@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Fixed: the first live daily-export run pushed and verified its export, then failed the prune,
+  and `make hub-data-export-setup` failed its self-test. The "legacy export" notice was sent
+  through `_err`, which exits in lib-foundation, so a warning stopped the prune; it is now a
+  warning. Setup's self-test listed Vault while `_vault_login`'s admin session was still set, and
+  that session's token is injected on stdin ahead of the list call's own token and path; setup now
+  drops the session before the self-test, so it runs exactly as the unattended export does. The
+  hub_data test harness stubbed `_err` without exiting, which hid both; it now exits like the real
+  one, and that surfaced two more of the same kind (restore's exit 2 for a missing context, and the
+  manifest check swallowing its caller's context message), both fixed.
 - Added: the hub data export now runs daily and unattended (launchd, 03:30 on the M4), which cuts
   the worst-case data loss from a week to about a day. It no longer generates a Vault root token
   from the Keychain unseal shards: it lists Vault with a list-only Kubernetes login

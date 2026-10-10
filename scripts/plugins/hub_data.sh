@@ -47,25 +47,29 @@ function _hub_data_encrypted_checksum() {
   done < <(find "$root" -type f \( -name '*.age' -o -name '*.age.part-*' -o -name 'pv-pvc.yaml' -o -name 'inventory.json' \) -print | sort)
 }
 
+# Prints and returns instead of exiting (lib-foundation's _err exits), so the caller can add context
+# (prune's "cannot verify kept export", the remote check's "did not verify").
+function _hub_data_verify_fail() { printf 'ERROR: %s\n' "$*" >&2; return 1; }
+
 function _hub_data_verify_export() {
   local dir="$1" stamp="${1##*/}" sum file rel actual key has_pv=0 has_inventory=0 legacy=0
   local -A manifest=() files=() age_seen=()
-  [[ -s "$dir/SHA256SUMS" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: SHA256SUMS"; return 1; }
+  [[ -s "$dir/SHA256SUMS" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: SHA256SUMS"; return 1; }
   while read -r sum rel; do
-    [[ "$sum" =~ ^[[:xdigit:]]{64}$ && -n "$rel" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: ${rel:-invalid SHA256SUMS line}"; return 1; }
-    [[ -z "${manifest[$rel]+x}" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    [[ "$sum" =~ ^[[:xdigit:]]{64}$ && -n "$rel" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: ${rel:-invalid SHA256SUMS line}"; return 1; }
+    [[ -z "${manifest[$rel]+x}" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
     manifest["$rel"]="$sum"
     [[ "$rel" == pv-pvc.yaml ]] && has_pv=1
     [[ "$rel" == inventory.json ]] && has_inventory=1
-    [[ -f "$dir/$rel" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    [[ -f "$dir/$rel" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
     if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$dir/$rel" | awk '{print $1}')"; else actual="$(shasum -a 256 "$dir/$rel" | awk '{print $1}')"; fi
-    [[ "$actual" == "$sum" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    [[ "$actual" == "$sum" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
   done < "$dir/SHA256SUMS"
   if (( has_pv == 0 && has_inventory == 0 )); then
     legacy=1
-    _err "[hub-data] export ${stamp} is a legacy export; pv-pvc.yaml and inventory.json are not covered by its manifest"
+    _warn "[hub-data] export ${stamp} is a legacy export; pv-pvc.yaml and inventory.json are not covered by its manifest"
   elif (( has_pv != has_inventory )); then
-    _err "[hub-data] export ${stamp} does not match its manifest: pv-pvc.yaml and inventory.json must be listed together"
+    _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: pv-pvc.yaml and inventory.json must be listed together"
     return 1
   fi
   while IFS= read -r file; do
@@ -74,7 +78,7 @@ function _hub_data_verify_export() {
   done < <(find "$dir" -type f ! -name SHA256SUMS -print)
   for rel in "${!manifest[@]}" "${!files[@]}"; do
     if (( legacy == 1 )) && [[ "$rel" == pv-pvc.yaml || "$rel" == inventory.json ]]; then continue; fi
-    [[ -n "${manifest[$rel]+x}" && -n "${files[$rel]+x}" ]] || { _err "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
+    [[ -n "${manifest[$rel]+x}" && -n "${files[$rel]+x}" ]] || { _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: $rel"; return 1; }
   done
   while IFS= read -r file; do
     if [[ "$file" == *.age ]]; then
@@ -86,7 +90,7 @@ function _hub_data_verify_export() {
       file="$(find "$dir" -name "$(basename "$key").part-*" -print | sort | head -1)"
     fi
     if [[ "$(head -n 1 "$file")" != age-encryption.org/v1* ]]; then
-      _err "[hub-data] export ${stamp} does not match its manifest: ${file#"$dir"/} is not an age file"
+      _hub_data_verify_fail "[hub-data] export ${stamp} does not match its manifest: ${file#"$dir"/} is not an age file"
       return 1
     fi
   done < <(find "$dir" -type f \( -name '*.age' -o -name '*.age.part-*' \) -print | sort)
@@ -213,11 +217,14 @@ function hub_data_export_setup() { (
   _kubectl -n secrets create sa hub-data-export --dry-run=client -o yaml | _kubectl apply -f -
   printf '%s\n' "$policy" | _no_trace _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- vault policy write hub-data-inventory -
   _vault_exec "$ns" 'vault write auth/kubernetes/role/hub-data-inventory bound_service_account_names=hub-data-export bound_service_account_namespaces=secrets policies=hub-data-inventory ttl=5m' "$release"
+  # The self-test must run as the unattended export does. _vault_login's admin session would be
+  # injected on stdin ahead of the list call's own token and path, so drop it first.
+  unset "_VAULT_SESSION_TOKENS[${ns}/${release}]"
   token="$(_hub_data_inventory_token "$ns" "$release")" || return 1
   cleanup=1
   _hub_data_revoke_setup_token() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
   trap '_hub_data_revoke_setup_token; rm -rf -- "$stage"' EXIT
-  listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || return 1
+  listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || { _err "[hub-data] Vault inventory self-test: vault kv list secret/ failed as hub-data-export"; return 1; }
   _hub_data_kv_names "$listing" >/dev/null || { _err "[hub-data] Vault inventory self-test returned no paths"; return 1; }
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 ) }
@@ -508,7 +515,7 @@ function _hub_data_copy_claim() {
 function hub_data_restore() { (
   local stage repo latest ns claim created=0
   if [[ -z "${DR_DRILL_CONTEXT:-}" || -z "${DR_DRILL_CLUSTER:-}" ]]; then
-    _err "[hub-data] DR_DRILL_CONTEXT and DR_DRILL_CLUSTER are required"
+    printf 'ERROR: %s\n' "[hub-data] DR_DRILL_CONTEXT and DR_DRILL_CLUSTER are required" >&2
     return 2
   fi
   if [[ -n "${DR_DRILL_RESTORE_STAGE:-}" ]]; then

@@ -126,7 +126,8 @@ YAML
 
 source_plugin() {
   export SCRIPT_DIR="$PWD/scripts"
-  _err() { printf '%s\n' "$*" >&2; }
+  # Like lib-foundation's _err, this exits: a warning sent through _err must fail a test here too.
+  _err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
   _warn() { printf '%s\n' "$*" >&2; }
   _no_trace() { "$@"; }
   source "$PLUGINS_DIR/hub_data.sh"
@@ -476,6 +477,9 @@ STUB
 
 @test "17 setup self-test passes and revokes its single token" {
   source_plugin; _vault_login() { :; }; _vault_exec() { :; }; _hub_data_vault_revoke() { printf 'token revoke -self\n' >> "$VLOG"; }; run hub_data_export_setup; [ "$status" -eq 0 ]; grep -q 'token revoke -self' "$VLOG"; [ "$(grep -c 'auth/kubernetes/login' "$VLOG")" -eq 1 ]
+  declare -gA _VAULT_SESSION_TOKENS=(); _vault_login() { _VAULT_SESSION_TOKENS[secrets/vault]=admin; }
+  _hub_data_vault_kv_list() { [[ -z "${_VAULT_SESSION_TOKENS[secrets/vault]:-}" ]] || { printf 'admin session still set\n' >&2; return 1; }; printf '["app/"]'; }
+  run hub_data_export_setup; [ "$status" -eq 0 ]
 }
 
 @test "18 lock semantics distinguish manual, scheduled, and delegated ownership" {
