@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.27.0`
 **Component:** `scripts/plugins/signing.sh`, `scripts/etc/signing/cluster-policy-verify-images.yaml.tmpl`
 **Status:** ROOT-CAUSED + fixed live (Audit) on the app cluster (hostinger). Template codified.
+**Priority:** P3 — fixed live (Audit) and codified
 
 ## Symptom
 

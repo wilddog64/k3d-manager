@@ -3,6 +3,7 @@
 **Filed:** 2026-08-25 (Claude, live-verified on hub `k3d-k3d-cluster`)
 **File:** `scripts/etc/argocd/platform-ops/app-cve-scan.sh` — `_git_persist_promotion()` (lines ~313-364)
 **Severity:** medium — every CVE promotion is **live-patch-only**; the fixed image pin is
+**Priority:** P3 — fixed and verified live (`915d1459`)
 never written back to git, so ArgoCD reverts it on the next sync from the source branch.
 
 ## Observed

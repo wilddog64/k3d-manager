@@ -3,6 +3,7 @@
 **Date:** 2026-06-25
 **Provider:** `k3s-hostinger`
 **Files:** `scripts/lib/providers/k3s-hostinger.sh`, `scripts/etc/argocd/projects/platform.yaml.tmpl`, `bin/k3dm-webhook`, `scripts/tests/lib/provider_contract.bats`
+**Priority:** P3 — status-report drift; no outage. Not re-verified since v1.8.0
 
 ## What failed
 

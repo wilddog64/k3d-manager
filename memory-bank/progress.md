@@ -1,3 +1,4 @@
+- 2026-10-10: [x] v1.43.0 bug-priority backfill: all 30 open/unknown bug docs carry a Priority (open: P1 1, P2 10, P3 27; unknown P3 5). [x] hub-dr-drill plan Status → DONE. Release left: 2026-10-11 export check, test-all, appsets reapply, release docs, PR.
 - 2026-10-10: v1.43.2 (bug-fix-only, parallel agents) specced: batch 1 = test-count floor, lib-foundation secret store, frontend Cache-Control; batch 2 = drill KEEP kubeconfig + set +u (after v1.43.1). [ ] cut branch after v1.43.1 merges; [ ] dispatch batch 1.
 - 2026-10-10: [x] v1.43.0 daily hub-data export live on the M4 (setup, manual export 20261010T194542Z verified, schedule 03:30). [ ] confirm first scheduled run 2026-10-11.
 - 2026-10-10: [x] v1.43.0 daily hub-data export LANDED 5c44b1c1; [ ] operator live setup on M4.

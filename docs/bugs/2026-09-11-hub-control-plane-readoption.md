@@ -1,6 +1,7 @@
 # Re-adopt the hub control-plane node under k3d
 
 **Status:** OBSOLETE — superseded by the 2026-10-03 hub rebuild (2026-10-09 status sweep)
+**Priority:** P3 — obsolete since the 2026-10-03 hub rebuild
 
 ## Problem
 

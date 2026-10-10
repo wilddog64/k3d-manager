@@ -3,6 +3,7 @@
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-14
 **Status:** IMPLEMENTED (Claude) — operator acceptance: `make restore-google-app-password`
+**Priority:** P3 — implemented; only operator acceptance remains
 **Files:** `Makefile`, `CHANGELOG.md`
 
 ## Problem

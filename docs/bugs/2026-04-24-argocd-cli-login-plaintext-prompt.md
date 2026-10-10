@@ -3,6 +3,7 @@
 **Date:** 2026-04-24
 **Branch:** `k3d-manager-v1.1.0`
 **Status:** COMPLETE (`fdbef8c4`) — implemented in `scripts/plugins/argocd.sh`
+**Priority:** P3 — fixed in `fdbef8c4`; no remaining urgency
 
 ## Problem
 

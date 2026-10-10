@@ -7,6 +7,7 @@ identity manifest change reaches the cluster, and `keycloak-realm-reconcile` has
 for 2d1h. Nothing is currently broken at runtime (`health: Healthy`), which is why it has gone
 unnoticed.
 **Status:** FIX LANDED in `shopping-cart-infra` `00d0d8a` (#101, "exempt bound PVCs from Replace=true so shopping-cart-identity can sync"), seen 2026-09-30 — live confirmation pending: Hermes `argocd` should stop reporting `shopping-cart-identity Healthy/OutOfSync`.
+**Priority:** P3 — fix landed in shopping-cart-infra `00d0d8a`
 
 ## Symptom
 

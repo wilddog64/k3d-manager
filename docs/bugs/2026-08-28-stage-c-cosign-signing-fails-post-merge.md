@@ -3,6 +3,7 @@
 **Filed:** 2026-08-28
 **Milestone:** v1.27.0 image-signing / CVE-loop closure (Stage C follow-up)
 **Status:** ✅ RESOLVED 2026-08-28 — all 5 image callers now sign; `cosign verify` passes on every one.
+**Priority:** P3 — resolved 2026-08-28
 **Severity:** high — all shopping-cart images are pushed to GHCR **unsigned**
 
 ## Resolution (2026-08-28)

@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.26.0`
 **Verified commit:** `b0fe320a` (Phase B impl) + `70940a01` (memory-bank)
 **Run context:** live ACG sandbox `851725327555`, `ACG_AGENT_COUNT=4` (1 server + 4 agents = 5 nodes = ACG cap)
+**Priority:** P3 — both findings fixed and re-verified live
 
 **STATUS 2026-08-21: BOTH FINDINGS FIXED + RE-VERIFIED LIVE.** Finding 1 fixed in
 `scripts/plugins/shopping_cart.sh`; Finding 2 fixed in `Makefile`. A fresh live

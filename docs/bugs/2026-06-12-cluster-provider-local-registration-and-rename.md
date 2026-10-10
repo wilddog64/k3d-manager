@@ -11,6 +11,7 @@ be consulted, and the prerequisite gate (`git grep 'k3s-aws…' -- scripts/lib/c
 can never be met by a subtree pull. The rename is done instead via the local-edit spec
 `docs/bugs/2026-06-12-rename-k3s-azure-to-k3s-az.md` (REINSTATED). The lib-foundation hook shipped
 separately as PR #30 (library improvement only). **Do NOT implement this file.**
+**Priority:** P3 — withdrawn; nothing to fix
 
 ---
 

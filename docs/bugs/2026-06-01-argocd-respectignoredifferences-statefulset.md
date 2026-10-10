@@ -3,6 +3,7 @@
 **Repo:** shopping-cart-infra
 **Branch:** docs/next-improvements
 **Status:** ignoreDifferences in place; RespectIgnoreDifferences missing
+**Priority:** P2 — selfHeal can revert the ignored StatefulSet fields; the workaround is a manual sync
 
 ## Context
 

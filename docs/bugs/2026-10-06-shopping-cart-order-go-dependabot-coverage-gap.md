@@ -4,6 +4,7 @@
 **Release:** v1.41.0
 **Branch:** `k3d-manager-v1.41.0`
 **Status:** Application coverage FIXED; live dependency/image remediation NOT VERIFIED
+**Priority:** P2 — coverage is fixed, but no one has verified the vulnerable dependency is gone from the deployed image
 **Component:** shopping-cart-order dependency updates / application CVE remediation chain
 **Severity:** high — vulnerable application dependency remains pinned despite image rebuilds
 

@@ -3,6 +3,7 @@
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
 **Status:** PR #98 MERGED 2026-09-16 as `af4b053d`. `enforce_admins` on shopping-cart-infra main RESTORED to true. Remaining: ArgoCD sync of `identity/keycloak/` and the PostSync reconcile hook run is outstanding (live verification, not yet confirmed; in progress).
+**Priority:** P3 — fix merged (`af4b053d`); only the ArgoCD sync confirmation remains
 **Live verification:** DONE 2026-09-30. The PostSync reconcile hook completed at shopping-cart-infra `e41f2ad` after #100, #101, #103, #104 and #105; see `2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md`.
 **Severity:** high — no one can log in to the `shopping-cart` realm through a browser: the frontend and ArgoCD SSO both fail.
 **Fix lands in:** `shopping-cart-infra` — `identity/keycloak/keycloak-reconcile-hook-job.yaml`

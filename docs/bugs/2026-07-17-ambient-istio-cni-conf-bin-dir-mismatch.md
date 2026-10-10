@@ -2,6 +2,7 @@
 
 **Branch:** `k3d-manager-v1.16.0`
 **Files:** `scripts/etc/argocd/applicationsets/istio-ambient.yaml`
+**Priority:** P3 — the live hub was fixed 2026-09-13; only the code default remains
 
 ---
 

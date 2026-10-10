@@ -60,6 +60,13 @@
 
 - 2026-10-09: P3 staged appsets-reapply output FIXED `40bd1278` (landed with `land --test` on the argocd suites). Preamble runs once via `_argocd_prepare_applicationsets`; stage lines name the stage; owner-scoped success line names the ApplicationSets. Claude added: an unknown stage refuses before labelling. Metrics task still running (waiter by9y09uhj).
 
+## 2026-10-10 — v1.43.0 release prep: priority backfill + drill plan status
+
+- Every bug doc that `doc_meta` counts as open or unknown now has `**Priority:**` (30 added; `2026-08-14-k3s-aws-ssm-agent-cannot-register` had an invalid `P4` → `P3`). Open tally: P1 1, P2 10, P3 27; unknown P3 5.
+- Classifier gap found, not fixed: about 17 "open" docs are done in prose (COMPLETE, WITHDRAWN, OBSOLETE, IMPLEMENTED, `✅ RESOLVED`, a status heading) but `_CLOSED_RE` in `scripts/lib/hermes/prior_art.py` only matches a leading FIXED/CLOSED/RESOLVED/DONE/…; candidate v1.43.2 bug.
+- `docs/plans/v1.43.0-hub-dr-drill.md` Status → DONE `5412b0b7`.
+- Remaining before the v1.43.0 PR: confirm the first scheduled export (2026-10-11 03:30), operator `make test-all` + Hermes restart + `make appsets-reapply`/`appsets-check`, Bugs dashboard check, CHANGELOG/README/releases rows.
+
 ## 2026-10-10 — v1.43.2 bug-fix batches specced (parallel agents)
 
 Operator asked whether multiple agents can work a dozen bugs in an x.y.N release. Yes: dispatcher worktree per slug, `land` lock serialises merges; limit ~3–4 concurrent, no shared files per batch, live work serial. Triage found 13 open items; 6 actionable.
