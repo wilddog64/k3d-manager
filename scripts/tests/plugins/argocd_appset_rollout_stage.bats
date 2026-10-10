@@ -39,8 +39,10 @@ EOF
   printf '%s\n' 'kind: ApplicationSet' 'metadata:' '  name: app-cluster-set' '  labels:' '    k3dm.k3d.io/rollout-stage: app-cluster' > "${ARGOCD_CONFIG_DIR}/applicationsets/01-app.yaml"
   printf '%s\n' 'kind: ApplicationSet' 'metadata:' '  name: hub-set' '  labels:' '    k3dm.k3d.io/rollout-stage: hub' > "${ARGOCD_CONFIG_DIR}/applicationsets/02-hub.yaml"
   events="${BATS_TEST_TMPDIR}/events"
+  prepares="${BATS_TEST_TMPDIR}/prepares"
   : > "$events"
-  _argocd_set_active_app_cluster() { :; }
+  : > "$prepares"
+  _argocd_set_active_app_cluster() { printf x >> "$prepares"; }
   _argocd_appset_live_overrides() { :; }
   _kubectl() {
     if [[ "$1" == apply ]]; then
@@ -50,11 +52,38 @@ EOF
     fi
     return 0
   }
-  export events
+  export events prepares
   export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
   K3DM_APPSETS_STAGE=all ARGOCD_CONFIG_DIR="$ARGOCD_CONFIG_DIR" run deploy_argocd_applicationsets --no-verify
   [ "$status" -eq 0 ]
   [[ "$(cat "$events")" == $'APPLY:hub-set\nAPPLY:app-cluster-set' ]]
+  [ "$(wc -c < "$prepares")" -eq 1 ]
+  [ "$(grep -c 'Preparing ApplicationSets' <<< "$output")" -eq 1 ]
+}
+
+@test "appset rollout stage: direct deploy prepares when no stage is supplied" {
+  _stage_config
+  applies="${BATS_TEST_TMPDIR}/applies"
+  prepares="${BATS_TEST_TMPDIR}/prepares"
+  : > "$applies"
+  : > "$prepares"
+  _argocd_set_active_app_cluster() { printf x >> "$prepares"; }
+  _argocd_appset_live_overrides() { :; }
+  _kubectl() {
+    if [[ "$1" == apply ]]; then
+      sed -n 's/^  name: /APPLY:/p' >> "$applies"
+    fi
+    return 0
+  }
+  export applies prepares
+  export -f _argocd_set_active_app_cluster _argocd_appset_live_overrides _kubectl
+
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [ "$(wc -c < "$prepares")" -eq 1 ]
+  [ "$(grep -c '^APPLY:' "$applies")" -eq 2 ]
+  grep -qx 'APPLY:hub-set' <(cat "$applies")
+  grep -qx 'APPLY:app-set' <(cat "$applies")
 }
 
 @test "appset rollout stage: failed hub confirmation prevents app-cluster apply" {
@@ -175,4 +204,17 @@ EOF
   [ "$status" -ne 0 ]
   [[ "$output" == *"no ApplicationSet manifests carry rollout stage app-cluster"* ]]
   [ ! -s "$checks" ]
+}
+
+@test "appset rollout stage: an unknown stage refuses before preparing" {
+  _stage_config
+  prepares="${BATS_TEST_TMPDIR}/prepares"
+  : > "$prepares"
+  _argocd_set_active_app_cluster() { printf x >> "$prepares"; }
+  export prepares
+  export -f _argocd_set_active_app_cluster
+  K3DM_APPSETS_STAGE=bogus run deploy_argocd_applicationsets --no-verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"must be hub or all"* ]]
+  [ ! -s "$prepares" ]
 }

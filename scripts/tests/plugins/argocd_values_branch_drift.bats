@@ -54,6 +54,18 @@ EOF
   [[ "${output}" == *"All Applications reference values branch k3d-manager-v1.18.0"* ]]
 }
 
+@test "argocd values branch: owners are included in the success scope" {
+  _kubectl() {
+    cat <<'EOF'
+{"items":[{"metadata":{"name":"hub-app","ownerReferences":[{"kind":"ApplicationSet","name":"hub-set"}]},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"k3d-manager-v1.18.0"}]}}]}
+EOF
+  }
+
+  run argocd_check_values_branch k3d-manager-v1.18.0 k3d-k3d-cluster hub-set
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"All Applications of ApplicationSets hub-set reference values branch k3d-manager-v1.18.0"* ]]
+}
+
 @test "argocd values branch: returns 2 instead of a false green when Applications cannot be read" {
   _kubectl() { return 1; }
 

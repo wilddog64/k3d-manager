@@ -1284,8 +1284,8 @@ function _argocd_appset_stage_names() {
 }
 
 function _argocd_apply_and_confirm_appset_stage() {
-   local stage="$1" verify="$2"
-   _argocd_deploy_applicationsets "$stage" || return 1
+   local stage="$1" verify="$2" prepared="${3:-}"
+   _argocd_deploy_applicationsets "$stage" "$prepared" || return 1
    if (( verify )) && declare -f argocd_check_values_branch >/dev/null 2>&1; then
       if _dry_run_active; then
          _info "[argocd] DRY_RUN: skipping the values-branch confirmation for ${stage}"
@@ -1293,6 +1293,28 @@ function _argocd_apply_and_confirm_appset_stage() {
          _argocd_confirm_applicationset_stage "$stage" || return 1
       fi
    fi
+}
+
+function _argocd_prepare_applicationsets() {
+   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+   export K3D_MANAGER_BRANCH
+
+   local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
+   if [[ ! -d "$appsets_dir" ]]; then
+      _err "[argocd] ApplicationSets directory not found: $appsets_dir"
+      return 1
+   fi
+   _argocd_validate_appset_rollout_stages "$appsets_dir" || return 1
+
+   local _active_app_cluster=""
+   if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
+      _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
+   fi
+   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_active_app_cluster:-ubuntu-k3s}}"
+   export APP_CLUSTER_NAME
+   _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
+   _argocd_set_active_app_cluster "${_active_app_cluster}"
+   _info "[argocd] Preparing ApplicationSets (branch ${K3D_MANAGER_BRANCH}, app-cluster ${APP_CLUSTER_NAME})"
 }
 
 function deploy_argocd_applicationsets() {
@@ -1346,20 +1368,21 @@ EOF
    esac
 
    local rollout_stage="${K3DM_APPSETS_STAGE:-all}"
+   if [[ "$rollout_stage" != hub && "$rollout_stage" != all ]]; then
+      _err "[argocd] K3DM_APPSETS_STAGE must be hub or all (got: $rollout_stage)"
+      return 1
+   fi
+   _argocd_prepare_applicationsets || return 1
    case "$rollout_stage" in
       hub)
-         _argocd_apply_and_confirm_appset_stage hub "$verify"
+         _argocd_apply_and_confirm_appset_stage hub "$verify" prepared
          ;;
       all)
-         _argocd_apply_and_confirm_appset_stage hub "$verify" || {
+         _argocd_apply_and_confirm_appset_stage hub "$verify" prepared || {
             _err "[argocd] hub stage failed — app-cluster ApplicationSets NOT applied"
             return 1
          }
-         _argocd_apply_and_confirm_appset_stage app-cluster "$verify"
-         ;;
-      *)
-         _err "[argocd] K3DM_APPSETS_STAGE must be hub or all (got: $rollout_stage)"
-         return 1
+         _argocd_apply_and_confirm_appset_stage app-cluster "$verify" prepared
          ;;
    esac
 }
@@ -1432,26 +1455,13 @@ function _argocd_appset_live_overrides() {
 }
 
 function _argocd_deploy_applicationsets() {
-   _info "[argocd] Deploying sample ApplicationSets"
-
-   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-   export K3D_MANAGER_BRANCH
+   local stage="${1:-all}" prepared="${2:-}"
+   if [[ "$prepared" != prepared ]]; then
+      _argocd_prepare_applicationsets || return 1
+   fi
 
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
-   if [[ ! -d "$appsets_dir" ]]; then
-      _err "[argocd] ApplicationSets directory not found: $appsets_dir"
-      return 1
-   fi
-   _argocd_validate_appset_rollout_stages "$appsets_dir" || return 1
-
-   local _active_app_cluster=""
-   if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
-      _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
-   fi
-   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_active_app_cluster:-ubuntu-k3s}}"
-   export APP_CLUSTER_NAME
-   _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
-   _argocd_set_active_app_cluster "${_active_app_cluster}"
+   _info "[argocd] Deploying ${stage} ApplicationSets"
 
    # Find all ApplicationSet YAML files
    local -a appset_files=()
@@ -1464,15 +1474,23 @@ function _argocd_deploy_applicationsets() {
       return 0
    fi
 
-   _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
+   local selected_count=0
+   for file in "${appset_files[@]}"; do
+      _argocd_appset_in_stage "$file" "$stage" || continue
+      selected_count=$((selected_count + 1))
+   done
+   if [[ "$stage" == all ]]; then
+      _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
+   else
+      _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s), ${selected_count} in stage ${stage}"
+   fi
 
    # Deploy each ApplicationSet in the requested rollout stage.
-   local stage="${1:-all}" deployed_count=0 failed_count=0 selected_count=0 _line
+   local deployed_count=0 failed_count=0 _line
    for file in "${appset_files[@]}"; do
       local filename
       filename=$(basename "$file")
       _argocd_appset_in_stage "$file" "$stage" || continue
-      selected_count=$((selected_count + 1))
       _info "[argocd] Deploying ApplicationSet: $filename"
 
       local _vars _v _name _unset=""
@@ -1917,7 +1935,11 @@ function argocd_check_values_branch() {
    esac
 
    if [[ -z "${_drift}" ]]; then
-      _info "[argocd] All Applications reference values branch ${_expected}"
+      if [[ -n "${_owners}" ]]; then
+         _info "[argocd] All Applications of ApplicationSets ${_owners} reference values branch ${_expected}"
+      else
+         _info "[argocd] All Applications reference values branch ${_expected}"
+      fi
       return 0
    fi
 
