@@ -21,6 +21,9 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: the DR drill's unseal failed with no message when the M2 Keychain had no shard count, a
+  count that was not a number, or a missing shard. Each case now prints which Keychain item is
+  wrong (never its value), and a rejected shard names the unseal step.
 - Fixed: the DR drill unsealed the restored Vault the moment the restore scaled it back up. The new
   `vault-0` was still pulling its image (55 s on a node that had not run it), so the exec failed and
   the drill reported `failed: unseal` with no reason, although the restored Vault was fine

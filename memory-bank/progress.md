@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 11: unseal sent no shard (M2 Keychain read). Unseal now reports why. Operator to check M2 shard items + rerun.
 - 2026-10-10: Drill run 10 passed restore + V0; failed unseal (vault-0 still pulling). Added wait. Rerun pending.
 - 2026-10-10: Drill run 9 passed Phase 2; failed Phase 3 (no postgres-keycloak in drill). Fixed with a drill-own postgres manifest. Rerun pending.
 - 2026-10-10: Drill run 8 got past Vault; failed LDAP (egress blocked ESO->Vault). Fixed egress-deny intra-namespace allow. Rerun pending.

@@ -191,11 +191,23 @@ _dr_drill_wait_vault() {
 _dr_drill_unseal() {
   local count shard idx
   _dr_drill_wait_vault || return 1
-  count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"
-  [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 1
+  if ! count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"; then
+    printf '[dr-drill] no DR shard count in Keychain service k3dm-vault-unseal-dr (account secrets/vault:count) on this Mac, or it is empty; repeat the shard import\n' >&2
+    return 1
+  fi
+  if [[ ! "$count" =~ ^[1-9][0-9]*$ ]]; then
+    printf '[dr-drill] the DR shard count in Keychain (secrets/vault:count) is not a positive number; repeat the shard import\n' >&2
+    return 1
+  fi
   for ((idx=1; idx<=count; idx++)); do
-    shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"
-    printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s\n" "$SHARD" | vault operator unseal -' >/dev/null || return 1
+    if ! shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; then
+      printf '[dr-drill] DR shard %s of %s is missing or empty in Keychain; repeat the shard import\n' "$idx" "$count" >&2
+      return 1
+    fi
+    if ! printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s\n" "$SHARD" | vault operator unseal -' >/dev/null; then
+      printf '[dr-drill] vault operator unseal failed for shard %s of %s\n' "$idx" "$count" >&2
+      return 1
+    fi
   done
 }
 

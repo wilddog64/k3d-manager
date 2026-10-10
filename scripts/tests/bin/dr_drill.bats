@@ -65,16 +65,18 @@ cat > "$STUB_BIN/security" <<'STUB'
 #!/usr/bin/env bash
 { printf 'security'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 case "$*" in
-  *'secrets/vault:count'*) printf '1' ;;
+  *'secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
   *'secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
+  *'secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
   *) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
 esac
 STUB
   cat > "$STUB_BIN/secret-tool" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
-  *'name secrets/vault:count'*) printf 1 ;;
+  *'name secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
   *'name secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
+  *'name secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
   *) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
 esac
 STUB
@@ -212,6 +214,34 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   [[ "$output" == *"vault-0 is not Running after 1s (phase: Pending)"* ]]
   [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"; [ "$(jq -r .failed "$result")" = unseal ]
+}
+
+@test "dr drill: an empty Keychain shard count fails unseal and says so" {
+  export DR_TEST_SHARD_COUNT=
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"no DR shard count in Keychain service k3dm-vault-unseal-dr"* ]]
+  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: a non-numeric shard count fails unseal and says so" {
+  export DR_TEST_SHARD_COUNT=abc
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"is not a positive number"* ]]
+  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: a missing shard is named without printing any shard" {
+  export DR_TEST_SHARD_COUNT=2 DR_TEST_SHARD_MISSING=1
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"DR shard 2 of 2 is missing or empty"* ]]
+  [[ "$output" != *SHARD-SENTINEL* ]]
+}
+
+@test "dr drill: a rejected shard names the unseal step" {
+  export DR_TEST_UNSEAL_FAIL=1
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"vault operator unseal failed for shard 1 of 1"* ]]
+  [[ "$output" != *SHARD-SENTINEL* ]]
 }
 
 @test "dr drill: unseal shard is executed through stdin only" {
