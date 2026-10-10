@@ -242,3 +242,17 @@ STUB
   [ "$status" -eq 2 ]
   [[ "$output" == *"Docker free disk is below 10 GB"* ]]
 }
+
+@test "dr drill: a failed clone of the data repo says so" {
+  cat > "$STUB_BIN/git" <<'STUB'
+#!/usr/bin/env bash
+printf 'git'; printf ' %q' "$@"; printf '\n' >> "$PHASE_LOG"
+[[ "$1" == clone ]] && exit 128
+exit 0
+STUB
+  chmod +x "$STUB_BIN/git"
+  run_drill
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"cannot clone the snapshots branch"* ]]
+  [[ "$output" != *"older than 26h"* ]]
+}

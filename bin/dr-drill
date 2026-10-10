@@ -98,7 +98,9 @@ _dr_drill_export_age_seconds() {
 _dr_drill_latest_export() {
   local stage="$1" repo latest
   repo="${stage}/preflight-repo"
-  git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo" >/dev/null 2>&1
+  if ! git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo" >/dev/null 2>&1; then
+    _dr_drill_refuse "[dr-drill] cannot clone the snapshots branch of ${K3DM_HUB_DATA_REPO}; check: git ls-remote ${K3DM_HUB_DATA_REPO}"
+  fi
   latest="$(_hub_data_latest_export_dir "$repo")"
   [[ -n "$latest" ]] || return 1
   _dr_drill_export_ts="$(basename "$latest")"
