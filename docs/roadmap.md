@@ -321,6 +321,25 @@ Initial action contracts (each precondition is drawn from an incident on this pl
 | v2.3 | Execution of allowlisted reversible actions, with retest and audit |
 | v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
 
+### Engineering-contract gaps (assessed 2026-10-10)
+
+The platform's working model rests on three principles. Each was assessed against the repo as it
+stands; the scores are judgement, not measurement.
+
+| Principle | Today | Main gap |
+|---|---|---|
+| Intent as an engineering contract | ~80%: every change is a spec with files, exact commit message, Definition of Done, "What NOT to do", stubbed and mutation tests, live acceptance | Operational requirements (resource budget, capacity, rollback) are rarely stated; required sections are checked by review, not by tooling |
+| Verification as the release authority | ~65%, ~80% after v1.47.0: agents' claims are re-verified; CI, CodeQL, ggshield, Copilot, nightly suite, e2e, DR drill | Infra changes reach the hub untested (v1.47.0); the PR gate is a followed checklist, not enforced; the evidence behind a release decision is not kept |
+| Common operational interfaces | ~40%: Slack, cloud bridge and Hermes enter through the webhook's action allowlist and roles | The CLI and local agents bypass it; the cloud bridge does not yet authenticate submitters |
+
+Next steps, smallest first:
+
+| Step | Lands in | Scope |
+|---|---|---|
+| Operational requirements in every spec | next spec written (doc change, no spec of its own) | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
+| Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
+| One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
