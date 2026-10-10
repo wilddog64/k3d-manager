@@ -356,6 +356,40 @@ class TestEmbeddingCache:
         assert calls and len(calls) == 1 and len(calls[0]) == 1
         assert "1 remaining" in capsys.readouterr().out
 
+    @pytest.mark.parametrize("args", [["--limit", "5"], []])
+    def test_prunes_stale_paths_with_or_without_limit(self, monkeypatch, args):
+        current = _doc("current")
+        stale = "docs/bugs/old.md"
+        writes = []
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: [current])
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {current[0]: current[3], stale: "old-hash"})
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("must not embed"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "pruned=1 indexed=1")
+        monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
+
+        assert ix.main(args) == 0
+        assert len(writes) == 1
+        assert stale not in writes[0]
+
+    def test_refuses_to_prune_too_many_stale_paths(self, monkeypatch, capsys):
+        docs = [_doc(f"current-{index}") for index in range(70)]
+        existing = {doc[0]: doc[3] for doc in docs}
+        existing.update({f"docs/bugs/stale-{index}.md": "old-hash" for index in range(30)})
+        writes = []
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: existing)
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("must not embed"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "")
+
+        assert ix.main([]) == 1
+        assert writes == []
+        assert capsys.readouterr().err == (
+            "index-docs: refusing to prune 30 of 100 stored docs; "
+            "run make index-docs DRY_RUN=1 to review\n"
+        )
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__]))

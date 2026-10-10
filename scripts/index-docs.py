@@ -238,8 +238,14 @@ def main(argv=None):
         return 1
 
     present = [doc[0] for doc in docs]
-    if args.limit > 0 and stale:
-        present = sorted(set(present) | set(existing))
+    prune_limit = max(20, len(existing) // 20)
+    if len(stale) > prune_limit:
+        print(
+            f"index-docs: refusing to prune {len(stale)} of {len(existing)} stored docs; "
+            "run make index-docs DRY_RUN=1 to review",
+            file=sys.stderr,
+        )
+        return 1
     try:
         summary = run_sql(_prune_script(present))
     except RetrievalUnavailable as exc:

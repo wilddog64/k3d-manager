@@ -375,6 +375,30 @@ def test_refresh_index_unchanged_full_store_stays_noop(monkeypatch):
     assert commands[-1]["result"] == "noop"
 
 
+def test_refresh_index_unchanged_store_with_extra_rows_reindexes(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 1948, "corpus_docs": 1947}), stderr="")
+        if "index-docs.py" in command[0]:
+            return SimpleNamespace(returncode=0, stdout=(
+                "index-docs: 1947 docs, 0 written (0 from cache, 0 embedded), "
+                "1 pruned, 1947 in store, 0 remaining\n"), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    k3dm_hermes._refresh_index({"index_fingerprint": "same"}, now=1000)
+    assert any("index-docs.py" in item[0] for item in commands if isinstance(item, list))
+    assert commands[-1]["result"] == "success"
+    assert "store has 1948 rows for 1947 corpus docs" in capsys.readouterr().err
+
+
 def test_refresh_index_unchanged_status_failure_stays_noop(monkeypatch):
     commands = []
     monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))

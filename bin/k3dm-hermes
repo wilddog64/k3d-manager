@@ -565,10 +565,10 @@ def _refresh_index(state, now=None):
             rows = payload.get("rows")
             corpus_docs = payload.get("corpus_docs")
             if (payload.get("available") is True and type(rows) is int and
-                    type(corpus_docs) is int and rows < corpus_docs):
+                    type(corpus_docs) is int and rows != corpus_docs):
                 state.pop("index_fingerprint", None)
                 print(
-                    f"vectordb index: store has {rows} of {corpus_docs} docs; "
+                    f"vectordb index: store has {rows} rows for {corpus_docs} corpus docs; "
                     "re-indexing despite unchanged corpus",
                     file=sys.stderr,
                 )
