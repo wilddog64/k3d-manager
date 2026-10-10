@@ -27,6 +27,9 @@
   exceeded") after Vault had initialised, and the keys were lost. `bin/hub-up` now adds a
   `dr-allow-apiserver-egress` policy in each drill namespace: TCP to the cluster's `kubernetes`
   endpoint only, as a /32. The internet stays blocked, and V0 still checks that.
+  The same policy also blocked traffic between drill pods, so ESO could not log in to Vault and the
+  LDAP step timed out waiting for `openldap-admin`. Egress to pods in the `secrets` and `identity`
+  namespaces is now allowed.
 - Fixed: the DR drill tests pinned their export to 2026-10-09T12:00Z and began failing the 26 h
   freshness check on 2026-10-10 at 14:00Z; the fixture now uses the current time.
 

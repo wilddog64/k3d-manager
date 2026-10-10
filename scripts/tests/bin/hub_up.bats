@@ -187,3 +187,13 @@ teardown() {
   [[ "$output" == *"cannot read the drill API server endpoint"* ]]
   [ "$(grep -c 'dispatcher deploy_vault' "$CALL_LOG" || true)" -eq 0 ]
 }
+
+@test "DR egress policy allows only DNS and the two drill namespaces" {
+  policy="${BATS_TEST_DIRNAME}/../../etc/dr/egress-deny.yaml"
+  [ "$(grep -c 'ipBlock' "$policy" || true)" -eq 0 ]
+  [ "$(grep -o 'kubernetes.io/metadata.name: [a-z-]*' "$policy" | sort -u | tr '\n' ' ')" = "kubernetes.io/metadata.name: identity kubernetes.io/metadata.name: kube-system kubernetes.io/metadata.name: secrets " ]
+  for ns in secrets identity kube-system; do
+    [ "$(grep -c "kubernetes.io/metadata.name: ${ns}}" "$policy")" -eq 2 ]
+  done
+  [ "$(grep -c 'k8s-app: kube-dns' "$policy")" -eq 2 ]
+}
