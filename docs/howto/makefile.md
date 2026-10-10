@@ -31,6 +31,12 @@ check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 
 ## Hub snapshots
 
+| `make vault-dr-shards-save` | `scripts/k3d-manager vault_dr_shards_save` | Save durable Vault DR shards in Keychain. |
+| `make vault-dr-shards-export` / `make vault-dr-shards-import` | Vault DR shard functions | One-time operator-mediated M4→M2 shard transfer over stdin. |
+| `make hub-data-export` | `scripts/k3d-manager hub_data_export` | Create the age-encrypted weekly claim export. |
+| `make dr-drill` | `bin/dr-drill` | Restore and verify the newest export on the M2. |
+| `make dr-drill-publish` | `bin/dr-drill-publish` | Publish the M2 result and metrics from the M4. |
+
 `make snapshot` captures the cold hub state and transfers it to
 `${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}`, where a
 relative default resolves against the remote login home. Do not set

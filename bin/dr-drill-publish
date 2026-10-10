@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RESULTS_REPO="${K3DM_HUB_DATA_REPO:-git@github-k3dm-hub-data:wilddog64/k3dm-hub-data.git}"
+DR_DRILL_HOST="${K3DM_DR_DRILL_HOST:-m2jump}"
+PUSHGATEWAY_URL="${K3DM_DR_DRILL_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-dr-drill}"
+stage="$(mktemp -d "${TMPDIR:-/tmp}/k3dm-dr-drill-publish.XXXXXX")"
+chmod 700 "$stage"
+_publish_cleanup() { rm -rf -- "$stage"; }
+trap _publish_cleanup EXIT
+
+remote_file="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$DR_DRILL_HOST" 'find ~/.k3dm/dr-drill -type f -name "*.json" -print | sort -r | head -1')"
+[[ -n "$remote_file" ]] || { echo '[dr-drill-publish] M2 has no result JSON' >&2; exit 1; }
+remote_name="${remote_file##*/}"
+remote_prefix="$(printf '~')/.k3dm/dr-drill/"
+[[ "$remote_file" == "$remote_prefix"* && "$remote_name" =~ ^[0-9]{8}T[0-9]{6}Z\.json$ ]] || { echo '[dr-drill-publish] refusing unexpected M2 result path' >&2; exit 1; }
+result="${stage}/result.json"
+ssh -o BatchMode=yes -o ConnectTimeout=10 "$DR_DRILL_HOST" cat -- "$remote_file" > "$result"
+jq -e '(.run_timestamp|type == "string" and test("^[0-9]{8}T[0-9]{6}Z$")) and (.success|type == "boolean") and (.rto_seconds|type == "number") and (.rpo_seconds|type == "number") and (.checks|type == "object")' "$result" >/dev/null || { echo '[dr-drill-publish] invalid result schema' >&2; exit 1; }
+stamp="$(jq -r .run_timestamp "$result")"
+repo="${stage}/repo"
+git clone --depth 1 --branch results "$RESULTS_REPO" "$repo"
+[[ ! -e "$repo/results/${stamp}.json" ]] || { echo "[dr-drill-publish] result already exists: ${stamp}" >&2; exit 1; }
+mkdir -p "$repo/results"
+cp "$result" "$repo/results/${stamp}.json"
+(cd "$repo" && git add "results/${stamp}.json" && git commit -m "drill: ${stamp}" && git push origin results)
+
+metrics="${stage}/metrics.txt"
+stamp_epoch="$(python3 -c 'import datetime,sys; print(int(datetime.datetime.strptime(sys.argv[1], "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc).timestamp()))' "$stamp")"
+{
+  printf 'k3dm_dr_drill_last_run_timestamp_seconds %s\n' "$stamp_epoch"
+  jq -r '"k3dm_dr_drill_success " + ((.success|if . then 1 else 0 end)|tostring), "k3dm_dr_drill_rto_seconds " + (.rto_seconds|tostring), "k3dm_dr_drill_rpo_seconds " + (.rpo_seconds|tostring), (.checks | to_entries[] | "k3dm_dr_drill_check_ok{check=\"" + .key + "\"} " + ((.value|if . then 1 else 0 end)|tostring))' "$result"
+} > "$metrics"
+if ! curl --fail --silent --show-error --data-binary "@${metrics}" "$PUSHGATEWAY_URL" >/dev/null; then
+  echo '[dr-drill-publish] result committed, but Pushgateway metrics push failed' >&2
+  exit 1
+fi

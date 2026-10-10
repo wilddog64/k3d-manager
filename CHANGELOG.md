@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added the attended weekly hub disaster-recovery drill: durable Vault shards,
+  encrypted claim exports, isolated M2 restore, result publishing, freshness
+  checks, and DR alerts.
+
 ## [1.42.0] - 2026-10-09
 
 ### Added

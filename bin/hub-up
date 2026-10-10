@@ -43,10 +43,16 @@ fi
 _info "[hub-up] Step 2/5 — waiting for Hub API"
 _api_ready=0
 for _attempt in $(seq 1 12); do
-  if kubectl get nodes --context "${_hub_context}" --request-timeout=10s >/dev/null 2>&1; then
+  if [[ "${DR_DRILL_MODE:-0}" == "1" ]]; then
+    if kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" get nodes --request-timeout=10s >/dev/null 2>&1; then
+      _api_ready=1
+      break
+    fi
+  elif kubectl get nodes --context "${_hub_context}" --request-timeout=10s >/dev/null 2>&1; then
     _api_ready=1
     break
   fi
+  if [[ "${_api_ready}" -eq 1 ]]; then break; fi
   _info "[hub-up] waiting for Hub API (${_attempt}/12)"
   sleep 5
 done
@@ -54,13 +60,27 @@ if [[ "${_api_ready}" -ne 1 ]]; then
   _err "[hub-up] Step 2/5 failed: Hub API did not become ready"
 fi
 
-_current_context="$(kubectl config current-context 2>/dev/null || true)"
+if [[ "${DR_DRILL_MODE:-0}" == "1" ]]; then
+  kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" create namespace secrets --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" apply -f - >/dev/null
+  kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" create namespace identity --dry-run=client -o yaml | kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" apply -f - >/dev/null
+  _current_context="$(kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" config current-context 2>/dev/null || true)"
+else
+  _current_context="$(kubectl config current-context 2>/dev/null || true)"
+fi
 if [[ "${_current_context}" != "${_hub_context}" ]]; then
   _err "[hub-up] current kube context is '${_current_context}', not '${_hub_context}' — run: kubectl config use-context ${_hub_context}"
 fi
 
+if [[ "${DR_DRILL_MODE:-0}" == "1" ]]; then
+  _info "[hub-up] applying DR egress policy before drill workloads"
+  kubectl --kubeconfig "${KUBECONFIG}" --context "${_hub_context}" apply -f "${REPO_ROOT}/scripts/etc/dr/egress-deny.yaml"
+fi
 _hub_dispatch 3 "deploying Vault" deploy_vault --confirm
 _hub_dispatch 4 "deploying LDAP" deploy_ldap --confirm
+if [[ "${DR_DRILL_MODE:-0}" == "1" ]]; then
+  _info "[hub-up] DR drill mode — stopping before ArgoCD"
+  exit 0
+fi
 _hub_dispatch 5 "deploying ArgoCD" deploy_argocd --confirm
 
 _info "[hub-up] local Hub rebuild complete"

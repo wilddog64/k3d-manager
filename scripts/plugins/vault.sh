@@ -385,6 +385,69 @@ function _vault_cache_unseal_from_secret() {
    return 0
 }
 
+# Durable DR copy.  Unlike the normal unseal cache this service is never
+# cleared after an unseal.
+function vault_dr_shards_save() {
+   local ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}}" release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   local -a shards=()
+   local cluster="${ns}/${release}" old_count old_shard index differs=0
+   mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$ns") || {
+      _warn "[vault] vault-unseal secret not found in ${ns}"; return 1
+   }
+   (( ${#shards[@]} > 0 )) || { _warn "[vault] vault-unseal has no shards"; return 1; }
+   old_count="$(_secret_load_data k3dm-vault-unseal-dr "${cluster}:count" vault-unseal-dr 2>/dev/null || true)"
+   if [[ "$old_count" =~ ^[1-9][0-9]*$ && "$old_count" != "${#shards[@]}" ]]; then
+      differs=1
+   elif [[ "$old_count" =~ ^[1-9][0-9]*$ ]]; then
+      for ((index=1; index<=old_count; index++)); do
+         old_shard="$(_secret_load_data k3dm-vault-unseal-dr "${cluster}:shard${index}" vault-unseal-dr 2>/dev/null || true)"
+         [[ "$old_shard" == "${shards[index-1]}" ]] || differs=1
+      done
+   fi
+   if (( differs == 1 )); then
+      _warn "[vault] replacing older DR shards; older exports need the old shards — run make hub-data-export now"
+   fi
+   _vault_dr_store_shards "$cluster" "${shards[@]}"
+}
+
+function _vault_dr_store_shards() {
+   local cluster="$1" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count=0 shard
+   shift
+   for shard in "$@"; do
+      [[ -n "$shard" ]] || continue
+      count=$((count + 1))
+      _secret_store_data "$service" "${cluster}:shard${count}" "$shard" "DR Vault unseal shard ${count}" "$type" || return 1
+   done
+   _secret_store_data "$service" "${cluster}:count" "$count" "DR Vault unseal shard count" "$type"
+}
+
+function vault_dr_shards_export() {
+   if [[ "${VAULT_DR_SHARDS_TEST_TTY:-0}" == 1 || -t 1 ]]; then
+      echo '[vault] refusing to print DR shards to a terminal; pipe the export' >&2
+      return 2
+   fi
+   local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count shard i
+   count="$(_secret_load_data "$service" "${cluster}:count" "$type")" || return 1
+   printf '%s\n' "$count"
+   for ((i=1; i<=count; i++)); do
+      shard="$(_secret_load_data "$service" "${cluster}:shard${i}" "$type")" || return 1
+      printf '%s\n' "$shard"
+   done
+}
+
+function vault_dr_shards_import() {
+   local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" count shard i=0
+   IFS= read -r count || return 1
+   [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 1
+   local -a shards=()
+   while IFS= read -r shard && (( i < count )); do
+      shards+=("$shard")
+      i=$((i + 1))
+   done
+   (( i == count )) || return 1
+   _vault_dr_store_shards "$cluster" "${shards[@]}"
+}
+
 function _vault_parse_sealed_from_status() {
    local status="${1:-}"
    local sealed=""
@@ -1560,6 +1623,10 @@ function _vault_process_init_artifacts() {
    done
    _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
    _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
+   if [[ "${DR_DRILL_MODE:-0}" != 1 ]]; then
+      vault_dr_shards_save "$ns" "$release" >/dev/null ||
+         _warn "[vault] unable to save durable DR unseal shards"
+   fi
 
   _vault_cache_unseal_keys "$ns" "$release" "${unseal_keys[@]}"
 

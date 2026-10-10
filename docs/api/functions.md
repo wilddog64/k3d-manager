@@ -1,5 +1,11 @@
 # Public Functions Reference
 
+| `vault_dr_shards_save` | `scripts/plugins/vault.sh` | Save durable Vault unseal shards in the DR Keychain service. |
+| `vault_dr_shards_export` | `scripts/plugins/vault.sh` | Stream the durable shard bundle for the operator's one-time transfer. |
+| `vault_dr_shards_import` | `scripts/plugins/vault.sh` | Read a shard bundle from stdin into the DR Keychain service. |
+| `hub_data_export` | `scripts/plugins/hub_data.sh` | Create an age-encrypted claim export in the data repository. |
+| `hub_data_restore` | `scripts/plugins/hub_data.sh` | Verify and restore an encrypted export with node pre-binding. |
+
 All functions callable via `./scripts/k3d-manager <function> [args]`.
 
 Use `-h` or `--help` with any function for a brief usage message:

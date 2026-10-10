@@ -160,3 +160,19 @@ spec:
           annotations:
             summary: "Hermes has not completed a poll in over 15 minutes"
             description: "Hermes runs every 300 s. Check launchctl print gui/$UID/com.k3d-manager.hermes for the last exit code and ~/Library/Logs/k3dm-hermes.log. Exit 78 (EX_CONFIG) means launchd could not start the interpreter named in the plist."
+    - name: dr.alerts
+      rules:
+        - alert: DRDrillFailed
+          expr: k3dm_dr_drill_success == 0
+          for: 10m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub DR drill failed"
+            description: "The latest weekly hub disaster-recovery drill reported failure."
+        - alert: DRDrillStale
+          expr: time() - k3dm_dr_drill_last_run_timestamp_seconds > 691200
+          for: 30m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub DR drill is stale"
+            description: "No hub disaster-recovery drill has been reported for more than eight days."

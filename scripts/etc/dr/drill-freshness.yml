@@ -1,0 +1,16 @@
+name: Hub DR drill freshness
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: {ref: results, fetch-depth: 1}
+      - uses: actions/checkout@v4.2.2
+        with: {ref: main, path: k3dm-manager}
+      - run: bash k3dm-manager/scripts/etc/dr/drill-freshness.sh results

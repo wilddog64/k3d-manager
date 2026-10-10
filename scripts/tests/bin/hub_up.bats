@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2155,SC2030,SC2031
 
 setup() {
   export HARNESS_DIR="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-up.XXXXXX")"
@@ -15,7 +16,7 @@ printf '%s %s\n' "$(basename "$0")" "$*" >> "${CALL_LOG}"
 if [[ "$(basename "$0")" == "k3d" && "${HUB_STATE:-missing}" == "existing" ]]; then
   printf 'k3d-cluster\tservers:1\tagents:1\n'
 fi
-if [[ "$(basename "$0")" == "kubectl" && "${1:-}" == "config" && "${2:-}" == "current-context" ]]; then
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"config current-context"* ]]; then
   printf '%s\n' "${KUBE_CONTEXT:-k3d-k3d-cluster}"
   exit 0
 fi
@@ -119,4 +120,38 @@ teardown() {
   run grep -A2 '^hub-up:' Makefile
   [ "$status" -eq 0 ]
   [[ "$output" == *"up CLUSTER_PROVIDER=k3d"* ]]
+}
+
+@test "hub-up: DR drill mode stops before ArgoCD" {
+  export DR_DRILL_MODE=1
+  export KUBE_CONTEXT=k3d-dr-drill
+  export HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"dispatcher deploy_vault --confirm"* ]]
+  [[ "$output" == *"dispatcher deploy_ldap --confirm"* ]]
+  [[ "$output" != *"dispatcher deploy_argocd"* ]]
+  while IFS= read -r line; do
+    [[ "$line" != kubectl\ * ]] || { [[ "$line" == *"--kubeconfig $KUBECONFIG"* ]] && [[ "$line" == *"--context k3d-dr-drill"* ]]; }
+  done < "$CALL_LOG"
+  [[ "$output" != *"deploy_argocd_bootstrap"* ]]
+  [[ "$output" != *"deploy_argocd_platform_ops"* ]]
+  [[ "$output" != *"_argocd_deploy_image_updater"* ]]
+}
+
+@test "hub-up: DR namespaces exist before egress policy and workloads" {
+  export DR_DRILL_MODE=1
+  export KUBE_CONTEXT=k3d-dr-drill
+  export HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  run awk '/kubectl/ {print}' "$CALL_LOG"
+  create_line="$(printf '%s\n' "$output" | grep -n 'create namespace secrets' | head -1 | cut -d: -f1)"
+  policy_line="$(printf '%s\n' "$output" | grep -n 'egress-deny.yaml' | head -1 | cut -d: -f1)"
+  vault_line="$(grep -n 'dispatcher deploy_vault' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  [ "$create_line" -lt "$policy_line" ]
+  [ "$policy_line" -lt "$vault_line" ]
 }
