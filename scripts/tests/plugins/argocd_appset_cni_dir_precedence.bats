@@ -11,6 +11,7 @@ setup() {
   mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
   printf '%s\n' '  name: istio-ambient' > "${ARGOCD_CONFIG_DIR}/applicationsets/istio-ambient.yaml"
   printf '%s\n' '  generators: ${AMBIENT_CNI_CONF_DIR} ${AMBIENT_CNI_BIN_DIR}' >> "${ARGOCD_CONFIG_DIR}/applicationsets/istio-ambient.yaml"
+  printf '%s\n' '    k3dm.k3d.io/rollout-stage: app-cluster' >> "${ARGOCD_CONFIG_DIR}/applicationsets/istio-ambient.yaml"
   export ARGOCD_NAMESPACE APP_CLUSTER_NAME ARGOCD_CONFIG_DIR
   _argocd_set_active_app_cluster() { :; }
   unset -f _acg_provider_context _acg_resolve_provider

@@ -17,7 +17,7 @@ setup() {
   argocd_check_values_branch() {
     local confirm_calls
     printf x >> "${CALLS}"
-    confirm_calls="$(wc -c < "${CALLS}")"
+    confirm_calls="$(wc -c < "${CALLS}" | tr -d " ")"
     (( confirm_calls < 3 )) && return 1
     return 0
   }
@@ -34,7 +34,7 @@ setup() {
   argocd_check_values_branch() {
     local confirm_calls
     printf x >> "${CALLS}"
-    confirm_calls="$(wc -c < "${CALLS}")"
+    confirm_calls="$(wc -c < "${CALLS}" | tr -d " ")"
     printf 'STALE-CHECK-%s\n' "${confirm_calls}"
     return 1
   }
