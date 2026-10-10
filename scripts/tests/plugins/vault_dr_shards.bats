@@ -12,7 +12,7 @@ setup() {
   export STORE_LOG="$BATS_TEST_TMPDIR/store.log" CLEAR_LOG="$BATS_TEST_TMPDIR/clear.log"
   : > "$STORE_LOG"; : > "$CLEAR_LOG"
   declare -gA FAKE_SECRET=()
-  _vault_collect_unseal_shards_from_secret() { printf '%s\n' SHARD-SENTINEL-1 SHARD-SENTINEL-2; }
+  _vault_collect_unseal_shards_from_secret() { printf '%s\n' SHARDSENTINEL1 SHARDSENTINEL2; }
   _secret_load_data() { printf '%s' "${FAKE_SECRET["$1|$2"]:-}"; [[ -n "${FAKE_SECRET["$1|$2"]:-}" ]]; }
   _secret_store_data() { FAKE_SECRET["$1|$2"]="$3"; printf '%s|%s\n' "$1" "$2" >> "$STORE_LOG"; printf '%s' "$3" > "$BATS_TEST_TMPDIR/value-$(printf '%s' "$2" | tr /: __)"; }
   _secret_clear_data() { printf '%s|%s\n' "$1" "$2" >> "$CLEAR_LOG"; }
@@ -23,14 +23,14 @@ setup() {
 @test "vault DR shards: save stores two shards under secrets/vault without exposing values" {
   vault_dr_shards_save
   [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_count")" = 2 ]
-  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard1")" = SHARD-SENTINEL-1 ]
-  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard2")" = SHARD-SENTINEL-2 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard1")" = SHARDSENTINEL1 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard2")" = SHARDSENTINEL2 ]
 }
 
 @test "vault DR shards: export and import round-trip through stdin" {
   FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:count']=2
-  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']=SHARD-SENTINEL-1
-  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard2']=SHARD-SENTINEL-2
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']=SHARDSENTINEL1
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard2']=SHARDSENTINEL2
   vault_dr_shards_export | vault_dr_shards_import secrets/vault
   [ "$(grep -c 'secrets/vault:shard' "$STORE_LOG" || true)" -ge 2 ]
 }
@@ -39,7 +39,7 @@ setup() {
   export VAULT_DR_SHARDS_TEST_TTY=1
   run vault_dr_shards_export
   [ "$status" -eq 2 ]
-  [[ "$output$stderr" != *SHARD-SENTINEL* ]]
+  [[ "$output$stderr" != *SHARDSENTINEL* ]]
 }
 
 @test "vault DR shards: drill init does not save durable shards" {
@@ -71,10 +71,33 @@ setup() {
 }
 
 @test "vault DR shards: import rejects a stream whose first line is not a count" {
-  run --separate-stderr vault_dr_shards_import <<< $'running under bash version 5.3\n1\nSHARD-SENTINEL-1'
+  run --separate-stderr vault_dr_shards_import <<< $'running under bash version 5.3\n1\nSHARDSENTINEL1'
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"first line is not a shard count"* ]]
   [ ! -s "$STORE_LOG" ]
+}
+
+@test "vault DR shards: import strips CRs from a copied export" {
+  vault_dr_shards_import secrets/vault <<< $'1\r\nSHARDSENTINEL1\r'
+  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_count")" = 1 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard1")" = SHARDSENTINEL1 ]
+}
+
+@test "vault DR shards: import refuses a malformed shard without storing or printing it" {
+  run --separate-stderr vault_dr_shards_import <<< $'1\n"SHARDSENTINEL1"'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"shard 1 is not a base64 or hex unseal key"* ]]
+  [[ "$output$stderr" != *SHARDSENTINEL* ]]
+  [ ! -s "$STORE_LOG" ]
+}
+
+@test "vault DR shards: export refuses a malformed stored shard without printing it" {
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:count']=1
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']='SHARDSENTINEL1 x'
+  run --separate-stderr vault_dr_shards_export
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"DR shard 1 of 1 for secrets/vault is not a base64 or hex unseal key"* ]]
+  [[ "$output$stderr" != *SHARDSENTINEL* ]]
 }
 
 @test "vault DR shards: the dispatcher banner stays off stdout" {

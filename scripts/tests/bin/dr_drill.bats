@@ -66,18 +66,18 @@ cat > "$STUB_BIN/security" <<'STUB'
 { printf 'security'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 case "$*" in
   *'secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
-  *'secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
-  *'secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
-  *) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
+  *'secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
+  *'secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
+  *) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
 esac
 STUB
   cat > "$STUB_BIN/secret-tool" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
   *'name secrets/vault:count'*) printf '%s' "${DR_TEST_SHARD_COUNT-1}" ;;
-  *'name secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
-  *'name secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
-  *) printf '%s' "${DR_TEST_SHARD:-SHARD-SENTINEL}" ;;
+  *'name secrets/vault:shard1'*) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
+  *'name secrets/vault:shard'*) [[ "${DR_TEST_SHARD_MISSING:-0}" == 1 ]] || printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
+  *) printf '%s' "${DR_TEST_SHARD:-SHARDSENTINEL}" ;;
 esac
 STUB
 cat > "$STUB_BIN/kubectl" <<'STUB'
@@ -120,9 +120,9 @@ STUB
 #!/usr/bin/env bash
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$VLOG"
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
-[[ "$*" == *SHARD-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97
+[[ "$*" == *SHARDSENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97
 case "$*" in
-  *'operator unseal -'*) [[ "$*" == *SHARD-SENTINEL* ]] && exit 97; key="$(cat)"; printf '%s\n' "$key" >> "$SHARD_LOG"; if [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]]; then printf 'Error unsealing: bad key %s\n* cipher: message authentication failed\n' "$key" >&2; exit 2; fi; exit 0 ;;
+  *'operator unseal -'*) [[ "$*" == *SHARDSENTINEL* ]] && exit 97; key="$(cat)"; printf '%s\n' "$key" >> "$SHARD_LOG"; if [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]]; then printf 'Error unsealing: bad key %s\n* cipher: message authentication failed\n' "$key" >&2; exit 2; fi; exit 0 ;;
   *'-generate-otp'*) printf '{"otp":"OTP-SENTINEL"}' ;;
   *'-init'*) printf '{"nonce":"NONCE"}' ;;
   *'-decode=-'*) [[ "$*" == *OTP-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97; cat >> "$SHARD_LOG"; printf ROOT-TOKEN ;;
@@ -234,7 +234,7 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   export DR_TEST_SHARD_COUNT=2 DR_TEST_SHARD_MISSING=1
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"DR shard 2 of 2 is missing or empty"* ]]
-  [[ "$output" != *SHARD-SENTINEL* ]]
+  [[ "$output" != *SHARDSENTINEL* ]]
 }
 
 @test "dr drill: a rejected shard names the unseal step" {
@@ -242,11 +242,25 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"vault operator unseal failed for shard 1 of 1"* ]]
   [[ "$output" == *"cipher: message authentication failed"* ]]
-  [[ "$output" != *SHARD-SENTINEL* ]]
+  [[ "$output" != *SHARDSENTINEL* ]]
+}
+
+@test "dr drill: a malformed Keychain shard is refused before Vault sees it" {
+  export DR_TEST_SHARD='SHARD"SENTINEL'
+  run_drill; [ "$status" -ne 0 ]
+  [[ "$output" == *"DR shard 1 of 1 in Keychain is not a base64 or hex unseal key"* ]]
+  [[ "$output" != *'SHARD"SENTINEL'* ]]
+  [ "$(grep -c 'operator unseal' "$VLOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: a trailing CR on a Keychain shard is stripped before unseal" {
+  export DR_TEST_SHARD=$'SHARDSENTINEL\r'
+  run_drill; [ "$status" -eq 0 ]
+  grep -qx SHARDSENTINEL "$SHARD_LOG"
 }
 
 @test "dr drill: unseal shard is executed through stdin only" {
-  export DR_TEST_SHARD=SHARD-SENTINEL
+  export DR_TEST_SHARD=SHARDSENTINEL
   run_drill; [ "$status" -eq 0 ]
 }
 

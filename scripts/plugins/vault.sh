@@ -410,6 +410,12 @@ function vault_dr_shards_save() {
    _vault_dr_store_shards "$cluster" "${shards[@]}"
 }
 
+# A Vault unseal key is base64 or hex; anything else (a CR, a space, a
+# pasted quote) is refused before it reaches the Keychain or Vault.
+function _vault_dr_shard_valid() {
+   [[ "${1:-}" =~ ^[A-Za-z0-9+/]+={0,2}$ ]]
+}
+
 function _vault_dr_store_shards() {
    local cluster="$1" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count=0 shard
    shift
@@ -435,6 +441,9 @@ function vault_dr_shards_export() {
       shard="$(_secret_load_data "$service" "${cluster}:shard${i}" "$type")" || {
          echo "[vault] DR shard ${i} of ${count} missing for ${cluster}" >&2; return 1
       }
+      _vault_dr_shard_valid "$shard" || {
+         echo "[vault] DR shard ${i} of ${count} for ${cluster} is not a base64 or hex unseal key; run make vault-dr-shards-save in Terminal.app" >&2; return 1
+      }
       printf '%s\n' "$shard"
    done
 }
@@ -442,9 +451,14 @@ function vault_dr_shards_export() {
 function vault_dr_shards_import() {
    local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" count shard i=0
    IFS= read -r count || { echo '[vault] DR shard import: empty input' >&2; return 1; }
+   count="${count%$'\r'}"
    [[ "$count" =~ ^[1-9][0-9]*$ ]] || { echo '[vault] DR shard import: first line is not a shard count; pipe the output of make vault-dr-shards-export' >&2; return 1; }
    local -a shards=()
    while IFS= read -r shard && (( i < count )); do
+      shard="${shard%$'\r'}"
+      _vault_dr_shard_valid "$shard" || {
+         echo "[vault] DR shard import: shard $((i + 1)) is not a base64 or hex unseal key; copy the export file unchanged, with no editor or paste" >&2; return 1
+      }
       shards+=("$shard")
       i=$((i + 1))
    done

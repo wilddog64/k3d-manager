@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 13: malformed M2 DR shard. Import/export/drill now validate + strip CR. Operator: redo shard copy, rerun.
 - 2026-10-10: Drill run 12: unseal rejected or exec failed (output hidden). Unseal now prints the filtered error. Operator rerun.
 - 2026-10-10: Drill run 11: unseal sent no shard (M2 Keychain read). Unseal now reports why. Operator to check M2 shard items + rerun.
 - 2026-10-10: Drill run 10 passed restore + V0; failed unseal (vault-0 still pulling). Added wait. Rerun pending.

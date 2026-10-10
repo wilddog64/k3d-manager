@@ -204,6 +204,11 @@ _dr_drill_unseal() {
       printf '[dr-drill] DR shard %s of %s is missing or empty in Keychain; repeat the shard import\n' "$idx" "$count" >&2
       return 1
     fi
+    shard="${shard%$'\r'}"
+    if ! _vault_dr_shard_valid "$shard"; then
+      printf '[dr-drill] DR shard %s of %s in Keychain is not a base64 or hex unseal key; repeat the shard copy from the M4\n' "$idx" "$count" >&2
+      return 1
+    fi
     if ! out="$(printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s\n" "$SHARD" | vault operator unseal -' 2>&1)"; then
       printf '[dr-drill] vault operator unseal failed for shard %s of %s\n' "$idx" "$count" >&2
       grep -F -v -- "$shard" <<<"$out" | grep -E 'Error|error|Code:|^\* ' | head -5 | sed 's/^/[dr-drill]   /' >&2 || true

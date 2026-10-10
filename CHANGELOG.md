@@ -21,6 +21,11 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: a malformed DR unseal shard reached Vault, which refused it with "'key' must be a valid
+  hex or base64 string" (drill run 13). The DR shard import stored whatever line it read, with no
+  check and no `\r` strip, unlike the normal unseal cache. Import, export and the drill now strip a
+  trailing `\r` and refuse any shard that is not base64 or hex, naming the shard number but never
+  its value. A bad copy now fails at import instead of in the drill.
 - Fixed: when `vault operator unseal` failed, the DR drill threw away its output, so a shard Vault
   rejected looked the same as a failed `kubectl exec`. The drill now prints the error lines from
   that output (at most five), and drops any line that contains the shard.
