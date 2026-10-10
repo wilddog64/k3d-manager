@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED `40bd1278` 2026-10-09 (Codex via worktree dispatch; Claude verified 77/77 BATS, shellcheck clean, three mutations red). Claude added: an unknown `K3DM_APPSETS_STAGE` refuses before `_argocd_prepare_applicationsets` labels anything, with a test.
 **Priority:** P3 — cosmetic; the rollout and both confirmations are correct
 **Severity:** low
 **Origin:** operator's first staged `make appsets-reapply` after `b90a15f1`, 2026-10-09.
