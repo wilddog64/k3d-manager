@@ -118,6 +118,18 @@ EOF
   [[ "${output}" != *"rollout-demo HEAD"* ]]
 }
 
+@test "argocd values branch: without owners Degraded Applications remain unreported" {
+  _kubectl() {
+    cat <<'EOF'
+{"items":[{"metadata":{"name":"degraded-app"},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"k3d-manager-v1.18.0"}]},"status":{"health":{"status":"Degraded"}}}]}
+EOF
+  }
+
+  run argocd_check_values_branch k3d-manager-v1.18.0
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"health Degraded"* ]]
+}
+
 @test "argocd values branch: counter reports checked and ignored HEAD references" {
   _kubectl() {
     cat <<'EOF'

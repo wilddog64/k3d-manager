@@ -497,7 +497,7 @@ JSON
 @test "_argocd_deploy_applicationsets surfaces the kubectl error when an apply fails" {
   ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-fail"
   mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
-  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n  labels:\n    k3dm.k3d.io/rollout-stage: hub\n' \
     > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
   _argocd_set_active_app_cluster() { :; }
   _argocd_appset_live_overrides() { :; }
@@ -516,7 +516,7 @@ JSON
 @test "_argocd_deploy_applicationsets returns success when every apply lands" {
   ARGOCD_CONFIG_DIR="${BATS_TEST_TMPDIR}/argocd-ok"
   mkdir -p "${ARGOCD_CONFIG_DIR}/applicationsets"
-  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n' \
+  printf 'kind: ApplicationSet\nmetadata:\n  name: probe\n  labels:\n    k3dm.k3d.io/rollout-stage: hub\n' \
     > "${ARGOCD_CONFIG_DIR}/applicationsets/probe.yaml"
   _argocd_set_active_app_cluster() { :; }
   _argocd_appset_live_overrides() { :; }

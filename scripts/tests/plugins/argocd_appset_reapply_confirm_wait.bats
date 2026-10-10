@@ -6,6 +6,8 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
   K3D_MANAGER_BRANCH=k3d-manager-v1.43.0
   export K3D_MANAGER_BRANCH
+  K3DM_APPSETS_STAGE=hub
+  export K3DM_APPSETS_STAGE
   CALLS="${BATS_TEST_TMPDIR}/confirmation-calls"
   : > "${CALLS}"
 }

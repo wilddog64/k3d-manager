@@ -328,7 +328,7 @@ appsets-reapply:
 	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
 	  exit 1; \
 	fi; \
-	K3D_MANAGER_BRANCH="$$_b" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	K3D_MANAGER_BRANCH="$$_b" K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
 ## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
 appsets-check:

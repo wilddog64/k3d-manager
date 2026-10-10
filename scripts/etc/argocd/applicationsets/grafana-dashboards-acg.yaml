@@ -6,6 +6,7 @@ metadata:
   labels:
     managed-by: k3d-manager
     app-type: observability
+    k3dm.k3d.io/rollout-stage: app-cluster
 spec:
   generators:
     - clusters:

@@ -1221,6 +1221,80 @@ function _argocd_deploy_image_updater() {
    _info "[argocd] ArgoCD Image Updater install complete"
 }
 
+function _argocd_validate_appset_rollout_stages() {
+   local appsets_dir="$1" file stage
+   while IFS= read -r -d '' file; do
+      stage="$(sed -n 's/^    k3dm\.k3d\.io\/rollout-stage: *//p' "$file" | head -1)"
+      case "$stage" in
+         hub|app-cluster) ;;
+         *)
+            _err "[argocd] ${file##*/}: missing or unknown k3dm.k3d.io/rollout-stage '${stage}'"
+            return 1
+            ;;
+      esac
+   done < <(find "$appsets_dir" -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
+}
+
+function _argocd_confirm_applicationset_stage() {
+   local stage="$1" confirm_timeout="${K3DM_APPSET_CONFIRM_TIMEOUT:-90}"
+   local confirm_interval="${K3DM_APPSET_CONFIRM_INTERVAL:-5}" elapsed confirm_out
+   local owners
+   [[ "$confirm_timeout" =~ ^[0-9]+$ ]] || confirm_timeout=90
+   [[ "$confirm_interval" =~ ^[1-9][0-9]*$ ]] || confirm_interval=5
+   owners="$(_argocd_appset_stage_names "$stage")"
+   [[ -n "$owners" ]] || { _err "[argocd] no ApplicationSet manifests carry rollout stage ${stage}"; return 1; }
+   _info "[argocd] Confirming ${stage} ApplicationSet values-branch pin (${K3D_MANAGER_BRANCH})"
+   elapsed="$confirm_interval"
+
+   if (( confirm_timeout > 0 )) && confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" k3d-k3d-cluster "$owners" 2>&1)"; then
+      printf '%s\n' "$confirm_out"
+      return 0
+   fi
+   while (( elapsed < confirm_timeout )); do
+      _info "[argocd] waiting for ApplicationSet controller to regenerate ${stage} Applications (${elapsed}s/${confirm_timeout}s)"
+      sleep "$confirm_interval"
+      if confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" k3d-k3d-cluster "$owners" 2>&1)"; then
+         printf '%s\n' "$confirm_out"
+         return 0
+      fi
+      elapsed=$((elapsed + confirm_interval))
+   done
+   argocd_check_values_branch "${K3D_MANAGER_BRANCH}" k3d-k3d-cluster "$owners"
+}
+
+function _argocd_appset_in_stage() {
+   local file="$1" stage="$2"
+   [[ "$stage" == all ]] && return 0
+   grep -q "^    k3dm\.k3d\.io/rollout-stage: ${stage}$" "$file"
+}
+
+function _argocd_appset_stage_names() {
+   local stage="$1" file file_stage name
+   local -a names=()
+   for file in "$ARGOCD_CONFIG_DIR"/applicationsets/*.yaml; do
+      [[ -f "$file" ]] || continue
+      file_stage="$(sed -n 's/^    k3dm\.k3d\.io\/rollout-stage: *//p' "$file" | head -1)"
+      if [[ "$file_stage" == "$stage" ]]; then
+         name="$(sed -n 's/^  name: //p' "$file" | head -1)"
+         [[ -n "$name" ]] && names+=("$name")
+      fi
+   done
+   local IFS=,
+   printf '%s' "${names[*]}"
+}
+
+function _argocd_apply_and_confirm_appset_stage() {
+   local stage="$1" verify="$2"
+   _argocd_deploy_applicationsets "$stage" || return 1
+   if (( verify )) && declare -f argocd_check_values_branch >/dev/null 2>&1; then
+      if _dry_run_active; then
+         _info "[argocd] DRY_RUN: skipping the values-branch confirmation for ${stage}"
+      else
+         _argocd_confirm_applicationset_stage "$stage" || return 1
+      fi
+   fi
+}
+
 function deploy_argocd_applicationsets() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'EOF'
@@ -1233,8 +1307,9 @@ ${K3D_MANAGER_BRANCH} at apply time, so config committed to a newer branch stays
 inert in-cluster until the sets are reapplied. Surgical — unlike
 deploy_argocd_bootstrap it does NOT redeploy the image updater or platform-ops.
 
-After reapplying it confirms the pin with argocd_check_values_branch unless
---no-verify is given.
+After reapplying it confirms each rollout stage with argocd_check_values_branch
+unless --no-verify is given. Set K3DM_APPSETS_STAGE=hub to apply only the hub
+stage; the default all applies and confirms both stages in order.
 
 As a deploy_* entrypoint this mutates the cluster, so the dispatcher deploy-guard
 requires --confirm (or --dry-run/-n) when no other option is passed.
@@ -1251,6 +1326,7 @@ Environment Variables:
    ARGOCD_APPSET_IGNORE_LIVE
                         1 = do not preserve each live set's destination cluster and
                         istio-cni dirs (default: preserve; a reapply never retargets)
+   K3DM_APPSETS_STAGE   hub or all (default: all)
 
 Examples:
    # Reapply + verify, pinning to the checked-out release branch
@@ -1269,37 +1345,23 @@ EOF
       *) _err "[argocd] Unknown option: $1"; return 1 ;;
    esac
 
-   _argocd_deploy_applicationsets || return 1
-
-   if (( verify )) && declare -f argocd_check_values_branch >/dev/null 2>&1; then
-      if _dry_run_active; then
-         _info "[argocd] DRY_RUN: skipping the values-branch confirmation — nothing was applied, so there is nothing to confirm"
-      else
-         _info "[argocd] Confirming values-branch pin (${K3D_MANAGER_BRANCH})"
-         local confirm_timeout="${K3DM_APPSET_CONFIRM_TIMEOUT:-90}"
-         local confirm_interval="${K3DM_APPSET_CONFIRM_INTERVAL:-5}"
-         [[ "${confirm_timeout}" =~ ^[0-9]+$ ]] || confirm_timeout=90
-         [[ "${confirm_interval}" =~ ^[1-9][0-9]*$ ]] || confirm_interval=5
-         local elapsed="${confirm_interval}" confirm_out
-
-         if (( confirm_timeout > 0 )) && confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" 2>&1)"; then
-            printf '%s\n' "${confirm_out}"
-            return 0
-         fi
-
-         while (( elapsed < confirm_timeout )); do
-            _info "[argocd] waiting for ApplicationSet controller to regenerate Applications (${elapsed}s/${confirm_timeout}s)"
-            sleep "${confirm_interval}"
-            if confirm_out="$(argocd_check_values_branch "${K3D_MANAGER_BRANCH}" 2>&1)"; then
-               printf '%s\n' "${confirm_out}"
-               return 0
-            fi
-            elapsed=$((elapsed + confirm_interval))
-         done
-
-         argocd_check_values_branch "${K3D_MANAGER_BRANCH}"
-      fi
-   fi
+   local rollout_stage="${K3DM_APPSETS_STAGE:-all}"
+   case "$rollout_stage" in
+      hub)
+         _argocd_apply_and_confirm_appset_stage hub "$verify"
+         ;;
+      all)
+         _argocd_apply_and_confirm_appset_stage hub "$verify" || {
+            _err "[argocd] hub stage failed — app-cluster ApplicationSets NOT applied"
+            return 1
+         }
+         _argocd_apply_and_confirm_appset_stage app-cluster "$verify"
+         ;;
+      *)
+         _err "[argocd] K3DM_APPSETS_STAGE must be hub or all (got: $rollout_stage)"
+         return 1
+         ;;
+   esac
 }
 
 function _argocd_warn_generic_cni_dirs() {
@@ -1375,6 +1437,13 @@ function _argocd_deploy_applicationsets() {
    K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
    export K3D_MANAGER_BRANCH
 
+   local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
+   if [[ ! -d "$appsets_dir" ]]; then
+      _err "[argocd] ApplicationSets directory not found: $appsets_dir"
+      return 1
+   fi
+   _argocd_validate_appset_rollout_stages "$appsets_dir" || return 1
+
    local _active_app_cluster=""
    if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
       _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
@@ -1383,13 +1452,6 @@ function _argocd_deploy_applicationsets() {
    export APP_CLUSTER_NAME
    _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
    _argocd_set_active_app_cluster "${_active_app_cluster}"
-
-   local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
-
-   if [[ ! -d "$appsets_dir" ]]; then
-      _err "[argocd] ApplicationSets directory not found: $appsets_dir"
-      return 1
-   fi
 
    # Find all ApplicationSet YAML files
    local -a appset_files=()
@@ -1404,11 +1466,13 @@ function _argocd_deploy_applicationsets() {
 
    _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
 
-   # Deploy each ApplicationSet
-   local deployed_count=0 failed_count=0 _line
+   # Deploy each ApplicationSet in the requested rollout stage.
+   local stage="${1:-all}" deployed_count=0 failed_count=0 selected_count=0 _line
    for file in "${appset_files[@]}"; do
       local filename
       filename=$(basename "$file")
+      _argocd_appset_in_stage "$file" "$stage" || continue
+      selected_count=$((selected_count + 1))
       _info "[argocd] Deploying ApplicationSet: $filename"
 
       local _vars _v _name _unset=""
@@ -1447,9 +1511,9 @@ function _argocd_deploy_applicationsets() {
       fi
    done
 
-   _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
+   _info "[argocd] Successfully deployed $deployed_count/${selected_count} ${stage} ApplicationSet(s)"
    if (( failed_count > 0 )); then
-      _err "[argocd] ${failed_count} of ${#appset_files[@]} ApplicationSet(s) did not apply"
+      _err "[argocd] ${failed_count} of ${selected_count} ${stage} ApplicationSet(s) did not apply"
       return 1
    fi
    return 0
@@ -1820,6 +1884,7 @@ EOF
 function argocd_check_values_branch() {
    local _expected="${1:-${K3D_MANAGER_BRANCH:-}}"
    local _context="${2:-k3d-k3d-cluster}"
+   local _owners="${3:-}"
    local _namespace="${ARGOCD_NAMESPACE:-cicd}"
    local _apps
    local _drift
@@ -1837,7 +1902,7 @@ function argocd_check_values_branch() {
    _info "[argocd] Expected values branch: ${_expected}"
 
    local _rc=0
-   _drift="$(printf '%s' "${_apps}" | _argocd_values_branch_drift "${_expected}")" || _rc=$?
+   _drift="$(printf '%s' "${_apps}" | _argocd_values_branch_drift "${_expected}" "${_owners}")" || _rc=$?
 
    case "${_rc}" in
       0) ;;
@@ -1864,6 +1929,7 @@ function argocd_check_values_branch() {
 
 function _argocd_values_branch_drift() {
    local _expected="$1"
+   local _owners="${2:-}"
    local _repo="https://github.com/wilddog64/k3d-manager"
 
    python3 -c '
@@ -1872,6 +1938,7 @@ import sys
 
 expected = sys.argv[1]
 repo = sys.argv[2]
+owners = {name for name in sys.argv[3].split(",") if name}
 
 try:
     doc = json.load(sys.stdin)
@@ -1882,6 +1949,11 @@ except ValueError:
 checked = 0
 tracking_head = 0
 for app in doc.get("items", []):
+    if owners and not any(
+        ref.get("kind") == "ApplicationSet" and ref.get("name") in owners
+        for ref in app.get("metadata", {}).get("ownerReferences", [])
+    ):
+        continue
     spec = app.get("spec", {})
     sources = spec.get("sources") or ([spec["source"]] if "source" in spec else [])
     for src in sources:
@@ -1894,13 +1966,15 @@ for app in doc.get("items", []):
         revision = src.get("targetRevision", "")
         if revision != expected:
             print("  {} {}".format(app.get("metadata", {}).get("name", "?"), revision))
+    if owners and app.get("status", {}).get("health", {}).get("status") == "Degraded":
+        print("  {} health Degraded".format(app.get("metadata", {}).get("name", "?")))
 
 print("[argocd] checked {} k3d-manager references ({} tracking HEAD, ignored)".format(
     checked, tracking_head), file=sys.stderr)
 if checked == 0:
     print("[argocd] no values references found — the query or the filter is wrong", file=sys.stderr)
     sys.exit(4)
-' "${_expected}" "${_repo}"
+' "${_expected}" "${_repo}" "${_owners}"
 }
 
 function argocd_reclaim_release_ownership() {
