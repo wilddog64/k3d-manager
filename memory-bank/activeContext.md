@@ -60,6 +60,14 @@
 
 - 2026-10-09: P3 staged appsets-reapply output FIXED `40bd1278` (landed with `land --test` on the argocd suites). Preamble runs once via `_argocd_prepare_applicationsets`; stage lines name the stage; owner-scoped success line names the ApplicationSets. Claude added: an unknown stage refuses before labelling. Metrics task still running (waiter by9y09uhj).
 
+## 2026-10-10 — v1.43.2 bug-fix batches specced (parallel agents)
+
+Operator asked whether multiple agents can work a dozen bugs in an x.y.N release. Yes: dispatcher worktree per slug, `land` lock serialises merges; limit ~3–4 concurrent, no shared files per batch, live work serial. Triage found 13 open items; 6 actionable.
+- Batch 1 (parallel): count-floor/partial-run (new P3), lib-foundation `_secret_store_data` argv + false success + delete-before-add (one agent, lib-foundation `fix/secret-store-data-stdin`), frontend `index.html` no Cache-Control (new P2, `expires -1` verified in nginx:1.31-alpine — `add_header` would drop CSP).
+- Batch 2 (after v1.43.1 lands, `bin/dr-drill`): KEEP deletes kubeconfig (new P3), `set +u` wrappers (new P3).
+- Hub-recovery node map DEFERRED (legacy restore can't read current snapshots; `hub_data_recover` supersedes).
+- Branch `k3d-manager-v1.43.2` cut from main after v1.43.1 merges. Roadmap updated.
+
 ## 2026-10-09 — filed P3 staged appsets-reapply output bug; dispatched
 
 - `docs/bugs/2026-10-09-appsets-reapply-staged-output-repeats-preamble-and-overstates-scope.md`: preamble (sample line, role label, file count) repeats per stage; scoped confirm says "All Applications". Fix: `_argocd_prepare_applicationsets` once; owners-aware success line. From operator first staged run (hub 9 + app-cluster 12 OK).

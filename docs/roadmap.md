@@ -154,6 +154,30 @@ that every destructive call targets the drill cluster. Scope:
 [`v1.43.1-dr-clean-room-checks.md`](plans/v1.43.1-dr-clean-room-checks.md). v1.43.1 is at 2 of 5
 plans. Full-hub recovery on the M2 moves into the v1.47.0 candidate-hub engine.
 
+### Candidate milestone — v1.43.2
+
+**Bug-fix-only release, worked by parallel agents** (operator, 2026-10-10). Branch
+`k3d-manager-v1.43.2`, cut from `main` after v1.43.1 merges. Each fix runs in its own dispatcher
+worktree, and `land` merges them one at a time behind its lock. A batch never puts two fixes on the
+same file.
+
+- **Batch 1:** three agents in parallel, code and stubbed tests only.
+  - [`offline-suite-count-floor-stale-and-partial-runs`](bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md):
+    `Makefile`, `bin/k3dm-test-metrics`, `rules-acg/k3dm-tests.yaml`.
+  - [`secret-store-data-puts-value-in-security-argv`](bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md)
+    and [`…-reports-success-on-failed-keychain-write`](bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md):
+    one agent in lib-foundation, then a subtree-pull here.
+  - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
+    `shopping-cart-frontend`.
+- **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
+  - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
+  - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
+- **Not dispatched:**
+  - the hub-recovery node map is deferred (superseded by `hub_data_recover`);
+  - the e2e payments assertion needs only the operator's live Tier 1 rerun;
+  - hub CPU overcommit (August) and data-layer `RespectIgnoreDifferences` (June) need re-triage
+    against today's hub first.
+
 ### Candidate milestone — v1.45.0
 
 **Docs drift detection.** Facts that can be derived from code (module tables, route tables,

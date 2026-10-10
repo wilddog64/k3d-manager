@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — found during the DR drill live checks (`docs/plans/v1.43.0-hub-dr-drill.md` §7 L2). Fix not yet specified.
+**Status:** DEFERRED (2026-10-10, Claude): not worth fixing in place. The only path that reads this map's node column, `hub_recovery_restore`, cannot read today's `make snapshot` archives anyway (`docs/howto/hub-snapshots.md`). The supported restore is v1.43.1 `hub_data_recover`, which pre-binds each claim to its recorded node. This doc is now an input to a future snapshot-restore design, not a v1.43.2 fix. Found during the DR drill live checks (`docs/plans/v1.43.0-hub-dr-drill.md` §7 L2).
 **Priority:** P2 — the legacy snapshot restore refuses on today's hub; the workaround is a hand edit of the map
 **Severity:** medium
 

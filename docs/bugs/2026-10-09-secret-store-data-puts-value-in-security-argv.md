@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-09
-**Status:** OPEN — fix upstream in lib-foundation, then subtree-pull
+**Status:** OPEN — spec ready (v1.43.2 batch 1). Fix upstream in lib-foundation (branch `fix/secret-store-data-stdin` from `origin/main`, v0.5.1 still affected), then subtree-pull. One agent fixes this and `2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md` in one change
 **Priority:** P2
 **Severity:** Medium — every Keychain write through the shared helper exposes the value in the process list for the life of the `security` call
 **Files:** `scripts/lib/foundation/scripts/lib/system.sh` (upstream: lib-foundation `scripts/lib/system.sh`)
@@ -51,3 +51,12 @@ Then subtree-pull into k3d-manager. Do not edit `scripts/lib/foundation/` here.
   sentinel appears in the stdin log only, never in any argv log.
 - A value containing a space, a quote and a backslash round-trips through `_secret_load_data`.
 - Mutation: put `-w "$3"` back on argv; the first test goes red.
+
+## Dispatch
+
+- Work repo `~/src/gitrepo/personal/lib-foundation`, branch `fix/secret-store-data-stdin` from
+  `origin/main`. Run `codex exec` from that repo; `make codex-dispatch` only handles k3d-manager.
+- One commit covers both bugs:
+  `fix(system): _secret_store_data writes over stdin, keeps the old item on failure, returns the real status`.
+- After the lib-foundation PR merges and is released, subtree-pull into k3d-manager on
+  `k3d-manager-v1.43.2`.
