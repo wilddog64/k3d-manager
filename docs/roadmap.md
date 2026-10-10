@@ -294,15 +294,25 @@ Starts only after v2.0.0 is stable, never in parallel with the v1.4x releases.
 **Guardrails (non-negotiable):**
 1. Read-only first: the first release diagnoses and proposes only. The model's MCP tools read
    metrics, logs and ArgoCD state, nothing else.
-2. Execution is limited to a short list of reversible actions (restart a pod, re-run a failed sync,
-   scale a deployment back up). Anything touching secrets, Vault, data, or cluster lifecycle always
-   needs human approval.
+2. Technically reversible is not operationally safe. Each executable action is a **contract**:
+   an allowlist entry, runtime preconditions, a post-action verification, and a documented rollback,
+   or escalation where rollback is not reliable. Anything touching secrets, Vault, data, or cluster
+   lifecycle always needs human approval.
 3. Policy is code with tests. The model never decides whether its own action is allowed.
 4. Every action is followed by a retest with the existing e2e and smoke checks. A failed retest
    rolls back or escalates to a human.
 5. An append-only audit record of diagnosis, proposal, approver, action and retest result.
 6. Providers are swappable, Claude is the default, and models are compared on recorded incidents,
    never live ones.
+
+Initial action contracts (each precondition is drawn from an incident on this platform):
+
+| Action | Preconditions | Verification |
+|---|---|---|
+| Restart an unhealthy pod | Replica redundancy (Hostinger is one node; a single replica means downtime); failure evidence; retry budget not spent (a k3s restart over dead kine compaction crash-looped) | Readiness and the app smoke check |
+| Retry an ingestion or export job | Idempotent; no active duplicate | Freshness watermark advances (the hub-data export freshness alerts) |
+| Sync an ArgoCD Application | Desired revision approved and on the release branch (ApplicationSets once pinned a stale branch); no destructive drift | Synced, Healthy, smoke passes |
+| Scale a deployment | Bounded limits; node capacity checked first (a `maxSurge` rollout deadlocked on full requests) | Service available; node requests and memory healthy |
 
 | Step | Scope |
 |---|---|
