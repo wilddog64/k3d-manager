@@ -99,6 +99,12 @@ Postgres and LDAP), and the drill cluster's own API server (its `kubernetes` end
 not answer `operator init` until that write finishes. Check V0 proves egress is blocked before Vault is unsealed, so restored data cannot leave
 the M2.
 
+The drill runs Keycloak's postgres from `scripts/etc/dr/postgres-keycloak.yaml`, not from
+`shopping-cart-infra`: the hub's manifests need a kustomize-generated ConfigMap and an
+ExternalSecret password, and the drill applies neither. Postgres starts without a password because
+the restored data directory is already initialised. Keycloak itself does not run in the drill; V3
+reads the realm's users straight from postgres. The image major version must match the hub's.
+
 ## Monitoring
 
 - **Alerts:** `DRDrillFailed` (latest drill failed) and `DRDrillStale` (no drill for 8 days),
@@ -116,5 +122,6 @@ the M2.
 | `failed: phase2` | result JSON | The drill hub did not build; read the `[hub-up]` step that failed |
 | `operator init … cannot be recovered` | Phase 2 | Vault initialised but the keys were lost; delete the cluster and rerun |
 | `could not record the inventory` | `make hub-data-export` on the M4 | The Vault, Keycloak or LDAP count failed; nothing was pushed. Fix that service, then export again |
+| `unable to scale <workload>` | Phase 3 | A restored workload is missing from the drill hub. Postgres comes from `scripts/etc/dr/postgres-keycloak.yaml`; Vault and LDAP from `hub-up` Steps 3–4 |
 | `failed: unseal` | result JSON | The M2 Keychain shards do not match the export's Vault; repeat the shard copy |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |

@@ -191,13 +191,9 @@ function _hub_data_scale() {
 }
 
 function _hub_data_apply_keycloak() {
-  local dir="${SHOPPING_CART_INFRA_ROOT:-${REPO_ROOT}/../shopping-cart-infra}/identity/keycloak" manifest
-  [[ -d "$dir" ]] || return 1
-  for manifest in "$dir"/*.yaml; do
-    [[ -f "$manifest" ]] || continue
-    if grep -Eq '^kind: (ExternalSecret|CronJob|ApplicationSet)$' "$manifest"; then continue; fi
-    _kubectl --context "$DR_DRILL_CONTEXT" -n identity apply -f "$manifest"
-  done
+  local manifest="${K3DM_HUB_DATA_POSTGRES_MANIFEST:-${REPO_ROOT:-.}/scripts/etc/dr/postgres-keycloak.yaml}"
+  [[ -f "$manifest" ]] || { _err "[hub-data] missing ${manifest}"; return 1; }
+  _kubectl --context "$DR_DRILL_CONTEXT" -n identity apply -f "$manifest"
 }
 
 function _hub_data_restore_one() {
@@ -215,10 +211,7 @@ function _hub_data_prepare_claim() {
   node="$(_hub_data_meta_field "${stage}/pv-pvc.yaml" "$ns" "$claim" logicalNode)"; storage="$(_hub_data_meta_field "${stage}/pv-pvc.yaml" "$ns" "$claim" storageClass)"
   size="$(_hub_data_meta_field "${stage}/pv-pvc.yaml" "$ns" "$claim" size)"; modes="$(_hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim")"
   [[ -n "$node" && -n "$size" && -n "$storage" && -n "$modes" ]] || return 1
-  if ! _hub_data_scale "$ns" "$claim" 0 >/dev/null 2>&1; then
-    _err "[hub-data] unable to scale $(_hub_data_workload "$ns" "$claim")"
-    return 1
-  fi
+  _hub_data_scale "$ns" "$claim" 0 >/dev/null || return 1
   _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" delete pvc "$claim" --ignore-not-found >/dev/null
   { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$DR_DRILL_CLUSTER" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$DR_DRILL_CONTEXT" apply -f -
   _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${claim}" --timeout=300s
@@ -258,10 +251,10 @@ function hub_data_restore() { (
     [[ -f "${latest}/${file}" ]] || return 1
     if command -v sha256sum >/dev/null 2>&1; then printf '%s  %s\n' "$sum" "${latest}/${file}" | sha256sum -c - >/dev/null; else printf '%s  %s\n' "$sum" "${latest}/${file}" | shasum -a 256 -c - >/dev/null; fi
   done < "${latest}/SHA256SUMS"
+  _hub_data_apply_keycloak || return 1
   while IFS='|' read -r ns claim; do
     if ! _hub_data_prepare_claim "$stage" "$ns" "$claim" "${latest}/${ns}-${claim}.tar.age"; then return 1; fi
   done < <(_hub_data_claims)
-  _hub_data_apply_keycloak
   while IFS='|' read -r ns claim; do
     _hub_data_copy_claim "$stage" "$ns" "$claim" "${latest}/${ns}-${claim}.tar.age" || return 1
   done < <(_hub_data_claims)

@@ -21,6 +21,14 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: the DR drill restore exited silently at the second claim. It applied Keycloak's manifests
+  from `../shopping-cart-infra`, a path that exists on neither Mac, ignored that failure, and then
+  scaled the missing `deployment/postgres-keycloak` to 0 with its error sent to `/dev/null`. The
+  raw manifests could not have started postgres anyway: they need a kustomize-generated ConfigMap
+  and an ExternalSecret the drill never applies. The drill now applies its own
+  `scripts/etc/dr/postgres-keycloak.yaml` (postgres only, 0 replicas, no password: the restored
+  data directory is already initialised) before any claim is touched, and a scale failure prints
+  which workload failed.
 - Fixed: the DR drill's default-deny egress policy also blocked the drill cluster's own API server.
   Vault writes its init state to its pod labels through the API server and holds the
   `operator init` response until that write gives up, so the CLI timed out ("context deadline

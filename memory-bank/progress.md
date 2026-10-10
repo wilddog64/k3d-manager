@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 9 passed Phase 2; failed Phase 3 (no postgres-keycloak in drill). Fixed with a drill-own postgres manifest. Rerun pending.
 - 2026-10-10: Drill run 8 got past Vault; failed LDAP (egress blocked ESO->Vault). Fixed egress-deny intra-namespace allow. Rerun pending.
 - 2026-10-10: Drill run 7 failed phase2; root cause = drill egress policy blocked Vault->API server. Fixed in bin/hub-up (allow /32 API endpoint). Rerun pending.
 - 2026-10-10: Pre-run-7 fixes (uncommitted→commit pending vault suites): detached Vault init; export inventory queries fixed (+export stops before push on inventory failure); drill fixture date. hub_data/dr_drill/dr_drill_publish 33/33, freshness+snapshot 42/42, 3 mutations red. v1.46.0 specs 4+5 written (backup integrity, full recovery time) — cap reached.

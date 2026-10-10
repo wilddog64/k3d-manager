@@ -40,6 +40,7 @@ elif [[ "$args" == *"get pv"* && "$args" == *"hostname"* ]]; then
   pv="${args#*get pv }"; pv="${pv%% *}"
   if [[ "${DR_TEST_MISMATCH:-0}" == 1 ]]; then printf node-z; else case "$pv" in pv-data-vault-0) printf node-a;; pv-postgres-keycloak-pvc) printf node-b;; pv-data-openldap-0) printf node-c;; esac; fi
 elif [[ "$args" == *"get pv"* && "$args" == *"local.path"* ]]; then pv="${args#*get pv }"; pv="${pv%% *}"; printf '/var/lib/k3s/%s\n' "${pv#pv-}"
+elif [[ -n "${DR_TEST_SCALE_FAIL:-}" && "$args" == *"scale ${DR_TEST_SCALE_FAIL} "* ]]; then printf 'Error from server (NotFound): %s\n' "$DR_TEST_SCALE_FAIL" >&2; exit 1
 elif [[ "$args" == *"apply -f -"* ]]; then cat > "$TEST_ROOT/applied-$RANDOM.yaml"
 elif [[ "$args" == *"get pods"* ]]; then printf 'postgres-keycloak-abc\n'; fi
 STUB
@@ -114,7 +115,7 @@ source_plugin() {
   _hub_snapshot_claim_pv() { printf 'pv-%s\n' "$2"; }
   _hub_snapshot_claim_path() { printf '/var/lib/k3s/%s\n' "${1#pv-}"; }
   _hub_snapshot_node_container() { printf 'k3d-test-%s\n' "$1"; }
-  _hub_data_apply_keycloak() { :; }
+  [[ "${DR_TEST_REAL_APPLY:-0}" == 1 ]] || _hub_data_apply_keycloak() { :; }
   _secret_load_data() { [[ "$2" == identity ]] && printf '%s\n' "${DR_TEST_IDENTITY:-AGE-IDENTITY}" || printf '%s\n' "${DR_TEST_SHARD:-SHARD-SENTINEL}"; }
   _vault_exec_stream() {
     local index=1 input command_name
@@ -168,6 +169,30 @@ source_plugin() {
 @test "hub data restore: scales live workloads down and up" {
   make_fixture; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage"; hub_data_restore
   for workload in statefulset/vault deployment/postgres-keycloak statefulset/openldap; do [ "$(grep -c "scale ${workload} --replicas=0" "$CALL_LOG")" -eq 1 ]; [ "$(grep -c "scale ${workload} --replicas=1" "$CALL_LOG")" -eq 1 ]; done
+}
+
+@test "hub data restore: applies the drill postgres before scaling any claim down" {
+  make_fixture; export DR_TEST_REAL_APPLY=1 REPO_ROOT="$PWD"; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage"
+  run hub_data_restore; [ "$status" -eq 0 ]
+  apply_line="$(grep -n -F -- "apply -f ${PWD}/scripts/etc/dr/postgres-keycloak.yaml" "$CALL_LOG" | head -1 | cut -d: -f1)"
+  first_scale="$(grep -n -- '--replicas=0' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  [ -n "$apply_line" ]; [ -n "$first_scale" ]; [ "$apply_line" -lt "$first_scale" ]
+}
+
+@test "hub data restore: drill postgres starts at zero replicas and carries no password" {
+  local manifest="$PWD/scripts/etc/dr/postgres-keycloak.yaml"
+  grep -q '^  replicas: 0$' "$manifest"
+  grep -q 'image: postgres:16-alpine$' "$manifest"
+  grep -q 'claimName: postgres-keycloak-pvc$' "$manifest"
+  [ "$(grep -v '^#' "$manifest" | grep -c -i -E 'password|secretKeyRef|secretRef|ExternalSecret' || true)" -eq 0 ]
+}
+
+@test "hub data restore: a workload that cannot be scaled stops the restore with its name" {
+  make_fixture; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage" DR_TEST_SCALE_FAIL=deployment/postgres-keycloak
+  _err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+  run hub_data_restore; [ "$status" -ne 0 ]
+  [[ "$output" == *"unable to scale deployment/postgres-keycloak"* ]]
+  [ "$(grep -c docker "$CALL_LOG" || true)" -eq 0 ]
 }
 
 @test "hub data export: streams each claim from its own node and path" {
