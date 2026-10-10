@@ -274,6 +274,43 @@ by editing lists, not code.
 What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
 of those only if a platform feature still needs it to prove itself.
 
+### Candidate theme — v2.x: AI diagnostics and healing gateway
+
+**Proposed 2026-10-10 (operator; not yet scoped).** After v2.0.0 the platform has a real application
+to protect. This theme closes the loop between what the platform already observes and validates
+and what it can safely do about it:
+**diagnose → propose fix → policy approval → execute → retest → audit.**
+Starts only after v2.0.0 is stable, never in parallel with the v1.4x releases.
+
+| Layer | Exists today | Gap |
+|---|---|---|
+| Application | TwinkleAI app from v2.0.0 (API, Postgres, Kubernetes) | none at v2.0.0 |
+| Observability | Prometheus, Grafana, Alertmanager, Loki, Pushgateway | app-level metrics (v1.49.0) |
+| Validation | e2e Tier 1/2, v1.47.0 promotion gate, nightly offline suite, smoke, DR drill | re-pointed at v1.50.0 |
+| Gateway | Hermes triage and bug drafts, webhook action allowlist, cloud-bridge roles, v1.45.0 alert intake, v1.46.0 Hermes self-recovery | one MCP tool server, an LLM provider adapter, an explicit policy engine |
+| Providers | Claude, Codex, Gemini, each wired separately | one interface; per-provider scoring on recorded incidents |
+| Remediation | Slack approval (pull model), Codex dispatch | the full loop, with retest and audit |
+
+**Guardrails (non-negotiable):**
+1. Read-only first: the first release diagnoses and proposes only. The model's MCP tools read
+   metrics, logs and ArgoCD state, nothing else.
+2. Execution is limited to a short list of reversible actions (restart a pod, re-run a failed sync,
+   scale a deployment back up). Anything touching secrets, Vault, data, or cluster lifecycle always
+   needs human approval.
+3. Policy is code with tests. The model never decides whether its own action is allowed.
+4. Every action is followed by a retest with the existing e2e and smoke checks. A failed retest
+   rolls back or escalates to a human.
+5. An append-only audit record of diagnosis, proposal, approver, action and retest result.
+6. Providers are swappable, Claude is the default, and models are compared on recorded incidents,
+   never live ones.
+
+| Step | Scope |
+|---|---|
+| v2.1 | Gateway with read-only MCP tools; diagnosis and proposals only |
+| v2.2 | Policy engine as code, approval flow |
+| v2.3 | Execution of allowlisted reversible actions, with retest and audit |
+| v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

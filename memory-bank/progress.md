@@ -1,5 +1,6 @@
 - 2026-10-10: v2.0.0 proposed in docs/roadmap.md (not scoped): TwinkleAI bilingual research app replaces shopping-cart; app M1–M4 in own repo → v1.49.0 onboard → v1.50.0 re-point e2e/gate/loadtest/DR → v2.0.0 retire shopping-cart. Research = 90 records (zh+en).
 - 2026-10-10: make test-all run 1 stopped in BATS (1533, 2 failed: bare-! lint in hub_data.bats:372, dr_alert_rules exact-set missing HubDataExport* alerts; both from 5c44b1c1). [x] fixed b8c870ae. [x] rerun green 2026-10-10: 2907 cases, 0 failed (BATS 1533 + bin 441 + pytest 838 passed/2 skipped); metrics pushed test-all/local.
+- 2026-10-10: [x] Roadmap: candidate v2.x theme — AI diagnostics and healing gateway (v2.1 read-only → v2.4 provider adapter), guardrails recorded. Starts after v2.0.0 is stable.
 - 2026-10-10: [x] Roadmap: app specs/M1 spike may start any time; only platform deploy (v1.49.0) waits on v1.47.0. v1.47.0 + v1.48.0 specs now workload-agnostic (v1.50.0 = list edit).
 - 2026-10-10: [x] appsets-reapply (operator, hub 5/5 + app-cluster 8/8, all pinned k3d-manager-v1.43.0) + appsets-check green (21 refs); all 33 Applications Synced/Healthy.
 - 2026-10-10: [x] v2.0.0 roadmap revised per operator: shopping-cart leaves Hostinger first (v1.49.0, gated on app M1), stays on hub/ACG as e2e target until v1.50.0, v2.0.0 retires with no soak. No work until app dev is close.
