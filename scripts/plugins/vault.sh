@@ -1550,6 +1550,23 @@ function _vault_wait_api() {
 }
 
 # Prints only error lines from a failed init's output, never key material.
+function _vault_init_once() {
+   local ns="$1" release="$2" jsonfile="$3" errfile="$4"
+   local container
+   container=$(_vault_container_name "$ns" "$release")
+   local -a args=(--no-exit -n "$ns" exec -i "${release}-0")
+   if [[ -n "$container" ]]; then
+      args+=(-c "$container")
+   fi
+   _kubectl "${args[@]}" -- sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' >"$jsonfile" 2>"$errfile"
+}
+
+function _vault_is_initialized() {
+   local ns="$1" release="$2"
+   _vault_exec --no-exit "$ns" 'vault status -format=json 2>/dev/null; exit 0' "$release" 2>/dev/null \
+      | command grep -q -E '"initialized":[[:space:]]*true'
+}
+
 function _vault_init_error_lines() {
    command grep -i -E '^(error|warning)|error:' "$1" 2>/dev/null \
       | command grep -v -i -E 'key|token|b64' | head -5 | sed 's/^/[vault] init: /'
@@ -1595,11 +1612,24 @@ function _vault_operator_init() {
       _err "[vault] $leader is Running but its API did not answer within ${VAULT_API_WAIT_S:-120}s"
    fi
 
-   if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
-      _vault_init_error_lines "$jsonfile" >&2
-      _cleanup_on_success "$jsonfile"
-      _err "[vault] failed to execute vault operator init"
-   fi
+   local errfile attempt=1
+   errfile=$(mktemp -t vault-init-err.XXXXXX)
+   trap '_cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"' EXIT TERM
+   until _vault_init_once "$ns" "$release" "$jsonfile" "$errfile"; do
+      _vault_init_error_lines "$errfile" >&2
+      if _vault_is_initialized "$ns" "$release"; then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] init failed but $leader is now initialised; its unseal keys were not returned and cannot be recovered. Delete the cluster and start again."
+      fi
+      if (( attempt >= ${VAULT_INIT_ATTEMPTS:-3} )); then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] failed to execute vault operator init"
+      fi
+      attempt=$((attempt + 1))
+      _info "[vault] $leader is still uninitialised; retrying init (attempt $attempt)"
+      sleep 5
+   done
+   _cleanup_on_success "$errfile"
 
    trap - EXIT TERM
    printf '%s\n' "$jsonfile"
