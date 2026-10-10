@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN
+**Status:** FIXED `4024d6f6` 2026-10-09 (Codex via worktree dispatch; Claude verified 87 pytest, three mutations red, including the safety valve, landed with `land --test`). Live from the next Hermes tick. The `VectorDBIndexDrift` description change reaches the hub with the next hub rules apply (`make` target for `scripts/etc/prometheus/rules`).
 **Priority:** P2 — retrieval keeps returning documents that no longer exist; the workaround is a manual unlimited `make index-docs`
 **Severity:** medium
 **Origin:** operator, 2026-10-09: the vectordb dashboard showed drift docs at −2 and `VectorDBIndexDrift` firing.
