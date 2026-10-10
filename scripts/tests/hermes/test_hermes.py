@@ -417,6 +417,46 @@ def test_refresh_index_unchanged_status_failure_stays_noop(monkeypatch):
     assert commands[-1]["result"] == "noop"
 
 
+def test_refresh_index_success_clears_expired_pause(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 0 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    state = {"index_paused_until": 999}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 0
+    assert pushed[-1]["paused_until"] == 0 and pushed[-1]["result"] == "success"
+
+
+def test_refresh_index_noop_clears_expired_pause(monkeypatch):
+    commands, pushed = [], []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 5, "corpus_docs": 5}), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    state = {"index_fingerprint": "same", "index_paused_until": 999}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 0
+    assert pushed[-1]["paused_until"] == 0 and pushed[-1]["result"] == "noop"
+
+
+def test_refresh_index_future_pause_is_unchanged(monkeypatch):
+    commands, pushed = [], []
+    _stub_refresh(monkeypatch, commands, SimpleNamespace(returncode=0, stdout="", stderr=""), pushed)
+    state = {"index_paused_until": 2000}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 2000
+    assert pushed[-1]["paused_until"] == 2000 and pushed[-1]["result"] == "paused"
+
+
 def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeypatch):
     commands = []
     pushed = []

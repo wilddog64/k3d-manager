@@ -552,6 +552,10 @@ def _refresh_index(state, now=None):
         "duration": 0, "paused_until": state.get("index_paused_until", 0),
         "result": "failed",
     }
+    stored_paused_until = float(state.get("index_paused_until", 0) or 0)
+    if stored_paused_until <= now:
+        metrics["paused_until"] = 0
+        state["index_paused_until"] = 0
     try:
         ref, branch = _index_ref()
         state["index_ref"] = ref
