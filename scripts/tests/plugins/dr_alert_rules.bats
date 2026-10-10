@@ -5,7 +5,7 @@
 import sys, yaml
 doc = yaml.safe_load(open(sys.argv[1]))
 rules = next(g['rules'] for g in doc['spec']['groups'] if g['name'] == 'dr.alerts')
-assert {r['alert'] for r in rules} == {'DRDrillFailed', 'DRDrillStale'}
+assert {r['alert'] for r in rules} == {'DRDrillFailed', 'DRDrillStale', 'HubDataExportFailed', 'HubDataExportStale', 'HubDataExportNeverRan'}
 assert all(r['labels']['severity'] == 'warning' for r in rules)
 PY
   [ "$status" -eq 0 ]

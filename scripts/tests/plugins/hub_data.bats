@@ -369,7 +369,7 @@ STUB
 
 @test "1 inventory uses Kubernetes login JWT on stdin only" {
   source_plugin; run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
-  ! grep -q JWT-SENTINEL "$VLOG"; grep -q JWT-SENTINEL "$STDIN_LOG"; grep -q 'auth/kubernetes/login' "$VLOG"; grep -q 'jwt=-' "$VLOG"
+  [ "$(grep -c JWT-SENTINEL "$VLOG" || true)" -eq 0 ]; grep -q JWT-SENTINEL "$STDIN_LOG"; grep -q 'auth/kubernetes/login' "$VLOG"; grep -q 'jwt=-' "$VLOG"
 }
 
 @test "2 export never loads DR shards or generate-root" {
