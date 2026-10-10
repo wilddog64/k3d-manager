@@ -427,24 +427,28 @@ function vault_dr_shards_export() {
       return 2
    fi
    local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count shard i
-   count="$(_secret_load_data "$service" "${cluster}:count" "$type")" || return 1
+   count="$(_secret_load_data "$service" "${cluster}:count" "$type")" || {
+      echo "[vault] no DR shards for ${cluster} in Keychain service ${service}; run make vault-dr-shards-save in Terminal.app" >&2; return 1
+   }
    printf '%s\n' "$count"
    for ((i=1; i<=count; i++)); do
-      shard="$(_secret_load_data "$service" "${cluster}:shard${i}" "$type")" || return 1
+      shard="$(_secret_load_data "$service" "${cluster}:shard${i}" "$type")" || {
+         echo "[vault] DR shard ${i} of ${count} missing for ${cluster}" >&2; return 1
+      }
       printf '%s\n' "$shard"
    done
 }
 
 function vault_dr_shards_import() {
    local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" count shard i=0
-   IFS= read -r count || return 1
-   [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 1
+   IFS= read -r count || { echo '[vault] DR shard import: empty input' >&2; return 1; }
+   [[ "$count" =~ ^[1-9][0-9]*$ ]] || { echo '[vault] DR shard import: first line is not a shard count; pipe the output of make vault-dr-shards-export' >&2; return 1; }
    local -a shards=()
    while IFS= read -r shard && (( i < count )); do
       shards+=("$shard")
       i=$((i + 1))
    done
-   (( i == count )) || return 1
+   (( i == count )) || { echo "[vault] DR shard import: expected ${count} shards, got ${i}" >&2; return 1; }
    _vault_dr_store_shards "$cluster" "${shards[@]}"
 }
 

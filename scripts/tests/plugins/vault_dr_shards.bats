@@ -62,3 +62,23 @@ setup() {
   grep -q 'k3dm-manager-vault-unseal|secrets/vault:count' "$CLEAR_LOG"
   [ "$(grep -c 'k3dm-vault-unseal-dr' "$CLEAR_LOG" || true)" -eq 0 ]
 }
+
+@test "vault DR shards: export with no stored shards says why and prints nothing" {
+  run --separate-stderr vault_dr_shards_export
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"no DR shards for secrets/vault"* ]]
+}
+
+@test "vault DR shards: import rejects a stream whose first line is not a count" {
+  run --separate-stderr vault_dr_shards_import <<< $'running under bash version 5.3\n1\nSHARD-SENTINEL-1'
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"first line is not a shard count"* ]]
+  [ ! -s "$STORE_LOG" ]
+}
+
+@test "vault DR shards: the dispatcher banner stays off stdout" {
+  run --separate-stderr "${SCRIPT_DIR}/k3d-manager" _k3dm_no_such_fn
+  [[ "$output" != *"running under"* ]]
+  [[ "$stderr" == *"running under bash version"* ]]
+}
