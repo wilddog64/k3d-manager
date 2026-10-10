@@ -1,3 +1,4 @@
+- 2026-10-10: Drill run 16 PASSED for real (RTO 499s, RPO 459s, V2 = 15 paths); RTO/RPO recorded in the how-to. Pending: M4 make dr-drill-publish.
 - 2026-10-10: Export root-token failure = unset stdin_payload under set -u (vault.sh). Fixed. Operator: M4 export, then M2 drill.
 - 2026-10-10: Drill run 15 passed except V2, which was vacuous (null vault_paths in the export). Fixed fail-closed. Do not publish run 15; operator: M4 re-export, M2 rerun.
 - 2026-10-10: Drill run 14: real unseal bug = `vault operator unseal -` sends literal '-'. Now `vault write sys/unseal key=-`. Operator: M2 pull, delete dr-drill, rerun.

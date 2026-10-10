@@ -182,8 +182,8 @@ identity, so this is the one time the Bitwarden copy goes on the M4, temporarily
 
 ## Measured RTO and RPO
 
-Record these after the first live drill. RTO here is the data-services RTO.
+Add a row after each notable drill. RTO here is the data-services RTO.
 
 | Date | RTO | RPO | Notes |
 |---|---|---|---|
-| | | | |
+| 2026-10-10 | 499 s (8 min 19 s) | 459 s (7 min 39 s) | First passing live drill (run `20261010T182508Z`, export `20261010T180910Z`), V0–V7 all true. V2 checked 15 Vault paths; the export held 6 Keycloak users and 12 LDAP entries. Kept with `DR_DRILL_KEEP=1`. RPO is small because the export was taken just before the drill. |
