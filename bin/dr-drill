@@ -106,10 +106,14 @@ _dr_drill_latest_export() {
   (( _dr_drill_export_age_seconds <= 93600 ))
 }
 
+DR_DRILL_CHECK_IMAGE="curlimages/curl:8.10.1"
+
+# Measures free space where Docker stores images and volumes. The root dir sits
+# inside the VM on OrbStack and Docker Desktop, so df runs in a container.
 _dr_drill_docker_free() {
   local free="${DR_DRILL_DOCKER_FREE_GB:-}"
   if [[ -z "$free" ]]; then
-    free="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null | xargs -r df -Pk 2>/dev/null | awk 'NR==2 {printf "%d", $4/1024/1024}')"
+    free="$(docker run --rm --entrypoint df "$DR_DRILL_CHECK_IMAGE" -Pk / 2>/dev/null | awk 'NR==2 {printf "%d", $4/1024/1024}')"
   fi
   [[ "$free" =~ ^[0-9]+$ ]] && (( free >= 10 ))
 }
@@ -138,7 +142,7 @@ _dr_drill_preflight() {
 _dr_drill_v0_one() {
   local ns="$1" pod wait_s output curl_rc exec_rc=0
   pod="dr-egress-check-${ns}"; wait_s="${DR_DRILL_EGRESS_WAIT_S:-10}"
-  if ! _dr_drill_kubectl --no-exit -n "$ns" run "$pod" --restart=Never --image=curlimages/curl:8.10.1 --command -- sleep 30 >/dev/null; then
+  if ! _dr_drill_kubectl --no-exit -n "$ns" run "$pod" --restart=Never --image="$DR_DRILL_CHECK_IMAGE" --command -- sleep 30 >/dev/null; then
     _dr_drill_kubectl -n "$ns" delete pod "$pod" --ignore-not-found=true >/dev/null 2>&1 || true
     return 1
   fi

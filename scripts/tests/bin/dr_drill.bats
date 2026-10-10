@@ -224,3 +224,21 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
 @test "dr drill: deny-list remains absent" {
   run ! grep -En 'hub-restore|hub_recovery_reconcile|install-.*port-forward|launchctl|cloudflared' bin/dr-drill
 }
+
+@test "dr drill: free disk is measured inside Docker, not on the host" {
+  unset DR_DRILL_DOCKER_FREE_GB
+  cat > "$STUB_BIN/docker" <<'STUB'
+#!/usr/bin/env bash
+printf 'docker'; printf ' %q' "$@"; printf '\n' >> "$PHASE_LOG"
+if [[ "$1" == run && " $* " == *" --entrypoint df "* ]]; then
+  printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
+  printf 'overlay 382205952 23533724 %s 6%% /\n' "$DR_TEST_DOCKER_AVAIL_KB"
+fi
+STUB
+  chmod +x "$STUB_BIN/docker"
+  DR_TEST_DOCKER_AVAIL_KB=358672228 run_drill
+  [ "$status" -eq 0 ]
+  DR_TEST_DOCKER_AVAIL_KB=5242880 run_drill
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Docker free disk is below 10 GB"* ]]
+}
