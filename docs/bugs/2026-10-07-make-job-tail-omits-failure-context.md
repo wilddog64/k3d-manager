@@ -42,7 +42,7 @@ tripwire noise, and high-cardinality raw logs out of permanent cloud responses.
   and Slack `diagnosis`.
 - Tests cover a failure whose cause appears before the final 2,000 characters.
 - The failure-evidence design is coordinated with
-  `docs/plans/v1.43.0-e2e-failure-artifacts.md` where artifact retention overlaps.
+  `docs/plans/v1.47.0-e2e-failure-artifacts.md` where artifact retention overlaps.
 
 ## Resolution
 

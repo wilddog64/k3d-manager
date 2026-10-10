@@ -132,7 +132,9 @@ P0/P1, untriaged, open by priority over time), and a pre-commit check rejects ne
 have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
-for v1.43.0: [`v1.43.0-e2e-failure-artifacts.md`](plans/v1.43.0-e2e-failure-artifacts.md),
+for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
+(daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
+spec, now v1.47.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
 (dispatched first: Codex work stays sequential until each spec can run in its own git worktree), and the
@@ -174,6 +176,12 @@ heartbeat alerts only while the hub is reachable. Planned downtime takes a `make
 maintenance silence. Scope:
 [`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
 is now at 2 of 5 plans.
+
+### Candidate milestone — v1.47.0
+
+**Structured E2E failure evidence**, moved from v1.43.0 on 2026-10-10 to make room for the P1 daily
+hub data export. Scope: [`v1.47.0-e2e-failure-artifacts.md`](plans/v1.47.0-e2e-failure-artifacts.md).
+v1.47.0 is at 1 of 5 plans.
 
 ## Forward themes (unversioned until scoped)
 
