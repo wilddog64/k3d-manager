@@ -1535,6 +1535,26 @@ Then:
 EOF
 }
 
+# Waits until the Vault API answers (status exit 0 or 2: unsealed or sealed).
+# A pod reports Running before its listener and raft leader are up.
+function _vault_wait_api() {
+   local ns="$1" release="$2" deadline=$((SECONDS + ${VAULT_API_WAIT_S:-120}))
+   while (( SECONDS < deadline )); do
+      if _vault_exec --no-exit "$ns" 'vault status -format=json >/dev/null 2>&1; rc=$?; [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ]' "$release" >/dev/null 2>&1; then
+         return 0
+      fi
+      _info "[vault] waiting for the $release API to answer"
+      sleep 3
+   done
+   return 1
+}
+
+# Prints only error lines from a failed init's output, never key material.
+function _vault_init_error_lines() {
+   command grep -i -E '^(error|warning)|error:' "$1" 2>/dev/null \
+      | command grep -v -i -E 'key|token|b64' | head -5 | sed 's/^/[vault] init: /'
+}
+
 function _vault_operator_init() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local leader="${release}-0"
@@ -1570,7 +1590,13 @@ function _vault_operator_init() {
       _err "[vault] timeout waiting for $leader to be Running (last=${vault_state:-unknown})"
    fi
 
+   if ! _vault_wait_api "$ns" "$release"; then
+      _cleanup_on_success "$jsonfile"
+      _err "[vault] $leader is Running but its API did not answer within ${VAULT_API_WAIT_S:-120}s"
+   fi
+
    if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
+      _vault_init_error_lines "$jsonfile" >&2
       _cleanup_on_success "$jsonfile"
       _err "[vault] failed to execute vault operator init"
    fi
