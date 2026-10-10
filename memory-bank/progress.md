@@ -1,3 +1,4 @@
+- 2026-10-10: [x] v1.43.0 daily hub-data export live on the M4 (setup, manual export 20261010T194542Z verified, schedule 03:30). [ ] confirm first scheduled run 2026-10-11.
 - 2026-10-10: [x] v1.43.0 daily hub-data export LANDED 5c44b1c1; [ ] operator live setup on M4.
 - 2026-10-10: v1.47.0 planned = infra e2e + promotion gate only (spec written). v1.46.0 now 4 specs; v1.48.0 = e2e-failure-artifacts.
 - 2026-10-10: v1.43.1 planned: hub-data-recover + dr-clean-room-checks (2/5). v1.43.0 scope = export schedule (Codex running).
