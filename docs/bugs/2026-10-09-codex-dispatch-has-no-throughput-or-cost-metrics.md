@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatch after `2026-10-09-codex-dispatch-land-does-not-test-integrated-state.md` lands
+**Status:** OPEN — dispatched 2026-10-09 (land-test dependency landed `c0871808`)
 **Priority:** P3 — no outage; without it, parallel dispatch cannot be judged by numbers
 **Severity:** low
 **Origin:** operator, 2026-10-09: track fleet throughput (accepted specs/day), landing success
@@ -53,6 +53,7 @@ The data exists but is never kept:
 | `land` | after `merge --ff-only` succeeds | `verifier_lines` (int), `wait_seconds` (int or null) |
 | `land_refused` | when `land` refuses for scope, rebase or tests | `reason`: `scope`, `rebase` or `tests` |
 | `abandon` | after `abandon --yes` | — |
+| `resume` | after `resume` launches | `n` (int, the resume number) |
 
 - `tokens` comes from the line after `^tokens used$` in `codex.log`, with commas removed. It is
   `null` when absent.
@@ -66,6 +67,13 @@ The data exists but is never kept:
   It is 0 when `codex-tree` is missing.
 - `wait_seconds` is the `land` ts minus the run's `codex_exit` ts. It is `null` if there is no
   `codex_exit`.
+- **Resume** (added after `resume` landed in `c0871808`). The `resume` background subshell writes a
+  `codex_exit` event exactly like `start`'s: tokens from `<run>/codex-<n>.log`, and a fresh `tree`
+  that overwrites `<run>/codex-tree`. Codex reports `tokens used` as the **session total**, so a
+  resumed log already includes the first run (observed: 148,680 after the first run, 246,887 after
+  one resume). The exporter therefore uses each task's **latest** `codex_exit` for `tokens`, and
+  `wait_seconds` / `verifier_lines` are measured from that latest exit too. Never sum `codex_exit`
+  tokens across one slug.
 
 ### 2. `bin/k3dm-dispatch-metrics` (new, Python)
 
@@ -155,11 +163,15 @@ the end of its log.
 4. A ledger directory that is not writable: `start` still succeeds and prints a warning.
 5. A slug containing a double quote is not possible (slugs are validated). Assert that every
    ledger line parses with `jq -e .`.
+6. After a `resume` (stub prints `tokens used` then `20,000` in `codex-2.log`), the ledger has a
+   `resume` event with `n` 2 and a second `codex_exit` with `tokens` 20000, and `<run>/codex-tree` is
+   the new tree.
 
 **`scripts/tests/bin/test_dispatch_metrics.py`**, with a hand-written ledger and a fixed `now`:
 - exact gauge values for each window: landed counts, landing success inputs, means, `running` and
   `awaiting_land`;
 - events older than 30 days are excluded from every window;
+- a slug with two `codex_exit` events (12345, then 20000) counts 20000 tokens, not 32345;
 - malformed lines are counted, not fatal;
 - `--dry-run` never opens a connection (stub the opener and assert it is not called);
 - the rendered text contains no slug.
