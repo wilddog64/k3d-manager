@@ -212,3 +212,16 @@ source_plugin() {
   _hub_data_vault_kv_list token secrets vault secret/app >/dev/null
   [ "$(grep -c eval "$VLOG" || true)" -eq 0 ]
 }
+
+@test "hub-data: the dispatcher finds every public hub_data function" {
+  local dispatcher="${BATS_TEST_DIRNAME}/../../k3d-manager"
+  run env -u DR_DRILL_CONTEXT -u DR_DRILL_CLUSTER "$dispatcher" hub_data_restore
+  [[ "$output" != *"not found in plugins"* ]]
+  [[ "$output" == *"DR_DRILL_CONTEXT and DR_DRILL_CLUSTER are required"* ]]
+  run env K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/no-recipient" "$dispatcher" hub_data_export
+  [[ "$output" != *"not found in plugins"* ]]
+  [[ "$output" == *"missing age recipient"* ]]
+  run "$dispatcher" hub_data_verify_vault_paths
+  [[ "$output" != *"not found in plugins"* ]]
+  [[ "$output" == *"inventory path required"* ]]
+}

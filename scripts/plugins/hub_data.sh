@@ -130,7 +130,7 @@ function _hub_data_inventory() (
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 )
 
-function hub_data_export() (
+function hub_data_export() { (
   [[ -r "$K3DM_HUB_DATA_AGE_RECIPIENT" ]] || { _err "[hub-data] missing age recipient: $K3DM_HUB_DATA_AGE_RECIPIENT"; return 1; }
   local stage repo root stamp ns claim logical path container
   stage="$(_hub_data_stage)"
@@ -147,7 +147,7 @@ function hub_data_export() (
   done < <(_hub_data_claims)
   _hub_data_inventory "$root"; _hub_data_split_large "$root"; _hub_data_encrypted_checksum "$root"
   (cd "$repo" && git add snapshots && git commit -m "snapshot: ${stamp}" && git push origin snapshots)
-)
+) }
 
 function _hub_data_meta_field() {
   local file="$1" ns="$2" claim="$3" field="$4"
@@ -223,7 +223,7 @@ function _hub_data_copy_claim() {
   _hub_data_restore_one "$ns" "$claim" "$encrypted" "$node" "$path"
 }
 
-function hub_data_restore() (
+function hub_data_restore() { (
   local stage repo latest ns claim created=0
   if [[ -z "${DR_DRILL_CONTEXT:-}" || -z "${DR_DRILL_CLUSTER:-}" ]]; then
     _err "[hub-data] DR_DRILL_CONTEXT and DR_DRILL_CLUSTER are required"
@@ -255,9 +255,9 @@ function hub_data_restore() (
   while IFS='|' read -r ns claim; do
     if ! _hub_data_scale "$ns" "$claim" 1; then return 1; fi
   done < <(_hub_data_claims)
-)
+) }
 
-function hub_data_verify_vault_paths() (
+function hub_data_verify_vault_paths() { (
   local ns="${1:-secrets}" release="${2:-vault}" inventory="${3:?inventory path required}" token cleanup=0 path
   local -a paths=()
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
@@ -272,4 +272,4 @@ function hub_data_verify_vault_paths() (
     _hub_data_vault_kv_list "$token" "$ns" "$release" "$path" >/dev/null || return 1
   done
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
-)
+) }
