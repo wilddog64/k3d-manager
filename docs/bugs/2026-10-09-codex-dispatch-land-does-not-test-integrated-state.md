@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** OPEN — dispatch via `make codex-dispatch` after the first parallel batch lands
+**Status:** FIXED `c0871808` 2026-10-09 (Codex via worktree dispatch; Claude verified 28/28 BATS, shellcheck clean, six mutations red). Claude's changes: the scope diff now starts at the merge-base with the release branch, because a `land` retried after a test refusal saw the release branch's newer commits as task changes and refused the retry as out of scope; a resume refused by the network check no longer deletes the finished task's `exit`; tests added for the `--test false`/`true` retry, `--no-test` output, the lock after a test refusal, resume argv/cwd and every resume refusal.
 **Priority:** P2 — parallel dispatch is live; a semantic conflict between two clean rebases would land untested
 **Severity:** medium
 **Origin:** operator, 2026-10-09, from a review of agent isolation: conflict handling,
