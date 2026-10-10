@@ -254,12 +254,19 @@ breaking change that makes this a major version.
 the nine repos stay public, archived, as the record. So there is no long side-by-side period. It
 leaves Hostinger first, which frees the room the new app needs there (about 900m CPU and 3 GiB of
 requests on a 2-CPU node). It stays on the hub and ACG only as the e2e target until the new app
-takes over. **Timing:** none of this starts until the app's own development is close (after
-v1.47.0). The k3d-manager steps below follow the app's milestones, not the calendar.
+takes over.
+
+**Timing, revised 2026-10-10 (operator).** The two tracks are independent until they meet at
+v1.49.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
+may start any time, in the gaps while agents work k3d-manager batches. M2 and later are not run in
+parallel with the platform releases. The v1.47.0 gate stays mandatory for every infra promotion and
+is never weakened for the app. Deploying the app onto the platform (v1.49.0) waits for v1.47.0 to
+ship and for app M1. v1.47.0 and v1.48.0 are written workload-agnostic, so v1.50.0 re-points them
+by editing lists, not code.
 
 | Step | Where | Scope |
 |---|---|---|
-| App M1–M4 | app repo, its own versions | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
+| App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
 | v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
 | v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
