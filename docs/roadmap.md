@@ -140,7 +140,7 @@ spec, now v1.48.0),
 (dispatched first: Codex work stays sequential until each spec can run in its own git worktree), and the
 R10 overflow from v1.42.0, [`v1.43.0-hermes-r10-delete-superseded-failed-job.md`](plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md)
 (an approval-gated deletion of a failed Job whose CronJob spec has since changed, in `identity`/`monitoring`/`cicd` only).
-v1.43.0 is now at its five-plan cap, so anything new goes to v1.44.0.
+v1.43.0 is at its five-plan cap and closed; all five plans are DONE.
 
 ### Candidate milestone — v1.43.1
 
@@ -177,6 +177,27 @@ same file.
   - the e2e payments assertion needs only the operator's live Tier 1 rerun;
   - hub CPU overcommit (August) and data-layer `RespectIgnoreDifferences` (June) need re-triage
     against today's hub first.
+
+### Candidate milestone — v1.44.0
+
+**Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
+`cloud-requests` branch as enough to submit a request, and `requested_by` is unsigned. v1.44.0
+authenticates the submitter, lets one request route its Slack notices to an approved channel, and
+turns the operator's manual acceptance checks into repeatable scenarios with evidence. Branch
+`k3d-manager-v1.44.0`, cut from `main` after v1.43.2 merges.
+
+| Spec | What it adds |
+|---|---|
+| [`v1.44.0-cloud-request-submitter-authentication.md`](plans/v1.44.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |
+| [`v1.44.0-cloud-request-slack-notification-routing.md`](plans/v1.44.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
+| [`v1.44.0-operator-acceptance-automation.md`](plans/v1.44.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
+| [`v1.44.0-bounded-index-metrics-diagnostics.md`](plans/v1.44.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
+
+Also in v1.44.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
+cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
+[Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
+[`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
+v1.43.0 and is superseded, so v1.44.0 has four live plans and room for one more.
 
 ### Candidate milestone — v1.45.0
 

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-10-11
+
 - Fixed: the first live daily-export run pushed and verified its export, then failed the prune,
   and `make hub-data-export-setup` failed its self-test. The "legacy export" notice was sent
   through `_err`, which exits in lib-foundation, so a warning stopped the prune; it is now a
@@ -108,6 +110,47 @@
   namespaces is now allowed.
 - Fixed: the DR drill tests pinned their export to 2026-10-09T12:00Z and began failing the 26 h
   freshness check on 2026-10-10 at 14:00Z; the fixture now uses the current time.
+- Added: `bin/k3dm-codex-dispatch` (`make codex-dispatch`) runs each Codex spec in its own git
+  worktree with isolated state, so several specs can be implemented in parallel without touching the
+  operator checkout. `land` checks scope against the spec's `## Files` table before it fast-forwards.
+  It takes exactly one of `--test CMD` or `--no-test`; the test runs in the rebased task worktree,
+  so two tasks that rebase cleanly but break each other are refused. A landing lock stops two lands
+  racing, only one networked task runs at a time, and `resume` sends a follow-up prompt to the same
+  Codex session. The scope comes from the spec as it was dispatched, not the task's working copy, so
+  a task can no longer widen its own allowlist by editing the spec. `start` detaches from the
+  caller's stdout. A ledger (`ledger.jsonl`) records start, exit, land, refusal, resume and abandon
+  events; `bin/k3dm-dispatch-metrics` turns it into 1d/7d/30d throughput, landing, intervention and
+  token gauges for the new k3dm Agent Dispatch dashboard. See `docs/howto/codex-dispatch.md`.
+- Added: bug priority as metadata. Every new `docs/bugs/` file carries `**Priority:** P0`–`P3`
+  directly under `**Status:**` (urgency, separate from Severity), and a pre-commit hook checks the
+  staged file. The three status formats in use are parsed into one state, the archive is excluded,
+  and priority and state appear in `/ask-docs` answers, in Pushgateway metrics and on the Bugs
+  dashboard. `make bug-tally` counts bugs per release, and count questions ("how many P1 bugs in
+  v1.42.0") are answered from that tally before any model runs. All 30 open bug docs were
+  backfilled with a priority.
+- Added: Hermes R10, an approval-gated repair that deletes a failed Job whose CronJob spec has since
+  changed, so `KubeJobFailed` stops firing for a failure the current spec can no longer produce. A
+  new `superseded_jobs` sensor finds them: failed, not active, owned by a CronJob in `identity`,
+  `monitoring` or `cicd`, with a container fingerprint (names, images, commands, args) that differs
+  from the CronJob's template. Hermes proposes the deletion; a human approves it in Slack.
+- Changed: `make appsets-reapply` rolls out in two stages. Every ApplicationSet manifest carries
+  `k3dm.k3d.io/rollout-stage` (`hub` or `app-cluster`), and an unlabelled or unknown stage refuses
+  before anything is applied. The hub stage is applied and confirmed first (its own Applications on
+  the branch, none `Degraded`), then the app-cluster stage. `APPSETS_STAGE=hub` stops after the hub
+  so it can soak. The confirmation now waits for the ApplicationSet controller instead of reading
+  stale state, the shared preparation runs once, and each stage line names its scope.
+- Fixed: Hermes stopped with exit 78 and no alert after a Homebrew upgrade removed
+  `/opt/homebrew/bin/python3`. The Hermes, webhook and cloud-bridge LaunchAgents now run
+  `/opt/homebrew/opt/python@3.14/bin/python3.14`, the installers refuse when it is missing, Hermes
+  pushes a heartbeat after every poll, and `HermesNotRunning` fires when it is older than 15 minutes.
+- Fixed: the scheduled vector-store index never pruned renamed or deleted docs, because Hermes
+  always passes `--limit` and the prune was disabled under it. A safety valve refuses to prune more
+  than max(20, 5%) of the store, and `VectorDBIndexDrift` explains a row-count mismatch.
+- Fixed: the vector-store dashboard showed an expired index pause (2026-10-05) next to a `success`
+  result; a successful run now clears the pause from state and metrics.
+- Fixed: the k3dm Alertmanager Delivery dashboard counted 39 upstream-image Trivy findings and a
+  down ACG sandbox as 41 warnings, hiding the actionable ones. It now separates actionable,
+  security and synthetic alerts.
 
 ## [1.42.0] - 2026-10-09
 
