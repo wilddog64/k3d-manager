@@ -122,7 +122,7 @@ STUB
 { printf 'vault'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 [[ "$*" == *SHARD-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97
 case "$*" in
-  *'operator unseal -'*) [[ "$*" == *SHARD-SENTINEL* ]] && exit 97; cat >> "$SHARD_LOG"; [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]] && exit 1; exit 0 ;;
+  *'operator unseal -'*) [[ "$*" == *SHARD-SENTINEL* ]] && exit 97; key="$(cat)"; printf '%s\n' "$key" >> "$SHARD_LOG"; if [[ "${DR_TEST_UNSEAL_FAIL:-0}" == 1 ]]; then printf 'Error unsealing: bad key %s\n* cipher: message authentication failed\n' "$key" >&2; exit 2; fi; exit 0 ;;
   *'-generate-otp'*) printf '{"otp":"OTP-SENTINEL"}' ;;
   *'-init'*) printf '{"nonce":"NONCE"}' ;;
   *'-decode=-'*) [[ "$*" == *OTP-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97; cat >> "$SHARD_LOG"; printf ROOT-TOKEN ;;
@@ -241,6 +241,7 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   export DR_TEST_UNSEAL_FAIL=1
   run_drill; [ "$status" -ne 0 ]
   [[ "$output" == *"vault operator unseal failed for shard 1 of 1"* ]]
+  [[ "$output" == *"cipher: message authentication failed"* ]]
   [[ "$output" != *SHARD-SENTINEL* ]]
 }
 

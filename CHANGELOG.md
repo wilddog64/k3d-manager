@@ -21,6 +21,9 @@
   Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
   uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
   fails.
+- Fixed: when `vault operator unseal` failed, the DR drill threw away its output, so a shard Vault
+  rejected looked the same as a failed `kubectl exec`. The drill now prints the error lines from
+  that output (at most five), and drops any line that contains the shard.
 - Fixed: the DR drill's unseal failed with no message when the M2 Keychain had no shard count, a
   count that was not a number, or a missing shard. Each case now prints which Keychain item is
   wrong (never its value), and a rejected shard names the unseal step.
