@@ -225,3 +225,40 @@ source_plugin() {
   [[ "$output" != *"not found in plugins"* ]]
   [[ "$output" == *"inventory path required"* ]]
 }
+
+_fake_identity_pod() {
+  export POD_BIN="$BATS_TEST_TMPDIR/pod-bin"; mkdir -p "$POD_BIN"
+  cat > "$POD_BIN/psql" <<'STUB'
+#!/usr/bin/env bash
+[[ " $* " == *" -U keycloak -d keycloak "* ]] || { echo 'psql: FATAL: role does not exist' >&2; exit 2; }
+printf '6\n'
+STUB
+  cat > "$POD_BIN/ldapsearch" <<'STUB'
+#!/usr/bin/env bash
+[[ " $* " == *" -Y EXTERNAL -H ldapi:/// "* && " $* " == *" -b dc=home,dc=org "* ]] || { echo "ldap_sasl_bind(SIMPLE): Can't contact LDAP server (-1)" >&2; exit 255; }
+for i in $(seq 1 12); do printf 'dn: cn=e%s,dc=home,dc=org\n\n' "$i"; done
+STUB
+  chmod +x "$POD_BIN/psql" "$POD_BIN/ldapsearch"
+  _kubectl() {
+    while (( $# )) && [[ "$1" != -- ]]; do shift; done; shift
+    POSTGRES_USER=keycloak POSTGRES_DB=keycloak LDAP_ROOT=dc=home,dc=org PATH="$POD_BIN:$PATH" "$@"
+  }
+  _hub_data_generate_root() { printf root-token; }
+  _hub_data_vault_kv_list() { printf '{"data":["secret/app"]}'; }
+  _hub_data_vault_revoke() { :; }
+}
+
+@test "hub data inventory: counts Keycloak users and LDAP entries with the pod's own credentials" {
+  source_plugin; _fake_identity_pod
+  run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
+  [ "$(jq -r .keycloak_realm_user_count "$TEST_ROOT/inventory.json")" = 6 ]
+  [ "$(jq -r .ldap_entry_count "$TEST_ROOT/inventory.json")" = 12 ]
+}
+
+@test "hub data export: an inventory failure stops the export before anything is pushed" {
+  source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
+  _hub_data_inventory() { return 1; }
+  run hub_data_export; [ "$status" -ne 0 ]
+  [[ "$output" == *"could not record the inventory"* ]]
+  [ "$(grep -c '^git commit\|^git push' "$CALL_LOG" || true)" -eq 0 ]
+}

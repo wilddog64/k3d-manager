@@ -9,6 +9,20 @@
   (`passed`, `still failing`, or `fixed: passed <date>`), newest first. Before, an old failed run
   stayed in the table with no date and no sign that a later run had passed, which read as a
   current failure.
+- Fixed: `vault operator init` now runs detached inside the Vault pod and writes its output to a
+  file there, which the caller reads back with retries. Before, a dropped `kubectl exec` stream
+  during the raft election lost the only copy of the keys while Vault itself had initialised, which
+  failed the DR drill at Phase 2 twice. If the output cannot be read back, the keys stay in the pod
+  and the error says where.
+- Fixed: the hub data export never wrote `inventory.json`. It counted Keycloak users as Postgres
+  role `postgres` (the hub's role is `keycloak`) and LDAP entries with an anonymous search under
+  `dc=shopping-cart,dc=local` (the hub refuses anonymous binds and its base is `dc=home,dc=org`).
+  The export ignored the failure and pushed anyway, so every drill would have failed at restore.
+  Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
+  uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
+  fails.
+- Fixed: the DR drill tests pinned their export to 2026-10-09T12:00Z and began failing the 26 h
+  freshness check on 2026-10-10 at 14:00Z; the fixture now uses the current time.
 
 ## [1.42.0] - 2026-10-09
 

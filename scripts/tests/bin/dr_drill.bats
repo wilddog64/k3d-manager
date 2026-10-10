@@ -7,7 +7,7 @@ setup() {
   export KLOG="$TEST_ROOT/kubectl.log" VLOG="$TEST_ROOT/vault.log" SHARD_LOG="$TEST_ROOT/phase.log" PHASE_LOG="$TEST_ROOT/phase.log" RESTORE_LOG="$TEST_ROOT/restore.log"
   mkdir -p "$STUB_BIN" "$TEST_ROOT" "$HOME"
   : > "$KLOG"; : > "$VLOG"; : > "$PHASE_LOG"; : > "$RESTORE_LOG"
-  export DR_DRILL_TEST_TTY=1 DR_DRILL_ALLOW_HOST=1 DR_DRILL_DOCKER_FREE_GB=20 DR_DRILL_EGRESS_WAIT_S=0 DR_TEST_EXPORT_TS=20261009T120000Z
+  export DR_DRILL_TEST_TTY=1 DR_DRILL_ALLOW_HOST=1 DR_DRILL_DOCKER_FREE_GB=20 DR_DRILL_EGRESS_WAIT_S=0 DR_TEST_EXPORT_TS="$(date -u +%Y%m%dT%H%M%SZ)"
   export JQ_REAL="$(command -v jq)"
   cat > "$STUB_BIN/hostname" <<'STUB'
 #!/usr/bin/env bash

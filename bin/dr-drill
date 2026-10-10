@@ -193,14 +193,14 @@ _dr_drill_v3() {
   local inventory want actual
   inventory="$(_dr_drill_inventory)"
   want="$(jq -r '.keycloak_realm_user_count' "$inventory")"
-  actual="$(_dr_drill_kubectl -n identity exec deployment/postgres-keycloak -- psql -U postgres -d keycloak -Atc "SELECT count(*) FROM user_entity WHERE realm_id=(SELECT id FROM realm WHERE name='${KEYCLOAK_REALM:-shopping-cart}');")"
+  actual="$(_hub_data_keycloak_user_count _dr_drill_kubectl)"
   [[ "$actual" == "$want" ]]
 }
 _dr_drill_v4() {
   local inventory want actual
   inventory="$(_dr_drill_inventory)"
   want="$(jq -r '.ldap_entry_count' "$inventory")"
-  actual="$(_dr_drill_kubectl -n identity exec statefulset/openldap -- ldapsearch -x -LLL -b "${LDAP_BASE_DN:-dc=shopping-cart,dc=local}" dn | awk '/^dn:/{n++} END{print n+0}')"
+  actual="$(_hub_data_ldap_entry_count _dr_drill_kubectl)"
   [[ "$actual" == "$want" ]]
 }
 _dr_drill_v5_one() {

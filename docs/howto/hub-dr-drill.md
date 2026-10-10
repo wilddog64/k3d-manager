@@ -124,7 +124,7 @@ newest result is older than 8 days or reports `success: false`.
 | `export` | The export the drill restored. |
 | `success` | `true` only when every check V0–V7 passed. |
 | `failed` | The first failure that stopped the drill: `phase2` (hub build), `phase3` (restore), `unseal`, or `V0`. |
-| `rto_seconds` | Phases 2–4, build to verified. |
+| `rto_seconds` | Phases 2–4, build to verified. This is the **data-services** RTO: Vault, Keycloak's database and LDAP. ArgoCD, monitoring and the M4 host services are not built or timed; see `docs/plans/v1.46.0-hub-full-recovery-time.md`. |
 | `rpo_seconds` | Export age when the drill ran. |
 | `checks` | V0–V7, each `true` or `false`. |
 
@@ -182,7 +182,7 @@ identity, so this is the one time the Bitwarden copy goes on the M4, temporarily
 
 ## Measured RTO and RPO
 
-Record these after the first live drill.
+Record these after the first live drill. RTO here is the data-services RTO.
 
 | Date | RTO | RPO | Notes |
 |---|---|---|---|

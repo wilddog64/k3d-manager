@@ -112,5 +112,6 @@ the M2.
 | `leftover drill cluster exists` | Phase 1 | A kept cluster from an earlier run; `k3d cluster delete dr-drill` on the M2 |
 | `failed: phase2` | result JSON | The drill hub did not build; read the `[hub-up]` step that failed |
 | `operator init … cannot be recovered` | Phase 2 | Vault initialised but the keys were lost; delete the cluster and rerun |
+| `could not record the inventory` | `make hub-data-export` on the M4 | The Vault, Keycloak or LDAP count failed; nothing was pushed. Fix that service, then export again |
 | `failed: unseal` | result JSON | The M2 Keychain shards do not match the export's Vault; repeat the shard copy |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |

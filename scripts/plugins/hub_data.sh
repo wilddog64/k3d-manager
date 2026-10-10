@@ -116,6 +116,18 @@ function _hub_data_generate_root() (
   printf '%s\n' "$token"
 )
 
+# Both counts run with the pod's own credentials: the hub's Postgres role is $POSTGRES_USER, not
+# postgres, and OpenLDAP refuses anonymous binds, so LDAP is read over ldapi as the server's own uid.
+function _hub_data_keycloak_user_count() {
+  local realm="${KEYCLOAK_REALM:-shopping-cart}"
+  [[ "$realm" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+  "$@" -n identity exec deployment/postgres-keycloak -- sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -Atc \"SELECT count(*) FROM user_entity WHERE realm_id=(SELECT id FROM realm WHERE name='${realm}');\"" 2>/dev/null | tr -d '[:space:]'
+}
+
+function _hub_data_ldap_entry_count() {
+  "$@" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' 2>/dev/null | awk '/^dn:/{n++} END{print n+0}'
+}
+
 function _hub_data_inventory() (
   local root="$1" ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" token paths users ldap cleanup=0
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
@@ -123,8 +135,8 @@ function _hub_data_inventory() (
   token="$(_hub_data_generate_root "$ns" "$release")"; cleanup=1
   paths="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)"
   jq -e '.data | type == "array" and length > 0' <<<"$paths" >/dev/null
-  users="$(_kubectl -n identity exec deployment/postgres-keycloak -- psql -U postgres -d keycloak -Atc "SELECT count(*) FROM user_entity WHERE realm_id=(SELECT id FROM realm WHERE name='${KEYCLOAK_REALM:-shopping-cart}');" 2>/dev/null | tr -d '[:space:]')"
-  ldap="$(_kubectl -n identity exec statefulset/openldap -- ldapsearch -x -LLL -b "${LDAP_BASE_DN:-dc=shopping-cart,dc=local}" dn 2>/dev/null | awk '/^dn:/{n++} END{print n+0}')"
+  users="$(_hub_data_keycloak_user_count _kubectl)"
+  ldap="$(_hub_data_ldap_entry_count _kubectl)"
   [[ "$users" =~ ^[1-9][0-9]*$ && "$ldap" =~ ^[1-9][0-9]*$ ]] || return 1
   jq -n --argjson p "${paths:-null}" --argjson u "$users" --argjson l "$ldap" '{vault_paths:($p.data // $p),keycloak_realm_user_count:$u,ldap_entry_count:$l}' > "${root}/inventory.json"
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
@@ -145,7 +157,8 @@ function hub_data_export() { (
     docker exec "$container" tar -C "$path" -cf - . | age -r "$(tr -d '\n' < "$K3DM_HUB_DATA_AGE_RECIPIENT")" -o "${root}/${ns}-${claim}.tar.age"
     _hub_data_yaml_metadata "$root" "$ns" "$claim"
   done < <(_hub_data_claims)
-  _hub_data_inventory "$root"; _hub_data_split_large "$root"; _hub_data_encrypted_checksum "$root"
+  if ! _hub_data_inventory "$root"; then _err "[hub-data] could not record the inventory (Vault paths, Keycloak users, LDAP entries); nothing was pushed"; return 1; fi
+  _hub_data_split_large "$root"; _hub_data_encrypted_checksum "$root"
   (cd "$repo" && git add snapshots && git commit -m "snapshot: ${stamp}" && git push origin snapshots)
 ) }
 
