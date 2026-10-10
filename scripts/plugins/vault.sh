@@ -1550,15 +1550,51 @@ function _vault_wait_api() {
 }
 
 # Prints only error lines from a failed init's output, never key material.
-function _vault_init_once() {
-   local ns="$1" release="$2" jsonfile="$3" errfile="$4"
-   local container
-   container=$(_vault_container_name "$ns" "$release")
+function _vault_pod_sh() {
+   local ns="$1" release="$2" container="$3" script="$4"
    local -a args=(--no-exit -n "$ns" exec -i "${release}-0")
    if [[ -n "$container" ]]; then
       args+=(-c "$container")
    fi
-   _kubectl "${args[@]}" -- sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' >"$jsonfile" 2>"$errfile"
+   _kubectl "${args[@]}" -- sh -c "$script"
+}
+
+# Init runs detached inside the pod and writes its output there, so a dropped exec stream
+# cannot lose the keys. Returns 3 when init succeeded but its output could not be read back.
+function _vault_init_once() {
+   local ns="$1" release="$2" jsonfile="$3" errfile="$4"
+   local f="${VAULT_INIT_POD_FILE:-/tmp/k3dm-vault-init}" container rc=""
+   container=$(_vault_container_name "$ns" "$release")
+   _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc; umask 077; nohup sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json >$f.json 2>$f.err; echo \$? >$f.rc' >/dev/null 2>&1 &" >/dev/null 2>"$errfile" || true
+   local deadline=$((SECONDS + ${VAULT_INIT_WAIT_S:-120}))
+   while (( SECONDS < deadline )); do
+      rc=$(_vault_pod_sh "$ns" "$release" "$container" "cat $f.rc 2>/dev/null" 2>/dev/null) || rc=""
+      [[ "$rc" =~ ^[0-9]+$ ]] && break
+      rc=""
+      sleep 2
+   done
+   if [[ -z "$rc" ]]; then
+      printf 'error: vault operator init did not finish within %ss\n' "${VAULT_INIT_WAIT_S:-120}" >>"$errfile"
+      return 1
+   fi
+   for _ in 1 2 3 4 5; do
+      _vault_pod_sh "$ns" "$release" "$container" "cat $f.err" >>"$errfile" 2>/dev/null && break
+      sleep 2
+   done
+   if (( rc != 0 )); then
+      _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc" >/dev/null 2>&1 || true
+      return "$rc"
+   fi
+   for _ in 1 2 3 4 5; do
+      if _vault_pod_sh "$ns" "$release" "$container" "cat $f.json" >"$jsonfile" 2>/dev/null \
+         && command grep -q unseal_keys_b64 "$jsonfile"; then
+         _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc" >/dev/null 2>&1 || true
+         return 0
+      fi
+      sleep 2
+   done
+   : >"$jsonfile"
+   return 3
 }
 
 function _vault_is_initialized() {
@@ -1615,8 +1651,16 @@ function _vault_operator_init() {
    local errfile attempt=1
    errfile=$(mktemp -t vault-init-err.XXXXXX)
    trap '_cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"' EXIT TERM
-   until _vault_init_once "$ns" "$release" "$jsonfile" "$errfile"; do
+   local init_rc
+   while true; do
+      init_rc=0
+      _vault_init_once "$ns" "$release" "$jsonfile" "$errfile" || init_rc=$?
+      (( init_rc == 0 )) && break
       _vault_init_error_lines "$errfile" >&2
+      if (( init_rc == 3 )); then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] init succeeded but its output could not be read back; the keys are still in $leader at ${VAULT_INIT_POD_FILE:-/tmp/k3dm-vault-init}.json. Do not delete the pod until they are copied out."
+      fi
       if _vault_is_initialized "$ns" "$release"; then
          _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
          _err "[vault] init failed but $leader is now initialised; its unseal keys were not returned and cannot be recovered. Delete the cluster and start again."

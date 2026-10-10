@@ -38,16 +38,31 @@ setup() {
 _init_stubs() {
   _vault_wait_api() { return 0; }
   _vault_container_name() { printf 'vault\n'; }
+  export VAULT_INIT_POD_FILE="$BATS_TEST_TMPDIR/pod-init" CALLS INIT_OK_ON
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  cat > "$BATS_TEST_TMPDIR/bin/vault" <<'STUB'
+#!/bin/sh
+printf 'init\n' >> "$CALLS"
+if [ "$(grep -c '^init$' "$CALLS")" -ge "${INIT_OK_ON:-99}" ]; then
+  printf '{"unseal_keys_b64":["KEY"],"root_token":"TOKEN-SENTINEL"}\n'
+  exit 0
+fi
+printf 'Error initializing: context canceled\n"root_token": "TOKEN-SENTINEL"\n' >&2
+exit 2
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/vault"
   _kubectl() {
     case " $* " in
       *" exec "*)
-        printf 'init\n' >> "$CALLS"
-        if [ "$(grep -c init "$CALLS")" -ge "${INIT_OK_ON:-99}" ]; then
-          printf '{"root_token":"TOKEN-SENTINEL"}\n'
-          return 0
+        local script="${!#}"
+        if [[ "$script" == "cat "*".json" ]] && [ "$(grep -c '^drop$' "$CALLS")" -lt "${JSON_DROPS:-0}" ]; then
+          printf 'drop\n' >> "$CALLS"
+          return 1
         fi
-        printf 'Error initializing: context canceled\n"root_token": "TOKEN-SENTINEL"\n' >&2
-        return 2 ;;
+        if [[ "$script" == "rm -f "* && "$script" != *nohup* ]]; then
+          printf 'cleanup\n' >> "$CALLS"
+        fi
+        PATH="$BATS_TEST_TMPDIR/bin:$PATH" sh -c "${script//sh -lc/sh -c}" ;;
       *jsonpath*) printf 'Running' ;;
     esac
   }
@@ -58,7 +73,7 @@ _init_stubs() {
   _vault_is_initialized() { return 0; }
   run --separate-stderr _vault_operator_init secrets vault
   [ "$status" -ne 0 ]
-  [ "$(grep -c init "$CALLS")" -eq 1 ]
+  [ "$(grep -c '^init$' "$CALLS")" -eq 1 ]
   [[ "$stderr" == *"cannot be recovered"* ]]
   [[ "$stderr" == *"context canceled"* ]]
   [[ "$stderr" != *"SENTINEL"* ]]
@@ -69,7 +84,7 @@ _init_stubs() {
   _vault_is_initialized() { return 1; }
   INIT_OK_ON=2 run --separate-stderr _vault_operator_init secrets vault
   [ "$status" -eq 0 ]
-  [ "$(grep -c init "$CALLS")" -eq 2 ]
+  [ "$(grep -c '^init$' "$CALLS")" -eq 2 ]
   grep -q TOKEN-SENTINEL "$output"
   rm -f "$output"
 }
@@ -79,7 +94,7 @@ _init_stubs() {
   _vault_is_initialized() { return 1; }
   VAULT_INIT_ATTEMPTS=3 run --separate-stderr _vault_operator_init secrets vault
   [ "$status" -ne 0 ]
-  [ "$(grep -c init "$CALLS")" -eq 3 ]
+  [ "$(grep -c '^init$' "$CALLS")" -eq 3 ]
   [[ "$stderr" == *"failed to execute vault operator init"* ]]
 }
 
@@ -90,4 +105,37 @@ _init_stubs() {
   _vault_exec() { printf '{"initialized": false, "sealed": true}\n'; }
   run _vault_is_initialized secrets vault
   [ "$status" -eq 1 ]
+}
+
+@test "vault init: a dropped read is retried and the keys come back" {
+  _init_stubs
+  _vault_is_initialized() { return 0; }
+  INIT_OK_ON=1 JSON_DROPS=2 run --separate-stderr _vault_operator_init secrets vault
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^init$' "$CALLS")" -eq 1 ]
+  grep -q unseal_keys_b64 "$output"
+  [ "$(grep -c '^cleanup$' "$CALLS")" -eq 1 ]
+  [ ! -e "$VAULT_INIT_POD_FILE.json" ]
+  rm -f "$output"
+}
+
+@test "vault init: keys left in the pod when they cannot be read back" {
+  _init_stubs
+  _vault_is_initialized() { return 0; }
+  INIT_OK_ON=1 JSON_DROPS=99 run --separate-stderr _vault_operator_init secrets vault
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"keys are still in vault-0"* ]]
+  [[ "$stderr" != *"cannot be recovered"* ]]
+  [[ "$stderr" != *"SENTINEL"* ]]
+  [ "$(grep -c '^cleanup$' "$CALLS")" -eq 0 ]
+  grep -q unseal_keys_b64 "$VAULT_INIT_POD_FILE.json"
+}
+
+@test "vault init: stops when init never finishes" {
+  _init_stubs
+  _vault_pod_sh() { return 1; }
+  _vault_is_initialized() { return 1; }
+  VAULT_INIT_WAIT_S=0 VAULT_INIT_ATTEMPTS=1 run --separate-stderr _vault_operator_init secrets vault
+  [ "$status" -ne 0 ]
+  [[ "$stderr" == *"did not finish within 0s"* ]]
 }
