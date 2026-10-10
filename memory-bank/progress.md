@@ -1,3 +1,4 @@
+- 2026-10-10: [x] First live DR drill passed and published (run 20261010T182508Z, results f19fea8).
 - 2026-10-10: dr-drill-publish path check fixed (literal ~ vs expanded home). Operator: rerun on the M4.
 - 2026-10-10: Drill run 16 PASSED for real (RTO 499s, RPO 459s, V2 = 15 paths); RTO/RPO recorded in the how-to. Pending: M4 make dr-drill-publish.
 - 2026-10-10: Export root-token failure = unset stdin_payload under set -u (vault.sh). Fixed. Operator: M4 export, then M2 drill.
