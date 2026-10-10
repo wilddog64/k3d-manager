@@ -3,7 +3,7 @@
 **Filed:** 2026-10-09
 **Branch:** `k3d-manager-v1.43.0` (spec); implement after
 `2026-10-09-appsets-reapply-confirms-before-controller-regenerates.md`, which edits the same function
-**Status:** OPEN — spec ready for Codex
+**Status:** FIXED `b90a15f1` 2026-10-09 (Codex via worktree dispatch + one `resume`; Claude verified 74/74 BATS, shellcheck clean, mutations red, both stage scopes checked live on the hub: hub 9 + app-cluster 12 = all 21 references). Claude's changes: owner-scoped per-stage confirmation (the first version checked every Application, so the hub stage could never pass on a real release), refusal of a stage with no manifests, stage filter moved into `_argocd_appset_in_stage` for the if-count audit. Landed through `land --test`.
 **Priority:** P2 — blast radius on the persistent clusters; no incident yet, but the istio-cni one
 came in through this path
 **Severity:** medium

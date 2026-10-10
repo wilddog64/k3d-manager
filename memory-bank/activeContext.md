@@ -1,3 +1,10 @@
+## 2026-10-09 — batch 2 DONE: hub-first appsets LANDED `b90a15f1`
+
+- `make appsets-reapply` now applies `hub` sets → confirms (owner-scoped: only Applications whose ownerReferences name a hub set; branch pin + none Degraded) → then `app-cluster` sets → confirms. `APPSETS_STAGE=hub` stops after the hub. Unlabelled set → nothing applied. CLAUDE.md reapply rule updated.
+- First real `bin/k3dm-codex-dispatch resume` (fixed the all-Applications confirmation) and first real `land --test` (combined suites green after rebasing over c0871808).
+- Codex claimed `_agent_audit` exit 0 but the pre-commit audit refused (9 ifs) — Claude extracted `_argocd_appset_in_stage`. Never trust an agent's audit claim; the hook is the gate.
+- Next: dispatch `2026-10-09-codex-dispatch-has-no-throughput-or-cost-metrics` (land-test dependency is in).
+
 ## 2026-10-09 — batch 2: codex-dispatch land-test LANDED `c0871808`; hub-first appsets resumed for a fix
 
 - `bin/k3dm-codex-dispatch`: `land --test CMD|--no-test` (test after rebase, before ff), `.land.lock`, exclusive `--network`, `resume --slug --prompt-file` (`make codex-resume`). 28/28 BATS, six mutations red.
