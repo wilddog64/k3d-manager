@@ -1,3 +1,8 @@
+## 2026-10-09 — filed P3 staged appsets-reapply output bug; dispatched
+
+- `docs/bugs/2026-10-09-appsets-reapply-staged-output-repeats-preamble-and-overstates-scope.md`: preamble (sample line, role label, file count) repeats per stage; scoped confirm says "All Applications". Fix: `_argocd_prepare_applicationsets` once; owners-aware success line. From operator first staged run (hub 9 + app-cluster 12 OK).
+- Dispatched in parallel with the metrics task (disjoint files).
+
 ## 2026-10-09 — dispatched throughput/cost metrics bug (from `fd307ae2`)
 
 - Spec amended first: resume writes `resume` + a second `codex_exit`; tokens are the Codex SESSION total, so the exporter uses the latest `codex_exit` per slug, never a sum.
