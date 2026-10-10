@@ -133,7 +133,7 @@ have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
 for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
-(daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
+(daily unattended export, 5-day retention, one-command restore; P1 2026-10-10, took the slot of the e2e failure-artifacts
 spec, now v1.47.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
 [`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
