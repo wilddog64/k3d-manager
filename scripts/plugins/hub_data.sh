@@ -921,7 +921,10 @@ function hub_data_verify_ldap() {
   fi
 }
 function hub_data_verify_placement() {
-  local inventory="$1" context="$2" postgres expected actual logical metadata="${DR_DRILL_METADATA:-${DR_DRILL_RESTORE_STAGE:-}/pv-pvc.yaml}"
+  local inventory="$1" context="$2" postgres expected actual logical metadata="${DR_DRILL_METADATA:-}"
+  [[ -n "$metadata" || -z "${DR_DRILL_RESTORE_STAGE:-}" ]] || metadata="${DR_DRILL_RESTORE_STAGE}/pv-pvc.yaml"
+  [[ -n "$metadata" || -z "${K3DM_HUB_DATA_EXPORT_DIR:-}" ]] || metadata="${K3DM_HUB_DATA_EXPORT_DIR}/pv-pvc.yaml"
+  [[ -r "$metadata" ]] || { printf '%s\n' "[hub-data] V5: no readable pv-pvc.yaml (set by the drill stage or K3DM_HUB_DATA_EXPORT_DIR): '${metadata}'" >&2; return 1; }
   postgres="$(_kubectl --context "$context" -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"; [[ -n "$postgres" ]] || return 1
   while IFS=$'\t' read -r ns pod claim; do
     _kubectl --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1

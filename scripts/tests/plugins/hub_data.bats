@@ -679,6 +679,18 @@ _fake_vault_tree() {
   [ "$K3DM_HUB_DATA_AGE_IDENTITY" = AGE-SECRET-KEY-1TYPED ]
 }
 
+@test "recover K5: V5 reads pv-pvc.yaml from the recovery's export dir, and names a missing one" {
+  source_plugin; unset DR_DRILL_METADATA DR_DRILL_RESTORE_STAGE
+  run --separate-stderr hub_data_verify_placement "$TEST_ROOT/inventory.json" ctx; [ "$status" -eq 1 ]
+  [[ "$stderr" == *"V5: no readable pv-pvc.yaml"* ]]
+  mkdir -p "$TEST_ROOT/export"; : > "$TEST_ROOT/export/pv-pvc.yaml"; export K3DM_HUB_DATA_EXPORT_DIR="$TEST_ROOT/export"
+  _hub_data_meta_field() { printf '%s\n' "$1" >> "$CALL_LOG"; printf agent-0; }
+  _kubectl() { case "$*" in *"get pods -l"*) printf postgres-0 ;; *"get pod"*) printf k3d-dr-drill-agent-0 ;; esac; }
+  _hub_recovery_logical_node() { printf agent-0; }
+  run hub_data_verify_placement "$TEST_ROOT/inventory.json" ctx; [ "$status" -eq 0 ]
+  [ "$(sort -u "$CALL_LOG")" = "$TEST_ROOT/export/pv-pvc.yaml" ]
+}
+
 @test "recover K1: a drill target never caches unseal keys in the Keychain; the hub does" {
   source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }
   _vault_cache_unseal_keys() { printf 'cache\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { cat >/dev/null; }
