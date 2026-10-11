@@ -158,6 +158,10 @@
   shipped releases before it, from `scripts/bug-tally.py`). The dashboard is laid out in three rows:
   the current release, stacked bar charts for the six releases by priority and by open vs fixed,
   and the all-time open counts.
+- Fixed: `/ask-docs` bug counts ignored ranges such as "last two releases" and listed every
+  release since v1.1.0 out of version order. Count questions now accept `last N releases` and
+  `this release`, counting back from the current release branch, and all-release answers are
+  sorted newest first, skip releases with no match and show at most ten.
 
 ## [1.42.0] - 2026-10-09
 

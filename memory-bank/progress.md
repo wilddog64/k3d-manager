@@ -2411,3 +2411,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - GREEN: the eight new hub snapshot tests passed; the required hub snapshot, hub recovery, and cluster-down suites passed; shellcheck was clean; `_agent_audit` passed.
 - Pushed fix commit to `origin/k3d-manager-v1.42.0`; `HEAD` and remote both equal `81baeca9f455a94110716d0ccc54fc7c3f969112`. PR URL: none. Live verification remains pending.
 - [x] 2026-10-10: operator ran `make restart-webhook` (18:09); webhook pid running, cloud-bridge running. `/ask-docs` count questions (bug_count via bug-tally, fixed ref handling 62dfcc39) now live. v1.43.0 waits only on the 2026-10-11 03:30 export check, then the PR.
+- [x] 2026-10-10: `/ask-docs` bug-count release ranges (last N / this release), version-sorted, capped; 58 tests pass; operator to `make restart-webhook`.
