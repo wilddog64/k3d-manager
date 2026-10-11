@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Changed: the DR drill's Keychain guard now defaults to `enforce`: a call outside the scoped allowlist exits 44 before it reaches `security`. The audit drill on the M2 after the unseal-cache fix reported no unexpected calls, which was the condition for the flip; `DR_DRILL_CREDENTIAL_POLICY=audit` still records without refusing.
 - Fixed: DR drills now isolate Vault unseal-key caches under `k3dm-vault-unseal-drill` and clear them at teardown, preventing overwrites of the host cache.
 - Fixed: v1.43.1 hub-data recovery now resumes from slurped checkpoints,
   restores the approved export from one run-local clone, pins verification to

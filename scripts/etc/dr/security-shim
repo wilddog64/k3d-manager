@@ -4,7 +4,7 @@ set -euo pipefail
 log_file="${DR_SECURITY_CREDENTIALS_FILE:?DR_SECURITY_CREDENTIALS_FILE is required}"
 unexpected_file="${DR_SECURITY_UNEXPECTED_FILE:-${log_file}.unexpected}"
 allowlist="${DR_SECURITY_ALLOWLIST:?DR_SECURITY_ALLOWLIST is required}"
-policy="${DR_DRILL_CREDENTIAL_POLICY:-audit}"
+policy="${DR_DRILL_CREDENTIAL_POLICY:-enforce}"
 real_security="${DR_SECURITY_REAL:-/usr/bin/security}"
 scopes=" ${DR_SECURITY_SCOPES:?DR_SECURITY_SCOPES is required} "
 context="${DR_SECURITY_CONTEXT:-}"

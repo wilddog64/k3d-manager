@@ -356,7 +356,7 @@ STUB
 }
 
 @test "dr drill: audit records an unexpected credential and still succeeds" {
-  export DR_TEST_EXTRA_CREDENTIAL=1
+  export DR_TEST_EXTRA_CREDENTIAL=1 DR_DRILL_CREDENTIAL_POLICY=audit
   run_drill
   [ "$status" -eq 0 ]
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
@@ -369,6 +369,14 @@ STUB
   [ "$status" -ne 0 ]
   [ "$(grep -c '^security .*hidden-service' "$PHASE_LOG" || true)" -eq 0 ]
   [[ "$output" != *"hidden-service"* ]]
+}
+
+@test "dr drill: the credential policy defaults to enforce" {
+  unset DR_DRILL_CREDENTIAL_POLICY
+  export DR_TEST_EXTRA_CREDENTIAL=1
+  run_drill
+  [ "$status" -ne 0 ]
+  [ "$(grep -c '^security .*hidden-service' "$PHASE_LOG" || true)" -eq 0 ]
 }
 
 @test "dr drill: target guard refuses bad contexts and ports before restore or delete" {

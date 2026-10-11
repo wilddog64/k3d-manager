@@ -172,11 +172,13 @@ values, Vault values, shards or the age identity.
 
 ### Credential policy and clean-room check
 
-Each drill puts the `security` shim first on `PATH`. In the default `audit` mode it records only
-the operation, service and account in the run directory and reports any pair outside
-`scripts/etc/dr/credential-allowlist.tsv` as `credentials_unexpected`; values passed with `-w` or
-on `security -i` stdin are never recorded. `DR_DRILL_CREDENTIAL_POLICY=enforce` exits 44 before
-an unexpected Keychain call reaches `security`. V9 is false when any unexpected pair is observed.
+Each drill puts the `security` shim first on `PATH`. It records only the operation, service and
+account in the run directory and reports any pair outside `scripts/etc/dr/credential-allowlist.tsv`
+as `credentials_unexpected`; values passed with `-w` or on `security -i` stdin are never recorded.
+The default policy is `enforce` (since v1.43.1, after an audit drill came back clean): an
+unexpected Keychain call exits 44 before it reaches `security`. `DR_DRILL_CREDENTIAL_POLICY=audit`
+records the call and lets it through, for settling a new allowlist entry. V9 is false when any
+unexpected pair is observed.
 
 The allowlist is scoped. Its first column names who may make the call: `drill` (`bin/dr-drill`),
 `restore` (`hub_data_recover`, any target), `restore-hub` (only against the real hub: the
