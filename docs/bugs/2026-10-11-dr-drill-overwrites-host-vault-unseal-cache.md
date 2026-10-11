@@ -67,7 +67,22 @@ The next audit drill on the M2 reports `credentials_unexpected: []`. Then the gu
 
 The M2 Vault (`k3d-k3d-cluster`, `secrets/vault`) is sealed and its cached shards are gone. If it
 is still wanted, unseal it from the operator's own record of its keys and re-cache; if not, retire
-it. Claude does not touch it.
+it.
+
+**Done 2026-10-11 (operator decision: retire; run by Claude in the M2 pane at the operator's
+request).** `helm uninstall vault -n secrets` and PVC `data-vault-0` deleted (its PV went with it);
+LaunchAgent `com.k3d-manager.vault-port-forward` booted out (the plist file is left in
+`~/Library/LaunchAgents`); both `k3d-manager-vault-unseal` `secrets/vault:count`/`:shard1` entries
+deleted. Nothing in `k3d-k3d-cluster` consumed it (no SecretStore, ClusterSecretStore or
+ExternalSecret). `external-secrets` in `secrets` was left running.
+
+## Proof (2026-10-11)
+
+Audit drill on the M2 at `cd78c5ad`, result `20261011T230653Z.json`: success, V0–V7 and V9 true,
+RTO 744 s, `credentials_unexpected: []`. All eight `credentials_read` entries are the age identity,
+`k3dm-vault-unseal-drill` (find/add/delete) or `k3dm-vault-unseal-dr` (find); none is
+`k3d-manager-vault-unseal`. After teardown `security find-generic-password -s
+k3dm-vault-unseal-drill` returned 44 (not found), so the teardown purge works.
 
 ## What NOT to Do
 
