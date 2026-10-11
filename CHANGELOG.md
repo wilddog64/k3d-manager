@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added: attended `make hub-data-recover` and `make hub-recover-all` flows with
+  target validation, resumable checkpoints, shared drill verification and an
+  auditable restore report.
+
 ## [1.43.0] - 2026-10-11
 
 - Fixed: the first live daily-export run pushed and verified its export, then failed the prune,

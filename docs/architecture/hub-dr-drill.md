@@ -86,6 +86,27 @@ sequenceDiagram
     M4->>M4: push metrics to Pushgateway
 ```
 
+## Hub restore sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Op as Operator on M4
+    participant Engine as hub_data_recover
+    participant Argo as ArgoCD
+    participant Hub as k3d-cluster
+    participant Repo as encrypted export
+    Op->>Engine: type selected export timestamp
+    Engine->>Engine: validate context, serverlb, node and export
+    Engine->>Argo: pause parent, then shopping-cart-identity
+    Engine->>Repo: decrypt claims through age process substitution
+    Engine->>Hub: replace claims, unseal Vault, re-point Kubernetes auth
+    Engine->>Hub: restart Keycloak and force-sync ExternalSecrets
+    Engine->>Hub: verify metadata, identity digests, placement and V8
+    Engine->>Argo: resume child, then parent with recorded policies
+    Engine-->>Op: report.json with checks and RTO
+```
+
 ## Trust boundaries
 
 | Item | Lives on | Never |
@@ -136,3 +157,6 @@ reads the realm's users straight from postgres. The image major version must mat
 | `cannot read drill results` / `prune failed` | scheduled export log | Results could not be fetched or a kept export failed manifest verification; nothing is pruned |
 | `Vault path missing after restore: secret/<name>` | Phase 4, V2 | The restored Vault lacks a path the hub had when exported |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |
+| restore stops before approval | Terminal | Context/serverlb identity, node, export compatibility, or typed approval failed; no destructive call was made |
+| ArgoCD auto-sync returned during pause | Terminal and report | Parent self-healed the child; restore stops before claim replacement and resumes recorded policies |
+| V8 `SecretSyncedError` | report.json | An ExternalSecret did not converge after the refresh; do not declare the restore complete |

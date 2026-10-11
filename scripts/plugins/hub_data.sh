@@ -10,6 +10,9 @@ K3DM_HUB_DATA_AGE_RECIPIENT="${K3DM_HUB_DATA_AGE_RECIPIENT:-${_HUB_DATA_ROOT}/sc
 K3DM_HUB_DATA_CONTEXT="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}"
 K3DM_HUB_DATA_RETAIN_DAYS="${K3DM_HUB_DATA_RETAIN_DAYS:-5}"
 K3DM_HUB_DATA_PUSHGATEWAY_URL="${K3DM_HUB_DATA_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-hub-data-export}"
+K3DM_HUB_DATA_ARGOCD_PARENT="${K3DM_HUB_DATA_ARGOCD_PARENT:-shopping-cart-apps}"
+K3DM_HUB_DATA_ARGOCD_APP="${K3DM_HUB_DATA_ARGOCD_APP:-shopping-cart-identity}"
+K3DM_HUB_DATA_RECOVER_RUN_ROOT="${K3DM_HUB_DATA_RECOVER_RUN_ROOT:-${HOME}/.k3dm/hub-recover}"
 
 if [[ -r "${PLUGINS_DIR}/hub_snapshot.sh" ]] && ! declare -f _hub_snapshot_copy >/dev/null 2>&1; then
   # shellcheck source=/dev/null
@@ -139,6 +142,11 @@ function _hub_data_vault_kv_list() {
   local token="$1" ns="$2" release="$3" path="$4"
   [[ "$path" =~ ^[A-Za-z0-9_./-]+$ ]] || { _err "[hub-data] invalid Vault KV path: ${path}"; return 1; }
   printf '%s\n%s\n' "$token" "$path" | _vault_exec_stream --no-exit "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; read -r KV_PATH; export VAULT_TOKEN; exec vault kv list -format=json "$KV_PATH"' sh
+}
+
+function _hub_data_vault_kv_metadata() {
+  local token="$1" ns="$2" release="$3" path="$4"
+  printf '%s\n%s\n' "$token" "$path" | _vault_exec_stream --no-exit "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; read -r KV_PATH; export VAULT_TOKEN; exec vault kv metadata get -format=json "$KV_PATH"' sh
 }
 
 function _hub_data_kv_names() {
@@ -470,7 +478,8 @@ function _hub_data_workload() {
 function _hub_data_scale() {
   local ns="$1" claim="$2" replicas="$3" workload
   workload="$(_hub_data_workload "$ns" "$claim")" || { _err "[hub-data] unknown workload for ${ns}/${claim}"; return 1; }
-  if ! _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" scale "$workload" --replicas="$replicas"; then
+  local context="${K3DM_HUB_DATA_CONTEXT:-${DR_DRILL_CONTEXT:-}}"
+  if ! _kubectl --context "$context" -n "$ns" scale "$workload" --replicas="$replicas"; then
     _err "[hub-data] unable to scale ${workload}"
     return 1
   fi
@@ -479,16 +488,62 @@ function _hub_data_scale() {
 function _hub_data_apply_keycloak() {
   local manifest="${K3DM_HUB_DATA_POSTGRES_MANIFEST:-${_HUB_DATA_ROOT}/scripts/etc/dr/postgres-keycloak.yaml}"
   [[ -f "$manifest" ]] || { _err "[hub-data] missing ${manifest}"; return 1; }
-  _kubectl --context "$DR_DRILL_CONTEXT" -n identity apply -f "$manifest"
+  _kubectl --context "${DR_DRILL_CONTEXT:-${K3DM_HUB_DATA_CONTEXT:-}}" -n identity apply -f "$manifest"
+}
+
+function _hub_data_wait_vault() {
+  local prefix="${1:-[dr-drill]}" limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc
+  deadline=$((SECONDS + limit))
+  while (( SECONDS < deadline )); do
+    phase="$(_kubectl --no-exit -n secrets get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    [[ "$phase" == Running ]] && break
+    sleep "${DR_DRILL_POLL_S:-5}"
+  done
+  if [[ "$phase" != Running ]]; then
+    printf '%s vault-0 is not Running after %ss (phase: %s)\n' "$prefix" "$limit" "${phase:-none}" >&2
+    return 1
+  fi
+  set +u; VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault; rc=$?; set -u
+  (( rc == 0 )) || printf '%s the restored Vault API did not answer within %ss\n' "$prefix" "$limit" >&2
+  return "$rc"
+}
+
+function hub_data_unseal_dr() {
+  local prefix="${1:-[dr-drill]}" count shard idx out
+  _hub_data_wait_vault "$prefix" || return 1
+  if ! count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"; then
+    printf '%s no DR shard count in Keychain service k3dm-vault-unseal-dr (account secrets/vault:count) on this Mac, or it is empty; repeat the shard import\n' "$prefix" >&2
+    return 1
+  fi
+  if [[ ! "$count" =~ ^[1-9][0-9]*$ ]]; then
+    printf '%s the DR shard count in Keychain (secrets/vault:count) is not a positive number; repeat the shard import\n' "$prefix" >&2
+    return 1
+  fi
+  for ((idx=1; idx<=count; idx++)); do
+    if ! shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; then
+      printf '%s DR shard %s of %s is missing or empty in Keychain; repeat the shard import\n' "$prefix" "$idx" "$count" >&2
+      return 1
+    fi
+    shard="${shard%$'\r'}"
+    if ! _vault_dr_shard_valid "$shard"; then
+      printf '%s DR shard %s of %s in Keychain is not a base64 or hex unseal key; repeat the shard copy from the M4\n' "$prefix" "$idx" "$count" >&2
+      return 1
+    fi
+    if ! out="$(printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s" "$SHARD" | vault write -format=json sys/unseal key=-' 2>&1)"; then
+      printf '%s vault operator unseal failed for shard %s of %s\n' "$prefix" "$idx" "$count" >&2
+      grep -F -v -- "$shard" <<<"$out" | grep -E 'Error|error|Code:|^\* ' | head -5 | sed "s/^/${prefix}   /" >&2 || true
+      return 1
+    fi
+  done
 }
 
 function _hub_data_restore_one() {
-  local ns="$1" claim="$2" encrypted node path identity source_dir source_name
-  encrypted="$3"; node="$4"; path="$5"; identity="$(_secret_load_data k3dm-hub-data-age identity age)"; source_dir="${encrypted%/*}"; source_name="${encrypted##*/}"
+  local ns="$1" claim="$2" encrypted node path identity source_dir source_name cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
+  encrypted="$3"; node="$4"; path="$5"; identity="${K3DM_HUB_DATA_AGE_IDENTITY:-$(_secret_load_data k3dm-hub-data-age identity age)}"; source_dir="${encrypted%/*}"; source_name="${encrypted##*/}"
   if [[ -f "$encrypted" ]]; then
-    age -d -i <(printf '%s\n' "$identity") "$encrypted" | docker exec -i "k3d-${DR_DRILL_CLUSTER}-${node}" tar -C "$path" -xpf -
+    age -d -i <(printf '%s\n' "$identity") "$encrypted" | docker exec -i "k3d-${cluster}-${node}" tar -C "$path" -xpf -
   else
-    find "$source_dir" -name "${source_name}.part-*" -print | sort | xargs cat | age -d -i <(printf '%s\n' "$identity") - | docker exec -i "k3d-${DR_DRILL_CLUSTER}-${node}" tar -C "$path" -xpf -
+    find "$source_dir" -name "${source_name}.part-*" -print | sort | xargs cat | age -d -i <(printf '%s\n' "$identity") - | docker exec -i "k3d-${cluster}-${node}" tar -C "$path" -xpf -
   fi
 }
 
@@ -499,12 +554,13 @@ function _hub_data_prepare_claim() {
   [[ -n "$node" && -n "$size" && -n "$storage" && -n "$modes" ]] || return 1
   _hub_data_scale "$ns" "$claim" 0 >/dev/null || return 1
   _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" delete pvc "$claim" --ignore-not-found >/dev/null
-  { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$DR_DRILL_CLUSTER" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$DR_DRILL_CONTEXT" apply -f -
-  _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${claim}" --timeout=300s
-  pv="$(_kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" get pvc "$claim" -o jsonpath='{.spec.volumeName}')"
-  actual="$(_kubectl --context "$DR_DRILL_CONTEXT" get pv "$pv" -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[?(@.key=="kubernetes.io/hostname")].values[0]}')"; logical="$(_hub_recovery_logical_node "$actual")"
+  local context="${K3DM_HUB_DATA_CONTEXT:-${DR_DRILL_CONTEXT:-}}" cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
+  { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$cluster" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$context" apply -f -
+  _kubectl --context "$context" -n "$ns" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${claim}" --timeout=300s
+  pv="$(_kubectl --context "$context" -n "$ns" get pvc "$claim" -o jsonpath='{.spec.volumeName}')"
+  actual="$(_kubectl --context "$context" get pv "$pv" -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[?(@.key=="kubernetes.io/hostname")].values[0]}')"; logical="$(_hub_recovery_logical_node "$actual")"
   [[ "$logical" == "$node" ]] || { _err "[hub-data] PV node mismatch for ${ns}/${claim}"; return 1; }
-  path="$(_kubectl --context "$DR_DRILL_CONTEXT" get pv "$pv" -o jsonpath='{.spec.local.path}')"
+  path="$(_kubectl --context "$context" get pv "$pv" -o jsonpath='{.spec.local.path}')"
   printf '%s\t%s\t%s\t%s\n' "$ns" "$claim" "$node" "$path" >> "${stage}/restore-targets.tsv"
 }
 
@@ -516,8 +572,8 @@ function _hub_data_copy_claim() {
 }
 
 function hub_data_restore() { (
-  local stage repo latest ns claim created=0
-  if [[ -z "${DR_DRILL_CONTEXT:-}" || -z "${DR_DRILL_CLUSTER:-}" ]]; then
+  local stage repo latest ns claim created=0 target="${HUB_DATA_RESTORE_TARGET:-drill}"
+  if [[ "$target" != hub && ( -z "${DR_DRILL_CONTEXT:-}" || -z "${DR_DRILL_CLUSTER:-}" ) ]]; then
     printf 'ERROR: %s\n' "[hub-data] DR_DRILL_CONTEXT and DR_DRILL_CLUSTER are required" >&2
     return 2
   fi
@@ -534,7 +590,11 @@ function hub_data_restore() { (
   _hub_data_verify_export "$latest" || return 1
   cp "$latest/pv-pvc.yaml" "$stage/pv-pvc.yaml"
   cp "$latest/inventory.json" "$stage/inventory.json"
-  _hub_data_apply_keycloak || return 1
+  if [[ "$target" == hub ]]; then
+    _kubectl --context "${K3DM_HUB_DATA_CONTEXT}" -n identity get deployment/postgres-keycloak >/dev/null || { _err '[hub-data] deployment/postgres-keycloak is required in hub mode'; return 1; }
+  else
+    _hub_data_apply_keycloak || return 1
+  fi
   while IFS='|' read -r ns claim; do
     if ! _hub_data_prepare_claim "$stage" "$ns" "$claim" "${latest}/${ns}-${claim}.tar.age"; then return 1; fi
   done < <(_hub_data_claims)
@@ -563,5 +623,145 @@ function hub_data_verify_vault_paths() { (
   for path in "${paths[@]}"; do
     jq -e --arg p "$path" 'any(.[]; . == $p)' <<<"$restored" >/dev/null || { _err "[hub-data] Vault path missing after restore: secret/${path}"; return 1; }
   done
+  if jq -e 'has("vault_keys")' "$inventory" >/dev/null 2>&1; then
+    local key expected_version actual_version metadata
+    while IFS=$'\t' read -r key expected_version; do
+      metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || { _err "[hub-data] Vault metadata missing: secret/${key}"; return 1; }
+      actual_version="$(jq -r '.data.current_version // .data.metadata.current_version // empty' <<<"$metadata")"
+      [[ "$actual_version" == "$expected_version" ]] || { _err "[hub-data] Vault current_version mismatch: secret/${key}"; return 1; }
+    done < <(jq -r '.vault_keys | to_entries[] | [.key,.value.current_version // .value] | @tsv' "$inventory")
+  fi
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
+) }
+
+function _hub_data_argocd_pause() {
+  local context="$1" parent="${K3DM_HUB_DATA_ARGOCD_PARENT}" app="${K3DM_HUB_DATA_ARGOCD_APP}" ns="${ARGOCD_NAMESPACE:-cicd}" dir="$2" value
+  mkdir -p "$dir"
+  for value in "$parent" "$app"; do
+    if _kubectl --context "$context" -n "$ns" get application "$value" >/dev/null 2>&1; then
+      _kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}' > "$dir/$value.automated"
+      _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' >/dev/null
+      [[ -z "$(<"$dir/$value.automated")" || "$(<"$dir/$value.automated")" == "null" ]] || true
+    elif [[ "$value" == "$app" ]]; then
+      _info "[hub-recover] ${value} not found; skipping ArgoCD child"
+    else
+      _info "[hub-recover] ${value} not found; pausing only the child"
+    fi
+  done
+  for value in "$parent" "$app"; do
+    if [[ -s "$dir/$value.automated" ]] && ! _kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}' | grep -qx 'null'; then
+      _err "[hub-recover] ArgoCD ${value} auto-sync was restored during pause"
+      return 1
+    fi
+  done
+}
+
+function _hub_data_argocd_resume() {
+  local context="$1" dir="$2" ns="${ARGOCD_NAMESPACE:-cicd}" value payload
+  for value in "$K3DM_HUB_DATA_ARGOCD_APP" "$K3DM_HUB_DATA_ARGOCD_PARENT"; do
+    [[ -r "$dir/$value.automated" ]] || continue
+    payload="$(<"$dir/$value.automated")"
+    [[ -n "$payload" && "$payload" != null ]] || continue
+    _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p "{\"spec\":{\"syncPolicy\":{\"automated\":${payload}}}}" >/dev/null || _warn "[hub-recover] failed to resume ${value}"
+  done
+}
+
+function _hub_data_checkpoint() {
+  local file="$1" step="$2" rc="$3" now
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '{"step":%s,"time":"%s","rc":%s}\n' "$step" "$now" "$rc" >> "$file"
+}
+
+function _hub_data_repoint_vault() {
+  local context="$1" root_token count idx shard ns="secrets" release="vault"
+  root_token="$(_hub_data_generate_root "$ns" "$release")" || return 1
+  _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token" || return 1
+  count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)" || return 1
+  local -a shards=()
+  for ((idx=1; idx<=count; idx++)); do shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; shards+=("$shard"); done
+  _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
+  printf '%s\n' "$root_token" | _kubectl --context "$context" -n secrets create secret generic vault-root --from-literal=root_token=- --dry-run=client -o yaml | _kubectl --context "$context" apply -f - || return 1
+  _hub_recovery_sync_vault_root_token "$context"
+}
+
+function _hub_data_recover_approval() {
+  local export_ts="$1" typed
+  [[ -t 0 || "${K3DM_HUB_DATA_TEST_TTY:-0}" == 1 ]] || { _err '[hub-recover] interactive TTY required'; return 2; }
+  printf '[hub-recover] Type export timestamp %s to approve: ' "$export_ts" >&2
+  IFS= read -r typed < /dev/tty || return 2
+  [[ "$typed" == "$export_ts" ]] || { _err '[hub-recover] approval did not match the selected export'; return 2; }
+}
+
+function _hub_data_validate_target() {
+  local context="$1" cluster="$2" server port containers
+  server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null)" || return 2
+  port="${server##*:}"; [[ "$port" =~ ^[0-9]+$ ]] || { _err '[hub-recover] context server has no port'; return 2; }
+  containers="$(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null)" || { _err '[hub-recover] cannot inspect local k3d containers'; return 2; }
+  grep -Eq "^k3d-${cluster}-serverlb[[:space:]].*:${port}->6443" <<<"$containers" || { _err '[hub-recover] context server is not the local serverlb'; return 2; }
+  grep -Eq "^k3d-${cluster}-server-0([[:space:]]|$)" <<<"$containers" || { _err '[hub-recover] local server-0 is not running'; return 2; }
+  local pair ns workload
+  for pair in 'secrets statefulset/vault' 'identity deployment/postgres-keycloak' 'identity statefulset/openldap'; do
+    read -r ns workload <<<"$pair"
+    _kubectl --context "$context" -n "$ns" get "$workload" >/dev/null || { _err "[hub-recover] missing workload $workload"; return 2; }
+  done
+}
+
+function _hub_data_check_compatibility() {
+  local dir="$1" inventory format
+  inventory="$dir/inventory.json"
+  format="$(jq -r '.format // 0' "$inventory" 2>/dev/null || printf 0)"
+  if [[ "$format" != 2 && "${K3DM_HUB_DATA_ALLOW_LEGACY_EXPORT:-0}" != 1 ]]; then
+    _err '[hub-recover] export inventory format 2 is required (set K3DM_HUB_DATA_ALLOW_LEGACY_EXPORT=1 only for a rehearsal)'
+    return 1
+  fi
+  for claim in data-vault-0 postgres-keycloak-pvc data-openldap-0; do
+    grep -q "name: $claim" "$dir/pv-pvc.yaml" || { _err "[hub-recover] export is missing claim $claim"; return 1; }
+  done
+}
+
+function _hub_data_report() {
+  local run_dir="$1" rc="$2" report
+  report="$run_dir/report.json"
+  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "${K3DM_HUB_DATA_EXPORT:-newest}" --argjson rc "$rc" '{run_id:$run,host:$host,operator:$operator,commit:$commit,export:$export,rc:$rc}' > "$report"
+}
+
+function hub_data_verify() {
+  local inventory="${1:?inventory path required}" ns="${2:-identity}" context="${3:-${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}}" expected actual
+  jq -e 'has("vault_keys") or has("vault_paths")' "$inventory" >/dev/null || { _err '[hub-data] inventory has no Vault proof'; return 1; }
+  if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null; then
+    expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"
+    actual="$(_kubectl --context "$context" -n identity exec deployment/postgres-keycloak -- sh -c 'psql -Atc "select username from user_entity order by username"' | sha256sum | awk '{print $1}')"
+    [[ "$expected" == "$actual" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
+  fi
+  if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null; then
+    expected="$(jq -r '.ldap_dns_sha256' "$inventory")"
+    actual="$(_kubectl --context "$context" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' | awk '/^dn:/{print $2}' | sort | sha256sum | awk '{print $1}')"
+    [[ "$expected" == "$actual" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
+  fi
+  hub_data_verify_vault_paths secrets vault "$inventory"
+}
+
+function hub_data_recover() { (
+  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" stage repo export_dir export_ts run_id run_dir steps rc=0
+  run_id="${RESUME:-$(date -u +%Y%m%dT%H%M%SZ)}"; run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"; mkdir -p "$run_dir"; steps="$run_dir/steps.jsonl"
+  trap 'rc=$?; _hub_data_argocd_resume "$context" "$run_dir" || true; _hub_data_report "$run_dir" "$rc"; unset K3DM_HUB_DATA_AGE_IDENTITY; exit "$rc"' EXIT
+  printf '[hub-recover] Step 1/9 — Preflight\n'
+  [[ "$context" == k3d-dr-drill && "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" == 1 || "$context" != k3d-dr-drill ]] || { _err '[hub-recover] refusing the M2 context without K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1'; return 2; }
+  repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"
+  if [[ -z "$export_dir" ]]; then export_dir="$(_hub_data_latest_export_dir "$repo" 2>/dev/null || true)"; else export_dir="$repo/snapshots/$export_dir"; fi
+  [[ -d "$export_dir" ]] || { _err '[hub-recover] selected export does not exist'; return 1; }
+  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; export_ts="${export_dir##*/}"
+  _hub_data_recover_approval "$export_ts" || return 2
+  _hub_data_checkpoint "$steps" 1 0
+  printf '[hub-recover] Step 2/9 — age identity\n'; read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty; printf '\n' >&2; [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || { _err '[hub-recover] invalid age identity'; return 1; }; _hub_data_checkpoint "$steps" 2 0
+  printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'; _hub_data_argocd_pause "$context" "$run_dir"; _hub_data_checkpoint "$steps" 3 0
+  cp "$export_dir/inventory.json" "$run_dir/inventory.json"
+  export K3DM_HUB_DATA_CONTEXT="$context" K3DM_HUB_DATA_CLUSTER="$cluster" HUB_DATA_RESTORE_TARGET=hub
+  if [[ -n "${RESUME:-}" && "${REDO_STEP:-}" != 4 && -s "$steps" ]] && grep -q '"step":4.*"rc":null' "$steps"; then _err '[hub-recover] step 4 started but did not finish; set REDO_STEP=4 to repeat it'; return 1; fi
+  printf '[hub-recover] Step 4/9 — Restore claims\n'; _hub_data_checkpoint "$steps" 4 null; hub_data_restore; _hub_data_checkpoint "$steps" 4 0
+  printf '[hub-recover] Step 5/9 — Unseal\n'; hub_data_unseal_dr '[hub-recover]'; _hub_data_checkpoint "$steps" 5 0
+  printf '[hub-recover] Step 6/9 — Re-point Vault\n'; _hub_data_checkpoint "$steps" 6 null; _hub_data_repoint_vault "$context"; _hub_data_checkpoint "$steps" 6 0
+  printf '[hub-recover] Step 7/9 — Refresh dependents\n'; _kubectl --context "$context" -n identity rollout restart deployment/keycloak; _hub_data_checkpoint "$steps" 7 0
+  printf '[hub-recover] Step 8/9 — Verify\n'; hub_data_verify "$run_dir/inventory.json" identity "$context"; _hub_data_checkpoint "$steps" 8 0
+  printf '[hub-recover] Step 9/9 — Report\n'; _hub_data_checkpoint "$steps" 9 0
 ) }

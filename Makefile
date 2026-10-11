@@ -87,6 +87,15 @@ hub-data-export-unschedule:
 hub-data-prune:
 	@K3DM_HUB_DATA_PRUNE_DRY_RUN=$(if $(DRY_RUN),$(DRY_RUN),0) ./scripts/k3d-manager hub_data_prune
 
+## Restore hub data from the newest encrypted export (Terminal.app; approval typed at the prompt)
+hub-data-recover:
+	@./scripts/k3d-manager hub_data_recover
+
+## Full hub disaster recovery: rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
+hub-recover-all:
+	@$(MAKE) --no-print-directory hub-recover
+	@$(MAKE) --no-print-directory hub-data-recover
+
 dr-drill:
 	@bin/dr-drill
 

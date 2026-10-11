@@ -184,29 +184,35 @@ reported for 8 days) route to `platform-warning` email, never SMS.
   into the real hub (below). This is the only test of the tunnel,
   port-forwards, launchd agents and cluster registrations.
 
-## Promoting a drill restore to a real restore
+## Restoring the hub
 
-The drill proves an export restores. To restore the real hub from it:
+Run these attended commands in Terminal.app on the M4. The full flow rebuilds
+the hub and restores its data; the data-only flow leaves the running hub in
+place. Approval is typed at the prompt and the identity is held only in memory.
 
-The restore streams into the hub's node containers with `docker exec`, so it
-must run on the M4, the hub's own Docker host. The M4 normally holds no age
-identity, so this is the one time the Bitwarden copy goes on the M4, temporarily.
+```bash
+make hub-recover-all       # rebuild, credentials, then data
+make hub-data-recover      # data only; hub is still running
+```
 
-1. Rebuild the hub on the M4 (`make hub-recover`), so the claims exist.
-2. On the M4, store the Bitwarden note's `AGE-SECRET-KEY-1...` line at the
-   prompt: `security add-generic-password -s k3dm-hub-data-age -a identity -w`.
-3. Run the restore against the real hub. It scales Vault, postgres-keycloak and
-   OpenLDAP to zero, recreates their claims, and stops at the first claim whose
-   PV is not on its recorded logical node:
+The restore validates the pinned local k3d target and encrypted export, pauses
+ArgoCD before replacing claims, restores and unseals Vault, re-points Kubernetes
+auth, refreshes Keycloak and ExternalSecrets, verifies Vault metadata and
+identity digests, and writes an auditable report under
+`~/.k3dm/hub-recover/<run_id>/`. A failed run can resume with `RESUME=<run_id>`;
+an unfinished destructive step requires its explicit `REDO_STEP`.
 
-   ```bash
-   DR_DRILL_CONTEXT=k3d-k3d-cluster DR_DRILL_CLUSTER=k3d-cluster \
-     ./scripts/k3d-manager hub_data_restore
-   ```
+### M2 rehearsal
 
-4. Remove the identity from the M4 straight away:
-   `security delete-generic-password -s k3dm-hub-data-age -a identity`.
-5. Unseal Vault with the Keychain shards and confirm V1–V5 by hand.
+Keep the drill cluster and rehearse the data path before a real hub window:
+
+```bash
+DR_DRILL_KEEP=1 make dr-drill
+K3DM_HUB_DATA_CONTEXT=k3d-dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 make hub-data-recover
+```
+
+The rehearsal skips the absent ArgoCD Application and proves the restore,
+unseal, refresh and verification stages without touching the production hub.
 
 ## Measured RTO and RPO
 

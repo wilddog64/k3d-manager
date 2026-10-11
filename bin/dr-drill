@@ -171,75 +171,19 @@ _dr_drill_v0() {
   return "$status"
 }
 
-_dr_drill_wait_vault() {
-  local limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc
-  deadline=$((SECONDS + limit))
-  while (( SECONDS < deadline )); do
-    phase="$(_dr_drill_kubectl --no-exit -n secrets get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    [[ "$phase" == Running ]] && break
-    sleep "${DR_DRILL_POLL_S:-5}"
-  done
-  if [[ "$phase" != Running ]]; then
-    printf '[dr-drill] vault-0 is not Running after %ss (phase: %s)\n' "$limit" "${phase:-none}" >&2
-    return 1
-  fi
-  set +u; VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault; rc=$?; set -u
-  (( rc == 0 )) || printf '[dr-drill] the restored Vault API did not answer within %ss\n' "$limit" >&2
-  return "$rc"
-}
-
-_dr_drill_unseal() {
-  local count shard idx out
-  _dr_drill_wait_vault || return 1
-  if ! count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"; then
-    printf '[dr-drill] no DR shard count in Keychain service k3dm-vault-unseal-dr (account secrets/vault:count) on this Mac, or it is empty; repeat the shard import\n' >&2
-    return 1
-  fi
-  if [[ ! "$count" =~ ^[1-9][0-9]*$ ]]; then
-    printf '[dr-drill] the DR shard count in Keychain (secrets/vault:count) is not a positive number; repeat the shard import\n' >&2
-    return 1
-  fi
-  for ((idx=1; idx<=count; idx++)); do
-    if ! shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; then
-      printf '[dr-drill] DR shard %s of %s is missing or empty in Keychain; repeat the shard import\n' "$idx" "$count" >&2
-      return 1
-    fi
-    shard="${shard%$'\r'}"
-    if ! _vault_dr_shard_valid "$shard"; then
-      printf '[dr-drill] DR shard %s of %s in Keychain is not a base64 or hex unseal key; repeat the shard copy from the M4\n' "$idx" "$count" >&2
-      return 1
-    fi
-    if ! out="$(printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s" "$SHARD" | vault write -format=json sys/unseal key=-' 2>&1)"; then
-      printf '[dr-drill] vault operator unseal failed for shard %s of %s\n' "$idx" "$count" >&2
-      grep -F -v -- "$shard" <<<"$out" | grep -E 'Error|error|Code:|^\* ' | head -5 | sed 's/^/[dr-drill]   /' >&2 || true
-      return 1
-    fi
-  done
-}
-
 _dr_drill_inventory() { printf '%s/inventory.json\n' "$DR_DRILL_RESTORE_STAGE"; }
 _dr_drill_metadata() { printf '%s/pv-pvc.yaml\n' "$DR_DRILL_RESTORE_STAGE"; }
-_dr_drill_v1() {
+_dr_drill_verify_unsealed() {
   set +u; _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null; local rc=$?; set -u; return "$rc"
 }
-_dr_drill_v2() {
-  set +u; hub_data_verify_vault_paths secrets vault "$(_dr_drill_inventory)"; local rc=$?; set -u; return "$rc"
+_dr_drill_verify_vault() { set +u; hub_data_verify "$(_dr_drill_inventory)" identity "$DR_DRILL_CONTEXT"; local rc=$?; set -u; return "$rc"; }
+_dr_drill_verify_keycloak() {
+  local inventory want actual; inventory="$(_dr_drill_inventory)"; want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _dr_drill_kubectl)"; [[ "$actual" == "$want" ]]
 }
-_dr_drill_v3() {
-  local inventory want actual
-  inventory="$(_dr_drill_inventory)"
-  want="$(jq -r '.keycloak_realm_user_count' "$inventory")"
-  actual="$(_hub_data_keycloak_user_count _dr_drill_kubectl)"
-  [[ "$actual" == "$want" ]]
+_dr_drill_verify_ldap() {
+  local inventory want actual; inventory="$(_dr_drill_inventory)"; want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _dr_drill_kubectl)"; [[ "$actual" == "$want" ]]
 }
-_dr_drill_v4() {
-  local inventory want actual
-  inventory="$(_dr_drill_inventory)"
-  want="$(jq -r '.ldap_entry_count' "$inventory")"
-  actual="$(_hub_data_ldap_entry_count _dr_drill_kubectl)"
-  [[ "$actual" == "$want" ]]
-}
-_dr_drill_v5_one() {
+_dr_drill_verify_placement_one() {
   local ns="$1" pod="$2" claim="$3" expected actual logical metadata
   metadata="$(_dr_drill_metadata)"
   _dr_drill_kubectl -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null
@@ -248,11 +192,11 @@ _dr_drill_v5_one() {
   logical="$(_hub_recovery_logical_node "$actual")"
   [[ "$logical" == "$expected" ]]
 }
-_dr_drill_v5() {
+_dr_drill_verify_placement() {
   local postgres
   postgres="$(_dr_drill_kubectl -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"
   [[ -n "$postgres" ]] || return 1
-  _dr_drill_v5_one secrets vault-0 data-vault-0 && _dr_drill_v5_one identity "$postgres" postgres-keycloak-pvc && _dr_drill_v5_one identity openldap-0 data-openldap-0
+  _dr_drill_verify_placement_one secrets vault-0 data-vault-0 && _dr_drill_verify_placement_one identity "$postgres" postgres-keycloak-pvc && _dr_drill_verify_placement_one identity openldap-0 data-openldap-0
 }
 _dr_drill_v6() { local elapsed=$(( $(date +%s) - _dr_drill_phase2_started )); (( elapsed <= DR_DRILL_RTO_BUDGET_S )); }
 _dr_drill_v7() { (( _dr_drill_export_age_seconds <= 93600 )); }
@@ -288,8 +232,8 @@ _dr_drill_run() {
   _dr_drill_phase 4 verify
   _dr_drill_check V0 _dr_drill_v0
   if [[ "${DR_CHECKS[V0]}" == true ]]; then
-    if ! _dr_drill_unseal; then _dr_drill_set failed unseal; _dr_drill_set V1 false; _dr_drill_set V2 false; _dr_drill_set V3 false; _dr_drill_set V4 false; _dr_drill_set V5 false
-    else _dr_drill_check V1 _dr_drill_v1; _dr_drill_check V2 _dr_drill_v2; _dr_drill_check V3 _dr_drill_v3; _dr_drill_check V4 _dr_drill_v4; _dr_drill_check V5 _dr_drill_v5; fi
+    if ! hub_data_unseal_dr '[dr-drill]'; then _dr_drill_set failed unseal; _dr_drill_set V1 false; _dr_drill_set V2 false; _dr_drill_set V3 false; _dr_drill_set V4 false; _dr_drill_set V5 false
+    else _dr_drill_check V1 _dr_drill_verify_unsealed; _dr_drill_check V2 _dr_drill_verify_vault; _dr_drill_check V3 _dr_drill_verify_keycloak; _dr_drill_check V4 _dr_drill_verify_ldap; _dr_drill_check V5 _dr_drill_verify_placement; fi
   else
     _dr_drill_set failed V0
     for _dr_name in V1 V2 V3 V4 V5; do _dr_drill_set "$_dr_name" false; done

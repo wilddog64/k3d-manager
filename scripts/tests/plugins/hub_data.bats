@@ -510,3 +510,64 @@ STUB
   run grep -c 'REPO_ROOT:-\.' "$plugin"
   [ "$output" = "0" ]
 }
+
+@test "13 approval is typed and mismatches are refused" {
+  source_plugin
+  grep -q 'approval did not match' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'read -r typed < /dev/tty' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "13a target validation checks the local serverlb and server-0" {
+  source_plugin
+  grep -q '_hub_data_validate_target' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'serverlb' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'server-0' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "13b destructive checkpoints require explicit redo on resume" {
+  source_plugin
+  grep -q 'REDO_STEP=4' "$PLUGINS_DIR/hub_data.sh"
+  grep -q '"rc":null' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "13c compatibility requires format 2 and all claims" {
+  source_plugin
+  grep -q '_hub_data_check_compatibility' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'format 2' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "13d verification uses metadata proof fields" {
+  source_plugin
+  grep -q 'keycloak_usernames_sha256' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'ldap_dns_sha256' "$PLUGINS_DIR/hub_data.sh"
+  ! grep -q 'vault kv get' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "13e drill delegates verification to hub_data" {
+  grep -q 'hub_data_verify' "$PWD/bin/dr-drill"
+  ! grep -Eq '^_dr_drill_v[1-5][[:space:]]*\(' "$PWD/bin/dr-drill"
+}
+
+@test "15 hub mode skips the drill postgres manifest" {
+  grep -q 'HUB_DATA_RESTORE_TARGET.*hub' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'deployment/postgres-keycloak is required in hub mode' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'else' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "17 ArgoCD resume is installed in the exit trap" {
+  source_plugin
+  grep -q '_hub_data_argocd_resume.*context' "$PLUGINS_DIR/hub_data.sh" || grep -q '_hub_data_argocd_resume' "$PLUGINS_DIR/hub_data.sh"
+  grep -q 'trap.*_hub_data_argocd_resume' "$PLUGINS_DIR/hub_data.sh"
+}
+
+@test "18 Vault re-point order is config, shards, then root" {
+  source_plugin
+  grep -n 'auth/kubernetes/config' "$PLUGINS_DIR/hub_data.sh" >/dev/null
+  grep -n '_vault_cache_unseal_keys' "$PLUGINS_DIR/hub_data.sh" >/dev/null
+  grep -n 'vault-root' "$PLUGINS_DIR/hub_data.sh" >/dev/null
+}
+
+@test "20 Makefile has the two restore entrypoints" {
+  grep -q '^hub-data-recover:' "$PWD/Makefile"
+  grep -q '^hub-recover-all:' "$PWD/Makefile"
+}
