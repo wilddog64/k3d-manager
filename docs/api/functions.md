@@ -5,6 +5,12 @@
 | `vault_dr_shards_import` | `scripts/plugins/vault.sh` | Read a shard bundle from stdin into the DR Keychain service. |
 | `hub_data_export` | `scripts/plugins/hub_data.sh` | Create an age-encrypted claim export in the data repository. |
 | `hub_data_restore` | `scripts/plugins/hub_data.sh` | Verify and restore an encrypted export with node pre-binding. |
+| `hub_data_export_setup` | `scripts/plugins/hub_data.sh` | Create the export service account and list-only Vault role, then self-test the login. |
+| `hub_data_export_scheduled` | `scripts/plugins/hub_data.sh` | The LaunchAgent entry point: lock, export with batch-mode SSH, push `k3dm-hub-data-export` metrics. |
+| `hub_data_export_schedule` | `scripts/plugins/hub_data.sh` | Render and bootstrap the 03:30 daily export LaunchAgent. |
+| `hub_data_export_unschedule` | `scripts/plugins/hub_data.sh` | Boot out the daily export LaunchAgent. |
+| `hub_data_prune` | `scripts/plugins/hub_data.sh` | Apply export retention on the `snapshots` branch; never prunes the newest or the last drill-proven export. |
+| `hub_data_verify_vault_paths` | `scripts/plugins/hub_data.sh` | Check every Vault path in an export inventory exists after a restore; fails closed. |
 
 All functions callable via `./scripts/k3d-manager <function> [args]`.
 

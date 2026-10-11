@@ -157,7 +157,9 @@
   also publishes per-release counts (`k3dm-bug-releases`: the current release branch and the five
   shipped releases before it, from `scripts/bug-tally.py`). The dashboard is laid out in three rows:
   the current release, stacked bar charts for the six releases by priority and by open vs fixed,
-  and the all-time open counts.
+  and the all-time open counts. Each priority and state keeps one colour whatever
+  the data order, empty segments are dropped in the query rather than labelled `0`, and counts are
+  in the hover tooltip, because Grafana drew stacked labels on the wrong segment and hid small ones.
 - Fixed: `/ask-docs` bug counts ignored ranges such as "last two releases" and listed every
   release since v1.1.0 out of version order. Count questions now accept `last N releases` and
   `this release`, counting back from the current release branch, and all-release answers are

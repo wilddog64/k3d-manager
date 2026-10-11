@@ -317,7 +317,10 @@ counts open docs already scheduled for a later release, such as a patch release.
 
 The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
 untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
-open vs fixed. `unset` there means the doc predates priorities (2026-10-09). The bottom row has the
+open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a
+fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
+zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
+where Grafana placed them on the wrong segment. The bottom row has the
 all-time open counts per priority, scan age, and open-by-priority over time. On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.

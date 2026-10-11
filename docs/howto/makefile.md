@@ -33,7 +33,10 @@ check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 
 | `make vault-dr-shards-save` | `scripts/k3d-manager vault_dr_shards_save` | Save durable Vault DR shards in Keychain. |
 | `make vault-dr-shards-export` / `make vault-dr-shards-import` | Vault DR shard functions | One-time operator-mediated M4→M2 shard transfer over stdin. |
-| `make hub-data-export` | `scripts/k3d-manager hub_data_export` | Create the age-encrypted weekly claim export. |
+| `make hub-data-export` | `scripts/k3d-manager hub_data_export` | Create an age-encrypted claim export now (the schedule also runs it daily). |
+| `make hub-data-export-setup` | `scripts/k3d-manager hub_data_export_setup` | One-time: service account and list-only Vault role for the unattended export, with a self-test. |
+| `make hub-data-export-schedule` / `make hub-data-export-unschedule` | hub data schedule functions | Install or remove the 03:30 daily export LaunchAgent on the M4. |
+| `make hub-data-prune` | `scripts/k3d-manager hub_data_prune` | Apply export retention (five days, newest, last drill-proven); `DRY_RUN=1` previews. |
 | `make dr-drill` | `bin/dr-drill` | Restore and verify the newest export on the M2. |
 | `make dr-drill-publish` | `bin/dr-drill-publish` | Publish the M2 result and metrics from the M4. |
 

@@ -2418,3 +2418,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - [x] 2026-10-10: zero-label fix v2: the 0→blank mapping added a grey `0` legend entry; replaced with `> 0` queries + null cells (dashboard version 4). All six releases still have rows (live Prometheus check).
 - [x] 2026-10-10: bug dashboard colours pinned by name (priority + state), column order fixed (version 5); the `> 0` change had made unset green. BATS 5/5.
 - [x] 2026-10-10: bug dashboard stacked bars: on-bar labels sat on the wrong segment and dropped counts (v1.42.0 P2 6 missing); `showValue: never` + `multi` tooltip (version 6). BATS 6/6, new test red on version 5.
+- [x] 2026-10-10: v1.43.0 final doc check: makefile.md (4 hub-data targets), functions.md (6 hub_data_* functions), Grafana guide + CHANGELOG (bug dashboard colours/tooltip).
