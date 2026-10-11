@@ -861,12 +861,17 @@ function _hub_data_validate_target() {
 }
 
 function _hub_data_install_credential_guard() {
-  local run_dir="$1" shim="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
+  local run_dir="$1" context="$2" shim="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
   export DR_SECURITY_CREDENTIALS_FILE="${run_dir}/credentials.tsv"
   export DR_SECURITY_UNEXPECTED_FILE="${run_dir}/credentials_unexpected.tsv"
   export DR_SECURITY_ALLOWLIST="${_HUB_DATA_ROOT}/scripts/etc/dr/credential-allowlist.tsv"
-  : > "$DR_SECURITY_CREDENTIALS_FILE"
-  : > "$DR_SECURITY_UNEXPECTED_FILE"
+  export DR_SECURITY_CONTEXT="$context"
+  if [[ "$context" == k3d-dr-drill || "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" == 1 ]]; then
+    export DR_SECURITY_SCOPES="restore restore-drill"
+  else
+    export DR_SECURITY_SCOPES="restore restore-hub"
+  fi
+  touch "$DR_SECURITY_CREDENTIALS_FILE" "$DR_SECURITY_UNEXPECTED_FILE"
   local shim_dir="${run_dir}/bin"
   mkdir -p "$shim_dir"
   ln -sf "$shim" "${shim_dir}/security"
@@ -1008,7 +1013,6 @@ function hub_data_recover_preflight() {
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
   run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
   mkdir -p "$run_dir"
-  _hub_data_install_credential_guard "$run_dir"
   repo="${run_dir}/repo"
   git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"
   chmod 700 "$repo"
@@ -1127,6 +1131,7 @@ function hub_data_recover() { (
   run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
   mkdir -p "$run_dir"
   steps="$run_dir/steps.jsonl"
+  _hub_data_install_credential_guard "$run_dir" "$context"
   trap 'rc=$?; set +e; _hub_data_argocd_resume "$context" "$run_dir"; _hub_data_report "$run_dir" "$rc"; unset K3DM_HUB_DATA_AGE_IDENTITY; exit "$rc"' EXIT
   printf '[hub-recover] Step 1/9 — Preflight\n'; [[ "$context" == k3d-dr-drill && "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" != 1 ]] && return 2
   export_dir="$(cat "$run_dir/export_dir" 2>/dev/null || true)"

@@ -42,6 +42,7 @@ _dr_drill_install_credential_guard() {
   export DR_SECURITY_CREDENTIALS_FILE="${run_dir}/credentials.tsv"
   export DR_SECURITY_UNEXPECTED_FILE="${run_dir}/credentials_unexpected.tsv"
   export DR_SECURITY_ALLOWLIST="${REPO_ROOT}/scripts/etc/dr/credential-allowlist.tsv"
+  export DR_SECURITY_SCOPES=drill DR_SECURITY_CONTEXT="$DR_DRILL_CONTEXT"
   : > "$DR_SECURITY_CREDENTIALS_FILE"
   : > "$DR_SECURITY_UNEXPECTED_FILE"
   local shim_dir="${run_dir}/bin"

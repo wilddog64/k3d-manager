@@ -6,11 +6,19 @@ unexpected_file="${DR_SECURITY_UNEXPECTED_FILE:-${log_file}.unexpected}"
 allowlist="${DR_SECURITY_ALLOWLIST:?DR_SECURITY_ALLOWLIST is required}"
 policy="${DR_DRILL_CREDENTIAL_POLICY:-audit}"
 real_security="${DR_SECURITY_REAL:-/usr/bin/security}"
+scopes=" ${DR_SECURITY_SCOPES:?DR_SECURITY_SCOPES is required} "
+context="${DR_SECURITY_CONTEXT:-}"
 
 _security_pair_allowed() {
-  local op="$1" service="$2" account="$3" allowed_op allowed_service allowed_account
-  while IFS=$'\t' read -r allowed_op allowed_service allowed_account; do
-    [[ -z "$allowed_op" || "$allowed_op" == \#* ]] && continue
+  local op="$1" service="$2" account="$3" scope allowed_op allowed_service allowed_account
+  while IFS=$'\t' read -r scope allowed_op allowed_service allowed_account; do
+    [[ -z "$scope" || "$scope" == \#* ]] && continue
+    [[ "$scopes" == *" $scope "* ]] || continue
+    # shellcheck disable=SC2016
+    if [[ "$allowed_account" == '${context}' ]]; then
+      [[ -n "$context" ]] || continue
+      allowed_account="$context"
+    fi
     # shellcheck disable=SC2053
     if [[ "$op" == "$allowed_op" && "$service" == $allowed_service && "$account" == $allowed_account ]]; then
       return 0

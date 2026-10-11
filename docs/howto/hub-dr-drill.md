@@ -178,6 +178,14 @@ the operation, service and account in the run directory and reports any pair out
 on `security -i` stdin are never recorded. `DR_DRILL_CREDENTIAL_POLICY=enforce` exits 44 before
 an unexpected Keychain call reaches `security`. V9 is false when any unexpected pair is observed.
 
+The allowlist is scoped. Its first column names who may make the call: `drill` (`bin/dr-drill`),
+`restore` (`hub_data_recover`, any target), `restore-hub` (only against the real hub: the
+unseal-key cache) and `restore-drill` (a rehearsal: the Keychain age identity). An account of
+`${context}` matches only the target context, so a rehearsal on `k3d-dr-drill` cannot write the
+hub's `k3dm-vault-root-token` entry, and neither a drill nor a rehearsal may touch
+`k3d-manager-vault-unseal`. `hub_data_recover` writes `credentials_read` and
+`credentials_unexpected` to its `report.json` too, across every `RESUME`.
+
 The restore and teardown guards also require the exact drill kubeconfig/context, the local
 `dr-drill` serverlb port, and literal `dr-drill` teardown target. A refusal says
 `[dr-drill] refusing: target is not the drill cluster (<reason>)` and stops before destructive work.

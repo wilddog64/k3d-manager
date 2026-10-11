@@ -890,7 +890,7 @@ STUB
 cat > "$REAL_STDIN_LOG"
 STUB
   chmod +x "$real"
-  export REAL_STDIN_LOG="$TEST_ROOT/real-stdin.log" DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$real"
+  export REAL_STDIN_LOG="$TEST_ROOT/real-stdin.log" DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL="$real"
   printf 'add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w VALUE-ONE\nfind-generic-password -s k3dm-vault-unseal-dr -a secrets/vault:shard1\n' | "$PWD/scripts/etc/dr/security-shim" -i
   grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
   grep -qx $'find\tk3dm-vault-unseal-dr\tsecrets/vault:shard1' "$run_dir/credentials.tsv"
@@ -901,7 +901,7 @@ STUB
 @test "dr credential shim: argv -w is skipped and never written under the run directory" {
   local run_dir="$TEST_ROOT/credential-argv"
   mkdir -p "$run_dir"
-  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$(command -v true)"
+  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL="$(command -v true)"
   "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w SENTINEL
   grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
   ! grep -R -q SENTINEL "$run_dir"
@@ -915,10 +915,53 @@ STUB
 touch "$TEST_ROOT/real-security-reached"
 STUB
   chmod +x "$TEST_ROOT/real-security"
-  export DR_DRILL_CREDENTIAL_POLICY=enforce DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$TEST_ROOT/real-security"
+  export DR_DRILL_CREDENTIAL_POLICY=enforce DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL="$TEST_ROOT/real-security"
   run "$PWD/scripts/etc/dr/security-shim" find-generic-password -s hidden -a account -w
   [ "$status" -eq 44 ]
   [ ! -e "$TEST_ROOT/real-security-reached" ]
+}
+
+_shim_env() {
+  local run_dir="$TEST_ROOT/shim-$1"; mkdir -p "$run_dir"
+  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$(command -v true)"
+  export DR_SECURITY_SCOPES="$2" DR_SECURITY_CONTEXT="$3"
+}
+
+@test "dr credential scope: a drill may not touch the unseal-key cache or another context's root token" {
+  _shim_env drill drill k3d-dr-drill
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1 -w X
+  "$PWD/scripts/etc/dr/security-shim" find-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w
+  [ "$(wc -l < "$DR_SECURITY_UNEXPECTED_FILE")" -eq 2 ]
+  export DR_DRILL_CREDENTIAL_POLICY=enforce
+  run "$PWD/scripts/etc/dr/security-shim" delete-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1
+  [ "$status" -eq 44 ]
+}
+
+@test "dr credential scope: a hub restore may cache unseal keys; a drill rehearsal may not; root token only for the target context" {
+  export DR_DRILL_CREDENTIAL_POLICY=enforce
+  _shim_env hub "restore restore-hub" k3d-k3d-cluster
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1 -w X
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w X
+  [ ! -s "$DR_SECURITY_UNEXPECTED_FILE" ]
+  _shim_env rehearsal "restore restore-drill" k3d-dr-drill
+  run "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1 -w X; [ "$status" -eq 44 ]
+  run "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w X; [ "$status" -eq 44 ]
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-dr-drill -w X
+  "$PWD/scripts/etc/dr/security-shim" find-generic-password -s k3dm-hub-data-age -a identity -w
+}
+
+@test "dr credential guard: hub_data_recover records in its own process, also on RESUME, and scopes by target" {
+  make_fixture; source_plugin
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/recover" RESUME=g1 K3DM_HUB_DATA_CONTEXT=k3d-dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1
+  mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1"
+  printf '%s\n' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" > "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1/export_dir"
+  : > "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1/approval_time"
+  _hub_data_verify_export() { :; }; _hub_data_check_compatibility() { :; }; _hub_data_validate_target() { :; }; _hub_data_argocd_resume() { :; }
+  _hub_data_recover_step2() { printf '%s|%s|%s|%s\n' "${PATH%%:*}" "$(type -t security)" "$DR_SECURITY_SCOPES" "$DR_SECURITY_CONTEXT" > "$TEST_ROOT/guard.txt"; return 1; }
+  run hub_data_recover; [ "$status" -ne 0 ]
+  [ "$(cat "$TEST_ROOT/guard.txt")" = "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1/bin|function|restore restore-drill|k3d-dr-drill" ]
+  [ "$(readlink "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1/bin/security")" = "$PWD/scripts/etc/dr/security-shim" ]
+  [ -e "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/g1/credentials.tsv" ]
 }
 
 @test "dr restore: an out-of-cluster docker target is refused before exec" {
