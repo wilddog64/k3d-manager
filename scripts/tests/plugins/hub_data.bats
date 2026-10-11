@@ -936,6 +936,8 @@ _shim_env() {
   [ "$status" -eq 44 ]
   "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-unseal-drill -a secrets/vault:count -w X
   [ "$(wc -l < "$DR_SECURITY_UNEXPECTED_FILE")" -eq 1 ]
+  run "$PWD/scripts/etc/dr/security-shim" find-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w
+  [ "$status" -eq 44 ]
   run "$PWD/scripts/etc/dr/security-shim" delete-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1
   [ "$status" -eq 44 ]
 }
