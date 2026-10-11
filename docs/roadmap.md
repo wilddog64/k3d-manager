@@ -305,6 +305,13 @@ by editing lists, not code.
 | v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
+**Unfamiliar-app onboarding (proposed 2026-10-11).** Before TwinkleAI is onboarded by hand, test the
+platform against an app it has never seen: a Bolt.new-generated app, exported to its own repo and
+onboarded cold. The headline metric is manual interventions (target 0 long-term), with 100%
+deployment success for supported templates and functional + operational e2e, including
+observability onboarding. Generating the app may start any time; deploying it waits for v1.47.0.
+Scope: [`v1.49.0-unfamiliar-app-onboarding.md`](plans/v1.49.0-unfamiliar-app-onboarding.md).
+
 What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
 of those only if a platform feature still needs it to prove itself.
 
