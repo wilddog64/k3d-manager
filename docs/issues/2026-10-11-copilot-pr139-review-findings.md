@@ -53,10 +53,23 @@ precommit_bug_priority` with `K3DM_ENABLE_AI=1`: 2 failures before the change, 4
 the bypasses it knew about. The hook also reads `K3DM_ENABLE_AI`, which CI sets and a developer
 shell usually does not.
 
+## Finding 3 — unused import in `bug-tally.py` (CI only)
+
+**File:** `scripts/bug-tally.py:9`
+
+With the tests fixed, CI run `38140433416` reached `make lint-python`, which failed:
+Ruff F401, `collections.defaultdict` imported but unused. Removed the import. In a
+`python:3.12-slim` container with the CI's `ruff==0.15.8`, `make lint-python` passes and
+`test_bug_tally.py` passes 5/5. `make validate-manifests` passes locally (78/78).
+
+**Root cause:** Ruff is not installed on the M4, so `make lint-python` refuses to run there and
+this was never checked before the PR.
+
 ## Process note
 
 - A test that runs `.githooks/pre-commit` must pin every switch the hook reads
   (`K3DM_ENABLE_AI`, `K3DM_SKIP_DOC_LINKS`, `K3DM_SKIP_ROOT_DEBRIS`), not only the ones it is
   testing around.
-- Before a PR, run any new suite once in `ubuntu:24.04` with the CI lint job's env. Neither defect
+- Before a PR, run any new suite once in `ubuntu:24.04` with the CI lint job's env, and run
+  `make lint-python` with the pinned Ruff. Neither defect
   shows up on the M4.
