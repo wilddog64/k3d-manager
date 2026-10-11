@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-11
-**Status:** FIXED (2026-10-11) — export and alerts proven live; data-repo workflow update pending
+**Status:** FIXED (2026-10-11) — export, alerts and freshness workflow proven live
 **Priority:** P1
 **Severity:** High — the daily export, the v1.43.0 release gate, produced nothing and nothing said so
 **Files:** `scripts/plugins/hub_data.sh`, `scripts/tests/plugins/hub_data.bats`,
@@ -85,6 +85,9 @@ Three separate failures on the night of 2026-10-10 → 2026-10-11.
 - `kubectl apply` of `prometheusrule.yaml`: `dr.alerts` loaded (`DRDrillFailed`, `DRDrillStale`,
   `HubDataExportFailed`, `HubDataExportStale`, `HubDataExportNeverRan`). `HubDataExportFailed` went
   pending on the 03:30 zero, then cleared once the kickstart pushed `1`.
+- Data repo `main` workflow updated by the operator (`7c88cbf`), remote copy `cmp`-identical to
+  `scripts/etc/dr/drill-freshness.yml`; `workflow_dispatch` run `38138788454` passed (exit 0,
+  `bash k3dm-manager/drill-freshness.sh results`), replacing the 09:30 UTC exit-127 failure.
 
 ## Lesson
 
