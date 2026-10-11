@@ -341,7 +341,7 @@ data:
           "id": 7,
           "type": "barchart",
           "title": "Bugs filed per release, by priority",
-          "description": "Every bug doc counted toward each release. unset = filed before priorities existed (2026-10-09).",
+          "description": "Every bug doc counted toward each release. unset = filed before priorities existed (2026-10-09). Hover a bar for every count.",
           "gridPos": {
             "x": 0,
             "y": 6,
@@ -400,13 +400,17 @@ data:
           "options": {
             "xField": "release",
             "stacking": "normal",
-            "showValue": "auto",
+            "showValue": "never",
             "legend": {
               "displayMode": "list",
               "placement": "bottom",
               "showLegend": true
             },
-            "xTickLabelRotation": 0
+            "xTickLabelRotation": 0,
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           },
           "fieldConfig": {
             "defaults": {
@@ -504,7 +508,7 @@ data:
           "id": 8,
           "type": "barchart",
           "title": "Bugs per release, open vs fixed",
-          "description": "closed = FIXED, RESOLVED, CLOSED or similar; unknown = no recognisable status line.",
+          "description": "closed = FIXED, RESOLVED, CLOSED or similar; unknown = no recognisable status line. Hover a bar for every count.",
           "gridPos": {
             "x": 12,
             "y": 6,
@@ -561,13 +565,17 @@ data:
           "options": {
             "xField": "release",
             "stacking": "normal",
-            "showValue": "auto",
+            "showValue": "never",
             "legend": {
               "displayMode": "list",
               "placement": "bottom",
               "showLegend": true
             },
-            "xTickLabelRotation": 0
+            "xTickLabelRotation": 0,
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           },
           "fieldConfig": {
             "defaults": {

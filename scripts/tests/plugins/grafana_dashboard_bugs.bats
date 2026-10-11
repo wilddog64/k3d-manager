@@ -92,3 +92,17 @@ assert set(colours(by_state[0])) == {"closed", "open", "unknown"}
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "bug dashboard stacked bars give counts in the tooltip, not on-bar labels" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
+assert len(bars) == 2
+for panel in bars:
+    assert panel["options"]["showValue"] == "never", panel["title"]
+    assert panel["options"]["tooltip"]["mode"] == "multi", panel["title"]
+PY
+  [ "${status}" -eq 0 ]
+}

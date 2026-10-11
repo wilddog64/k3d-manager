@@ -61,3 +61,12 @@ assigns palette colours by column order, so `unset` turned green and P1 orange-r
 pinned by name on both priority panels (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey) and
 the state chart (closed green, open orange, unknown grey), and an `organize` step fixes the column
 order. A BATS test asserts the same priority colours on both panels (fails on the previous version).
+
+### Follow-up: on-bar labels sat on the wrong segment
+
+With `showValue: auto` on stacked bars, Grafana draws each count at the top edge of its own
+segment, so on short segments it reads as the next colour's number, and it silently drops labels
+that do not fit. Live check 2026-10-10: v1.42.0 is P1 4, P2 6, P3 3, unset 29; the chart showed "4"
+inside the orange P2 segment and no 6 at all, and every `open` count was hidden. The stacked bars
+now set `showValue: never` with a `multi` tooltip, so hovering a bar lists every series' count, and
+the panel descriptions say so. BATS test 6 asserts both settings and fails on the previous file.
