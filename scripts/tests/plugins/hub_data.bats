@@ -659,6 +659,26 @@ _fake_vault_tree() {
   grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
 }
 
+@test "recover K3: a missing ArgoCD Application is skipped, not a fatal kubectl exit" {
+  source_plugin; mkdir -p "$TEST_ROOT/run"
+  _kubectl() { [[ "$1" == --no-exit ]] && return 1; printf 'fatal kubectl exit\n' >&2; exit 1; }
+  run --separate-stderr _hub_data_argocd_pause k3d-dr-drill "$TEST_ROOT/run"; [ "$status" -eq 0 ]
+  [[ "$stderr" != *"fatal kubectl exit"* ]]
+}
+
+@test "recover K4: the Keychain age identity is drill-only and never prompts" {
+  source_plugin; local tty="$TEST_ROOT/tty"; printf 'AGE-SECRET-KEY-1TYPED\n' > "$tty"; export K3DM_HUB_DATA_TTY_DEVICE="$tty"
+  _secret_load_data() { printf '%s\n' "$*" >> "$CALL_LOG"; printf 'AGE-SECRET-KEY-1KEYCHAIN\r'; }
+  _hub_data_run_step() { :; }
+  K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1 run --separate-stderr _hub_data_recover_step2 "$TEST_ROOT/steps"; [ "$status" -eq 1 ]
+  [[ "$stderr" == *"drill rehearsals only"* ]]; [ "$(wc -c < "$CALL_LOG")" -eq 0 ]
+  export K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1 K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1
+  _hub_data_recover_step2 "$TEST_ROOT/steps" 2>/dev/null
+  [ "$K3DM_HUB_DATA_AGE_IDENTITY" = AGE-SECRET-KEY-1KEYCHAIN ]; grep -q 'k3dm-hub-data-age identity age' "$CALL_LOG"
+  unset K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN; _hub_data_recover_step2 "$TEST_ROOT/steps" 2>/dev/null
+  [ "$K3DM_HUB_DATA_AGE_IDENTITY" = AGE-SECRET-KEY-1TYPED ]
+}
+
 @test "recover K1: a drill target never caches unseal keys in the Keychain; the hub does" {
   source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }
   _vault_cache_unseal_keys() { printf 'cache\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { cat >/dev/null; }

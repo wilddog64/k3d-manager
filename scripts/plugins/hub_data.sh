@@ -719,8 +719,8 @@ function _hub_data_argocd_pause() {
   local context="$1" parent="${K3DM_HUB_DATA_ARGOCD_PARENT}" app="${K3DM_HUB_DATA_ARGOCD_APP}" ns="${ARGOCD_NAMESPACE:-cicd}" dir="$2" value current
   mkdir -p "$dir"
   for value in "$parent" "$app"; do
-    if _kubectl --context "$context" -n "$ns" get application "$value" >/dev/null 2>&1; then
-      current="$(_kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
+    if _kubectl --no-exit --context "$context" -n "$ns" get application "$value" >/dev/null 2>&1; then
+      current="$(_kubectl --no-exit --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
       if [[ ( -n "$current" && "$current" != null ) || ! -e "$dir/$value.automated" ]]; then
         printf '%s' "$current" > "$dir/$value.automated"
       fi
@@ -743,7 +743,7 @@ function _hub_data_argocd_assert_paused() {
   local context="$1" dir="$2" ns="${ARGOCD_NAMESPACE:-cicd}" value current
   for value in "$K3DM_HUB_DATA_ARGOCD_PARENT" "$K3DM_HUB_DATA_ARGOCD_APP"; do
     [[ -r "$dir/$value.automated" ]] || continue
-    current="$(_kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
+    current="$(_kubectl --no-exit --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
     [[ -z "$current" || "$current" == null ]] || return 1
   done
 }
@@ -1008,7 +1008,15 @@ function _hub_data_recover_step2() {
   local steps="$1"
   printf '[hub-recover] Step 2/9 — age identity\n'
   K3DM_HUB_DATA_AGE_IDENTITY=""
-  if ! read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < "${K3DM_HUB_DATA_TTY_DEVICE:-/dev/tty}"; then
+  if [[ "${K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN:-0}" == 1 ]]; then
+    if [[ "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" != 1 ]]; then
+      printf '%s\n' '[hub-recover] K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN is for drill rehearsals only; a real recovery types the key' >&2
+      return 1
+    fi
+    K3DM_HUB_DATA_AGE_IDENTITY="$(_secret_load_data k3dm-hub-data-age identity age)"
+    K3DM_HUB_DATA_AGE_IDENTITY="${K3DM_HUB_DATA_AGE_IDENTITY%$'\r'}"
+    printf '%s\n' '[hub-recover] drill rehearsal: age identity loaded from the Keychain (k3dm-hub-data-age)' >&2
+  elif ! read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < "${K3DM_HUB_DATA_TTY_DEVICE:-/dev/tty}"; then
     printf '%s\n' '[hub-recover] could not read the age identity from the TTY' >&2
     return 1
   fi
