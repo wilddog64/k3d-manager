@@ -203,8 +203,62 @@ function _hub_data_ldap_entry_count() {
   "$@" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' 2>/dev/null | awk '/^dn:/{n++} END{print n+0}'
 }
 
+function _hub_data_keycloak_user_digest() {
+  local realm="${KEYCLOAK_REALM:-shopping-cart}"
+  "$@" -n identity exec deployment/postgres-keycloak -- sh -c "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -Atc \"SELECT username FROM user_entity WHERE realm_id=(SELECT id FROM realm WHERE name='${realm}') ORDER BY username;\"" 2>/dev/null | shasum -a 256 | awk '{print $1}'
+}
+
+function _hub_data_ldap_dn_digest() {
+  "$@" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' 2>/dev/null | awk '/^dn:/{print $2}' | sort | shasum -a 256 | awk '{print $1}'
+}
+
+function _hub_data_inventory_images() {
+  local context
+  context="$(_hub_data_target_context)"
+  jq -n \
+    --arg vault "$(_kubectl --context "$context" -n secrets get pod vault-0 -o jsonpath='{.spec.containers[0].image}')" \
+    --arg keycloak "$(_kubectl --context "$context" -n identity get pod -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].spec.containers[0].image}')" \
+    --arg ldap "$(_kubectl --context "$context" -n identity get pod openldap-0 -o jsonpath='{.spec.containers[0].image}')" \
+    '{"secrets/vault-0":$vault,"identity/postgres-keycloak":$keycloak,"identity/openldap-0":$ldap}'
+}
+
+function _hub_data_inventory_vault_keys() {
+  local token="$1" ns="$2" release="$3" path listing child metadata key version
+  local -a pending=("secret/")
+  declare -A seen=() result=()
+  while ((${#pending[@]})); do
+    path="${pending[0]}"; pending=("${pending[@]:1}")
+    [[ -n "${seen[$path]+x}" ]] && continue
+    seen["$path"]=1
+    listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" "$path")" || return 1
+    while IFS= read -r child; do
+      [[ -n "$child" ]] || continue
+      if [[ "$child" == */ ]]; then
+        if [[ "secret/${child}" == "$path" ]]; then
+          key="${path#secret/}"; key="${key%/}"
+          metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || return 1
+          version="$(jq -r '.data.current_version // .data.metadata.current_version // empty' <<<"$metadata")"; [[ "$version" =~ ^[1-9][0-9]*$ ]] || return 1; result["$key"]="$version"
+        else
+          pending+=("secret/${child}")
+        fi
+      else
+        key="${path#secret/}${child}"
+        metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || return 1
+        version="$(jq -r '.data.current_version // .data.metadata.current_version // empty' <<<"$metadata")"
+        [[ "$version" =~ ^[1-9][0-9]*$ ]] || return 1
+        result["$key"]="$version"
+      fi
+    done < <(_hub_data_kv_names "$listing")
+  done
+  local json='{}'
+  for key in "${!result[@]}"; do
+    json="$(jq --arg k "$key" --arg v "${result[$key]}" '. + {($k):{current_version:($v|tonumber)}}' <<<"$json")"
+  done
+  printf '%s\n' "$json"
+}
+
 function _hub_data_inventory() (
-  local root="$1" ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" token paths users ldap cleanup=0
+  local root="$1" ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" token paths users ldap images keycloak_digest ldap_digest vault_keys cleanup=0
   _hub_data_revoke_root() { (( cleanup == 1 )) || return 0; _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1 || true; }
   trap _hub_data_revoke_root EXIT
   token="$(_hub_data_inventory_token "$ns" "$release")" && [[ -n "$token" ]] || return 1
@@ -214,12 +268,18 @@ function _hub_data_inventory() (
   users="$(_hub_data_keycloak_user_count _kubectl)"
   ldap="$(_hub_data_ldap_entry_count _kubectl)"
   [[ "$users" =~ ^[1-9][0-9]*$ && "$ldap" =~ ^[1-9][0-9]*$ ]] || return 1
-  jq -n --argjson p "$paths" --argjson u "$users" --argjson l "$ldap" '{vault_paths:$p,keycloak_realm_user_count:$u,ldap_entry_count:$l}' > "${root}/inventory.json"
+  images="$(_hub_data_inventory_images)" || return 1
+  keycloak_digest="$(_hub_data_keycloak_user_digest _kubectl)" || return 1
+  ldap_digest="$(_hub_data_ldap_dn_digest _kubectl)" || return 1
+  vault_keys="$(_hub_data_inventory_vault_keys "$token" "$ns" "$release")" || return 1
+  jq -n --argjson p "$paths" --argjson u "$users" --argjson l "$ldap" --argjson i "$images" --arg kd "$keycloak_digest" --arg ld "$ldap_digest" --argjson vk "$vault_keys" \
+    '{format:2,images:$i,vault_paths:$p,keycloak_realm_user_count:$u,ldap_entry_count:$l,keycloak_usernames_sha256:$kd,ldap_dns_sha256:$ld,vault_keys:$vk}' > "${root}/inventory.json"
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 )
 
 function hub_data_export_setup() { (
-  local ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" policy='path "secret/metadata/" { capabilities = ["list"] }' stage token listing cleanup=0
+  local ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" policy='path "secret/metadata/" { capabilities = ["list"] }
+path "secret/metadata/*" { capabilities = ["read"] }' stage token listing cleanup=0
   stage="$(_hub_data_stage)"; trap 'rm -rf -- "$stage"' EXIT
   _hub_data_pin_context "$stage"
   _vault_login "$ns" "$release"
@@ -478,7 +538,8 @@ function _hub_data_workload() {
 function _hub_data_scale() {
   local ns="$1" claim="$2" replicas="$3" workload
   workload="$(_hub_data_workload "$ns" "$claim")" || { _err "[hub-data] unknown workload for ${ns}/${claim}"; return 1; }
-  local context="${K3DM_HUB_DATA_CONTEXT:-${DR_DRILL_CONTEXT:-}}"
+  local context
+  context="$(_hub_data_target_context)"
   if ! _kubectl --context "$context" -n "$ns" scale "$workload" --replicas="$replicas"; then
     _err "[hub-data] unable to scale ${workload}"
     return 1
@@ -488,7 +549,15 @@ function _hub_data_scale() {
 function _hub_data_apply_keycloak() {
   local manifest="${K3DM_HUB_DATA_POSTGRES_MANIFEST:-${_HUB_DATA_ROOT}/scripts/etc/dr/postgres-keycloak.yaml}"
   [[ -f "$manifest" ]] || { _err "[hub-data] missing ${manifest}"; return 1; }
-  _kubectl --context "${DR_DRILL_CONTEXT:-${K3DM_HUB_DATA_CONTEXT:-}}" -n identity apply -f "$manifest"
+  _kubectl --context "$(_hub_data_target_context)" -n identity apply -f "$manifest"
+}
+
+function _hub_data_target_context() {
+  if [[ "${DR_DRILL_MODE:-0}" == 1 ]]; then
+    printf '%s\n' "${DR_DRILL_CONTEXT:-}"
+  else
+    printf '%s\n' "${K3DM_HUB_DATA_CONTEXT:-}"
+  fi
 }
 
 function _hub_data_wait_vault() {
@@ -553,8 +622,9 @@ function _hub_data_prepare_claim() {
   size="$(_hub_data_meta_field "${stage}/pv-pvc.yaml" "$ns" "$claim" size)"; modes="$(_hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim")"
   [[ -n "$node" && -n "$size" && -n "$storage" && -n "$modes" ]] || return 1
   _hub_data_scale "$ns" "$claim" 0 >/dev/null || return 1
-  _kubectl --context "$DR_DRILL_CONTEXT" -n "$ns" delete pvc "$claim" --ignore-not-found >/dev/null
-  local context="${K3DM_HUB_DATA_CONTEXT:-${DR_DRILL_CONTEXT:-}}" cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
+  local context cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
+  context="$(_hub_data_target_context)"
+  _kubectl --context "$context" -n "$ns" delete pvc "$claim" --ignore-not-found >/dev/null
   { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$cluster" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$context" apply -f -
   _kubectl --context "$context" -n "$ns" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${claim}" --timeout=300s
   pv="$(_kubectl --context "$context" -n "$ns" get pvc "$claim" -o jsonpath='{.spec.volumeName}')"
@@ -641,7 +711,6 @@ function _hub_data_argocd_pause() {
     if _kubectl --context "$context" -n "$ns" get application "$value" >/dev/null 2>&1; then
       _kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}' > "$dir/$value.automated"
       _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' >/dev/null
-      [[ -z "$(<"$dir/$value.automated")" || "$(<"$dir/$value.automated")" == "null" ]] || true
     elif [[ "$value" == "$app" ]]; then
       _info "[hub-recover] ${value} not found; skipping ArgoCD child"
     else
@@ -649,10 +718,19 @@ function _hub_data_argocd_pause() {
     fi
   done
   for value in "$parent" "$app"; do
-    if [[ -s "$dir/$value.automated" ]] && ! _kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}' | grep -qx 'null'; then
+    if [[ -s "$dir/$value.automated" ]] && ! _hub_data_argocd_assert_paused "$context" "$dir"; then
       _err "[hub-recover] ArgoCD ${value} auto-sync was restored during pause"
       return 1
     fi
+  done
+}
+
+function _hub_data_argocd_assert_paused() {
+  local context="$1" dir="$2" ns="${ARGOCD_NAMESPACE:-cicd}" value current
+  for value in "$K3DM_HUB_DATA_ARGOCD_PARENT" "$K3DM_HUB_DATA_ARGOCD_APP"; do
+    [[ -r "$dir/$value.automated" ]] || continue
+    current="$(_kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
+    [[ -z "$current" || "$current" == null ]] || return 1
   done
 }
 
@@ -662,14 +740,43 @@ function _hub_data_argocd_resume() {
     [[ -r "$dir/$value.automated" ]] || continue
     payload="$(<"$dir/$value.automated")"
     [[ -n "$payload" && "$payload" != null ]] || continue
-    _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p "{\"spec\":{\"syncPolicy\":{\"automated\":${payload}}}}" >/dev/null || _warn "[hub-recover] failed to resume ${value}"
+    if ! _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p "{\"spec\":{\"syncPolicy\":{\"automated\":${payload}}}}" >/dev/null; then
+      ( _err "[hub-recover] failed to resume ${value}" ) 2>/dev/null || true
+      printf '%s\n' false > "$dir/argocd_resume"
+    fi
   done
 }
 
 function _hub_data_checkpoint() {
-  local file="$1" step="$2" rc="$3" now
+  local file="$1" step="$2" state="$3" now
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '{"step":%s,"time":"%s","rc":%s}\n' "$step" "$now" "$rc" >> "$file"
+  if [[ "$state" == start ]]; then
+    printf '{"step":%s,"started":"%s"}\n' "$step" "$now" >> "$file"
+  else
+    printf '{"step":%s,"finished":"%s","rc":%s}\n' "$step" "$now" "$state" >> "$file"
+  fi
+}
+
+function _hub_data_step_finished() {
+  jq -e --argjson step "$1" 'any(.[]; .step == $step and .finished != null and .rc == 0)' "$2" >/dev/null 2>&1
+}
+
+function _hub_data_step_unfinished() {
+  jq -e --argjson step "$1" 'any(.[]; .step == $step and .started != null) and (any(.[]; .step == $step and .finished != null and .rc == 0) | not)' "$2" >/dev/null 2>&1
+}
+
+function _hub_data_refresh_dependents() {
+  local context="$1"
+  _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
+  _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite
+}
+
+function _hub_data_run_step() {
+  local file="$1" step="$2"; shift 2; local step_rc
+  _hub_data_checkpoint "$file" "$step" start
+  set +e; "$@"; step_rc=$?; set -e
+  _hub_data_checkpoint "$file" "$step" "$step_rc"
+  return "$step_rc"
 }
 
 function _hub_data_repoint_vault() {
@@ -677,19 +784,25 @@ function _hub_data_repoint_vault() {
   root_token="$(_hub_data_generate_root "$ns" "$release")" || return 1
   _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token" || return 1
   count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)" || return 1
+  [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 1
   local -a shards=()
-  for ((idx=1; idx<=count; idx++)); do shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; shards+=("$shard"); done
+  for ((idx=1; idx<=count; idx++)); do
+    shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)" || return 1
+    shard="${shard%$'\r'}"
+    [[ -n "$shard" ]] && _vault_dr_shard_valid "$shard" || return 1
+    shards+=("$shard")
+  done
   _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
-  printf '%s\n' "$root_token" | _kubectl --context "$context" -n secrets create secret generic vault-root --from-literal=root_token=- --dry-run=client -o yaml | _kubectl --context "$context" apply -f - || return 1
-  _hub_recovery_sync_vault_root_token "$context"
+  printf '%s' "$root_token" | jq -Rs '{apiVersion:"v1",kind:"Secret",metadata:{name:"vault-root",namespace:"secrets"},type:"Opaque",stringData:{root_token:.}}' | _kubectl --context "$context" apply -f - || return 1
+  _hub_recovery_sync_vault_root_token "$context" || return 1
 }
 
 function _hub_data_recover_approval() {
   local export_ts="$1" typed
-  [[ -t 0 || "${K3DM_HUB_DATA_TEST_TTY:-0}" == 1 ]] || { _err '[hub-recover] interactive TTY required'; return 2; }
+  [[ -t 0 || "${K3DM_HUB_DATA_TEST_TTY:-0}" == 1 ]] || { printf '%s\n' '[hub-recover] interactive TTY required' >&2; return 2; }
   printf '[hub-recover] Type export timestamp %s to approve: ' "$export_ts" >&2
   IFS= read -r typed < /dev/tty || return 2
-  [[ "$typed" == "$export_ts" ]] || { _err '[hub-recover] approval did not match the selected export'; return 2; }
+  [[ "$typed" == "$export_ts" ]] || { printf '%s\n' '[hub-recover] approval did not match the selected export' >&2; return 2; }
 }
 
 function _hub_data_validate_target() {
@@ -707,7 +820,7 @@ function _hub_data_validate_target() {
 }
 
 function _hub_data_check_compatibility() {
-  local dir="$1" inventory format
+  local dir="$1" inventory format context target_images key export_image target_image
   inventory="$dir/inventory.json"
   format="$(jq -r '.format // 0' "$inventory" 2>/dev/null || printf 0)"
   if [[ "$format" != 2 && "${K3DM_HUB_DATA_ALLOW_LEGACY_EXPORT:-0}" != 1 ]]; then
@@ -717,51 +830,128 @@ function _hub_data_check_compatibility() {
   for claim in data-vault-0 postgres-keycloak-pvc data-openldap-0; do
     grep -q "name: $claim" "$dir/pv-pvc.yaml" || { _err "[hub-recover] export is missing claim $claim"; return 1; }
   done
+  if [[ "$format" == 2 ]]; then
+    context="$(_hub_data_target_context)"
+    target_images="$(_hub_data_inventory_images)" || return 1
+    while IFS=$'\t' read -r key export_image; do
+      target_image="$(jq -r --arg k "$key" '.[$k] // empty' <<<"$target_images")"
+      local export_major target_major
+      export_major="$(sed -n 's/.*:\([0-9][0-9]*\)\..*/\1/p' <<<"${export_image%%@*}")"
+      target_major="$(sed -n 's/.*:\([0-9][0-9]*\)\..*/\1/p' <<<"${target_image%%@*}")"
+      if [[ -n "$export_major" && -n "$target_major" && "$export_major" != "$target_major" ]]; then
+        _err "[hub-recover] image major mismatch for ${key}: export ${export_image}, target ${target_image}"
+        return 1
+      fi
+    done < <(jq -r '.images | to_entries[] | [.key,.value] | @tsv' "$inventory")
+  fi
 }
 
 function _hub_data_report() {
-  local run_dir="$1" rc="$2" report
+  local run_dir="$1" rc="$2" report steps_json checks_json target_json export_dir export_ts sums_digest approval_time
   report="$run_dir/report.json"
-  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "${K3DM_HUB_DATA_EXPORT:-newest}" --argjson rc "$rc" '{run_id:$run,host:$host,operator:$operator,commit:$commit,export:$export,rc:$rc}' > "$report"
+  steps_json='[]'; [[ -s "$run_dir/steps.jsonl" ]] && steps_json="$(jq -s 'group_by(.step) | map({step:.[0].step,started:(map(select(.started != null))[0].started // null),finished:(map(select(.finished != null))[-1].finished // null),rc:(map(select(.finished != null))[-1].rc // null)})' "$run_dir/steps.jsonl")"
+  checks_json='{}'; [[ -s "$run_dir/checks.json" ]] && checks_json="$(<"$run_dir/checks.json")"
+  target_json='{}'; [[ -s "$run_dir/target.json" ]] && target_json="$(<"$run_dir/target.json")"
+  export_dir="${K3DM_HUB_DATA_EXPORT_DIR:-}"; export_ts="${export_dir##*/}"
+  sums_digest=''; [[ -n "$export_dir" && -r "$export_dir/SHA256SUMS" ]] && sums_digest="$(shasum -a 256 "$export_dir/SHA256SUMS" | awk '{print $1}')"
+  approval_time=''; [[ -r "$run_dir/approval_time" ]] && approval_time="$(<"$run_dir/approval_time")"
+  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "$export_ts" --arg sums "$sums_digest" --arg approval "$approval_time" --argjson target "$target_json" --argjson steps "$steps_json" --argjson checks "$checks_json" --argjson rc "$rc" --arg resume "$(cat "$run_dir/argocd_resume" 2>/dev/null || printf true)" --argjson rto "$(cat "$run_dir/rto_seconds" 2>/dev/null || printf 0)" \
+    '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),rto_seconds:$rto,rc:$rc}' > "$report"
 }
 
-function hub_data_verify() {
-  local inventory="${1:?inventory path required}" ns="${2:-identity}" context="${3:-${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}}" expected actual
-  jq -e 'has("vault_keys") or has("vault_paths")' "$inventory" >/dev/null || { _err '[hub-data] inventory has no Vault proof'; return 1; }
-  if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null; then
-    expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"
-    actual="$(_kubectl --context "$context" -n identity exec deployment/postgres-keycloak -- sh -c 'psql -Atc "select username from user_entity order by username"' | sha256sum | awk '{print $1}')"
-    [[ "$expected" == "$actual" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
+function hub_data_verify_unsealed() { local context="$1"; set +u; _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null; local rc=$?; set -u; return "$rc"; }
+function hub_data_verify_keycloak() {
+  local inventory="$1" context="$2" want actual expected digest
+  want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _kubectl)"; [[ "$actual" == "$want" ]] || return 1
+  if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null 2>&1; then
+    expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"; digest="$(_hub_data_keycloak_user_digest _kubectl)"
+    [[ "$expected" == "$digest" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
   fi
-  if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null; then
-    expected="$(jq -r '.ldap_dns_sha256' "$inventory")"
-    actual="$(_kubectl --context "$context" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' | awk '/^dn:/{print $2}' | sort | sha256sum | awk '{print $1}')"
-    [[ "$expected" == "$actual" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
-  fi
-  hub_data_verify_vault_paths secrets vault "$inventory"
 }
+function hub_data_verify_ldap() {
+  local inventory="$1" context="$2" want actual expected digest
+  want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl)"; [[ "$actual" == "$want" ]] || return 1
+  if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null 2>&1; then
+    expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl)"
+    [[ "$expected" == "$digest" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
+  fi
+}
+function hub_data_verify_placement() {
+  local inventory="$1" context="$2" postgres expected actual logical metadata="${DR_DRILL_METADATA:-${DR_DRILL_RESTORE_STAGE:-}/pv-pvc.yaml}"
+  postgres="$(_kubectl --context "$context" -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"; [[ -n "$postgres" ]] || return 1
+  while IFS=$'\t' read -r ns pod claim; do
+    _kubectl --context "$context" -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null || return 1
+    expected="$(_hub_data_meta_field "$metadata" "$ns" "$claim" logicalNode)"; actual="$(_kubectl --context "$context" -n "$ns" get pod "$pod" -o jsonpath='{.spec.nodeName}')"; logical="$(_hub_recovery_logical_node "$actual")"; [[ "$logical" == "$expected" ]] || return 1
+  done <<EOF
+secrets	vault-0	data-vault-0
+identity	${postgres}	postgres-keycloak-pvc
+identity	openldap-0	data-openldap-0
+EOF
+}
+function hub_data_verify_externalsecrets() {
+  local context="$1" deadline=$((SECONDS + ${K3DM_HUB_DATA_V8_WAIT_S:-300})) json
+  while (( SECONDS <= deadline )); do
+    json="$(_kubectl --context "$context" get externalsecret --all-namespaces -o json)" || return 1
+    [[ -z "$json" ]] && return 0
+    ! jq -e '[.items[]?.status.conditions[]? | select(.type == "Ready" and .reason == "SecretSyncedError")] | length > 0' <<<"$json" >/dev/null && return 0
+    sleep "${K3DM_HUB_DATA_V8_POLL_S:-5}"
+  done
+  return 1
+}
+function hub_data_verify() {
+  local inventory="${1:?inventory path required}" ns="${2:-identity}" context="${3:-${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}}" name rc all=true
+  local -a names=(V1 V2 V3 V4 V5 V8)
+  local -a funcs=(hub_data_verify_unsealed hub_data_verify_vault_paths hub_data_verify_keycloak hub_data_verify_ldap hub_data_verify_placement hub_data_verify_externalsecrets)
+  printf '{}' > "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}"
+  for ((i=0; i<${#names[@]}; i++)); do
+    name="${names[$i]}"; set +e; if [[ "$name" == V1 ]]; then "${funcs[$i]}" "$context"; elif [[ "$name" == V2 ]]; then "${funcs[$i]}" secrets vault "$inventory"; elif [[ "$name" == V8 ]]; then "${funcs[$i]}" "$context"; else "${funcs[$i]}" "$inventory" "$context"; fi; rc=$?; set -e
+    (( rc == 0 )) || all=false
+    printf '%s\t%s\n' "$name" "$([[ $rc -eq 0 ]] && printf true || printf false)"
+    jq --arg n "$name" --argjson v "$([[ $rc -eq 0 ]] && printf true || printf false)" '. + {($n):$v}' "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}" > "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}.tmp" && mv "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}.tmp" "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}"
+  done
+  [[ "$all" == true ]]
+}
+
+function hub_data_recover_preflight() {
+  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" repo export_dir export_ts run_id run_dir
+  repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"
+  [[ -n "$export_dir" ]] && export_dir="$repo/snapshots/$export_dir" || export_dir="$(_hub_data_latest_export_dir "$repo")"
+  [[ -d "$export_dir" ]] || return 1
+  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2
+  export_ts="${export_dir##*/}"; local server nodes live_users live_ldap export_users export_ldap export_paths
+  server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"; nodes="$(_kubectl --context "$context" get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}')"
+  export_users="$(jq -r '.keycloak_realm_user_count' "$export_dir/inventory.json")"; export_ldap="$(jq -r '.ldap_entry_count' "$export_dir/inventory.json")"; export_paths="$(jq -r '.vault_paths | length' "$export_dir/inventory.json")"
+  live_users="$(_hub_data_keycloak_user_count _kubectl 2>/dev/null || printf unknown)"; live_ldap="$(_hub_data_ldap_entry_count _kubectl 2>/dev/null || printf unknown)"
+  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live unknown/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap"
+  mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT"; jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/.target.json"
+  _hub_data_recover_approval "$export_ts" || return 2
+  run_id="$(date -u +%Y%m%dT%H%M%SZ)"; run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"; mkdir -p "$run_dir"; cp "${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/.target.json" "$run_dir/target.json"; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; printf '%s\n' "$export_dir" > "$run_dir/export_dir"; printf 'RUN_ID=%s\n' "$run_id"
+}
+
+function _hub_data_recover_step2() {
+  local steps="$1"; _hub_data_step_finished 2 "$steps" && return 0
+  printf '[hub-recover] Step 2/9 — age identity\n'; read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty; printf '\n' >&2; [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || return 1; _hub_data_run_step "$steps" 2 true
+}
+function _hub_data_recover_step3() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 3 "$steps" && return 0; printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'; _hub_data_run_step "$steps" 3 _hub_data_argocd_pause "$context" "$dir"; }
+function _hub_data_recover_step4() { local steps="$1" context="$2"; _hub_data_step_finished 4 "$steps" && return 0; _hub_data_step_unfinished 4 "$steps" && [[ "${REDO_STEP:-}" != 4 ]] && return 1; printf '[hub-recover] Step 4/9 — Restore claims\n'; _hub_data_argocd_assert_paused "$context" "$3" || return 1; _hub_data_run_step "$steps" 4 hub_data_restore; }
+function _hub_data_recover_step5() { local steps="$1"; _hub_data_step_finished 5 "$steps" && return 0; printf '[hub-recover] Step 5/9 — Unseal\n'; _hub_data_run_step "$steps" 5 hub_data_unseal_dr '[hub-recover]'; }
+function _hub_data_recover_step6() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 6 "$steps" && return 0; _hub_data_step_unfinished 6 "$steps" && [[ "${REDO_STEP:-}" != 6 ]] && return 1; printf '[hub-recover] Step 6/9 — Re-point Vault\n'; _hub_data_argocd_assert_paused "$context" "$dir" || return 1; _hub_data_run_step "$steps" 6 _hub_data_repoint_vault "$context"; }
+function _hub_data_recover_step7() { local steps="$1" context="$2"; _hub_data_step_finished 7 "$steps" && return 0; printf '[hub-recover] Step 7/9 — Refresh dependents\n'; _hub_data_run_step "$steps" 7 _hub_data_refresh_dependents "$context"; }
+function _hub_data_recover_step8() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 8 "$steps" && return 0; printf '[hub-recover] Step 8/9 — Verify\n'; export HUB_DATA_VERIFY_REPORT="$dir/checks.json"; _hub_data_run_step "$steps" 8 hub_data_verify "$dir/inventory.json" identity "$context"; }
+function _hub_data_recover_step9() { local steps="$1"; _hub_data_step_finished 9 "$steps" && return 0; printf '[hub-recover] Step 9/9 — Report\n'; _hub_data_run_step "$steps" 9 true; }
 
 function hub_data_recover() { (
-  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" stage repo export_dir export_ts run_id run_dir steps rc=0
+  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" export_dir export_ts run_id run_dir steps rc=0
   run_id="${RESUME:-$(date -u +%Y%m%dT%H%M%SZ)}"; run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"; mkdir -p "$run_dir"; steps="$run_dir/steps.jsonl"
-  trap 'rc=$?; _hub_data_argocd_resume "$context" "$run_dir" || true; _hub_data_report "$run_dir" "$rc"; unset K3DM_HUB_DATA_AGE_IDENTITY; exit "$rc"' EXIT
-  printf '[hub-recover] Step 1/9 — Preflight\n'
-  [[ "$context" == k3d-dr-drill && "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" == 1 || "$context" != k3d-dr-drill ]] || { _err '[hub-recover] refusing the M2 context without K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1'; return 2; }
-  repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"
-  if [[ -z "$export_dir" ]]; then export_dir="$(_hub_data_latest_export_dir "$repo" 2>/dev/null || true)"; else export_dir="$repo/snapshots/$export_dir"; fi
-  [[ -d "$export_dir" ]] || { _err '[hub-recover] selected export does not exist'; return 1; }
-  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; export_ts="${export_dir##*/}"
-  _hub_data_recover_approval "$export_ts" || return 2
-  _hub_data_checkpoint "$steps" 1 0
-  printf '[hub-recover] Step 2/9 — age identity\n'; read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty; printf '\n' >&2; [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || { _err '[hub-recover] invalid age identity'; return 1; }; _hub_data_checkpoint "$steps" 2 0
-  printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'; _hub_data_argocd_pause "$context" "$run_dir"; _hub_data_checkpoint "$steps" 3 0
-  cp "$export_dir/inventory.json" "$run_dir/inventory.json"
+  trap 'rc=$?; set +e; _hub_data_argocd_resume "$context" "$run_dir"; _hub_data_report "$run_dir" "$rc"; unset K3DM_HUB_DATA_AGE_IDENTITY; exit "$rc"' EXIT
+  printf '[hub-recover] Step 1/9 — Preflight\n'; [[ "$context" == k3d-dr-drill && "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" != 1 ]] && return 2
+  export_dir="$(cat "$run_dir/export_dir" 2>/dev/null || true)"; [[ -n "$export_dir" ]] || { repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"; [[ -n "$export_dir" ]] && export_dir="$repo/snapshots/$export_dir" || export_dir="$(_hub_data_latest_export_dir "$repo")"; }
+  [[ -d "$export_dir" ]] || return 1; export_ts="${export_dir##*/}"; export K3DM_HUB_DATA_EXPORT_DIR="$export_dir"; cp "$export_dir/inventory.json" "$run_dir/inventory.json"; printf '%s\n' "$export_dir" > "$run_dir/export_dir"
+  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; if [[ ! -r "$run_dir/approval_time" ]]; then _hub_data_recover_approval "$export_ts" || return 2; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; fi
+  _hub_data_step_finished 1 "$steps" || _hub_data_run_step "$steps" 1 true || return $?
+  _hub_data_recover_step2 "$steps" || return $?; _hub_data_recover_step3 "$steps" "$context" "$run_dir" || return $?
   export K3DM_HUB_DATA_CONTEXT="$context" K3DM_HUB_DATA_CLUSTER="$cluster" HUB_DATA_RESTORE_TARGET=hub
-  if [[ -n "${RESUME:-}" && "${REDO_STEP:-}" != 4 && -s "$steps" ]] && grep -q '"step":4.*"rc":null' "$steps"; then _err '[hub-recover] step 4 started but did not finish; set REDO_STEP=4 to repeat it'; return 1; fi
-  printf '[hub-recover] Step 4/9 — Restore claims\n'; _hub_data_checkpoint "$steps" 4 null; hub_data_restore; _hub_data_checkpoint "$steps" 4 0
-  printf '[hub-recover] Step 5/9 — Unseal\n'; hub_data_unseal_dr '[hub-recover]'; _hub_data_checkpoint "$steps" 5 0
-  printf '[hub-recover] Step 6/9 — Re-point Vault\n'; _hub_data_checkpoint "$steps" 6 null; _hub_data_repoint_vault "$context"; _hub_data_checkpoint "$steps" 6 0
-  printf '[hub-recover] Step 7/9 — Refresh dependents\n'; _kubectl --context "$context" -n identity rollout restart deployment/keycloak; _hub_data_checkpoint "$steps" 7 0
-  printf '[hub-recover] Step 8/9 — Verify\n'; hub_data_verify "$run_dir/inventory.json" identity "$context"; _hub_data_checkpoint "$steps" 8 0
-  printf '[hub-recover] Step 9/9 — Report\n'; _hub_data_checkpoint "$steps" 9 0
-) }
+  _hub_data_recover_step4 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step5 "$steps" || return $?; _hub_data_recover_step6 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step7 "$steps" "$context" || return $?; _hub_data_recover_step8 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step9 "$steps" || return $?
+  printf '%s\n' "$SECONDS" > "$run_dir/rto_seconds"
+)
+}

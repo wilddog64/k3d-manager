@@ -93,8 +93,7 @@ hub-data-recover:
 
 ## Full hub disaster recovery: rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
 hub-recover-all:
-	@$(MAKE) --no-print-directory hub-recover
-	@$(MAKE) --no-print-directory hub-data-recover
+	@set -e; run_id=$$(./scripts/k3d-manager hub_data_recover_preflight | sed -n 's/^RUN_ID=//p'); test -n "$$run_id"; $(MAKE) --no-print-directory hub-recover; RESUME=$$run_id ./scripts/k3d-manager hub_data_recover
 
 dr-drill:
 	@bin/dr-drill

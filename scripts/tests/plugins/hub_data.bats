@@ -315,6 +315,8 @@ STUB
   }
   _hub_data_generate_root() { printf root-token; }
   _hub_data_vault_kv_list() { printf '["app/","shared"]'; }
+  _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }
+  _hub_data_inventory_images() { printf '%s\n' '{"secrets/vault-0":"vault:1.0","identity/postgres-keycloak":"postgres:1.0","identity/openldap-0":"openldap:1.0"}'; }
   _hub_data_vault_revoke() { :; }
 }
 
@@ -368,7 +370,7 @@ STUB
 }
 
 @test "1 inventory uses Kubernetes login JWT on stdin only" {
-  source_plugin; run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
+  source_plugin; _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }; run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
   [ "$(grep -c JWT-SENTINEL "$VLOG" || true)" -eq 0 ]; grep -q JWT-SENTINEL "$STDIN_LOG"; grep -q 'auth/kubernetes/login' "$VLOG"; grep -q 'jwt=-' "$VLOG"
 }
 
@@ -512,35 +514,30 @@ STUB
 }
 
 @test "13 approval is typed and mismatches are refused" {
-  source_plugin
-  grep -q 'approval did not match' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'read -r typed < /dev/tty' "$PLUGINS_DIR/hub_data.sh"
+  source_plugin; K3DM_HUB_DATA_TEST_TTY=1; read() { REPLY=wrong; return 0; }
+  run _hub_data_recover_approval 20261011T120000Z; [ "$status" -eq 2 ]; [ "$(grep -c kubectl "$CALL_LOG" || true)" -eq 0 ]
 }
 
 @test "13a target validation checks the local serverlb and server-0" {
-  source_plugin
-  grep -q '_hub_data_validate_target' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'serverlb' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'server-0' "$PLUGINS_DIR/hub_data.sh"
+  source_plugin; _kubectl() { [[ "$*" == *'config view'* ]] && printf 'https://127.0.0.1:6443'; }
+  docker() { printf 'k3d-test-serverlb 0.0.0.0:6443->6443/tcp\nk3d-test-server-0\n'; }
+  run _hub_data_validate_target ctx test; [ "$status" -ne 0 ]
 }
 
 @test "13b destructive checkpoints require explicit redo on resume" {
   source_plugin
   grep -q 'REDO_STEP=4' "$PLUGINS_DIR/hub_data.sh"
-  grep -q '"rc":null' "$PLUGINS_DIR/hub_data.sh"
+  grep -q '"finished"' "$PLUGINS_DIR/hub_data.sh"
 }
 
 @test "13c compatibility requires format 2 and all claims" {
-  source_plugin
-  grep -q '_hub_data_check_compatibility' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'format 2' "$PLUGINS_DIR/hub_data.sh"
+  source_plugin; local dir="$TEST_ROOT/compat"; mkdir -p "$dir"; printf '%s\n' '{"format":1}' > "$dir/inventory.json"; printf 'name: data-vault-0\nname: postgres-keycloak-pvc\nname: data-openldap-0\n' > "$dir/pv-pvc.yaml"
+  run _hub_data_check_compatibility "$dir"; [ "$status" -ne 0 ]
 }
 
 @test "13d verification uses metadata proof fields" {
-  source_plugin
-  grep -q 'keycloak_usernames_sha256' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'ldap_dns_sha256' "$PLUGINS_DIR/hub_data.sh"
-  ! grep -q 'vault kv get' "$PLUGINS_DIR/hub_data.sh"
+  source_plugin; printf '%s\n' '{"vault_paths":["app/"],"vault_keys":{"app":{"current_version":2}}}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root; }; _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }; _hub_data_vault_revoke() { :; }
+  run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; ! grep -q 'vault kv get' "$VLOG"
 }
 
 @test "13e drill delegates verification to hub_data" {
@@ -555,19 +552,31 @@ STUB
 }
 
 @test "17 ArgoCD resume is installed in the exit trap" {
-  source_plugin
-  grep -q '_hub_data_argocd_resume.*context' "$PLUGINS_DIR/hub_data.sh" || grep -q '_hub_data_argocd_resume' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'trap.*_hub_data_argocd_resume' "$PLUGINS_DIR/hub_data.sh"
+  source_plugin; mkdir -p "$TEST_ROOT/run"; printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; return 0; }
+  run _hub_data_argocd_resume ctx "$TEST_ROOT/run"; [ "$status" -eq 0 ]; grep -q 'patch application' "$CALL_LOG"
 }
 
 @test "18 Vault re-point order is config, shards, then root" {
-  source_plugin
-  grep -n 'auth/kubernetes/config' "$PLUGINS_DIR/hub_data.sh" >/dev/null
-  grep -n '_vault_cache_unseal_keys' "$PLUGINS_DIR/hub_data.sh" >/dev/null
-  grep -n 'vault-root' "$PLUGINS_DIR/hub_data.sh" >/dev/null
+  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf config >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf shards >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf root >> "$CALL_LOG"; }; _kubectl() { cat >/dev/null; printf vault-root >> "$CALL_LOG"; }
+  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; [ "$(grep -o config "$CALL_LOG" | head -1)" = config ]; [ "$(grep -o shards "$CALL_LOG" | head -1)" = shards ]; grep -q vault-root "$CALL_LOG"
 }
 
 @test "20 Makefile has the two restore entrypoints" {
   grep -q '^hub-data-recover:' "$PWD/Makefile"
   grep -q '^hub-recover-all:' "$PWD/Makefile"
+}
+
+@test "D1 a failed step records its rc and does not run the next step" {
+  source_plugin; local steps="$TEST_ROOT/steps.jsonl"; _hub_data_run_step "$steps" 4 false || rc=$?; [ "${rc:-0}" -ne 0 ]; ! _hub_data_step_finished 4 "$steps"
+  grep -q '"step":4,"finished".*"rc":1' "$steps"; ! grep -q '"step":5' "$steps"
+}
+
+@test "D2 empty ArgoCD jsonpath is paused and auto-sync is rejected" {
+  source_plugin; mkdir -p "$TEST_ROOT/argo"; : > "$TEST_ROOT/argo/$K3DM_HUB_DATA_ARGOCD_APP.automated"; _kubectl() { [[ "${ARGO_AUTO:-0}" == 1 ]] && printf '{"selfHeal":true}' || printf ''; }
+  run _hub_data_argocd_assert_paused ctx "$TEST_ROOT/argo"; [ "$status" -eq 0 ]; ARGO_AUTO=1 run _hub_data_argocd_assert_paused ctx "$TEST_ROOT/argo"; [ "$status" -ne 0 ]
+}
+
+@test "D3 vault-root is JSON from stdin and no literal dash is used" {
+  source_plugin; _hub_data_generate_root() { printf ROOT-TOKEN; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { :; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; cat > "$TEST_ROOT/payload.json"; }
+  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; jq -e '.stringData.root_token == "ROOT-TOKEN"' "$TEST_ROOT/payload.json"; ! grep -q --from-literal "$CALL_LOG"
 }

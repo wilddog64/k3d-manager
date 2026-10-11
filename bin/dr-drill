@@ -174,29 +174,17 @@ _dr_drill_v0() {
 _dr_drill_inventory() { printf '%s/inventory.json\n' "$DR_DRILL_RESTORE_STAGE"; }
 _dr_drill_metadata() { printf '%s/pv-pvc.yaml\n' "$DR_DRILL_RESTORE_STAGE"; }
 _dr_drill_verify_unsealed() {
-  set +u; _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null; local rc=$?; set -u; return "$rc"
+  hub_data_verify_unsealed "$DR_DRILL_CONTEXT"
 }
 _dr_drill_verify_vault() { set +u; hub_data_verify "$(_dr_drill_inventory)" identity "$DR_DRILL_CONTEXT"; local rc=$?; set -u; return "$rc"; }
 _dr_drill_verify_keycloak() {
-  local inventory want actual; inventory="$(_dr_drill_inventory)"; want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _dr_drill_kubectl)"; [[ "$actual" == "$want" ]]
+  hub_data_verify_keycloak "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
 _dr_drill_verify_ldap() {
-  local inventory want actual; inventory="$(_dr_drill_inventory)"; want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _dr_drill_kubectl)"; [[ "$actual" == "$want" ]]
-}
-_dr_drill_verify_placement_one() {
-  local ns="$1" pod="$2" claim="$3" expected actual logical metadata
-  metadata="$(_dr_drill_metadata)"
-  _dr_drill_kubectl -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null
-  expected="$(_hub_data_meta_field "$metadata" "$ns" "$claim" logicalNode)"
-  actual="$(_dr_drill_kubectl -n "$ns" get pod "$pod" -o jsonpath='{.spec.nodeName}')"
-  logical="$(_hub_recovery_logical_node "$actual")"
-  [[ "$logical" == "$expected" ]]
+  hub_data_verify_ldap "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
 _dr_drill_verify_placement() {
-  local postgres
-  postgres="$(_dr_drill_kubectl -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"
-  [[ -n "$postgres" ]] || return 1
-  _dr_drill_verify_placement_one secrets vault-0 data-vault-0 && _dr_drill_verify_placement_one identity "$postgres" postgres-keycloak-pvc && _dr_drill_verify_placement_one identity openldap-0 data-openldap-0
+  hub_data_verify_placement "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
 _dr_drill_v6() { local elapsed=$(( $(date +%s) - _dr_drill_phase2_started )); (( elapsed <= DR_DRILL_RTO_BUDGET_S )); }
 _dr_drill_v7() { (( _dr_drill_export_age_seconds <= 93600 )); }
