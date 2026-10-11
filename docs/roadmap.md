@@ -235,8 +235,18 @@ translated by the model into a small query object (releases, priority, state, Fi
 validated against a closed schema, and answered by `bug-tally`. The model never sees a bug doc or
 produces a number, and every reply states what was counted. Split into a patch release because
 v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
-[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md). v1.45.1 is
-at 1 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md).
+
+**Engineering Decision Digest** (operator, 2026-10-11). One digest answers: what did I request,
+which requests became specs, what did Claude and Codex complete, what changed without my explicit
+approval, and which decisions wait on me. Approval is recorded **in the spec** (`**Approval:**
+explicit|standing|pending` header) and on agent commits (`Approval:` trailer, or `spec <path>` to
+inherit an approved spec), enforced by a new `commit-msg` hook and derived from git by
+`scripts/decision-digest.py`. Surfaces: `make decision-digest`, a "k3dm Decision Digest" Grafana
+dashboard (incl. spec approval by release) and an `/ask-docs` fast path. Scope:
+[`v1.45.1-engineering-decision-digest.md`](plans/v1.45.1-engineering-decision-digest.md).
+
+v1.45.1 is at 2 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.46.0
 
@@ -255,7 +265,7 @@ When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A s
 heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
 maintenance silence. Scope:
 [`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
-is now at 2 of 5 plans.
+is at 4 of 5 plans (also `v1.46.0-dr-drill-dashboard.md`, `v1.46.0-hub-data-backup-integrity.md`).
 
 ### Candidate milestone — v1.47.0
 
