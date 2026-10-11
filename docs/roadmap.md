@@ -173,7 +173,7 @@ same file.
     `shopping-cart-frontend`.
   - [`bug-dashboard-cannot-list-open-bugs`](bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md)
     (operator, 2026-10-11): `bin/k3dm-vectordb-metrics`, `grafana-dashboard-bugs.yaml` and their
-    tests. An "Open bugs" table listing each open doc by priority, linked to the doc.
+    tests. An "Open bugs" table under "All open bugs": Priority, Bug (title, linked), Filed, Open for.
 - **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
   - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
   - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
