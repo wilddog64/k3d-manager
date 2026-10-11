@@ -3,6 +3,7 @@
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Approval:** explicit 2026-10-11 "go ahead to file bug at v1.43.2"
 **Priority:** P3 — the raw counts are on the same dashboard in "Land outcomes"
 **Severity:** low — one stat panel is blank; no metric is wrong or lost
 
