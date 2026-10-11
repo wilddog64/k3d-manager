@@ -13,4 +13,4 @@ jobs:
         with: {ref: results, fetch-depth: 1}
       - uses: actions/checkout@v4.2.2
         with: {ref: main, path: k3dm-manager}
-      - run: bash k3dm-manager/scripts/etc/dr/drill-freshness.sh results
+      - run: bash k3dm-manager/drill-freshness.sh results

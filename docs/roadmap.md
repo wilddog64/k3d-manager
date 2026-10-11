@@ -167,6 +167,8 @@ same file.
   - [`secret-store-data-puts-value-in-security-argv`](bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md)
     and [`…-reports-success-on-failed-keychain-write`](bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md):
     one agent in lib-foundation, then a subtree-pull here.
+  - [`e2e-stale-alert-fires-for-an-idle-runner`](bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md):
+    `prometheusrule.yaml` (`E2EVerificationStale` only), `e2e_observability.bats`.
   - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
     `shopping-cart-frontend`.
 - **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.

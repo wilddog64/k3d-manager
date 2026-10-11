@@ -499,3 +499,14 @@ STUB
   HUB_DATA_LOCK_HELD=1 run hub_data_export; [ "$status" -ne 0 ]
   [ -d "$K3DM_HUB_DATA_DIR/export.lock" ]; [ "$(cat "$K3DM_HUB_DATA_DIR/export.lock/pid")" = "$$" ]
 }
+
+@test "hub-data: repo file defaults resolve from the plugin, not the caller's directory" {
+  local plugin="$PLUGINS_DIR/hub_data.sh" root
+  root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  run env -u REPO_ROOT -u K3DM_HUB_DATA_AGE_RECIPIENT PLUGINS_DIR="$PLUGINS_DIR" SCRIPT_DIR="$root/scripts" bash -c 'cd / && source "$1" && printf "%s\n" "$K3DM_HUB_DATA_AGE_RECIPIENT"' _ "$plugin"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$root/scripts/etc/dr/age-recipient.txt" ]
+  [ -r "$output" ]
+  run grep -c 'REPO_ROOT:-\.' "$plugin"
+  [ "$output" = "0" ]
+}

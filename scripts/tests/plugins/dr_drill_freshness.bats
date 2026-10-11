@@ -36,3 +36,12 @@ setup() { mkdir -p "$BATS_TEST_TMPDIR/results"; }
   run scripts/etc/dr/drill-freshness.sh "$BATS_TEST_TMPDIR/results"
   [ "$status" -eq 0 ]
 }
+
+@test "freshness: workflow runs the script from the data repo main checkout, where the how-to installs it" {
+  run grep -E '^ +- run: bash k3dm-manager/drill-freshness\.sh results$' scripts/etc/dr/drill-freshness.yml
+  [ "$status" -eq 0 ]
+  run grep -c 'scripts/etc/dr/drill-freshness.sh' scripts/etc/dr/drill-freshness.yml
+  [ "$output" = "0" ]
+  run grep -c 'drill-freshness.sh` to the root of the data repository' docs/howto/hub-dr-drill.md
+  [ "$output" = "1" ]
+}

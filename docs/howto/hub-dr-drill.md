@@ -106,7 +106,13 @@ First time, on the M4, in this order, from Terminal.app:
 4. `make hub-data-prune DRY_RUN=1`: read the `keep:` and `prune:` lines.
 5. `make hub-data-export-schedule`: installs the 03:30 launchd job. A slot missed while the Mac
    sleeps runs on wake. `make hub-data-export-unschedule` removes it.
-The three alerts need no step: ArgoCD syncs `hub-platform-ops` from the release branch.
+6. Apply the alerts once, and again whenever `prometheusrule.yaml` changes:
+   `kubectl --context k3d-k3d-cluster apply -f scripts/etc/argocd/platform-ops/prometheusrule.yaml`.
+   ArgoCD does not sync this file (`hub-platform-ops` includes only the app-cluster
+   ExternalSecret); without this step the `HubDataExport*` and `DRDrill*` alerts never load.
+7. Prove the scheduled path, not just the manual one:
+   `launchctl kickstart gui/$(id -u)/com.k3d-manager.hub-data-export`, then read the log. launchd
+   starts the job in `/`, so a path that only works from the repo fails here first.
 
 The job writes `~/Library/Logs/k3dm-hub-data-export.log` and publishes the
 `HubDataExportFailed`, `HubDataExportStale`, and `HubDataExportNeverRan`

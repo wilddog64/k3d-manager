@@ -160,6 +160,14 @@
   and the all-time open counts. Each priority and state keeps one colour whatever
   the data order, empty segments are dropped in the query rather than labelled `0`, and counts are
   in the hover tooltip, because Grafana drew stacked labels on the wrong segment and hid small ones.
+- Fixed: the first scheduled hub data export (03:30, 2026-10-11) failed with `missing age recipient:
+  ./scripts/etc/dr/age-recipient.txt`. The plugin's repo-file defaults were relative to the caller's
+  directory, which was right for every manual run from the repo and wrong under launchd, which starts
+  in `/`. They now resolve from the plugin's own path. The `HubDataExport*` and `DRDrill*` alerts had
+  never loaded either: `prometheusrule.yaml` is not synced by ArgoCD, so the how-to now applies it
+  explicitly and proves the schedule with `launchctl kickstart`. The data repo's drill freshness
+  workflow ran a k3d-manager path that does not exist in that checkout; it now runs the installed
+  `drill-freshness.sh`.
 - Fixed: `/ask-docs` bug counts ignored ranges such as "last two releases" and listed every
   release since v1.1.0 out of version order. Count questions now accept `last N releases` and
   `this release`, counting back from the current release branch, and all-release answers are

@@ -5,7 +5,8 @@ set -euo pipefail
 
 K3DM_HUB_DATA_REPO="${K3DM_HUB_DATA_REPO:-git@github-k3dm-hub-data:wilddog64/k3dm-hub-data.git}"
 K3DM_HUB_DATA_DIR="${K3DM_HUB_DATA_DIR:-${HOME}/.k3dm/hub-data}"
-K3DM_HUB_DATA_AGE_RECIPIENT="${K3DM_HUB_DATA_AGE_RECIPIENT:-${REPO_ROOT:-.}/scripts/etc/dr/age-recipient.txt}"
+_HUB_DATA_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+K3DM_HUB_DATA_AGE_RECIPIENT="${K3DM_HUB_DATA_AGE_RECIPIENT:-${_HUB_DATA_ROOT}/scripts/etc/dr/age-recipient.txt}"
 K3DM_HUB_DATA_CONTEXT="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}"
 K3DM_HUB_DATA_RETAIN_DAYS="${K3DM_HUB_DATA_RETAIN_DAYS:-5}"
 K3DM_HUB_DATA_PUSHGATEWAY_URL="${K3DM_HUB_DATA_PUSHGATEWAY_URL:-http://localhost:19094/metrics/job/k3dm-hub-data-export}"
@@ -476,7 +477,7 @@ function _hub_data_scale() {
 }
 
 function _hub_data_apply_keycloak() {
-  local manifest="${K3DM_HUB_DATA_POSTGRES_MANIFEST:-${REPO_ROOT:-.}/scripts/etc/dr/postgres-keycloak.yaml}"
+  local manifest="${K3DM_HUB_DATA_POSTGRES_MANIFEST:-${_HUB_DATA_ROOT}/scripts/etc/dr/postgres-keycloak.yaml}"
   [[ -f "$manifest" ]] || { _err "[hub-data] missing ${manifest}"; return 1; }
   _kubectl --context "$DR_DRILL_CONTEXT" -n identity apply -f "$manifest"
 }
