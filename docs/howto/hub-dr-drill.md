@@ -207,7 +207,10 @@ export, prints live/export counts, and asks for that export timestamp before it
 rebuilds the hub. `RESUME` reuses the recorded export; `REDO_STEP=4` or
 `REDO_STEP=6` is required after an interrupted destructive step. The report
 contains the selected export, checkpoint steps and return codes, every V1/V2/V3/V4/V5/V8
-check, ArgoCD resume status, and RTO. Inventory format 2 records Vault metadata
+check, ArgoCD resume status, whether the unseal keys were cached in the Keychain
+(`unseal_keys_cache`: `cached`, or `skipped` for a drill target), and RTO. The recovery RTO
+runs from the typed approval to the verified report, across every `RESUME`, so time spent
+fixing a failed step counts. Inventory format 2 records Vault metadata
 versions and identity digests without secret values. V8 confirms that
 ExternalSecrets are no longer in `SecretSyncedError`.
 
@@ -216,12 +219,29 @@ ExternalSecrets are no longer in `SecretSyncedError`.
 Keep the drill cluster and rehearse the data path before a real hub window:
 
 ```bash
-DR_DRILL_KEEP=1 make dr-drill
-K3DM_HUB_DATA_CONTEXT=k3d-dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 make hub-data-recover
+DR_DRILL_KEEP=1 script -q ~/.k3dm/dr-drill/run.log make dr-drill   # not | tee: the drill needs a TTY
+k3d kubeconfig get dr-drill > ~/.k3dm/dr-drill/kubeconfig          # KEEP deletes it (bug 2026-10-10)
+KUBECONFIG=~/.k3dm/dr-drill/kubeconfig K3DM_HUB_DATA_CONTEXT=k3d-dr-drill \
+  K3DM_HUB_DATA_CLUSTER=dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 \
+  K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1 make hub-data-recover
 ```
 
-The rehearsal skips the absent ArgoCD Application and proves the restore,
-unseal, refresh and verification stages without touching the production hub.
+Type the export timestamp at the approval prompt. `K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1`
+loads the age identity from the M2 Keychain instead of the prompt (useful when the pane is
+viewed over ssh, where the M2's clipboard is not yours). It is refused without
+`K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1`: a real recovery types the key, from the Bitwarden note.
+
+Against a drill target the rehearsal skips what the drill cluster does not have: both ArgoCD
+Applications (step 3), the Keychain unseal-key cache, so the M2's own `k3d-cluster` keys are
+kept (step 6), and the Keycloak and ESO refresh (step 7). It still restores, unseals, re-points
+Vault and runs V1–V5 and V8. V8 is vacuous there, because the drill cluster has no
+ExternalSecrets; only a real hub recovery tests it. Step 6 does write a Keychain entry
+`k3dm-vault-root-token` for account `k3d-dr-drill`, separate from the hub's.
+
+First pass on 2026-10-11 (run `20261011T184927Z`, export `20261011T175204Z`): all nine steps
+rc 0 and every check true after three fixes found by the rehearsal itself: a missing ArgoCD
+Application killed step 3, step 7 restarted a Keycloak the drill does not run, and V5 could
+not find `pv-pvc.yaml` outside the drill.
 
 ## Measured RTO and RPO
 

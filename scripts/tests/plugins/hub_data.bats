@@ -691,6 +691,14 @@ _fake_vault_tree() {
   [ "$(sort -u "$CALL_LOG")" = "$TEST_ROOT/export/pv-pvc.yaml" ]
 }
 
+@test "recover K6: RTO runs from approval across resumes, not from the last resume" {
+  source_plugin; mkdir -p "$TEST_ROOT/run"
+  printf '%s\n' "$(( $(date +%s) - 600 ))" > "$TEST_ROOT/run/approval_epoch"
+  _hub_data_record_rto "$TEST_ROOT/run" 13
+  [ "$(cat "$TEST_ROOT/run/rto_seconds")" -ge 600 ]; [ "$(cat "$TEST_ROOT/run/rto_seconds")" -lt 700 ]
+  rm "$TEST_ROOT/run/approval_epoch"; _hub_data_record_rto "$TEST_ROOT/run" 13; [ "$(cat "$TEST_ROOT/run/rto_seconds")" -eq 13 ]
+}
+
 @test "recover K1: a drill target never caches unseal keys in the Keychain; the hub does" {
   source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }
   _vault_cache_unseal_keys() { printf 'cache\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { cat >/dev/null; }

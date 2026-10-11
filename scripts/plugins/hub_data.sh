@@ -792,6 +792,16 @@ function _hub_data_refresh_dependents() {
   _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite
 }
 
+function _hub_data_record_rto() {
+  local run_dir="$1" fallback="$2" approval_epoch
+  approval_epoch="$(cat "$run_dir/approval_epoch" 2>/dev/null || true)"
+  if [[ "$approval_epoch" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$(( $(date +%s) - approval_epoch ))" > "$run_dir/rto_seconds"
+  else
+    printf '%s\n' "$fallback" > "$run_dir/rto_seconds"
+  fi
+}
+
 function _hub_data_run_step() {
   local file="$1" step="$2"; shift 2; local step_rc
   _hub_data_checkpoint "$file" "$step" start
@@ -1003,6 +1013,7 @@ function hub_data_recover_preflight() {
   jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${run_dir}/target.json"
   _hub_data_recover_approval "$export_ts" || return 2
   printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${run_dir}/approval_time"
+  date +%s > "${run_dir}/approval_epoch"
   printf '%s\n' "$export_dir" > "${run_dir}/export_dir"
   printf 'RUN_ID=%s\n' "$run_id"
 }
@@ -1101,7 +1112,7 @@ function hub_data_recover() { (
   export_ts="${export_dir##*/}"
   export K3DM_HUB_DATA_EXPORT_DIR="$export_dir" HUB_DATA_RESTORE_EXPORT_DIR="$export_dir"
   cp "$export_dir/inventory.json" "$run_dir/inventory.json"
-  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; if [[ ! -r "$run_dir/approval_time" ]]; then _hub_data_recover_approval "$export_ts" || return 2; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; fi
+  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; if [[ ! -r "$run_dir/approval_time" ]]; then _hub_data_recover_approval "$export_ts" || return 2; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; date +%s > "$run_dir/approval_epoch"; fi
   _hub_data_step_finished 1 "$steps" || _hub_data_run_step "$steps" 1 true || return $?
   _hub_data_recover_step2 "$steps" || return $?
   _hub_data_recover_step3 "$steps" "$context" "$run_dir" || return $?
@@ -1112,6 +1123,6 @@ function hub_data_recover() { (
   _hub_data_recover_step7 "$steps" "$context" || return $?
   _hub_data_recover_step8 "$steps" "$context" "$run_dir" || return $?
   _hub_data_recover_step9 "$steps" || return $?
-  printf '%s\n' "$SECONDS" > "$run_dir/rto_seconds"
+  _hub_data_record_rto "$run_dir" "$SECONDS"
 )
 }
