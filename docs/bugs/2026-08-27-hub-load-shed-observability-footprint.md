@@ -8,6 +8,7 @@ reapply for live rollout). Note on inspection: Prometheus already carried a 1500
 had kube-etcd/scheduler/controller-manager/coredns/kube-proxy scrapes + several apiserver rules
 disabled — so the remaining levers were 2a (loki-canary) and the scrape-frequency/retention cuts
 in 2b, not a new CPU limit.
+**Priority:** P3 — committed; takes effect on the next ApplicationSet reapply
 
 ## Why
 

@@ -132,12 +132,75 @@ P0/P1, untriaged, open by priority over time), and a pre-commit check rejects ne
 have no Priority. Once it lands, Claude backfills priorities on the open bugs.
 
 Scope: [`v1.43.0-bug-priority-tracking.md`](plans/v1.43.0-bug-priority-tracking.md). Also queued
-for v1.43.0: [`v1.43.0-e2e-failure-artifacts.md`](plans/v1.43.0-e2e-failure-artifacts.md),
+for v1.43.0: [`v1.43.0-hub-data-export-schedule.md`](plans/v1.43.0-hub-data-export-schedule.md)
+(daily unattended export, 5-day retention; P1 2026-10-10, took the slot of the e2e failure-artifacts
+spec, now v1.48.0),
 [`v1.43.0-hub-dr-drill.md`](plans/v1.43.0-hub-dr-drill.md),
-[`v1.43.0-test-metrics-log-retention.md`](plans/v1.43.0-test-metrics-log-retention.md), and the
+[`v1.43.0-worktree-isolated-codex-dispatch.md`](plans/v1.43.0-worktree-isolated-codex-dispatch.md)
+(dispatched first: Codex work stays sequential until each spec can run in its own git worktree), and the
 R10 overflow from v1.42.0, [`v1.43.0-hermes-r10-delete-superseded-failed-job.md`](plans/v1.43.0-hermes-r10-delete-superseded-failed-job.md)
 (an approval-gated deletion of a failed Job whose CronJob spec has since changed, in `identity`/`monitoring`/`cicd` only).
-v1.43.0 is now at its five-plan cap, so anything new goes to v1.44.0.
+v1.43.0 is at its five-plan cap and closed; all five plans are DONE.
+
+### Candidate milestone — v1.43.1
+
+**One-command hub restore and DR clean-room checks** (P1, split from v1.43.0 on 2026-10-10 so
+v1.43.0 stops growing). `make hub-recover-all` rebuilds the hub, restores the data and proves it
+(typed approval, resumable checkpoints that never repeat a destructive step, export compatibility,
+Vault key versions and identity digests, auditable report), sharing one restore and verify engine
+with the drill. The drill gains a Keychain credential allowlist (audit, then enforce) and a guard
+that every destructive call targets the drill cluster. Scope:
+[`v1.43.1-hub-data-recover.md`](plans/v1.43.1-hub-data-recover.md),
+[`v1.43.1-dr-clean-room-checks.md`](plans/v1.43.1-dr-clean-room-checks.md). v1.43.1 is at 2 of 5
+plans. Full-hub recovery on the M2 moves into the v1.47.0 candidate-hub engine.
+
+### Candidate milestone — v1.43.2
+
+**Bug-fix-only release, worked by parallel agents** (operator, 2026-10-10). Branch
+`k3d-manager-v1.43.2`, cut from `main` after v1.43.1 merges. Each fix runs in its own dispatcher
+worktree, and `land` merges them one at a time behind its lock. A batch never puts two fixes on the
+same file.
+
+- **Batch 1:** three agents in parallel, code and stubbed tests only.
+  - [`offline-suite-count-floor-stale-and-partial-runs`](bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md):
+    `Makefile`, `bin/k3dm-test-metrics`, `rules-acg/k3dm-tests.yaml`.
+  - [`secret-store-data-puts-value-in-security-argv`](bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md)
+    and [`…-reports-success-on-failed-keychain-write`](bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md):
+    one agent in lib-foundation, then a subtree-pull here.
+  - [`e2e-stale-alert-fires-for-an-idle-runner`](bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md):
+    `prometheusrule.yaml` (`E2EVerificationStale` only), `e2e_observability.bats`.
+  - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
+    `shopping-cart-frontend`.
+- **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
+  - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
+  - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
+- **Not dispatched:**
+  - the hub-recovery node map is deferred (superseded by `hub_data_recover`);
+  - the e2e payments assertion needs only the operator's live Tier 1 rerun;
+  - hub CPU overcommit (August) and data-layer `RespectIgnoreDifferences` (June) need re-triage
+    against today's hub first.
+
+### Candidate milestone — v1.44.0
+
+**Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
+`cloud-requests` branch as enough to submit a request, and `requested_by` is unsigned. v1.44.0
+authenticates the submitter, lets one request route its Slack notices to an approved channel, and
+turns the operator's manual acceptance checks into repeatable scenarios with evidence. Branch
+`k3d-manager-v1.44.0`, cut from `main` after v1.43.2 merges.
+
+| Spec | What it adds |
+|---|---|
+| [`v1.44.0-cloud-request-submitter-authentication.md`](plans/v1.44.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |
+| [`v1.44.0-cloud-request-slack-notification-routing.md`](plans/v1.44.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
+| [`v1.44.0-operator-acceptance-automation.md`](plans/v1.44.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
+| [`v1.44.0-bounded-index-metrics-diagnostics.md`](plans/v1.44.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
+| [`v1.44.0-bug-lifecycle-metrics.md`](plans/v1.44.0-bug-lifecycle-metrics.md) | Bug age, reopen rate and fix verification: `**Filed:**`, `**Recurred:**` and `**Verified by:**` lines, `make bug-close` (closes only after the named regression test passes), pre-commit checks, and a Lifecycle row on the Bug Tracking dashboard. Operator request 2026-10-10. |
+
+Also in v1.44.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
+cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
+[Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
+[`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
+v1.43.0 and is superseded. v1.44.0 is at its five-plan cap.
 
 ### Candidate milestone — v1.45.0
 
@@ -150,7 +213,166 @@ edits a doc. Hermes also publishes per-doc drift to the hub Pushgateway for a ne
 "Docs Health" dashboard, with one `info` rule that fires if the check stops running. Prompted by the 2026-10-09 audit that found all four sampled docs stale.
 
 Scope: [`v1.45.0-docs-drift-detection.md`](plans/v1.45.0-docs-drift-detection.md). Also queued for
-v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md).
+v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md),
+[`v1.45.0-node-tunnel-fault-drill.md`](plans/v1.45.0-node-tunnel-fault-drill.md),
+[`v1.45.0-alert-intake-draft-bugs.md`](plans/v1.45.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
+[`v1.45.0-test-metrics-log-retention.md`](plans/v1.45.0-test-metrics-log-retention.md) (moved from v1.43.0). v1.45.0 is at its five-plan cap.
+
+### Candidate milestone — v1.45.1 (patch)
+
+**Bug-count questions in plain English.** Slack count questions that miss the regex router are
+translated by the model into a small query object (releases, priority, state, Filed date range),
+validated against a closed schema, and answered by `bug-tally`. The model never sees a bug doc or
+produces a number, and every reply states what was counted. Split into a patch release because
+v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
+[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md). v1.45.1 is
+at 1 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+
+### Candidate milestone — v1.46.0
+
+**Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
+new webhook route that diagnoses the Hermes LaunchAgent with a fixed routine (no model): not loaded,
+interpreter missing (reports the `brew install`), mid-cycle, or on cooldown are reported only;
+otherwise it runs `launchctl kickstart` at most once an hour. Every outcome posts to Slack. Prompted
+by the 2026-10-09 exit-78 outage.
+
+Scope: [`v1.46.0-hermes-not-running-recovery.md`](plans/v1.46.0-hermes-not-running-recovery.md).
+
+**Offsite hub watch from Hostinger.** Hostinger runs two independent checks of the hub: a blackbox
+probe of a public endpoint (`argocd.3ai-talk.org/healthz`) and a one-series `/federate` read of the
+hub Prometheus. When both fail, `HubExternallyUnreachable` sends email at 10 minutes and SMS at 30.
+When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A stale Hermes
+heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
+maintenance silence. Scope:
+[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
+is now at 2 of 5 plans.
+
+### Candidate milestone — v1.47.0
+
+**Infra e2e and promotion gate — the only item in this release** (operator, 2026-10-10). `make
+hub-e2e REF=<release branch>` builds a full candidate hub on the M2 from that commit (the M2's
+other clusters are stopped for the run), proves it cannot act on the outside world, checks every
+required Application, Vault/ESO, Keycloak/LDAP logins, Prometheus rules, Alertmanager, dashboards
+and `make smoke`, and records the platform RTO (absorbs the former v1.46.0 full-recovery spec,
+option A). `make appsets-reapply` and `make hub-up` then refuse without a passing run for the exact
+commit, unless a recorded override is given. Scope:
+[`v1.47.0-hub-e2e-promotion-gate.md`](plans/v1.47.0-hub-e2e-promotion-gate.md).
+
+### Candidate milestone — v1.48.0
+
+**Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
+[`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
+
+### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
+
+**Proposed 2026-10-10 (operator; not yet scoped).** The shopping-cart apps are a demo. Their
+replacement is the TwinkleAI real-estate research platform: a Next.js app in its own repo that
+answers questions in Chinese or English. It reaches Taiwan open data (`realestate_land`) through MCP,
+and keeps a research log. The plan source is the operator's
+`房地產生成式 AI × MCP × TwinkleAI 網站 Codex 實作計畫.md`.
+
+**English counts in the research.** The 15 questions each get an equivalent English version, so the
+study is 15 × 2 languages × 3 runs = **90 records**, and human scoring doubles. English questions are
+mapped to Chinese place names with a fixed district table, not by model guesswork.
+
+Shopping-cart is the platform's acceptance contract today:
+- the Tier 1 and Tier 2 e2e tests, and the v1.47.0 promotion gate;
+- image signing and Kyverno, loadtest;
+- the Keycloak realm, ESO and Vault paths, Dependabot coverage;
+- about 100 files in `scripts/`, `bin/` and `scripts/etc/`.
+
+So it is retired only after the new app covers the same platform surfaces. The removal is the
+breaking change that makes this a major version.
+
+**Revised 2026-10-10 (operator).** Shopping-cart has served its purpose: it has no real users, and
+the nine repos stay public, archived, as the record. So there is no long side-by-side period. It
+leaves Hostinger first, which frees the room the new app needs there (about 900m CPU and 3 GiB of
+requests on a 2-CPU node). It stays on the hub and ACG only as the e2e target until the new app
+takes over.
+
+**Timing, revised 2026-10-10 (operator).** The two tracks are independent until they meet at
+v1.49.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
+may start any time, in the gaps while agents work k3d-manager batches. M2 and later are not run in
+parallel with the platform releases. The v1.47.0 gate stays mandatory for every infra promotion and
+is never weakened for the app. Deploying the app onto the platform (v1.49.0) waits for v1.47.0 to
+ship and for app M1. v1.47.0 and v1.48.0 are written workload-agnostic, so v1.50.0 re-points them
+by editing lists, not code.
+
+| Step | Where | Scope |
+|---|---|---|
+| App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
+| v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
+| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
+| v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
+
+What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
+of those only if a platform feature still needs it to prove itself.
+
+### Candidate theme — v2.x: AI diagnostics and healing gateway
+
+**Proposed 2026-10-10 (operator; not yet scoped).** After v2.0.0 the platform has a real application
+to protect. This theme closes the loop between what the platform already observes and validates
+and what it can safely do about it:
+**diagnose → propose fix → policy approval → execute → retest → audit.**
+Starts only after v2.0.0 is stable, never in parallel with the v1.4x releases.
+
+| Layer | Exists today | Gap |
+|---|---|---|
+| Application | TwinkleAI app from v2.0.0 (API, Postgres, Kubernetes) | none at v2.0.0 |
+| Observability | Prometheus, Grafana, Alertmanager, Loki, Pushgateway | app-level metrics (v1.49.0) |
+| Validation | e2e Tier 1/2, v1.47.0 promotion gate, nightly offline suite, smoke, DR drill | re-pointed at v1.50.0 |
+| Gateway | Hermes triage and bug drafts, webhook action allowlist, cloud-bridge roles, v1.45.0 alert intake, v1.46.0 Hermes self-recovery | one MCP tool server, an LLM provider adapter, an explicit policy engine |
+| Providers | Claude, Codex, Gemini, each wired separately | one interface; per-provider scoring on recorded incidents |
+| Remediation | Slack approval (pull model), Codex dispatch | the full loop, with retest and audit |
+
+**Guardrails (non-negotiable):**
+1. Read-only first: the first release diagnoses and proposes only. The model's MCP tools read
+   metrics, logs and ArgoCD state, nothing else.
+2. Technically reversible is not operationally safe. Each executable action is a **contract**:
+   an allowlist entry, runtime preconditions, a post-action verification, and a documented rollback,
+   or escalation where rollback is not reliable. Anything touching secrets, Vault, data, or cluster
+   lifecycle always needs human approval.
+3. Policy is code with tests. The model never decides whether its own action is allowed.
+4. Every action is followed by a retest with the existing e2e and smoke checks. A failed retest
+   rolls back or escalates to a human.
+5. An append-only audit record of diagnosis, proposal, approver, action and retest result.
+6. Providers are swappable, Claude is the default, and models are compared on recorded incidents,
+   never live ones.
+
+Initial action contracts (each precondition is drawn from an incident on this platform):
+
+| Action | Preconditions | Verification |
+|---|---|---|
+| Restart an unhealthy pod | Replica redundancy (Hostinger is one node; a single replica means downtime); failure evidence; retry budget not spent (a k3s restart over dead kine compaction crash-looped) | Readiness and the app smoke check |
+| Retry an ingestion or export job | Idempotent; no active duplicate | Freshness watermark advances (the hub-data export freshness alerts) |
+| Sync an ArgoCD Application | Desired revision approved and on the release branch (ApplicationSets once pinned a stale branch); no destructive drift | Synced, Healthy, smoke passes |
+| Scale a deployment | Bounded limits; node capacity checked first (a `maxSurge` rollout deadlocked on full requests) | Service available; node requests and memory healthy |
+
+| Step | Scope |
+|---|---|
+| v2.1 | Gateway with read-only MCP tools; diagnosis and proposals only |
+| v2.2 | Policy engine as code, approval flow |
+| v2.3 | Execution of allowlisted reversible actions, with retest and audit |
+| v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
+
+### Engineering-contract gaps (assessed 2026-10-10)
+
+The platform's working model rests on three principles. Each was assessed against the repo as it
+stands; the scores are judgement, not measurement.
+
+| Principle | Today | Main gap |
+|---|---|---|
+| Intent as an engineering contract | ~80%: every change is a spec with files, exact commit message, Definition of Done, "What NOT to do", stubbed and mutation tests, live acceptance | Operational requirements (resource budget, capacity, rollback) are rarely stated; required sections are checked by review, not by tooling |
+| Verification as the release authority | ~65%, ~80% after v1.47.0: agents' claims are re-verified; CI, CodeQL, ggshield, Copilot, nightly suite, e2e, DR drill | Infra changes reach the hub untested (v1.47.0); the PR gate is a followed checklist, not enforced; the evidence behind a release decision is not kept |
+| Common operational interfaces | ~40%: Slack, cloud bridge and Hermes enter through the webhook's action allowlist and roles | The CLI and local agents bypass it; the cloud bridge does not yet authenticate submitters |
+
+Next steps, smallest first:
+
+| Step | Lands in | Scope |
+|---|---|---|
+| Operational requirements in every spec | DONE 2026-10-10, with `v1.44.0-bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
+| Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
+| One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
 ## Forward themes (unversioned until scoped)
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2155,SC2030,SC2031
 
 setup() {
   export HARNESS_DIR="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-up.XXXXXX")"
@@ -15,12 +16,20 @@ printf '%s %s\n' "$(basename "$0")" "$*" >> "${CALL_LOG}"
 if [[ "$(basename "$0")" == "k3d" && "${HUB_STATE:-missing}" == "existing" ]]; then
   printf 'k3d-cluster\tservers:1\tagents:1\n'
 fi
-if [[ "$(basename "$0")" == "kubectl" && "${1:-}" == "config" && "${2:-}" == "current-context" ]]; then
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"config current-context"* ]]; then
   printf '%s\n' "${KUBE_CONTEXT:-k3d-k3d-cluster}"
   exit 0
 fi
 if [[ "$(basename "$0")" == "kubectl" && "$*" == *"config use-context"* ]]; then
   exit 99
+fi
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"get endpoints kubernetes"* ]]; then
+  printf '%s\n' "${DR_TEST_API_ENDPOINT-192.168.117.2 6443}"
+  exit 0
+fi
+if [[ "$(basename "$0")" == "kubectl" && "$*" == *"apply -f -"* ]]; then
+  cat >> "${CALL_LOG}.stdin"
+  exit 0
 fi
 exit 0
 EOF
@@ -119,4 +128,72 @@ teardown() {
   run grep -A2 '^hub-up:' Makefile
   [ "$status" -eq 0 ]
   [[ "$output" == *"up CLUSTER_PROVIDER=k3d"* ]]
+}
+
+@test "hub-up: DR drill mode stops before ArgoCD" {
+  export DR_DRILL_MODE=1
+  export KUBE_CONTEXT=k3d-dr-drill
+  export HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"dispatcher deploy_vault --confirm"* ]]
+  [[ "$output" == *"dispatcher deploy_ldap --confirm"* ]]
+  [[ "$output" != *"dispatcher deploy_argocd"* ]]
+  while IFS= read -r line; do
+    [[ "$line" != kubectl\ * ]] || { [[ "$line" == *"--kubeconfig $KUBECONFIG"* ]] && [[ "$line" == *"--context k3d-dr-drill"* ]]; }
+  done < "$CALL_LOG"
+  [[ "$output" != *"deploy_argocd_bootstrap"* ]]
+  [[ "$output" != *"deploy_argocd_platform_ops"* ]]
+  [[ "$output" != *"_argocd_deploy_image_updater"* ]]
+}
+
+@test "hub-up: DR namespaces exist before egress policy and workloads" {
+  export DR_DRILL_MODE=1
+  export KUBE_CONTEXT=k3d-dr-drill
+  export HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  run awk '/kubectl/ {print}' "$CALL_LOG"
+  create_line="$(printf '%s\n' "$output" | grep -n 'create namespace secrets' | head -1 | cut -d: -f1)"
+  policy_line="$(printf '%s\n' "$output" | grep -n 'egress-deny.yaml' | head -1 | cut -d: -f1)"
+  vault_line="$(grep -n 'dispatcher deploy_vault' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  [ "$create_line" -lt "$policy_line" ]
+  [ "$policy_line" -lt "$vault_line" ]
+}
+
+@test "hub-up: DR mode lets drill pods reach only the drill API server" {
+  export DR_DRILL_MODE=1 KUBE_CONTEXT=k3d-dr-drill HUB_CLUSTER_NAME=dr-drill
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'name: dr-allow-apiserver-egress' "${CALL_LOG}.stdin")" -eq 2 ]
+  grep -q 'namespace: secrets' "${CALL_LOG}.stdin"; grep -q 'namespace: identity' "${CALL_LOG}.stdin"
+  [ "$(grep -c 'cidr: 192.168.117.2/32' "${CALL_LOG}.stdin")" -eq 2 ]
+  [ "$(grep -c 'port: 6443' "${CALL_LOG}.stdin")" -eq 2 ]
+  [ "$(grep -c 'cidr:' "${CALL_LOG}.stdin")" -eq 2 ]
+  allow_line="$(grep -n 'apply -f -' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  vault_line="$(grep -n 'dispatcher deploy_vault' "$CALL_LOG" | head -1 | cut -d: -f1)"
+  [ "$allow_line" -lt "$vault_line" ]
+}
+
+@test "hub-up: DR mode stops when the API server endpoint is unreadable" {
+  export DR_DRILL_MODE=1 KUBE_CONTEXT=k3d-dr-drill HUB_CLUSTER_NAME=dr-drill DR_TEST_API_ENDPOINT='0.0.0.0/0 6443'
+  export KUBECONFIG="${FAKE_HOME}/dr-drill/kubeconfig"
+  run bin/hub-up
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot read the drill API server endpoint"* ]]
+  [ "$(grep -c 'dispatcher deploy_vault' "$CALL_LOG" || true)" -eq 0 ]
+}
+
+@test "DR egress policy allows only DNS and the two drill namespaces" {
+  policy="${BATS_TEST_DIRNAME}/../../etc/dr/egress-deny.yaml"
+  [ "$(grep -c 'ipBlock' "$policy" || true)" -eq 0 ]
+  [ "$(grep -o 'kubernetes.io/metadata.name: [a-z-]*' "$policy" | sort -u | tr '\n' ' ')" = "kubernetes.io/metadata.name: identity kubernetes.io/metadata.name: kube-system kubernetes.io/metadata.name: secrets " ]
+  for ns in secrets identity kube-system; do
+    [ "$(grep -c "kubernetes.io/metadata.name: ${ns}}" "$policy")" -eq 2 ]
+  done
+  [ "$(grep -c 'k8s-app: kube-dns' "$policy")" -eq 2 ]
 }

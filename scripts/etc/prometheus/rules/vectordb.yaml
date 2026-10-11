@@ -44,8 +44,10 @@ spec:
           annotations:
             summary: "VectorDB index has corpus drift"
             description: >-
-              Documents differ from the indexed corpus. Check the Hermes log and run
-              make index-docs DRY_RUN=1.
+              Documents differ from the indexed corpus. A positive value means corpus docs are
+              missing from the store (the backlog); a negative value means the store holds docs
+              no longer in the corpus (not pruned). Check the Hermes log and run make index-docs
+              DRY_RUN=1.
         - alert: VectorDBIndexFailing
           expr: k3dm_vectordb_index_last_result{result="failed"} == 1
           for: 30m

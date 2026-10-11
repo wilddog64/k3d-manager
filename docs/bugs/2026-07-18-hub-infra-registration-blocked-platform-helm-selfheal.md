@@ -4,6 +4,7 @@
 **Status:** **DO NOT EXECUTE the cluster-Secret registration route.** Owner approved
 Option A (read the live Deployment label) on 2026-07-30; source fix `699da11b` is
 awaiting deployment through `make platform-ops`.
+**Priority:** P3 — source fix `699da11b` waits only on `make platform-ops`
 **Supersedes:** the "Phase 2 — Claude-only" section of
 `docs/bugs/2026-07-18-argocd-cve-scan-silent-exit-missing-infra-secret.md`
 

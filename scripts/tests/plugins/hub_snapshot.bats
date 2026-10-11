@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC1007,SC1091,SC2030,SC2031,SC2329
 
 setup() {
   export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
@@ -9,6 +10,7 @@ setup() {
   export K3DM_SNAPSHOT_STAMP="$BATS_TEST_TMPDIR/hub-snapshot-last"
   export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
   export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_AUTO_PRUNE=1 K3DM_SNAPSHOT_MIN_FREE_GB=20
+  export DATA_GIT_FAIL=1
   export TMPDIR="$BATS_TEST_TMPDIR/staging"
   export SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
   export RSYNC_LOG="$BATS_TEST_TMPDIR/rsync.log"
@@ -126,6 +128,16 @@ if [[ "$command_text" == du\ * ]]; then
 fi
 exit 0
 EOF
+  cat > "$BATS_TEST_TMPDIR/bin/git" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == ls-remote ]]; then
+  [[ "${DATA_GIT_FAIL:-0}" == 1 ]] && exit 1
+  printf 'abc\trefs/heads/snapshots\n'
+elif [[ "${1:-}" == clone ]]; then
+  dest="${@: -1}"
+  mkdir -p "$dest/snapshots/${DATA_EXPORT_STAMP:-20261009T000000Z}"
+fi
+EOF
   chmod +x "$BATS_TEST_TMPDIR/bin"/*
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH" PATCH_LOG="$BATS_TEST_TMPDIR/patch.log"
   export TAR_FIXTURE_DIR="$BATS_TEST_TMPDIR/fixtures"
@@ -162,6 +174,13 @@ PY
   [[ "$output" == *"latest verified snapshot"* ]]
 }
 
+@test "hub snapshot: delete guard accepts a fresh data-repo export without SSH" {
+  export DATA_GIT_FAIL=0 DATA_EXPORT_STAMP="$(snapshot_name_hours_ago 2)"
+  run hub_snapshot_guard_delete
+  [ "$status" -eq 0 ]
+  [ ! -s "$SSH_LOG" ]
+}
+
 @test "hub snapshot: guard reads verified snapshots during dry-run" {
   export DRY_RUN=1
   mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 2)"
@@ -176,6 +195,22 @@ PY
   run hub_snapshot_guard_delete
   [ "$status" -ne 0 ]
   [[ "$output" == *"DISCARD_HUB_DATA=1"* ]]
+}
+
+@test "hub snapshot: old data export and unreachable M2 fail" {
+  export DATA_GIT_FAIL=0 DATA_EXPORT_STAMP="$(snapshot_name_hours_ago 30)" SSH_RC=1
+  run hub_snapshot_guard_delete
+  [ "$status" -eq 1 ]
+  [[ "$output" == *unreachable* ]]
+}
+
+@test "hub snapshot: inaccessible data repo falls through to M2" {
+  export DATA_GIT_FAIL=1
+  mkdir -p "$K3DM_SNAPSHOT_DIR/$(snapshot_name_hours_ago 2)"
+  run hub_snapshot_guard_delete
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"latest verified snapshot"* ]]
+  [ -s "$SSH_LOG" ]
 }
 
 @test "hub snapshot: guard refuses incomplete-only snapshots" {

@@ -148,3 +148,52 @@ spec:
           annotations:
             summary: "no passing e2e for {{ $labels.exported_service }}/{{ $labels.tier }} (runner {{ $labels.runner }}) in >3d"
             description: "No passing e2e run for {{ $labels.exported_service }} on the {{ $labels.tier }} substrate (runner {{ $labels.runner }}) in over 3 days; the verification signal is stale."
+    - name: hermes.alerts
+      rules:
+        - alert: HermesNotRunning
+          expr: time() - k3dm_hermes_last_tick_timestamp_seconds > 900 or absent(k3dm_hermes_last_tick_timestamp_seconds)
+          for: 5m
+          labels:
+            group: hermes
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hermes has not completed a poll in over 15 minutes"
+            description: "Hermes runs every 300 s. Check launchctl print gui/$UID/com.k3d-manager.hermes for the last exit code and ~/Library/Logs/k3dm-hermes.log. Exit 78 (EX_CONFIG) means launchd could not start the interpreter named in the plist."
+    - name: dr.alerts
+      rules:
+        - alert: DRDrillFailed
+          expr: k3dm_dr_drill_success == 0
+          for: 10m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub DR drill failed"
+            description: "The latest weekly hub disaster-recovery drill reported failure."
+        - alert: DRDrillStale
+          expr: time() - k3dm_dr_drill_last_run_timestamp_seconds > 691200
+          for: 30m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub DR drill is stale"
+            description: "No hub disaster-recovery drill has been reported for more than eight days."
+        - alert: HubDataExportFailed
+          expr: k3dm_hub_data_export_last_run_success == 0
+          for: 10m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export failed"
+            description: "The latest scheduled hub data export failed."
+        - alert: HubDataExportStale
+          expr: time() - k3dm_hub_data_export_last_success_timestamp_seconds > 129600
+          for: 30m
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export is stale"
+            description: "No successful hub data export has been verified for more than 36 hours."
+        - alert: HubDataExportNeverRan
+          expr: absent(k3dm_hub_data_export_last_success_timestamp_seconds)
+          for: 48h
+          labels: {group: dr, severity: warning}
+          annotations:
+            summary: "Hub data export has never run"
+            description: "No successful hub data export metric exists."

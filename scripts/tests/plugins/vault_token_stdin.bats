@@ -111,3 +111,11 @@ setup() {
   run cat "$STDIN_LOG"
   [ "${output}" = "payload-linepayload-line" ]
 }
+
+@test "__vault_exec_kubectl without --exec-stdin runs under set -u" {
+  _kubectl() { printf 'ok'; }
+  _exec_nounset() { ( set -u; __vault_exec_kubectl 0 secrets vault -n secrets exec vault-0 -- vault status ); }
+  run _exec_nounset
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "ok" ]
+}

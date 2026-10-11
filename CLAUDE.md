@@ -14,7 +14,7 @@ Uses a dispatcher pattern with lazy plugin loading.
 
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
-- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes.
+- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
 - **No network path out of a cloud session** — if you are running in a Claude cloud
   environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
   or any host. Do not search for a token, do not attempt a tunnel, and do not ask the operator to
@@ -23,7 +23,7 @@ Uses a dispatcher pattern with lazy plugin loading.
   read-only actions listed in that how-to's table are available; everything else must be run
   by the operator.
 
-- **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants with `make appsets-reapply` (refuses a non-release branch), then confirm with `make appsets-check`.
+- **Reapply the ApplicationSets on every release** — ApplicationSets template their `$values` source at `${K3D_MANAGER_BRANCH}`, which freezes to whatever branch was checked out when the set was last applied. Config committed to a newer branch is **inert** until the sets are reapplied: it is in git, CI is green, and no cluster reads it. This silently persisted for two releases (hub `trivy-operator` still on `k3d-manager-v1.16.0` as of 2026-07-24). Decision 2026-07-24: the values ref keeps tracking the **release branch**, not `main` — which makes this a required release step, not an optional one. Reapply for **both** the hub and ACG variants with `make appsets-reapply` (refuses a non-release branch), then confirm with `make appsets-check`. The reapply runs in two stages: the `hub` sets first, confirmed (their own Applications on the branch, none `Degraded`), and only then the `app-cluster` sets. `APPSETS_STAGE=hub` stops after the hub so it can soak; rerun without it to roll out the app-cluster stage. A new ApplicationSet manifest must carry `k3dm.k3d.io/rollout-stage`, or the reapply refuses to apply anything.
 
 ## Environment Constraints
 - **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
@@ -89,6 +89,10 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 ---
 
 ## Docs Conventions
+
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
+without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
+new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
 
 - **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
 - **`docs/issues/`** — Copilot PR findings and post-incident notes.

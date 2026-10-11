@@ -15,6 +15,10 @@
 Write pure Bash with portable `#!/usr/bin/env bash`. Match the existing 2-space indentation used in `scripts/`, prefer snake_case for functions/files (`deploy_vault`, `plugins/shopping_cart.sh`), and guard sourced files with `# shellcheck source=` hints. Keep functions idempotent, avoid unbounded `if` depth (Agent Rigor flags this), and favor `_run_command` helpers instead of raw subshell pipelines. Templates in `scripts/etc/` should stay `.yaml.tmpl` and load values from `vars.sh`.
 
 ## Testing Guidelines
+
+Bug priority convention: P0 is outage/data loss/security now, P1 is broken without a workaround,
+P2 is degraded with a workaround, and P3 is cosmetic/hygiene/test-only. Every new `docs/bugs/`
+file must include `**Priority:** P0` through `P3` under its Status line.
 BATS is the canonical framework. Name suites `<area>.bats` and tests `@test "<component>: <expectation>"`. Extend shared helpers via `scripts/tests/test_helpers.bash` rather than duplicating logic. Every PR must keep `./scripts/k3d-manager test all` green, preserve or increase `@test` counts (enforced by `_agent_audit`), and document new suites in `docs/tests` if they cover novel flows. For provider-specific behavior, add focused suites under `scripts/tests/lib/provider_contract.bats` or create plugin-level suites mirroring the file under test.
 
 ## Commit & Pull Request Guidelines

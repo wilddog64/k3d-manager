@@ -35,9 +35,9 @@ EOF
 fi
 
 if [[ -n "$BASH_VERSION" ]]; then
-   echo "running under bash version ${BASH_VERSION}"
+   echo "running under bash version ${BASH_VERSION}" >&2
 elif [[ -n "$ZSH_VERSION" ]]; then
-   echo "running under zsh version ${ZSH_VERSION}"
+   echo "running under zsh version ${ZSH_VERSION}" >&2
 fi
 
 DEBUG=${DEBUG:-0}

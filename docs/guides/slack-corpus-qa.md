@@ -38,3 +38,23 @@ calibrates against the live store: `ASK_DOCS_MIN_SCORE` defaults to `0.60` and c
 with `K3DM_ASK_DOCS_MIN_SCORE`.
 
 For recent questions that name a document kind (bugs, issues, plans/specs, or retros), `/ask-docs` lists the newest documents of that kind by date; "fixed", "verified", or "resolved" narrows the results to done statuses. Other recent questions still rank by similarity and then date.
+
+## Count questions
+
+A question that asks "how many", "count", "number of" or "tally" about bugs is not searched. It
+is answered from `scripts/bug-tally.py` at the indexed branch, so the numbers are exact and no
+model is called. It understands:
+
+| In the question | Meaning |
+|---|---|
+| `v1.42.0` | that release |
+| `last two releases`, `past 3 releases` | the current release branch and the ones before it |
+| `this release`, `current release` | the current release branch |
+| nothing | all releases, newest first, the ten with a match |
+| `P0`–`P3` | that priority only; docs with no Priority line are counted separately |
+| `open`/`outstanding`, `fixed`/`closed`/`resolved`/`verified` | that state |
+
+Examples: `/ask-docs how many P1 bugs from last two releases`,
+`/ask-docs how many open bugs in v1.43.0`. A bug's release is its `**Branch:**` line, else the
+release its doc was added in. Phrasings outside this table fall back to similarity search.
+

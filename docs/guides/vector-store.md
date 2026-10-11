@@ -343,6 +343,11 @@ K3DM_VECTORDB_PUSHGATEWAY_URL=http://localhost:19094 bin/k3dm-vectordb-metrics
 
 ### Hub metrics and dashboard
 
+Bug documents are stored with non-embedded `priority` and `state` columns. Ask-docs appends
+`[P1 · open]` to bug sources and includes the same metadata in excerpts. Run `make bug-tally`
+for deterministic per-release counts; bug-count questions in `/ask`, `/ask gemini`, and `/ask codex`
+route directly to that tally rather than a model.
+
 VectorDB metrics belong to the hub because the store, its alerts and the Grafana dashboard all run
 there. The hub has a dedicated `prometheus-pushgateway` installed by ArgoCD and a static Prometheus
 scrape job that preserves the publisher's `job="k3dm-vectordb"` labels. On the M4, install the

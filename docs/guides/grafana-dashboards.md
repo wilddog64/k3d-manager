@@ -25,7 +25,9 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
+| k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
+| Bug tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `make platform-ops` | hub |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
 | Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
@@ -203,7 +205,7 @@ Templated on `$service` / `$tier` / `$runner`. Everything is exporter-fed from
 | Last success age | `time() - e2e_last_success_timestamp_seconds{...}` |
 | Failing runs in window | `count(e2e_run_info{passed="false",...})` |
 | Duration trend | `e2e_last_run_duration_seconds{...}` |
-| Recent runs | `topk(100, e2e_run_info{...,failure_ratio=~".*%.*"})` |
+| Recent runs | `topk(100, e2e_run_info{...,failure_ratio=~".*%.*"})`; newest first. **Run date** is when the run happened (UTC). **Status now** is `passed`, `still failing`, or `fixed: passed <date>` when a later run of the same tier/service/suite/runner passed, so an old failure is not mistaken for a current one |
 | Failure groups / details | `topk(200, e2e_failure_group_info{...})`, `topk(100, e2e_failure_info{...})` |
 | Failure trend / causes by service | `sum by (exported_service[, kind]) (e2e_failure_group_info{...})` |
 | Top failing specs | `topk(10, sum by (exported_service,file) (e2e_failure_info{...}))` |
@@ -266,16 +268,62 @@ do not: apply them with `make prometheus-rules`, which applies only
 
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
 
-Shows whether alerts are actually being delivered. Stats at the top: notifications sent and failed
-per integration over 24h, and a count of firing alerts by severity. Below them, the **Firing
-alerts** table lists every alert firing right now, one row per alert, with
-`severity`, `alertname`, `cluster`, `namespace` and, for Trivy alerts, `image_repository`, `tier`
-and `remediation`. It reads Prometheus's `ALERTS` series, so it answers "which alerts make up that
-count" without opening Prometheus. Severity mostly decides the route: `critical` texts (`sms-critical`),
-`warning` emails. The exception is `TrivyCriticalVulnerabilityDetected`, which goes to the CVE
-auto-patch webhook and the analysis receiver, not SMS. Both the count and the table leave out two always-on kube-prometheus-stack
-meta-alerts: `Watchdog` (the heartbeat) and `InfoInhibitor` (severity `none`, which fires whenever an
-`info` alert such as `CPUThrottlingHigh` is active, to mute it). Neither one is a real problem.
+Shows whether alerts are actually being delivered. Stats at the top cover notifications sent and failed
+per integration over 24h, actionable alerts by severity, and an `Alerting pipeline` health count. The
+actionable selector is `ALERTS{alertstate="firing",alertname!~"Watchdog|InfoInhibitor|Trivy.*",job!~".*smstest.*"}`:
+it excludes the two always-on meta-alerts, Trivy security findings, and deliberate synthetic tests.
+The **Actionable alerts** table uses the same selector and lists `severity`, `alertname`, `cluster`,
+`namespace`, and any image/remediation labels. The **Security findings by image** table uses
+`alertname=~"Trivy.*"`; `tier="upstream"` is a third-party image we only consume, while other tiers
+have a remediation path through the CVE loop. The **Synthetic / test alerts** table uses
+`job=~".*smstest.*"`; these route like real alerts and can send texts, so delete the test job when it
+is no longer needed.
+
+The **Alerting pipeline** stat counts kube-prometheus-stack rules that watch delivery and evaluation
+health, including Alertmanager send failures, Prometheus connectivity, a full notification queue, and
+rule failures or missed evaluations. Zero means none are firing; inspect the alert names in Prometheus
+when it is red.
+
+Severity mostly decides the route: `critical` texts (`sms-critical`), `warning` emails
+(`platform-warning`). The exception is `TrivyCriticalVulnerabilityDetected`, which goes to the CVE
+auto-patch webhook and the analysis receiver, not SMS. Synthetic tests route like real alerts, so a
+`critical` test does send a text.
+
+The **Noisiest alerts (3d)** table uses the hub Prometheus retention window. `firing series-hours` is
+time spent firing summed over series, assuming the 60-second rule evaluation interval. `trips` counts
+starts of pending or firing states, including alerts that cleared before firing; a high trips count with
+no firing hours indicates flapping. Alertmanager does not label notification counts or latency by alert
+name, so this table cannot show notifications per alert. The dashboard's 41-warning example was 39
+Trivy findings, plus one actionable `TargetDown` and one deliberate `HostDiskSpaceLow` synthetic alert.
+
+### k3dm Agent Dispatch (`k3dm-agent-dispatch`) — hub
+
+The dispatch dashboard reads the shared Codex ledger export and selects 1d, 7d, or 30d. It shows
+accepted specs, integration-test landing success, verifier lines changed, wait minutes, Codex
+tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
+minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens
+only, excludes Claude verification, and is not converted to dollars because token pricing is not
+stable. Scope and rebase refusals are excluded from the integration success ratio.
+
+### k3dm Bug Tracking (`k3dm-bugs`) — hub
+
+Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb-metrics`.
+`k3dm-bug-docs` is the whole inventory: `k3dm_bug_docs{priority,state}` and its scan time.
+`k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
+`**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
+indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
+`k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
+counts open docs already scheduled for a later release, such as a patch release.
+
+The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
+untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
+open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a
+fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
+zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
+where Grafana placed them on the wrong segment. The bottom row has the
+all-time open counts per priority, scan age, and open-by-priority over time. On `main`, which is
+not a release branch, the current-release row is empty and the charts show the last five shipped
+releases. A tally failure skips only the release group, so the inventory keeps updating.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 

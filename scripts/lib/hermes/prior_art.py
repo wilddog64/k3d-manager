@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS {TABLE} (
   embedding    vector({EMBED_DIM}) NOT NULL,
   indexed_at   timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE {TABLE} ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'unset';
+ALTER TABLE {TABLE} ADD COLUMN IF NOT EXISTS state text NOT NULL DEFAULT 'unknown';
 CREATE INDEX IF NOT EXISTS {TABLE}_embedding_idx
   ON {TABLE} USING hnsw (embedding vector_cosine_ops);
 """
@@ -104,6 +106,44 @@ _SKIP_LINE = re.compile(r"^\s*(?:[-*+]\s|\d+\.\s|>|\||#{1,6}\s|!\[|<)")
 # It is not the prose that describes the problem, and embedding it adds no topical signal.
 _META_LINE = re.compile(r"^\*\*[^*]{1,40}:\*\*")
 _RULE_LINE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
+_PRIORITY_RE = re.compile(r"^\*\*Priority:\*\*\s*(P[0-3])\b", re.IGNORECASE | re.MULTILINE)
+_SEVERITY_RE = re.compile(r"^\*\*Severity:\*\*\s*(P[0-3])\b", re.IGNORECASE | re.MULTILINE)
+_BOLD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.*)$", re.MULTILINE)
+_BARE_STATUS_RE = re.compile(r"^Status:\s*(.*)$", re.MULTILINE)
+_STATUS_HEADING_RE = re.compile(r"^## Status\s*$", re.IGNORECASE | re.MULTILINE)
+_CLOSED_RE = re.compile(
+    r"^(?:FIXED|CLOSED|RESOLVED|DONE|WONTFIX|WON'T FIX|SUPERSEDED|DUPLICATE|VERIFIED|LIVE-VERIFIED)\b"
+    r"|^Fixed (?:on|in)\b", re.IGNORECASE
+)
+_BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTILINE)
+
+
+def doc_meta(text):
+    """Return the canonical ``(priority, state)`` metadata for a bug document."""
+    priority_match = _PRIORITY_RE.search(text) or _SEVERITY_RE.search(text)
+    priority = priority_match.group(1).upper() if priority_match else "unset"
+    match = _BOLD_STATUS_RE.search(text) or _BARE_STATUS_RE.search(text)
+    value = match.group(1).strip() if match else None
+    if value is None:
+        heading = _STATUS_HEADING_RE.search(text)
+        if heading:
+            value = next((line.strip() for line in text[heading.end():].splitlines() if line.strip()), None)
+    if value is None:
+        state = "unknown"
+    else:
+        state = "closed" if _CLOSED_RE.search(value) else "open"
+    return priority, state
+
+
+def doc_release(text, added_release=None):
+    match = _BRANCH_RELEASE_RE.search(text)
+    if match:
+        return f"v{match.group(1)}", "branch_line"
+    if added_release:
+        if isinstance(added_release, tuple):
+            return added_release
+        return added_release, "added_tag"
+    return "unknown", "unknown"
 LEAD_MAX_CHARS = 600
 
 
@@ -576,6 +616,18 @@ def fetch_hashes():
         f"SELECT coalesce(json_object_agg(path, content_hash)::text, '{{}}') FROM {TABLE};"
     ).strip()
     return json.loads(out or "{}")
+
+
+def fetch_doc_meta(paths):
+    """Return metadata for paths with one store query."""
+    if not paths:
+        return {}
+    values = ",".join("'" + path.replace("'", "''") + "'" for path in paths)
+    out = run_sql(
+        f"SELECT coalesce(json_object_agg(path, json_build_array(priority, state))::text, '{{}}') "
+        f"FROM {TABLE} WHERE path IN ({values});"
+    ).strip()
+    return {path: tuple(value) for path, value in json.loads(out or "{}").items()}
 
 
 def search(text, k=5):

@@ -26,7 +26,7 @@ from hermes import repairs
 from hermes.sensors import (ARGOCD_SERVICE, GITHUB_SERVICE, WEBHOOK_SERVICE,
                             _keychain_secret, alert_delivery, argocd, ci, eso, kine, kine_log_signals,
                             app_health, data_layer, hostnet_drift, node_pressure, reachability,
-                            stale_acg_registration,
+                            stale_acg_registration, superseded_jobs,
                             status_checks, token_expiry_advisory, values_branch, vectordb)
 from hermes.approvals import (APPROVAL_DRAIN_SERVICE, delete_approval, fetch_approvals,
                               interactive_blocks)
@@ -182,6 +182,7 @@ def _run_cycle(state, status_runner=None):
         node_pressure(_probe_run, state),
         data_layer(webhook_fetch, state, token=webhook),
         hostnet_drift(_probe_run, state),
+        superseded_jobs(_probe_run, state),
         kine(_datastore_run, state),
         vectordb(_vectordb_run, state),
         alert_delivery(_alert_delivery_run, state),
@@ -527,6 +528,19 @@ def _push_index_metrics(metrics):
         print(f"vectordb index metrics push skipped (non-fatal): {exc}", file=sys.stderr)
 
 
+def _push_hermes_heartbeat():
+    """Publish the time of the most recent Hermes poll, without affecting the poll."""
+    body = f"k3dm_hermes_last_tick_timestamp_seconds {time.time()}\n".encode()
+    base = os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    url = f"{base}/metrics/job/k3dm-hermes"
+    try:
+        request = urllib.request.Request(url, data=body, method="POST",
+                                         headers={"Content-Type": "text/plain; charset=utf-8"})
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception as exc:
+        print(f"Hermes heartbeat push skipped (non-fatal): {exc}", file=sys.stderr)
+
+
 def _refresh_index(state, now=None):
     """Fetch the tracked ref and index changed corpus docs without touching the checkout."""
     now = time.time() if now is None else now
@@ -538,6 +552,10 @@ def _refresh_index(state, now=None):
         "duration": 0, "paused_until": state.get("index_paused_until", 0),
         "result": "failed",
     }
+    stored_paused_until = float(state.get("index_paused_until", 0) or 0)
+    if stored_paused_until <= now:
+        metrics["paused_until"] = 0
+        state["index_paused_until"] = 0
     try:
         ref, branch = _index_ref()
         state["index_ref"] = ref
@@ -564,10 +582,10 @@ def _refresh_index(state, now=None):
             rows = payload.get("rows")
             corpus_docs = payload.get("corpus_docs")
             if (payload.get("available") is True and type(rows) is int and
-                    type(corpus_docs) is int and rows < corpus_docs):
+                    type(corpus_docs) is int and rows != corpus_docs):
                 state.pop("index_fingerprint", None)
                 print(
-                    f"vectordb index: store has {rows} of {corpus_docs} docs; "
+                    f"vectordb index: store has {rows} rows for {corpus_docs} corpus docs; "
                     "re-indexing despite unchanged corpus",
                     file=sys.stderr,
                 )
@@ -627,7 +645,7 @@ def _publish_disk_metrics():
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
 
 
-def _poll(state, state_path, now=None, status_runner=_status_run):
+def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     now = time.time() if now is None else now
     _refresh_index(state, now)
     due = _status_due(state, now)
@@ -690,6 +708,13 @@ def _poll(state, state_path, now=None, status_runner=_status_run):
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
                       "pages": pages}))
     return 0
+
+
+def _poll(state, state_path, now=None, status_runner=_status_run):
+    try:
+        return _poll_cycle(state, state_path, now, status_runner)
+    finally:
+        _push_hermes_heartbeat()
 
 
 def _usage():

@@ -23,7 +23,7 @@ route:
         - severity = critical
       receiver: sms-critical
     - matchers:
-        - alertname =~ "KubeJobFailed|KubeJobNotCompleted|E2EVerificationFailing|E2EVerificationStale|PrometheusDuplicateTimestamps"
+        - alertname =~ "KubeJobFailed|KubeJobNotCompleted|E2EVerificationFailing|E2EVerificationStale|DRDrillFailed|DRDrillStale|PrometheusDuplicateTimestamps"
       receiver: platform-warning
       group_wait: 5m
       group_interval: 2h

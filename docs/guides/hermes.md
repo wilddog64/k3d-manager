@@ -50,6 +50,7 @@ holds, and `approve` takes a fresh sensor cycle before executing it.
 | R4 | Re-run transient CI | CI is `timed_out`, `cancelled`, or `stuck`, with a run ID | `gh api ... rerun-failed-jobs` using the `k3dm-hermes-gh-token` PAT in `GH_TOKEN` |
 | R5 | Quarantine stale ACG reconciliation | sustained Kine pressure, `state.db` >= 8 GiB, and the known stale `host.k3d.internal` registration | pause hub ArgoCD application-controller (opt-in automatic circuit breaker only) |
 | R9 | Reapply ApplicationSets on the release branch | `values_branch` degraded with stale references | `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` with `K3D_MANAGER_BRANCH` pinned |
+| R10 | Delete failed Jobs superseded by a newer CronJob spec | A failed, inactive CronJob-owned Job in `identity`, `monitoring`, or `cicd` has a different runnable template (image/command/args); never automatic | `kubectl ... delete job --wait=false -- <pinned Job names>`; the allowlisted namespace and exact target set are rechecked and pinned at approval time |
 
 ## Slack approvals (opt-in)
 
@@ -349,6 +350,31 @@ unusable ones.
 ---
 
 ## Install and uninstall
+
+The Hermes LaunchAgent uses the pinned Homebrew interpreter
+`/opt/homebrew/opt/python@3.14/bin/python3.14`. The `opt/` link survives patch upgrades,
+while changing to a new Python minor version is an explicit template change. Render the plist
+with that interpreter, then bootstrap it. On a reinstall, boot out the loaded agent first;
+`bootstrap` fails with "service already loaded" otherwise:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.k3d-manager.hermes" 2>/dev/null || true
+sed -e "s|{{HERMES_BIN}}|$PWD/bin/k3dm-hermes|g" \
+    -e "s|{{K3DM_REPO_ROOT}}|$PWD|g" \
+    -e "s|{{HERMES_LOG}}|$HOME/Library/Logs/k3dm-hermes.log|g" \
+    scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl \
+    > "$HOME/Library/LaunchAgents/com.k3d-manager.hermes.plist"
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.k3d-manager.hermes.plist"
+```
+
+`HermesNotRunning` alerts when no heartbeat has arrived for 15 minutes. Check
+`launchctl print gui/$UID/com.k3d-manager.hermes` and `~/Library/Logs/k3dm-hermes.log`.
+Exit 78 (`EX_CONFIG`) means launchd could not start the interpreter named in the plist. Recover
+with `brew install python@3.14`, then kick Hermes back into service:
+
+```bash
+launchctl kickstart gui/$(id -u)/com.k3d-manager.hermes
+```
 
 The installer helper `_install_hermes_agent` lives in **lib-foundation** (`scripts/lib/system.sh`,
 subtree-pulled into [`scripts/lib/foundation/`](../../scripts/lib/foundation)); never edit the subtree

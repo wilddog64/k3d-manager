@@ -3,6 +3,7 @@
 **Date:** 2026-09-23
 **Branch:** `k3d-manager-v1.37.0`
 **Status:** IMPLEMENTED 2026-09-23 — unit-verified, not yet exercised live
+**Priority:** P3 — implemented; not yet exercised live
 
 > **Amendment (2026-09-23, during implementation).** Changes 3 and 4 below were specced with
 > two branches (token / no-token). That put `e2e_runner_dispatch` over the `_agent_audit`

@@ -27,10 +27,11 @@ ARGOCD_SCHEME ?= http
 GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
+K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
-.PHONY: appsets-reapply appsets-check
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -61,6 +62,36 @@ hub-recover:
 	@bin/hub-restore --preflight-only
 	@$(MAKE) --no-print-directory hub-up
 	@bin/hub-restore
+
+vault-dr-shards-save:
+	@./scripts/k3d-manager vault_dr_shards_save
+
+vault-dr-shards-export:
+	@./scripts/k3d-manager vault_dr_shards_export
+
+vault-dr-shards-import:
+	@./scripts/k3d-manager vault_dr_shards_import
+
+hub-data-export:
+	@./scripts/k3d-manager hub_data_export
+
+hub-data-export-setup:
+	@./scripts/k3d-manager hub_data_export_setup
+
+hub-data-export-schedule:
+	@./scripts/k3d-manager hub_data_export_schedule
+
+hub-data-export-unschedule:
+	@./scripts/k3d-manager hub_data_export_unschedule
+
+hub-data-prune:
+	@K3DM_HUB_DATA_PRUNE_DRY_RUN=$(if $(DRY_RUN),$(DRY_RUN),0) ./scripts/k3d-manager hub_data_prune
+
+dr-drill:
+	@bin/dr-drill
+
+dr-drill-publish:
+	@bin/dr-drill-publish
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/cluster-down)
 ## make down preserves the local Hub; set DELETE_HUB=1 to delete it
@@ -328,11 +359,39 @@ appsets-reapply:
 	  echo "[appsets-reapply] Check out the release branch or pass BRANCH=k3d-manager-vX.Y.Z." >&2; \
 	  exit 1; \
 	fi; \
-	K3D_MANAGER_BRANCH="$$_b" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
+	K3D_MANAGER_BRANCH="$$_b" K3DM_APPSETS_STAGE="$${APPSETS_STAGE:-all}" ./scripts/k3d-manager deploy_argocd_applicationsets --confirm
 
 ## Report Applications whose k3d-manager values source is not on BRANCH (read-only)
 appsets-check:
 	@./scripts/k3d-manager argocd_check_values_branch '$(BRANCH)' '$(INFRA_CONTEXT)'
+
+## Count bug docs per release by status and priority (RELEASE=vX.Y.Z, JSON=1)
+bug-tally:
+	@python3 scripts/bug-tally.py $(if $(RELEASE),--release $(RELEASE),) $(if $(JSON),--json,)
+
+## Start Codex in an isolated worktree (SPEC=path)
+codex-dispatch:
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)'
+
+## Show Codex worktree task status
+codex-status:
+	@bin/k3dm-codex-dispatch status
+
+## Land a verified Codex task (SLUG=slug)
+codex-land:
+	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,)
+
+## Resume a Codex task (SLUG=slug, PROMPT=path)
+codex-resume:
+	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)'
+
+## Abandon a Codex task (SLUG=slug, YES=1 to remove)
+codex-abandon:
+	@if [ "$(YES)" = 1 ]; then bin/k3dm-codex-dispatch abandon --slug '$(SLUG)' --yes; else bin/k3dm-codex-dispatch abandon --slug '$(SLUG)'; fi
+
+## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
+dispatch-metrics:
+	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
@@ -562,6 +621,8 @@ init-cloud-requests:
 ## Install the cloud-session request bridge LaunchAgent (reads origin/cloud-requests every 60s)
 install-cloud-bridge:
 	@set -euo pipefail; \
+	[ -x "$(K3DM_PYTHON3_PATH)" ] || \
+	  { echo "[install-cloud-bridge] ERROR: python@3.14 is not installed; run: brew install python@3.14" >&2; exit 1; }; \
 	security find-generic-password -s k3dm-webhook-token-reader -a k3dm >/dev/null 2>&1 || \
 	  { echo "[install-cloud-bridge] ERROR: Keychain item k3dm-webhook-token-reader (account k3dm) not found — create it from a real terminal first; see docs/howto/cloud-session-requests.md" >&2; exit 1; }; \
 	[ -n "$$(git ls-remote --heads origin cloud-requests)" ] || \

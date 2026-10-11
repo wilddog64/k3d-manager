@@ -10,6 +10,7 @@ from pathlib import Path
 from hermes import prior_art
 from webhook import agent
 from webhook.redact import scrub_credentials
+from webhook import bug_count
 
 LOGGER = logging.getLogger(__name__)
 REPO_ROOT = prior_art.REPO_ROOT
@@ -156,7 +157,7 @@ def _recent_docs(question, limit):
     return [(None, path, title) for _date, path, title in candidates[:limit]]
 
 
-def _excerpt(path, title):
+def _excerpt(path, title, metadata=None):
     file_path = REPO_ROOT / path
     if not file_path.is_file():
         return None
@@ -166,25 +167,46 @@ def _excerpt(path, title):
         return None
     date = _doc_date(path)
     date_line = f"\nDate: {date}" if date else ""
-    return f"Title: {_scrub(title)}{date_line}\n{_scrub(text)}"
+    meta_line = ""
+    if str(path).startswith("docs/bugs/") and metadata:
+        priority, state = metadata
+        meta_line = f"\nPriority: {priority} · State: {state}"
+    return f"Title: {_scrub(title)}{date_line}{meta_line}\n{_scrub(text)}"
 
 
 def _sources(results):
+    source_meta = {}
     kept = []
     excerpts = []
-    for score, path, title in results:
-        if (score is not None and score < ASK_DOCS_MIN_SCORE) or not _allowed_path(path):
-            continue
-        excerpt = _excerpt(path, title)
+    candidates = [(score, path, title) for score, path, title in results
+                  if (score is None or score >= ASK_DOCS_MIN_SCORE) and _allowed_path(path)]
+    bug_paths = [path for _score, path, _title in candidates if str(path).startswith("docs/bugs/")]
+    metadata_by_path = {}
+    if bug_paths:
+        try:
+            metadata_by_path = prior_art.fetch_doc_meta(bug_paths)
+        except Exception:
+            metadata_by_path = {}
+    for _score, path, title in candidates:
+        metadata = metadata_by_path.get(path, {})
+        excerpt = _excerpt(path, title, metadata)
         if excerpt is None:
             continue
         kept.append(path)
+        if metadata:
+            source_meta[path] = metadata
         excerpts.append(excerpt)
-    return kept, excerpts
+    return kept, excerpts, source_meta
 
 
-def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None):
-    source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(_doc_link(path) for path in paths)
+def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, source_meta=None):
+    def source_line(path):
+        suffix = ""
+        if str(path).startswith("docs/bugs/") and source_meta and path in source_meta:
+            priority, state = source_meta[path]
+            suffix = f" [{priority} · {state}]"
+        return _doc_link(path) + suffix
+    source_lines = "Sources: none" if not paths else "Sources:\n" + "\n".join(source_line(path) for path in paths)
     if not prose:
         prose = "Could not summarise — read the sources directly."
     if scrub_prose:
@@ -205,6 +227,9 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
     question = agent._sanitize_question(question or "")
     if not question:
         return _reply("Question rejected — too long or contains disallowed patterns.", [])
+    query = bug_count.match(question)
+    if query is not None:
+        return _reply(bug_count.reply(query), [], scrub_prose=False)
     recent = _wants_recent(question)
     try:
         results = _recent_docs(question, k) if recent else []
@@ -222,7 +247,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         dated.sort(key=lambda result: _doc_date(result[1]), reverse=True)
         undated.sort(key=lambda result: result[0], reverse=True)
         results = (dated + undated)[:k]
-    paths, excerpts = _sources(results)
+    paths, excerpts, source_meta = _sources(results)
     if not excerpts:
         return _reply("No matching documents for that question.", [])
     if not summarise:
@@ -230,7 +255,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         lines.extend(f"{_doc_date(path) if score is None else f'{score:.2f}'}  {_doc_date(path) or '-'}  {_doc_link(path)} — {_scrub(title)}" for score, path, title in results
                      if (score is None or score >= ASK_DOCS_MIN_SCORE) and _allowed_path(path)
                      and path in paths)
-        return _reply("\n".join(lines), paths, scrub_prose=False)
+        return _reply("\n".join(lines), paths, scrub_prose=False, source_meta=source_meta)
     recent_note = (
         "The user asked for recent items; these are the newest matching documents, newest first. "
         "List each with its date and one-line summary. Do not say there are no newer items — only "
@@ -251,6 +276,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
             f"Could not summarise — model error: {type(exc).__name__}",
             paths,
             status="failed",
+            source_meta=source_meta,
             metadata={
                 "status": "failed",
                 "failure_class": "summary_model_exception",
@@ -263,6 +289,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
             "Could not summarise — model returned no output",
             paths,
             status="failed",
+            source_meta=source_meta,
             metadata={
                 "status": "failed",
                 "failure_class": "summary_model_empty",
@@ -273,6 +300,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
             prose,
             paths,
             status="failed",
+            source_meta=source_meta,
             metadata=metadata,
         )
-    return _reply(prose, paths, metadata=metadata)
+    return _reply(prose, paths, metadata=metadata, source_meta=source_meta)

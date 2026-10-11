@@ -1,5 +1,8 @@
 # How-To: Controlled hub rebuild from GitOps + Vault
 
+For the weekly encrypted data restore and isolated validation, see
+[Weekly hub disaster-recovery drill](hub-dr-drill.md).
+
 **Audience:** the operator. **Not** an agent task.
 **Status:** **EXECUTED 2026-09-20** — the kine stall is cleared. `state.db` 2.72 GiB → 25.8 MB,
 `kubectl get nodes` 5.5s → 0.05s, and `COMPACT deleted` is logging on a 5-minute cadence after

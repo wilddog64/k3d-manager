@@ -4,6 +4,7 @@
 **Severity:** High — self-inflicted DNS + monitoring outages every ~6 min under hub CPU pressure.
 **Status:** MITIGATED LIVE (watchdog `launchctl bootout` 2026-08-28 ~04:20 PDT — the forced
 restarts stopped; agent-0 holds Ready on its own). Durable fix below NOT yet in git.
+**Priority:** P3 — mitigated live (watchdog booted out)
 
 ## Symptom
 

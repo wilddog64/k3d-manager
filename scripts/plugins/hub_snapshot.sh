@@ -11,6 +11,7 @@ K3DM_SNAPSHOT_CLUSTER="${K3DM_SNAPSHOT_CLUSTER:-k3d-k3d-cluster}"
 K3DM_SNAPSHOT_CONTEXT="${K3DM_SNAPSHOT_CONTEXT:-k3d-k3d-cluster}"
 K3DM_SNAPSHOT_MAX_AGE_HOURS="${K3DM_SNAPSHOT_MAX_AGE_HOURS:-24}"
 K3DM_SNAPSHOT_STAMP="${K3DM_SNAPSHOT_STAMP:-${HOME}/.local/share/k3d-manager/hub-snapshot-last}"
+K3DM_HUB_DATA_REPO="${K3DM_HUB_DATA_REPO:-git@github-k3dm-hub-data:wilddog64/k3dm-hub-data.git}"
 
 if [[ -r "${PLUGINS_DIR}/hub_recovery.sh" ]] && ! declare -f _hub_recovery_records >/dev/null 2>&1; then
   # shellcheck disable=SC1091
@@ -144,8 +145,30 @@ function _hub_snapshot_capture_retention_notice() {
   fi
 }
 
+function _hub_snapshot_latest_export_age_hours() {
+  local stage repo stamp
+  stage="$(mktemp -d "${TMPDIR:-/tmp}/k3dm-hub-data-guard.XXXXXX")" || return 1
+  chmod 700 "$stage"
+  if ! git ls-remote --exit-code "$K3DM_HUB_DATA_REPO" refs/heads/snapshots >/dev/null 2>&1; then
+    rm -rf -- "$stage"; return 1
+  fi
+  repo="${stage}/repo"
+  if ! git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo" >/dev/null 2>&1; then
+    rm -rf -- "$stage"; return 1
+  fi
+  stamp="$(find "$repo/snapshots" -mindepth 1 -maxdepth 1 -type d -name '20*T*Z' -print 2>/dev/null | sort -r | head -1 || true)"
+  stamp="${stamp##*/}"
+  rm -rf -- "$stage"
+  [[ -n "$stamp" ]] || return 1
+  _hub_snapshot_age_hours "$stamp"
+}
+
 function hub_snapshot_guard_delete() {
-  local _latest _age
+  local _latest _age _export_age
+  if _export_age="$(_hub_snapshot_latest_export_age_hours 2>/dev/null)" && [[ "$_export_age" =~ ^[0-9]+$ ]] && (( _export_age <= 24 )); then
+    _info "[hub-snapshot] fresh encrypted hub export is ${_export_age}h old"
+    return 0
+  fi
   if ! _hub_snapshot_guard_read _hub_snapshot_ssh true; then
     _warn "[hub-snapshot] M2 host ${K3DM_SNAPSHOT_HOST} is unreachable; run make snapshot or set DISCARD_HUB_DATA=1 (--discard-hub-data), which permanently loses the seven hub claims"
     return 1

@@ -1,7 +1,7 @@
 # k3s-aws provisioning waits for an SSM agent that never registers
 
 **Status:** OPEN — mitigated (SSH fallback); not a bring-up blocker
-**Priority:** P4 — the sandbox comes up over the autossh tunnel; SSM is optional
+**Priority:** P3 — the sandbox comes up over the autossh tunnel; SSM is optional
 **Discovered:** 2026-08-14
 **Component:** `scripts/lib/providers/k3s-aws.sh` SSM tunnel bring-up
 

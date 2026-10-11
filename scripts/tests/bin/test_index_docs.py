@@ -62,6 +62,17 @@ class TestScriptShape:
         assert "'indexed=' ||" in sql
         assert "staging" not in sql
 
+    def test_schema_adds_metadata_columns_without_reembedding(self):
+        assert "ALTER TABLE doc_embeddings ADD COLUMN IF NOT EXISTS priority" in pa.SCHEMA_SQL
+        assert "ALTER TABLE doc_embeddings ADD COLUMN IF NOT EXISTS state" in pa.SCHEMA_SQL
+
+    def test_metadata_update_is_copy_and_update_only(self):
+        sql = ix._metadata_script([("docs/bugs/a.md", "P1", "open")])
+        assert "COPY metadata_staging (path, priority, state)" in sql
+        assert "UPDATE doc_embeddings AS docs" in sql
+        assert "content_hash" not in sql
+        assert "embedding vector" not in sql
+
 
 class TestPerBatchCommit:
     def test_one_write_per_batch(self, monkeypatch):
@@ -165,6 +176,22 @@ class TestPerBatchCommit:
         monkeypatch.setattr(ix, "run_sql", lambda _sql: "pruned=0 indexed=1")
         monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
         assert ix.main([]) == 0
+
+    def test_unchanged_corpus_still_updates_metadata(self, monkeypatch, tmp_path):
+        path = tmp_path / "docs/bugs/one.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("# one\n\n**Priority:** P2\n**Status:** Open\n")
+        docs = [("docs/bugs/one.md", "one", "text", "hash-one")]
+        writes = []
+        monkeypatch.setattr(ix, "ROOT", tmp_path)
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {docs[0][0]: docs[0][3]})
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("embedded"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "pruned=0 indexed=1")
+        monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
+        assert ix.main([]) == 0
+        assert any("UPDATE doc_embeddings AS docs" in sql for sql in writes)
 
     def test_a_prune_failure_says_the_documents_landed(self, monkeypatch, capsys):
         docs = [_doc("one")]
@@ -328,6 +355,40 @@ class TestEmbeddingCache:
         assert len(written_paths) == 4
         assert calls and len(calls) == 1 and len(calls[0]) == 1
         assert "1 remaining" in capsys.readouterr().out
+
+    @pytest.mark.parametrize("args", [["--limit", "5"], []])
+    def test_prunes_stale_paths_with_or_without_limit(self, monkeypatch, args):
+        current = _doc("current")
+        stale = "docs/bugs/old.md"
+        writes = []
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: [current])
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {current[0]: current[3], stale: "old-hash"})
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("must not embed"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "pruned=1 indexed=1")
+        monkeypatch.setattr(ix.subprocess, "run", lambda *_a, **_k: None)
+
+        assert ix.main(args) == 0
+        assert len(writes) == 1
+        assert stale not in writes[0]
+
+    def test_refuses_to_prune_too_many_stale_paths(self, monkeypatch, capsys):
+        docs = [_doc(f"current-{index}") for index in range(70)]
+        existing = {doc[0]: doc[3] for doc in docs}
+        existing.update({f"docs/bugs/stale-{index}.md": "old-hash" for index in range(30)})
+        writes = []
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: existing)
+        monkeypatch.setattr(ix, "embed_batch", lambda *_a, **_k: pytest.fail("must not embed"))
+        monkeypatch.setattr(ix, "run_sql", lambda sql: writes.append(sql) or "")
+
+        assert ix.main([]) == 1
+        assert writes == []
+        assert capsys.readouterr().err == (
+            "index-docs: refusing to prune 30 of 100 stored docs; "
+            "run make index-docs DRY_RUN=1 to review\n"
+        )
 
 
 if __name__ == "__main__":

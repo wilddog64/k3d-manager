@@ -31,6 +31,15 @@ check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 
 ## Hub snapshots
 
+| `make vault-dr-shards-save` | `scripts/k3d-manager vault_dr_shards_save` | Save durable Vault DR shards in Keychain. |
+| `make vault-dr-shards-export` / `make vault-dr-shards-import` | Vault DR shard functions | One-time operator-mediated M4→M2 shard transfer over stdin. |
+| `make hub-data-export` | `scripts/k3d-manager hub_data_export` | Create an age-encrypted claim export now (the schedule also runs it daily). |
+| `make hub-data-export-setup` | `scripts/k3d-manager hub_data_export_setup` | One-time: service account and list-only Vault role for the unattended export, with a self-test. |
+| `make hub-data-export-schedule` / `make hub-data-export-unschedule` | hub data schedule functions | Install or remove the 03:30 daily export LaunchAgent on the M4. |
+| `make hub-data-prune` | `scripts/k3d-manager hub_data_prune` | Apply export retention (five days, newest, last drill-proven); `DRY_RUN=1` previews. |
+| `make dr-drill` | `bin/dr-drill` | Restore and verify the newest export on the M2. |
+| `make dr-drill-publish` | `bin/dr-drill-publish` | Publish the M2 result and metrics from the M4. |
+
 `make snapshot` captures the cold hub state and transfers it to
 `${K3DM_SNAPSHOT_HOST:-m2jump}:${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}`, where a
 relative default resolves against the remote login home. Do not set
@@ -68,8 +77,14 @@ After a rebuild, generate the new target map and restore with:
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
-| `make appsets-reapply` | **Every release:** reapply every ApplicationSet (hub and ACG) so its `$values` source tracks the release branch (`BRANCH=`, default: current branch; refuses anything that is not `k3d-manager-vX.Y.Z`) |
+| `make appsets-reapply` | **Every release:** reapply hub ApplicationSets, confirm their values pin and health, then reapply app-cluster sets; use `APPSETS_STAGE=hub` to stop after the hub soak (`BRANCH=`, `APPSETS_STAGE=all`, `K3DM_APPSET_CONFIRM_TIMEOUT=`, `K3DM_APPSET_CONFIRM_INTERVAL=`, default interval: 5s; refuses anything that is not `k3d-manager-vX.Y.Z`) |
 | `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
+| `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
+| `make codex-status` | Show Codex task state, changes, and scope |
+| `make codex-land SLUG=... TEST='bats scripts/tests/...'` | Rebase, test, and land a verified, in-scope task; use `NO_TEST=1` for docs-only work |
+| `make codex-resume SLUG=... PROMPT=...` | Send a follow-up prompt to the same Codex session |
+| `make codex-abandon SLUG=... [YES=1]` | Preview or remove an abandoned task |
+| `make dispatch-metrics [DRY_RUN=1]` | Export Codex dispatch ledger metrics to Pushgateway, or render them locally |
 
 `sync-apps` delegates to `bin/cluster-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
@@ -190,6 +205,7 @@ the store rather than truncating it. See
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
 | `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
+| `make bug-tally` | Count bug documents by release, status and priority | Deterministic bug inventory; use `RELEASE=vX.Y.Z` or `JSON=1` |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |
 | `make validate-manifests` | `kubeconform -strict -summary` | Validate Kubernetes manifests, custom resources included, against the Datree CRD catalog pinned to a commit. Defaults to platform-ops, Prometheus rules, Grafana dashboards and ApplicationSets; `FILES="a.yaml b.yaml"` overrides the set. Installs kubeconform if missing (Homebrew, else the pinned release into `~/.local/bin`, SHA-256 checked) and needs network for the schemas |
 

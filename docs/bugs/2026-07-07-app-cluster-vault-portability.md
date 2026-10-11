@@ -4,6 +4,7 @@
 **Source:** /ask agent observations, verified live 2026-07-07
 **Branch:** `k3d-manager-v1.14.0`
 **Status:** DESIGN — decisions signed off 2026-07-10. Still NOT a copy-paste bugfix: the Phase 1 implementation spec must be written before any handoff.
+**Priority:** P3 — design work; nothing is broken today
 **Tracked project:** App-cluster Vault auth portability (kubecontext-keyed helper per provider; "Vault endpoint is the open seam")
 
 ## Why these three are one bug

@@ -11,6 +11,11 @@ The installed agents can be updated together with:
 make webhook-log-level LEVEL=debug
 ```
 
+The webhook and cloud bridge LaunchAgents use the pinned Homebrew interpreter
+`/opt/homebrew/opt/python@3.14/bin/python3.14`, not the unversioned `/opt/homebrew/bin/python3`.
+If an installer reports that Python is missing, run `brew install python@3.14` before rendering
+or loading either plist.
+
 The helper edits both LaunchAgent plists and restarts the agents. It does not
 log request bodies, headers, bearer tokens, Keychain values, Slack response
 URLs, or make output. Status routes are logged as `/api/v1/status/{job_id}`.

@@ -17,6 +17,7 @@ from webhook.config import (
 )
 from webhook.policy import _role_allows
 from webhook.proc import _spawn_capture_text
+from webhook import bug_count
 from webhook.render import (
     _fetch_thread_context, _post_slack_bot, _slack_post, _start_bot_thread,
     _redact_thread_question,
@@ -370,6 +371,10 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         _finish("❌ Question rejected — contains disallowed patterns.", status="failed")
         return
     question = _q_stripped
+    query = bug_count.match(question)
+    if query is not None:
+        _finish(f"📊 Counted, not asked ({agent} was not consulted):\n{bug_count.reply(query)}")
+        return
 
     _ask_bash = str(Path(REPO_ROOT) / "bin" / "k3dm-ask-bash")
     _scope = (

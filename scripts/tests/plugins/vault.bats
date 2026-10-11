@@ -124,6 +124,12 @@ setup_vault_bootstrap_stubs() {
     elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault status -format json"* ]]; then
       echo '{"initialized": false}'
       return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"cat /tmp/k3dm-vault-init.rc"* ]]; then
+      echo 0
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"cat /tmp/k3dm-vault-init.json"* ]]; then
+      printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
+      return 0
     elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault operator init -key-shares=1 -key-threshold=1 -format=json"* ]]; then
       printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
       return 0
@@ -713,7 +719,10 @@ JSON
       "-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json")
         echo '{"initialized": false}'
         return 0 ;;
-      "-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
+      "-n ${TEST_NS} exec -i ${TEST_POD} "*"-- sh -c cat /tmp/k3dm-vault-init.rc"*)
+        echo 0
+        return 0 ;;
+      "-n ${TEST_NS} exec -i ${TEST_POD} "*"-- sh -c cat /tmp/k3dm-vault-init.json"*)
         printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
         return 0 ;;
       "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root")

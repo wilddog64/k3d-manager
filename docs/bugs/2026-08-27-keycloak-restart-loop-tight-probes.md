@@ -6,6 +6,7 @@
 StatefulSet the same day — keycloak-0 now `1/1 Running`, 0 restarts). Rolling the pod exposed a
 **second, cluster-wide casualty of the same disease — CoreDNS crashlooping** (see "CoreDNS
 collateral" below); also fixed live.
+**Priority:** P3 — implemented and live
 
 ## Symptom
 

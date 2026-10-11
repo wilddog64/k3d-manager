@@ -2,6 +2,177 @@
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-10-11
+
+- Fixed: the first live daily-export run pushed and verified its export, then failed the prune,
+  and `make hub-data-export-setup` failed its self-test. The "legacy export" notice was sent
+  through `_err`, which exits in lib-foundation, so a warning stopped the prune; it is now a
+  warning. Setup's self-test listed Vault while `_vault_login`'s admin session was still set, and
+  that session's token is injected on stdin ahead of the list call's own token and path; setup now
+  drops the session before the self-test, so it runs exactly as the unattended export does. The
+  hub_data test harness stubbed `_err` without exiting, which hid both; it now exits like the real
+  one, and that surfaced two more of the same kind (restore's exit 2 for a missing context, and the
+  manifest check swallowing its caller's context message), both fixed.
+- Added: the hub data export now runs daily and unattended (launchd, 03:30 on the M4), which cuts
+  the worst-case data loss from a week to about a day. It no longer generates a Vault root token
+  from the Keychain unseal shards: it lists Vault with a list-only Kubernetes login
+  (`make hub-data-export-setup` creates the service account, policy and role once), so nothing
+  unattended reads the shards. Each run pins the hub context, checks every file against a manifest
+  that now covers `pv-pvc.yaml` and `inventory.json` before uploading, confirms GitHub holds the
+  exact commit and that a fresh download of the new export verifies, and only then records success
+  and prunes. Prune removes exports older than five days but always keeps the newest and the last
+  one a drill proved good, rewrites the `snapshots` branch with `--force-with-lease` so the repo
+  actually shrinks, and refuses when it cannot read the drill results or verify a kept export.
+  Exports made before this change verify as legacy. The run takes a lock that records its owner,
+  so a run killed mid-export does not block later ones. Metrics go to the hub Pushgateway (job
+  `k3dm-hub-data-export`), with `HubDataExportFailed`, `HubDataExportStale` (36 h) and
+  `HubDataExportNeverRan` alerts.
+- Added the attended weekly hub disaster-recovery drill: durable Vault shards,
+  encrypted claim exports, isolated M2 restore, result publishing, freshness
+  checks, and DR alerts. Architecture and diagrams: `docs/architecture/hub-dr-drill.md`.
+- The E2E dashboard's Recent runs table now shows each run's date and a "Status now" column
+  (`passed`, `still failing`, or `fixed: passed <date>`), newest first. Before, an old failed run
+  stayed in the table with no date and no sign that a later run had passed, which read as a
+  current failure.
+- Fixed: `vault operator init` now runs detached inside the Vault pod and writes its output to a
+  file there, which the caller reads back with retries. Before, a dropped `kubectl exec` stream
+  during the raft election lost the only copy of the keys while Vault itself had initialised, which
+  failed the DR drill at Phase 2 twice. If the output cannot be read back, the keys stay in the pod
+  and the error says where.
+- Fixed: the hub data export never wrote `inventory.json`. It counted Keycloak users as Postgres
+  role `postgres` (the hub's role is `keycloak`) and LDAP entries with an anonymous search under
+  `dc=shopping-cart,dc=local` (the hub refuses anonymous binds and its base is `dc=home,dc=org`).
+  The export ignored the failure and pushed anyway, so every drill would have failed at restore.
+  Both counts now use the pod's own credentials (`$POSTGRES_USER`; LDAP over `ldapi` as the server's
+  uid), the drill's V3/V4 checks share them, and the export stops before pushing when the inventory
+  fails.
+- Fixed: `make dr-drill-publish` refused every real result with "refusing unexpected M2 result
+  path". The M2's shell expands `~` before `find` prints, so the path was
+  `/Users/<user>/.k3dm/dr-drill/<ts>.json`, but the check compared it to a literal `~/` prefix. The
+  test stub printed the literal `~` form, which ssh never returns, so the tests passed. The script
+  now lists from inside the result directory, accepts only `./<ts>.json`, and reads that name by a
+  path relative to the M2 home. The stubs print the real shape, and a new test refuses a listing
+  from a subdirectory.
+- Fixed: `make hub-data-export` could never generate its Vault root token, which is why the run 15
+  export's Vault listing was empty. `__vault_exec_kubectl` declared `local stdin_payload` with no
+  value and read it on calls that send no stdin (the first `generate-root -generate-otp`). Under the
+  export's `set -u` that aborted with "stdin_payload: unbound variable". The drill ran the same
+  code under `set +u`, so it never failed there. The variable now starts empty, and a test runs
+  the no-stdin path under `set -u`; it fails on the old line.
+- Fixed: DR drill check V2 passed without checking anything (drill run 15). The export recorded
+  `"vault_paths": null` because its `secret/` listing came back empty and the export ignored that:
+  its "non-empty" check expected `{"data": [...]}`, but `vault kv list -format=json` prints a bare
+  array, and its exit status was never read. V2 then iterated `null` inside an unchecked process
+  substitution, never checked the root token, and passed with zero paths. The export now stops
+  before pushing, saying whether the root token or the listing failed. V2 fails on an inventory
+  with no paths and on an empty token, lists the restored `secret/` once, and names any recorded
+  path that is missing. (It used to run `kv list` on each name as if it were a full path, which
+  could not have worked.) The test stubs now print Vault's real array shape.
+- Fixed: the DR drill never unsealed the restored Vault (drill runs 13 and 14). It piped the shard
+  into `vault operator unseal -`, but `operator unseal` has no stdin form: it sent a literal `-` as
+  the key, and Vault answered "'key' must be a valid hex or base64 string" whatever the Keychain
+  held. The drill now sends the shard with `vault write sys/unseal key=-`, which does read stdin,
+  so the shard still never appears in any argv. The test stub had accepted `unseal -` as a stdin
+  read; it now fails the way real Vault does, so the old command turns the green-run tests red.
+  `operator generate-root` and `-decode` do document `-` as stdin and are unchanged.
+- Fixed: a malformed DR unseal shard reached Vault, which refused it with "'key' must be a valid
+  hex or base64 string" (drill run 13). The DR shard import stored whatever line it read, with no
+  check and no `\r` strip, unlike the normal unseal cache. Import, export and the drill now strip a
+  trailing `\r` and refuse any shard that is not base64 or hex, naming the shard number but never
+  its value. A bad copy now fails at import instead of in the drill.
+- Fixed: when `vault operator unseal` failed, the DR drill threw away its output, so a shard Vault
+  rejected looked the same as a failed `kubectl exec`. The drill now prints the error lines from
+  that output (at most five), and drops any line that contains the shard.
+- Fixed: the DR drill's unseal failed with no message when the M2 Keychain had no shard count, a
+  count that was not a number, or a missing shard. Each case now prints which Keychain item is
+  wrong (never its value), and a rejected shard names the unseal step.
+- Fixed: the DR drill unsealed the restored Vault the moment the restore scaled it back up. The new
+  `vault-0` was still pulling its image (55 s on a node that had not run it), so the exec failed and
+  the drill reported `failed: unseal` with no reason, although the restored Vault was fine
+  (initialised, sealed, 1 of 1 shares). The drill now waits up to `DR_DRILL_VAULT_START_S` (300 s)
+  for `vault-0` to be Running and its API to answer, and says which wait ran out.
+- Fixed: the DR drill restore exited silently at the second claim. It applied Keycloak's manifests
+  from `../shopping-cart-infra`, a path that exists on neither Mac, ignored that failure, and then
+  scaled the missing `deployment/postgres-keycloak` to 0 with its error sent to `/dev/null`. The
+  raw manifests could not have started postgres anyway: they need a kustomize-generated ConfigMap
+  and an ExternalSecret the drill never applies. The drill now applies its own
+  `scripts/etc/dr/postgres-keycloak.yaml` (postgres only, 0 replicas, no password: the restored
+  data directory is already initialised) before any claim is touched, and a scale failure prints
+  which workload failed.
+- Fixed: the DR drill's default-deny egress policy also blocked the drill cluster's own API server.
+  Vault writes its init state to its pod labels through the API server and holds the
+  `operator init` response until that write gives up, so the CLI timed out ("context deadline
+  exceeded") after Vault had initialised, and the keys were lost. `bin/hub-up` now adds a
+  `dr-allow-apiserver-egress` policy in each drill namespace: TCP to the cluster's `kubernetes`
+  endpoint only, as a /32. The internet stays blocked, and V0 still checks that.
+  The same policy also blocked traffic between drill pods, so ESO could not log in to Vault and the
+  LDAP step timed out waiting for `openldap-admin`. Egress to pods in the `secrets` and `identity`
+  namespaces is now allowed.
+- Fixed: the DR drill tests pinned their export to 2026-10-09T12:00Z and began failing the 26 h
+  freshness check on 2026-10-10 at 14:00Z; the fixture now uses the current time.
+- Added: `bin/k3dm-codex-dispatch` (`make codex-dispatch`) runs each Codex spec in its own git
+  worktree with isolated state, so several specs can be implemented in parallel without touching the
+  operator checkout. `land` checks scope against the spec's `## Files` table before it fast-forwards.
+  It takes exactly one of `--test CMD` or `--no-test`; the test runs in the rebased task worktree,
+  so two tasks that rebase cleanly but break each other are refused. A landing lock stops two lands
+  racing, only one networked task runs at a time, and `resume` sends a follow-up prompt to the same
+  Codex session. The scope comes from the spec as it was dispatched, not the task's working copy, so
+  a task can no longer widen its own allowlist by editing the spec. `start` detaches from the
+  caller's stdout. A ledger (`ledger.jsonl`) records start, exit, land, refusal, resume and abandon
+  events; `bin/k3dm-dispatch-metrics` turns it into 1d/7d/30d throughput, landing, intervention and
+  token gauges for the new k3dm Agent Dispatch dashboard. See `docs/howto/codex-dispatch.md`.
+- Added: bug priority as metadata. Every new `docs/bugs/` file carries `**Priority:** P0`–`P3`
+  directly under `**Status:**` (urgency, separate from Severity), and a pre-commit hook checks the
+  staged file. The three status formats in use are parsed into one state, the archive is excluded,
+  and priority and state appear in `/ask-docs` answers, in Pushgateway metrics and on the Bugs
+  dashboard. `make bug-tally` counts bugs per release, and count questions ("how many P1 bugs in
+  v1.42.0") are answered from that tally before any model runs. All 30 open bug docs were
+  backfilled with a priority.
+- Added: Hermes R10, an approval-gated repair that deletes a failed Job whose CronJob spec has since
+  changed, so `KubeJobFailed` stops firing for a failure the current spec can no longer produce. A
+  new `superseded_jobs` sensor finds them: failed, not active, owned by a CronJob in `identity`,
+  `monitoring` or `cicd`, with a container fingerprint (names, images, commands, args) that differs
+  from the CronJob's template. Hermes proposes the deletion; a human approves it in Slack.
+- Changed: `make appsets-reapply` rolls out in two stages. Every ApplicationSet manifest carries
+  `k3dm.k3d.io/rollout-stage` (`hub` or `app-cluster`), and an unlabelled or unknown stage refuses
+  before anything is applied. The hub stage is applied and confirmed first (its own Applications on
+  the branch, none `Degraded`), then the app-cluster stage. `APPSETS_STAGE=hub` stops after the hub
+  so it can soak. The confirmation now waits for the ApplicationSet controller instead of reading
+  stale state, the shared preparation runs once, and each stage line names its scope.
+- Fixed: Hermes stopped with exit 78 and no alert after a Homebrew upgrade removed
+  `/opt/homebrew/bin/python3`. The Hermes, webhook and cloud-bridge LaunchAgents now run
+  `/opt/homebrew/opt/python@3.14/bin/python3.14`, the installers refuse when it is missing, Hermes
+  pushes a heartbeat after every poll, and `HermesNotRunning` fires when it is older than 15 minutes.
+- Fixed: the scheduled vector-store index never pruned renamed or deleted docs, because Hermes
+  always passes `--limit` and the prune was disabled under it. A safety valve refuses to prune more
+  than max(20, 5%) of the store, and `VectorDBIndexDrift` explains a row-count mismatch.
+- Fixed: the vector-store dashboard showed an expired index pause (2026-10-05) next to a `success`
+  result; a successful run now clears the pause from state and metrics.
+- Fixed: the k3dm Alertmanager Delivery dashboard counted 39 upstream-image Trivy findings and a
+  down ACG sandbox as 41 warnings, hiding the actionable ones. It now separates actionable,
+  security and synthetic alerts.
+
+- Fixed: the k3dm Bug Tracking dashboard stacked every panel in one narrow column with raw label
+  legends and a red Scan age at a healthy 400 s, and it could not show bugs per release. Hermes now
+  also publishes per-release counts (`k3dm-bug-releases`: the current release branch and the five
+  shipped releases before it, from `scripts/bug-tally.py`). The dashboard is laid out in three rows:
+  the current release, stacked bar charts for the six releases by priority and by open vs fixed,
+  and the all-time open counts. Each priority and state keeps one colour whatever
+  the data order, empty segments are dropped in the query rather than labelled `0`, and counts are
+  in the hover tooltip, because Grafana drew stacked labels on the wrong segment and hid small ones.
+- Fixed: the first scheduled hub data export (03:30, 2026-10-11) failed with `missing age recipient:
+  ./scripts/etc/dr/age-recipient.txt`. The plugin's repo-file defaults were relative to the caller's
+  directory, which was right for every manual run from the repo and wrong under launchd, which starts
+  in `/`. They now resolve from the plugin's own path. The `HubDataExport*` and `DRDrill*` alerts had
+  never loaded either: `prometheusrule.yaml` is not synced by ArgoCD, so the how-to now applies it
+  explicitly and proves the schedule with `launchctl kickstart`. The data repo's drill freshness
+  workflow ran a k3d-manager path that does not exist in that checkout; it now runs the installed
+  `drill-freshness.sh`.
+- Fixed: `/ask-docs` bug counts ignored ranges such as "last two releases" and listed every
+  release since v1.1.0 out of version order. Count questions now accept `last N releases` and
+  `this release`, counting back from the current release branch, and all-release answers are
+  sorted newest first, skip releases with no match and show at most ten.
+
 ## [1.42.0] - 2026-10-09
 
 ### Added

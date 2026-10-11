@@ -86,7 +86,7 @@ function __vault_exec_kubectl() {
    local retries=0
    local max_retries=5
    local container_removed=0
-   local stdin_payload
+   local stdin_payload=""
    if (( buffer_stdin )); then
       stdin_payload=$(__vault_exec_kubectl_read_stdin)
    fi
@@ -383,6 +383,87 @@ function _vault_cache_unseal_from_secret() {
 
    _vault_cache_unseal_keys "$cluster_ns" "$cluster_release" "${shards[@]}" >/dev/null 2>&1 || true
    return 0
+}
+
+# Durable DR copy.  Unlike the normal unseal cache this service is never
+# cleared after an unseal.
+function vault_dr_shards_save() {
+   local ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}}" release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   local -a shards=()
+   local cluster="${ns}/${release}" old_count old_shard index differs=0
+   mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$ns") || {
+      _warn "[vault] vault-unseal secret not found in ${ns}"; return 1
+   }
+   (( ${#shards[@]} > 0 )) || { _warn "[vault] vault-unseal has no shards"; return 1; }
+   old_count="$(_secret_load_data k3dm-vault-unseal-dr "${cluster}:count" vault-unseal-dr 2>/dev/null || true)"
+   if [[ "$old_count" =~ ^[1-9][0-9]*$ && "$old_count" != "${#shards[@]}" ]]; then
+      differs=1
+   elif [[ "$old_count" =~ ^[1-9][0-9]*$ ]]; then
+      for ((index=1; index<=old_count; index++)); do
+         old_shard="$(_secret_load_data k3dm-vault-unseal-dr "${cluster}:shard${index}" vault-unseal-dr 2>/dev/null || true)"
+         [[ "$old_shard" == "${shards[index-1]}" ]] || differs=1
+      done
+   fi
+   if (( differs == 1 )); then
+      _warn "[vault] replacing older DR shards; older exports need the old shards — run make hub-data-export now"
+   fi
+   _vault_dr_store_shards "$cluster" "${shards[@]}"
+}
+
+# A Vault unseal key is base64 or hex; anything else (a CR, a space, a
+# pasted quote) is refused before it reaches the Keychain or Vault.
+function _vault_dr_shard_valid() {
+   [[ "${1:-}" =~ ^[A-Za-z0-9+/]+={0,2}$ ]]
+}
+
+function _vault_dr_store_shards() {
+   local cluster="$1" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count=0 shard
+   shift
+   for shard in "$@"; do
+      [[ -n "$shard" ]] || continue
+      count=$((count + 1))
+      _secret_store_data "$service" "${cluster}:shard${count}" "$shard" "DR Vault unseal shard ${count}" "$type" || return 1
+   done
+   _secret_store_data "$service" "${cluster}:count" "$count" "DR Vault unseal shard count" "$type"
+}
+
+function vault_dr_shards_export() {
+   if [[ "${VAULT_DR_SHARDS_TEST_TTY:-0}" == 1 || -t 1 ]]; then
+      echo '[vault] refusing to print DR shards to a terminal; pipe the export' >&2
+      return 2
+   fi
+   local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" service="k3dm-vault-unseal-dr" type="vault-unseal-dr" count shard i
+   count="$(_secret_load_data "$service" "${cluster}:count" "$type")" || {
+      echo "[vault] no DR shards for ${cluster} in Keychain service ${service}; run make vault-dr-shards-save in Terminal.app" >&2; return 1
+   }
+   printf '%s\n' "$count"
+   for ((i=1; i<=count; i++)); do
+      shard="$(_secret_load_data "$service" "${cluster}:shard${i}" "$type")" || {
+         echo "[vault] DR shard ${i} of ${count} missing for ${cluster}" >&2; return 1
+      }
+      _vault_dr_shard_valid "$shard" || {
+         echo "[vault] DR shard ${i} of ${count} for ${cluster} is not a base64 or hex unseal key; run make vault-dr-shards-save in Terminal.app" >&2; return 1
+      }
+      printf '%s\n' "$shard"
+   done
+}
+
+function vault_dr_shards_import() {
+   local cluster="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}/${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}" count shard i=0
+   IFS= read -r count || { echo '[vault] DR shard import: empty input' >&2; return 1; }
+   count="${count%$'\r'}"
+   [[ "$count" =~ ^[1-9][0-9]*$ ]] || { echo '[vault] DR shard import: first line is not a shard count; pipe the output of make vault-dr-shards-export' >&2; return 1; }
+   local -a shards=()
+   while IFS= read -r shard && (( i < count )); do
+      shard="${shard%$'\r'}"
+      _vault_dr_shard_valid "$shard" || {
+         echo "[vault] DR shard import: shard $((i + 1)) is not a base64 or hex unseal key; copy the export file unchanged, with no editor or paste" >&2; return 1
+      }
+      shards+=("$shard")
+      i=$((i + 1))
+   done
+   (( i == count )) || { echo "[vault] DR shard import: expected ${count} shards, got ${i}" >&2; return 1; }
+   _vault_dr_store_shards "$cluster" "${shards[@]}"
 }
 
 function _vault_parse_sealed_from_status() {
@@ -1468,6 +1549,79 @@ Then:
 EOF
 }
 
+# Waits until the Vault API answers (status exit 0 or 2: unsealed or sealed).
+# A pod reports Running before its listener and raft leader are up.
+function _vault_wait_api() {
+   local ns="$1" release="$2" deadline=$((SECONDS + ${VAULT_API_WAIT_S:-120}))
+   while (( SECONDS < deadline )); do
+      if _vault_exec --no-exit "$ns" 'vault status -format=json >/dev/null 2>&1; rc=$?; [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ]' "$release" >/dev/null 2>&1; then
+         return 0
+      fi
+      _info "[vault] waiting for the $release API to answer"
+      sleep 3
+   done
+   return 1
+}
+
+# Prints only error lines from a failed init's output, never key material.
+function _vault_pod_sh() {
+   local ns="$1" release="$2" container="$3" script="$4"
+   local -a args=(--no-exit -n "$ns" exec -i "${release}-0")
+   if [[ -n "$container" ]]; then
+      args+=(-c "$container")
+   fi
+   _kubectl "${args[@]}" -- sh -c "$script"
+}
+
+# Init runs detached inside the pod and writes its output there, so a dropped exec stream
+# cannot lose the keys. Returns 3 when init succeeded but its output could not be read back.
+function _vault_init_once() {
+   local ns="$1" release="$2" jsonfile="$3" errfile="$4"
+   local f="${VAULT_INIT_POD_FILE:-/tmp/k3dm-vault-init}" container rc=""
+   container=$(_vault_container_name "$ns" "$release")
+   _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc; umask 077; nohup sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json >$f.json 2>$f.err; echo \$? >$f.rc' >/dev/null 2>&1 &" >/dev/null 2>"$errfile" || true
+   local deadline=$((SECONDS + ${VAULT_INIT_WAIT_S:-120}))
+   while (( SECONDS < deadline )); do
+      rc=$(_vault_pod_sh "$ns" "$release" "$container" "cat $f.rc 2>/dev/null" 2>/dev/null) || rc=""
+      [[ "$rc" =~ ^[0-9]+$ ]] && break
+      rc=""
+      sleep 2
+   done
+   if [[ -z "$rc" ]]; then
+      printf 'error: vault operator init did not finish within %ss\n' "${VAULT_INIT_WAIT_S:-120}" >>"$errfile"
+      return 1
+   fi
+   for _ in 1 2 3 4 5; do
+      _vault_pod_sh "$ns" "$release" "$container" "cat $f.err" >>"$errfile" 2>/dev/null && break
+      sleep 2
+   done
+   if (( rc != 0 )); then
+      _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc" >/dev/null 2>&1 || true
+      return "$rc"
+   fi
+   for _ in 1 2 3 4 5; do
+      if _vault_pod_sh "$ns" "$release" "$container" "cat $f.json" >"$jsonfile" 2>/dev/null \
+         && command grep -q unseal_keys_b64 "$jsonfile"; then
+         _vault_pod_sh "$ns" "$release" "$container" "rm -f $f.json $f.err $f.rc" >/dev/null 2>&1 || true
+         return 0
+      fi
+      sleep 2
+   done
+   : >"$jsonfile"
+   return 3
+}
+
+function _vault_is_initialized() {
+   local ns="$1" release="$2"
+   _vault_exec --no-exit "$ns" 'vault status -format=json 2>/dev/null; exit 0' "$release" 2>/dev/null \
+      | command grep -q -E '"initialized":[[:space:]]*true'
+}
+
+function _vault_init_error_lines() {
+   command grep -i -E '^(error|warning)|error:' "$1" 2>/dev/null \
+      | command grep -v -i -E 'key|token|b64' | head -5 | sed 's/^/[vault] init: /'
+}
+
 function _vault_operator_init() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local leader="${release}-0"
@@ -1503,10 +1657,37 @@ function _vault_operator_init() {
       _err "[vault] timeout waiting for $leader to be Running (last=${vault_state:-unknown})"
    fi
 
-   if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
+   if ! _vault_wait_api "$ns" "$release"; then
       _cleanup_on_success "$jsonfile"
-      _err "[vault] failed to execute vault operator init"
+      _err "[vault] $leader is Running but its API did not answer within ${VAULT_API_WAIT_S:-120}s"
    fi
+
+   local errfile attempt=1
+   errfile=$(mktemp -t vault-init-err.XXXXXX)
+   trap '_cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"' EXIT TERM
+   local init_rc
+   while true; do
+      init_rc=0
+      _vault_init_once "$ns" "$release" "$jsonfile" "$errfile" || init_rc=$?
+      (( init_rc == 0 )) && break
+      _vault_init_error_lines "$errfile" >&2
+      if (( init_rc == 3 )); then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] init succeeded but its output could not be read back; the keys are still in $leader at ${VAULT_INIT_POD_FILE:-/tmp/k3dm-vault-init}.json. Do not delete the pod until they are copied out."
+      fi
+      if _vault_is_initialized "$ns" "$release"; then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] init failed but $leader is now initialised; its unseal keys were not returned and cannot be recovered. Delete the cluster and start again."
+      fi
+      if (( attempt >= ${VAULT_INIT_ATTEMPTS:-3} )); then
+         _cleanup_on_success "$jsonfile"; _cleanup_on_success "$errfile"
+         _err "[vault] failed to execute vault operator init"
+      fi
+      attempt=$((attempt + 1))
+      _info "[vault] $leader is still uninitialised; retrying init (attempt $attempt)"
+      sleep 5
+   done
+   _cleanup_on_success "$errfile"
 
    trap - EXIT TERM
    printf '%s\n' "$jsonfile"
@@ -1560,6 +1741,10 @@ function _vault_process_init_artifacts() {
    done
    _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
    _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
+   if [[ "${DR_DRILL_MODE:-0}" != 1 ]]; then
+      vault_dr_shards_save "$ns" "$release" >/dev/null ||
+         _warn "[vault] unable to save durable DR unseal shards"
+   fi
 
   _vault_cache_unseal_keys "$ns" "$release" "${unseal_keys[@]}"
 

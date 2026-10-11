@@ -4,6 +4,7 @@
 **Severity:** High — hub control plane intermittently unresponsive; ArgoCD, Keycloak,
 CoreDNS, repo-server in restart storms.
 **Status:** SPEC
+**Priority:** P2 — the hub control plane can stall under CPU overcommit; the load-shed changes are the workaround
 
 ## Symptom
 

@@ -196,7 +196,7 @@ def test_status_interval_gate_wires_sensor_and_can_be_disabled(monkeypatch):
     calls = []
     runner = lambda *_: calls.append(True) or (0, status_payload("healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
-                 "alert_delivery", "vectordb"):
+                 "alert_delivery", "vectordb", "superseded_jobs"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
@@ -244,7 +244,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
-                 "alert_delivery", "vectordb"):
+                 "alert_delivery", "vectordb", "superseded_jobs"):
         monkeypatch.setattr(k3dm_hermes, name,
                             lambda *_args, sensor_name=name, **_kwargs: sensor(sensor_name, "healthy"))
     calls = []
@@ -375,6 +375,30 @@ def test_refresh_index_unchanged_full_store_stays_noop(monkeypatch):
     assert commands[-1]["result"] == "noop"
 
 
+def test_refresh_index_unchanged_store_with_extra_rows_reindexes(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", lambda metrics: commands.append(metrics))
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 1948, "corpus_docs": 1947}), stderr="")
+        if "index-docs.py" in command[0]:
+            return SimpleNamespace(returncode=0, stdout=(
+                "index-docs: 1947 docs, 0 written (0 from cache, 0 embedded), "
+                "1 pruned, 1947 in store, 0 remaining\n"), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    k3dm_hermes._refresh_index({"index_fingerprint": "same"}, now=1000)
+    assert any("index-docs.py" in item[0] for item in commands if isinstance(item, list))
+    assert commands[-1]["result"] == "success"
+    assert "store has 1948 rows for 1947 corpus docs" in capsys.readouterr().err
+
+
 def test_refresh_index_unchanged_status_failure_stays_noop(monkeypatch):
     commands = []
     monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
@@ -391,6 +415,46 @@ def test_refresh_index_unchanged_status_failure_stays_noop(monkeypatch):
     k3dm_hermes._refresh_index({"index_fingerprint": "same"}, now=1000)
     assert all(not (isinstance(item, list) and "index-docs.py" in item[0]) for item in commands)
     assert commands[-1]["result"] == "noop"
+
+
+def test_refresh_index_success_clears_expired_pause(monkeypatch):
+    commands, pushed = [], []
+    ok = SimpleNamespace(returncode=0, stderr="",
+                         stdout="index-docs: 4 docs, 0 embedded, 0 pruned, 4 in store, 0 remaining\n")
+    _stub_refresh(monkeypatch, commands, ok, pushed)
+    state = {"index_paused_until": 999}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 0
+    assert pushed[-1]["paused_until"] == 0 and pushed[-1]["result"] == "success"
+
+
+def test_refresh_index_noop_clears_expired_pause(monkeypatch):
+    commands, pushed = [], []
+    monkeypatch.setattr(k3dm_hermes, "_index_ref", lambda: ("origin/main", "main"))
+    monkeypatch.setattr(k3dm_hermes, "corpus_fingerprint", lambda *_: "same")
+    monkeypatch.setattr(k3dm_hermes, "_push_index_metrics", pushed.append)
+
+    def run(command, **_kw):
+        commands.append(command)
+        if command[0].endswith("k3dm-vectordb-status"):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(
+                {"available": True, "rows": 5, "corpus_docs": 5}), stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    state = {"index_fingerprint": "same", "index_paused_until": 999}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 0
+    assert pushed[-1]["paused_until"] == 0 and pushed[-1]["result"] == "noop"
+
+
+def test_refresh_index_future_pause_is_unchanged(monkeypatch):
+    commands, pushed = [], []
+    _stub_refresh(monkeypatch, commands, SimpleNamespace(returncode=0, stdout="", stderr=""), pushed)
+    state = {"index_paused_until": 2000}
+    k3dm_hermes._refresh_index(state, now=1000)
+    assert state["index_paused_until"] == 2000
+    assert pushed[-1]["paused_until"] == 2000 and pushed[-1]["result"] == "paused"
 
 
 def test_refresh_index_success_uses_ref_and_limit_and_stores_fingerprint(monkeypatch):
@@ -580,6 +644,7 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
     monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
                         lambda request, **_kw: requests.append(request) or Response())
     monkeypatch.setenv("K3DM_PUSHGATEWAY_URL", "http://old.invalid:9091")
+    monkeypatch.delenv("K3DM_VECTORDB_PUSHGATEWAY_URL", raising=False)
     k3dm_hermes._push_index_metrics({"last_run": 1, "last_success": 1, "embedded": 0, "from_cache": 0,
                                      "pruned": 0, "backlog": 0, "duration": 0.1,
                                      "paused_until": 0, "result": "success"})
@@ -590,6 +655,30 @@ def test_index_metrics_use_dedicated_hub_endpoint_and_ignore_old_override(monkey
                                      "pruned": 0, "backlog": 0, "duration": 0.1,
                                      "paused_until": 0, "result": "success"})
     assert requests[0].full_url.startswith("http://hub.invalid:1234/metrics/job/k3dm-vectordb-index")
+
+
+def test_poll_heartbeat_runs_when_sensors_raise_and_push_failure_is_nonfatal(monkeypatch, tmp_path):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes, "_poll_cycle", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("sensor failed")))
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kw: requests.append(request) or Response())
+    try:
+        k3dm_hermes._poll({}, tmp_path / "state.json", now=1000)
+    except RuntimeError:
+        pass
+    assert requests[0].full_url.endswith("/metrics/job/k3dm-hermes")
+    assert "k3dm_hermes_last_tick_timestamp_seconds" in requests[0].data.decode()
+
+    def refused(*_args, **_kw):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", refused)
+    k3dm_hermes._push_hermes_heartbeat()
 
 
 def test_status_reminder_waits_for_local_midnight(monkeypatch):
