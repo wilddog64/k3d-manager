@@ -58,7 +58,7 @@ def tally(ref):
     listing = _git("ls-tree", "-r", "--name-only", ref, "docs/bugs")
     paths = [path for path in listing.splitlines()
              if path.startswith("docs/bugs/") and "/" not in path[len("docs/bugs/"):]]
-    branch = _git("symbolic-ref", "--short", "-q", ref).strip() if ref != "HEAD" else _git("branch", "--show-current").strip()
+    branch = ref.removeprefix("origin/") if ref != "HEAD" else _git("branch", "--show-current").strip()
     added_releases = _added_releases(ref, branch)
     result = {}
     for path in paths:

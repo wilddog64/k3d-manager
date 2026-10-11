@@ -60,3 +60,17 @@ def test_tally_read_failure_returns_exit_two_and_no_stdout(tally_module, monkeyp
     monkeypatch.setattr(tally_module, "tally", lambda _ref: (_ for _ in ()).throw(OSError("unreadable")))
     assert tally_module.main(["--json", "--ref", "HEAD"]) == 2
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("ref", ["k3d-manager-v1.1.0", "origin/k3d-manager-v1.1.0"])
+def test_tally_a_named_ref_uses_its_branch_name(tally_module, tmp_path, ref):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "open.md").write_text("# open\n\n**Status:** Open\n")
+    _commit(tmp_path, "seed")
+    subprocess.run(["git", "switch", "-q", "-c", "k3d-manager-v1.1.0"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/k3d-manager-v1.1.0", "HEAD"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "switch", "-q", "main"], cwd=tmp_path, check=True)
+    result = tally_module.tally(ref)
+    assert result["v1.1.0"]["open"] == 1
+    assert result["v1.1.0"]["by_source"]["added_branch"] == 1

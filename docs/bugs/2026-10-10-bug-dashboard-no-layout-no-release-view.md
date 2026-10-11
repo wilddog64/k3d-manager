@@ -34,3 +34,13 @@ healthy. Nothing showed bugs per release, which the dashboard was meant to answe
   groups, tally failure, and a dashboard layout check (no overlap, 24 columns, every queried metric
   emitted). Mutation-checked: removing the history cap, pushing to the wrong group, counting the
   current release as later, and renaming the metric each turn a test red.
+
+## Follow-up: `bug-tally --ref` failed for every ref except HEAD
+
+After the fix went live, the release row read "No data". Hermes passes
+`K3DM_INDEX_REF=origin/k3d-manager-v1.43.0`, and `scripts/bug-tally.py` found the branch with
+`git symbolic-ref --short -q <ref>`, which fails for any ref that is not symbolic, so the tally exited 2.
+The producer tests had stubbed the tally, so they missed it. The branch is now the ref name without
+`origin/`. A regression test runs the tally against a local and an `origin/` ref; it was red before the fix.
+`bug-tally.py` reads `K3DM_INDEX_REF` as its default `--ref`, so `make bug-tally` and the count
+answers also failed wherever that variable was set.
