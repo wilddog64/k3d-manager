@@ -612,6 +612,10 @@ function _hub_data_restore_one() {
     fi
     identity="$(_secret_load_data k3dm-hub-data-age identity age)"
   fi
+  if [[ "${DR_DRILL_MODE:-0}" == 1 && "${HUB_DATA_RESTORE_TARGET:-drill}" != hub && "k3d-${cluster}-${node}" != k3d-dr-drill-* ]]; then
+    _err '[hub-data] refusing: target is not the drill cluster (docker restore target)'
+    return 2
+  fi
   if [[ -f "$encrypted" ]]; then
     age -d -i <(printf '%s\n' "$identity") "$encrypted" | docker exec -i "k3d-${cluster}-${node}" tar -C "$path" -xpf -
   else
@@ -856,6 +860,20 @@ function _hub_data_validate_target() {
   done
 }
 
+function _hub_data_install_credential_guard() {
+  local run_dir="$1" shim="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
+  export DR_SECURITY_CREDENTIALS_FILE="${run_dir}/credentials.tsv"
+  export DR_SECURITY_UNEXPECTED_FILE="${run_dir}/credentials_unexpected.tsv"
+  export DR_SECURITY_ALLOWLIST="${_HUB_DATA_ROOT}/scripts/etc/dr/credential-allowlist.tsv"
+  : > "$DR_SECURITY_CREDENTIALS_FILE"
+  : > "$DR_SECURITY_UNEXPECTED_FILE"
+  local shim_dir="${run_dir}/bin"
+  mkdir -p "$shim_dir"
+  ln -sf "$shim" "${shim_dir}/security"
+  export PATH="${shim_dir}:$PATH"
+  security() { "$shim" "$@"; }
+}
+
 function _hub_data_check_compatibility() {
   local dir="$1" inventory format context target_images key export_image target_image
   inventory="$dir/inventory.json"
@@ -892,8 +910,11 @@ function _hub_data_report() {
   export_dir="${K3DM_HUB_DATA_EXPORT_DIR:-}"; export_ts="${export_dir##*/}"
   sums_digest=''; [[ -n "$export_dir" && -r "$export_dir/SHA256SUMS" ]] && sums_digest="$(shasum -a 256 "$export_dir/SHA256SUMS" | awk '{print $1}')"
   approval_time=''; [[ -r "$run_dir/approval_time" ]] && approval_time="$(<"$run_dir/approval_time")"
-  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "$export_ts" --arg sums "$sums_digest" --arg approval "$approval_time" --argjson target "$target_json" --argjson steps "$steps_json" --argjson checks "$checks_json" --argjson rc "$rc" --arg resume "$(cat "$run_dir/argocd_resume" 2>/dev/null || printf true)" --argjson rto "$(cat "$run_dir/rto_seconds" 2>/dev/null || printf 0)" --arg keycache "$(cat "$run_dir/unseal_keys_cache" 2>/dev/null || printf none)" \
-    '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),unseal_keys_cache:$keycache,rto_seconds:$rto,rc:$rc}' > "$report"
+  local credentials='[]' unexpected='[]'
+  [[ -s "$run_dir/credentials.tsv" ]] && credentials="$(jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {op:.[0],service:.[1],account:.[2]}) | unique' "$run_dir/credentials.tsv")"
+  [[ -s "$run_dir/credentials_unexpected.tsv" ]] && unexpected="$(jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {op:.[0],service:.[1],account:.[2]}) | unique' "$run_dir/credentials_unexpected.tsv")"
+  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "$export_ts" --arg sums "$sums_digest" --arg approval "$approval_time" --argjson target "$target_json" --argjson steps "$steps_json" --argjson checks "$checks_json" --argjson rc "$rc" --arg resume "$(cat "$run_dir/argocd_resume" 2>/dev/null || printf true)" --argjson rto "$(cat "$run_dir/rto_seconds" 2>/dev/null || printf 0)" --arg keycache "$(cat "$run_dir/unseal_keys_cache" 2>/dev/null || printf none)" --argjson credentials "$credentials" --argjson unexpected "$unexpected" \
+    '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),unseal_keys_cache:$keycache,rto_seconds:$rto,rc:$rc,credentials_read:$credentials,credentials_unexpected:$unexpected}' > "$report"
 }
 
 function hub_data_verify_unsealed() {
@@ -987,6 +1008,7 @@ function hub_data_recover_preflight() {
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
   run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
   mkdir -p "$run_dir"
+  _hub_data_install_credential_guard "$run_dir"
   repo="${run_dir}/repo"
   git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"
   chmod 700 "$repo"

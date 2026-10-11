@@ -1813,3 +1813,4 @@ Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status cou
 - Pushed fix commit to `origin/k3d-manager-v1.42.0`; `HEAD` and remote both equal `81baeca9f455a94110716d0ccc54fc7c3f969112`. PR URL: none. Live verification remains pending.
 - 2026-10-11: v1.43.1 hub-data-recover implementation was rejected and fixed in the current work; see git log for the fix commit. Final gate output and mutation results are recorded at completion.
 - 2026-10-11: v1.43.1 round-2 recovery defects and behavioral tests fixed; see git log.
+- 2026-10-11: feat(dr): drill credential allowlist and target isolation guard; see git log.

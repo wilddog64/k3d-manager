@@ -170,6 +170,19 @@ old. If list-only Vault login fails, rerun `make hub-data-export-setup`.
 The result holds counts and path names only. The drill never prints Secret
 values, Vault values, shards or the age identity.
 
+### Credential policy and clean-room check
+
+Each drill puts the `security` shim first on `PATH`. In the default `audit` mode it records only
+the operation, service and account in the run directory and reports any pair outside
+`scripts/etc/dr/credential-allowlist.tsv` as `credentials_unexpected`; values passed with `-w` or
+on `security -i` stdin are never recorded. `DR_DRILL_CREDENTIAL_POLICY=enforce` exits 44 before
+an unexpected Keychain call reaches `security`. V9 is false when any unexpected pair is observed.
+
+The restore and teardown guards also require the exact drill kubeconfig/context, the local
+`dr-drill` serverlb port, and literal `dr-drill` teardown target. A refusal says
+`[dr-drill] refusing: target is not the drill cluster (<reason>)` and stops before destructive work.
+Review `credentials_unexpected` in the result JSON after an audit run before enabling enforce mode.
+
 Alerts: `DRDrillFailed` (latest drill failed) and `DRDrillStale` (no drill
 reported for 8 days) route to `platform-warning` email, never SMS.
 

@@ -9,6 +9,8 @@
 - Added: attended `make hub-data-recover` and `make hub-recover-all` flows with
   target validation, resumable checkpoints, shared drill verification and an
   auditable restore report.
+- Added: the DR drill now audits Keychain service/account access through a redacting allowlist
+  shim and refuses restore or teardown targets that are not the isolated `dr-drill` cluster.
 
 ## [1.43.0] - 2026-10-11
 

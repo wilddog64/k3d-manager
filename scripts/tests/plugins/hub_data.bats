@@ -882,6 +882,57 @@ STUB
   [ "$status" -eq 1 ]
 }
 
+@test "dr credential shim: stdin is recorded and forwarded byte-for-byte without -w value" {
+  local run_dir="$TEST_ROOT/credential-run" real="$TEST_ROOT/real-security"
+  mkdir -p "$run_dir"
+  cat > "$real" <<'STUB'
+#!/usr/bin/env bash
+cat > "$REAL_STDIN_LOG"
+STUB
+  chmod +x "$real"
+  export REAL_STDIN_LOG="$TEST_ROOT/real-stdin.log" DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$real"
+  printf 'add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w VALUE-ONE\nfind-generic-password -s k3dm-vault-unseal-dr -a secrets/vault:shard1\n' | "$PWD/scripts/etc/dr/security-shim" -i
+  grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
+  grep -qx $'find\tk3dm-vault-unseal-dr\tsecrets/vault:shard1' "$run_dir/credentials.tsv"
+  grep -q VALUE-ONE "$REAL_STDIN_LOG"
+  ! grep -R -q -- '-w VALUE-ONE' "$run_dir"
+}
+
+@test "dr credential shim: argv -w is skipped and never written under the run directory" {
+  local run_dir="$TEST_ROOT/credential-argv"
+  mkdir -p "$run_dir"
+  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$(command -v true)"
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w SENTINEL
+  grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
+  ! grep -R -q SENTINEL "$run_dir"
+}
+
+@test "dr credential shim: enforce exits 44 and does not reach real security" {
+  local run_dir="$TEST_ROOT/credential-enforce"
+  mkdir -p "$run_dir"
+  cat > "$TEST_ROOT/real-security" <<'STUB'
+#!/usr/bin/env bash
+touch "$TEST_ROOT/real-security-reached"
+STUB
+  chmod +x "$TEST_ROOT/real-security"
+  export DR_DRILL_CREDENTIAL_POLICY=enforce DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$TEST_ROOT/real-security"
+  run "$PWD/scripts/etc/dr/security-shim" find-generic-password -s hidden -a account -w
+  [ "$status" -eq 44 ]
+  [ ! -e "$TEST_ROOT/real-security-reached" ]
+}
+
+@test "dr restore: an out-of-cluster docker target is refused before exec" {
+  source_plugin
+  local encrypted="$TEST_ROOT/claim.tar.age"
+  : > "$encrypted"
+  export DR_DRILL_MODE=1 DR_DRILL_CONTEXT=k3d-dr-drill DR_DRILL_CLUSTER=k3d-cluster
+  docker() { printf 'docker %s\n' "$*" >> "$CALL_LOG"; }
+  run _hub_data_restore_one identity c "$encrypted" agent-0 /data
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"target is not the drill cluster"* ]]
+  ! grep -q 'docker exec' "$CALL_LOG"
+}
+
 @test "recover F1: the preflight summary is on stderr so it shows before the approval; stdout is only RUN_ID" {
   make_fixture; source_plugin
   export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/recover"
