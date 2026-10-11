@@ -15,7 +15,7 @@ data:
         "k3dm"
       ],
       "schemaVersion": 38,
-      "version": 3,
+      "version": 4,
       "refresh": "1m",
       "time": {
         "from": "now-7d",
@@ -351,7 +351,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (release, order, priority) (k3dm_bug_release_docs)",
+              "expr": "sum by (release, order, priority) (k3dm_bug_release_docs) > 0",
               "instant": true,
               "format": "table"
             }
@@ -373,7 +373,7 @@ data:
                 "rowField": "release",
                 "columnField": "priority",
                 "valueField": "Value",
-                "emptyValue": "zero"
+                "emptyValue": "null"
               }
             },
             {
@@ -402,18 +402,7 @@ data:
               },
               "custom": {
                 "fillOpacity": 80
-              },
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "0": {
-                      "text": " ",
-                      "index": 0
-                    }
-                  }
-                }
-              ]
+              }
             },
             "overrides": []
           },
@@ -436,7 +425,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (release, order, state) (k3dm_bug_release_docs)",
+              "expr": "sum by (release, order, state) (k3dm_bug_release_docs) > 0",
               "instant": true,
               "format": "table"
             }
@@ -458,7 +447,7 @@ data:
                 "rowField": "release",
                 "columnField": "state",
                 "valueField": "Value",
-                "emptyValue": "zero"
+                "emptyValue": "null"
               }
             },
             {
@@ -487,18 +476,7 @@ data:
               },
               "custom": {
                 "fillOpacity": 80
-              },
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "0": {
-                      "text": " ",
-                      "index": 0
-                    }
-                  }
-                }
-              ]
+              }
             },
             "overrides": []
           },

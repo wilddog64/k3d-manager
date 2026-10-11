@@ -49,6 +49,9 @@ answers also failed wherever that variable was set.
 
 After the rebuild, "Bugs filed per release, by priority" printed a value label on every stacked
 segment, including the empty ones, so `0` labels piled up on the bar bottoms over the real count
-(`4` over `0`). Both bar charts now map the value 0 to blank text; releases with no bugs keep their
-place on the x-axis. `grafana_dashboard_bugs.bats` asserts the mapping on both charts (fails
-without it).
+(`4` over `0`). A first fix mapped 0 to blank text, which hid the labels but added a grey `0`
+entry to both legends (the bar chart lists value mappings in its legend). The charts now query
+`… > 0` and leave empty matrix cells `null`, so empty segments are neither drawn nor labelled. A
+series that is zero in every release (today P0) drops out of the legend, and a release with no bug
+docs at all would drop off the x-axis. `grafana_dashboard_bugs.bats` asserts the query, the null
+cells and the absence of mappings.

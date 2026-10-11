@@ -64,8 +64,10 @@ data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
 assert len(bars) == 2
 for panel in bars:
-    mappings = panel["fieldConfig"]["defaults"]["mappings"]
-    assert any(m["type"] == "value" and m["options"].get("0", {}).get("text", "").strip() == "" for m in mappings), panel["title"]
+    assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
+    matrix = next(x for x in panel["transformations"] if x["id"] == "groupingToMatrix")
+    assert matrix["options"]["emptyValue"] == "null", panel["title"]
+    assert not panel["fieldConfig"]["defaults"].get("mappings"), panel["title"]
 PY
   [ "${status}" -eq 0 ]
 }
