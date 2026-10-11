@@ -89,6 +89,8 @@ _dr_drill_teardown() {
   local rc="${1:-$?}"
   (( _dr_drill_preflight_refused == 1 )) && rc=2
   if (( _dr_drill_started == 1 && _dr_drill_preflight_refused == 0 )); then
+    local drill_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}" drill_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+    VAULT_UNSEAL_CACHE_SERVICE=k3dm-vault-unseal-drill _vault_purge_unseal_cache "$drill_ns" "$drill_release" >/dev/null 2>&1 || true
     if [[ "${DR_DRILL_KEEP:-0}" == 1 ]]; then
       printf '[dr-drill] kept cluster; delete with: k3d cluster delete dr-drill\n' >&2
     else
@@ -242,7 +244,7 @@ _dr_drill_run() {
   _dr_drill_phase 1 preflight
   _dr_drill_preflight || return 2
   _dr_drill_phase 2 'build isolated hub'; _dr_drill_phase2_started="$(date +%s)"; _dr_drill_started=1
-  export KUBECONFIG="$DR_DRILL_KUBECONFIG" HUB_CLUSTER_NAME="$DR_DRILL_CLUSTER" DR_DRILL_MODE=1 DR_DRILL_CONTEXT DR_DRILL_CLUSTER
+  export KUBECONFIG="$DR_DRILL_KUBECONFIG" VAULT_UNSEAL_CACHE_SERVICE=k3dm-vault-unseal-drill HUB_CLUSTER_NAME="$DR_DRILL_CLUSTER" DR_DRILL_MODE=1 DR_DRILL_CONTEXT DR_DRILL_CLUSTER
   export DR_DRILL_RESTORE_STAGE="${DR_DRILL_STAGE}/restore"
   if [[ -n "${DR_DRILL_HUB_UP_CMD:-}" ]]; then
     if ! "$DR_DRILL_HUB_UP_CMD"; then if ! _dr_drill_fail phase2; then return 1; fi; fi

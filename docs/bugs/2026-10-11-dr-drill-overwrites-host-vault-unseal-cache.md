@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.1`
-**Status:** OPEN — fix before the credential guard flips to `enforce`
+**Status:** FIXED — see git log (fix(dr): drill caches its Vault unseal keys under its own Keychain service commit)
 **Priority:** P2 — the host Vault can still be unsealed by hand; nothing is lost from a running Vault
 **Severity:** high — the cached shards for the host Vault are replaced with a throwaway Vault's shard
 

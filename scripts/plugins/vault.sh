@@ -287,7 +287,7 @@ function _vault_cache_unseal_keys() {
    local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
    shift 2 || true
    local -a keys=("$@")
-   local service="k3d-manager-vault-unseal"
+   local service="${VAULT_UNSEAL_CACHE_SERVICE:-k3d-manager-vault-unseal}"
    local type="vault-unseal"
 
    if (( ${#keys[@]} == 0 )); then
@@ -570,7 +570,7 @@ function _vault_replay_cached_unseal() {
       1|true|yes) clear_after=1 ;;
       *) clear_after=0 ;;
    esac
-   local service="k3d-manager-vault-unseal"
+   local service="${VAULT_UNSEAL_CACHE_SERVICE:-k3d-manager-vault-unseal}"
    local type="vault-unseal"
    local cluster="${cluster_ns}/${cluster_release}"
 
@@ -790,7 +790,7 @@ function _vault_restart_pod() {
 
 function _vault_purge_unseal_cache() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local service="k3d-manager-vault-unseal"
+   local service="${VAULT_UNSEAL_CACHE_SERVICE:-k3d-manager-vault-unseal}"
    local type="vault-unseal"
    local cluster="${ns}/${release}"
    local count

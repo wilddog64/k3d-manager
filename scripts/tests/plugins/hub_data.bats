@@ -423,19 +423,19 @@ _fake_vault_tree() {
 @test "2 export never loads DR shards or generate-root" {
   make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
   _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
-  _hub_data_remote_verify() { :; }; run hub_data_export; [ "$status" -eq 0 ]; ! grep -q 'generate-root\|k3dm-vault-unseal-dr' "$VLOG" "$CALL_LOG"
+  _hub_data_remote_verify() { :; }; run hub_data_export; [ "$status" -eq 0 ]; run grep -q 'generate-root\|k3dm-vault-unseal-dr' "$VLOG" "$CALL_LOG"; [ "$status" -eq 1 ]
 }
 
 @test "3 empty login fails with setup guidance and pushes nothing" {
   make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
   _hub_data_inventory_token() { _err '[hub-data] Vault login as hub-data-export failed; run make hub-data-export-setup'; return 1; }
-  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *make\ hub-data-export-setup* ]]; ! grep -q 'git commit\|git push' "$CALL_LOG"
+  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *make\ hub-data-export-setup* ]]; run grep -q 'git commit\|git push' "$CALL_LOG"; [ "$status" -eq 1 ]
 }
 
 @test "4 missing pinned context fails before docker or git clone" {
   source_plugin; export K3DM_HUB_DATA_CONTEXT=missing; _kubectl() { [[ "$1" == config ]] && return 1; kubectl "$@"; }
   printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
-  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *'hub context missing not found'* ]]; ! grep -q 'docker\|git clone' "$CALL_LOG"
+  run hub_data_export; [ "$status" -ne 0 ]; [[ "$output" == *'hub context missing not found'* ]]; run grep -q 'docker\|git clone' "$CALL_LOG"; [ "$status" -eq 1 ]
 }
 
 @test "5 prune keeps recent exports and the last passing export" {
@@ -455,7 +455,7 @@ _fake_vault_tree() {
 
 @test "8 prune force-pushes snapshots only" {
   make_prune_fixture 20261004T120000Z 20261002T120000Z; source_plugin; export K3DM_HUB_DATA_RETAIN_DAYS=1
-  run hub_data_prune; [ "$status" -eq 0 ]; grep -q -- '--force-with-lease=snapshots:' "$TEST_ROOT/push.log"; grep -q 'refs/heads/snapshots' "$TEST_ROOT/push.log"; ! grep -q 'refs/heads/results' "$TEST_ROOT/push.log"
+  run hub_data_prune; [ "$status" -eq 0 ]; grep -q -- '--force-with-lease=snapshots:' "$TEST_ROOT/push.log"; grep -q 'refs/heads/snapshots' "$TEST_ROOT/push.log"; run grep -q 'refs/heads/results' "$TEST_ROOT/push.log"; [ "$status" -eq 1 ]
 }
 
 @test "8b export passes its existing clone to prune" {
@@ -486,7 +486,7 @@ _fake_vault_tree() {
 
 @test "11 rendered plist has scheduled command and calendar" {
   run sed -e "s|{{K3D_MANAGER_PATH}}|$PWD/scripts/k3d-manager|g" -e "s|{{HOME}}|$HOME|g" scripts/etc/launchd/com.k3d-manager.hub-data-export.plist.tmpl
-  [ "$status" -eq 0 ]; [[ "$output" == *hub_data_export_scheduled* && "$output" == *'<integer>3</integer>'* && "$output" == *'<integer>30</integer>'* ]]; ! [[ "$output" == *'{{'* ]]
+  [ "$status" -eq 0 ]; [[ "$output" == *hub_data_export_scheduled* && "$output" == *'<integer>3</integer>'* && "$output" == *'<integer>30</integer>'* ]]; [[ "$output" != *'{{'* ]]
 }
 
 @test "12 alert manifest contains all three export alerts" {
@@ -600,7 +600,7 @@ _fake_vault_tree() {
 
 @test "recover B4-13d: verification uses metadata proof fields" {
   source_plugin; printf '%s\n' '{"vault_paths":["app/"],"vault_keys":{"app":{"current_version":2}}}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root; }; _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }; _hub_data_vault_revoke() { :; }
-  run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; ! grep -q 'vault kv get' "$VLOG"
+  run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; run grep -q 'vault kv get' "$VLOG"; [ "$status" -eq 1 ]
 }
 
 @test "recover B4-13e: drill delegates verification to hub_data" {
@@ -895,7 +895,8 @@ STUB
   grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
   grep -qx $'find\tk3dm-vault-unseal-dr\tsecrets/vault:shard1' "$run_dir/credentials.tsv"
   grep -q VALUE-ONE "$REAL_STDIN_LOG"
-  ! grep -R -q -- '-w VALUE-ONE' "$run_dir"
+  run grep -R -q -- '-w VALUE-ONE' "$run_dir"
+  [ "$status" -eq 1 ]
 }
 
 @test "dr credential shim: argv -w is skipped and never written under the run directory" {
@@ -904,7 +905,8 @@ STUB
   export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL="$(command -v true)"
   "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w SENTINEL
   grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
-  ! grep -R -q SENTINEL "$run_dir"
+  run grep -R -q SENTINEL "$run_dir"
+  [ "$status" -eq 1 ]
 }
 
 @test "dr credential shim: enforce exits 44 and does not reach real security" {
@@ -929,10 +931,11 @@ _shim_env() {
 
 @test "dr credential scope: a drill may not touch the unseal-key cache or another context's root token" {
   _shim_env drill drill k3d-dr-drill
-  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1 -w X
-  "$PWD/scripts/etc/dr/security-shim" find-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w
-  [ "$(wc -l < "$DR_SECURITY_UNEXPECTED_FILE")" -eq 2 ]
   export DR_DRILL_CREDENTIAL_POLICY=enforce
+  run "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1 -w X
+  [ "$status" -eq 44 ]
+  "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-unseal-drill -a secrets/vault:count -w X
+  [ "$(wc -l < "$DR_SECURITY_UNEXPECTED_FILE")" -eq 1 ]
   run "$PWD/scripts/etc/dr/security-shim" delete-generic-password -s k3d-manager-vault-unseal -a secrets/vault:shard1
   [ "$status" -eq 44 ]
 }
@@ -973,7 +976,8 @@ _shim_env() {
   run _hub_data_restore_one identity c "$encrypted" agent-0 /data
   [ "$status" -ne 0 ]
   [[ "$output" == *"target is not the drill cluster"* ]]
-  ! grep -q 'docker exec' "$CALL_LOG"
+  run grep -q 'docker exec' "$CALL_LOG"
+  [ "$status" -eq 1 ]
 }
 
 @test "recover F1: the preflight summary is on stderr so it shows before the approval; stdout is only RUN_ID" {

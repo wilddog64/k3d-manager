@@ -15,7 +15,7 @@ printf '%s\n' "${DR_TEST_HOST:-m2-air.local}"
 STUB
   cat > "$TEST_ROOT/hub-up" <<'STUB'
 #!/usr/bin/env bash
-printf 'hub-up %s\n' "${DR_DRILL_CONTEXT}|${DR_DRILL_CLUSTER}|${KUBECONFIG}|${DR_DRILL_MODE}" >> "$PHASE_LOG"
+printf 'hub-up %s\n' "${DR_DRILL_CONTEXT}|${DR_DRILL_CLUSTER}|${KUBECONFIG}|${DR_DRILL_MODE}|${VAULT_UNSEAL_CACHE_SERVICE:-}" >> "$PHASE_LOG"
 [[ "${DR_TEST_HUB_UP_FAIL:-0}" == 1 ]] && exit 1
 exit 0
 STUB
@@ -155,6 +155,32 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   [ "$(jq -r .success "$result")" = true ]
 }
 
+@test "dr drill: hub-up inherits its dedicated Vault cache service and teardown purges it" {
+  run_drill
+  [ "$status" -eq 0 ]
+  grep -q 'hub-up k3d-dr-drill|dr-drill|.*|1|k3dm-vault-unseal-drill' "$PHASE_LOG"
+  grep -q 'security .*k3dm-vault-unseal-drill' "$PHASE_LOG"
+  [ "$(grep -c 'security .*k3d-manager-vault-unseal' "$PHASE_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: teardown uses the drill service even when its environment is unset" {
+  local harness="$TEST_ROOT/teardown-only"
+  sed '/^if _dr_drill_run; then/,$d' "$PWD/bin/dr-drill" | sed "s#^REPO_ROOT=.*#REPO_ROOT=\"$PWD\"#" > "$harness"
+  cat >> "$harness" <<'STUB'
+_vault_purge_unseal_cache() { printf '%s\n' "${VAULT_UNSEAL_CACHE_SERVICE:-unset}" > "$PURGE_LOG"; }
+_dr_drill_started=1
+_dr_drill_preflight_refused=0
+DR_DRILL_KEEP=1
+unset VAULT_UNSEAL_CACHE_SERVICE
+_dr_drill_teardown 0
+STUB
+  chmod +x "$harness"
+  export PURGE_LOG="$TEST_ROOT/purge.log"
+  run "$harness"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$PURGE_LOG")" = k3dm-vault-unseal-drill ]
+}
+
 @test "dr drill: name and host guards refuse before k3d" {
   export DR_DRILL_CLUSTER=k3d-cluster
   run_drill; [ "$status" -eq 2 ]; [ "$(grep -c k3d "$PHASE_LOG" || true)" -eq 0 ]
@@ -292,7 +318,8 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
 }
 
 @test "dr drill: deny-list remains absent" {
-  run ! grep -En 'hub-restore|hub_recovery_reconcile|install-.*port-forward|launchctl|cloudflared' bin/dr-drill
+  run grep -En 'hub-restore|hub_recovery_reconcile|install-.*port-forward|launchctl|cloudflared' bin/dr-drill
+  [ "$status" -eq 1 ]
 }
 
 @test "dr drill: free disk is measured inside Docker, not on the host" {

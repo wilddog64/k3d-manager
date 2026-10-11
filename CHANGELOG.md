@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed: DR drills now isolate Vault unseal-key caches under `k3dm-vault-unseal-drill` and clear them at teardown, preventing overwrites of the host cache.
 - Fixed: v1.43.1 hub-data recovery now resumes from slurped checkpoints,
   restores the approved export from one run-local clone, pins verification to
   the selected context, preserves resume failures in the report, and makes

@@ -16,8 +16,41 @@ setup() {
   _secret_load_data() { printf '%s' "${FAKE_SECRET["$1|$2"]:-}"; [[ -n "${FAKE_SECRET["$1|$2"]:-}" ]]; }
   _secret_store_data() { FAKE_SECRET["$1|$2"]="$3"; printf '%s|%s\n' "$1" "$2" >> "$STORE_LOG"; printf '%s' "$3" > "$BATS_TEST_TMPDIR/value-$(printf '%s' "$2" | tr /: __)"; }
   _secret_clear_data() { printf '%s|%s\n' "$1" "$2" >> "$CLEAR_LOG"; }
+  _kubectl() { :; }
   _warn() { printf '%s\n' "$*" >&2; }
   _info() { :; }
+}
+
+@test "vault cache: override routes cache reads, writes, and clears to the drill service" {
+  local call_log="$BATS_TEST_TMPDIR/cache-calls.log"
+  : > "$call_log"
+  _secret_load_data() { printf '1'; printf 'load|%s\n' "$1" >> "$call_log"; }
+  _secret_store_data() { printf 'store|%s\n' "$1" >> "$call_log"; return 0; }
+  _secret_clear_data() { printf 'clear|%s\n' "$1" >> "$call_log"; }
+  export VAULT_UNSEAL_CACHE_SERVICE=k3dm-vault-unseal-drill
+  run _vault_cache_unseal_keys secrets vault k1
+  [ "$status" -eq 0 ]
+  _vault_purge_unseal_cache secrets vault
+  run grep -q 'k3d-manager-vault-unseal' "$call_log"
+  [ "$status" -eq 1 ]
+  grep -q '^load|k3dm-vault-unseal-drill$' "$call_log"
+  grep -q '^store|k3dm-vault-unseal-drill$' "$call_log"
+  grep -q '^clear|k3dm-vault-unseal-drill$' "$call_log"
+}
+
+@test "vault cache: unset override preserves the host service" {
+  local call_log="$BATS_TEST_TMPDIR/cache-default-calls.log"
+  : > "$call_log"
+  _secret_load_data() { printf '1'; printf 'load|%s\n' "$1" >> "$call_log"; }
+  _secret_store_data() { printf 'store|%s\n' "$1" >> "$call_log"; return 0; }
+  _secret_clear_data() { printf 'clear|%s\n' "$1" >> "$call_log"; }
+  unset VAULT_UNSEAL_CACHE_SERVICE
+  run _vault_cache_unseal_keys secrets vault k1
+  [ "$status" -eq 0 ]
+  _vault_purge_unseal_cache secrets vault
+  grep -q '^load|k3d-manager-vault-unseal$' "$call_log"
+  grep -q '^store|k3d-manager-vault-unseal$' "$call_log"
+  grep -q '^clear|k3d-manager-vault-unseal$' "$call_log"
 }
 
 @test "vault DR shards: save stores two shards under secrets/vault without exposing values" {

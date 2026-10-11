@@ -185,6 +185,9 @@ unseal-key cache) and `restore-drill` (a rehearsal: the Keychain age identity). 
 hub's `k3dm-vault-root-token` entry, and neither a drill nor a rehearsal may touch
 `k3d-manager-vault-unseal`. `hub_data_recover` writes `credentials_read` and
 `credentials_unexpected` to its `report.json` too, across every `RESUME`.
+The drill's Vault caches its unseal keys under `k3dm-vault-unseal-drill`, which
+is cleared at teardown, never under the host's `k3d-manager-vault-unseal`; once
+enforced, the guard refuses the host service name in the drill scope.
 
 The restore and teardown guards also require the exact drill kubeconfig/context, the local
 `dr-drill` serverlb port, and literal `dr-drill` teardown target. A refusal says
