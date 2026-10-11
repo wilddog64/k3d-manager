@@ -608,7 +608,14 @@ function hub_data_unseal_dr() {
 
 function _hub_data_restore_one() {
   local ns="$1" claim="$2" encrypted node path identity source_dir source_name cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
-  encrypted="$3"; node="$4"; path="$5"; identity="${K3DM_HUB_DATA_AGE_IDENTITY:-$(_secret_load_data k3dm-hub-data-age identity age)}"; source_dir="${encrypted%/*}"; source_name="${encrypted##*/}"
+  encrypted="$3"; node="$4"; path="$5"; identity="${K3DM_HUB_DATA_AGE_IDENTITY:-}"; source_dir="${encrypted%/*}"; source_name="${encrypted##*/}"
+  if [[ -z "$identity" ]]; then
+    if [[ "${HUB_DATA_RESTORE_TARGET:-drill}" == hub ]]; then
+      _err '[hub-data] no age identity in memory; hub mode never reads it from the Keychain'
+      return 1
+    fi
+    identity="$(_secret_load_data k3dm-hub-data-age identity age)"
+  fi
   if [[ -f "$encrypted" ]]; then
     age -d -i <(printf '%s\n' "$identity") "$encrypted" | docker exec -i "k3d-${cluster}-${node}" tar -C "$path" -xpf -
   else
@@ -713,11 +720,14 @@ function hub_data_verify_vault_paths() { (
 ) }
 
 function _hub_data_argocd_pause() {
-  local context="$1" parent="${K3DM_HUB_DATA_ARGOCD_PARENT}" app="${K3DM_HUB_DATA_ARGOCD_APP}" ns="${ARGOCD_NAMESPACE:-cicd}" dir="$2" value
+  local context="$1" parent="${K3DM_HUB_DATA_ARGOCD_PARENT}" app="${K3DM_HUB_DATA_ARGOCD_APP}" ns="${ARGOCD_NAMESPACE:-cicd}" dir="$2" value current
   mkdir -p "$dir"
   for value in "$parent" "$app"; do
     if _kubectl --context "$context" -n "$ns" get application "$value" >/dev/null 2>&1; then
-      _kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}' > "$dir/$value.automated"
+      current="$(_kubectl --context "$context" -n "$ns" get application "$value" -o jsonpath='{.spec.syncPolicy.automated}')" || return 1
+      if [[ ( -n "$current" && "$current" != null ) || ! -e "$dir/$value.automated" ]]; then
+        printf '%s' "$current" > "$dir/$value.automated"
+      fi
       _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}' >/dev/null
     elif [[ "$value" == "$app" ]]; then
       _info "[hub-recover] ${value} not found; skipping ArgoCD child"
@@ -812,7 +822,7 @@ function _hub_data_recover_approval() {
   local export_ts="$1" typed
   [[ -t 0 || "${K3DM_HUB_DATA_TEST_TTY:-0}" == 1 ]] || { printf '%s\n' '[hub-recover] interactive TTY required' >&2; return 2; }
   printf '[hub-recover] Type export timestamp %s to approve: ' "$export_ts" >&2
-  IFS= read -r typed < /dev/tty || return 2
+  IFS= read -r typed < "${K3DM_HUB_DATA_TTY_DEVICE:-/dev/tty}" || return 2
   [[ "$typed" == "$export_ts" ]] || { printf '%s\n' '[hub-recover] approval did not match the selected export' >&2; return 2; }
 }
 
@@ -979,7 +989,7 @@ function hub_data_recover_preflight() {
   export_paths="$(jq -r '.vault_paths | length' "$export_dir/inventory.json")"
   live_users="$(_hub_data_keycloak_user_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
   live_ldap="$(_hub_data_ldap_entry_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
-  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live n/a (needs Vault login)/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap"
+  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live n/a (needs Vault login)/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap" >&2
   mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT"
   jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${run_dir}/target.json"
   _hub_data_recover_approval "$export_ts" || return 2
@@ -990,16 +1000,21 @@ function hub_data_recover_preflight() {
 
 function _hub_data_recover_step2() {
   local steps="$1"
-  _hub_data_step_finished 2 "$steps" && return 0
   printf '[hub-recover] Step 2/9 — age identity\n'
-  read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty
+  K3DM_HUB_DATA_AGE_IDENTITY=""
+  if ! read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < "${K3DM_HUB_DATA_TTY_DEVICE:-/dev/tty}"; then
+    printf '%s\n' '[hub-recover] could not read the age identity from the TTY' >&2
+    return 1
+  fi
   printf '\n' >&2
-  [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || return 1
+  if [[ "$K3DM_HUB_DATA_AGE_IDENTITY" != AGE-SECRET-KEY-1* ]]; then
+    printf '%s\n' '[hub-recover] the age identity must start with AGE-SECRET-KEY-1' >&2
+    return 1
+  fi
   _hub_data_run_step "$steps" 2 true
 }
 function _hub_data_recover_step3() {
   local steps="$1" context="$2" dir="$3"
-  _hub_data_step_finished 3 "$steps" && return 0
   printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'
   _hub_data_run_step "$steps" 3 _hub_data_argocd_pause "$context" "$dir"
 }

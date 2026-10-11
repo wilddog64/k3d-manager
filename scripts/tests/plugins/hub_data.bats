@@ -514,8 +514,15 @@ STUB
 }
 
 @test "recover B4-13: approval is typed and mismatches are refused" {
-  source_plugin; K3DM_HUB_DATA_TEST_TTY=1; read() { typed=wrong; return 0; }
-  run _hub_data_recover_approval 20261011T120000Z; [ "$status" -eq 2 ]; [ "$(grep -c kubectl "$CALL_LOG" || true)" -eq 0 ]
+  source_plugin
+  export K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/tty"
+  printf '%s\n' 20261010T000000Z > "$K3DM_HUB_DATA_TTY_DEVICE"
+  run _hub_data_recover_approval 20261011T120000Z
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'did not match'* ]]
+  printf '%s\n' 20261011T120000Z > "$K3DM_HUB_DATA_TTY_DEVICE"
+  run _hub_data_recover_approval 20261011T120000Z
+  [ "$status" -eq 0 ]
 }
 
 @test "recover B4-13a: target validation checks the local serverlb and server-0" {
@@ -526,8 +533,18 @@ STUB
 
 @test "recover B4-13b: destructive checkpoints require explicit redo on resume" {
   source_plugin
-  grep -q 'REDO_STEP=4' "$PLUGINS_DIR/hub_data.sh"
-  grep -q '"finished"' "$PLUGINS_DIR/hub_data.sh"
+  local steps="$TEST_ROOT/steps.jsonl"
+  printf '%s\n' '{"step":6,"started":"now"}' > "$steps"
+  _hub_data_argocd_assert_paused() { :; }
+  _hub_data_repoint_vault() { printf 'repoint\n' >> "$CALL_LOG"; }
+  run _hub_data_recover_step6 "$steps" ctx "$TEST_ROOT/run"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'REDO_STEP=6'* ]]
+  run grep -q repoint "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  REDO_STEP=6 run _hub_data_recover_step6 "$steps" ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  grep -q repoint "$CALL_LOG"
 }
 
 @test "recover B4-13c: compatibility requires format 2 and all claims" {
@@ -568,9 +585,23 @@ STUB
   [ "$status" -eq 1 ]
 }
 
-@test "recover B4-17: ArgoCD resume is installed in the exit trap" {
-  source_plugin; mkdir -p "$TEST_ROOT/run"; printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; return 0; }
-  run _hub_data_argocd_resume ctx "$TEST_ROOT/run"; [ "$status" -eq 0 ]; grep -q 'patch application' "$CALL_LOG"
+@test "recover B4-17: ArgoCD resume patches the child before the parent with the recorded values" {
+  source_plugin; mkdir -p "$TEST_ROOT/run"
+  printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"
+  printf '%s' '{"selfHeal":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_PARENT.automated"
+  _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; return 0; }
+  run _hub_data_argocd_resume ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  mapfile -t calls < "$CALL_LOG"
+  [ "${#calls[@]}" -eq 2 ]
+  [[ "${calls[0]}" == *"patch application $K3DM_HUB_DATA_ARGOCD_APP "*'"automated":{"prune":true}'* ]]
+  [[ "${calls[1]}" == *"patch application $K3DM_HUB_DATA_ARGOCD_PARENT "*'"automated":{"selfHeal":true}'* ]]
+  : > "$CALL_LOG"
+  : > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"
+  rm -f "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_PARENT.automated"
+  run _hub_data_argocd_resume ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
 }
 
 @test "recover B4-18: Vault re-point order is config, shards, vault-root, root" {
@@ -643,9 +674,9 @@ STUB
 @test "recover B4-R1: finished steps are skipped and unfinished step 4 needs redo" {
   source_plugin
   local steps="$TEST_ROOT/steps.jsonl"
-  printf '%s\n' '{"step":3,"started":"now"}' '{"step":3,"finished":"now","rc":0}' > "$steps"
-  _hub_data_argocd_pause() { printf ran >> "$CALL_LOG"; }
-  run _hub_data_recover_step3 "$steps" ctx "$TEST_ROOT/run"
+  printf '%s\n' '{"step":5,"started":"now"}' '{"step":5,"finished":"now","rc":0}' > "$steps"
+  hub_data_unseal_dr() { printf ran >> "$CALL_LOG"; }
+  run _hub_data_recover_step5 "$steps"
   [ "$status" -eq 0 ]
   run grep -q ran "$CALL_LOG"
   [ "$status" -eq 1 ]
@@ -704,14 +735,19 @@ STUB
 
 @test "recover B4-16: age identity is not sent in command argv" {
   source_plugin
-  _hub_data_run_step() { printf '%s\n' "$*" >> "$CALL_LOG"; }
-  K3DM_HUB_DATA_AGE_IDENTITY=AGE-SECRET-KEY-1SENTINEL
-  read() { :; }
-  run _hub_data_recover_step2 "$TEST_ROOT/steps.jsonl"
+  export HUB_DATA_RESTORE_TARGET=hub
+  K3DM_HUB_DATA_AGE_IDENTITY=AGE-SECRET-KEY-1SENTINELVALUE
+  age() { printf 'age %s\n' "$*" >> "$CALL_LOG"; cat "$3" > "$TEST_ROOT/identity-seen"; }
+  docker() { printf 'docker %s\n' "$*" >> "$CALL_LOG"; cat >/dev/null; }
+  _secret_load_data() { printf 'keychain\n' >> "$CALL_LOG"; }
+  : > "$TEST_ROOT/claim.tar.age"
+  run _hub_data_restore_one identity c "$TEST_ROOT/claim.tar.age" agent-0 /data
   [ "$status" -eq 0 ]
-  run grep -q AGE-SECRET-KEY "$CALL_LOG"
+  grep -q '^age -d -i /dev/fd/' "$CALL_LOG"
+  grep -q SENTINELVALUE "$TEST_ROOT/identity-seen"
+  run grep -q SENTINELVALUE "$CALL_LOG"
   [ "$status" -eq 1 ]
-  run grep -q security "$CALL_LOG"
+  run grep -q keychain "$CALL_LOG"
   [ "$status" -eq 1 ]
 }
 
@@ -738,4 +774,66 @@ STUB
   grep -q 'hub_data_unseal_dr' "$PWD/bin/dr-drill"
   run grep -Eq '^_dr_drill_v[1-5][[:space:]]*\(' "$PWD/bin/dr-drill"
   [ "$status" -eq 1 ]
+}
+
+@test "recover F1: the preflight summary is on stderr so it shows before the approval; stdout is only RUN_ID" {
+  make_fixture; source_plugin
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/recover"
+  git() { cp -R "$DR_TEST_REPO_FIXTURE" "${@: -1}"; }
+  _hub_data_verify_export() { :; }
+  _hub_data_check_compatibility() { :; }
+  _hub_data_validate_target() { :; }
+  _hub_data_keycloak_user_count() { printf 6; }
+  _hub_data_ldap_entry_count() { printf 12; }
+  _kubectl() { printf 'value'; }
+  _hub_data_recover_approval() { printf 'approval\n' >> "$CALL_LOG"; }
+  run --separate-stderr hub_data_recover_preflight
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ ^RUN_ID=[0-9]{8}T[0-9]{6}Z$ ]]
+  [[ "$stderr" == *'Target context: ctx'* ]]
+  [[ "$stderr" == *'Export: 20261009T120000Z'* ]]
+  grep -q approval "$CALL_LOG"
+}
+
+@test "recover F2: a resumed run pauses ArgoCD again and keeps the value recorded before the first pause" {
+  source_plugin
+  local steps="$TEST_ROOT/steps.jsonl" dir="$TEST_ROOT/run"
+  mkdir -p "$dir"
+  printf '%s\n' '{"step":3,"started":"now"}' '{"step":3,"finished":"now","rc":0}' > "$steps"
+  printf '%s' '{"prune":true}' > "$dir/$K3DM_HUB_DATA_ARGOCD_APP.automated"
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    [[ "$*" == *'-o jsonpath'* ]] && return 0
+    return 0
+  }
+  run _hub_data_recover_step3 "$steps" ctx "$dir"
+  [ "$status" -eq 0 ]
+  grep -q "patch application $K3DM_HUB_DATA_ARGOCD_APP" "$CALL_LOG"
+  [ "$(cat "$dir/$K3DM_HUB_DATA_ARGOCD_APP.automated")" = '{"prune":true}' ]
+}
+
+@test "recover F3: step 2 prompts on every run and hub mode never reads the age identity from the Keychain" {
+  source_plugin
+  local steps="$TEST_ROOT/steps.jsonl"
+  printf '%s\n' '{"step":2,"started":"now"}' '{"step":2,"finished":"now","rc":0}' > "$steps"
+  export K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/tty"
+  : > "$K3DM_HUB_DATA_TTY_DEVICE"
+  read() { printf 'prompted\n' >> "$CALL_LOG"; K3DM_HUB_DATA_AGE_IDENTITY=AGE-SECRET-KEY-1TEST; }
+  run _hub_data_recover_step2 "$steps"
+  [ "$status" -eq 0 ]
+  grep -q prompted "$CALL_LOG"
+  unset -f read
+  unset K3DM_HUB_DATA_AGE_IDENTITY
+  : > "$CALL_LOG"
+  _secret_load_data() { printf 'keychain\n' >> "$CALL_LOG"; printf AGE-SECRET-KEY-1KEYCHAIN; }
+  age() { printf 'age\n' >> "$CALL_LOG"; }
+  docker() { cat >/dev/null; }
+  : > "$TEST_ROOT/claim.tar.age"
+  HUB_DATA_RESTORE_TARGET=hub run _hub_data_restore_one identity c "$TEST_ROOT/claim.tar.age" agent-0 /data
+  [ "$status" -ne 0 ]
+  run grep -Eq 'keychain|age' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  HUB_DATA_RESTORE_TARGET=drill run _hub_data_restore_one identity c "$TEST_ROOT/claim.tar.age" agent-0 /data
+  [ "$status" -eq 0 ]
+  grep -q keychain "$CALL_LOG"
 }
