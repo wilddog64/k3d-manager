@@ -650,6 +650,15 @@ _fake_vault_tree() {
   [ ! -s "$CALL_LOG" ]
 }
 
+@test "recover K2: a drill target skips the Keycloak and ESO refresh; the hub runs it" {
+  source_plugin; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; }
+  run --separate-stderr _hub_data_refresh_dependents k3d-dr-drill; [ "$status" -eq 0 ]
+  [ "$(wc -c < "$CALL_LOG")" -eq 0 ]; [[ "$stderr" == *"no Keycloak or ESO to refresh"* ]]
+  K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 run _hub_data_refresh_dependents other-ctx; [ "$status" -eq 0 ]; [ "$(wc -c < "$CALL_LOG")" -eq 0 ]
+  run _hub_data_refresh_dependents k3d-k3d-cluster; [ "$status" -eq 0 ]
+  grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
+}
+
 @test "recover K1: a drill target never caches unseal keys in the Keychain; the hub does" {
   source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }
   _vault_cache_unseal_keys() { printf 'cache\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { cat >/dev/null; }

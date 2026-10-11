@@ -784,6 +784,10 @@ function _hub_data_step_unfinished() {
 
 function _hub_data_refresh_dependents() {
   local context="$1"
+  if [[ "$context" == k3d-dr-drill || "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" == 1 ]]; then
+    printf '%s\n' '[hub-recover] drill target: no Keycloak or ESO to refresh; skipping' >&2
+    return 0
+  fi
   _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
   _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite
 }
