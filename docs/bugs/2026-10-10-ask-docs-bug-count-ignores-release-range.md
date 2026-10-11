@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.0`
-**Status:** FIXED 2026-10-10 (Claude, in-tree; see CHANGELOG [1.43.0])
+**Status:** FIXED 2026-10-10 (Claude, in-tree; see CHANGELOG [1.43.0]); live-verified in Slack 2026-10-10 18:33
 **Priority:** P3 — the counts were correct, the answer was unreadable
 **Severity:** low
 

@@ -2413,3 +2413,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - [x] 2026-10-10: operator ran `make restart-webhook` (18:09); webhook pid running, cloud-bridge running. `/ask-docs` count questions (bug_count via bug-tally, fixed ref handling 62dfcc39) now live. v1.43.0 waits only on the 2026-10-11 03:30 export check, then the PR.
 - [x] 2026-10-10: `/ask-docs` bug-count release ranges (last N / this release), version-sorted, capped; 58 tests pass; operator to `make restart-webhook`.
 - [x] 2026-10-10: spec `v1.45.1-bug-count-query-translation.md` written (v1.45.1 patch, 1/5; v1.45.0 full). Codex dispatch after v1.45.0 merges and `k3d-manager-v1.45.1` exists.
+- [x] 2026-10-10 18:33: LIVE-VERIFIED in Slack after `make restart-webhook` (18:31): "how many P1 bugs for last two releases" → v1.43.0 1 fixed, v1.42.0 3 fixed + 1 open, single Priority note (29).
