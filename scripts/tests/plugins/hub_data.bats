@@ -650,6 +650,17 @@ _fake_vault_tree() {
   [ ! -s "$CALL_LOG" ]
 }
 
+@test "recover K1: a drill target never caches unseal keys in the Keychain; the hub does" {
+  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }
+  _vault_cache_unseal_keys() { printf 'cache\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { cat >/dev/null; }
+  mkdir -p "$TEST_ROOT/run"
+  run --separate-stderr _hub_data_repoint_vault k3d-dr-drill "$TEST_ROOT/run"; [ "$status" -eq 0 ]
+  [ "$(grep -c cache "$CALL_LOG" || true)" -eq 0 ]; [ "$(cat "$TEST_ROOT/run/unseal_keys_cache")" = skipped ]; [[ "$stderr" == *"not caching unseal keys"* ]]
+  K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 run _hub_data_repoint_vault other-ctx "$TEST_ROOT/run"; [ "$status" -eq 0 ]; [ "$(grep -c cache "$CALL_LOG" || true)" -eq 0 ]
+  run _hub_data_repoint_vault k3d-hub "$TEST_ROOT/run"; [ "$status" -eq 0 ]
+  [ "$(grep -c cache "$CALL_LOG")" -eq 1 ]; [ "$(cat "$TEST_ROOT/run/unseal_keys_cache")" = cached ]
+}
+
 @test "recover B4-18: Vault re-point order is config, shards, vault-root, root" {
   source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf 'config\n' >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf 'shards\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf 'root\n' >> "$CALL_LOG"; }; _kubectl() { cat >/dev/null; printf 'vault-root\n' >> "$CALL_LOG"; }
   run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; mapfile -t order < "$CALL_LOG"; [ "${order[*]}" = 'config shards vault-root root' ]

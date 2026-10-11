@@ -797,7 +797,7 @@ function _hub_data_run_step() {
 }
 
 function _hub_data_repoint_vault() {
-  local context="$1" root_token count idx shard ns="secrets" release="vault"
+  local context="$1" dir="${2:-}" root_token count idx shard ns="secrets" release="vault"
   root_token="$(_hub_data_generate_root "$ns" "$release")" || return 1
   _no_trace _vault_exec_stream --no-exit --stdin --pod vault-0 "$ns" "$release" -- sh -lc 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault write auth/kubernetes/config token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" kubernetes_host="https://kubernetes.default.svc:443" kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' <<<"$root_token" || return 1
   count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)" || return 1
@@ -809,7 +809,13 @@ function _hub_data_repoint_vault() {
     [[ -n "$shard" ]] && _vault_dr_shard_valid "$shard" || return 1
     shards+=("$shard")
   done
-  _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
+  if [[ "$context" == k3d-dr-drill || "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" == 1 ]]; then
+    printf '%s\n' '[hub-recover] drill target: not caching unseal keys in the Keychain (it holds this host'"'"'s own cluster keys)' >&2
+    [[ -z "$dir" ]] || printf '%s\n' skipped > "$dir/unseal_keys_cache"
+  else
+    _vault_cache_unseal_keys "$ns" "$release" "${shards[@]}" || return 1
+    [[ -z "$dir" ]] || printf '%s\n' cached > "$dir/unseal_keys_cache"
+  fi
   printf '%s' "$root_token" | jq -Rs '{apiVersion:"v1",kind:"Secret",metadata:{name:"vault-root",namespace:"secrets"},type:"Opaque",stringData:{root_token:.}}' | _kubectl --context "$context" apply -f - || return 1
   _hub_recovery_sync_vault_root_token "$context" || return 1
 }
@@ -872,8 +878,8 @@ function _hub_data_report() {
   export_dir="${K3DM_HUB_DATA_EXPORT_DIR:-}"; export_ts="${export_dir##*/}"
   sums_digest=''; [[ -n "$export_dir" && -r "$export_dir/SHA256SUMS" ]] && sums_digest="$(shasum -a 256 "$export_dir/SHA256SUMS" | awk '{print $1}')"
   approval_time=''; [[ -r "$run_dir/approval_time" ]] && approval_time="$(<"$run_dir/approval_time")"
-  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "$export_ts" --arg sums "$sums_digest" --arg approval "$approval_time" --argjson target "$target_json" --argjson steps "$steps_json" --argjson checks "$checks_json" --argjson rc "$rc" --arg resume "$(cat "$run_dir/argocd_resume" 2>/dev/null || printf true)" --argjson rto "$(cat "$run_dir/rto_seconds" 2>/dev/null || printf 0)" \
-    '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),rto_seconds:$rto,rc:$rc}' > "$report"
+  jq -n --arg run "$(basename "$run_dir")" --arg host "$(hostname)" --arg operator "$(id -un)" --arg commit "$(git rev-parse HEAD 2>/dev/null || true)" --arg export "$export_ts" --arg sums "$sums_digest" --arg approval "$approval_time" --argjson target "$target_json" --argjson steps "$steps_json" --argjson checks "$checks_json" --argjson rc "$rc" --arg resume "$(cat "$run_dir/argocd_resume" 2>/dev/null || printf true)" --argjson rto "$(cat "$run_dir/rto_seconds" 2>/dev/null || printf 0)" --arg keycache "$(cat "$run_dir/unseal_keys_cache" 2>/dev/null || printf none)" \
+    '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),unseal_keys_cache:$keycache,rto_seconds:$rto,rc:$rc}' > "$report"
 }
 
 function hub_data_verify_unsealed() {
@@ -1040,7 +1046,7 @@ function _hub_data_recover_step6() {
   fi
   printf '[hub-recover] Step 6/9 — Re-point Vault\n'
   _hub_data_argocd_assert_paused "$context" "$dir" || return 1
-  _hub_data_run_step "$steps" 6 _hub_data_repoint_vault "$context"
+  _hub_data_run_step "$steps" 6 _hub_data_repoint_vault "$context" "$dir"
 }
 function _hub_data_recover_step7() {
   local steps="$1" context="$2"
