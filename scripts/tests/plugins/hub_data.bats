@@ -32,7 +32,9 @@ case "$*" in
   *-cancel*) : ;;
   *'token revoke -self'*) : ;;
   *'auth/kubernetes/login'*) printf 'INVENTORY-TOKEN' ;;
-  *'kv list'*) printf '%s' "${DR_TEST_KV_LIST:-[\"app/\",\"shared\"]}" ;;
+  *'kv list -format=json secret/') printf '%s' "${DR_TEST_KV_LIST:-[\"app/\",\"shared\"]}" ;;
+  *'kv list'*) printf '["leaf"]' ;;
+  *'kv metadata get'*) printf '{"data":{"current_version":1}}' ;;
   *'generate-root'*'-format=json -'*) [[ "${DR_TEST_KEY_FAIL:-0}" == 1 ]] && exit 1; cat >> "$STDIN_LOG"; printf '{"encoded_token":"ENCODED-SENTINEL"}' ;;
 esac
 STUB
@@ -314,10 +316,54 @@ STUB
     POSTGRES_USER=keycloak POSTGRES_DB=keycloak LDAP_ROOT=dc=home,dc=org PATH="$POD_BIN:$PATH" "$@"
   }
   _hub_data_generate_root() { printf root-token; }
-  _hub_data_vault_kv_list() { printf '["app/","shared"]'; }
-  _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }
+  _fake_vault_tree
   _hub_data_inventory_images() { printf '%s\n' '{"secrets/vault-0":"vault:1.0","identity/postgres-keycloak":"postgres:1.0","identity/openldap-0":"openldap:1.0"}'; }
   _hub_data_vault_revoke() { :; }
+}
+
+_fake_vault_tree() {
+  _hub_data_vault_kv_list() {
+    printf '%s\n' "$4" >> "$TEST_ROOT/kv-list.log"
+    case "$4" in
+      secret/) printf '["app/","shared"]' ;;
+      secret/app/) printf '["db","deep/"]' ;;
+      secret/app/deep/) printf '["key"]' ;;
+      *) return 1 ;;
+    esac
+  }
+  _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }
+}
+
+@test "hub data inventory: walks nested Vault folders by their full path" {
+  source_plugin; _fake_identity_pod
+  run _hub_data_inventory "$TEST_ROOT"; [ "$status" -eq 0 ]
+  [ "$(jq -c '.vault_keys | keys' "$TEST_ROOT/inventory.json")" = '["app/db","app/deep/key","shared"]' ]
+  [ "$(cat "$TEST_ROOT/kv-list.log")" = "$(printf 'secret/\nsecret/\nsecret/app/\nsecret/app/deep/')" ]
+}
+
+@test "hub data inventory: a failed nested list names the path instead of failing silently" {
+  source_plugin; _fake_identity_pod
+  _hub_data_vault_kv_list() { [[ "$4" == secret/ ]] && printf '["app/"]' || return 1; }
+  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"vault kv list secret/app/ failed"* ]]; [ ! -e "$TEST_ROOT/inventory.json" ]
+}
+
+@test "hub data inventory: a zero LDAP count names LDAP" {
+  source_plugin; _fake_identity_pod
+  _hub_data_ldap_entry_count() { printf 0; }
+  run --separate-stderr _hub_data_inventory "$TEST_ROOT"; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"LDAP entry count is not a positive number"* ]]
+}
+
+@test "hub data export setup: the policy grants list below secret/metadata so nested folders can be walked" {
+  source_plugin; _vault_login() { :; }; _vault_exec() { :; }; _hub_data_vault_revoke() { :; }
+  eval "$(declare -f _vault_exec_stream | sed '1s/_vault_exec_stream/_orig_vault_exec_stream/')"
+  _vault_exec_stream() { if [[ "$*" == *"policy write"* ]]; then cat >> "$TEST_ROOT/policy.hcl"; else _orig_vault_exec_stream "$@"; fi; }
+  run hub_data_export_setup; [ "$status" -eq 0 ]
+  grep -q 'path "secret/metadata/\*" { capabilities = \["read", "list"\] }' "$TEST_ROOT/policy.hcl"
+  _hub_data_vault_kv_list() { [[ "$4" == secret/ ]] && printf '["app/"]' || return 1; }
+  run --separate-stderr hub_data_export_setup; [ "$status" -ne 0 ]
+  [[ "$stderr" == *"vault kv list secret/app/ failed"* ]]
 }
 
 @test "hub data inventory: counts Keycloak users and LDAP entries with the pod's own credentials" {
@@ -480,7 +526,7 @@ STUB
 @test "17 setup self-test passes and revokes its single token" {
   source_plugin; _vault_login() { :; }; _vault_exec() { :; }; _hub_data_vault_revoke() { printf 'token revoke -self\n' >> "$VLOG"; }; run hub_data_export_setup; [ "$status" -eq 0 ]; grep -q 'token revoke -self' "$VLOG"; [ "$(grep -c 'auth/kubernetes/login' "$VLOG")" -eq 1 ]
   declare -gA _VAULT_SESSION_TOKENS=(); _vault_login() { _VAULT_SESSION_TOKENS[secrets/vault]=admin; }
-  _hub_data_vault_kv_list() { [[ -z "${_VAULT_SESSION_TOKENS[secrets/vault]:-}" ]] || { printf 'admin session still set\n' >&2; return 1; }; printf '["app/"]'; }
+  _hub_data_vault_kv_list() { [[ -z "${_VAULT_SESSION_TOKENS[secrets/vault]:-}" ]] || { printf 'admin session still set\n' >&2; return 1; }; [[ "$4" == secret/ ]] && printf '["app/"]' || printf '["leaf"]'; }
   run hub_data_export_setup; [ "$status" -eq 0 ]
 }
 

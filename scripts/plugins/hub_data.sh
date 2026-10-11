@@ -230,25 +230,19 @@ function _hub_data_inventory_vault_keys() {
     path="${pending[0]}"; pending=("${pending[@]:1}")
     [[ -n "${seen[$path]+x}" ]] && continue
     seen["$path"]=1
-    listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" "$path")" || return 1
+    listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" "$path")" || { _err "[hub-data] vault kv list ${path} failed; run make hub-data-export-setup"; return 1; }
     while IFS= read -r child; do
       [[ -n "$child" ]] || continue
       if [[ "$child" == */ ]]; then
-        if [[ "secret/${child}" == "$path" ]]; then
-          key="${path#secret/}"; key="${key%/}"
-          metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || return 1
-          version="$(jq -r '.data.current_version // .data.metadata.current_version // empty' <<<"$metadata")"; [[ "$version" =~ ^[1-9][0-9]*$ ]] || return 1; result["$key"]="$version"
-        else
-          pending+=("secret/${child}")
-        fi
+        pending+=("${path}${child}")
       else
         key="${path#secret/}${child}"
-        metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || return 1
+        metadata="$(_hub_data_vault_kv_metadata "$token" "$ns" "$release" "secret/${key}")" || { _err "[hub-data] vault kv metadata get secret/${key} failed"; return 1; }
         version="$(jq -r '.data.current_version // .data.metadata.current_version // empty' <<<"$metadata")"
-        [[ "$version" =~ ^[1-9][0-9]*$ ]] || return 1
+        [[ "$version" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-data] secret/${key} has no current version"; return 1; }
         result["$key"]="$version"
       fi
-    done < <(_hub_data_kv_names "$listing")
+    done < <(_hub_data_kv_names "$listing" | jq -r '.[]')
   done
   local json='{}'
   for key in "${!result[@]}"; do
@@ -267,10 +261,11 @@ function _hub_data_inventory() (
   paths="$(_hub_data_kv_names "$paths")" || { _err "[hub-data] vault kv list secret/ returned no paths"; return 1; }
   users="$(_hub_data_keycloak_user_count _kubectl)"
   ldap="$(_hub_data_ldap_entry_count _kubectl)"
-  [[ "$users" =~ ^[1-9][0-9]*$ && "$ldap" =~ ^[1-9][0-9]*$ ]] || return 1
-  images="$(_hub_data_inventory_images)" || return 1
-  keycloak_digest="$(_hub_data_keycloak_user_digest _kubectl)" || return 1
-  ldap_digest="$(_hub_data_ldap_dn_digest _kubectl)" || return 1
+  [[ "$users" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-data] Keycloak user count is not a positive number: '${users}'"; return 1; }
+  [[ "$ldap" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-data] LDAP entry count is not a positive number: '${ldap}'"; return 1; }
+  images="$(_hub_data_inventory_images)" || { _err "[hub-data] could not read the vault, postgres-keycloak and openldap images"; return 1; }
+  keycloak_digest="$(_hub_data_keycloak_user_digest _kubectl)" || { _err "[hub-data] could not digest the Keycloak usernames"; return 1; }
+  ldap_digest="$(_hub_data_ldap_dn_digest _kubectl)" || { _err "[hub-data] could not digest the LDAP DNs"; return 1; }
   vault_keys="$(_hub_data_inventory_vault_keys "$token" "$ns" "$release")" || return 1
   jq -n --argjson p "$paths" --argjson u "$users" --argjson l "$ldap" --argjson i "$images" --arg kd "$keycloak_digest" --arg ld "$ldap_digest" --argjson vk "$vault_keys" \
     '{format:2,images:$i,vault_paths:$p,keycloak_realm_user_count:$u,ldap_entry_count:$l,keycloak_usernames_sha256:$kd,ldap_dns_sha256:$ld,vault_keys:$vk}' > "${root}/inventory.json"
@@ -279,7 +274,7 @@ function _hub_data_inventory() (
 
 function hub_data_export_setup() { (
   local ns="${VAULT_NS:-secrets}" release="${VAULT_RELEASE:-vault}" policy='path "secret/metadata/" { capabilities = ["list"] }
-path "secret/metadata/*" { capabilities = ["read"] }' stage token listing cleanup=0
+path "secret/metadata/*" { capabilities = ["read", "list"] }' stage token listing cleanup=0
   stage="$(_hub_data_stage)"; trap 'rm -rf -- "$stage"' EXIT
   _hub_data_pin_context "$stage"
   _vault_login "$ns" "$release"
@@ -297,6 +292,7 @@ path "secret/metadata/*" { capabilities = ["read"] }' stage token listing cleanu
   trap '_hub_data_revoke_setup_token; rm -rf -- "$stage"' EXIT
   listing="$(_hub_data_vault_kv_list "$token" "$ns" "$release" secret/)" || { _err "[hub-data] Vault inventory self-test: vault kv list secret/ failed as hub-data-export"; return 1; }
   _hub_data_kv_names "$listing" >/dev/null || { _err "[hub-data] Vault inventory self-test returned no paths"; return 1; }
+  _hub_data_inventory_vault_keys "$token" "$ns" "$release" >/dev/null || { _err "[hub-data] Vault inventory self-test: the metadata walk under secret/ failed as hub-data-export"; return 1; }
   _hub_data_vault_revoke "$token" "$ns" "$release" >/dev/null 2>&1; cleanup=0
 ) }
 
