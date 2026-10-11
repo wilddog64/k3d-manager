@@ -16,7 +16,7 @@ setup() {
 
 run_hook() {
   cd "${repo}"
-  run env K3DM_SKIP_DOC_LINKS=1 K3DM_SKIP_ROOT_DEBRIS=1 bash "${hook}"
+  run env K3DM_ENABLE_AI=0 K3DM_SKIP_DOC_LINKS=1 K3DM_SKIP_ROOT_DEBRIS=1 bash "${hook}"
 }
 
 @test "new bug doc without Priority is rejected" {

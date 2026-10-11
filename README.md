@@ -328,11 +328,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-10-11 | [PR #139 review findings](docs/issues/2026-10-11-copilot-pr139-review-findings.md) | Copilot flagged an `rg` call in a new test suite, which exited 127 on the CI runner (now `grep`). CI also failed two pre-commit priority tests: the lint job's `K3DM_ENABLE_AI=1` sent the hook into AI lint. Both reproduced in `ubuntu:24.04`, and the test now pins the switch |
 | 2026-10-09 | [PR #138 review findings](docs/issues/2026-10-09-copilot-pr138-review-findings.md) | Copilot found nothing; CI lint caught `bin/k3dm-webhook` calling an undefined `REPO_ROOT` in the test-metrics fallback publisher, which a broad `except` had hidden as a log warning. Fixed with a direct test that fails on the old code; a CodeQL ambiguous-regex alert in a test is left to the operator (the edit trips the assertion audit) |
 | 2026-10-08 | [Webhook and cloud-bridge security review](docs/issues/2026-10-08-webhook-cloud-bridge-security-review.md) | Two offline-reproduced defects: relayed slash commands trusted the relay's role header, so a reader-mapped caller could reach admin commands, and `ask-bash` checked path scope on argv but not shell strings. Both fixed in v1.42.0 (caller-role cap, OS read boundary) |
 | 2026-10-08 | [v1.42.0 gate results](docs/issues/2026-10-08-v1420-gate-results.md) | Shell, Python, relay, focused BATS and full `make test` gate output for v1.42.0, run on temporary test homes with no live worker or cluster |
 | 2026-10-08 | [Slack thread dispatch fallthrough](docs/issues/2026-10-08-slack-thread-dispatch-fallthrough.md) | A successfully handled thread command also fell through to "unknown command"; reproduced offline and fixed so handled commands return before the fallback |
-| 2026-10-08 | [Hermes values-branch drift investigation](docs/issues/2026-10-08-hermes-values-branch-drift-investigation.md) | Hermes counted source refs, not Applications, as stale values-branch drift; two live apps were confirmed still on v1.41.0 until the AppSets were reapplied |
 [All issues →](docs/issues/)
 
 ---
