@@ -55,3 +55,17 @@ for panel in data["panels"]:
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "bug dashboard bar charts blank the labels of empty segments" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
+assert len(bars) == 2
+for panel in bars:
+    mappings = panel["fieldConfig"]["defaults"]["mappings"]
+    assert any(m["type"] == "value" and m["options"].get("0", {}).get("text", "").strip() == "" for m in mappings), panel["title"]
+PY
+  [ "${status}" -eq 0 ]
+}

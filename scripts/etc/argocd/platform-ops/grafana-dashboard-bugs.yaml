@@ -15,7 +15,7 @@ data:
         "k3dm"
       ],
       "schemaVersion": 38,
-      "version": 2,
+      "version": 3,
       "refresh": "1m",
       "time": {
         "from": "now-7d",
@@ -402,7 +402,18 @@ data:
               },
               "custom": {
                 "fillOpacity": 80
-              }
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": " ",
+                      "index": 0
+                    }
+                  }
+                }
+              ]
             },
             "overrides": []
           },
@@ -476,7 +487,18 @@ data:
               },
               "custom": {
                 "fillOpacity": 80
-              }
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": " ",
+                      "index": 0
+                    }
+                  }
+                }
+              ]
             },
             "overrides": []
           },

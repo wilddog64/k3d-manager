@@ -2414,3 +2414,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - [x] 2026-10-10: `/ask-docs` bug-count release ranges (last N / this release), version-sorted, capped; 58 tests pass; operator to `make restart-webhook`.
 - [x] 2026-10-10: spec `v1.45.1-bug-count-query-translation.md` written (v1.45.1 patch, 1/5; v1.45.0 full). Codex dispatch after v1.45.0 merges and `k3d-manager-v1.45.1` exists.
 - [x] 2026-10-10 18:33: LIVE-VERIFIED in Slack after `make restart-webhook` (18:31): "how many P1 bugs for last two releases" → v1.43.0 1 fixed, v1.42.0 3 fixed + 1 open, single Priority note (29).
+- [x] 2026-10-10: Bug dashboard bar charts blank zero-segment labels (value mapping 0 → blank), dashboard version 3; BATS 4/4 (new test red without the mapping). Live after the platform-ops sync.

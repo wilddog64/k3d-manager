@@ -44,3 +44,11 @@ The producer tests had stubbed the tally, so they missed it. The branch is now t
 `origin/`. A regression test runs the tally against a local and an `origin/` ref; it was red before the fix.
 `bug-tally.py` reads `K3DM_INDEX_REF` as its default `--ref`, so `make bug-tally` and the count
 answers also failed wherever that variable was set.
+
+## Follow-up: zero labels on the stacked bars (2026-10-10)
+
+After the rebuild, "Bugs filed per release, by priority" printed a value label on every stacked
+segment, including the empty ones, so `0` labels piled up on the bar bottoms over the real count
+(`4` over `0`). Both bar charts now map the value 0 to blank text; releases with no bugs keep their
+place on the x-axis. `grafana_dashboard_bugs.bats` asserts the mapping on both charts (fails
+without it).
