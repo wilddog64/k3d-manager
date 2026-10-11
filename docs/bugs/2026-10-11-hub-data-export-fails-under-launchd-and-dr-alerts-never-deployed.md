@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-11
-**Status:** FIXED in code (2026-10-11, Claude) — live proof pending the operator's kickstart run and rule apply
+**Status:** FIXED (2026-10-11) — export and alerts proven live; data-repo workflow update pending
 **Priority:** P1
 **Severity:** High — the daily export, the v1.43.0 release gate, produced nothing and nothing said so
 **Files:** `scripts/plugins/hub_data.sh`, `scripts/tests/plugins/hub_data.bats`,
@@ -76,6 +76,15 @@ Three separate failures on the night of 2026-10-10 → 2026-10-11.
 3. Update `.github/workflows/drill-freshness.yml` on the data repo's `main` with the one-line `run:`
    change, then `gh workflow run "Hub DR drill freshness" --repo wilddog64/k3dm-hub-data` and
    confirm it passes (newest result `20261010T182508Z`).
+
+## Live proof (2026-10-11, M4)
+
+- `launchctl kickstart` at 05:06 PDT: export `20261011T120849Z` pushed (`snapshots` `0db9921..2e717cf`),
+  remote copy verified, prune kept 5; launchd `last exit code = 0`; Pushgateway
+  `k3dm_hub_data_export_last_run_success 1`.
+- `kubectl apply` of `prometheusrule.yaml`: `dr.alerts` loaded (`DRDrillFailed`, `DRDrillStale`,
+  `HubDataExportFailed`, `HubDataExportStale`, `HubDataExportNeverRan`). `HubDataExportFailed` went
+  pending on the 03:30 zero, then cleared once the kickstart pushed `1`.
 
 ## Lesson
 
