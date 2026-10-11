@@ -1,3 +1,4 @@
+- 2026-10-11: PRs merged: #139 edfc9a5c (2026-10-11) — v1.43.0 hub data export. Tag v1.43.0 + GitHub release (latest) created on edfc9a5c. Retro docs/retro/2026-10-11-v1.43.0-retrospective.md. [x] enforce_admins restored (true). [x] v1.43.1 branch cut from edfc9a5c; memory-bank carried over. [x] v1.43.0 live operator setup on M4 (done per the 2026-10-10 entry). [x] P1 v1.43.0-hub-data-export-schedule spec written and landed.
 - 2026-10-10: v2.0.0 proposed in docs/roadmap.md (not scoped): TwinkleAI bilingual research app replaces shopping-cart; app M1–M4 in own repo → v1.49.0 onboard → v1.50.0 re-point e2e/gate/loadtest/DR → v2.0.0 retire shopping-cart. Research = 90 records (zh+en).
 - 2026-10-10: make test-all run 1 stopped in BATS (1533, 2 failed: bare-! lint in hub_data.bats:372, dr_alert_rules exact-set missing HubDataExport* alerts; both from 5c44b1c1). [x] fixed b8c870ae. [x] rerun green 2026-10-10: 2907 cases, 0 failed (BATS 1533 + bin 441 + pytest 838 passed/2 skipped); metrics pushed test-all/local.
 - 2026-10-10: [x] Spec docs/plans/v1.44.0-bug-lifecycle-metrics.md (operator: bug age, reopen rate, fix verification): Filed/Recurred/Verified by lines, make bug-close runs the named test before closing, pre-commit transition rules, Lifecycle dashboard row; no paths in labels, no backfill. v1.44.0 now 5/5. Template gained ## Operational Requirements (engineering-contract gap 1 DONE).
@@ -12,10 +13,10 @@
 - 2026-10-10: [x] v1.43.0 bug-priority backfill: all 30 open/unknown bug docs carry a Priority (open: P1 1, P2 10, P3 27; unknown P3 5). [x] hub-dr-drill plan Status → DONE. Release left: 2026-10-11 export check, test-all, appsets reapply, release docs, PR.
 - 2026-10-10: v1.43.2 (bug-fix-only, parallel agents) specced: batch 1 = test-count floor, lib-foundation secret store, frontend Cache-Control; batch 2 = drill KEEP kubeconfig + set +u (after v1.43.1). [ ] cut branch after v1.43.1 merges; [ ] dispatch batch 1.
 - 2026-10-10: [x] v1.43.0 daily hub-data export live on the M4 (setup, manual export 20261010T194542Z verified, schedule 03:30). [x] 03:30 run failed (launchd cwd); fixed bf58a8e1; [x] launchd kickstart proof 2026-10-11 export 20261011T120849Z, success 1; [x] dr.alerts applied. [x] data-repo freshness workflow fixed (7c88cbf), dispatch run 38138788454 green. PRs open: https://github.com/wilddog64/k3d-manager/pull/139.
-- 2026-10-10: [x] v1.43.0 daily hub-data export LANDED 5c44b1c1; [ ] operator live setup on M4.
+- 2026-10-10: [x] v1.43.0 daily hub-data export LANDED 5c44b1c1; [x] operator live setup on M4.
 - 2026-10-10: v1.47.0 planned = infra e2e + promotion gate only (spec written). v1.46.0 now 4 specs; v1.48.0 = e2e-failure-artifacts.
 - 2026-10-10: v1.43.1 planned: hub-data-recover + dr-clean-room-checks (2/5). v1.43.0 scope = export schedule (Codex running).
-- 2026-10-10: [ ] P1 v1.43.0-hub-data-export-schedule spec written; dispatching to Codex.
+- 2026-10-10: [x] P1 v1.43.0-hub-data-export-schedule spec written; dispatched to Codex and landed.
 - 2026-10-10: [x] First live DR drill passed and published (run 20261010T182508Z, results f19fea8).
 - 2026-10-10: dr-drill-publish path check fixed (literal ~ vs expanded home). Operator: rerun on the M4.
 - 2026-10-10: Drill run 16 PASSED for real (RTO 499s, RPO 459s, V2 = 15 paths); RTO/RPO recorded in the how-to. Pending: M4 make dr-drill-publish.
