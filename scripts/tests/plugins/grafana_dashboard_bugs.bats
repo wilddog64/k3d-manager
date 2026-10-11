@@ -71,3 +71,24 @@ for panel in bars:
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "bug dashboard pins one colour per priority and state, independent of data order" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+def colours(panel):
+    return {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
+            for o in panel["fieldConfig"]["overrides"] if o["properties"][0]["id"] == "color"}
+by_priority = [p for p in data["panels"] if p["type"] in ("barchart", "timeseries")
+               and "priority)" in " ".join(t["expr"] for t in p["targets"])]
+by_state = [p for p in data["panels"] if p["type"] == "barchart"
+            and "state)" in " ".join(t["expr"] for t in p["targets"])]
+assert len(by_priority) == 2 and len(by_state) == 1
+first = colours(by_priority[0])
+assert set(first) == {"P0", "P1", "P2", "P3", "unset"}
+assert all(colours(p) == first for p in by_priority)
+assert set(colours(by_state[0])) == {"closed", "open", "unknown"}
+PY
+  [ "${status}" -eq 0 ]
+}

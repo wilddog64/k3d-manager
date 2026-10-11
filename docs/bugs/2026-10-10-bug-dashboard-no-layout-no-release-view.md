@@ -55,3 +55,9 @@ entry to both legends (the bar chart lists value mappings in its legend). The ch
 series that is zero in every release (today P0) drops out of the legend, and a release with no bug
 docs at all would drop off the x-axis. `grafana_dashboard_bugs.bats` asserts the query, the null
 cells and the absence of mappings.
+
+Dropping zero rows changed which column appears first (v1.38.0 has only `unset` bugs), and Grafana
+assigns palette colours by column order, so `unset` turned green and P1 orange-red. Colours are now
+pinned by name on both priority panels (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey) and
+the state chart (closed green, open orange, unknown grey), and an `organize` step fixes the column
+order. A BATS test asserts the same priority colours on both panels (fails on the previous version).

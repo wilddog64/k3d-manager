@@ -2416,3 +2416,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - [x] 2026-10-10 18:33: LIVE-VERIFIED in Slack after `make restart-webhook` (18:31): "how many P1 bugs for last two releases" → v1.43.0 1 fixed, v1.42.0 3 fixed + 1 open, single Priority note (29).
 - [x] 2026-10-10: Bug dashboard bar charts blank zero-segment labels (value mapping 0 → blank), dashboard version 3; BATS 4/4 (new test red without the mapping). Live after the platform-ops sync.
 - [x] 2026-10-10: zero-label fix v2: the 0→blank mapping added a grey `0` legend entry; replaced with `> 0` queries + null cells (dashboard version 4). All six releases still have rows (live Prometheus check).
+- [x] 2026-10-10: bug dashboard colours pinned by name (priority + state), column order fixed (version 5); the `> 0` change had made unset green. BATS 5/5.
