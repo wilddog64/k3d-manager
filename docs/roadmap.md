@@ -177,6 +177,10 @@ same file.
   - [`dispatch-dashboard-landing-success-no-data`](bugs/2026-10-11-dispatch-dashboard-landing-success-no-data.md)
     (operator, 2026-10-11): `grafana-dashboard-agent-dispatch.yaml` (panel 2 only),
     `agent_dispatch_dashboard.bats`. The numerator needs `sum()` like the denominator.
+  - [`dispatch-dashboard-no-per-spec-cost-or-time`](bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md)
+    (operator, 2026-10-11): same agent and dispatch as the landing-success fix (same dashboard file),
+    plus `bin/k3dm-dispatch-metrics` and its pytest. Readable token stat, a Per spec table (tokens,
+    Codex time, time to land, runs) and two time-per-spec stats.
 - **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
   - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
   - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
