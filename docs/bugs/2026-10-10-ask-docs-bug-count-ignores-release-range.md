@@ -40,5 +40,5 @@ fails two.
 ## Follow-up
 
 The router is still regex. Count questions phrased another way ("bugs we closed since August")
-fall through to similarity search. See the discussion of a small grammar vs a model-produced
-query object in `memory-bank/activeContext.md` (2026-10-10).
+fall through to similarity search. Planned for v1.45.1:
+[`v1.45.1-bug-count-query-translation.md`](../plans/v1.45.1-bug-count-query-translation.md).

@@ -216,6 +216,16 @@ v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve
 [`v1.45.0-alert-intake-draft-bugs.md`](plans/v1.45.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
 [`v1.45.0-test-metrics-log-retention.md`](plans/v1.45.0-test-metrics-log-retention.md) (moved from v1.43.0). v1.45.0 is at its five-plan cap.
 
+### Candidate milestone — v1.45.1 (patch)
+
+**Bug-count questions in plain English.** Slack count questions that miss the regex router are
+translated by the model into a small query object (releases, priority, state, Filed date range),
+validated against a closed schema, and answered by `bug-tally`. The model never sees a bug doc or
+produces a number, and every reply states what was counted. Split into a patch release because
+v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
+[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md). v1.45.1 is
+at 1 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+
 ### Candidate milestone — v1.46.0
 
 **Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
