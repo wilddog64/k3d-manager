@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -14,6 +15,11 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 from hermes.prior_art import doc_meta  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
+RELEASE_HISTORY = 5
+PRIORITIES = ("P0", "P1", "P2", "P3", "unset")
+STATES = ("open", "closed", "unknown")
+_VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+_BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
 
 
 def _pushgateway_url():
@@ -102,15 +108,74 @@ def _bug_metrics(root, ref=None):
     return "\n".join(lines) + "\n"
 
 
+def _version(name):
+    match = _VERSION_RE.match(name or "")
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def _git_out(root, *args):
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                          check=True, timeout=60).stdout
+
+
+def _current_release(root, ref):
+    name = ref.removeprefix("origin/") if ref != "HEAD" else _git_out(root, "branch", "--show-current").strip()
+    match = _BRANCH_RE.search(name)
+    return match.group(1) if match else None
+
+
+def _release_metrics(root, ref=None):
+    """Bug docs per release for the current release branch and the shipped releases before it."""
+    root = Path(root)
+    ref = ref or "HEAD"
+    result = subprocess.run([sys.executable, str(root / "scripts" / "bug-tally.py"), "--json", "--ref", ref],
+                            cwd=root, capture_output=True, text=True, check=True, timeout=90)
+    tally = json.loads(result.stdout)["releases"]
+    current = _current_release(root, ref)
+    shipped = sorted((tag for tag in _git_out(root, "tag", "--list", "v*", "--merged", ref).split()
+                      if _version(tag) and (current is None or _version(tag) < _version(current))),
+                     key=_version)[-RELEASE_HISTORY:]
+    releases = shipped + ([current] if current else [])
+    lines = []
+    for order, release in enumerate(releases):
+        by_priority = (tally.get(release) or {}).get("by_priority", {})
+        for priority in PRIORITIES:
+            counts = by_priority.get(priority, {})
+            for state in STATES:
+                lines.append(f'k3dm_bug_release_docs{{release="{release}",order="{order}",priority="{priority}",'
+                             f'state="{state}"}} {int(counts.get(state, 0))}')
+    if current:
+        lines.append(f'k3dm_bug_current_release_info{{release="{current}"}} 1')
+        later = {priority: 0 for priority in PRIORITIES}
+        for release, data in tally.items():
+            if _version(release) and _version(release) > _version(current):
+                for priority in PRIORITIES:
+                    later[priority] += int(data.get("by_priority", {}).get(priority, {}).get("open", 0))
+        lines.extend(f'k3dm_bug_later_release_open_docs{{priority="{priority}"}} {count}'
+                     for priority, count in later.items())
+    return "\n".join(lines) + "\n"
+
+
 def publish_bug_metrics(root, ref=None):
     try:
         payload = _bug_metrics(root, ref)
     except Exception as exc:
         print(f"bug metrics scan skipped (non-fatal): {exc}", file=sys.stderr)
         return False
+    pushed = _push_bug_group("k3dm-bug-docs", payload)
+    try:
+        releases = _release_metrics(root, ref)
+    except Exception as exc:
+        print(f"bug release metrics skipped (non-fatal): {exc}", file=sys.stderr)
+        return pushed
+    _push_bug_group("k3dm-bug-releases", releases)
+    return pushed
+
+
+def _push_bug_group(job, payload):
     base = _pushgateway_url()
     healthy_url = f"{base}/-/healthy"
-    url = f"{base}/metrics/job/k3dm-bug-docs"
+    url = f"{base}/metrics/job/{job}"
     for attempt in range(1, PUSH_RETRIES + 1):
         try:
             with urllib.request.urlopen(healthy_url, timeout=2) as response:

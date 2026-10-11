@@ -23,15 +23,35 @@ import re
 queries = set()
 for panel in data["panels"]:
     for target in panel.get("targets", []):
-        queries.update(re.findall(r"k3dm_bug_docs(?:_scan_timestamp_seconds)?", target["expr"]))
+        queries.update(re.findall(r"k3dm_bug_[a-z_]+", target["expr"]))
 module = runpy.run_path(metrics_path)
 with tempfile.TemporaryDirectory() as tmp:
     bugs = Path(tmp) / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "one.md").write_text("**Priority:** P1\n**Status:** Open\n")
     output = module["_bug_metrics"](Path(tmp))
-assert all(name in output for name in queries)
+source = Path(metrics_path).read_text()
+assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs"} <= queries
+missing = [name for name in queries if name + "{" not in output and name + " " not in output and name + "{{" not in source]
+assert not missing, missing
 assert "k3dm_bug_docs_scan_timestamp_seconds" in output
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard panels have non-overlapping positions inside 24 columns" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+cells = set()
+for panel in data["panels"]:
+    pos = panel["gridPos"]
+    assert pos["x"] + pos["w"] <= 24, panel["title"]
+    for x in range(pos["x"], pos["x"] + pos["w"]):
+        for y in range(pos["y"], pos["y"] + pos["h"]):
+            assert (x, y) not in cells, panel["title"]
+            cells.add((x, y))
 PY
   [ "${status}" -eq 0 ]
 }

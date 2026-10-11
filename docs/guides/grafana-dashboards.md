@@ -305,6 +305,23 @@ minutes are wall-clock waiting time rather than active human minutes; token cost
 only, excludes Claude verification, and is not converted to dollars because token pricing is not
 stable. Scope and rebase refusals are excluded from the integration success ratio.
 
+### k3dm Bug Tracking (`k3dm-bugs`) — hub
+
+Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb-metrics`.
+`k3dm-bug-docs` is the whole inventory: `k3dm_bug_docs{priority,state}` and its scan time.
+`k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
+`**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
+indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
+`k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
+counts open docs already scheduled for a later release, such as a patch release.
+
+The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
+untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
+open vs fixed. `unset` there means the doc predates priorities (2026-10-09). The bottom row has the
+all-time open counts per priority, scan age, and open-by-priority over time. On `main`, which is
+not a release branch, the current-release row is empty and the charts show the last five shipped
+releases. A tally failure skips only the release group, so the inventory keeps updating.
+
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
 | Panel | Query |

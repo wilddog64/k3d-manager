@@ -152,6 +152,13 @@
   down ACG sandbox as 41 warnings, hiding the actionable ones. It now separates actionable,
   security and synthetic alerts.
 
+- Fixed: the k3dm Bug Tracking dashboard stacked every panel in one narrow column with raw label
+  legends and a red Scan age at a healthy 400 s, and it could not show bugs per release. Hermes now
+  also publishes per-release counts (`k3dm-bug-releases`: the current release branch and the five
+  shipped releases before it, from `scripts/bug-tally.py`). The dashboard is laid out in three rows:
+  the current release, stacked bar charts for the six releases by priority and by open vs fixed,
+  and the all-time open counts.
+
 ## [1.42.0] - 2026-10-09
 
 ### Added

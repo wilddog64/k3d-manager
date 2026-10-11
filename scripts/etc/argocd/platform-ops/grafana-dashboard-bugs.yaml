@@ -8,11 +8,827 @@ metadata:
     release: kube-prometheus-stack
 data:
   k3dm-bugs.json: |
-    {"title":"k3dm Bug Tracking","uid":"k3dm-bugs","tags":["k3dm"],"schemaVersion":38,"version":1,"refresh":"30s","datasource":{"type":"prometheus","uid":"prometheus"},"panels":[
-      {"id":1,"type":"stat","title":"Open P0","targets":[{"expr":"sum(k3dm_bug_docs{state=\"open\",priority=\"P0\"})"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":null},{"color":"red","value":1}]}}}},
-      {"id":2,"type":"stat","title":"Open P1","targets":[{"expr":"sum(k3dm_bug_docs{state=\"open\",priority=\"P1\"})"}],"fieldConfig":{"defaults":{"thresholds":{"steps":[{"color":"green","value":null},{"color":"orange","value":1}]}}}},
-      {"id":3,"type":"stat","title":"Open, untriaged","targets":[{"expr":"sum(k3dm_bug_docs{state=~\"open|unknown\",priority=\"unset\"})"}]},
-      {"id":4,"type":"bargauge","title":"Open by priority","targets":[{"expr":"sum by (priority) (k3dm_bug_docs{state=\"open\"})"}]},
-      {"id":5,"type":"timeseries","title":"Open by priority over time","description":"This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted.","targets":[{"expr":"sum by (priority) (k3dm_bug_docs{state=\"open\"})"}]},
-      {"id":6,"type":"stat","title":"Scan age","targets":[{"expr":"time() - k3dm_bug_docs_scan_timestamp_seconds"}]}
-    ]}
+    {
+      "title": "k3dm Bug Tracking",
+      "uid": "k3dm-bugs",
+      "tags": [
+        "k3dm"
+      ],
+      "schemaVersion": 38,
+      "version": 2,
+      "refresh": "1m",
+      "time": {
+        "from": "now-7d",
+        "to": "now"
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "panels": [
+        {
+          "id": 20,
+          "type": "row",
+          "title": "Current release",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 1
+          },
+          "panels": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Release",
+          "gridPos": {
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_bug_current_release_info",
+              "instant": true,
+              "legendFormat": "{{release}}"
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "textMode": "name"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "description": "The release branch Hermes indexes. Bug docs count toward it by their **Branch:** line, else the first tag that contains them.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Filed this release",
+          "gridPos": {
+            "x": 4,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_release_docs and on(release) k3dm_bug_current_release_info)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Open this release",
+          "gridPos": {
+            "x": 8,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_release_docs{state=\"open\"} and on(release) k3dm_bug_current_release_info)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Fixed this release",
+          "gridPos": {
+            "x": 12,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_release_docs{state=\"closed\"} and on(release) k3dm_bug_current_release_info)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Open, scheduled later",
+          "gridPos": {
+            "x": 16,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_later_release_open_docs)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "description": "Open bug docs whose **Branch:** line names a release after the current one (for example a patch release).",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Open, untriaged",
+          "gridPos": {
+            "x": 20,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=~\"open|unknown\",priority=\"unset\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "description": "Open or unclear docs with no **Priority:** line. Should stay 0.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 21,
+          "type": "row",
+          "title": "Last five releases and the current one",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 5,
+            "w": 24,
+            "h": 1
+          },
+          "panels": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 7,
+          "type": "barchart",
+          "title": "Bugs filed per release, by priority",
+          "description": "Every bug doc counted toward each release. unset = filed before priorities existed (2026-10-09).",
+          "gridPos": {
+            "x": 0,
+            "y": 6,
+            "w": 12,
+            "h": 9
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (release, order, priority) (k3dm_bug_release_docs)",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "order"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "rowField": "release",
+                "columnField": "priority",
+                "valueField": "Value",
+                "emptyValue": "zero"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "release\\\\priority",
+                "renamePattern": "release"
+              }
+            }
+          ],
+          "options": {
+            "xField": "release",
+            "stacking": "normal",
+            "showValue": "auto",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "xTickLabelRotation": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80
+              }
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 8,
+          "type": "barchart",
+          "title": "Bugs per release, open vs fixed",
+          "description": "closed = FIXED, RESOLVED, CLOSED or similar; unknown = no recognisable status line.",
+          "gridPos": {
+            "x": 12,
+            "y": 6,
+            "w": 12,
+            "h": 9
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (release, order, state) (k3dm_bug_release_docs)",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "order"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "rowField": "release",
+                "columnField": "state",
+                "valueField": "Value",
+                "emptyValue": "zero"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "release\\\\state",
+                "renamePattern": "release"
+              }
+            }
+          ],
+          "options": {
+            "xField": "release",
+            "stacking": "normal",
+            "showValue": "auto",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "xTickLabelRotation": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80
+              }
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 22,
+          "type": "row",
+          "title": "All open bugs",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 15,
+            "w": 24,
+            "h": 1
+          },
+          "panels": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "Open P0",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P0\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "title": "Open P1",
+          "gridPos": {
+            "x": 4,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P1\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "Open P2",
+          "gridPos": {
+            "x": 8,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P2\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "Open P3",
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P3\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 13,
+          "type": "stat",
+          "title": "Open, any release",
+          "gridPos": {
+            "x": 16,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_bug_docs{state=\"open\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 14,
+          "type": "stat",
+          "title": "Scan age",
+          "gridPos": {
+            "x": 20,
+            "y": 16,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "time() - k3dm_bug_docs_scan_timestamp_seconds",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1800
+                  },
+                  {
+                    "color": "red",
+                    "value": 7200
+                  }
+                ]
+              },
+              "unit": "s"
+            }
+          },
+          "description": "Seconds since Hermes last published the bug inventory (every poll, about 5 minutes).",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "Open by priority over time",
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 8
+          },
+          "description": "This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted.",
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (priority) (k3dm_bug_docs{state=\"open\"})",
+              "legendFormat": "{{priority}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "stacking": {
+                  "mode": "normal"
+                },
+                "fillOpacity": 30,
+                "lineWidth": 1
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    }
