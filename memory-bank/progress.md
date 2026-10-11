@@ -2410,3 +2410,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - RED at `a6a53d7d` with only the updated BATS file: the five required tests failed — prune newest, capture auto-prune, auto-prune failure tolerance, insufficient space, and rename failure.
 - GREEN: the eight new hub snapshot tests passed; the required hub snapshot, hub recovery, and cluster-down suites passed; shellcheck was clean; `_agent_audit` passed.
 - Pushed fix commit to `origin/k3d-manager-v1.42.0`; `HEAD` and remote both equal `81baeca9f455a94110716d0ccc54fc7c3f969112`. PR URL: none. Live verification remains pending.
+- [x] 2026-10-10: operator ran `make restart-webhook` (18:09); webhook pid running, cloud-bridge running. `/ask-docs` count questions (bug_count via bug-tally, fixed ref handling 62dfcc39) now live. v1.43.0 waits only on the 2026-10-11 03:30 export check, then the PR.

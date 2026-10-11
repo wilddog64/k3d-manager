@@ -65,7 +65,7 @@
 - Every bug doc that `doc_meta` counts as open or unknown now has `**Priority:**` (30 added; `2026-08-14-k3s-aws-ssm-agent-cannot-register` had an invalid `P4` → `P3`). Open tally: P1 1, P2 10, P3 27; unknown P3 5.
 - Classifier gap found, not fixed: about 15 "open" docs are done in prose (COMPLETE, WITHDRAWN, OBSOLETE, IMPLEMENTED, `✅ RESOLVED`, a status heading) but `_CLOSED_RE` in `scripts/lib/hermes/prior_art.py` only matches a leading FIXED/CLOSED/RESOLVED/DONE/…; candidate v1.43.2 bug.
 - `docs/plans/v1.43.0-hub-dr-drill.md` Status → DONE `5412b0b7`.
-- Remaining before the v1.43.0 PR: confirm the first scheduled export (2026-10-11 03:30), `make restart-webhook` if not run since 89cb86c1. Done: test-all, appsets-reapply/check, CHANGELOG [1.43.0] + README/releases rows + roadmap v1.44.0 (2026-10-10). If the PR slips past 2026-10-11, fix the date in CHANGELOG, README and releases.md.
+- Remaining before the v1.43.0 PR: confirm the first scheduled export (2026-10-11 03:30). Done: `make restart-webhook` (operator, 2026-10-10 18:09, webhook + cloud-bridge running; bug_count routing live), test-all, appsets-reapply/check, CHANGELOG [1.43.0] + README/releases rows + roadmap v1.44.0 (2026-10-10). If the PR slips past 2026-10-11, fix the date in CHANGELOG, README and releases.md.
 
 ## 2026-10-10 — v1.43.2 bug-fix batches specced (parallel agents)
 
