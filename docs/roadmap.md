@@ -192,12 +192,13 @@ turns the operator's manual acceptance checks into repeatable scenarios with evi
 | [`v1.44.0-cloud-request-slack-notification-routing.md`](plans/v1.44.0-cloud-request-slack-notification-routing.md) | A request may name an approved channel alias; nothing else changes the global `SLACK_CHANNEL_ID`. |
 | [`v1.44.0-operator-acceptance-automation.md`](plans/v1.44.0-operator-acceptance-automation.md) | An acceptance harness with explicit oracles; pilot on the k3dm Tests dashboard. |
 | [`v1.44.0-bounded-index-metrics-diagnostics.md`](plans/v1.44.0-bounded-index-metrics-diagnostics.md) | One read-only bridge action that explains a gap in the vector-store index-age panel. |
+| [`v1.44.0-bug-lifecycle-metrics.md`](plans/v1.44.0-bug-lifecycle-metrics.md) | Bug age, reopen rate and fix verification: `**Filed:**`, `**Recurred:**` and `**Verified by:**` lines, `make bug-close` (closes only after the named regression test passes), pre-commit checks, and a Lifecycle row on the Bug Tracking dashboard. Operator request 2026-10-10. |
 
 Also in v1.44.0, as a how-to rather than a spec: an inventory of every request channel (Slack,
 cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
 [`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
-v1.43.0 and is superseded, so v1.44.0 has four live plans and room for one more.
+v1.43.0 and is superseded. v1.44.0 is at its five-plan cap.
 
 ### Candidate milestone — v1.45.0
 
@@ -357,7 +358,7 @@ Next steps, smallest first:
 
 | Step | Lands in | Scope |
 |---|---|---|
-| Operational requirements in every spec | next spec written (doc change, no spec of its own) | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
+| Operational requirements in every spec | DONE 2026-10-10, with `v1.44.0-bug-lifecycle-metrics.md` | Add an `## Operational Requirements` section to `docs/plans/task-spec-template.md`: resource requests and limits, a capacity check on the target node, rollback, and the alert or dashboard that shows it working. |
 | Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 

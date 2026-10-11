@@ -51,6 +51,20 @@ Tick each item as you complete it. Do not add items.
 
 ---
 
+## Operational Requirements
+
+Required for any change that deploys, schedules or runs something. For a pure-logic or docs change,
+write one line saying why the section does not apply.
+
+| Item | Requirement |
+|---|---|
+| Resources | CPU and memory requests and limits for each new or changed workload; runtime added to an existing job |
+| Capacity | Free room on the target node or host (single-node Hostinger: a restart means downtime); new PVCs, metric series or log volume |
+| Rollback | How to undo it, and anything a revert leaves behind |
+| Proof it works | The alert, dashboard panel or command that shows it working live, and what value to expect |
+
+---
+
 ## Verification
 
 [Exact commands to run to confirm the fix works. Include expected output.]
