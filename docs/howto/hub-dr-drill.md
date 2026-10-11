@@ -202,6 +202,15 @@ identity digests, and writes an auditable report under
 `~/.k3dm/hub-recover/<run_id>/`. A failed run can resume with `RESUME=<run_id>`;
 an unfinished destructive step requires its explicit `REDO_STEP`.
 
+`make hub-recover-all` is approval-first: it clones and validates one snapshots
+export, prints live/export counts, and asks for that export timestamp before it
+rebuilds the hub. `RESUME` reuses the recorded export; `REDO_STEP=4` or
+`REDO_STEP=6` is required after an interrupted destructive step. The report
+contains the selected export, checkpoint steps and return codes, every V1/V2/V3/V4/V5/V8
+check, ArgoCD resume status, and RTO. Inventory format 2 records Vault metadata
+versions and identity digests without secret values. V8 confirms that
+ExternalSecrets are no longer in `SecretSyncedError`.
+
 ### M2 rehearsal
 
 Keep the drill cluster and rehearse the data path before a real hub window:

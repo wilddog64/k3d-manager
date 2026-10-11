@@ -2426,3 +2426,4 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 - [x] 2026-10-10: v1.43.0 final doc check: makefile.md (4 hub-data targets), functions.md (6 hub_data_* functions), Grafana guide + CHANGELOG (bug dashboard colours/tooltip).
 - [ ] 2026-10-11: 03:30 export failed (launchd cwd); fixed in code, alerts/workflow fixes need operator live steps; release gate = a passing kickstart run. P3 e2e-stale-idle-runner filed to v1.43.2.
 - 2026-10-11: v1.43.1 B1-B4 implementation was superseded after review; see git log for the fix commit. Final gate output and mutation results are recorded at completion.
+- 2026-10-11: v1.43.1 hub-data recover resume/export/context/approval fixes and B4 tests completed; see git log.

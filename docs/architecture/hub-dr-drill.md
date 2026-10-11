@@ -107,6 +107,16 @@ sequenceDiagram
     Engine-->>Op: report.json with checks and RTO
 ```
 
+The full `hub-recover-all` path is approval-first: preflight clones the
+snapshots branch once into the run directory, selects the export, and records
+its exact directory before `hub-recover` runs. A resumed run uses that same
+directory. Checkpoints support `RESUME`; interrupted destructive steps 4 and 6
+require `REDO_STEP`. The V8 check waits for ExternalSecrets to clear
+`SecretSyncedError`. `report.json` records the export timestamp, checkpoint
+states/return codes, approval, target, V1/V2/V3/V4/V5/V8 results, ArgoCD resume
+status, and RTO. Inventory format 2 carries Vault `current_version` metadata,
+image majors, and hashed Keycloak/LDAP identity proofs, never secret values.
+
 ## Trust boundaries
 
 | Item | Lives on | Never |

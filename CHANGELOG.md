@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Fixed: v1.43.1 hub-data recovery now resumes from slurped checkpoints,
+  restores the approved export from one run-local clone, pins verification to
+  the selected context, preserves resume failures in the report, and makes
+  `hub-recover-all` return refused approval status 2.
 - Added: attended `make hub-data-recover` and `make hub-recover-all` flows with
   target validation, resumable checkpoints, shared drill verification and an
   auditable restore report.

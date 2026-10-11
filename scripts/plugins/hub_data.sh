@@ -655,8 +655,16 @@ function hub_data_restore() { (
   fi
   mkdir -p "$stage"; chmod 700 "$stage"
   if (( created == 1 )); then trap 'rm -rf -- "$stage"' EXIT; fi
-  repo="${stage}/repo"; : > "${stage}/restore-targets.tsv"
-  git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"; chmod 700 "$repo"; latest="$(_hub_data_latest_export_dir "$repo")"; [[ -n "$latest" ]] || return 1
+  : > "${stage}/restore-targets.tsv"
+  if [[ -n "${HUB_DATA_RESTORE_EXPORT_DIR:-}" ]]; then
+    latest="$HUB_DATA_RESTORE_EXPORT_DIR"
+  else
+    repo="${stage}/repo"
+    git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"
+    chmod 700 "$repo"
+    latest="$(_hub_data_latest_export_dir "$repo")"
+  fi
+  [[ -n "$latest" ]] || return 1
   _hub_data_verify_export "$latest" || return 1
   cp "$latest/pv-pvc.yaml" "$stage/pv-pvc.yaml"
   cp "$latest/inventory.json" "$stage/inventory.json"
@@ -735,13 +743,14 @@ function _hub_data_argocd_assert_paused() {
 }
 
 function _hub_data_argocd_resume() {
-  local context="$1" dir="$2" ns="${ARGOCD_NAMESPACE:-cicd}" value payload
+  local context="$1" dir="$2" ns="${ARGOCD_NAMESPACE:-cicd}" value payload error
   for value in "$K3DM_HUB_DATA_ARGOCD_APP" "$K3DM_HUB_DATA_ARGOCD_PARENT"; do
     [[ -r "$dir/$value.automated" ]] || continue
     payload="$(<"$dir/$value.automated")"
     [[ -n "$payload" && "$payload" != null ]] || continue
     if ! _kubectl --context "$context" -n "$ns" patch application "$value" --type merge -p "{\"spec\":{\"syncPolicy\":{\"automated\":${payload}}}}" >/dev/null; then
-      ( _err "[hub-recover] failed to resume ${value}" ) 2>/dev/null || true
+      error="$( ( _err "[hub-recover] failed to resume ${value}" ) 2>&1 || true )"
+      printf '%s\n' "$error" >&2
       printf '%s\n' false > "$dir/argocd_resume"
     fi
   done
@@ -758,11 +767,13 @@ function _hub_data_checkpoint() {
 }
 
 function _hub_data_step_finished() {
-  jq -e --argjson step "$1" 'any(.[]; .step == $step and .finished != null and .rc == 0)' "$2" >/dev/null 2>&1
+  [[ -s "$2" ]] || return 1
+  jq -se --argjson step "$1" 'any(.[]; .step == $step and .finished != null and .rc == 0)' "$2" >/dev/null 2>&1
 }
 
 function _hub_data_step_unfinished() {
-  jq -e --argjson step "$1" 'any(.[]; .step == $step and .started != null) and (any(.[]; .step == $step and .finished != null and .rc == 0) | not)' "$2" >/dev/null 2>&1
+  [[ -s "$2" ]] || return 1
+  jq -se --argjson step "$1" 'any(.[]; .step == $step and .started != null) and (any(.[]; .step == $step and .finished != null and .rc == 0) | not)' "$2" >/dev/null 2>&1
 }
 
 function _hub_data_refresh_dependents() {
@@ -859,20 +870,37 @@ function _hub_data_report() {
     '{run_id:$run,host:$host,operator:$operator,commit:$commit,target:$target,export_timestamp:$export,sha256sums:$sums,approval_time:$approval,steps:$steps,checks:$checks,argocd_resume:($resume=="true"),rto_seconds:$rto,rc:$rc}' > "$report"
 }
 
-function hub_data_verify_unsealed() { local context="$1"; set +u; _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null; local rc=$?; set -u; return "$rc"; }
+function hub_data_verify_unsealed() {
+  local context="$1" stage old_kubeconfig had_kubeconfig=0 rc
+  stage="$(_hub_data_stage)"
+  old_kubeconfig="${KUBECONFIG:-}"
+  [[ -n "${KUBECONFIG+x}" ]] && had_kubeconfig=1
+  if [[ -n "${DR_DRILL_CONTEXT:-}" && "$DR_DRILL_CONTEXT" == "$context" && -n "${KUBECONFIG:-}" ]]; then
+    :
+  else
+    K3DM_HUB_DATA_CONTEXT="$context" _hub_data_pin_context "$stage" || { rm -rf -- "$stage"; return 1; }
+  fi
+  set +u
+  _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null
+  rc=$?
+  set -u
+  if (( had_kubeconfig == 1 )); then export KUBECONFIG="$old_kubeconfig"; else unset KUBECONFIG; fi
+  rm -rf -- "$stage"
+  return "$rc"
+}
 function hub_data_verify_keycloak() {
   local inventory="$1" context="$2" want actual expected digest
-  want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _kubectl)"; [[ "$actual" == "$want" ]] || return 1
+  want="$(jq -r '.keycloak_realm_user_count' "$inventory")"; actual="$(_hub_data_keycloak_user_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
   if jq -e 'has("keycloak_usernames_sha256")' "$inventory" >/dev/null 2>&1; then
-    expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"; digest="$(_hub_data_keycloak_user_digest _kubectl)"
+    expected="$(jq -r '.keycloak_usernames_sha256' "$inventory")"; digest="$(_hub_data_keycloak_user_digest _kubectl --context "$context")"
     [[ "$expected" == "$digest" ]] || { _err '[hub-data] Keycloak usernames digest mismatch'; return 1; }
   fi
 }
 function hub_data_verify_ldap() {
   local inventory="$1" context="$2" want actual expected digest
-  want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl)"; [[ "$actual" == "$want" ]] || return 1
+  want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
   if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null 2>&1; then
-    expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl)"
+    expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl --context "$context")"
     [[ "$expected" == "$digest" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }
   fi
 }
@@ -904,7 +932,19 @@ function hub_data_verify() {
   local -a funcs=(hub_data_verify_unsealed hub_data_verify_vault_paths hub_data_verify_keycloak hub_data_verify_ldap hub_data_verify_placement hub_data_verify_externalsecrets)
   printf '{}' > "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}"
   for ((i=0; i<${#names[@]}; i++)); do
-    name="${names[$i]}"; set +e; if [[ "$name" == V1 ]]; then "${funcs[$i]}" "$context"; elif [[ "$name" == V2 ]]; then "${funcs[$i]}" secrets vault "$inventory"; elif [[ "$name" == V8 ]]; then "${funcs[$i]}" "$context"; else "${funcs[$i]}" "$inventory" "$context"; fi; rc=$?; set -e
+    name="${names[$i]}"
+    set +e
+    if [[ "$name" == V1 ]]; then
+      "${funcs[$i]}" "$context"
+    elif [[ "$name" == V2 ]]; then
+      "${funcs[$i]}" secrets vault "$inventory"
+    elif [[ "$name" == V8 ]]; then
+      "${funcs[$i]}" "$context"
+    else
+      "${funcs[$i]}" "$inventory" "$context"
+    fi
+    rc=$?
+    set -e
     (( rc == 0 )) || all=false
     printf '%s\t%s\n' "$name" "$([[ $rc -eq 0 ]] && printf true || printf false)"
     jq --arg n "$name" --argjson v "$([[ $rc -eq 0 ]] && printf true || printf false)" '. + {($n):$v}' "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}" > "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}.tmp" && mv "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}.tmp" "${HUB_DATA_VERIFY_REPORT:-/tmp/k3dm-hub-checks.json}"
@@ -914,44 +954,132 @@ function hub_data_verify() {
 
 function hub_data_recover_preflight() {
   local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" repo export_dir export_ts run_id run_dir
-  repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"
-  [[ -n "$export_dir" ]] && export_dir="$repo/snapshots/$export_dir" || export_dir="$(_hub_data_latest_export_dir "$repo")"
+  local server nodes live_users live_ldap export_users export_ldap export_paths
+  run_id="$(date -u +%Y%m%dT%H%M%SZ)"
+  run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
+  mkdir -p "$run_dir"
+  repo="${run_dir}/repo"
+  git clone --depth 1 --branch snapshots "$K3DM_HUB_DATA_REPO" "$repo"
+  chmod 700 "$repo"
+  export_dir="${K3DM_HUB_DATA_EXPORT:-}"
+  if [[ -n "$export_dir" ]]; then
+    export_dir="$repo/snapshots/$export_dir"
+  else
+    export_dir="$(_hub_data_latest_export_dir "$repo")"
+  fi
   [[ -d "$export_dir" ]] || return 1
-  _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2
-  export_ts="${export_dir##*/}"; local server nodes live_users live_ldap export_users export_ldap export_paths
-  server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"; nodes="$(_kubectl --context "$context" get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}')"
-  export_users="$(jq -r '.keycloak_realm_user_count' "$export_dir/inventory.json")"; export_ldap="$(jq -r '.ldap_entry_count' "$export_dir/inventory.json")"; export_paths="$(jq -r '.vault_paths | length' "$export_dir/inventory.json")"
-  live_users="$(_hub_data_keycloak_user_count _kubectl 2>/dev/null || printf unknown)"; live_ldap="$(_hub_data_ldap_entry_count _kubectl 2>/dev/null || printf unknown)"
-  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live unknown/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap"
-  mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT"; jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/.target.json"
+  _hub_data_verify_export "$export_dir" || return 1
+  _hub_data_check_compatibility "$export_dir" || return 1
+  _hub_data_validate_target "$context" "$cluster" || return 2
+  export_ts="${export_dir##*/}"
+  server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+  nodes="$(_kubectl --context "$context" get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}')"
+  export_users="$(jq -r '.keycloak_realm_user_count' "$export_dir/inventory.json")"
+  export_ldap="$(jq -r '.ldap_entry_count' "$export_dir/inventory.json")"
+  export_paths="$(jq -r '.vault_paths | length' "$export_dir/inventory.json")"
+  live_users="$(_hub_data_keycloak_user_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
+  live_ldap="$(_hub_data_ldap_entry_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
+  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live n/a (needs Vault login)/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap"
+  mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT"
+  jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${run_dir}/target.json"
   _hub_data_recover_approval "$export_ts" || return 2
-  run_id="$(date -u +%Y%m%dT%H%M%SZ)"; run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"; mkdir -p "$run_dir"; cp "${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/.target.json" "$run_dir/target.json"; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; printf '%s\n' "$export_dir" > "$run_dir/export_dir"; printf 'RUN_ID=%s\n' "$run_id"
+  printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${run_dir}/approval_time"
+  printf '%s\n' "$export_dir" > "${run_dir}/export_dir"
+  printf 'RUN_ID=%s\n' "$run_id"
 }
 
 function _hub_data_recover_step2() {
-  local steps="$1"; _hub_data_step_finished 2 "$steps" && return 0
-  printf '[hub-recover] Step 2/9 — age identity\n'; read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty; printf '\n' >&2; [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || return 1; _hub_data_run_step "$steps" 2 true
+  local steps="$1"
+  _hub_data_step_finished 2 "$steps" && return 0
+  printf '[hub-recover] Step 2/9 — age identity\n'
+  read -rs -p '[hub-recover] Age identity: ' K3DM_HUB_DATA_AGE_IDENTITY < /dev/tty
+  printf '\n' >&2
+  [[ "$K3DM_HUB_DATA_AGE_IDENTITY" == AGE-SECRET-KEY-1* ]] || return 1
+  _hub_data_run_step "$steps" 2 true
 }
-function _hub_data_recover_step3() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 3 "$steps" && return 0; printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'; _hub_data_run_step "$steps" 3 _hub_data_argocd_pause "$context" "$dir"; }
-function _hub_data_recover_step4() { local steps="$1" context="$2"; _hub_data_step_finished 4 "$steps" && return 0; if _hub_data_step_unfinished 4 "$steps" && [[ "${REDO_STEP:-}" != 4 ]]; then printf '%s\n' '[hub-recover] step 4 started but did not finish; set REDO_STEP=4 to repeat it' >&2; return 1; fi; printf '[hub-recover] Step 4/9 — Restore claims\n'; _hub_data_argocd_assert_paused "$context" "$3" || return 1; _hub_data_run_step "$steps" 4 hub_data_restore; }
-function _hub_data_recover_step5() { local steps="$1"; _hub_data_step_finished 5 "$steps" && return 0; printf '[hub-recover] Step 5/9 — Unseal\n'; _hub_data_run_step "$steps" 5 hub_data_unseal_dr '[hub-recover]'; }
-function _hub_data_recover_step6() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 6 "$steps" && return 0; if _hub_data_step_unfinished 6 "$steps" && [[ "${REDO_STEP:-}" != 6 ]]; then printf '%s\n' '[hub-recover] step 6 started but did not finish; set REDO_STEP=6 to repeat it' >&2; return 1; fi; printf '[hub-recover] Step 6/9 — Re-point Vault\n'; _hub_data_argocd_assert_paused "$context" "$dir" || return 1; _hub_data_run_step "$steps" 6 _hub_data_repoint_vault "$context"; }
-function _hub_data_recover_step7() { local steps="$1" context="$2"; _hub_data_step_finished 7 "$steps" && return 0; printf '[hub-recover] Step 7/9 — Refresh dependents\n'; _hub_data_run_step "$steps" 7 _hub_data_refresh_dependents "$context"; }
-function _hub_data_recover_step8() { local steps="$1" context="$2" dir="$3"; _hub_data_step_finished 8 "$steps" && return 0; printf '[hub-recover] Step 8/9 — Verify\n'; export HUB_DATA_VERIFY_REPORT="$dir/checks.json"; _hub_data_run_step "$steps" 8 hub_data_verify "$dir/inventory.json" identity "$context"; }
-function _hub_data_recover_step9() { local steps="$1"; _hub_data_step_finished 9 "$steps" && return 0; printf '[hub-recover] Step 9/9 — Report\n'; _hub_data_run_step "$steps" 9 true; }
+function _hub_data_recover_step3() {
+  local steps="$1" context="$2" dir="$3"
+  _hub_data_step_finished 3 "$steps" && return 0
+  printf '[hub-recover] Step 3/9 — Pause ArgoCD\n'
+  _hub_data_run_step "$steps" 3 _hub_data_argocd_pause "$context" "$dir"
+}
+function _hub_data_recover_step4() {
+  local steps="$1" context="$2" dir="$3"
+  _hub_data_step_finished 4 "$steps" && return 0
+  if _hub_data_step_unfinished 4 "$steps" && [[ "${REDO_STEP:-}" != 4 ]]; then
+    printf '%s\n' '[hub-recover] step 4 started but did not finish; set REDO_STEP=4 to repeat it' >&2
+    return 1
+  fi
+  printf '[hub-recover] Step 4/9 — Restore claims\n'
+  _hub_data_argocd_assert_paused "$context" "$dir" || return 1
+  _hub_data_run_step "$steps" 4 hub_data_restore
+}
+function _hub_data_recover_step5() {
+  local steps="$1"
+  _hub_data_step_finished 5 "$steps" && return 0
+  printf '[hub-recover] Step 5/9 — Unseal\n'
+  _hub_data_run_step "$steps" 5 hub_data_unseal_dr '[hub-recover]'
+}
+function _hub_data_recover_step6() {
+  local steps="$1" context="$2" dir="$3"
+  _hub_data_step_finished 6 "$steps" && return 0
+  if _hub_data_step_unfinished 6 "$steps" && [[ "${REDO_STEP:-}" != 6 ]]; then
+    printf '%s\n' '[hub-recover] step 6 started but did not finish; set REDO_STEP=6 to repeat it' >&2
+    return 1
+  fi
+  printf '[hub-recover] Step 6/9 — Re-point Vault\n'
+  _hub_data_argocd_assert_paused "$context" "$dir" || return 1
+  _hub_data_run_step "$steps" 6 _hub_data_repoint_vault "$context"
+}
+function _hub_data_recover_step7() {
+  local steps="$1" context="$2"
+  _hub_data_step_finished 7 "$steps" && return 0
+  printf '[hub-recover] Step 7/9 — Refresh dependents\n'
+  _hub_data_run_step "$steps" 7 _hub_data_refresh_dependents "$context"
+}
+function _hub_data_recover_step8() {
+  local steps="$1" context="$2" dir="$3"
+  _hub_data_step_finished 8 "$steps" && return 0
+  printf '[hub-recover] Step 8/9 — Verify\n'
+  export HUB_DATA_VERIFY_REPORT="$dir/checks.json"
+  _hub_data_run_step "$steps" 8 hub_data_verify "$dir/inventory.json" identity "$context"
+}
+function _hub_data_recover_step9() {
+  local steps="$1"
+  _hub_data_step_finished 9 "$steps" && return 0
+  printf '[hub-recover] Step 9/9 — Report\n'
+  _hub_data_run_step "$steps" 9 true
+}
 
 function hub_data_recover() { (
-  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" export_dir export_ts run_id run_dir steps rc=0
-  run_id="${RESUME:-$(date -u +%Y%m%dT%H%M%SZ)}"; run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"; mkdir -p "$run_dir"; steps="$run_dir/steps.jsonl"
+  local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" export_dir export_ts run_id run_dir steps rc=0 preflight_output
+  if [[ -n "${RESUME:-}" ]]; then
+    run_id="$RESUME"
+  else
+    preflight_output="$(hub_data_recover_preflight)" || return $?
+    run_id="${preflight_output##*RUN_ID=}"
+  fi
+  run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
+  mkdir -p "$run_dir"
+  steps="$run_dir/steps.jsonl"
   trap 'rc=$?; set +e; _hub_data_argocd_resume "$context" "$run_dir"; _hub_data_report "$run_dir" "$rc"; unset K3DM_HUB_DATA_AGE_IDENTITY; exit "$rc"' EXIT
   printf '[hub-recover] Step 1/9 — Preflight\n'; [[ "$context" == k3d-dr-drill && "${K3DM_HUB_DATA_RECOVER_ALLOW_DRILL:-0}" != 1 ]] && return 2
-  export_dir="$(cat "$run_dir/export_dir" 2>/dev/null || true)"; [[ -n "$export_dir" ]] || { repo="${K3DM_HUB_DATA_DIR}/repo"; export_dir="${K3DM_HUB_DATA_EXPORT:-}"; [[ -n "$export_dir" ]] && export_dir="$repo/snapshots/$export_dir" || export_dir="$(_hub_data_latest_export_dir "$repo")"; }
-  [[ -d "$export_dir" ]] || return 1; export_ts="${export_dir##*/}"; export K3DM_HUB_DATA_EXPORT_DIR="$export_dir"; cp "$export_dir/inventory.json" "$run_dir/inventory.json"; printf '%s\n' "$export_dir" > "$run_dir/export_dir"
+  export_dir="$(cat "$run_dir/export_dir" 2>/dev/null || true)"
+  [[ -d "$export_dir" ]] || return 1
+  export_ts="${export_dir##*/}"
+  export K3DM_HUB_DATA_EXPORT_DIR="$export_dir" HUB_DATA_RESTORE_EXPORT_DIR="$export_dir"
+  cp "$export_dir/inventory.json" "$run_dir/inventory.json"
   _hub_data_verify_export "$export_dir" || return 1; _hub_data_check_compatibility "$export_dir" || return 1; _hub_data_validate_target "$context" "$cluster" || return 2; if [[ ! -r "$run_dir/approval_time" ]]; then _hub_data_recover_approval "$export_ts" || return 2; printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$run_dir/approval_time"; fi
   _hub_data_step_finished 1 "$steps" || _hub_data_run_step "$steps" 1 true || return $?
-  _hub_data_recover_step2 "$steps" || return $?; _hub_data_recover_step3 "$steps" "$context" "$run_dir" || return $?
+  _hub_data_recover_step2 "$steps" || return $?
+  _hub_data_recover_step3 "$steps" "$context" "$run_dir" || return $?
   export K3DM_HUB_DATA_CONTEXT="$context" K3DM_HUB_DATA_CLUSTER="$cluster" HUB_DATA_RESTORE_TARGET=hub
-  _hub_data_recover_step4 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step5 "$steps" || return $?; _hub_data_recover_step6 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step7 "$steps" "$context" || return $?; _hub_data_recover_step8 "$steps" "$context" "$run_dir" || return $?; _hub_data_recover_step9 "$steps" || return $?
+  _hub_data_recover_step4 "$steps" "$context" "$run_dir" || return $?
+  _hub_data_recover_step5 "$steps" || return $?
+  _hub_data_recover_step6 "$steps" "$context" "$run_dir" || return $?
+  _hub_data_recover_step7 "$steps" "$context" || return $?
+  _hub_data_recover_step8 "$steps" "$context" "$run_dir" || return $?
+  _hub_data_recover_step9 "$steps" || return $?
   printf '%s\n' "$SECONDS" > "$run_dir/rto_seconds"
 )
 }

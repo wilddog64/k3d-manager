@@ -1807,3 +1807,4 @@ Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status cou
 - GREEN: the eight new hub snapshot tests passed; the required hub snapshot, hub recovery, and cluster-down suites passed; shellcheck was clean; `_agent_audit` passed.
 - Pushed fix commit to `origin/k3d-manager-v1.42.0`; `HEAD` and remote both equal `81baeca9f455a94110716d0ccc54fc7c3f969112`. PR URL: none. Live verification remains pending.
 - 2026-10-11: v1.43.1 hub-data-recover implementation was rejected and fixed in the current work; see git log for the fix commit. Final gate output and mutation results are recorded at completion.
+- 2026-10-11: v1.43.1 round-2 recovery defects and behavioral tests fixed; see git log.

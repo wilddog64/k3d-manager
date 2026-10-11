@@ -513,70 +513,229 @@ STUB
   [ "$output" = "0" ]
 }
 
-@test "13 approval is typed and mismatches are refused" {
-  source_plugin; K3DM_HUB_DATA_TEST_TTY=1; read() { REPLY=wrong; return 0; }
+@test "recover B4-13: approval is typed and mismatches are refused" {
+  source_plugin; K3DM_HUB_DATA_TEST_TTY=1; read() { typed=wrong; return 0; }
   run _hub_data_recover_approval 20261011T120000Z; [ "$status" -eq 2 ]; [ "$(grep -c kubectl "$CALL_LOG" || true)" -eq 0 ]
 }
 
-@test "13a target validation checks the local serverlb and server-0" {
+@test "recover B4-13a: target validation checks the local serverlb and server-0" {
   source_plugin; _kubectl() { [[ "$*" == *'config view'* ]] && printf 'https://127.0.0.1:6443'; }
   docker() { printf 'k3d-test-serverlb 0.0.0.0:6443->6443/tcp\nk3d-test-server-0\n'; }
   run _hub_data_validate_target ctx test; [ "$status" -ne 0 ]
 }
 
-@test "13b destructive checkpoints require explicit redo on resume" {
+@test "recover B4-13b: destructive checkpoints require explicit redo on resume" {
   source_plugin
   grep -q 'REDO_STEP=4' "$PLUGINS_DIR/hub_data.sh"
   grep -q '"finished"' "$PLUGINS_DIR/hub_data.sh"
 }
 
-@test "13c compatibility requires format 2 and all claims" {
+@test "recover B4-13c: compatibility requires format 2 and all claims" {
   source_plugin; local dir="$TEST_ROOT/compat"; mkdir -p "$dir"; printf '%s\n' '{"format":1}' > "$dir/inventory.json"; printf 'name: data-vault-0\nname: postgres-keycloak-pvc\nname: data-openldap-0\n' > "$dir/pv-pvc.yaml"
   run _hub_data_check_compatibility "$dir"; [ "$status" -ne 0 ]
 }
 
-@test "13d verification uses metadata proof fields" {
+@test "recover B4-13d: verification uses metadata proof fields" {
   source_plugin; printf '%s\n' '{"vault_paths":["app/"],"vault_keys":{"app":{"current_version":2}}}' > "$TEST_ROOT/inventory.json"; _hub_data_generate_root() { printf root; }; _hub_data_vault_kv_list() { printf '["app/"]'; }; _hub_data_vault_kv_metadata() { printf '{"data":{"current_version":1}}'; }; _hub_data_vault_revoke() { :; }
   run hub_data_verify_vault_paths secrets vault "$TEST_ROOT/inventory.json"; [ "$status" -ne 0 ]; ! grep -q 'vault kv get' "$VLOG"
 }
 
-@test "13e drill delegates verification to hub_data" {
-  grep -q 'hub_data_verify' "$PWD/bin/dr-drill"
-  ! grep -Eq '^_dr_drill_v[1-5][[:space:]]*\(' "$PWD/bin/dr-drill"
+@test "recover B4-13e: drill delegates verification to hub_data" {
+  source_plugin
+  run grep -Eq '^_dr_drill_v[1-5][[:space:]]*\(' "$PWD/bin/dr-drill"
+  [ "$status" -eq 1 ]
+  eval "$(sed -n '/^_dr_drill_verify_keycloak()/,/^}/p' "$PWD/bin/dr-drill")"
+  _dr_drill_inventory() { printf '%s\n' inventory; }
+  DR_DRILL_CONTEXT=ctx
+  hub_data_verify_keycloak() { printf called >> "$CALL_LOG"; }
+  _dr_drill_verify_keycloak
+  grep -q called "$CALL_LOG"
 }
 
-@test "15 hub mode skips the drill postgres manifest" {
-  grep -q 'HUB_DATA_RESTORE_TARGET.*hub' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'deployment/postgres-keycloak is required in hub mode' "$PLUGINS_DIR/hub_data.sh"
-  grep -q 'else' "$PLUGINS_DIR/hub_data.sh"
+@test "recover B4-15: hub mode skips the drill postgres manifest" {
+  make_fixture; source_plugin
+  export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage" HUB_DATA_RESTORE_TARGET=hub
+  _hub_data_verify_export() { :; }
+  _hub_data_prepare_claim() { :; }
+  _hub_data_copy_claim() { :; }
+  _hub_data_scale() { :; }
+  _hub_data_apply_keycloak() { printf applied >> "$CALL_LOG"; return 1; }
+  run hub_data_restore
+  [ "$status" -eq 0 ]
+  run grep -q applied "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  run grep -q 'scripts/etc/dr/postgres-keycloak.yaml' "$CALL_LOG"
+  [ "$status" -eq 1 ]
 }
 
-@test "17 ArgoCD resume is installed in the exit trap" {
+@test "recover B4-17: ArgoCD resume is installed in the exit trap" {
   source_plugin; mkdir -p "$TEST_ROOT/run"; printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; return 0; }
   run _hub_data_argocd_resume ctx "$TEST_ROOT/run"; [ "$status" -eq 0 ]; grep -q 'patch application' "$CALL_LOG"
 }
 
-@test "18 Vault re-point order is config, shards, then root" {
-  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf config >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf shards >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf root >> "$CALL_LOG"; }; _kubectl() { cat >/dev/null; printf vault-root >> "$CALL_LOG"; }
-  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; [ "$(grep -o config "$CALL_LOG" | head -1)" = config ]; [ "$(grep -o shards "$CALL_LOG" | head -1)" = shards ]; grep -q vault-root "$CALL_LOG"
+@test "recover B4-18: Vault re-point order is config, shards, vault-root, root" {
+  source_plugin; _hub_data_generate_root() { printf ROOT; }; _vault_exec_stream() { printf 'config\n' >> "$CALL_LOG"; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { printf 'shards\n' >> "$CALL_LOG"; }; _hub_recovery_sync_vault_root_token() { printf 'root\n' >> "$CALL_LOG"; }; _kubectl() { cat >/dev/null; printf 'vault-root\n' >> "$CALL_LOG"; }
+  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; mapfile -t order < "$CALL_LOG"; [ "${order[*]}" = 'config shards vault-root root' ]
 }
 
-@test "20 Makefile has the two restore entrypoints" {
-  grep -q '^hub-data-recover:' "$PWD/Makefile"
-  grep -q '^hub-recover-all:' "$PWD/Makefile"
+@test "recover B4-20: refused preflight prevents hub-recover" {
+  local fakebin="$TEST_ROOT/fakebin" script="$TEST_ROOT/fake-k3d-manager" copy="$TEST_ROOT/repo"
+  mkdir -p "$fakebin"
+  cat > "$script" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == hub_data_recover_preflight ]]; then
+  printf 'refused\n'
+  exit 2
+fi
+printf '%s\n' "$1" >> "$CALL_LOG"
+STUB
+  chmod +x "$script"
+  cp -R "$PWD" "$copy"
+  cp "$script" "$copy/scripts/k3d-manager"
+  run env PATH="$fakebin:$PATH" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" make -C "$copy" hub-recover-all
+  [ "$status" -eq 2 ]
+  run grep -q hub-recover "$CALL_LOG"
+  [ "$status" -eq 1 ]
 }
 
-@test "D1 a failed step records its rc and does not run the next step" {
-  source_plugin; local steps="$TEST_ROOT/steps.jsonl"; _hub_data_run_step "$steps" 4 false || rc=$?; [ "${rc:-0}" -ne 0 ]; ! _hub_data_step_finished 4 "$steps"
-  grep -q '"step":4,"finished".*"rc":1' "$steps"; ! grep -q '"step":5' "$steps"
+@test "recover B4-D1: a failed step records its rc and does not run the next step" {
+  source_plugin; local steps="$TEST_ROOT/steps.jsonl"; _hub_data_run_step "$steps" 4 false || rc=$?; [ "${rc:-0}" -ne 0 ]
+  run _hub_data_step_finished 4 "$steps"
+  [ "$status" -ne 0 ]
+  grep -q '"step":4,"finished".*"rc":1' "$steps"
+  run grep -q '"step":5' "$steps"
+  [ "$status" -eq 1 ]
+  make_fixture
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/recover" RESUME=d1
+  mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1"
+  printf '%s\n' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" > "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1/export_dir"
+  : > "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1/approval_time"
+  _hub_data_verify_export() { :; }
+  _hub_data_check_compatibility() { :; }
+  _hub_data_validate_target() { :; }
+  _hub_data_argocd_resume() { :; }
+  _hub_data_recover_step2() { :; }
+  _hub_data_recover_step3() { :; }
+  _hub_data_recover_step4() { _hub_data_run_step "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1/steps.jsonl" 4 false; }
+  _hub_data_recover_step5() { printf ran >> "$CALL_LOG"; }
+  run hub_data_recover
+  [ "$status" -ne 0 ]
+  run grep -q ran "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  grep -q '"step":4,"finished".*"rc":1' "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1/steps.jsonl"
+  [ -s "$K3DM_HUB_DATA_RECOVER_RUN_ROOT/d1/report.json" ]
 }
 
-@test "D2 empty ArgoCD jsonpath is paused and auto-sync is rejected" {
+@test "recover B4-D2: empty ArgoCD jsonpath is paused and auto-sync is rejected" {
   source_plugin; mkdir -p "$TEST_ROOT/argo"; : > "$TEST_ROOT/argo/$K3DM_HUB_DATA_ARGOCD_APP.automated"; _kubectl() { [[ "${ARGO_AUTO:-0}" == 1 ]] && printf '{"selfHeal":true}' || printf ''; }
   run _hub_data_argocd_assert_paused ctx "$TEST_ROOT/argo"; [ "$status" -eq 0 ]; ARGO_AUTO=1 run _hub_data_argocd_assert_paused ctx "$TEST_ROOT/argo"; [ "$status" -ne 0 ]
 }
 
-@test "D3 vault-root is JSON from stdin and no literal dash is used" {
+@test "recover B4-D3: vault-root is JSON from stdin and no literal dash is used" {
   source_plugin; _hub_data_generate_root() { printf ROOT-TOKEN; }; _vault_exec_stream() { :; }; _secret_load_data() { [[ "$2" == *:count ]] && printf 1 || printf SHARD; }; _vault_dr_shard_valid() { return 0; }; _vault_cache_unseal_keys() { :; }; _hub_recovery_sync_vault_root_token() { :; }; _kubectl() { printf '%s\n' "$*" >> "$CALL_LOG"; cat > "$TEST_ROOT/payload.json"; }
-  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; jq -e '.stringData.root_token == "ROOT-TOKEN"' "$TEST_ROOT/payload.json"; ! grep -q --from-literal "$CALL_LOG"
+  run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; jq -e '.stringData.root_token == "ROOT-TOKEN"' "$TEST_ROOT/payload.json"
+  run grep -q -- '--from-literal' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  run grep -q ROOT-TOKEN "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover B4-R1: finished steps are skipped and unfinished step 4 needs redo" {
+  source_plugin
+  local steps="$TEST_ROOT/steps.jsonl"
+  printf '%s\n' '{"step":3,"started":"now"}' '{"step":3,"finished":"now","rc":0}' > "$steps"
+  _hub_data_argocd_pause() { printf ran >> "$CALL_LOG"; }
+  run _hub_data_recover_step3 "$steps" ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  run grep -q ran "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  printf '%s\n' '{"step":4,"started":"now"}' > "$steps"
+  _hub_data_argocd_assert_paused() { :; }
+  hub_data_restore() { printf restored >> "$CALL_LOG"; }
+  run _hub_data_recover_step4 "$steps" ctx "$TEST_ROOT/run"
+  [ "$status" -ne 0 ]
+  REDO_STEP=4 run _hub_data_recover_step4 "$steps" ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  grep -q restored "$CALL_LOG"
+}
+
+@test "recover B4-R2: restore uses the recorded export and never clones" {
+  make_fixture; source_plugin
+  export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage"
+  export HUB_DATA_RESTORE_EXPORT_DIR="$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z"
+  _hub_data_verify_export() { :; }
+  _hub_data_prepare_claim() { :; }
+  _hub_data_copy_claim() { :; }
+  _hub_data_scale() { :; }
+  run hub_data_restore
+  [ "$status" -eq 0 ]
+  run grep -q clone "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover B4-R3: verification passes context to kubectl" {
+  source_plugin
+  printf '%s\n' '{"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$TEST_ROOT/inventory.json"
+  _hub_data_keycloak_user_count() { printf '%s\n' "$*" >> "$CALL_LOG"; printf 3; }
+  _hub_data_ldap_entry_count() { printf '%s\n' "$*" >> "$CALL_LOG"; printf 2; }
+  run hub_data_verify_keycloak "$TEST_ROOT/inventory.json" target-context
+  [ "$status" -eq 0 ]
+  run hub_data_verify_ldap "$TEST_ROOT/inventory.json" target-context
+  [ "$status" -eq 0 ]
+  grep -q -- '--context target-context' "$CALL_LOG"
+}
+
+@test "recover B4-R4: resume failure is logged and report records false" {
+  source_plugin; mkdir -p "$TEST_ROOT/run"
+  printf '%s' '{"prune":true}' > "$TEST_ROOT/run/$K3DM_HUB_DATA_ARGOCD_APP.automated"
+  _kubectl() { return 1; }
+  run --separate-stderr _hub_data_argocd_resume ctx "$TEST_ROOT/run"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *'failed to resume'* ]]
+  [ "$(cat "$TEST_ROOT/run/argocd_resume")" = false ]
+  _hub_data_report "$TEST_ROOT/run" 1
+  [ "$(jq -r .argocd_resume "$TEST_ROOT/run/report.json")" = false ]
+}
+
+@test "recover B4-14: without a TTY approval is refused before the prompt" {
+  run env PLUGINS_DIR="$PLUGINS_DIR" SCRIPT_DIR="$PWD/scripts" bash -c 'source "$PLUGINS_DIR/hub_data.sh"; unset K3DM_HUB_DATA_TEST_TTY; _hub_data_recover_approval 20261011T120000Z </dev/null'
+  [ "$status" -eq 2 ]
+}
+
+@test "recover B4-16: age identity is not sent in command argv" {
+  source_plugin
+  _hub_data_run_step() { printf '%s\n' "$*" >> "$CALL_LOG"; }
+  K3DM_HUB_DATA_AGE_IDENTITY=AGE-SECRET-KEY-1SENTINEL
+  read() { :; }
+  run _hub_data_recover_step2 "$TEST_ROOT/steps.jsonl"
+  [ "$status" -eq 0 ]
+  run grep -q AGE-SECRET-KEY "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  run grep -q security "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover B4-17a: ArgoCD read-back stops before destructive work" {
+  source_plugin; mkdir -p "$TEST_ROOT/argo"
+  printf '%s' '{"prune":true}' > "$TEST_ROOT/argo/$K3DM_HUB_DATA_ARGOCD_PARENT.automated"
+  printf '%s' '{"prune":true}' > "$TEST_ROOT/argo/$K3DM_HUB_DATA_ARGOCD_APP.automated"
+  _kubectl() { [[ "$*" == *'get application'* ]] && printf '{"selfHeal":true}'; }
+  run _hub_data_argocd_assert_paused ctx "$TEST_ROOT/argo"
+  [ "$status" -ne 0 ]
+  run grep -q 'scale ' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover B4-19: V8 records SecretSyncedError as false" {
+  source_plugin; export K3DM_HUB_DATA_V8_WAIT_S=0
+  _kubectl() { printf '%s\n' '{"items":[{"status":{"conditions":[{"type":"Ready","reason":"SecretSyncedError"}]}}]}'; }
+  run hub_data_verify_externalsecrets ctx
+  [ "$status" -ne 0 ]
+}
+
+@test "recover B4-21: drill unseal uses the moved hub function" {
+  source_plugin
+  grep -q 'hub_data_unseal_dr' "$PWD/bin/dr-drill"
+  run grep -Eq '^_dr_drill_v[1-5][[:space:]]*\(' "$PWD/bin/dr-drill"
+  [ "$status" -eq 1 ]
 }
