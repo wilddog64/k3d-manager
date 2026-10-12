@@ -267,8 +267,15 @@ hub Prometheus. When both fail, `HubExternallyUnreachable` sends email at 10 min
 When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A stale Hermes
 heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
 maintenance silence. Scope:
-[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
-is at 4 of 5 plans (also `v1.46.0-dr-drill-dashboard.md`, `v1.46.0-hub-data-backup-integrity.md`).
+[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md).
+
+**Weekly DR drill, unattended** (operator, 2026-10-11). A GUI LaunchAgent on the M2 runs the drill
+on Sunday 05:00 in an explicit unattended mode. That mode requires the `enforce` Keychain guard,
+refuses on a locked keychain, never widens an ACL, and writes a failed result on refusal so
+`DRDrillFailed` fires the same day. The M4 pulls and publishes daily, so the M2 never holds the data
+repo key. Scope: [`v1.46.0-scheduled-dr-drill.md`](plans/v1.46.0-scheduled-dr-drill.md). v1.46.0 is
+**full at 5 of 5 plans** (also `v1.46.0-dr-drill-dashboard.md`,
+`v1.46.0-hub-data-backup-integrity.md`); the next v1.46.0 item goes to v1.46.1.
 
 ### Candidate milestone — v1.47.0
 
