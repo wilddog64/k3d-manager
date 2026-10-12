@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Status:** FIXED 2026-10-11 (`40f99b0e`, v1.43.2)
 **Approval:** explicit 2026-10-11 "can we make number more human readable" (operator, Hermes Status screenshot)
 **Priority:** P3 — cosmetic; the numbers are correct
 **Severity:** low
