@@ -169,6 +169,11 @@ same file.
     one agent in lib-foundation, then a subtree-pull here.
   - [`e2e-stale-alert-fires-for-an-idle-runner`](bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md):
     `prometheusrule.yaml` (`E2EVerificationStale` only), `e2e_observability.bats`.
+  - [`hermes-kine-sensor-misses-dead-compaction`](bugs/2026-10-11-hermes-kine-sensor-misses-dead-compaction.md)
+    (operator, 2026-10-11, **P2, dispatch first**): `bin/k3dm-hermes`, `scripts/lib/hermes/sensors.py`,
+    `prometheusrule.yaml` (new `HubKineCompactionStalled`), `test_hermes.py`,
+    `hermes_alert_rules.bats`. It lands after the e2e-stale fix because both edit
+    `prometheusrule.yaml`.
   - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
     `shopping-cart-frontend`.
   - [`bug-dashboard-cannot-list-open-bugs`](bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md)
