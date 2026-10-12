@@ -445,6 +445,37 @@ Next steps, smallest first:
 | Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
+### Candidate major — v3.0.0: multi-agent product team
+
+**Proposed 2026-10-12 (operator; scheduled for v3.0.0, not yet scoped).** A product team made of
+agents, building TwinkleAI features end to end:
+
+- **Operator: engineering owner.** Product objectives, priorities, release approval.
+- **Claude: engineering lead and release coordinator.** Specs, task allocation, dependencies,
+  integration decisions.
+- **Agent A: backend.** APIs and business logic.
+- **Agent B: frontend.** UI and workflows.
+- **Agent C: QA.** Tests and regression.
+
+Their work lands through merge gates → CI → e2e → deployment, on k3d-manager (GitOps, vCluster,
+Grafana, security, recovery).
+
+**Ordering:** the v1.4x releases through v1.50.0 first, then v2.0.0 (the TwinkleAI workload). This
+waits for the intent / natural-language development infrastructure ("Intent as an engineering
+contract" under Where we actually are), so the agents can take intent, not hand-written specs.
+
+**Design notes to carry into the scope doc:**
+
+1. **Contract first.** Claude publishes the API contract (OpenAPI) before A or B starts, so a
+   mismatch fails a contract test.
+2. **QA tests from the spec, never from A's or B's code.**
+3. **Gates decide, not the coordinator.** Claude steps in on a gate failure or a conflict.
+4. **Measure the experiment.** Time per agent from task handed out to work landed,
+   coordinator interventions per feature, bugs caught by QA versus e2e, and tokens per role.
+
+On 2026-10-12, eight finished Codex worktrees were waiting on Claude's verify-and-land step. That
+step is the known bottleneck the experiment must test.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a

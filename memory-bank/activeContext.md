@@ -1,3 +1,4 @@
+- 2026-10-12: multi-agent product team (owner → Claude lead → backend/frontend/QA agents) scheduled for v3.0.0 in `docs/roadmap.md`; after v1.50.0, v2.0.0 and the intent/NL dev infra. No work before then.
 - 2026-10-12: hub `hostnet_drift` degraded after the OrbStack upgrade (2 node-exporter pods on stale IPs) — recurrence recorded in `2026-09-29-hostnetwork-pods-keep-stale-ip-after-node-restart.md`; operator deleted the pods 23:0xZ, Hermes healthy 23:15Z. `values_branch` also healthy (21 refs on v1.43.2) at 23:14Z.
 - 2026-10-12: v1.49.0 A/B input pinned: twinkleai-real-estate-lab 56dab41 (partial, build fails on missing ui/label); target = ACG k3s, not vCluster. Operator: all phases incl. 0a wait for v1.47.0.
 - 2026-10-12: v1.45.1 bug-count plan verified against code; P3 + Approval added (ea4e600c). Waits for v1.44.0 doc_lifecycle.
