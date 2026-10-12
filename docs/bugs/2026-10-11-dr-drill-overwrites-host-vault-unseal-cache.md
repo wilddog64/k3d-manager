@@ -84,6 +84,11 @@ RTO 744 s, `credentials_unexpected: []`. All eight `credentials_read` entries ar
 `k3d-manager-vault-unseal`. After teardown `security find-generic-password -s
 k3dm-vault-unseal-drill` returned 44 (not found), so the teardown purge works.
 
+Enforce drill on the M2 at `4f18c638` (guard default `enforce`, no override), result
+`20261012T001215Z.json`: success, V0–V7 and V9 true, RTO 1294 s, `credentials_unexpected: []`, eight
+`credentials_read` entries across `k3dm-hub-data-age`, `k3dm-vault-unseal-drill` and
+`k3dm-vault-unseal-dr` only.
+
 ## What NOT to Do
 
 - Do NOT change the default service name; the hub and the real restore depend on it.
