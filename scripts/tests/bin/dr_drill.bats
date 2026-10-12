@@ -156,11 +156,18 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
 }
 
 @test "dr drill: hub-up inherits its dedicated Vault cache service and teardown purges it" {
+  cat > "$STUB_BIN/secret-tool" <<'STUB'
+#!/usr/bin/env bash
+{ printf 'secret-tool'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
+[[ "$1" == lookup ]] || exit 0
+exec "$DR_SECURITY_REAL" find-generic-password -s "$3" -a "$5" -w
+STUB
+  chmod +x "$STUB_BIN/secret-tool"
   run_drill
   [ "$status" -eq 0 ]
   grep -q 'hub-up k3d-dr-drill|dr-drill|.*|1|k3dm-vault-unseal-drill' "$PHASE_LOG"
-  grep -q 'security .*k3dm-vault-unseal-drill' "$PHASE_LOG"
-  [ "$(grep -c 'security .*k3d-manager-vault-unseal' "$PHASE_LOG" || true)" -eq 0 ]
+  grep -Eq '(security|secret-tool) .*k3dm-vault-unseal-drill' "$PHASE_LOG"
+  [ "$(grep -Ec '(security|secret-tool) .*k3d-manager-vault-unseal' "$PHASE_LOG" || true)" -eq 0 ]
 }
 
 @test "dr drill: teardown uses the drill service even when its environment is unset" {
