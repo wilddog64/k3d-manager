@@ -176,6 +176,10 @@ same file.
     (`test_kine_compaction_stalled.py`: a stale timestamp with a healthy API and no slow queries
     fires the rule in promtool, routes to `platform-warning` and reaches the fake receiver). It lands after the e2e-stale fix because both edit
     `prometheusrule.yaml`.
+  - [`hermes-kine-evidence-not-human-readable`](bugs/2026-10-11-hermes-kine-evidence-not-human-readable.md)
+    (operator, 2026-10-11, P3): `scripts/lib/hermes/sensors.py` `kine` evidence only. Stall age
+    first, `1.9 GiB` / `8d 9h`, so the finding survives table truncation and stops minting a
+    `hermes_sensor_status` series every poll. Dispatched after the kine stall fix landed.
   - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
     `shopping-cart-frontend`.
   - [`bug-dashboard-cannot-list-open-bugs`](bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md)
