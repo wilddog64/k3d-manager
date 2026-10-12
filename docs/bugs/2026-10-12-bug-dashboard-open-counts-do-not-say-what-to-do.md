@@ -78,7 +78,7 @@ Add two labels to `k3dm_bug_open_info`:
 | `scripts/lib/hermes/prior_art.py` | `_CLOSED_RE` words |
 | `bin/k3dm-vectordb-metrics` | `phase` + `status` labels |
 | `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` | table columns + stat descriptions |
-| `scripts/tests/bin/test_k3dm_vectordb_metrics.py` | tests below |
+| `scripts/tests/bin/test_vectordb_bug_metrics.py` | tests below |
 | `scripts/tests/plugins/grafana_dashboard_bugs.bats` | tests below |
 | `docs/guides/grafana-dashboards.md` | section above |
 | `CHANGELOG.md` | `[Unreleased]` entry |
@@ -104,7 +104,7 @@ BATS (`grafana_dashboard_bugs.bats`):
 Mutations (each must turn a test red): map `IMPLEMENTED` to `not started` (test 1); drop
 `WITHDRAWN` from `_CLOSED_RE` (test 3); remove the Open P1 description (test 7).
 
-Gates: `pytest scripts/tests/bin/test_k3dm_vectordb_metrics.py`,
+Gates: `pytest scripts/tests/bin/test_vectordb_bug_metrics.py`,
 `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`, `make test`, `make test-pytest`.
 
 ## Proof it works
