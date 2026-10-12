@@ -96,6 +96,9 @@ Healthy kine compacts every 5 minutes (288 cycles a day, each one logs three `CO
 | `scripts/etc/argocd/platform-ops/prometheusrule.yaml` | `HubKineCompactionStalled` |
 | `scripts/tests/hermes/test_hermes.py` | sensor and probe tests |
 | `scripts/tests/plugins/hermes_alert_rules.bats` | rule assertions |
+| `scripts/tests/observability/test_kine_compaction_stalled.py` | new: promtool fire, delivery to `platform-warning` |
+| `scripts/tests/plugins/alertmanager_config_secret.bats` | amtool route assertion |
+| `Makefile` | `test-alertmanager-behaviour` also runs the new file |
 | `docs/howto/hub-rebuild-from-gitops-vault.md`, Hermes guide | sections above |
 | `CHANGELOG.md` | `[Unreleased]` entry |
 
@@ -114,6 +117,55 @@ Healthy kine compacts every 5 minutes (288 cycles a day, each one logs three `CO
 
 `hermes_alert_rules.bats`: `HubKineCompactionStalled` exists in group `hermes` with
 `severity: warning`, `for: 15m`, and an expr on `k3dm_hub_kine_last_compaction_timestamp_seconds`.
+
+### Targeted regression test: the alert fires, and the notification reaches its destination
+
+Operator, 2026-10-11: "simulate a stale last-successful-compaction timestamp while the Kubernetes
+API remains healthy and slow-query counts are zero. Verify that `HubKineCompactionStalled` fires and
+that the notification reaches its intended destination." This is the failure that went unalerted
+from 2026-10-08 to 2026-10-11, so it gets an end-to-end test, not only unit tests.
+
+The test is a new `scripts/tests/observability/test_kine_compaction_stalled.py`. Mark it
+`pytest.mark.external` like `test_alertmanager_notify_behaviour.py`, because it runs pinned images
+in Docker. It has three stages and reuses that file's `Sink` and Alertmanager fixture (import them
+or move them to a shared `conftest.py`; do not copy them).
+
+1. **Rule evaluation (promtool).** Extract `spec.groups` from `prometheusrule.yaml` into a temporary
+   rules file, then run `promtool test rules` from `quay.io/prometheus/prometheus:v3.1.0` (the
+   version the hub runs). Input series over 60 minutes at a 1-minute interval:
+   - `k3dm_hub_kine_last_compaction_timestamp_seconds` fixed at `0` (stale from the start);
+   - `k3dm_hub_kine_state_db_bytes` steady at 2e9;
+   - `up{job="apiserver"}` = 1 throughout (the API is healthy);
+   - no slow-query series at all.
+
+   Expected:
+   - **firing** at `eval_time: 46m`, with labels `group=hermes, severity=warning, cluster=hub`;
+   - **not firing** at `eval_time: 44m`, inside the `for: 15m`;
+   - `KubeAPIDown` not firing at 46m, if the extracted rules include it, which proves the API was
+     modelled as healthy.
+
+   A second case advances the timestamp every 5 minutes (healthy compaction) and asserts no
+   `HubKineCompactionStalled` at 60m.
+2. **Routing (amtool).** Render `alertmanager.yaml.tmpl` as `alertmanager_config_secret.bats`
+   does. Then `amtool config routes test alertname=HubKineCompactionStalled group=hermes
+   severity=warning cluster=hub` must print exactly `platform-warning`, not `sms-critical` or
+   `null`. Put this assertion in `alertmanager_config_secret.bats` next to the existing route tests.
+3. **Delivery (real Alertmanager, fake receiver).** With the existing fixture (pinned
+   `alertmanager:v0.27.0`, email receivers rewritten to webhooks into the `Sink`), POST the alert
+   with stage 1's labels and annotations to `/api/v2/alerts`. Assert:
+   - the sink receives one notification on path `/platform-warning` and none on `/sms-critical`;
+   - the payload's `commonLabels.alertname` is `HubKineCompactionStalled`;
+   - the description contains "Do NOT restart", so the warning reaches the reader.
+
+Mutation: change the rule's `severity` to `critical`. Stage 1 still fires, but stages 2 and 3 must
+fail (it would route to SMS). Change the threshold to `> 3600`; stage 1 must fail at 46m.
+
+`make test-alertmanager-behaviour` runs both observability files. CI skips external tests, so the
+verifier runs this target locally and pastes the result. The test never touches the real hub,
+Pushgateway or Alertmanager.
+
+**Live check after the fix lands** (in "Proof it works"): the real email arrives at the
+`platform-warning` address while the current hub still has dead compaction.
 
 Mutations (each must turn a test red): drop `stalled` from `raw`; match `compact` case-insensitively;
 take the first `COMPACT deleted` line instead of the last.

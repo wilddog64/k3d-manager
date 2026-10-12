@@ -172,7 +172,9 @@ same file.
   - [`hermes-kine-sensor-misses-dead-compaction`](bugs/2026-10-11-hermes-kine-sensor-misses-dead-compaction.md)
     (operator, 2026-10-11, **P2, dispatch first**): `bin/k3dm-hermes`, `scripts/lib/hermes/sensors.py`,
     `prometheusrule.yaml` (new `HubKineCompactionStalled`), `test_hermes.py`,
-    `hermes_alert_rules.bats`. It lands after the e2e-stale fix because both edit
+    `hermes_alert_rules.bats`, plus the operator's end-to-end regression test
+    (`test_kine_compaction_stalled.py`: a stale timestamp with a healthy API and no slow queries
+    fires the rule in promtool, routes to `platform-warning` and reaches the fake receiver). It lands after the e2e-stale fix because both edit
     `prometheusrule.yaml`.
   - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
     `shopping-cart-frontend`.
