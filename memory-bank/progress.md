@@ -1,5 +1,6 @@
 - [x] v1.43.1 PR #140 MERGED 38fbf3ab; tag + release v1.43.1; enforce_admins restored; next branch k3d-manager-v1.43.2.
 - [ ] v1.43.2 bug: hub-recover-all never rebuilds the hub (P2) — spec filed, dispatched to Codex; operator then runs `make hub-recover-all` to clear dead kine.
+- [ ] v1.44.0 bug (queued for Codex with the two Vault bugs): docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md — phase 1 detect/alert only.
 - [ ] After the hub rebuild: CVE patch-window plan doc (Claude; operator approved "sure" 2026-10-11) — separate from the rebuild.
 - [x] v1.43.2 kine readability (P3): LANDED 40f99b0e with the assert-removed marker after lib-foundation PR #65 merged (f987c40) and subtree pull 1a94dd98; lib-foundation v0.5.2 released (PR #66 f5cef1e, tag + GH release), subtree 277b2643. LIVE-PROVEN 2026-10-11 (Hermes evidence `last compaction 8d 10h ago; state.db 1.9 GiB; ...`).
 - [x] v1.43.2: operator make appsets-reapply + appsets-check (done 2026-10-11: 5/5 hub + 8/8 app-cluster, all 21 refs on k3d-manager-v1.43.2). Still open: planned hub rebuild (make hub-recover-all); dispatch batch 1 (kine sensor bug first).
