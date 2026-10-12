@@ -177,6 +177,9 @@ same file.
   - [`dispatch-dashboard-landing-success-no-data`](bugs/2026-10-11-dispatch-dashboard-landing-success-no-data.md)
     (operator, 2026-10-11): `grafana-dashboard-agent-dispatch.yaml` (panel 2 only),
     `agent_dispatch_dashboard.bats`. The numerator needs `sum()` like the denominator.
+  - [`checkout-loadtest-dashboard-deployed-to-hub`](bugs/2026-10-11-checkout-loadtest-dashboard-deployed-to-hub.md)
+    (operator, 2026-10-11): `grafana-dashboards-acg.yaml` (in-cluster exclude),
+    `grafana_dashboard_appsets.bats`, `docs/guides/grafana-dashboards.md`.
   - [`dispatch-dashboard-no-per-spec-cost-or-time`](bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md)
     (operator, 2026-10-11): same agent and dispatch as the landing-success fix (same dashboard file),
     plus `bin/k3dm-dispatch-metrics` and its pytest. Readable token stat, a Per spec table (tokens,
@@ -282,6 +285,14 @@ commit, unless a recorded override is given. Scope:
 
 **Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
 [`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
+
+**Scheduled baseline load test** (operator, 2026-10-11, after the Checkout Load Test dashboard was
+found empty). A light 5–10 VU baseline every 12h keeps the k6 panels filled, plus a full stress run
+as a gate for major releases. Moved from the never-cut v1.41.1. Credentials and preflight come
+first. Its life is bounded: v2.0.0 retires shopping-cart and v1.50.0 re-points the load test.
+Scope: [`v1.48.0-loadtest-credentials-and-preflight.md`](plans/v1.48.0-loadtest-credentials-and-preflight.md),
+then [`v1.48.0-scheduled-baseline-loadtest.md`](plans/v1.48.0-scheduled-baseline-loadtest.md).
+v1.48.0 is at 3 of 5 plans.
 
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
