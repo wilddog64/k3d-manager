@@ -1,3 +1,4 @@
+- 2026-10-12: v1.45.1 bug-count plan verified against code; P3 + Approval added (ea4e600c). Waits for v1.44.0 doc_lifecycle.
 - 2026-10-12: SCHEDULE — Thursday 2026-10-15 start 15:30–16:00 local (Claude quota resets 15:00). Codex idle; 8 worktrees await verify+land, hub-recover-all-rebuild first, then operator make hub-recover-all, then the other 7 one at a time.
 - 2026-10-12: Filed orbstack-update-is-invisible-to-monitoring (P3, v1.44.0, operator "go ahead"): hourly Hermes-run `orbctl update --check` + version to Pushgateway, email-only OrbStackUpdateAvailable, upgrade annotation. Phase 2 (scheduled `orbctl update`) gated on both Vault fixes + operator window.
 - 2026-10-12: Bug-doc status cleanup scheduled for v1.50.1 (operator); roadmap row added. Dashboard phase bug held from the Codex queue until cannot-list lands (dispatcher has no base option).
