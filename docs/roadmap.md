@@ -164,9 +164,6 @@ same file.
 - **Batch 1:** three agents in parallel, code and stubbed tests only.
   - [`offline-suite-count-floor-stale-and-partial-runs`](bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md):
     `Makefile`, `bin/k3dm-test-metrics`, `rules-acg/k3dm-tests.yaml`.
-  - [`secret-store-data-puts-value-in-security-argv`](bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md)
-    and [`…-reports-success-on-failed-keychain-write`](bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md):
-    one agent in lib-foundation, then a subtree-pull here.
   - [`e2e-stale-alert-fires-for-an-idle-runner`](bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md):
     `prometheusrule.yaml` (`E2EVerificationStale` only), `e2e_observability.bats`.
   - [`hermes-kine-sensor-misses-dead-compaction`](bugs/2026-10-11-hermes-kine-sensor-misses-dead-compaction.md)
@@ -180,8 +177,6 @@ same file.
     (operator, 2026-10-11, P3): `scripts/lib/hermes/sensors.py` `kine` evidence only. Stall age
     first, `1.9 GiB` / `8d 9h`, so the finding survives table truncation and stops minting a
     `hermes_sensor_status` series every poll. Dispatched after the kine stall fix landed.
-  - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
-    `shopping-cart-frontend`.
   - [`bug-dashboard-cannot-list-open-bugs`](bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md)
     (operator, 2026-10-11): `bin/k3dm-vectordb-metrics`, `grafana-dashboard-bugs.yaml` and their
     tests. An "Open bugs" table under "All open bugs": Priority, Bug (title, linked), Filed, Open for.
@@ -203,6 +198,18 @@ same file.
   - the e2e payments assertion needs only the operator's live Tier 1 rerun;
   - hub CPU overcommit (August) and data-layer `RespectIgnoreDifferences` (June) need re-triage
     against today's hub first.
+
+### Candidate milestone — v1.43.3
+
+**Bug-fix-only patch release for the fixes that live in other repos** (operator, 2026-10-12: moved
+out of v1.43.2). The k3d-manager dispatcher only works in this repo, so each fix is worked in its own
+repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
+
+- [`secret-store-data-puts-value-in-security-argv`](bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md)
+  and [`…-reports-success-on-failed-keychain-write`](bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md):
+  one agent in lib-foundation, release, then a subtree-pull on `k3d-manager-v1.43.3`.
+- [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
+  `shopping-cart-frontend`, branch `fix/index-html-no-cache`.
 
 ### Candidate milestone — v1.44.0
 
