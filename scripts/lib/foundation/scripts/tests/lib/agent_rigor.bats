@@ -63,6 +63,69 @@ teardown() {
   [[ "$output" == *"assertions removed"* ]]
 }
 
+@test "_agent_audit allows removed Python assertions with an added marker" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add assertion test" >/dev/null
+  printf 'def test_one():\n  assert value2  # agent-audit: allow assert-removed format changed\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"assert-removed allow marker"* ]]
+  [[ "$output" == *"assert value"* ]]
+}
+
+@test "_agent_audit requires a reason for assert-removed marker" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add assertion test" >/dev/null
+  printf 'def test_one():\n  assert value2  # agent-audit: allow assert-removed\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"assertions removed"* ]]
+}
+
+@test "_agent_audit applies assert-removed marker per file" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value\n' > tests/test_a.py
+  printf 'def test_two():\n  assert other\n' > tests/test_b.py
+  git add tests
+  git commit -m "add assertion tests" >/dev/null
+  printf 'def test_one():\n  assert value2  # agent-audit: allow assert-removed format changed\n' > tests/test_a.py
+  printf 'def test_two():\n  pass\n' > tests/test_b.py
+  git add tests
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"tests/test_b.py"* ]]
+}
+
+@test "_agent_audit ignores an already-committed assert-removed marker" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value  # agent-audit: allow assert-removed committed marker\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add marked assertion test" >/dev/null
+  printf 'def test_one():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"assertions removed"* ]]
+}
+
+@test "_agent_audit does not allow marker to hide test count decrease" {
+  mkdir -p tests
+  printf 'def test_one():\n  assert value\n\ndef test_two():\n  pass\n' > tests/test_a.py
+  git add tests/test_a.py
+  git commit -m "add assertion tests" >/dev/null
+  printf 'def test_one():\n  assert value2  # agent-audit: allow assert-removed format changed\n' > tests/test_a.py
+  git add tests/test_a.py
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"test functions decreased"* ]]
+}
+
 @test "_agent_audit detects @test count decrease" {
   mkdir -p tests
   local at='@'
@@ -494,6 +557,8 @@ SCRIPT
   run _agent_audit
   [ "$status" -ne 0 ]
   [[ "$output" == *"assertions removed"* ]]
+  [[ "$output" == *"assert value"* ]]
+  [[ "$output" == *"tests/test_a.py"* ]]
 }
 
 @test "_agent_audit allows added Python test functions" {

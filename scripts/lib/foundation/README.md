@@ -139,8 +139,14 @@ subprocess.run(cmd, shell=True)  # agent-audit: allow shell-true cmd is a fixed 
 The rule names are `shell-true`, `eval`, `exec`, `sudo` and `sensitive-flag`. Shell scripts that
 run a privileged command on another host use the trailing marker `# agent-audit: remote-sudo`.
 
-An edited assertion counts as removed. If a test change really needs it, the operator commits
-with `--no-verify` knowingly; an agent never does.
+An edited assertion counts as removed. If an assertion replacement is intentional, add the marker
+to an added line in that file with a non-empty reason; it is visible in the audit output:
+
+```python
+assert value2  # agent-audit: allow assert-removed format changed
+```
+
+The marker does not exempt a decrease in Python test-function count.
 
 `_agent_lint` (opt-in AI lint, `ENABLE_AGENT_LINT=1`) reviews staged files matching
 `AGENT_LINT_GLOBS` (default `*.sh *.js *.md`).
