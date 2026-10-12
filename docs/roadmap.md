@@ -219,6 +219,10 @@ authenticates the submitter, lets one request route its Slack notices to an appr
 turns the operator's manual acceptance checks into repeatable scenarios with evidence. Branch
 `k3d-manager-v1.44.0`, cut from `main` after v1.43.2 merges.
 
+Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack upgrade restarted the hub):
+- `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (P2): the watchdog retries for up to a minute while Vault boots.
+- `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (P3): a read-only `vault_seal` Hermes sensor; no repair.
+
 | Spec | What it adds |
 |---|---|
 | [`v1.44.0-cloud-request-submitter-authentication.md`](plans/v1.44.0-cloud-request-submitter-authentication.md) | Verify which agent submitted a request before the action and argument allowlists run. |

@@ -1,3 +1,4 @@
+- 2026-10-12: Filed for v1.44.0 (operator): vault-unseal-watchdog-gives-up-while-vault-boots (P2) + hermes-has-no-vault-sealed-sensor (P3, read-only, no repair). Roadmap v1.44.0 section updated.
 - 2026-10-12: Operator approved dispatch-dashboard-per-spec. Dispatch it only after landing-success lands (same dashboard file), Thu.
 - 2026-10-12 04:53: Codex queue 2 COMPLETE: both DR-drill worktrees exited 0, in-scope, unverified; set-u skipped vault.sh (check on Thu).
 - 2026-10-12: Bugs dashboard "Open, untriaged" = 1 was the reopened 2026-09-09 kine stall bug (pre-Priority-rule, no Priority line). Added P2 (`365f0de5`); clears on the next Hermes cycle (producer reads the checkout).
