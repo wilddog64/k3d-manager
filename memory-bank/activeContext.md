@@ -1,3 +1,4 @@
+- 2026-10-12: Open P1 = node-health-watch dead-kubelet-tunnel bug, IMPLEMENTED in v1.42.0, awaiting a natural recurrence (not an outage). Filed bug-dashboard-open-counts-do-not-say-what-to-do (P3, v1.43.2) so the dashboard says so.
 - 2026-10-12: Filed for v1.44.0 (operator): vault-unseal-watchdog-gives-up-while-vault-boots (P2) + hermes-has-no-vault-sealed-sensor (P3, read-only, no repair). Roadmap v1.44.0 section updated.
 - 2026-10-12: Operator approved dispatch-dashboard-per-spec. Dispatch it only after landing-success lands (same dashboard file), Thu.
 - 2026-10-12 04:53: Codex queue 2 COMPLETE: both DR-drill worktrees exited 0, in-scope, unverified; set-u skipped vault.sh (check on Thu).
