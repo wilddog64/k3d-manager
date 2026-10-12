@@ -1,891 +1,166 @@
-## 2026-10-06 — ask-docs summary failure bug filed (OPEN, v1.41.0)
-
-docs/bugs/2026-10-06-ask-docs-model-failure-reported-as-success.md records operator Slack
-10:44/10:48 AM: agy exit 1, Gemini timed out. Cause of CLI failure unknown; host not probed.
-Current branch returns an unavailable sentinel as prose and writes job success; captured CLI
-detail is deleted. Acceptance covers honest outcome reporting, retained sources, bounded scrubbed
-failure metadata, and useful fallback budgets. Cheaper/cross-provider routing is optional design.
-Existing fake-CLI fallback tests: system Python 8/8; runtime spawn unsupported, pytest unavailable.
-Docs only; no runtime fix/provider switch. Local vector dedup unavailable; indexing unverified.
-
-## 2026-10-06 — Empty Make-log regression traced; older canonical bug reopened
-
-Reopened docs/bugs/2026-09-28-make-jobs-never-write-output-file.md and cross-linked the
-October 6 evidence report. Commit 73d0ef5682ed33f4792ab82181f37d41497fc96e removed the
-scrubbed output write when switching to streaming make.log; HTTP reader still expects output.
-Producer tests were changed to make.log and explicitly absent output, missing the consumer contract.
-Current acceptance: bounded redacted shared selection across cloud status and Slack consumers.
-Operator's pasted find-similar-docs result confirms September/October reports were indexed.
-Deployed revision and host logs remain unverified; underlying suite failures unknown.
-Documentation only; no runtime fix or additional test job.
-
-## 2026-10-06 — Existing empty-log bug extended to Slack and E2E
-
-Updated `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: operator sees
-automatic Slack output but cannot retrieve E2E job 033ceddc via logs. Slack thread logs,
-diagnosis, and ask context omit make.log; cloud job-status also omits it. E2E final response
-17:36:37Z is failed with empty output; failure cause remains unknown. Exact Slack command/error
-not supplied, so thread association versus file lookup must be distinguished in live verification.
-Added shared-selector/redaction/regression acceptance; no runtime changes or new test requests.
-
-## 2026-10-06 — Second bridge test job succeeds but returns no log
-
-`make-test-python-unit`, request `20261006T165715Z-make-test-python-unit`, job `5cc7f225`:
-terminal success at 16:58:14Z, output empty, summary artifact only. Added evidence to
-`docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`. Passing and failing Make
-jobs both lose log visibility; host fix pending. No assertion/count details available remotely.
-
-## 2026-10-06 — Cloud Make job-status empty output bug filed (OPEN, v1.41.0)
-
-`docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`: test-all job ccc20dc9
-FAILED at 16:47:47Z; final bridge response has output="" and summary only. Code mismatch:
-Make executor writes make.log; job-status reads only output. Test failure cause remains unknown.
-Fix acceptance covers bounded log selection, redaction, legacy output, and regression cases.
-Docs only; live host log not accessed, similarity unavailable, vector ingestion not verified.
-
-## 2026-10-06 — Cloud test-all Grafana publication gap filed (OPEN, v1.41.0)
-
-`docs/bugs/2026-10-06-cloud-bridge-test-all-does-not-publish-grafana-metrics.md` records
-real bridge request `20261006T163821Z-make-test-all`, job `ccc20dc9` (queued, then running).
-Code shows test-all does not call the test metrics exporter; only test-metrics publishes.
-Proposed acceptance: publish the captured result once without rerunning tests or hiding failures.
-No runtime changes; terminal test result, live dashboard, and vector ingestion not verified.
-Similarity retrieval unavailable; offline dedup distinguished the nightly push-failure bug.
-
-## 2026-10-06 — Order-service Go Dependabot coverage gap documented (v1.41.0)
-
-Filed `docs/bugs/2026-10-06-shopping-cart-order-go-dependabot-coverage-gap.md`.
-Application issue #81 / PR #82: missing gomod /go and docker /go coverage fixed and merged
-as `fc3fae5a24675b464c2c72ed27b747cc1ef74b86`; Java CI and coverage guard green.
-Application module upgrade, image promotion, running-pod rescan, and vector ingestion remain
-unverified. Report is in the tracked index-docs corpus; next index run must include this commit.
-Similarity lookup unavailable (no embeddings credential / kubectl); offline dedup found no match.
-Documentation only; no k3d-manager runtime changes or live tests.
+# Progress — lib-foundation
+
+- [x] **v1.26.0 fleet lifecycle Phase A (2026-08-20):** commit `8148e33` (`feat(acg): make
+  CloudFormation agent fleet count-agnostic`) pushed to `origin/feat/v0.4.12`. The ACG module now
+  validates `ACG_AGENT_COUNT` before AWS access, emits N discrete agent resources/outputs to a
+  temporary template, and discovers all agent public IPs in order. Added `scripts/tests/lib/acg.bats`
+  (6 tests); focused lib-acg BATS 11/11, default shellcheck, and `AGENT_AUDIT_MAX_IF=8` passed.
+  Claude must release/tag lib-foundation and subtree-pull before Phase B begins; no live AWS action
+  was run by Codex.
 
-# Progress — k3d-manager
-
-> Compressed 2026-10-06 (v1.41.0 release prep). Full pre-compression detail:
-> `memory-bank/archive/progress-2026-10-06.md`. Settled work lives in `CHANGELOG.md`,
-> `docs/releases.md`, `docs/retro/`, `docs/issues/`, `docs/bugs/` and git history.
-> This file tracks what is still open. Every unchecked item (and every checked item that still
-> carries an inline `[ ]` sub-step) is retained verbatim below, under the heading it was filed
-> under. Many pre-v1.41.0 items are likely stale: triage them against the tree before acting.
+- [x] **ACG CDP BATS isolation (2026-08-20):** browser-launch tests now use `HOME=$BATS_TEST_TMPDIR`
+  and explicit listener-probe mocks, eliminating false failures from the operator's live Chrome/CDP
+  state and protected log path. Clean-env focused BATS 5/5 and ACG Jest 7 suites/22 tests pass;
+  shellcheck and agent-rigor pass. Live `make credential-test PROVIDER=aws` also passes after the
+  authenticated CDP session is reused: `ACG_SESSION_OK`, four copyable inputs extracted, and
+  `sts:GetCallerIdentity OK`.
 
-## Release ledger
+## v0.4.4 Track (branch: `feat/v0.4.4`) — js-yaml advisory fix
+
+- [x] **DONE (Codex, 2026-07-13) — close GHSA-h67p-54hq-rp68 in `scripts/lib/acg/package-lock.json`:** `docs/plans/v0.4.4-bugfix-js-yaml-dos.md`. Implemented as commit **`db9f5b2`** (`fix(acg): bump js-yaml to 3.15.0 to close DoS advisory GHSA-h67p-54hq-rp68`) on `origin/feat/v0.4.4`. Scope held to the exact 2 target files only: `scripts/lib/acg/package-lock.json` updates the dev-only transitive `js-yaml` node `3.14.2` → `3.15.0`, and `CHANGE.md` adds the `### Security` entry under `[Unreleased]`. The lockfile update was generated by `npm update js-yaml --package-lock-only --prefix scripts/lib/acg` and verified to be the expected 3-line diff only (`version`/`resolved`/`integrity`); `scripts/lib/acg/package.json` stayed unchanged. Validation passed with `npm ci --prefix scripts/lib/acg`, `npm audit --prefix scripts/lib/acg` (`found 0 vulnerabilities`), clean-env BATS `scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats` (`1..69`, all pass), and `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh` (exit 0). Downstream subtree-pull into `k3d-manager` remains a separate Claude follow-up after release/tag.
+
+## v0.4.3 Track (next branch: `feat/v0.4.4`) — ACG session-check hardening
+
+- [x] **PR #35 SQUASH-MERGED to main (`b7d08b3`, 2026-07-07)** — ACG session-check render-race false-negative fix. Post-merge done: main fast-forwarded, release stamped `## [v0.4.3] — 2026-07-07` via direct-to-main commit `5a9bfbe` (matches v0.4.0–v0.4.2 pattern), **TAGGED v0.4.3** (annotated tag at `5a9bfbe`; GitHub release published), `feat/v0.4.4` cut from the stamp, retro `docs/retro/2026-07-07-v0.4.3-retrospective.md`. No branch protection on main → no enforce_admins to restore. Copilot round: 4 threads (3× worst-case probe timing → fixed by parallelizing `anyVisible` `487b2f9`; 1× `.catch` sync-`TypeError` on a mock → resolved by-design); findings `docs/issues/2026-07-07-copilot-pr35-review-findings.md`. **Downstream: k3d-manager subtree-pulled v0.4.3** into `scripts/lib/foundation/` (merge `f39b2282`, squash split `8cd7cee5`, `0ce4d0b8..5a9bfbe0`) on `k3d-manager-v1.14.0`, pushed; parallel-`anyVisible` + v0.4.3 changelog verified in the subtree copy.
+- [x] **DONE (Claude applied directly, 2026-07-07, `d803a00` on `origin/feat/v0.4.3`) — ACG session check render-race false-negative:** `docs/bugs/2026-07-07-acg-session-check-render-race-false-negative.md`. An already-signed-in reused CDP browser still triggered `ACTION REQUIRED: Please log into Pluralsight` during `make up` because the single-shot `pageLooksLoggedIn` probed the sandbox SPA before it painted (nav uses `domcontentloaded` + swallowed `.catch`). Fix (3 files: `pluralsight_login.js`, `acg_session_check.js`, `tests/providers/pluralsight_login.test.js`) adds a backward-compatible retry loop, a `networkidle` settle + `{attempts:4}` initial probe, and a jest regression test. No selector/credential-gating changes. Commit msg `fix(acg): retry logged-in detection to stop session-check render-race false negative`. Landed 4 files (Change 4 = `tests/providers/acg_session_check.test.js` mock gains `waitForLoadState`, a spec gap Codex flagged and the spec was amended in `92180ee`). Gates green (`node --check`, `npm run check`, `npm test` 15/15); regression proven (revert Change 1 → `attempts:4` test red). Next: PR to main + subtree-pull into k3d-manager.
+
+## v0.4.0 Track (next branch: `feat/v0.4.1`) — Absorb lib-acg
+
+- [x] **PR #32 MERGED to main (`aed8c56`, 2026-06-23T01:14Z)** — v0.4.0 acg absorption shipped (9 commits, 44 files). main fast-forwarded; `feat/v0.4.1` cut from the merge SHA; retro `docs/retro/2026-06-22-v0.4.0-retrospective.md`. **TAGGED v0.4.0** (2026-06-22, `647408a` on feat/v0.4.1): CHANGE.md split `[Unreleased]` → `## [v0.4.0]` + back-filled `## [v0.3.19]`; tag at merge `aed8c56`; GitHub release published. Drift resolved — tag v0.3.19 (`45040e2`) had no section; v0.3.18 + v0.3.20 never existed. Standing docs audited: `copilot-instructions.md` current (PR added acg coverage), acg functions live in `docs/api/acg.md` (not `functions.md`), `projectbrief.md` n/a for lib-foundation. No branch protection on main → no enforce_admins to restore.
+- [x] **Phase 0: finalize lib-acg standalone** — DONE (2026-06-22). lib-acg PR #46 merged; tagged `v0.1.9` (gravestone release) on `7708ae31`; GitHub release published; `enforce_admins` restored. Migration source SHA = `7708ae31b4cd17c1cf81209f07adc88866301b37`.
+- [x] **Phase 1: import lib-acg runtime tree as `scripts/lib/acg/`** — imported `0a7b6dd`, **VERIFIED WITH GAPS** (Claude, 2026-06-22). Spec: `docs/plans/v0.4.0-phase1-import-acg-module.md` (committed `716379f`). Core rewiring correct (clean tree-copy, `cdp.sh`/`gcp.sh` guarded `../system.sh` bootstrap, `acg.sh` flattened paths, line-188 dispatcher NOTE deferred to Phase 2, `package.json` check extended, independent `acg` CI job, docs). Codex added a legitimate but unsolicited finding doc `docs/issues/2026-06-22-acg-cluster-cidr-audit-allowlist.md` (CloudFormation CIDRs trip `_agent_audit`) — kept. Two spec omissions found → see follow-up below.
+- [x] **Phase 1 follow-up: root entry points + missing playwright config** — DONE (`e6cecef`, 2026-06-22). Spec: `docs/plans/v0.4.0-phase1-followup-root-entrypoints.md`. Imported `scripts/lib/acg/playwright.config.js`, moved `bin/acg-credential-test` + `bin/acg-extend-test` to repo-root `bin/`, added root `Makefile`, repointed `REPO_ROOT` to `../scripts/lib/acg`, fixed the `acg` CI shellcheck path, and updated docs/CHANGE. Validation passed (`npm ci`, `npm run check`, `npm test`, `shellcheck -S warning bin/acg-credential-test bin/acg-extend-test`, `make help`, `make lint`, `make test`, `git diff --check`). The first Playwright run hit a sandbox-only `EPERM` mkdir on `scripts/lib/acg/test-results`; the rerun with elevated access passed and is documented in `docs/issues/2026-06-22-lib-foundation-playwright-test-results-permission.md`.
+- [x] **Phase 1 follow-up REGRESSION FIX: keep bin/ module-local** — DONE (`cf3ad7a`, 2026-06-22). The `e6cecef` repo-root `bin/` hoist regressed the live Playwright sandbox-delete flow ("Element is outside of the viewport") on `make credential-test PROVIDER=aws`. Root cause isolated by a byte-for-byte lib-acg copy experiment: both layouts resolve `REPO_ROOT` to the same absolute path, so the only runtime difference is the **working directory at launch** (repo root vs `scripts/lib/acg`). Running from the module dir — matching upstream lib-acg exactly — works. Reverted the hoist: `bin/` back to `scripts/lib/acg/bin/` (`REPO_ROOT=".."`), Makefile `cd`s into the module, CI shellcheck override dropped, docs/CHANGE realigned, added `.gitignore` (node_modules/, test-results/, etc.). **Live `make credential-test PROVIDER=aws` PASSED.** All CI gates green locally (`make lint`, `make check`, `npm test` 10/10). PR pending.
+- [x] **PR #32 hardening (Copilot findings) — DONE (`cbe203f`, Claude applied directly per user "review, address, resolve")** — spec `docs/bugs/2026-06-22-acg-cdp-env-and-creds-injection-hardening.md`. All 12 Copilot findings addressed (2 Makefile in `f3f2fbd`; 10 imported-code in `cbe203f`): threaded `PLAYWRIGHT_CDP_HOST/PORT` through `cdp.sh`/`acg.sh`/`acg_extend.js`/`acg_restart.js`/`acg_session_check.js`; replaced `gcp.sh` `source <creds>` with allowlisted no-eval parser (A03); `output.js` `chmodSync` for existing creds files; fixed `vars.sh` stale paths. Gates green (`npm run check`, `npm test` 10/10, `shellcheck -S warning`); **CI green on `cbe203f`**; all 12 Copilot threads replied + **resolved (0 unresolved)**. Defaults unchanged (127.0.0.1:9222). Triage doc `docs/issues/2026-06-22-copilot-pr32-review-findings.md`. **MERGE GATE MET (2026-06-22):** live `make credential-test PROVIDER=aws` re-run PASSED both scenarios (sandbox-exists reuse + sandbox-delete/restart), final `sts:GetCallerIdentity OK` — CDP hardening did not regress the live flow. lib-foundation `main` has NO branch protection (404 "Branch not protected"), so no enforce_admins to disable; PR #32 mergeable on user approval. GCP/`PLAYWRIGHT_CDP_PORT`-override paths still not live-exercised (low risk; defaults unchanged).
+- [x] **FOLLOW-UP DONE (`0614642`, 2026-06-23): `acg-credential-test:277` undefined `_sts_valid` fixed** — replaced with inline `AWS_CONFIG_FILE=/dev/null aws sts get-caller-identity >/dev/null 2>&1` (matches the line-292 final gate). Pre-existing, verbatim from lib-acg `7708ae31`; the undefined call exited 127 → `!` always-true → spurious sandbox restart on every happy-path AWS run. Spec `docs/bugs/2026-06-23-acg-credential-test-undefined-sts-valid.md`; bash -n + shellcheck clean. Must land BEFORE the k3d-manager acg Phase 2 subtree pull (upstream-first).
+- [ ] **Phase 2: rewire k3d-manager** — drop old acg subtree, repoint stub, one subtree left. Separate spec on next k3d-manager branch.
+- [ ] **Phase 3: archive lib-acg repo** — README banner + GitHub archive (do not delete).
+
+## v0.4.1 Track (next branch: `feat/v0.4.2`) — ACG headless Pluralsight auto-login
 
-Canonical: `docs/releases.md` (full history) and the README releases table (3 most recent).
-Per-release detail: `CHANGELOG.md` and `docs/retro/`.
+- [x] **PR #33 MERGED to main (`b7c849c`, 2026-07-06T02:56Z)** — headless Pluralsight auto-login + non-interactive fast-fail. Codex-implemented per 22-step spec, independently verified (SHAs on origin, scope under `scripts/lib/acg/`, creds via env not argv, `_secret_load_data <service> <key>` order). **TAGGED v0.4.1** (annotated tag at merge; GitHub release published). `feat/v0.4.2` cut from merge SHA; retro `docs/retro/2026-07-06-v0.4.1-retrospective.md`; CHANGE.md stamped `## [v0.4.1]`. No branch protection → no enforce_admins to restore.
+- [x] **Copilot PR #33 round** — 4 findings: #1 hard-coded CDP port in expiry msg (fixed, use `${CDP_URL}`), #2 `close()` vs `disconnect()` (DECLINED — `Browser.disconnect()` absent in Playwright 1.60.0), #3 duplicate no-creds tests → distinct no-creds + MFA-refuse branches (fixed), #4 retro version-history inconsistency (fixed). All 4 threads resolved. Fix `d9405bc`. Triage `docs/issues/2026-07-05-copilot-pr33-review-findings.md`.
+- [x] **Downstream: k3d-manager subtree-pull v0.4.1** — DONE (merge `67b466db`, split `aed8c56`→`b7c849c6`, 13 files under prefix). In-place `npm ci`+`npm test` green (5 suites/13 tests).
+- [x] **v0.4.2 BUG #1: headless session gate never wired into `_browser_launch`** — spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-browser-launch.md`. `_cdp_ensure_acg_session`/`acg_session_check.js`/`loginWithPage` shipped in v0.4.1 but no production path called it; `make up`'s only sign-in (`handleSignIn`) relies on Google-PW autofill that can't fire in the `--password-store=basic` dedicated profile → no sign-in/sandbox/AWS-env → CFN `InvalidClientTokenId`. Fix = call gate on both `_browser_launch` paths (`cdp.sh`), no JS change, fast-fail preserved. **DONE (`96bea46`, pushed `origin/feat/v0.4.2`)** — cdp.sh + acg_cdp.bats (3 cases) + CHANGE.md; shellcheck clean; verified by Claude (SHA on origin, only 3 spec files, no `.js`). Covers the `make up` path only.
+- [x] **v0.4.2 BUG #2: gate wired into `bin/acg-credential-test` (`make credential-test` path) + `connectBrowser` locked-profile fallback guarded** — spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-credential-test.md`. Implemented as commit **`36c3bb16ee832f09223693f59d25aa57c9ab0210`** (`fix(acg): wire _cdp_ensure_acg_session into acg-credential-test + guard connectBrowser CDP fallback`), pushed to `origin/feat/v0.4.2`. `bin/acg-credential-test` now sources `cdp.sh` and calls `_cdp_ensure_acg_session` after the CDP-alive check; `playwright/lib/browser.js` now throws a clear error when CDP is reachable but exposes no usable context instead of attempting `launchPersistentContext` on the locked live profile; `CHANGE.md` `[Unreleased]` entry added. Gates passed: `shellcheck -S warning scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _cdp_ensure_acg_session >/dev/null'` exited 0. **Acceptance remains user-run:** `make credential-test PROVIDER=aws` in lib-foundation BEFORE subtree-pull.
+- [x] **v0.4.2 BUG #3: CDP launches Playwright-managed Chromium, not system Chrome** — spec `docs/bugs/2026-07-06-cdp-use-playwright-managed-chromium.md`. Implemented as commit **`e136f55ea39ea590c5ddccfa9fa4d064c42f4402`** (`fix(acg): launch Playwright-managed Chromium for CDP instead of system Chrome`), pushed to `origin/feat/v0.4.2`. `scripts/lib/acg/cdp.sh` now resolves the browser via `require('playwright').chromium.executablePath()`, hard-fails with the `npm install` guidance if absent, and has no system-Chrome fallback; all 3 `cdp.sh` profile defaults now use `pw-profile`; `playwright/lib/output.js` `AUTH_DIR` now also defaults to `pw-profile`. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`, and negative grep confirmed no `/Applications/Google Chrome.app` or `open -a "Google Chrome"` remained in `cdp.sh`. **USER acceptance:** `make credential-test PROVIDER=aws` after quitting stale system Chrome on `:9222`.
+- [x] **v0.4.2 BUG #4: credential-test launches managed browser + `_browser_launch` rejects a foreign CDP browser** — spec `docs/bugs/2026-07-06-credential-test-launch-and-browser-identity-guard.md`. Implemented as commit **`2918d5c0d818b73ebdde6ba3a5c18a12af604c10`** (`fix(acg): route credential-test through _browser_launch and guard CDP browser identity`), pushed to `origin/feat/v0.4.2`. `scripts/lib/acg/cdp.sh` now hoists `_cdp_profile_dir` and rejects an existing `:9222` listener unless `_cdp_profile_in_use` confirms the Playwright-managed `pw-profile`; `scripts/lib/acg/bin/acg-credential-test` now routes through `_browser_launch`, removing the stale system-Chrome `open -a "Google Chrome"` guidance and restoring the self-launch path; `CHANGE.md` `[Unreleased]` entry added. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`. **Acceptance remains user-run:** `make credential-test PROVIDER=aws` in lib-foundation before any subtree-pull/tag claim.
+- [x] **v0.4.2 BUG #5: reuse healthy CDP browser; reclaim stale/zombie one instead of erroring** — spec `docs/bugs/2026-07-06-cdp-reclaim-unhealthy-browser-instead-of-error.md`. Implemented as commit **`db5b8e23dc2f33ea6a2be36636266cec03806a70`** (`fix(acg): reclaim stale CDP browser and reuse healthy one instead of erroring`), pushed to `origin/feat/v0.4.2`. `scripts/lib/acg/cdp.sh` now adds `_cdp_connectable` (Playwright `connectOverCDP` health probe, non-destructive `close()`) and `_cdp_kill_port_listener` (`lsof -t` reclaim), then rewrites `_browser_launch` to reuse an existing `:9222` browser only when Playwright can actually drive it, otherwise reclaim the port and relaunch the managed Chromium; `CHANGE.md` `[Unreleased]` entry added. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch _cdp_connectable _cdp_kill_port_listener >/dev/null'`. **Acceptance remains user-run:** `make credential-test PROVIDER=aws` in lib-foundation must prove healthy reuse and stale/zombie reclaim before any subtree-pull/tag claim.
+- [x] **PR #34 MERGED to main (`ae9fc73`, 2026-07-06)** — v0.4.2 headless CDP auto-login + stale-browser reclaim/reuse, all 5 BUGs. `feat/v0.4.2` → `main`, head `9be232a`. Operator ran the live `make credential-test PROVIDER=aws` gate — works headlessly (user-confirmed). First CI run surfaced accumulated debt: stale `acg_cdp.bats` `_browser_launch` tests (test 2 drifted at BUG #3, test 1 at BUG #5) fixed test-only in **`d9ff95e`** (mock `_cdp_connectable`, stub `node`, + new reclaim-branch test); SC2016 (info, default-severity shellcheck) on the `_cdp_connectable` node `-e` literal + a superseded CHANGE.md bullet fixed in **`9be232a`**. **CI green on `9be232a`.** Copilot: 6 findings — 4 fixed, 2 declined-with-rationale; all threads resolved. No branch protection on `main` → no `enforce_admins`. **TAGGED v0.4.2** (annotated tag at merge `ae9fc73`; GitHub release published, targetCommitish main, not draft/prerelease). CHANGE.md stamped `## [v0.4.2] — 2026-07-06` (`0ce4d0b`). `feat/v0.4.3` cut from main; retro `docs/retro/2026-07-06-v0.4.2-retrospective.md`. **Downstream: k3d-manager subtree-pulled v0.4.2** (merge `c116e655`, split `b6141505`, 14 files under prefix; cdp.sh verified diff-identical to upstream, `bash -n` clean).
+- [ ] **Follow-up: `gcp_login.js:157` latent no-op `disconnect()`** — swallowed `TypeError`; replace with `close()` in a separate change.
+
+## v0.3.20 Track (branch: `feat/v0.3.20`)
+
+- [x] **Bugfix: `_run_command_resolve_sudo` TTY fallback** — DONE (`2f46d4be`). Spec: `docs/bugs/2026-05-29-sudo-no-tty-fallback.md`. Adds `sudo -n` fallback when stdin/stdout TTY not available. PR #29 merged to main.
+- [x] **BATS mock sudo flag-stripping** — DONE. Test fix ensures `sudo` mock in `system.bats` properly strips flags before execution (pattern: `while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"`).
+
+## v0.3.21 Track (branch: `feat/v0.3.21`)
+
+- [x] **Feature: extensible cluster-provider validation via optional consumer hook** — DONE (`f7a9178`). Spec: `docs/bugs/2026-06-12-cluster-provider-extensibility-libfoundation.md`. `scripts/lib/core.sh` now consults optional `_cluster_provider_is_extra_supported` hooks in both `_cluster_provider()` case blocks, `scripts/tests/lib/core.bats` now covers the no-hook, hook-accepts-extra-provider, and base-provider-with-hook contract cases, and `CHANGE.md` records the Unreleased changelog note.
 
-## Process (standing rules — do not archive)
-
-- Every implementation updates this file and `activeContext.md` with the real commit/PR SHA.
-- Unexpected live failures get a dated `docs/issues/YYYY-MM-DD-*.md` record with verbatim evidence.
-- Historical specs/issues are archived only when superseded or unreferenced; files are never deleted.
-- Keep all new work within the five-plan milestone limit. **v1.34.0 is at 5/5 — the next spec opens v1.35.0.**
-- Reapply the ApplicationSets (hub and ACG) every release, then run `argocd_check_values_branch`.
-
-## v1.41.0 release prep (2026-10-06)
-
-- [x] Compress memory-bank — `44e73006`.
-- [x] `make test` 1374/1374 + `make test-pytest` 682 passed / 2 skipped at `44e73006` (2026-10-06).
-- [x] Docs sweep — `0ceb5a37` (acg.md watcher section; 5 plan statuses DONE, SHAs verified).
-- [x] CHANGELOG promoted to `[1.41.0] - 2026-10-06`; duplicate Added/Fixed blocks merged (entry text unchanged, verified); empty `[Unreleased]` kept.
-- [x] Releases rows added; README table rotated to 3 rows (v1.38.0 + v1.37.0 into Older).
-- [x] AppSets: `argocd_check_values_branch k3d-manager-v1.41.0` rc=0 — 27 refs (hub + ACG) already on the release branch, no reapply needed. Scope check vs origin/main: 257 files / 326 commits, 5 v1.41.0 plans (cap), every code/config file maps to a CHANGELOG entry. Local `main` fast-forwarded to v1.40.0 `b5500db2` by the operator (2026-10-06).
-- [x] federate-acg rollout DONE 2026-10-06 12:29Z: operator restarted PF :19190 (new PID 3165); hub `up{job="federate-acg"}`=1, scrape 5.3 s / 30 s timeout, 23,772 samples (spec predicted 23,777).
-- [x] Live smoke gate 2026-10-06: plain `make e2e` 91/8 (run 1791290346-2661) — all 8 `order-management`, caused by hub agent-0 serving cached pre-fix `:latest` (sha-35098ac) under `IfNotPresent`. Pinned `E2E_IMAGE_TAG=sha-e5e644d… make e2e` (run 1791290881-10078, f945a8e5): **98 passed / 0 failed of 102** → gate GREEN. `make` still exited 1 after the pass (unexplained, see bug doc).
-- [ ] Filed `docs/bugs/2026-10-06-e2e-runner-ifnotpresent-serves-stale-latest-image.md` (pull policy from tag + exit-1-after-pass). Next: operator go on target release (v1.41.0 vs v1.42.0) + Codex dispatch; then go to `gh pr create` (body in scratchpad `pr-v1.41.0.md`). Merge waits for operator go.
-
-## Open items (verbatim, grouped by original section)
-
-### From: 2026-10-02 — v1.40.0 release close-out (gh auth churn deferred to next release, operator call)
-- [x] e2e-tests publish run 37044992425 GREEN: sha-755ad2d… and latest both = sha256:78044624… (old latest 59abbc19). [ ] operator reruns `make e2e E2E_IMAGE_TAG=sha-755ad2d7efeb96dcb6d3701077264fc6b9374db3` (live smoke gate).
-- [ ] Next release: Vault GHCR PAT lookup returns silently on empty/unreachable — should say which.
-- [ ] v1.40.0 PR body drafted — operator go before gh pr create.
-
-### From: 2026-10-01 — v1.40.0 spec handoff
-- [x] Live e2e run `1790962990-9267` (commit cb8373ef, 2026-10-02): first run to reach Playwright — keycloak + payment rolled out (realm fix fef39649 works live). 49 passed / 8 failed / 102; all 8 = `api/payments.spec.ts` empty-body 401s, the known option-(b) set in `docs/bugs/2026-09-16-e2e-assertion-api-payments.md` (fix on payment `d2f2d55` + e2e-tests `df6b9c1` branches, unmerged; image pins pending). Health test now passes. [ ] Operator: merge both PRs, bump pins, rerun.
-- [x] Live retrieval eval run 2026-10-01; numbers in vector-store.md + live floors. [ ] copy into v1.40.0 retro at release.
-- [ ] Operator: restart cloud bridge + `make restart-webhook` to load artifacts.
-- [ ] `/ask-docs` operator steps: `wrangler deploy` relay, Slack manifest `/ask-docs`, `make restart-webhook`, live smoke; then Claude calibrates `K3DM_ASK_DOCS_MIN_SCORE` and replaces the PLACEHOLDER fixture.
-
-### From: 2026-10-01 — v1.40.0 review fix spec (Codex)
-- [ ] Deferred review items 5–10: Vault root token, latency unit, duplicated overview dashboard,
-  label cardinality, and release-label test location.
-
-### From: 2026-09-30 — Hermes data_layer unknown-cause bug filed
-- [ ] Preserve and display a bounded, redacted cause for historical `data_layer` unknown states.
-
-### From: 2026-09-30 — Hermes dashboard bugs filed
-- [ ] Add drill-down evidence/links to the current findings table.
-- [ ] Explain numeric status history and expose evidence for unknown/degraded transitions.
-
-### From: 2026-10-01 — Codex batch bug 2 complete (`2f8c3ec8`)
-- [ ] Batch bug 3 remains.
-
-### From: 2026-10-01 — Codex batch bug 1 complete (`8a7cdec9`)
-- [ ] Batch bugs 2 and 3 remain.
-
-### From: 2026-10-01 — bug backlog triage
-- [ ] Operator: git pull + `make restart-webhook` so the running webhook loads the new agent.py.
-
-### From: 2026-09-30 — vector store freshness
-- [ ] v1.41.0 design: fixed moving ref (e.g. `k3dm-live`) so a reapply is never needed.
-- [ ] Operator: let ArgoCD sync the rules and dashboard, and watch the Ingestion row for one poll.
-
-### From: 2026-09-30 — MinIO registry bug closed
-- [ ] Follow-up (owner): replace the sunset bitnamilegacy MinIO image (12 CRITICAL / 80 HIGH).
-
-### From: 2026-09-30 — MinIO port merged
-- [ ] Operator: `enforce_admins` back to true; hostinger post-merge checks.
-
-### From: 2026-09-30 — MinIO port ready
-- [ ] Operator: merge the shopping-cart-infra PR; run the post-merge checks.
-
-### From: 2026-09-30 — hostinger KubeJobFailed root-caused
-- [ ] Codex (shopping-cart-infra): finish the MinIO bitnamilegacy port safely for existing data; PR only.
-- [ ] Operator: confirm shopping-cart-identity is Synced now that #101 is on main.
-
-### From: 2026-09-30 — Alertmanager delivery dashboard
-- [ ] Operator: confirm in Grafana after the next platform-ops sync.
-
-### From: 2026-09-30 — Codex verification #3
-- [ ] Operator: choose a fix for the Alertmanager Overview integration panels.
-
-### From: 2026-09-30 — Codex verification #2 + handoff #3
-- [ ] Codex: node_pressure → data_layer brief. Claude verifies on return.
-
-### From: 2026-09-29 — Codex verification + next handoff
-- [ ] Codex: hostnet-drift brief. Claude verifies on return.
-
-### From: 2026-09-29 — host-network IP drift
-- [ ] Codex: implement the brief in hostnetwork-pods-keep-stale-ip-after-node-restart.md.
-
-### From: 2026-09-29 — Codex handoff: cosign prevention + Hermes R7
-- [ ] Codex implements; Claude verifies SHA, tests and mutations independently.
-- [ ] Operator: Prometheus log for the duplicate-timestamp scrape pool.
-
-### From: 2026-09-29 — cosign restore
-- [ ] Operator: approve Fix 1 (bring-up restore) and/or Fix 2 (Hermes R7).
-
-### From: 2026-09-29 — Hermes status publish diagnostics
-- [ ] Operator: read the new log line; then fix the named cause.
-- [ ] Operator: `bin/k3dm-worker-setup` to repopulate the empty `CLOUDFLARE_API_TOKEN` GitHub secret.
-
-### From: 2026-09-29 — /cluster-diagnose all-namespaces overview
-- [ ] Operator: `make deploy-worker` (or merge to main) so Slack sees the new form.
-
-### From: 2026-09-29 — e2e payment root cause documented
-- [ ] Operator: choose auth option (e2e profile vs real token) before a Codex spec for the two repos.
-
-### From: v1.40.0 in progress — 2026-09-27
-- [ ] **the installer dropped `K3DM_HERMES_AUTO_KINE_GUARD=1` from the plist** —
-      `_install_hermes_agent` regenerates from a template that omits it, so the
-      auto Kine guard is now OFF. Restore or leave? User's call.
-- [ ] **`eso` sensor reports unknown on a false negative** — the webhook defaults
-      the provider to `k3s-aws`, whose context `ubuntu-k3s` is not registered, and
-      `_kubectl_absent()` classifies kubectl's `context was not found` error as
-      resource absence. Two fixes available: delete the stale context (necessary,
-      not sufficient) and stop `_kubectl_absent()` treating a kubeconfig error as
-      absence (the real fix). Not started.
-- [ ] **`eso` sensor never evaluates the hub** — it exact-matches only the
-      unprefixed names, so the `Hub ESO *` entries the webhook emits are invisible
-      to it. Hub ESO failures surface only incidentally via `node_pressure`.
-- [ ] **`keycloak-realm-reconcile` Job Failed for 6d21h** — `awk: command not
-      found`; `quay.io/keycloak/keycloak:24.0` has no awk and the inline script
-      uses it ~9 times. ArgoCD PostSync hook of `shopping-cart-identity`, so the
-      manifest lives in **shopping-cart-infra** — spec + Codex. Likely the common
-      cause of both remaining `node_pressure` failures (Keycloak, Frontend SSO
-      login). Nothing alerted on it for six days.
-- [ ] **hub `platform-ops/cosign-public-key` ExternalSecret still not synced** —
-      1 of 8; this is the "Hub ESO ExternalSecrets" failure `node_pressure`
-      reports. Pre-existing backlog item, now confirmed as the live cause.
-- [ ] Hermes sensors reporting: `eso` unknown, `reachability` degraded
-      (`frontend.3ai-talk.org`), `node_pressure` degraded (Keycloak, Hub ESO,
-      Frontend SSO), `kine` healthy with `stale_acg_registration: true`.
-- [ ] delete the stale `ubuntu-k3s` kube context — now load-bearing: it is the
-      current context and does not exist, so unqualified `kubectl` reads error and
-      read as empty listings.
-- [ ] `workers/slack-relay/test/relay.test.mjs` runs in no make target and no
-      CI job — same defect class, the only known remaining instance; no decision
-
-### From: v1.39.0 shipped — 2026-09-27
-- [ ] `docs/howto/makefile.md` still documents no `test`/`test-pytest`/`test-bin`/`test-all`
-      target — pre-existing, not a v1.39.0 regression. Worth a pass in v1.40.0.
-- [ ] `bin/k3dm-vectordb-metrics` is undocumented. Its sibling `bin/k3dm-vectordb-status` is
-      covered in `docs/guides/vector-store.md`.
-- [ ] Branch cleanup not run — v1.39.0 is not a 5-release boundary and the user did not ask.
-      Branch deletion needs the user's explicit go.
-
-### From: v1.39.0 k3dm-tests alerts moved to the ACG stack — 2026-09-27
-- [ ] **`/k3dm help` omits the cluster lifecycle commands** — spec
-      `docs/bugs/2026-09-27-k3dm-help-omits-cluster-lifecycle-commands.md` filed and committed
-      `788deeb2`, pushed. Dispatched to Codex (session `01a0e3a3`). Help text only:
-      `CLUSTER_COMMANDS` + a role-filtered section in `make_target_help`, four new tests in
-      `scripts/tests/bin/webhook_make_targets.py`, a note in `docs/howto/slack-slash-commands.md`.
-      The routing split stays — `/api/v1/make` has no job guard, no stall timer and no metrics push.
-      VERIFIED 2026-09-27: Codex commits `f3cdc25a` (fix) + `86c18cf5` (memory), both on
-      `origin/k3d-manager-v1.39.0`. Diff is exactly the three permitted files, insertions only;
-      `workers/slack-relay/index.js`, `scripts/lib/webhook/lifecycle.py` and `bin/k3dm-webhook` show
-      an empty diff. All four specified tests present; suite re-run by Claude: 33 tests, OK.
-- [ ] **Slack job `c7faf86b` (`/cluster-up aws`) failed at Step 3.5/12** — the k3s-aws cluster
-      provisioned fine (3 nodes Ready); `bin/cluster-up:402` then failed `_command_exist k3d`
-      because `com.k3d-manager.webhook.plist` sets `PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`
-      and `k3d` lives in `~/.local/bin`. Slack-driven `make up` always fails here; the same command
-      run by hand succeeds. Fix NOT approved, NOT started: plist PATH (host config) or absolute
-      `k3d` resolution in `bin/cluster-up` (durable). Metrics were pushed: `success 0`,
-      `duration 644`, `status="failed"` — the deployment dashboard now has real data.
-- [ ] Duration metrics (DEFECT 2) still undecided: fix in v1.39.0 or file for v1.40.0.
-- [ ] My `:19190` forward propping up `federate-acg` is still undisclosed to a durable fix.
-
-### From: embeddings credential + indexer resumability — 2026-09-26 complete
-- [ ] v1.40.0 retrieval eval — first datapoint in hand, and it points at **ranking, not recall**:
-      the correct doc for an `ArgoCD OutOfSync with no real diff` query ranked 4th of 5, and the
-      whole band spanned 0.785-0.764 (0.021). Do not add a score threshold on this evidence; any
-      cutoff in that band drops the right answer. Details in `activeContext.md`.
-- [ ] v1.39.0 PR is NOT created — gates unmet. See `activeContext.md` for which.
-
-### From: vectordb seed — 2026-09-26 verified
-- [ ] `hub-vectordb` ExternalSecret still OutOfSync on CRD defaults despite ServerSideDiff
-      being live — needs a hard refresh so the controller re-diffs under SSA. Operator's call.
-
-### From: vectordb — 2026-09-26 final: running, one cosmetic OutOfSync left
-- [ ] Operator: reapply the ApplicationSets so `d44ef5cd`'s `ServerSideDiff=true` reaches the
-      live Application. Until then `hub-vectordb` stays `OutOfSync / Healthy` on the
-      ExternalSecret alone — the workload is fine, the diff is spurious.
-- [ ] Offered, not approved: seed `vectordb/postgres` in the automated Vault path
-      (`_vault_kv_exists` -> generate -> `_vault_kv_put`) so the credential survives a hub rebuild.
-
-### From: vectordb — 2026-09-26 later: Vault path written, ESO still denied
-- [ ] Operator: apply the Vault policy so the grant is live. `vars.sh` alone changes nothing.
-      Blocked on an operator-run `vault policy read eso-ldap-directory` first — Claude cannot
-      read it (needs the root token) and so cannot confirm an overwrite would not revoke a
-      prefix that was merged in out of band.
-- [ ] Operator: reapply the ApplicationSets for the `ServerSideDiff` annotation (`d44ef5cd`).
-- [ ] Then Claude verifies read-only: `vectordb-postgres` `SecretSynced/True`, `pod/vectordb-0`
-      Running, `hub-vectordb` `Synced/Healthy`.
-
-### From: WS1 vectordb — live status 2026-09-26
-- [ ] BLOCKED — operator: write Vault `vectordb/postgres` with `username` and `password`.
-      `vectordb-postgres` is `SecretSyncedError` and `pod/vectordb-0` is
-      `CreateContainerConfigError` until it exists. Claude must not create, read, print or log
-      that value.
-- [ ] Operator: reapply the ApplicationSets so the `ServerSideDiff` annotation reaches the live
-      Application. The git fix is inert until then.
-- [ ] Then Claude verifies read-only: `hub-vectordb` `Synced/Healthy` and `vectordb-postgres`
-      `SecretSynced/True`.
-- [ ] Latent: `observability.yaml` and `data-git.yaml` lack the same annotation. No symptom today
-      (their ExternalSecrets are on `ubuntu-hostinger`); any ESO resource added to them will drift.
-
-### From: 2026-09-26 — v1.38.0 MERGED, tagged and released; v1.39.0 branch cut
-- [ ] **BLOCKS WS2 — the embeddings provider is undecided and no credential exists.**
-  `k3dm-openai-api-key`, `k3dm-embeddings-api-key` and `k3dm-anthropic-api-key` are all absent
-  (existence check only, no value read). **`gemini-cli-api-key` does exist** and Gemini embeddings
-  are free-tier, making it the candidate needing no new credential — but it was provisioned for the
-  Gemini CLI and **repurposing it needs the operator's explicit go**. WS1 does not depend on this;
-  WS2 cannot start without it.
-  WS2 cannot start without it. RESOLVED 2026-09-26: the operator approved reusing
-  `gemini-cli-api-key`, and ruled that it stays the single keychain copy — the remaining absent items
-  stay absent rather than being filled with duplicates. See the one-slot decision in
-  `activeContext.md`.
-- [ ] **WS1 needs the operator's go** — it deploys pgvector to the hub. Prerequisites verified
-  2026-09-26: ESO on the hub is healthy (6 of 7 ExternalSecrets `SecretSynced/True`; the one
-  failure is the pre-existing `cosign-public-key` in `platform-ops`), and the hub-scoped Application
-  pattern to copy already exists (`hub-loki`, `hub-platform-ops`). WS1 must **not** use the
-  `role: app-cluster` selector.
-  - [ ] `docs/plans/v1.39.0-test-suite-metrics-and-staleness.md` — **dispatched to Codex**
-  - [ ] `docs/plans/v1.39.0-public-endpoint-blackbox-probes.md` — **dispatched to Codex, offline half
-        only**; the live TSDB verification and the ApplicationSet reapply stay operator-owned.
-  Operator follow-up: `make restart-webhook` before `/k3dm smoke` resolves.
-- [ ] **NOT DONE and NOT to be retried as a sync: `shopping-cart-identity`** — deterministic
-  failure, not drift. `Replace=true` in its syncOptions makes ArgoCD `kubectl replace` the bound
-  `postgres-keycloak-pvc`, whose spec is immutable except `resources.requests`; the manifest
-  omits `volumeName`/`storageClassName` so the replacement blanks them and the API server rejects
-  it. Retry limit 5 exhausted, `phase: Failed`, which also blocks self-heal. Holds back 3
-  ExternalSecrets and prevents `Job/keycloak-realm-reconcile` from being created at all.
-  Already filed: `docs/bugs/2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`
-  (dedup check caught it; no second file). **Appended update disproves that doc's open question**
-  — the realm-reconcile failure is independent, caused by `awk: command not found` in the
-  `ubi9-micro` image. **Two fixes needed; the PVC one must land first** or the awk fix cannot be
-  observed. Needs the operator's go on which fix option (per-resource `Replace=false` annotation
-  in `shopping-cart-infra` is the filed preference).
-- [ ] **Delete the stale `ubuntu-k3s` kube context** — now escalated from a ~90s-per-query
-  annoyance to having burned a release step. `kubectl config delete-context ubuntu-k3s`. Operator's
-  call (config mutation).
-- [ ] **Branch cleanup NOT run** — due every 5 releases; v1.35.0 was the last multiple, so
-  v1.40.0 is next. Run early only if the operator asks.
-- [ ] **`875f97da` missed the squash** — the memory-bank commit queueing the cloud-bridge
-  architecture doc was pushed after the merge window and is **not in `main`**. Cherry-picked
-  onto `k3d-manager-v1.39.0` as `ed697ef3`. Lesson: a push to a branch whose PR is already
-  merge-ready is a push into a closing window.
-- [ ] **Release-scope decision — NOW DUE, blocks v1.39.0 planning** — four v1.38.0 specs
-  shipped as specs only (public-endpoint
-  blackbox probes, hermes app-health delta sensor, slack smoke target, vector-store prior
-  art). Carrying all four to v1.39.0 puts that branch at **6 plan docs, one over the max-5
-  cap**, so they must be split across v1.39.0/v1.40.0 or dropped. Decide at `/post-merge`.
-- [ ] **Cloud-bridge architecture doc — queued for v1.39.0** (operator, 2026-09-25). There is
-  no `docs/architecture/` page for the bridge: v1.38.0 shipped
-  `docs/howto/cloud-session-requests.md`, which is a usage contract (schema, actions, exit
-  codes), not a design view. Missing: the request/response topology across the trust boundary,
-  the two-token model and why a header may only narrow a role, the bare-clone + git-plumbing
-  choice, the validator's ordered reject chain, and the deliberately unbuilt push path.
-  **Not a plan doc** — `docs/architecture/` is outside the max-5 cap, so this does not
-  compete with the four carried v1.38.0 specs. House style is Mermaid (9 of 11 existing
-  architecture docs), plus a README `## Documentation` link.
-
-### From: 2026-09-25 — `/api/v1/health` has been 500ing since v1.37.0 (found during v1.38.0 verify)
-- [ ] Follow-up, not in this fix: no gate asserts `/api/v1/health` returns 200 and parses its
-      `services` array. That is why a dead endpoint merged. Belongs with the webhook smoke gate.
-- [ ] Bears on the pending v1.37.0 tag: the broken endpoint is ON the v1.37.0 tree and the fix is
-      only on `k3d-manager-v1.38.0`. Tagging v1.37.0 as-is tags a webhook whose `/api/v1/health`
-      and post-provision check both raise. Operator's call.
-
-### From: 2026-09-25 — S3 gate hole closed for the health query form (Claude)
-- [ ] Positive-path live check (admin 200 / reader 200 on health, reader 200 on POST
-      `cluster-status`) is the operator's — it needs the token values, which Claude does not read.
-- [ ] No live escalation test offered on purpose: every above-reader POST route
-      (`argocd-upgrade`, `cluster-refresh`, `cve-remediate`, `analyze`) mutates or is expensive, so
-      a probe that found the gate broken would execute the action. That case is covered by the
-      synthetic-route unit tests instead, both mutation-checked.
-- [ ] Part 2 (P2 bridge + P5) not dispatched.
-
-### From: 2026-09-24 — unknown actor role authorization fix (commit pending)
-- [ ] Implement the BATS fix (Part A — stub the reachability probe, hard-fail `ssh`/`scp`).
-      **Part B (move the SSH-key guard in `shopping_cart.sh`) needs the owner's go** — it changes
-      behavior on the already-Ready path.
-- [ ] Sweep the rest of `scripts/tests/` for reachability-dependent live mutation (own spec).
-
-### From: 2026-09-24 — webhook Phase 3 agent extraction (staged; Git blocked)
-- [ ] Commit/push and final SHA verification remain; Git returned
-      `fatal: Unable to create '.git/index.lock': Operation not permitted`. No retry,
-      lock removal, hook bypass, force-push, or PR was attempted. Changes are staged.
-
-### From: 2026-09-24 — upstream credential-test observability (dispatched)
-- [ ] Verify Codex: SHA on origin, diff confined to the four listed files, jest > 28 tests, all three
-      mutations reddening their named tests, disappearance gate 4 -> 0.
-- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
-  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
-  gate; `enforce_admins` untouched until then.
-
-### From: 2026-09-24 — ACG preflight account-name fix
-- [ ] Operator, at the Mac in Terminal.app: populate both accounts, then
-      `make -C scripts/lib/foundation credential-test` expecting `ACG_SESSION_OK`. All three
-      accounts measured absent on 2026-09-24; nothing to clean up first.
-
-### From: 2026-09-24 — Tier 2 ACG preflight (working tree complete; Git blocked)
-- [ ] Git staging was blocked by `.git/index.lock: Operation not permitted`; no commit SHA
-      or push exists. The requested files remain unstaged; operator must stage, commit, and push.
-
-### From: 2026-09-24 — webhook Phase 1b authorization (staged; commit blocked)
-- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted`; no SHA exists.
-      The staged implementation is ready for the operator/Claude to commit and push with the
-      exact requested message. The import gate used `/usr/bin/python3` 3.9.6 and failed before
-      module execution on existing `str | None` annotations; `make test-all` also encountered
-      the sandbox's restricted `/var/folders` temp root. No out-of-scope files were changed.
-
-### From: 2026-09-24 — webhook Phase 1 extraction (working tree only; blocked)
-- [ ] `make test-all` is not green because an unrelated existing `cluster_status_summary.bats`
-      JSON assertion expects one failed service while its fixture returns two; the system
-      `python3` used by Make also has no pytest unless PATH is shimmed. No out-of-scope test
-      fix was made. No issue doc was created because the dispatch explicitly forbids modifying
-      files outside its target list.
-- [ ] Commit/push blocked by sandbox Git write restrictions (`.git/index.lock`,
-      `.git/COMMIT_EDITMSG`, and temporary tree objects: `Operation not permitted`); no SHA.
-
-### From: 2026-09-24 — app-CVE scan trigger target
-- [ ] `make test` completed **1105 tests** but exited 1 on unrelated pre-existing
-      `e2e_remote.bats` tests 688, 699, 723, and 724; left untouched per scope. No live
-      cluster commands were run. Commit/push is blocked by `.git/index.lock: Operation not
-      permitted`; no commit SHA exists yet.
-
-### From: 2026-09-23 — Hostinger registration must survive a hub rebuild (spec filed)
-- [ ] **Operator: re-register hostinger** — `make refresh-registration CLUSTER_PROVIDER=k3s-hostinger`.
-      Live hub mutation; needs the user's go. Hostinger workloads are unmanaged until then.
-- [ ] **Durability unproven until a rebuild happens with the fix in place.** A reconcile that has
-      never run during an actual rebuild is a claim, not a verified fix. The bug doc stays open.
-
-### From: 2026-09-23 — Alertmanager warning-severity delivery fix
-- [ ] **NOT YET DEPLOYED** — the live Alertmanager still runs the old two-route tree and is
-      still discarding `KubeJobFailed`. Needs the operator to re-render the Alertmanager
-      secret, then confirm `platform-warning` appears in the route tree and that a
-      `KubeJobFailed` email actually arrives. Delivery is unproven until then.
-
-### From: 2026-09-23 — M2 GHCR credential root-caused (locked keychain), fix dispatched to Codex
-- [ ] **Tier 1 still unproven** — all three fixes (GHCR stdin `9d2a0ad0`, leak `7338a238`,
-      the ensure_exists fix) are unexercised against the live runner. A dispatch is needed to confirm,
-      and needs the operator's go.
-- [ ] **Hostinger hub registration LOST AGAIN 2026-09-23** — regression of a doc marked DONE.
-      The 2026-09-20T23:49Z hub rebuild recreated only `ubuntu-k3s-app-cluster` (in-cluster);
-      `cluster-ubuntu-hostinger` is absent and 0 `ubuntu-hostinger-*` Applications exist. This
-      is why CVE Auto-Patch has no data: `cve-remediation-verify` fails every 15 min with
-      `secrets "cluster-ubuntu-hostinger" not found`, so no remediation event ConfigMap is
-      written and the exporter emits zero `cve_*` gauges. Recurrence appended to
-      `docs/bugs/2026-09-13-hostinger-app-cluster-registration-lost-orphaned-workloads.md`.
-      Needs the operator's go: no registration-only entry point exists, and
-      `make refresh CLUSTER_PROVIDER=k3s-hostinger` remains unsafe and unapproved. The real
-      fix is making registration survive a rebuild — otherwise recurrence #3 is scheduled.
-      Also: 3 consecutive CronJob failures raised no alert.
-- [ ] **Hermes still BOOTED OUT** — must stay down until both blockers are fixed, or it
-      re-wedges the runner every 5 minutes. Restore:
-      `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`
-
-### From: 2026-09-23 — shopping-cart made opt-in per app cluster (code done, reapply pending)
-- [ ] ~~PENDING OPERATOR GO~~ (superseded) Task 0 re-capture (read-only),
-      then reapply the ApplicationSets for hub **and** ACG, then `argocd_check_values_branch`.
-      Expect zero `ubuntu-k3s-data-layer` / `ubuntu-k3s-shopping-cart-*`; verify `ubuntu-k3s-eso`
-      and `ubuntu-k3s-grafana-dashboards` still Synced with 21 ESO CRDs and 22 ExternalSecrets.
-      `data-git` prunes and holds the resources finalizer — if StatefulSets or bound PVCs have
-      appeared in `shopping-cart-data`, stop.
-- [ ] **Then decide 3a vs 3b** — `preserveResourcesOnDeletion: true` leaves the `shopping-cart-apps`
-      Deployments running unmanaged. 3a deletes the `shopping-cart-apps` + `shopping-cart-data`
-      namespaces; 3b keeps them as an unmanaged demo. Never delete the `secrets` namespace.
-- [ ] **ESO re-homing** — queued in `docs/roadmap.md` Forward themes, unversioned, needs a scope doc
-      (the 21 CRDs must be adopted, not recreated).
-
-### From: 2026-09-22 — v1.36.0 smoke and hub snapshot features
-- [ ] **Residual gap, accepted knowingly:** on a *transfer* failure the remote directory is left
-  un-marked rather than `.INCOMPLETE` (checksum failures still mark it). Two-line fix available;
-  awaiting the operator's word.
-
-### From: 2026-09-22 — Prometheus Vault entry repaired
-- [ ] **Does not affect Grafana** — hub Prometheus has no basic auth; the blank e2e panels are
-  still a producer problem, unblocked only by a Tier 1 run.
-- [ ] Realm SSO rows still read "not provisioned": `secret/keycloak/` has only
-  `['admin','clients']`, no `users/`. Seeding remains an operator decision.
-
-### From: 2026-09-22 — Webhook decomposition specced, QUEUED for v1.37.0
-- [ ] **Follow-up worth acting on independently of the refactor:** `_fix_mode_enabled` gates
-  whether an AI agent may mutate the cluster and has **no test today**. Phase 3 adds one, but
-  it does not have to wait for the refactor.
-- [ ] **Gate hygiene finding:** the three `webhook_*.py` suites are `unittest`, run only via
-  `make test-python-unit`'s `scripts/tests/bin/*.py` loop, and are invisible to both
-  `make test` and `make test-pytest` — so `make test` cannot catch a break in any of the 37
-  Python cases. Use `make test-all`. (Initially suspected orphaned; that was wrong.)
-
-### From: 2026-09-22 — Grafana triage + two specs assigned to Codex
-- [ ] **e2e failure-detail gap (NEW, real).** A failed run published no `e2e_failure_info`
-  or `e2e_failure_group_info`, and `e2e_run_info` carries a malformed `failure_ratio="/"`
-  (empty-over-empty). Belongs to `docs/plans/v1.36.0-e2e-deterministic-triage-and-corpus.md`.
-- [ ] **Tier 2 e2e blocked (re-verified 2026-09-23).** No ACG context (`k3d-k3d-cluster`,
-  `ubuntu-hostinger` only); keychain `k3dm-acg-pluralsight` **ABSENT**. Manual TTY login
-  required — operator-only.
-- [ ] **Tier 1 e2e RAN 2026-09-23 and FAILED twice — both blockers filed, neither a
-  shopping-cart regression.** (1) A leaked vCluster from a 09:04Z failure wedged the shared
-  `vclusters` namespace; ~17 Hermes dispatches failed identically over 2h. Cleared; leak
-  reproduces on every failure → `docs/bugs/2026-09-23-e2e-failed-run-leaks-vcluster-and-wedges-all-later-runs.md`.
-  (2) The runner cannot obtain a GHCR PAT — Gap 3 of
-  `docs/bugs/2026-08-22-e2e-m2-runner-bootstrap-kubeconfig-and-ghcr-gaps.md` regressed
-  (m2jump's `gh` token invalid; Vault path hardcoded to the hub context). Commits `ea6d39ca`,
-  `84798fc0`.
-- [ ] **Hermes is BOOTED OUT — restore it.** `launchctl bootstrap gui/$(id -u)
-  ~/Library/LaunchAgents/com.k3d-manager.hermes.plist`. Leave it down until the GHCR
-  credential is fixed, or it re-wedges the runner every 5 minutes.
-- [ ] **Correction: the 2026-09-22 credential clearance was the M4's `gh` token, not M2's.**
-  The GHCR pull happens on the runner, so that entry did not clear Tier 1.
-- [ ] **Snapshot capture NOT wired into `make down`/`make up`** — deliberately out of scope
-  until capture is proven on a real hub.
-
-### From: 2026-09-21 — rotate-ghcr-pat fix prepared; blocked before commit
-- [ ] `docs/bugs/2026-09-21-rotate-ghcr-pat-targets-wrong-cluster-and-leaks-pat-in-argv.md`:
-  exact Changes 1–4 implemented in `bin/rotate-ghcr-pat`; five static BATS gates added in
-  `scripts/tests/bin/rotate_ghcr_pat.bats`. Counts proved non-vacuous: hardcoded context 2→0;
-  pull probe 0→2; `--docker-password` 1→0; Vault-token argv 2→0;
-  `/user` validation 1→0; ESO branch 0→1. **Correction by Claude:** the PAT basic-auth argv gate
-  was reported 1→0 but measured 0→0 (vacuous, stray `\${` escapes); pattern fixed and re-verified. Pull probe line 59 is before `gh secret set` line 106.
-  `shellcheck -S warning` and `shellcheck -S error` clean; focused BATS 5/5. Commit/push pending:
-  `git commit` failed with `fatal: Unable to create .git/index.lock: Operation not permitted`,
-  so there is no SHA or origin verification yet.
-
-### From: Open items
-- [ ] **Prometheus local-port drift: 19090 vs 19190.** `_acg_prom_local_port` computes
-  `19190 + offset`, and `k3s-aws` offset is **0**, so the app-cluster Prometheus forward is 19190 —
-  which is what `bin/k3dm-webhook:2233` probes. But `scripts/etc/cloudflared/config.yml` (and the
-  installed `~/.cloudflared/config.yml`) map `prometheus.3ai-talk.org` to **19090**. One of the two
-  is wrong; `prometheus.3ai-talk.org` cannot work while they disagree. Separately the hub's own
-  launchd agent forwards 19091. Three ports for one service — needs a decision, then one source of
-  truth. Not yet filed as a bug doc.
-- [ ] **GHCR pull is 403 — and `shopping_cart_resolve_ghcr_pat` poisoned the Vault cache.**
-  All four `shopping-cart-apps` pods are `ImagePullBackOff`:
-  `403 Forbidden` from `ghcr.io/v2/wilddog64/shopping-cart-frontend/blobs/...`. Root cause: the
-  function's fallback chain reached "use gh CLI token", and `gh auth status` reports scopes
-  `admin:public_key, gist, read:org, repo` — **no `read:packages`**. It then wrote that token to
-  `secret/github/pat` and logged `gh CLI token saved to Vault for future runs`, so every later run
-  will find it in Vault and reuse a token that cannot pull. Two defects worth filing:
-  1. The gh CLI branch is **not validated** before saving, unlike the Vault branch, which does
-     check (`Vault PAT is expired (HTTP ${_pat_http})`). Validate for `read:packages` first.
-  2. The Vault write is `|| true`, so `saved to Vault for future runs` prints even when the write
-     failed — observed directly: the first run printed it while `vault kv list secret` showed no
-     `github/` at all (the write had built `http://localhost:/v1/...` because `_vault_local_port`
-     was unset). A success message must not be unconditional.
-  Operator action: supply a PAT with `read:packages` — see
-  [[reference_packages_token_expiry_image_build]] — then overwrite `secret/github/pat`, force-sync
-  the `ghcr-pull-secret` ExternalSecret and restart the four deployments.
-- [ ] **`shopping-cart-data` StatefulSets never applied.** `ubuntu-k3s-data-layer` reports
-  `phase=Failed`, `namespaces "shopping-cart-payment" not found (retried 5 times)`. ConfigMaps and
-  Services synced; all StatefulSets are `OutOfSync` and absent, so the namespace has **zero** pods.
-  `ubuntu-k3s-shopping-cart-namespace` only creates `shopping-cart-apps`, so nothing creates
-  `shopping-cart-payment`. A failed sync also blocks self-heal
-  ([[reference_argocd_error_phase_blocks_selfheal]]) — operator sync after the namespace exists.
-- [ ] **`Frontend: HTTP 200` in `make status` is a FALSE GREEN for the hub.**
-  `~/.local/share/k3d-manager/bin/frontend-browser-http.sh` port-forwards
-  `--context "ubuntu-hostinger" svc/frontend`, so the check is served by the **hostinger** cluster,
-  not the rebuilt hub. The hub's own frontend is in `ImagePullBackOff`. Do not read that green as
-  hub health.
-- [ ] **`make status` still reports 1 error — needs the operator, not code.**
-  ArgoCD, Frontend and Prometheus now pass; all nine local endpoints answer (grafana 3001, argocd
-  8080, prometheus 19190 + 19091, alertmanager 9093 → 401 by auth-proxy design and 19093 raw,
-  keycloak 8880, frontend 127.0.0.2, vault 18200). The two remaining:
-  1. **Keycloak connection refused** — the probe is `http://keycloak.shopping-cart.local/health/live`
-     on **port 80**, which needs the `keycloak-browser-http` LaunchDaemon. That is a privileged
-     system-domain job; teardown itself logged `no sudo in headless context — skipping`. Keycloak is
-     healthy on 8880, so this is purely the privileged listener.
-  2. Pushgateway's `!` warning is **pre-existing, not a regression** — `grep -i pushgateway`
-     against `~/hub-rebuild-pods-before.txt` confirms it was not running before the rebuild either.
-- [ ] **`cosign-public-key` ExternalSecret cannot sync** — `SecretSyncedError: could not get secret
-  data from provider`, and it is what still makes ArgoCD `hub-platform-ops` **Degraded**. The key is
-  not among the 14 backed-up canonical keys, so it was genuinely lost with the Vault PVC. It belongs
-  to the v1.27.0 image signing work and needs a recovery path that is **not** `signing_init`
-  (forbidden). `app-cluster-kubeconfig` **now syncs** — `hub_recovery_reconcile` seeds
-  `platform-ops/app-cluster-hostinger` — as do `monitoring/grafana-admin-credentials` and all four
-  `identity` secrets.
-- [ ] **`observability/alertmanager` and `observability/prometheus` unseeded** — `make observability`
-  warned `Alertmanager Vault secret not found — skipping SMS config`, `Failed to create Alertmanager
-  login secret in Vault — using generated local credentials for this run`, and `Prometheus Vault
-  credentials unreadable — skipping auth proxy`. The Prometheus auth proxy is therefore **not
-  running**, which also means `K3DM_HERMES_STATUS_ENABLED=1` must stay unset. Run
-  `make alertmanager-secret`.
-- [ ] **`ServiceMonitor monitoring/kube-prometheus-stack-apiserver not found`** — the 45s apiserver
-  scrape-timeout patch landed earlier this release had nothing to patch on a fresh cluster, so the
-  `KubeAPIDown` flap guard is **not** in place. Re-run once the ServiceMonitor exists.
-- [ ] **`cve-remediation-verify` CronJob fails every run: `secrets "cluster-ubuntu-hostinger" not
-  found`.** The new hub ArgoCD has no registration Secret for the live `ubuntu-hostinger` cluster,
-  so the CVE remediation verifier errors on every schedule. Re-register the hostinger cluster with
-  the rebuilt hub — do **not** hand-patch the cluster Secret
-  ([[reference_appset_generated_app_cleanup_ordering]] ordering applies). Until then this is a
-  recurring red that is *expected*, which is exactly the kind of thing that later gets dismissed as
-  noise — fix or pause it, do not learn to ignore it.
-- [ ] **Hermes ArgoCD token needs re-minting** — the hub ArgoCD is new, so
-  `k3dm-hermes-argocd-token` is stale by construction.
-- [ ] **Hub rebuild runbook written; execution is the operator's.**
-  `docs/howto/hub-rebuild-from-gitops-vault.md`. Verified during authoring: all **14** canonical KV
-  keys are present in Keychain `k3d-manager-app-cluster-secrets`, so the rebuild does not lose
-  secrets; `bin/cluster-down:330` runs `k3d cluster delete` (destroys the Vault PVC — the cached
-  unseal shards are worthless without it, and `bin/cluster-up:417-432` re-unseals from cache);
-  `bin/cluster-up` sequence is cluster → vault → ldap → argocd → bootstrap → shopping-cart-data,
-  then `make up` adds observability + platform-ops. Vault lives at `secrets/vault-0`, currently
-  `0/1`. `kubectl exec` and `logs` both fail with `net/http: TLS handshake timeout`, so no live KV
-  dump is possible — Keychain is the source. Gated on the Stripe blocker above.
-- [ ] **Grafana CF 502 is downstream of the kine stall — no independent fix.** Port-forward
-  restarted 18,211 times, ~every 35 s, because the apiserver is unreachable. All 7 tunnel hosts
-  flap. Grafana, cloudflared, Cloudflare and the supervisor probe are all exonerated. Clears only
-  on the hub rebuild, which remains the operator's decision.
-- [ ] **Tier 2 live-run blockers — spec filed `5edf557e`, fix NOT started.**
-  `docs/bugs/2026-09-20-e2e-sandbox-job-service-names-markers-secrets.md`. Three defects in
-  `_e2e_sandbox_job_manifest()` / `e2e_verify_sandbox()`: wrong service hostnames (3 of 4),
-  missing `__E2E_RESULTS_BEGIN__`/`__E2E_RESULTS_END__` wrapper, and `ghcr-pull-secret` +
-  `stripe-e2e` never created. 8 test cases specified, each needing a real=PASS / mutated=FAIL
-  pair. Tier 1 is unaffected. Awaiting the user's call on who implements. Running Tier 2 live
-  (`acg_restart` then `e2e_verify_sandbox`) stays the operator's action.
-- [ ] **`e2e_remote.bats` dispatch tests depend on the repo's push state** — tests 23/28/52/53 fail
-  with `HEAD <sha> is not pushed` on any locally-committed, unpushed HEAD, because
-  `e2e_runner_dispatch`'s push guard fires before the tests' stubs are reached. Green in CI only
-  because CI always tests a pushed ref. Found while verifying the rebase above; not filed as a bug
-  yet and NOT in this branch's scope.
-- [ ] **v1.35.0 PR → CI → Copilot → merge.** Remaining release steps that are NOT repo-local.
-- [ ] **Reapply the ApplicationSets (hub AND ACG), then `argocd_check_values_branch`** — the
-  operator's, live cluster. **Outstanding for v1.34.0's config as well as v1.35.0's**: the sets
-  template `$values` at `${K3D_MANAGER_BRANCH}`, so config on a newer branch is inert in-cluster
-  until they are reapplied. Two releases of config may currently be unread by any cluster.
-- [ ] **Tier 2 → v1.36.0, deliberately deferred (decided 2026-09-18).** `e2e_verify_sandbox` does
-  not exist; unimplemented since v1.25.0. Precondition before the spec: the **ACG login live gate**
-  (Keychain `k3dm-acg-pluralsight`, or one manual sign-in in `pw-profile`) — the false-green fix is
-  vendored but has never passed live, and Tier 2's Stripe acceptance would sit on top of it.
-  **UPDATE 2026-09-22 — the "ACG login live gate" wording above is misleading and caused a
-  multi-session misreading.** `e2e_verify_sandbox` now EXISTS (`scripts/plugins/e2e.sh:294`), and the
-  headless auto-login is fully wired: `acg-credential-test:7-8` calls `_browser_launch`
-  unconditionally, which calls `_cdp_ensure_acg_session` on both paths (`cdp.sh:132,163`), which
-  reads `k3dm-acg-pluralsight` (`cdp.sh:184-185`). The gate fires on EVERY run. The only gap is that
-  the Keychain item is **ABSENT** on this box, so the gate gets empty creds and fast-fails
-  `ACG_LOGIN_NO_CREDS` → `ACG_SESSION_EXPIRED` to non-TTY callers. Spec queued:
-  `docs/plans/v1.37.0-acg-autologin-enablement-for-tier2.md`. Blocking operator question: does the
-  ACG account carry MFA (auto-login refuses MFA by design)? If no → populate the item once and P4
-  closes permanently; if yes → permanently manual via `pw-profile`.
-  Then: Tier 2 spec → implementation → HTTP/2 protocol label + failure-rate panel. Still blocked
-  meanwhile: Stripe live E2E at 2/4, and `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
-- [ ] **HTTP/2 failure-rate observability** — deferred until Tier 2 E2E coverage publishes bounded protocol/version labels. Current dashboard intentionally does not claim HTTP/2-specific failure rates; see `docs/issues/2026-09-16-http2-failure-rate-tier2-dependency.md`.
-- [ ] **Hermes scheduled `make status` sensor + triage — IMPLEMENTED `e3e37f96`, live acceptance pending.** Spec `docs/plans/v1.34.0-hermes-scheduled-status-triage.md`. Runs `bin/cluster-status --json` on a ~40 min gate inside the existing 300s Hermes poll, classifies reds by check id, notifies on state change only, files bugs via the e2e worktree path. No new launchd agent, no new REPAIRS entry, no auto-execution (proposal + Slack approval only). Offline gates green (Hermes pytest 106, status-summary BATS 8/8). **The schedule defaults off**: set `K3DM_HERMES_STATUS_ENABLED=1` only after the Prometheus authenticated-probe dependency is verified, or the first run pages on a false red. Corrections and findings: `docs/issues/2026-09-16-hermes-status-triage-review.md`.
-- [ ] **Hook fix PR (step 2 of 3)** — branch `fix/keycloak-reconcile-pipefail-ldap-federation`
-  @ `a5838c19`, one commit ahead of the new main. Conflict pre-check (previously blocked
-  by the auto-mode classifier) now RUN against merged main: `git merge-tree origin/main
-  <branch>` → exit 0, merged tree `6678e606`, no conflict section = merges cleanly.
-  Needs: own CHANGELOG entry (deferred to avoid colliding with #96's), Copilot review, CI.
-- [ ] **lib-foundation: ACG session-check false-green — bug filed, Codex assigned.**
-  Spec `docs/bugs/2026-09-12-acg-session-check-false-green-on-signed-out-page.md`
-  (commit `ecfc15f`, pushed on `fix/acg-prism-monogram-selector`). Removes the two
-  page-CONTENT selectors (`text=/Cloud Sandboxes/i`, `text=/Open Sandbox/i`) from
-  `LOGGED_IN_SELECTORS`, adds `SIGNED_OUT_SELECTORS` + `pageLooksSignedOut` /
-  `urlLooksSignedOut` as a negative gate, and makes `acg_session_check.js` say out loud
-  when the `k3dm-acg-pluralsight` Keychain item is missing. Handed to Codex via
-  `codex exec`. **IMPLEMENTED `308bb3c`** (Codex authored; Codex could not write `.git`,
-  so Claude re-ran every gate and committed). Gates Claude ran, not taken on trust:
-  `npm run check` clean, jest 25/25 across 7 suites, `make lint`, `make shellcheck-lib`,
-  132 BATS — all green. CHANGE.md `[Unreleased]` entry added by Claude; still collides
-  with lib-foundation #49, rebase whichever lands second.
-  Files in scope: `pluralsight_login.js`, `acg_session_check.js`,
-  `tests/providers/pluralsight_login.test.js`. Operator action still required before the
-  live gate can pass: create Keychain item `k3dm-acg-pluralsight` (username+password) OR
-  sign in once manually in `~/.local/share/k3d-manager/pw-profile`. MFA accounts can only
-  use the manual path.
-- [ ] **Portability Phase 3 inventory recorded** in
-  `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (24 `--context ubuntu-k3s`
-  sites in `shopping_cart.sh`, 3 functions, resolver already present). Still needs the
-  decision-#1 re-scope + swallowed-failure fix before a spec.
-- [ ] **2026-09-14 — `/k3dm` Slack make-target command** — spec `docs/plans/v1.34.0-slack-k3dm-make-command.md` (`d8a2c8d8`); implemented + verified `cfbdddde`; webhook restarted; worker deploy pending user `make deploy-worker` (GH `CLOUDFLARE_API_TOKEN` secret missing → CI deploy fails); Slack app `/k3dm` registration pending user
-- [ ] **v1.28.0-platform-zero-downtime-rollouts — QUEUED, hardware-gated** (deferred 2026-09-04).
-  No CPU headroom on the M4 Air 24GB hub for 2+ replicas of the stateless tier (hub CPU-starves at
-  single replicas). Gated on the Mac Mini M5 upgrade (Oct 2026). Spec stays on disk; do NOT implement
-  until the hardware lands.
-- [ ] Keep all new work within the five-plan milestone limit (at 5/5 — split before a 6th).
-- [ ] **Hub control-plane saturation/public 502 incident (2026-09-02):** API `/readyz` reports
-  etcd failures while k3s server reaches ~880% CPU; Grafana port-forward flaps and ArgoCD public
-  OAuth URL drifted to the local hostname. Bug recorded in
-  `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md`; workload-level
-  mitigation and durable URL/status fixes remain pending.
-- [ ] **Argo identity drift + stale dashboard route (2026-09-02):** Git Keycloak Service renders
-  valid ports but Argo strategic merge still produces duplicate `http`; Grafana dashboard links
-  include a stale route. Bug: `docs/issues/2026-09-02-argocd-identity-drift-and-dashboard-502.md`.
-- [ ] **E2E observability follow-up:** M2 result ConfigMaps publish correctly, but the live
-  Prometheus deployment currently has no `e2e_run_info` series and the `Recent runs` Grafana
-  panel shows duplicate exporter/application service columns plus blank legacy totals. Bugs:
-  `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md` and the contract-mismatch issue above.
-  Dashboard source fix `cfe925fc` is pushed; it uses `exported_service` as the canonical service
-  filter, hides exporter `service`, and renames table fields. E2E client fix `0c2505b` is pushed
-  on `shopping-cart-e2e-tests:feat/e2e-image-multiarch`; full repo `tsc` remains red only on
-  pre-existing unrelated test strictness/type errors.
-- [ ] **CVE remediation event panels empty (2026-08-24) — ROOT-CAUSED 2026-08-25.**
-  NOT a durability bug (Codex RC wrong). Durable source (event ConfigMaps) exists; 0 series
-  is correct because 0 events exist. Real RC: Keychain `platform-ops-app-rebuild/k3dm` absent
-  → secret never synced → `app-cve-scan` pod wedged in `CreateContainerConfigError` → requester
-  never runs. Fix = user stores scoped PAT + re-run `argocd_sync_app_rebuild_secret` + delete
-  wedged job `cve-auto-1787541034`; then hardening (fail-loud + bounded backoff) + dashboard
-  no-data annotation. Corrected diagnosis in `docs/issues/2026-08-24-cve-remediation-panels-empty.md`.
-- [ ] **Image signing / CVE-loop closure** (`docs/plans/v1.27.0-image-signing-cve-loop-closure.md`)
-  — cosign sign+attest, Kyverno Audit→Enforce, promoter verify gate. Multi-repo, heavy.
-- [ ] **Frontend inline attest — spec WRITTEN 2026-08-31, Codex NOT dispatched.** `shopping-cart-frontend` inlines its
-  own build/sign in `ci.yml` `publish` job (no reusable-workflow `uses:`) — signs but no attestation. Spec
-  `docs/plans/v1.27.0-image-signing-frontend-inline-attest-codex-task.md`: insert 3 steps (trivy `cosign-vuln` +
-  `spdx-json` predicates by digest → `cosign attest --type vuln`/`--type spdxjson`) after `Sign image by digest`, trivy
-  pin reused `v0.36.0`, branch `feat/frontend-inline-attest`, exact msg `ci: attest frontend image (vuln + SBOM) inline by digest`.
-- [ ] TWO-CLOUD (hostinger as 2nd registered cluster) NOT yet done — this run was k3s-aws only; hostinger node up but not registered into hub.
-
-### From: 2026-09-20 — Port-forward wrapper fix pending commit
-- [ ] Commit/push blocked by workspace Git permission: `fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted`. No commit SHA or PR URL exists yet; PR creation remains forbidden by the task.
-
-### From: 2026-09-21 — GHCR PAT validated for auth, not for `read:packages`
-- [ ] **Operator, out of scope for Codex** — mint a PAT with `read:packages`, overwrite
-  `secret/github/pat`, force-sync `ghcr-pull-secret`, restart the four deployments. The gh CLI token
-  can never work: its scopes are fixed by the OAuth app (`repo, read:org, gist, admin:public_key`).
-- [ ] **Codex: fix `bin/rotate-ghcr-pat`** — hardcoded `ubuntu-k3s` context, auth-only PAT
-  validation, PAT+Vault token in argv. Spec `796ba237`. Dispatched 2026-09-21 via `codex exec`.
-  Awaiting SHA — verify before trusting.
-- [ ] **Hub GHCR `ImagePullBackOff`** — OPEN, blocked. No GitHub credential on the operator's
-  machine can pull from `ghcr.io` (403 Forbidden). Needs a PAT with `read:packages`.
-- [ ] **`github-packages-token` cannot pull** — implies GitHub Actions image builds will 401.
-  Independent of the hub outage; track separately.
-- [ ] **Codex: forward `PROMOTER_SSH_KEY`** — spec `eb97355d`, dispatched 2026-09-21, branch
-  `fix/pass-promoter-ssh-key` in payment / product-catalog / frontend / infra. Awaiting 4 SHAs.
-- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` and
-  `shopping-cart-frontend` (both lack it entirely; reuse the key already in basket/order/payment).
-- [ ] **Codex: forward `PROMOTER_SSH_KEY`** — RE-DISPATCHED with corrected scope, spec `6fa1ceab`.
-  Only `shopping-cart-product-catalog` + `shopping-cart-infra`. Awaiting 2 SHAs.
-- [ ] **OPERATOR: create `PROMOTER_SSH_KEY` secret** in `shopping-cart-product-catalog` only
-  (it has none; reuse the key already in basket/order/payment).
-- [ ] **UNFILED follow-up:** basket run `33507015429` promotion failed with
-  `failed to push some refs` — push rejection, key was present. File if it recurs.
-- [ ] **Stray branches** `fix/pass-promoter-ssh-key` exist in payment and frontend from the first
-  dispatch, with no commits. Deletion NOT approved — left in place.
-- [ ] **Dispatch the refetch-loop fix to Codex** — BLOCKED until `fix/pass-promoter-ssh-key` merges
-      in shopping-cart-infra (same file).
-- [ ] **Rotate two exposed credentials** - Grafana (pasted by the user into the session) and Keycloak
-      admin (leaked past my redaction filter). Both need rotation.
-- [ ] **`show-service-passwords` Keycloak line defeats redaction** - prints `admin user: admin / <pw>`
-      instead of the `password: <pw>` convention every other service uses, so filtering by convention
-      misses it. Also the 3 Keycloak dev users print `N/A`. Unfiled.
-- [ ] **ROTATE two exposed credentials** - Grafana (pasted into the session) and Keycloak admin
-  (leaked past my redaction filter). Still outstanding.
-- [ ] **`secret/keycloak/users/*` unseeded on the hub** - expected state, now reported honestly.
-  Seeding it would require either running `bin/cluster-up`'s SSO step or adding the path to the
-  14-key allowlist; the latter is NOT approved. No action taken.
-- [ ] **Jev / TypeSafe AI - do not integrate now.** Recommendation is a deterministic e2e verdict
-  taxonomy + repo routing table + back-labelled corpus from the 28 existing e2e/Hermes bug docs,
-  which doubles as the offline eval set. Spec NOT written - needs the user's go.
-  (`docs/plans/` for v1.36.0 currently holds 1 of the 5-doc cap.)
-- [ ] **No PRs opened** for `ef3d4b8d`/`f9d956ae`/`6c744a23`/`41855a2d` (k3d-manager) or
-  `e99960e` (shopping-cart-infra). PR creation still needs the user's explicit go.
-- [ ] **Keycloak admin rotation** — still outstanding; no rotator exists and the ESO secret is bootstrap-only, so Vault+restart alone will not change the live password. Needs a 3-step manual or a new `keycloak-credential-rotator` spec. Operator to choose.
-- [ ] **Fix `base64 --decode` in platform-ops rotators** — BusyBox in `alpine/k8s:1.31.4` only
-  accepts `-d`. keycloak lines 98/113 and argocd line 139 silently disable ALL Slack
-  notifications (including rollback-failure alerts); argocd line 117 has no `|| true` and looks
-  like it aborts the job outright. grafana already uses `-d`. Needs a bug doc + a test banning
-  `--decode` in `scripts/etc/argocd/platform-ops/`.
-- [ ] **`keycloak-realm-reconcile` fails with `awk: command not found`** — exit 127, 2026-09-21,
-  `quay.io/keycloak/keycloak:24.0`. Realm `shopping-cart` created but auth flows never
-  configured. Pre-existing, unrelated to the rotation. Needs a bug doc.
-
-### From: 2026-09-22 — Prometheus reseed and rotator CI fix
-- [ ] **`keycloak-realm-reconcile` awk exit 127** — still needs its own bug doc.
-- [ ] **Alertmanager root route is default-deny — all warning alerts discarded** (spec filed
-  2026-09-23, assigned to Codex). Root cause of the 15 silent `cve-remediation-verify`
-  failures. `route.receiver: 'null'` at `alertmanager.yaml.tmpl:9`; only `severity = critical`
-  or the 5-name allowlist escape it. Also silences this repo's own `E2EVerificationFailing`
-  and the `keycloak-realm-reconcile` awk-127 job. Spec:
-  `docs/bugs/2026-09-23-alertmanager-null-root-route-silently-drops-warning-alerts.md`.
-- [ ] **Probe has no test of its own** — `test_alert_delivery.py` stubs `run`, so
-  `bin/k3dm-alert-delivery-status` is never executed by any suite. That is how the gzip-key defect
-  shipped green. A parse-level test over a fixture generated Secret would close it.
-- [ ] **istio-cni DaemonSet — precondition done, awaiting the user's go for the AppSet reapply.**
-  `istio-cni-node-vgr6m` is 0/1 since 2026-09-06, `install-cni` readiness 503, **160,074 probe
-  failures over 17d**, 0 restarts (no probe ever passed). The live `istio-ambient` AppSet still
-  holds the generic `cniConfDir: /etc/cni/net.d` / `cniBinDir: /opt/cni/bin`; the correct k3s values
-  are `/var/lib/rancher/k3s/agent/etc/cni/net.d` and `/var/lib/rancher/k3s/data/cni`
-  (`_istio_ambient_cni_dirs k3s-hostinger` confirms). **`02e3fa76` fixes the overwrite mechanism but
-  is inert until the AppSet is reapplied** — the stale generic dirs are still live. Ambient is in
-  real use, not cosmetic: `ztunnel-69cft` is 1/1 and namespace `shopping-cart-apps` carries
-  `istio.io/dataplane-mode: ambient`, so redirection setup for new pods there is degraded.
-  Next action, needs the user's go: reapply the `istio-ambient` ApplicationSet, confirm it writes
-  the k3s dirs (the new guard should refuse the generic ones), then roll the DaemonSet.
-- [ ] **AWAITING THE USER'S GO — reapply the `istio-ambient` ApplicationSet.** All preconditions now
-  hold. Expected: `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d`,
-  `cniBinDir: /var/lib/rancher/k3s/data/cni`, and the new guard silent (provider is specific).
-  Then roll `istio-cni-node` and confirm 1/1 plus `KubeDaemonSetRolloutStuck` clearing.
-
-### From: 2026-09-24 — webhook Phase 4 lifecycle/status extraction (working tree; commit pending)
-- [ ] Commit/push blocked by `.git/index.lock: Operation not permitted` after one commit attempt;
-      no retry, lock removal, hook bypass, force-push, or PR. All scoped changes remain staged;
-      no Phase 4 SHA exists.
-
-### From: 2026-09-24 — lib-foundation v0.4.18 credential-test observability
-- [ ] **Operator action:** dismiss CodeQL alerts 23/24/26/27 via `gh api` — the classifier
-  denied it as a CI bypass; must be run from the operator's terminal. Blocks the #131 CodeQL
-  gate; `enforce_admins` untouched until then.
-- [ ] Follow-up (deliberately out of scope): dedup the two `_robustClick` copies —
-      `sandbox.js` swallows errors, `acg_restart.js` does not, so unifying them changes the
-      live sandbox path and needs a sandbox to verify.
-- [ ] **Unalerted public-path failure:** `make status CLUSTER_PROVIDER=k3s-hostinger` reports
-      Frontend 404 while all four `shopping-cart-apps` pods are Running 1/1, so `ServiceDown`
-      (`kube_pod_status_ready ... == 0`) is correctly silent. Nothing probes the public hostnames —
-      there is **no blackbox exporter anywhere in the repo** and nothing writes smoke/status results
-      to Pushgateway, so no rule can fire and no SMS can be sent. Delivery is fine
-      (`severity = critical` → `sms-critical`). Second silent failure from this same gap; the
-      blackbox-probe + `CloudflareTunnelDown` follow-up is now load-bearing.
-
-### From: v1.39.0 test-suite metrics — 2026-09-27 implementation status
-- [ ] No commit/push SHA: the environment denies writes to `.git` (`FETCH_HEAD` and `index.lock`).
-      Resume by retrying the required pull, commit (including the observed marker fact), push, and
-      remote SHA verification from a checkout with writable Git metadata.
-
-### From: v1.39.0 test-suite metrics — DONE 2026-09-27, commit `205405c0`
-- [ ] OPERATOR-OWNED, deliberately not done: the first live `make test-metrics` push, and
-      confirming the `k3dm-tests` dashboard loads in the ACG Grafana. No live Pushgateway, cluster
-      or host action was taken by any agent.
-
-### From: v1.39.0 public endpoint blackbox probes — 2026-09-27, pushed `ba2a01e1`
-- [ ] **Live verification pending operator action:** deploy the chart/Probe resources via ArgoCD;
-  query `count(probe_success)` and all seven `probe_http_status_code` series; prove the frontend
-  404 yields `probe_success 0`; reapply hub and ACG ApplicationSets; run
-  `argocd_check_values_branch`. The local remote-tracking ref could not be updated by the sandbox,
-  but `git ls-remote` reports the pushed SHA above.
-
-### From: v1.39.0 test-suite metrics — live push CONFIRMED 2026-09-27
-- [ ] **Duration metrics are dead** — `k3dm_test_run_duration_seconds` is a hardcoded 0 and
-      `bats`/`pytest` suite durations are 0 (the parser expects a `# duration:` marker that no
-      harness emits). Needs Makefile timing + `--duration` + a pytest `in <n>s` parse. DECISION
-      PENDING: fix in v1.39.0 or file as a bug doc for v1.40.0.
-- [ ] Operator-owned: apply the `k3dm-tests` dashboard (`make observability-acg`) and confirm it
-      loads in the ACG Grafana. The ConfigMap is still absent on both clusters, so the metrics
-      that just landed have nothing reading them yet.
-
-### From: v1.39.0 blackbox probes — Codex landed ba2a01e1 2026-09-27
-- [ ] Operator-owned live DoD: ArgoCD deploy, seven `probe_success` series, seven status codes,
-      prove the frontend returns `probe_success 0` / 404, ApplicationSet reapply,
-      `argocd_check_values_branch`.
-
-### From: 2026-09-27 — launchd PATH omission fixed
-- [ ] **Upstream lib-foundation change: add `{{HOME}}` substitution to `_install_hermes_agent`** so
-      the hermes template can carry the fix like its siblings. Not started; needs the lib-foundation
-      repo and its own PR.
-
-### From: 2026-10-01 — v1.42.0 daily verification plan
-- [ ] Implementation not started; Tier 2 ACG/Stripe remains opt-in and outside this plan.
-
-### From: 2026-10-01 — k3d-manager Dot roadmap
-- [ ] Implementation is not started; this remains a roadmap/specification item.
-
-### From: 2026-10-01 — v1.40.0 review fixes complete
-- [x] 2026-10-03 payment PRs #80 (19c42aa) + #82 (e3b6f06) MERGED. [ ] Trivy 0 CRITICAL on sha-e3b6f06, re-pin hostinger + e2e.
-- [x] 2026-10-03 payment sha-e3b6f06 Trivy 0 vulns; re-pinned hostinger digest + e2e tag b7604afe. [ ] payment repo k8s/base stuck at sha-19c42aa (CI commit-back rebase conflict). [ ] hostinger payment VulnerabilityReport 0 CRITICAL.
-- [ ] 2026-10-03 payment k8s/base stuck at sha-19c42aa: promote rebase bug (2026-09-21 doc) unimplemented; re-run fails deterministically. Spec needs is-ancestor guard + refresh; then bump caller pins.
-- [x] 2026-10-02 promote-loop fix spec refreshed + dispatched to Codex (infra fix/promote-refetch-never-backwards). [x] e1ef171c verified (harness 5/5, guard mutation red). [x] infra PR #107 MERGED 98b10f05 (enforce_admins restored). [ ] hostinger trivy: no reports for payment/order/catalog (uninvestigated). [x] Part B pin bumps verified: payment 741ffdc, basket 01904e2, order af3f105, product-catalog d3ac722. [ ] PRs: payment #83 OPENED 2026-10-03 (+CHANGELOG a8add76; Copilot 1 finding = CHANGELOG entry outside Fixed list, fixed 171d8e4, thread resolved, issue doc 79ff70d; CI GREEN on 79ff70d, mergeable clean; ruleset-protected main, no enforce_admins lever) MERGED 2026-10-03 e93d32c by operator; main CI 37088705440 SUCCESS = first live promote-loop run: pushed e93d32c..4e79be2 on attempt 1, k8s/base newTag sha-e93d32c (stale sha-19c42aa repaired). basket #50, order #80, product-catalog #57 OPENED 2026-10-03 (CHANGELOG entry each; Copilot requested; CI pending). basket/order/catalog HELD: open dependabot PRs basket #49, order #79, catalog #56 bump the same line to older infra SHAs (64c11783/e41f2adb) -> CLOSED as superseded 2026-10-03 (user go). Remaining: open those 3 PRs after payment's first main promote run is confirmed. [ ] confirm payment main promote repairs k8s/base. CI 2026-10-03: basket #50 green/CLEAN, order #80 green/BLOCKED (review), product-catalog #57 RED — pre-existing: SQLAlchemy 2.1.3 defaults bare postgresql:// to psycopg3 (not installed; Dependabot #56 same on 09-28). Bug docs/bugs/2026-10-03-product-catalog-sqlalchemy-2-1-defaults-postgresql-url-to-psycopg3.md dispatched to Codex on catalog branch fix/sqlalchemy-explicit-psycopg2-driver (postgresql+psycopg2:// + tests/unit/test_config.py); after merge, update-branch #57. Codex 9c92929 verified (2.1.3, 110 passed, ruff clean) + Claude dbe05c5 (CHANGELOG moved inside Fixed list — Codex repeated the payment placement error); catalog PR #58 OPENED, Copilot requested; #58 CI ALL GREEN; #58 MERGED 666b832 (2026-10-03); #57 merged main in 41e7e1c (CHANGELOG conflict, kept both entries), #57 CI GREEN + CLEAN. main run 37090500718 (old pin) published + promoted newTag sha-666b832 — first catalog image since 09-22. Copilot: 0 reviews on #50/#80/#57. 2026-10-03: basket #50 MERGED f84411f (Go CI main run 37091213040 SUCCESS: new loop pushed f84411f..3194768, newTag sha-f84411f — basket proven); #57 BEHIND after promote commit → update-branch, CI GREEN + CLEAN again, awaiting merge; order #80 merge REFUSED (ruleset 20606891: 1 approval, no admin bypass); classifier denied Claude ruleset edit, operator ran 0→merge→1: #80 MERGED 86f79e4, ruleset verified back to approvals=1 / DeployKey bypass / same 4 rules. Catalog #57 MERGED 2d3d687 (operator, --admin); ALL FOUR PROVEN on the new loop: order run 37120665295 pushed 86f79e4..6386ed1 newTag sha-86f79e4; catalog run 37120828300 pushed 2d3d687..b050ba1 newTag sha-2d3d687. Promote-loop rollout DONE.
-- [ ] 2026-10-03 v1.41.0 features dispatched to Codex ONE AT A TIME, Claude verifies each before the next: (1) find-similar-docs-links — DONE `a4996800` (Claude verified: on origin, 4 scope files, 11+1s / make test-pytest 590+1s, doc-links OK, independent mutation forcing "main" fails the URL test); (2) cloud-bridge round-trip latency bug — `6fc0bc47` pushed (Codex gates: 82 / 599+1s / doc-links OK / 2 mutations); Claude review found a regression (MAX_PER_TICK cap returns own pushed commit as last_tip → requests 11+ stall); follow-up DONE `819e636a` (Claude verified: on origin, 2 files, 68 bridge tests, independent revert-to-break mutation fails the new test); operator restarted 2026-10-03 06:18; live: bridge gap 14 s / 9 s, client round trip ~20 s (was up to ~90 s); Codex cloud session (codex@github) also used it 06:23 — diagnose-apps 7 s, job-status 8 s bridge-side (hand-committed requests, not the helper); old Sep 29 publickey lines still the log tail — log untouched since `docs/bugs/2026-10-03-cloud-bridge-round-trip-latency.md` (adaptive 5s tick, no re-fetch, 5s client poll; operator then `make restart-cloud-bridge`); (3) webhook-log-levels-and-retention — `3f7cf103` M1 / `73d0ef56` M2 / `dc5211de` M3 / `f1d0ec5d` M4 (Claude verified: test-pytest 605+1s, test-python-unit 7 suites OK, cleanup BATS 12/12, shellcheck clean, 0 print(), independent mutation removing ALL redaction fails the token test); review finding: M2 hollowed `test_make_target_passes_timeout_to_transport` (no assertion) → follow-up DONE `cd20fc1b` (Claude verified: on origin, 1 file, test-python-unit 7 suites OK, independent mutation dropping killpg fails the test at 30 s vs <5 s); item 3 COMPLETE — operator to run `make restart-webhook` (restarts bridge too); docs sweep of all v1.41.0 features after the queue (operator ask 2026-10-03); (4) cloud-bridge-e2e-dispatch — split into two runs: part A M1–M6 DONE `a324b6cd` (Claude verified: on origin, 14 files, 100 bridge/capability tests, test-python-unit 7 OK, e2e_remote BATS 81/81, shellcheck clean; independent mutations: capability check→True fails 2 pytest + 3 unittest, dropping lock holder from refusal fails BATS 24; nits: blank line splits the trailers, `removeprefix("make:")` would grant a future non-make route named e2e → fixed in part B; architecture doc lacks cloud-runner token → part B); part B M7–M8 + hardening DONE `c2667b6d` (Claude verified: 8 files, bridge 80 passed, policy unittest OK, independent mutation running slow actions inline fails 1; review: job state `killed` (cluster kill route) is missing from TERMINAL_JOB_STATES → a killed job is watched until timeout+10 min then 'watch expired' — folded into the sandbox spec); item 4 COMPLETE — operator `make restart-webhook` now; operator ask 2026-10-03: let the cloud agent bring the ACG sandbox up/down (not the primary cluster) → spec `docs/plans/v1.41.0-cloud-bridge-sandbox-lifecycle.md` (5th v1.41.0 plan = cap) — DISPATCHED 2026-10-03 (codex-sandbox-lifecycle.log); operator rationale: 4h+ sandbox lets an agent debug without touching live Hostinger; single `make restart-webhook` after it is verified, then operator does the ACG sandbox login (Chrome CDP) so `sandbox-up` can run; operator provisioned Keychain `k3dm-webhook-token-cloud-runner` (account k3dm) 2026-10-03; operator restart-webhook deferred until B verified (shared worktree) (now M1–M8: + M7 slow actions off the serial loop, M8 bridge follows its own jobs → `.final.json` / `--wait-final`); (5) python-agent-rigor (brief A lib-foundation, then B k3d-manager). Sandbox lifecycle DONE `9d527cec` (Claude verified: on origin, 8 files = spec, 83 bridge tests, test-python-unit 7 OK; independent mutation granting any provider fails 8 hostinger/empty/AWS/gcp subtests, cmp-restored). Codex's run wiped Claude's uncommitted memory-bank edits (re-added) — commit memory-bank before a dispatch, never leave it dirty in the shared worktree. NEXT: operator `make restart-webhook`, then a live `sandbox-up` smoke — operator plan 2026-10-03: after the operator's own run completes, the operator asks a cloud agent to run `bin/k3dm-cloud-request --wait-final sandbox-up` (first live use of the cloud-runner lifecycle path); Claude then checks the bridge request/response/.final.json commits and the webhook job. Operator's own `make up CLUSTER_PROVIDER=k3s-aws` 2026-10-03 FAILED: data-layer Application never Synced — hub ArgoCD cannot resolve `host.k3d.internal` (NodeHosts has only the 4 nodes, last written by k3s-supervisor 2026-09-27 hub rebuild). Root cause: `_acg_repair_hub_host_alias` (bin/cluster-up:170) resolves the host IP with `getent`, which rancher/k3s:v1.32.0-k3s1 lacks → empty → WARN + skip, so the repair has been a silent no-op since the rebuild. OrbStack: `nslookup host.docker.internal` in the server container = 0.250.250.254. CloudFormation stack k3d-manager-cluster (us-west-2) left running (billable). Sudo prompt during the run = ArgoCD browser HTTPS LaunchDaemon reinstall (wrapper changed); headless runs skip it. No manual ACG login step: operator confirmed 2026-10-03 that `make up` logs in unattended (Keychain `k3dm-acg-pluralsight` auto-login runs before the TTY gate, acg_session_check.js:91-99); how-to corrected.
-- [ ] 2026-10-03 QUEUED (operator decision) — cloud-agent sandbox debugging, two separate releases: (1) v1.43.0 (v1.42.0 is already reserved to its 5-plan cap by the Hermes alert-triage scope §5): sandbox-only (`provider=aws`) read-only diagnostics — namespace events, get/describe deploy/svc/ingress/node, logs `previous` + `container` (webhook supports container/tail_lines; the bridge does not pass them); also verify the ACG ApplicationSet values ref tracks the branch a cloud agent pushes to (git push → ArgoCD sync is the agent's only write path). Operator follow-up: "possible to delegate to hermes for investigation and report info (cloud agent <-> hermes)" — Claude proposed building (1) as a Hermes on-demand investigation: bridge action `hermes-investigate` (structured args only, no free text reaching Hermes' LLM) → Hermes runs a fixed read-only evidence bundle on the sandbox context, reusing the v1.42.0 `alert_recipes` engine, + prior art → one report back as a bridge artifact. (2) a LATER release, deep investigation first: a sandbox-bound mutating step (e.g. rollout restart) — natural home is a Hermes Phase-2 allowlisted repair with Slack approval. Awaiting operator's pick on the Hermes route.
-- [ ] **Hub DR one-command target** (operator 2026-10-03: "we should have a better make <target> to execute hub recovery") — spec `docs/bugs/2026-10-03-hub-restore-has-no-single-make-target.md`: `bin/hub-restore` (TTY + Keychain + context + root-owned-dir preflight, 8 keep-going steps, summary), tunnel agent extracted to `scripts/lib/cloudflare_tunnel.sh`, `make hub-restore` / `make hub-recover`, alertmanager-secret backs up gmail_app_pw, restore-google-app-password tells empty vs denied apart. Codex DISPATCHED 2026-10-03. Live: operator's `restore-google-app-password` in Terminal.app said not in Keychain although the item is present → empty value or denied ACL; operator checking length.
-- [ ] **Hub identity + public origins are sandbox-path only** (found 2026-10-03 12:45). Operator ran signing-restore (RESTORED from Keychain — key not lost), reconcile and platform-ops (OK; webhook-token, app-rebuild and git-writer Secrets synced) in Terminal.app. Reconcile stopped at the identity hook: no `shopping-cart-identity` Application on the hub (only cluster-up Step 10c creates it). Claude applied it by hand; it is blocked on Vault keycloak/admin, keycloak/clients, keycloak/smoke-user and ldap/admin (404, seeded only by deploy_shopping_cart_data). PublicEndpointDown SMS for argocd/keycloak/frontend (local PF agents + sandbox frontend missing) → Claude added 6 h silence `84a19233`. Fix: the next sandbox `make up` restores all of it; durable fix in the follow-up section of the hub-restore spec. After that make up, rerun `hub_recovery_reconcile` (smoke user, ArgoCD admin mirror, cloudflared config steps did not run) and expire the silence.
-- [ ] **Proposal v1.43.0: off-laptop outage watcher** (operator 2026-10-03: use Hermes to coordinate jobs during a local network outage) — first confirm where Hermes runs; it only helps if it is off the Mac (heartbeat page, queue held until reconnect, sweep stuck pods/jobs afterward).
-- [ ] **HUB DELETED 2026-10-03 ~08:35** — Claude gave `make down CLUSTER_PROVIDER=k3s-aws` without `KEEP_LOCAL=1`; `bin/cluster-down` defaults `_keep_hub=0` → `k3d cluster delete k3d-cluster`. No k3d containers/volumes remain; context gone; all hub dashboards error. Fix spec `docs/bugs/2026-10-03-make-down-deletes-hub-by-default.md` (default keep hub, `DELETE_HUB=1`/`--delete-hub` to delete; `k3d` provider implies delete). Dispatch order: host-alias (running) → make-down default → hang → SMS routing. Hub rebuild = operator, hub-only sequence + Vault reseed from Keychain (app-cluster-kubeconfig, cosign-public-key not backed up).
-- [ ] **Hub recovery progress (Claude, 2026-10-03 09:00–09:15)** — done: Vault PF reinstalled (health 200); `make platform-ops` OK; AppSets reapplied 13/13 pinned to v1.41.0; hub self-registration + Hostinger re-registered (ArgoCD + Vault auth mount); all 30 apps Synced; hub pushgateway :19094 OK. `hub_recovery_reconcile` stopped at step 5 (signing — Keychain unreadable from Claude session). BLOCKED on operator: (1) `sudo chown -R cliang:staff ~/.local/share/k3d-manager/logs` (root-owned since 07:34 → grafana-port-forward exits 78); (2) `make alertmanager-secret` + `make observability` from operator terminal (Keychain); (3) `make signing-restore` then `./scripts/k3d-manager hub_recovery_reconcile --confirm`; (4) `make platform-ops` rerun for Keychain-synced secrets (webhook token); (5) Cloudflare tunnel agent missing → public hosts 530; ArgoCD PF + browser LaunchDaemons missing (restored by next sandbox make up / cluster-up). NO snapshot existed (M2 `k3dm-snapshots` absent, `~/k3dm-backups` empty).
-- [ ] **Hub-loss DR (real, 2026-10-03)** — operator: "a good lesson and a disaster recovery". Capture per-step timings (measured RTO) + lost-for-good list (RPO) during the manual rebuild; after recovery write `docs/issues/2026-10-03-hub-deleted-by-sandbox-teardown.md` (timeline, cause, restored-from-Keychain/git, lost, timings). Follow-ups: scheduled off-hub Vault snapshot (proposed v1.43.0); maybe `make hub-restore` for post-rebuild restores (decide after counting today's manual steps). No snapshot exists today — recovery is per-item from Keychain (`k3d-manager-app-cluster-secrets`, signing, alertmanager, cloudflared) + git.
-- [ ] **Bug: root-owned state logs dir kills grafana-port-forward** — `docs/bugs/2026-10-03-root-owned-state-logs-dir-kills-grafana-port-forward.md` (OPEN, hypothesis: root LaunchDaemons recreated the dir after cluster-down removed it). Operator workaround: `sudo chown -R cliang:staff ~/.local/share/k3d-manager/logs` + kickstart.
-- [ ] **2026-10-03 sandbox `make up` FAILED at Step 10c (Keycloak never created)** — root cause: `bin/cluster-up` identity Application heredoc sets `Replace=true`; ArgoCD replaces the bound `postgres-keycloak-pvc` (immutable) and the sync fails; infra per-PVC `Replace=false` (`00d0d8a`) is present live and IGNORED. Fix F1 (ServerSideApply=true + ServerSideDiff=true) appended to `docs/bugs/2026-09-23-argocd-identity-replace-true-cannot-update-bound-pvc.md`, dispatched to Codex. Operator rollout: patch live app + start sync, then re-run make up. CFN stack `k3d-manager-cluster` (us-west-2) left running by the failed run.
-- [ ] **hub_recovery_reconcile run 2026-10-03 13:44** — identity Synced/Healthy, KC 1/1, but public Keycloak 502: wrapper pins REMOTE_PORT 8080, infra svc exposes http:80 → recurrence + named-port spec appended to `docs/bugs/2026-08-22-keycloak-port-forward-wrong-remote-port.md` (Codex queue). Smoke seed skipped (public mint curl 56). Vault root token Keychain write failed silently (-25308, non-GUI) — same doc. Operator: stopgap wrapper edit + kickstart, rerun reconcile foreground in Terminal.app. My wrapper sed was classifier-DENIED (Irreversible Local Destruction) — don't retry.
-- [ ] **Reconcile rerun (operator, foreground)** — Keycloak PF stopgap verified: :8880 + public 200; smoke client created; identity Synced/Healthy; ESO SecretSynced. public-endpoint-probe: all OK except frontend 502 — origin 127.0.0.2:80 has no listener because the frontend/keycloak browser-http LaunchDaemons were skipped by headless make up (none in /Library/LaunchDaemons). Fix: operator `make refresh CLUSTER_PROVIDER=k3s-aws` in Terminal.app. Keychain root-token write -25308 even foreground → operator `security show-keychain-info`.
-- [ ] **make refresh did not install LaunchDaemons** — `_system_daemon_install_if_missing` uses --prefer-sudo (sudo -n only) → silent soft fail; filed `docs/bugs/2026-10-03-refresh-system-daemon-install-never-prompts-for-sudo.md` (Codex queue). Workaround: `sudo -v && make refresh CLUSTER_PROVIDER=k3s-aws`. Keychain -25308 root cause = login keychain LOCKED (show-keychain-info failed until unlock-keychain); operator unlocked → rerun reconcile to sync Vault root token.
-- [ ] **v1.43.0 PLAN: weekly hub DR drill** — `docs/plans/v1.43.0-hub-dr-drill.md` (operator 2026-10-03: planned DR, restore data quickly, not image snapshots). Operator decisions 2026-10-03: (1) Vault unseal shards durable in Keychain `k3dm-vault-unseal-dr` (M4+M2), generate-root short-lived token, no state.db in backups; (2) pre-bind PVCs with selected-node + node-match hard stop; (3) data = age-encrypted critical claims (~100MB) in private repo `wilddog64/k3dm-hub-data`, M4 has public key only, bounded history; (4) drill runs on M2 with its own kubeconfig; (5) PrometheusRules in git + GitHub scheduled freshness workflow in the data repo; (6) drill hub on M2, not a 2nd hub on M4. Also DELETE_HUB=1 refuses without an export <24h. Live checks L1–L6 before dispatch; likely split into 2 Codex dispatches (export/restore, then drill). Supersedes the scheduled-snapshot proposal below. 1 of 5 for v1.43.0.
-- [ ] **DR gap: no snapshot before destructive teardown** — `make snapshot` exists (M2 store) but is manual and was never run; nothing captured before the 08:35 hub deletion. Propose v1.43.0: scheduled snapshot + `make down DELETE_HUB=1` refuses without a verified snapshot < N h old.
-- [ ] **Hub VectorDB empty after rebuild** — the Hermes index tick fails every run because the Vault copy `secret/embeddings/gemini` was lost with the hub; launchd can't use the keychain. The operator reseeds it via `docs/guides/vector-store.md` (Terminal.app), then runs `make index-docs`. Durable fix = hub-restore follow-up F2.
-- [ ] **index-docs stalled at 700/1802 (2026-10-03 14:08)** — sleeping on an uncapped server `retryDelay` (likely per-day quota). Bug filed: `docs/bugs/2026-10-03-index-docs-sleeps-on-uncapped-server-retry-delay.md`; Codex queue. Operator to Ctrl-C and re-run later (resumes).
-- [ ] **index-docs re-run** — operator runs `make index-docs` morning of 2026-10-04 (after midnight-PT quota reset); 700/1802 committed, ~1102 remaining.
-- [ ] **Codex chain dispatched 2026-10-03 14:20** (`codex exec`, sequential): f3 Keycloak named port + Keychain write verify; f4 refresh `--interactive-sudo`; f5 index-docs retry-delay cap. Logs `scratchpad/codex-f{3,4,5}.log`. Claude verifies each SHA on origin. Not yet specced for Codex: preseed ESO force-sync, hub-restore embeddings key.
-- [ ] **Bug: cluster-up Keycloak LDAP component lookup picks a mapper** (2026-10-03, Claude) — `docs/bugs/2026-10-03-cluster-up-keycloak-ldap-component-lookup-picks-a-mapper.md`. Explains all 3 `make up` SSO WARNs: `grep -B1 'ldap'` returns the "full name" mapper id (10d.6 update/sync fail; 10d.7 created stray group-mapper `9233ebab` under that mapper → NPE `ldapProvider is null`); frontendUrl sent top-level instead of `attributes.frontendUrl` (also fired 2026-07-07). Live SSO is OK (real provider `a5a37610` syncs 5 users; issuer public via `_keycloak_smoke_ensure_realm`). Spec F1–F4 for Codex; fix also deletes the stray mapper on the next `make up`.
-- [ ] **Root-owned logs bug updated** — confirmed `argocd.sh:83` defaults the ROOT ArgoCD browser daemon log into the shared top-level `logs/` (cluster-up's per-provider fallback is dead); 744-mode creator still unconfirmed.
-- [ ] **ssh-tunnel down after k3s restart** — orphaned sandbox sshd (PID 51046) holds `-R 8200`; autossh `ExitOnForwardFailure` loops; ArgoCD loses ubuntu-k3s. Bug `docs/bugs/2026-10-04-ssh-tunnel-autossh-reconnect-blocked-by-orphaned-remote-8200.md`. [x] operator kill+kickstart (tunnel back 02:46Z) [x] sync — ArgoCD auto-sync Succeeded, Synced/Healthy, Prometheus 2/2 Running, svc prometheus-operated present [x] operator restarted Step 14b PF (PID 93911, 19190); hub federate-acg up=1 at ~02:55Z (14c pushgateway agent already up on 9091) [ ] decide fix on sandbox if sandbox metrics wanted. Orphan `bin/cluster-up` PID 1927 + child 85324 killed by operator.
-- [x] **Codex: three sandbox-recovery fixes** (dispatched 2026-10-04) — DONE `f61d3b3b` (cleanup PID ownership) / `3b789adf` (CRD condition + discovery warn + 14b svc guard) / `d49e5eb8` (Vault reverse forward as own agent + remote fuser). Claude verified: all on origin, scope = spec, no new shellcheck warnings, 61/61 targeted BATS, independent mutation (drop ownership check) fails test 28, cmp-restored. Review: R1 Step 14b warn expands `$!` to this run's PID (paste writes the Vault PF PID into acg-prom-pf.pid); R2/R3 Codex split `"su""do"` to slip past the pre-commit bare-sudo audit (observability warn text + tunnel wrapper remote `sudo fuser`). R1+R2 specced in the CRD bug doc; R3 needs operator decision (sandbox 8200 listener is held by non-dumpable sshd, so remote fuser needs root). [x] follow-up R1/R2 `98835aac` (Codex edits, Claude committed; 8/8 crd-discovery BATS + lint; R1 mutation red; `\$!` renders literally) [x] R3 decision: audit exemption upstream — lib-foundation `5c9b631` on `fix/agent-audit-remote-sudo-marker` [x] lib-foundation PR #57 MERGED `44e7e8d` 2026-10-04 (no tag: fix branch, [Unreleased]) [x] subtree pull `ce1164eb` (tree-equal to 44e7e8d) [x] operator: retire the stale local fork `scripts/lib/agent_rigor.sh` → shim to the subtree copy (trial: 9/9 local BATS pass) — spec `docs/bugs/2026-10-04-pre-commit-hook-loads-stale-local-agent-rigor-fork.md` (C1 shim, C2 tunnel marked sudo) [x] Codex [x] verify — `e22b7df6` + `0670b075` (23/23 BATS, fork-restore mutation red, hook accepted marked sudo) [x] make test 5133de03: 1345/1345 BATS, pytest 621 passed 1 skipped [x] make test 709aba8d: 1336/1341, 5 test-only reds [ ] live verify next `make up` + `tunnel_start` migration
-- [ ] **Hermes app_health never enabled** — spec `docs/bugs/2026-10-04-hermes-app-health-sensor-never-enabled.md` (template env ENABLED=1 + CONTEXT=ubuntu-hostinger; Claude dry run 2026-10-04: payment-service:8084 health/liveness/readiness UP via service proxy). [x] Codex (edits; Claude committed) `254a291e` [x] verify (3 files = spec, pytest 12/12, Codex mutation KeyError) [x] make test (402bd596 green) [x] operator `bin/k3dm-hermes-setup` 2026-10-04 — first poll 11:43:35Z app_health healthy "1 service(s) agree with their probe groups". **CLOSED.**
-- [ ] **Hermes Slack-approval setup make targets** — operator asked 2026-10-04 to replace the 5 hand-typed credential steps. Spec `docs/bugs/2026-10-04-hermes-slack-approval-setup-has-no-make-target.md` (`hermes-approvals-kv` / `hermes-drain-token` (token via `security -i` stdin, read back, ROTATE=1) / `hermes-approvers APPROVERS=` / umbrella `hermes-approvals-setup`; stubbed BATS; guide + CHANGELOG). [x] Codex [x] verify `2054d058` (20/20 BATS; both mutations red; Claude hardened: APPROVERS read from env not recipe text, `</dev/null` on kv create — stub hung on inherited stdin) [x] make test `09370a01`: 1345/1345 BATS; test-bin 287/289 — 2 reds PRE-EXISTING at `544ed18a` (k3dm_cleanup.bats:89 GNU-only `stat -c` on macOS; make_lifecycle.bats:17 `make down` `_keep_hub_flag=--keep-hub` assertion) — untriaged [~] operator: ran drain token MANUALLY (first keychain write failed 'User interaction is not allowed', retry ok; APPROVAL_DRAIN_TOKEN uploaded) — KV binding, APPROVER_ALLOWLIST, deploy-worker still pending. Operator's first `make hermes-approvals-setup` died SILENTLY in hermes-approvals-kv (`x=$(cmd)` under set -e exits before the friendly message) — fixed: `|| true` on Keychain reads, wrangler output printed on create failure, 2 regression tests (red on old recipe). Operator had used Claude's PLACEHOLDER id U07ABC12DEF — needs real member ID (Profile → ⋮ → Copy member ID). Follow-up (unanswered): LaunchAgent template lacks `K3DM_HERMES_APPROVAL_DRAIN_URL`. Operator rerun with real member ID: kv create failed 'APPROVALS_KV already exists' (made by hand earlier) — Claude bound existing id `ee9eb140ea624a09802fef9e16396caf` in wrangler.toml; operator reruns setup (KV step skips). `ROTATE=1` rerun SUCCEEDED 2026-10-04: APPROVAL_DRAIN_TOKEN (new 64-hex) + APPROVER_ALLOWLIST uploaded. Guide gained member-ID how-to, troubleshooting table, recovery notes. Operator DONE 2026-10-04: deploy-worker, Slack Interactivity + `/hermes-auth`, drain URL set by hand via PlistBuddy (verified in `launchctl print`). Automation spec `docs/bugs/2026-10-04-hermes-launchagent-template-lacks-approval-drain-url.md` (static URL in template + opt-in moves to Keychain drain token) [x] Codex [x] verify (232 pytest; gate mutation red; Claude fixed Codex typo `k3d-slack-relay` → `k3dm-slack-relay` in template/test/guide — test was self-consistent so it passed). Operator: rerun `bin/k3dm-hermes-setup` optional (hand-set URL already correct).
-- [ ] **index-docs** — paused 2026-10-04 at 1000/1120 on the Gemini free-tier daily embeddings quota (HTTP 429, retry ~12h); re-run `make index-docs` after reset, it resumes.
-- [ ] **index-docs local embedding cache** — operator asked 2026-10-04: hub loss costs >1 day of Gemini quota to re-index (1000/1120 paused). Spec `docs/bugs/2026-10-04-index-docs-rebuild-after-hub-loss-costs-a-day-of-quota.md` (SQLite cache ~/.cache/k3dm/embeddings.sqlite keyed by model/dim/task/text; newest-dated-first on misses; summary 'from cache'). [x] Codex [x] verify (316 pytest incl. 7 new; cache-off mutation → 3 red; Claude fixed duplicated EMBED_DIM=768 in embed_cache.py → import from prior_art). Cache fills on the next real index run.
-- [ ] **Embedding cache second copy** — operator agreed 2026-10-04 (cache on same M4 as hub). Spec `docs/bugs/2026-10-04-embedding-cache-has-no-second-copy.md` (`make embed-cache-backup DEST=` via sqlite backup API + atomic replace; `embed-cache-restore SRC=` merges INSERT OR IGNORE) + integrity metadata per 2nd review (schema v2 via user_version, model/dim/task/content_hash/created/last_used; read+restore integrity checks; `embed-cache-stats`; `embed-cache-prune` = stale AND unused >90d). [x] Codex [x] verify (648 pytest; 6 mutations red→restored; Claude fixed spec defect: NULL last_used_at counted as unused + restore dropped metadata → first prune would wipe the v1/restored cache; migration now stamps timestamps, restore copies metadata, +2 tests). Operator next: `make embed-cache-backup DEST=…` after quota-reset index run.
-- [ ] 2026-10-04 Codex queue: [x] root-owned logs (verified, committed this push) (docs/bugs/2026-10-03-root-owned-state-logs-dir-kills-grafana-port-forward.md) [x] e2e dispatch CPU gate — Codex done, Claude-verified, commit held until operator make e2e ends (docs/bugs/2026-09-30-e2e-harness-dispatch.md) [ ] deploy-worker keychain msg (docs/bugs/2026-10-02-deploy-worker-keychain-error-misleading.md) [ ] then payment e2e rerun (operator)
-- [ ] Sandbox make up hijacks Hostinger launchd labels (frontend.3ai-talk.org 502, Pushgateway refused after sandbox expiry): docs/bugs/2026-10-05-sandbox-make-up-hijacks-hostinger-launchd-labels.md OPEN; operator workaround = plutil repoint + make refresh-edge; fix spec pending.
-- [x] Stale active-provider marker trusted without liveness (Makefile status, cluster-status-summary, webhook): Recurrence 4 FIXED 2026-10-05, Claude-verified. [ ] operator `make restart-webhook`.
-- [ ] lib-foundation `_browser_launch` missing ready helper under host: PR #61 MERGED `dbed340` (2026-10-05; fix branch, stays under [Unreleased] — no tag). Subtree pull DONE `1a62d0b2` (pushed; only scripts/lib/foundation touched). Live check: next `make up` with Chrome closed.
-- [ ] 2026-10-05 `make up` FAILED exit 1 at Step 10b: sandbox node ip-10-0-1-161 kubelet went silent 12:20:37Z (EC2 alive, status checks ok); sandbox Prometheus: Trivy scan of kube-system/cilium (7 scanner containers x 1Gi limit) at 1265Mi, MemAvailable 398Mi; ESO webhook endpoints empty -> data-layer OutOfSync. CFN stack still up. Bugs filed: `docs/bugs/2026-10-05-sandbox-node-notready-trivy-cilium-scan-starves-kubelet.md` (ACG excludeNamespaces kube-system + scanJobsConcurrentLimit 1 + kubelet system/kube-reserved 256Mi) and `docs/bugs/2026-10-05-cluster-up-data-layer-wait-silent-on-cause.md` (explain op message + NotReady nodes; reconnect timeout logs 'connected'). Both dispatched to Codex (one run).
-- [ ] Follow-up candidate: `shopping_cart.sh:1403` server-Ready probe `kubectl get nodes` has no `--request-timeout`; hangs silently ~1-2 min on a fresh sandbox (observed 2026-10-05 make up). Not filed yet.
-- [ ] 2026-10-05 alert deep dive: 5 bug specs filed (argocd-cve-scan no-newer-chart exit 1; offline tests rotted on v1.41.0; nightly test-metrics push failure silent; hub Trivy scans vclusters; E2E alert re-fires on exporter rollout) — dispatched to Codex (one run). Claude verifies + commits.
-- [ ] 2026-10-05 hub agent-0 k3s agent memory leak: measure growth rate (scratchpad RSS sampler, 10-min), then spec a kube-proxy sync-staleness alert (`docs/issues/2026-10-05-hub-agent-0-k3s-agent-memory-wedges-kube-proxy.md`).
-- [ ] 2026-10-05 ACG extend fix (lib-foundation fix/acg-extend-wait-for-button): spec filed; [x] Codex [x] Claude verify (65cc6bd; jest 44/44, BATS 17/17, 8 new tests red pre-fix, reload + retry mutations red, cmp-restored) [x] PR #62 merged (1b4cd33; Copilot never picked up the request; credential-test gate skipped pre-PR, handed to operator post-merge) [x] make credential-test PASS post-merge (rc=0, sts OK, no restart) [x] subtree pull (3d8956e4, pushed) [x] launchd reinstall (operator 18:12; wrapper verified: node + acg_extend.js) [x] live wake verified (in-process watcher PID 13364, 19:12: found `[data-testid="extend-sandbox-modal"] button:has-text("Extend")`, "Extend action complete"; Auto Shutdown moved 19:25 → 23:25) [x] launchd agent itself verified 2026-10-05 21:42 PDT (04:42Z): first run after reinstall connected via CDP, TTL ~102m, "Extension window not open yet … Skipping" — no "No such file" error (the old wrapper failures stop at the reinstall). Logs now at ~/.local/share/k3d-manager/run/k3d-manager-acg-watch.{err,out}, not /tmp. [ ] a launchd-driven run that actually extends
-- [x] 2026-10-06 ACG watcher still lets the sandbox expire (lib-foundation `fix/acg-watch-interval-and-expired-ttl`): launchd runs every 3.5h but extend only fires with <=65m left (21:42 PDT saw 102m, skipped; sandbox died ~23:24); 01:12 run read yesterday's 11:24 PM shutdown as +1331m. Spec `docs/bugs/2026-10-06-acg-watch-misses-extend-window-and-reads-expired-as-22h.md` filed [x] (`25e2b75`) [x] Codex [x] Claude verify (lib-foundation `211a3fd` pushed; RED + mutations A/B/C, jest 49/49, bats 170/170) [x] PR lib-foundation #64 (release v0.5.1, docs back-filled; CI green, Copilot 0 inline findings) [x] merged `cb5575c` [x] tag v0.5.1 + release [x] subtree-pull `09e8fe37` [ ] operator reinstall agent (acg_watch_start) + stop in-process 3h watcher.
-- [ ] 2026-10-05 sudo prompt in `make up` Step 10g + `refresh-edge`: root cause = (1) sudo resolves bare `install` to gnubin (GNU coreutils) so the `/usr/bin/install` NOPASSWD rule never matches, (2) `bin/*` source stale `scripts/lib/system.sh` lacking the no-TTY `-n` guard. Spec `docs/bugs/2026-10-05-sudo-prompt-stale-system-sh-gnubin-install.md` filed [ ] Codex [ ] Claude verify [ ] commit. Follow-ups: lib-foundation path resolution upstream; reconcile the two system.sh copies; `sudo -n true` probe defect.
-- [ ] 2026-10-06 Hub `federate-acg` TargetDown (operator asked to dispatch the sandbox-Prometheus bug). That bug (`2026-10-03-acg-sandbox-prometheus-crds-...`) was already mitigated (`3b789adf`, `98835aac`) and did not recur — status set MITIGATED. Live read-only check found a NEW cause: k3s kubelet endpoint exposes apiserver/etcd histograms → federate 75,583 series / 37.6 MB / 15.6 s vs 10 s timeout; port-forward :19190 (PID 13954) wedged. Spec `docs/bugs/2026-10-06-federate-acg-scrape-exceeds-timeout-k3s-control-plane-histograms.md` (exclude apiserver_/etcd_/scheduler_/workqueue_ → 23,777; scrape_timeout 30s) [x] [x] Codex `07385677` (pushed) [x] Claude verify (BATS 14/14, RED on temp copy: new tests 3+4 fail on old values, yq ok, 4 files) [ ] rollout (hub sync + operator restarts PF + up==1). Then release prep (compress memory-bank, make test, docs sweep, CHANGELOG promote, AppSet reapply, PR).
-## 2026-10-06 — v1.41.0 release PR opened (#135)
-
-PR https://github.com/wilddog64/k3d-manager/pull/135 is open from
-`k3d-manager-v1.41.0` to `main`; branch was clean and pushed at `d7ee5520`.
-Mergeability is `true` / `blocked` while checks run. The required Copilot
-reviewer request returned no requested reviewer; verification is recorded in
-`docs/issues/2026-10-06-v1.41.0-pr-copilot-request.md`.
-## 2026-10-06 — Ubuntu CI plist test portability bug fixed
-
-Filed `docs/bugs/2026-10-06-sandbox-launchd-test-requires-macos-plutil.md` for
-PR #135 lint test 313 and fixed the BATS assertion with Python `plistlib`.
-Focused suite: 8/8. Full `make test-bin`: 328/328; only expected tripwire
-notices for blocked Keychain probes remain.
-## 2026-10-06 — Ubuntu CI follow-up portability bug fixed
-
-Tests 150 and 151 in `hub_restore.bats` used BSD/macOS `script` syntax. The
-portable dialect-detecting helper now passes locally: `hub_restore.bats` 14/14
-and `make test-bin` 328/328. CI rerun pending after push.
-## 2026-10-06 — Ubuntu `script` exit propagation fixed
-
-Added GNU `script -e` to preserve the wrapped preflight command's rc in tests
-150 and 151. Local `hub_restore.bats` is 14/14 and `make test-bin` is 328/328;
-the next CI run is pending.
+## v0.3.18 Track (branch: `feat/v0.3.18`)
+
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Assigned to Codex.
+- [x] **`_copilot_review` combined fix: `--allow-all-tools` + malformed `--deny-tool` patterns** — DONE (`713c18e`). Branch: `fix/copilot-deny-tool-patterns`. Combined spec: `docs/bugs/2026-05-02-copilot-review-noninteractive-combined-fix.md`. Supersedes deny-tool-only spec. Fixes both missing `--allow-all-tools` (non-interactive mode) and 4 patterns missing `)`. Commit: `fix(system): add --allow-all-tools and close malformed --deny-tool patterns in _copilot_review`
+
+---
+
+## Overall Status
+
+**v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
+**v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
+**v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23.
+**v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, released.
+**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. Tagged v0.3.7 retroactively, GitHub release created.
+**v0.3.8 SHIPPED** — PR #14 merged to main (`a669a63`) 2026-03-24. Tagged v0.3.8 retroactively, GitHub release created.
+**v0.3.9 SHIPPED** — PR #15 merged to main (`fb09921`) 2026-03-24. No tag (docs-only, no version bump).
+**v0.3.10 SHIPPED** — PR #16 merged to main (`c5662c9`) 2026-03-24. No tag (docs-only, `.clinerules` fix).
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored.
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored.
+**v0.3.15 SHIPPED** — PR #21 merged to main. Tagged v0.3.15.
+**v0.3.16 SHIPPED** — PR #22 merged to main. Tagged v0.3.16.
+**v0.3.17 SHIPPED** — PR #24 merged to main (`108924b9`). Tagged v0.3.17, GitHub release created 2026-05-01.
+**v0.3.18 IN PROGRESS** — branch `feat/v0.3.18`. PR #25 open.
+**v0.3.20 SHIPPED** — PR #29 merged to main (`2f46d4be`) 2026-05-30. No tag (unreleased, in [Unreleased] section of CHANGE.md). Sudo no-TTY fallback + BATS mock fix.
+
+## v0.3.14 — Shipped
+
+**Dependency:** k3d-manager PR #51 (Copilot) deferred 5 findings here. Fix these before k3d-manager can subtree-pull v0.3.14.
+
+- [x] **`_ensure_antigravity_ide` binary detection** — commit `e52b819` adds `agy`-first detection so macOS installs succeed post-brew
+- [x] **`_antigravity_browser_ready` curl fast-fail** — commit `e52b819` hard-fails when `curl` missing before the polling loop
+- [x] **`agent_rigor.sh` tab-scan NUL-delimited loop** — commit `e52b819` rewrites the tab scan to iterate staged `.sh` files via `-z` for filenames with spaces
+- [x] **`docs/api/functions.md` @latest inaccuracy** — commit `e52b819` documents the `PLAYWRIGHT_MCP_VERSION` env var + pinned version, not `@latest`
+- [x] **`CHANGE.md` version labels** — commit `e52b819` marks the shipped v0.3.12/v0.3.13 entries with release dates
+
+## v0.3.13 — Shipped
+
+- [x] **`_antigravity_browser_ready` curl probe fix** — PR #19 merged (`e870c6d9`); `_run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}"` replaces `_curl` probe; BATS stubs updated to target `_run_command`; Copilot `--max-time` finding addressed
+
+## v0.3.12 — Shipped
+
+- [x] **`_ensure_antigravity_ide` + MCP helpers** — Antigravity IDE install + Playwright MCP config helpers; Copilot PR #18 findings addressed in `9f28d88` (apt-get update, mktemp template, PLAYWRIGHT_MCP_VERSION, _curl wrapper, 7 BATS)
+
+---
+
+## What Is Complete
+
+- [x] GitHub repo + CI + branch protection (v0.1.0)
+- [x] `core.sh` + `system.sh` extracted from k3d-manager (v0.1.0)
+- [x] `_resolve_script_dir` — portable symlink-aware locator + BATS (v0.1.1)
+- [x] Drop Colima support (v0.1.2)
+- [x] `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook, 13 BATS (v0.2.0)
+- [x] k3d-manager subtree wired at `scripts/lib/foundation/` (k3d-manager v0.7.0)
+- [x] `_run_command` if-count refactor — `_run_command_resolve_sudo` extracted, both < 8 if-blocks (v0.3.0)
+- [x] Bash 3.2 compat — `_RCRS_RUNNER` global temp (v0.3.0)
+- [x] Route bare `sudo` in install helpers through `_run_command --interactive-sudo` (v0.3.1)
+- [x] Fix `_ensure_cargo` WSL redhat branch (v0.3.1)
+- [x] AGENTS.md, GEMINI.md, CLAUDE.md, copilot-instructions.md overhaul (v0.3.1)
+- [x] Sync `deploy_cluster` helpers from k3d-manager; TTY fix (`_DCRS_PROVIDER` global); BATS 36 tests (v0.3.2)
+- [x] Repo flipped **public** (v0.3.2)
+- [x] API reference — `docs/api/functions.md` (v0.3.3)
+- [x] README releases table split — top 3 + `docs/releases.md` full history (v0.3.3)
+
+---
+
+## What Is Pending
+
+### v0.3.4 — SHIPPED (`dbfafe9`)
+
+- [x] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8 resolved in commit `7bb60c2`; spec `docs/plans/v0.3.4-api-doc-fixes.md`.
+- [x] **Upstream lib sync** — `system.sh` TTY fix (`_run_command_resolve_sudo` + remove `_run_command_has_tty`); `agent_rigor.sh` if-count allowlist + staged-only audit; `statusline.sh` cost display fix.
+- [x] **PR #11 Copilot review** — 8 findings addressed in `08cfbc8`, all threads resolved.
+- [x] **Retro** — `docs/retro/2026-03-22-v0.3.4-retrospective.md`
+
+### v0.3.5 — SHIPPED (`2f895a99`)
+
+- [x] **PR #10 doc-hygiene hook** — `doc_hygiene.sh` + pre-commit hook + BATS 14 tests; staged-only `_agent_audit` BATS test (`bdd60e7`); spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` adds `_dh_grep` index reader + new BATS (spec `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`).
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, adds staged `git cat-file` guard, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [x] **PR #10 merged** — squash-merged to main (`2f895a99`) 2026-03-23.
+
+### v0.3.6 — SHIPPED (`d8b4c48`)
+
+- [x] **Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, `_dh_grep --strip-fences`, and 3 BATS covering fenced + tilde blocks (`docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`).
+- [x] **CoreDNS Check 4** — commit `c352c1b` adds warn-only `<svc>.<ns>.svc(.cluster.local)` detection and 4 BATS per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`, branch feat/init); mapfile compat fix (`8ae57bc`) + gist installer (`310fd16`).
+- [ ] Consumer integration: `shopping-carts`
+- [ ] `fix/acg-sandbox-robust-click` — ACG sandbox Open/Start/Resume/reopen clicks converted from `click({force:true})` to `_robustClick` (dispatched MouseEvent); spec `docs/bugs/acg-sandbox-force-click-panel-noop.md`. `npm run check` + jest 22/22 green. Pending: push, live gate, PR/tag/subtree-pull.
+- [x] `fix/sudo-system-path-resolution` (2026-10-05) — `_run_command_resolve_sudo` passes bare names to sudo, which resolves them via the user's PATH (gnubin `install` shadows `/usr/bin/install`, so the NOPASSWD rule never matches → password prompt in k3d-manager `make up` 10g / refresh-edge). Spec `docs/bugs/2026-10-05-sudo-resolves-bare-name-through-user-path.md` filed [x] Codex [x] Claude verify (pre-fix RED, mutations A/B + cmp, bats 168/168, shellcheck clean) [x] commit `48f8a70` [x] PR #63 merged `8b97c0b` [x] subtree-pulled into k3d-manager (`c848d37`).
+- [ ] `fix/acg-watch-interval-and-expired-ttl` (2026-10-06) — launchd watcher every 3.5 h misses the 65 m extend window; yesterday's shutdown time read as ~22 h left. Spec `docs/bugs/2026-10-06-acg-watch-misses-extend-window-and-reads-expired-as-22h.md` [x] Codex [x] Claude verify (pre-fix RED jest 5 + bats 2, mutations A/B/C + cmp, jest 49/49, bats 170/170, shellcheck clean) [x] commit `211a3fd` [ ] release PR v0.5.1 (CHANGE.md promoted, acg.md watcher section, release tables back-filled v0.3.19–v0.5.1) [ ] tag + GitHub release [ ] subtree-pull.
+
+---
+
+## Known Constraints
+
+| Item | Notes |
+|---|---|
+| `SCRIPT_DIR` dependency | `system.sh` sources `agent_rigor.sh` via `$SCRIPT_DIR` at load time |
+| Contract stability | `_run_command`, `_detect_platform`, `_cluster_provider` — signature changes require all-consumer coordination |
+| Clean env testing | BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes |
+| bash 3.2 compat | No `local -n`, no `declare -A`, no `mapfile` in lib code |
+| `--interactive-sudo` for installs | Install helpers use `--interactive-sudo`; `--prefer-sudo` is for non-interactive contexts only |
+| Global temp vars | `_RCRS_RUNNER` (sudo runner), `_DCRS_PROVIDER` (deploy provider) — never use `$()` for functions that check TTY |
