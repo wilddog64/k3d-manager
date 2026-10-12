@@ -1,4 +1,5 @@
 - [x] v1.43.1 PR #140 MERGED 38fbf3ab; tag + release v1.43.1; enforce_admins restored; next branch k3d-manager-v1.43.2.
+- [ ] v1.43.2 bug: hub-recover-all never rebuilds the hub (P2) — spec filed, dispatched to Codex; operator then runs `make hub-recover-all` to clear dead kine.
 - [x] v1.43.2 kine readability (P3): LANDED 40f99b0e with the assert-removed marker after lib-foundation PR #65 merged (f987c40) and subtree pull 1a94dd98; lib-foundation v0.5.2 released (PR #66 f5cef1e, tag + GH release), subtree 277b2643. LIVE-PROVEN 2026-10-11 (Hermes evidence `last compaction 8d 10h ago; state.db 1.9 GiB; ...`).
 - [ ] v1.43.2: operator make appsets-reapply + appsets-check; planned hub rebuild (make hub-recover-all); dispatch batch 1 (kine sensor bug first).
 - 2026-10-11: v1.43.1 ENFORCE drill PASSED on M2 at 4f18c638 (default enforce, no override; result 20261012T001215Z.json): success, V0-V7 + V9 true, RTO 1294s (audit run 744s), credentials_unexpected [], 8 reads (age identity, unseal-drill, unseal-dr). All v1.43.1 live gates done. Next: /create-pr v1.43.1.
