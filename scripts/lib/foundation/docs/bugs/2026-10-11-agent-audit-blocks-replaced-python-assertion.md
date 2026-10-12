@@ -1,6 +1,6 @@
 # Bug: `_agent_audit` blocks a commit that replaces a Python assertion with a stronger one
 
-**Status:** FIXED 2026-10-11 (branch `fix/agent-audit-assert-removed-allow`)
+**Status:** FIXED 2026-10-11 (PR #65, merge `f987c40`; released v0.5.2)
 **Filed:** 2026-10-11
 **Branch:** `fix/agent-audit-assert-removed-allow`
 **Approval:** explicit 2026-10-11 (operator chose "Add an audit allow marker" when k3d-manager's pre-commit blocked a spec-mandated assertion replacement)
