@@ -1,4 +1,4 @@
-- 2026-10-12: v1.49.0 A/B input pinned: twinkleai-real-estate-lab 56dab41 (partial, build fails on missing ui/label); target = ACG k3s, not vCluster.
+- 2026-10-12: v1.49.0 A/B input pinned: twinkleai-real-estate-lab 56dab41 (partial, build fails on missing ui/label); target = ACG k3s, not vCluster. Operator: all phases incl. 0a wait for v1.47.0.
 - 2026-10-12: v1.45.1 bug-count plan verified against code; P3 + Approval added (ea4e600c). Waits for v1.44.0 doc_lifecycle.
 - 2026-10-12: SCHEDULE — Thursday 2026-10-15 start 15:30–16:00 local (Claude quota resets 15:00). Codex idle; 8 worktrees await verify+land, hub-recover-all-rebuild first, then operator make hub-recover-all, then the other 7 one at a time.
 - 2026-10-12: Filed orbstack-update-is-invisible-to-monitoring (P3, v1.44.0, operator "go ahead"): hourly Hermes-run `orbctl update --check` + version to Pushgateway, email-only OrbStackUpdateAvailable, upgrade annotation. Phase 2 (scheduled `orbctl update`) gated on both Vault fixes + operator window.
