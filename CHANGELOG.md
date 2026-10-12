@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and
+  `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
 - Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the
   `HubKineCompactionStalled` warning alert so a dead compaction loop is detected
   without relying on Slow SQL or a short log window. The alert directs operators

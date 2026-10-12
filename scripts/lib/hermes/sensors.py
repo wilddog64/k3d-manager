@@ -442,6 +442,35 @@ def kine_log_signals(text):
     }
 
 
+def _human_bytes(value):
+    """Format a byte count with binary units for operator-facing evidence."""
+    value = int(value)
+    units = ("B", "KiB", "MiB", "GiB", "TiB")
+    scaled = float(value)
+    unit = 0
+    while abs(scaled) >= 1024 and unit < len(units) - 1:
+        scaled /= 1024
+        unit += 1
+    if unit == 0:
+        return f"{value} B"
+    return f"{scaled:.1f} {units[unit]}"
+
+
+def _human_age(seconds):
+    """Format an age compactly while retaining the useful coarse unit."""
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return "<1m"
+    minutes = seconds // 60
+    if seconds < 3600:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if seconds < 86400:
+        return f"{hours}h {minutes % 60}m"
+    days = hours // 24
+    return f"{days}d {hours % 24}h"
+
+
 def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024,
          max_compaction_age=900):
     """Report local hub Kine pressure from a read-only, injected probe."""
@@ -470,14 +499,21 @@ def kine(run, state, threshold=2, max_db_bytes=8 * 1024 * 1024 * 1024,
         raw = db_bytes >= max_db_bytes or failed or stalled or (slow_sql > 0 and not compacting)
         if raw:
             status = "degraded" if _debounced("kine", True, threshold, state) else "healthy"
-            evidence = (f"state.db={db_bytes}B, slow_sql={slow_sql}, "
-                        f"compaction_recent={compacting}, compaction_failed={failed}")
             if last_compaction is not None:
-                evidence += f", last_compaction_age={int(time.time() - last_compaction)}s"
+                evidence = (f"last compaction {_human_age(time.time() - last_compaction)} ago; "
+                            f"state.db {_human_bytes(db_bytes)}; slow SQL {slow_sql}; "
+                            f"compaction failed: {'yes' if failed else 'no'}")
+            else:
+                evidence = (f"state.db {_human_bytes(db_bytes)}; slow SQL {slow_sql}; "
+                            f"compaction recent: {'yes' if compacting else 'no'}; "
+                            f"compaction failed: {'yes' if failed else 'no'}")
             return record("kine", status, evidence, data=data)
         _debounced("kine", False, threshold, state)
-        return record("kine", "healthy", f"state.db={db_bytes}B; compaction recent",
-                      data=data)
+        if last_compaction is not None:
+            evidence = f"state.db {_human_bytes(db_bytes)}; last compaction {_human_age(time.time() - last_compaction)} ago"
+        else:
+            evidence = f"state.db {_human_bytes(db_bytes)}; compaction recent"
+        return record("kine", "healthy", evidence, data=data)
     except Exception:
         return record("kine", "unknown", "hub datastore status source unavailable")
 
