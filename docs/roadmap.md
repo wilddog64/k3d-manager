@@ -169,8 +169,28 @@ same file.
     one agent in lib-foundation, then a subtree-pull here.
   - [`e2e-stale-alert-fires-for-an-idle-runner`](bugs/2026-10-11-e2e-stale-alert-fires-for-an-idle-runner.md):
     `prometheusrule.yaml` (`E2EVerificationStale` only), `e2e_observability.bats`.
+  - [`hermes-kine-sensor-misses-dead-compaction`](bugs/2026-10-11-hermes-kine-sensor-misses-dead-compaction.md)
+    (operator, 2026-10-11, **P2, dispatch first**): `bin/k3dm-hermes`, `scripts/lib/hermes/sensors.py`,
+    `prometheusrule.yaml` (new `HubKineCompactionStalled`), `test_hermes.py`,
+    `hermes_alert_rules.bats`, plus the operator's end-to-end regression test
+    (`test_kine_compaction_stalled.py`: a stale timestamp with a healthy API and no slow queries
+    fires the rule in promtool, routes to `platform-warning` and reaches the fake receiver). It lands after the e2e-stale fix because both edit
+    `prometheusrule.yaml`.
   - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
     `shopping-cart-frontend`.
+  - [`bug-dashboard-cannot-list-open-bugs`](bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md)
+    (operator, 2026-10-11): `bin/k3dm-vectordb-metrics`, `grafana-dashboard-bugs.yaml` and their
+    tests. An "Open bugs" table under "All open bugs": Priority, Bug (title, linked), Filed, Open for.
+  - [`dispatch-dashboard-landing-success-no-data`](bugs/2026-10-11-dispatch-dashboard-landing-success-no-data.md)
+    (operator, 2026-10-11): `grafana-dashboard-agent-dispatch.yaml` (panel 2 only),
+    `agent_dispatch_dashboard.bats`. The numerator needs `sum()` like the denominator.
+  - [`checkout-loadtest-dashboard-deployed-to-hub`](bugs/2026-10-11-checkout-loadtest-dashboard-deployed-to-hub.md)
+    (operator, 2026-10-11): `grafana-dashboards-acg.yaml` (in-cluster exclude),
+    `grafana_dashboard_appsets.bats`, `docs/guides/grafana-dashboards.md`.
+  - [`dispatch-dashboard-no-per-spec-cost-or-time`](bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md)
+    (operator, 2026-10-11): same agent and dispatch as the landing-success fix (same dashboard file),
+    plus `bin/k3dm-dispatch-metrics` and its pytest. Readable token stat, a Per spec table (tokens,
+    Codex time, time to land, runs) and two time-per-spec stats.
 - **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
   - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
   - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
@@ -225,8 +245,18 @@ translated by the model into a small query object (releases, priority, state, Fi
 validated against a closed schema, and answered by `bug-tally`. The model never sees a bug doc or
 produces a number, and every reply states what was counted. Split into a patch release because
 v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
-[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md). v1.45.1 is
-at 1 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+[`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md).
+
+**Engineering Decision Digest** (operator, 2026-10-11). One digest answers: what did I request,
+which requests became specs, what did Claude and Codex complete, what changed without my explicit
+approval, and which decisions wait on me. Approval is recorded **in the spec** (`**Approval:**
+explicit|standing|pending` header) and on agent commits (`Approval:` trailer, or `spec <path>` to
+inherit an approved spec), enforced by a new `commit-msg` hook and derived from git by
+`scripts/decision-digest.py`. Surfaces: `make decision-digest`, a "k3dm Decision Digest" Grafana
+dashboard (incl. spec approval by release) and an `/ask-docs` fast path. Scope:
+[`v1.45.1-engineering-decision-digest.md`](plans/v1.45.1-engineering-decision-digest.md).
+
+v1.45.1 is at 2 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.46.0
 
@@ -244,8 +274,15 @@ hub Prometheus. When both fail, `HubExternallyUnreachable` sends email at 10 min
 When only the Prometheus read fails, `HubPrometheusUnreachable` sends email. A stale Hermes
 heartbeat alerts only while the hub is reachable. Planned downtime takes a `make hub-watch-silence`
 maintenance silence. Scope:
-[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md). v1.46.0
-is now at 2 of 5 plans.
+[`v1.46.0-hostinger-offsite-hub-watch.md`](plans/v1.46.0-hostinger-offsite-hub-watch.md).
+
+**Weekly DR drill, unattended** (operator, 2026-10-11). A GUI LaunchAgent on the M2 runs the drill
+on Sunday 05:00 in an explicit unattended mode. That mode requires the `enforce` Keychain guard,
+refuses on a locked keychain, never widens an ACL, and writes a failed result on refusal so
+`DRDrillFailed` fires the same day. The M4 pulls and publishes daily, so the M2 never holds the data
+repo key. Scope: [`v1.46.0-scheduled-dr-drill.md`](plans/v1.46.0-scheduled-dr-drill.md). v1.46.0 is
+**full at 5 of 5 plans** (also `v1.46.0-dr-drill-dashboard.md`,
+`v1.46.0-hub-data-backup-integrity.md`); the next v1.46.0 item goes to v1.46.1.
 
 ### Candidate milestone — v1.47.0
 
@@ -262,6 +299,14 @@ commit, unless a recorded override is given. Scope:
 
 **Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
 [`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
+
+**Scheduled baseline load test** (operator, 2026-10-11, after the Checkout Load Test dashboard was
+found empty). A light 5–10 VU baseline every 12h keeps the k6 panels filled, plus a full stress run
+as a gate for major releases. Moved from the never-cut v1.41.1. Credentials and preflight come
+first. Its life is bounded: v2.0.0 retires shopping-cart and v1.50.0 re-points the load test.
+Scope: [`v1.48.0-loadtest-credentials-and-preflight.md`](plans/v1.48.0-loadtest-credentials-and-preflight.md),
+then [`v1.48.0-scheduled-baseline-loadtest.md`](plans/v1.48.0-scheduled-baseline-loadtest.md).
+v1.48.0 is at 3 of 5 plans.
 
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
@@ -304,6 +349,13 @@ by editing lists, not code.
 | v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
 | v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
+
+**Unfamiliar-app onboarding (proposed 2026-10-11).** Before TwinkleAI is onboarded by hand, test the
+platform against an app it has never seen: a Bolt.new-generated app, exported to its own repo and
+onboarded cold. The headline metric is manual interventions (target 0 long-term), with 100%
+deployment success for supported templates and functional + operational e2e, including
+observability onboarding. Generating the app may start any time; deploying it waits for v1.47.0.
+Scope: [`v1.49.0-unfamiliar-app-onboarding.md`](plans/v1.49.0-unfamiliar-app-onboarding.md).
 
 What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
 of those only if a platform feature still needs it to prove itself.

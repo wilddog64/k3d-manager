@@ -1,6 +1,6 @@
 # Hub Kine compaction stall causes control-plane saturation
 
-**Status:** CLOSED — the 2026-10-03 hub rebuild replaced the saturated kine datastore. If compaction stalls again, rebuild; a restart does not fix it (2026-10-09 status sweep)
+**Status:** REOPENED 2026-10-11 — compaction died again on the rebuilt hub on 2026-10-08 (see "Recurrence — 2026-10-08"); the 2026-10-03 rebuild bought five days. A restart does not fix it.
 
 ## What was observed
 
@@ -315,3 +315,65 @@ agent nodes, give the control plane the datastore to itself, and watch for the f
 `COMPACT deleted` line. That is unproven, costs ~34 h at 1000 revisions/cycle, and is the
 operator's decision. Raw SQLite retention deletion remains forbidden, and the `profile` and
 `pw-profile` directories must not be deleted.
+
+---
+
+## Recurrence — 2026-10-08 (found 2026-10-11, read-only)
+
+Reported by the operator from the Hermes status table: `kine` degraded with `state.db=2022141952B,
+slow_sql=7`. Hub `k3d-k3d-cluster-server-0`, k3s `v1.32.0+k3s1`, container up 8 days.
+
+Case-sensitive tally of `msg="COMPACT` lines (three per cycle) and `Slow SQL` lines from
+`docker logs --since 200h`:
+
+| Day (UTC) | COMPACT lines | Slow SQL lines |
+|---|---|---|
+| 10-04 → 10-07 | 864–866 per day (288 cycles, healthy) | 3–76 |
+| 10-08 | 151, last at 11:28 | 303 |
+| 10-09 | 0 | 309 |
+| 10-10 | 0 | 159 |
+| 10-11 | 0 | 162 |
+
+The last cycles:
+
+```text
+2026-10-08T04:06:37Z COMPACT deleted 473 rows from 466 revisions in 438.209712ms - compacted to 648148/649148
+2026-10-08T11:28:22Z COMPACT compactRev=648148 targetCompactRev=648436 currentRev=649436
+2026-10-08T11:28:33Z Slow SQL ... (total time: 11.576712227s): DELETE FROM kine AS kv WHERE kv.id IN ( SELECT kp.prev_revision ...
+2026-10-08T11:28:34Z level=error msg="Compact failed: failed to record compact revision: sql: transaction has already been committed or rolled back"
+```
+
+No `Compact failed` line has appeared since: the loop died after one failure and was never
+rescheduled, the same signature as 2026-09-20.
+
+**What is new.** The database was small (one cycle deleted 473 rows in 438 ms), so the
+2026-09-20 explanation, "too large to compact", does not fit this time. The server logged
+**nothing at all from 04:06 to 11:28** (7 lines in the 04:00 hour, none from 05:00 to 10:59, 192
+in the 11:00 hour). That is the M4 asleep, not a quiet cluster. The failing cycle was the first
+after wake: its DELETE took 11.6 s under the wake-up load, the transaction was rolled back
+underneath it, and kine's compaction goroutine did not survive the error. Hypothesis, consistent
+with the log and with earlier sleep-then-clock-jump incidents on this laptop; not yet
+reproduced.
+
+**Consequences.**
+- Retention has been off for about 3.5 days. `state.db` is 2.0 GB and grows until rebuilt. The
+  Hermes size gate is 8 GiB, so the size check is not the early signal; the log is.
+- Restarting the k3s server is still the wrong move (2026-09-20 section): it resumes compaction at
+  1000 revisions per cycle against a large backlog and can crash-loop the bootstrap.
+
+**Options, for the operator.**
+1. **Rebuild the hub** from GitOps/Vault, the indicated remedy since 2026-09-20. v1.43.1 (PR #140)
+   adds `make hub-recover-all` (rebuild, credentials, then data restore from the daily export),
+   which makes this a planned operation rather than a scramble. Prefer it after PR #140 merges.
+2. **Wait and watch** until a rebuild slot: the cluster is stable while it stays bootstrapped. Watch
+   `state.db` and Slow SQL; rebuild before the 8 GiB gate.
+
+**Prevention to spec (v1.43.2 bug candidate).**
+- Hermes's kine sensor reads a short log window, so `compaction_failed` is only true for the cycle
+  that failed. It should key on **the age of the last `COMPACT deleted`** (more than 15 minutes
+  means the loop is dead), as recommended on 2026-09-20, and that age should raise an alert, not
+  only a status row.
+- Keep the M4 from sleeping while it hosts the hub, or accept that every sleep risks this.
+  `caffeinate` does not stop lid-closed sleep; `pmset -a disablesleep 1` does (operator's call).
+- k3s `v1.32.0+k3s1` is old; check whether a newer kine restarts compaction after an error before
+  upgrading for that reason alone.

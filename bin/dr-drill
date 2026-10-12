@@ -35,6 +35,28 @@ _dr_drill_export_ts=""
 _dr_drill_export_age_seconds=0
 _dr_drill_phase2_started=0
 _dr_drill_result=""
+_dr_drill_security_shim="${REPO_ROOT}/scripts/etc/dr/security-shim"
+
+_dr_drill_install_credential_guard() {
+  local run_dir="$1"
+  export DR_SECURITY_CREDENTIALS_FILE="${run_dir}/credentials.tsv"
+  export DR_SECURITY_UNEXPECTED_FILE="${run_dir}/credentials_unexpected.tsv"
+  export DR_SECURITY_ALLOWLIST="${REPO_ROOT}/scripts/etc/dr/credential-allowlist.tsv"
+  export DR_SECURITY_SCOPES=drill DR_SECURITY_CONTEXT="$DR_DRILL_CONTEXT"
+  : > "$DR_SECURITY_CREDENTIALS_FILE"
+  : > "$DR_SECURITY_UNEXPECTED_FILE"
+  local shim_dir="${run_dir}/bin"
+  mkdir -p "$shim_dir"
+  ln -sf "$_dr_drill_security_shim" "${shim_dir}/security"
+  export PATH="${shim_dir}:$PATH"
+  security() { "$_dr_drill_security_shim" "$@"; }
+}
+
+_dr_drill_credentials_json() {
+  local file="$1"
+  [[ -s "$file" ]] || { printf '[]'; return; }
+  jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {op:.[0],service:.[1],account:.[2]}) | unique' "$file"
+}
 
 _dr_drill_kubectl() {
   local has_config=0 has_context=0 arg
@@ -66,11 +88,13 @@ unset -f kubectl
 _dr_drill_teardown() {
   local rc="${1:-$?}"
   (( _dr_drill_preflight_refused == 1 )) && rc=2
-  if (( _dr_drill_started == 1 )); then
+  if (( _dr_drill_started == 1 && _dr_drill_preflight_refused == 0 )); then
+    local drill_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-secrets}}" drill_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+    VAULT_UNSEAL_CACHE_SERVICE=k3dm-vault-unseal-drill _vault_purge_unseal_cache "$drill_ns" "$drill_release" >/dev/null 2>&1 || true
     if [[ "${DR_DRILL_KEEP:-0}" == 1 ]]; then
-      printf '[dr-drill] kept cluster; delete with: k3d cluster delete %s\n' "$DR_DRILL_CLUSTER" >&2
+      printf '[dr-drill] kept cluster; delete with: k3d cluster delete dr-drill\n' >&2
     else
-      k3d cluster delete "$DR_DRILL_CLUSTER" >/dev/null 2>&1 || true
+      k3d cluster delete dr-drill >/dev/null 2>&1 || true
     fi
   fi
   [[ -n "$DR_DRILL_STAGE" ]] && rm -rf -- "$DR_DRILL_STAGE"
@@ -85,6 +109,18 @@ _dr_drill_phase() { printf '[dr-drill] Phase %s/6 — %s\n' "$1" "$2"; }
 _dr_drill_set() { DR_CHECKS["$1"]="$2"; }
 _dr_drill_check() { local name="$1"; shift; if "$@"; then _dr_drill_set "$name" true; else _dr_drill_set "$name" false; fi; }
 _dr_drill_refuse() { printf 'ERROR: %s\n' "$1" >&2; _dr_drill_preflight_refused=1; exit 2; }
+_dr_drill_assert_target() {
+  local expected="${HOME}/.k3dm/dr-drill/kubeconfig" contexts server port containers
+  [[ "${KUBECONFIG:-}" == "$expected" ]] || _dr_drill_refuse '[dr-drill] refusing: target is not the drill cluster (KUBECONFIG is not the drill kubeconfig)'
+  [[ "$DR_DRILL_CLUSTER" == dr-drill ]] || _dr_drill_refuse "[dr-drill] refusing: target is not the drill cluster (cluster is ${DR_DRILL_CLUSTER})"
+  contexts="$(_dr_drill_kubectl config get-contexts -o name 2>/dev/null || true)"
+  [[ "$(grep -c . <<<"$contexts")" -eq 1 && "$contexts" == k3d-dr-drill ]] || _dr_drill_refuse '[dr-drill] refusing: target is not the drill cluster (context set is not exactly k3d-dr-drill)'
+  server="$(_dr_drill_kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+  port="${server##*:}"
+  [[ "$port" =~ ^[0-9]+$ ]] || _dr_drill_refuse '[dr-drill] refusing: target is not the drill cluster (context server has no port)'
+  containers="$(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null || true)"
+  grep -Eq "^k3d-dr-drill-serverlb[[:space:]].*:${port}->6443" <<<"$containers" || _dr_drill_refuse '[dr-drill] refusing: target is not the drill cluster (serverlb port mismatch)'
+}
 
 _dr_drill_export_age_seconds() {
   local stamp="$1" epoch now
@@ -136,6 +172,7 @@ _dr_drill_preflight() {
   else
     mkdir -p "$DR_DRILL_STAGE"
   fi
+  _dr_drill_install_credential_guard "$DR_DRILL_STAGE"
   if ! _dr_drill_latest_export "$DR_DRILL_STAGE"; then
     _dr_drill_refuse '[dr-drill] newest export is missing or older than 26h'
   fi
@@ -171,98 +208,33 @@ _dr_drill_v0() {
   return "$status"
 }
 
-_dr_drill_wait_vault() {
-  local limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc
-  deadline=$((SECONDS + limit))
-  while (( SECONDS < deadline )); do
-    phase="$(_dr_drill_kubectl --no-exit -n secrets get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    [[ "$phase" == Running ]] && break
-    sleep "${DR_DRILL_POLL_S:-5}"
-  done
-  if [[ "$phase" != Running ]]; then
-    printf '[dr-drill] vault-0 is not Running after %ss (phase: %s)\n' "$limit" "${phase:-none}" >&2
-    return 1
-  fi
-  set +u; VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault; rc=$?; set -u
-  (( rc == 0 )) || printf '[dr-drill] the restored Vault API did not answer within %ss\n' "$limit" >&2
-  return "$rc"
-}
-
-_dr_drill_unseal() {
-  local count shard idx out
-  _dr_drill_wait_vault || return 1
-  if ! count="$(_secret_load_data k3dm-vault-unseal-dr 'secrets/vault:count' vault-unseal-dr)"; then
-    printf '[dr-drill] no DR shard count in Keychain service k3dm-vault-unseal-dr (account secrets/vault:count) on this Mac, or it is empty; repeat the shard import\n' >&2
-    return 1
-  fi
-  if [[ ! "$count" =~ ^[1-9][0-9]*$ ]]; then
-    printf '[dr-drill] the DR shard count in Keychain (secrets/vault:count) is not a positive number; repeat the shard import\n' >&2
-    return 1
-  fi
-  for ((idx=1; idx<=count; idx++)); do
-    if ! shard="$(_secret_load_data k3dm-vault-unseal-dr "secrets/vault:shard${idx}" vault-unseal-dr)"; then
-      printf '[dr-drill] DR shard %s of %s is missing or empty in Keychain; repeat the shard import\n' "$idx" "$count" >&2
-      return 1
-    fi
-    shard="${shard%$'\r'}"
-    if ! _vault_dr_shard_valid "$shard"; then
-      printf '[dr-drill] DR shard %s of %s in Keychain is not a base64 or hex unseal key; repeat the shard copy from the M4\n' "$idx" "$count" >&2
-      return 1
-    fi
-    if ! out="$(printf '%s\n' "$shard" | _vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- sh -lc 'read -r SHARD; printf "%s" "$SHARD" | vault write -format=json sys/unseal key=-' 2>&1)"; then
-      printf '[dr-drill] vault operator unseal failed for shard %s of %s\n' "$idx" "$count" >&2
-      grep -F -v -- "$shard" <<<"$out" | grep -E 'Error|error|Code:|^\* ' | head -5 | sed 's/^/[dr-drill]   /' >&2 || true
-      return 1
-    fi
-  done
-}
-
 _dr_drill_inventory() { printf '%s/inventory.json\n' "$DR_DRILL_RESTORE_STAGE"; }
 _dr_drill_metadata() { printf '%s/pv-pvc.yaml\n' "$DR_DRILL_RESTORE_STAGE"; }
-_dr_drill_v1() {
-  set +u; _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null; local rc=$?; set -u; return "$rc"
+_dr_drill_verify_unsealed() {
+  hub_data_verify_unsealed "$DR_DRILL_CONTEXT"
 }
-_dr_drill_v2() {
-  set +u; hub_data_verify_vault_paths secrets vault "$(_dr_drill_inventory)"; local rc=$?; set -u; return "$rc"
+_dr_drill_verify_vault() { set +u; hub_data_verify "$(_dr_drill_inventory)" identity "$DR_DRILL_CONTEXT"; local rc=$?; set -u; return "$rc"; }
+_dr_drill_verify_keycloak() {
+  hub_data_verify_keycloak "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
-_dr_drill_v3() {
-  local inventory want actual
-  inventory="$(_dr_drill_inventory)"
-  want="$(jq -r '.keycloak_realm_user_count' "$inventory")"
-  actual="$(_hub_data_keycloak_user_count _dr_drill_kubectl)"
-  [[ "$actual" == "$want" ]]
+_dr_drill_verify_ldap() {
+  hub_data_verify_ldap "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
-_dr_drill_v4() {
-  local inventory want actual
-  inventory="$(_dr_drill_inventory)"
-  want="$(jq -r '.ldap_entry_count' "$inventory")"
-  actual="$(_hub_data_ldap_entry_count _dr_drill_kubectl)"
-  [[ "$actual" == "$want" ]]
-}
-_dr_drill_v5_one() {
-  local ns="$1" pod="$2" claim="$3" expected actual logical metadata
-  metadata="$(_dr_drill_metadata)"
-  _dr_drill_kubectl -n "$ns" wait --for=condition=Ready "pod/${pod}" --timeout=300s >/dev/null
-  expected="$(_hub_data_meta_field "$metadata" "$ns" "$claim" logicalNode)"
-  actual="$(_dr_drill_kubectl -n "$ns" get pod "$pod" -o jsonpath='{.spec.nodeName}')"
-  logical="$(_hub_recovery_logical_node "$actual")"
-  [[ "$logical" == "$expected" ]]
-}
-_dr_drill_v5() {
-  local postgres
-  postgres="$(_dr_drill_kubectl -n identity get pods -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}')"
-  [[ -n "$postgres" ]] || return 1
-  _dr_drill_v5_one secrets vault-0 data-vault-0 && _dr_drill_v5_one identity "$postgres" postgres-keycloak-pvc && _dr_drill_v5_one identity openldap-0 data-openldap-0
+_dr_drill_verify_placement() {
+  hub_data_verify_placement "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }
 _dr_drill_v6() { local elapsed=$(( $(date +%s) - _dr_drill_phase2_started )); (( elapsed <= DR_DRILL_RTO_BUDGET_S )); }
 _dr_drill_v7() { (( _dr_drill_export_age_seconds <= 93600 )); }
 
 _dr_drill_report() {
-  local success=true name rto now run_timestamp checks_json='{}' failed="${DR_CHECKS[failed]:-}"
+  local success=true name rto now run_timestamp checks_json='{}' failed="${DR_CHECKS[failed]:-}" credentials='[]' unexpected='[]' v9=true
   for name in V0 V1 V2 V3 V4 V5 V6 V7; do [[ "${DR_CHECKS[$name]:-false}" == true ]] || success=false; done
   for name in V0 V1 V2 V3 V4 V5 V6 V7; do checks_json="$(jq --arg n "$name" --argjson v "${DR_CHECKS[$name]:-false}" '. + {($n):$v}' <<<"$checks_json")"; done
+  credentials="$(_dr_drill_credentials_json "${DR_SECURITY_CREDENTIALS_FILE:-/dev/null}")"; unexpected="$(_dr_drill_credentials_json "${DR_SECURITY_UNEXPECTED_FILE:-/dev/null}")"
+  [[ "$unexpected" == '[]' ]] || v9=false
+  checks_json="$(jq --argjson v "$v9" '. + {V9:$v}' <<<"$checks_json")"
   now="$(date +%s)"; run_timestamp="$(date -u +%Y%m%dT%H%M%SZ)"; rto=$(( now - _dr_drill_phase2_started )); mkdir -p "${HOME}/.k3dm/dr-drill"; _dr_drill_result="${HOME}/.k3dm/dr-drill/${run_timestamp}.json"
-  jq -n --arg ts "$run_timestamp" --arg export_ts "$_dr_drill_export_ts" --argjson ok "$success" --argjson rto "$rto" --argjson rpo "$_dr_drill_export_age_seconds" --arg failed "$failed" --argjson checks "$checks_json" '{timestamp:$ts,run_timestamp:$ts,export:$export_ts,success:$ok,rto_seconds:$rto,rpo_seconds:$rpo,failed:($failed // null),checks:$checks}' > "$_dr_drill_result"
+  jq -n --arg ts "$run_timestamp" --arg export_ts "$_dr_drill_export_ts" --argjson ok "$success" --argjson rto "$rto" --argjson rpo "$_dr_drill_export_age_seconds" --arg failed "$failed" --argjson checks "$checks_json" --argjson credentials "$credentials" --argjson unexpected "$unexpected" '{timestamp:$ts,run_timestamp:$ts,export:$export_ts,success:$ok,rto_seconds:$rto,rpo_seconds:$rpo,failed:($failed // null),checks:$checks,credentials_read:$credentials,credentials_unexpected:$unexpected}' > "$_dr_drill_result"
 }
 
 _dr_drill_all_false() { local name; for name in V0 V1 V2 V3 V4 V5 V6 V7; do _dr_drill_set "$name" false; done; }
@@ -272,7 +244,7 @@ _dr_drill_run() {
   _dr_drill_phase 1 preflight
   _dr_drill_preflight || return 2
   _dr_drill_phase 2 'build isolated hub'; _dr_drill_phase2_started="$(date +%s)"; _dr_drill_started=1
-  export KUBECONFIG="$DR_DRILL_KUBECONFIG" HUB_CLUSTER_NAME="$DR_DRILL_CLUSTER" DR_DRILL_MODE=1 DR_DRILL_CONTEXT DR_DRILL_CLUSTER
+  export KUBECONFIG="$DR_DRILL_KUBECONFIG" VAULT_UNSEAL_CACHE_SERVICE=k3dm-vault-unseal-drill HUB_CLUSTER_NAME="$DR_DRILL_CLUSTER" DR_DRILL_MODE=1 DR_DRILL_CONTEXT DR_DRILL_CLUSTER
   export DR_DRILL_RESTORE_STAGE="${DR_DRILL_STAGE}/restore"
   if [[ -n "${DR_DRILL_HUB_UP_CMD:-}" ]]; then
     if ! "$DR_DRILL_HUB_UP_CMD"; then if ! _dr_drill_fail phase2; then return 1; fi; fi
@@ -280,6 +252,7 @@ _dr_drill_run() {
     if ! _dr_drill_fail phase2; then return 1; fi
   fi
   _dr_drill_phase 3 restore
+  _dr_drill_assert_target
   if [[ -n "${DR_DRILL_RESTORE_CMD:-}" ]]; then
     if ! "$DR_DRILL_RESTORE_CMD"; then if ! _dr_drill_fail phase3; then return 1; fi; fi
   elif ! "$REPO_ROOT/scripts/k3d-manager" hub_data_restore; then
@@ -288,14 +261,14 @@ _dr_drill_run() {
   _dr_drill_phase 4 verify
   _dr_drill_check V0 _dr_drill_v0
   if [[ "${DR_CHECKS[V0]}" == true ]]; then
-    if ! _dr_drill_unseal; then _dr_drill_set failed unseal; _dr_drill_set V1 false; _dr_drill_set V2 false; _dr_drill_set V3 false; _dr_drill_set V4 false; _dr_drill_set V5 false
-    else _dr_drill_check V1 _dr_drill_v1; _dr_drill_check V2 _dr_drill_v2; _dr_drill_check V3 _dr_drill_v3; _dr_drill_check V4 _dr_drill_v4; _dr_drill_check V5 _dr_drill_v5; fi
+    if ! hub_data_unseal_dr '[dr-drill]'; then _dr_drill_set failed unseal; _dr_drill_set V1 false; _dr_drill_set V2 false; _dr_drill_set V3 false; _dr_drill_set V4 false; _dr_drill_set V5 false
+    else _dr_drill_check V1 _dr_drill_verify_unsealed; _dr_drill_check V2 _dr_drill_verify_vault; _dr_drill_check V3 _dr_drill_verify_keycloak; _dr_drill_check V4 _dr_drill_verify_ldap; _dr_drill_check V5 _dr_drill_verify_placement; fi
   else
     _dr_drill_set failed V0
     for _dr_name in V1 V2 V3 V4 V5; do _dr_drill_set "$_dr_name" false; done
   fi
   _dr_drill_check V6 _dr_drill_v6; _dr_drill_check V7 _dr_drill_v7
-  _dr_drill_phase 5 report; _dr_drill_report; _dr_drill_phase 6 teardown
+  _dr_drill_phase 5 report; _dr_drill_report; _dr_drill_phase 6 teardown; _dr_drill_assert_target
   [[ "$(jq -r .success "$_dr_drill_result")" == true ]]
 }
 

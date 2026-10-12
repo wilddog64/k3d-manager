@@ -87,6 +87,24 @@ hub-data-export-unschedule:
 hub-data-prune:
 	@K3DM_HUB_DATA_PRUNE_DRY_RUN=$(if $(DRY_RUN),$(DRY_RUN),0) ./scripts/k3d-manager hub_data_prune
 
+## Restore hub data from the newest encrypted export (Terminal.app; approval typed at the prompt)
+hub-data-recover:
+	@./scripts/k3d-manager hub_data_recover
+
+## Full hub disaster recovery: rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
+hub-recover-all:
+	@set -e; \
+	run_root="$${K3DM_HUB_DATA_RECOVER_RUN_ROOT:-$$HOME/.k3dm/hub-recover}"; \
+	mkdir -p "$$run_root"; \
+	preflight="$$run_root/preflight.$$$$"; \
+	if ./scripts/k3d-manager hub_data_recover_preflight >"$$preflight"; then preflight_rc=0; else preflight_rc=$$?; fi; \
+	cat "$$preflight"; \
+	if test "$$preflight_rc" -ne 0; then exit "$$preflight_rc"; fi; \
+	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
+	test -n "$$run_id"; \
+	$(MAKE) --no-print-directory hub-recover; \
+	RESUME=$$run_id ./scripts/k3d-manager hub_data_recover
+
 dr-drill:
 	@bin/dr-drill
 

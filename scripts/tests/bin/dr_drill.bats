@@ -15,7 +15,7 @@ printf '%s\n' "${DR_TEST_HOST:-m2-air.local}"
 STUB
   cat > "$TEST_ROOT/hub-up" <<'STUB'
 #!/usr/bin/env bash
-printf 'hub-up %s\n' "${DR_DRILL_CONTEXT}|${DR_DRILL_CLUSTER}|${KUBECONFIG}|${DR_DRILL_MODE}" >> "$PHASE_LOG"
+printf 'hub-up %s\n' "${DR_DRILL_CONTEXT}|${DR_DRILL_CLUSTER}|${KUBECONFIG}|${DR_DRILL_MODE}|${VAULT_UNSEAL_CACHE_SERVICE:-}" >> "$PHASE_LOG"
 [[ "${DR_TEST_HUB_UP_FAIL:-0}" == 1 ]] && exit 1
 exit 0
 STUB
@@ -23,6 +23,9 @@ STUB
 #!/usr/bin/env bash
 printf '%s|%s|%s\n' "$DR_DRILL_CONTEXT" "$DR_DRILL_CLUSTER" "$DR_DRILL_RESTORE_STAGE" >> "$RESTORE_LOG"
 [[ "${DR_TEST_RESTORE_FAIL:-0}" == 1 ]] && exit 1
+if [[ "${DR_TEST_EXTRA_CREDENTIAL:-0}" == 1 ]]; then
+  security find-generic-password -s hidden-service -a hidden-account -w || exit $?
+fi
 mkdir -p "$DR_DRILL_RESTORE_STAGE"
 printf '%s\n' '{"vault_paths":["app/"],"keycloak_realm_user_count":1,"ldap_entry_count":2}' > "$DR_DRILL_RESTORE_STAGE/inventory.json"
 cat > "$DR_DRILL_RESTORE_STAGE/pv-pvc.yaml" <<'YAML'
@@ -54,7 +57,8 @@ if [[ "$1 $2" == 'cluster list' && -n "${DR_TEST_CLUSTER_LIST:-}" ]]; then print
 STUB
   cat > "$STUB_BIN/docker" <<'STUB'
 #!/usr/bin/env bash
-printf 'docker'; printf ' %q' "$@"; printf '\n' >> "$PHASE_LOG"
+{ printf 'docker'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
+if [[ "$1" == ps ]]; then printf 'k3d-dr-drill-serverlb 0.0.0.0:%s->6443/tcp\n' "${DR_TEST_SERVERLB_PORT:-6445}"; fi
 STUB
   cat > "$STUB_BIN/git" <<'STUB'
 #!/usr/bin/env bash
@@ -92,7 +96,9 @@ for arg in "$@"; do
 done
 { printf 'kubectl'; printf ' %q' "$@"; printf '\n'; } >> "$KLOG"
 args="$*"
-if [[ "$args" == *' run dr-egress-check-'* ]]; then exit 0
+if [[ "$args" == *'config get-contexts'* ]]; then printf '%b' "${DR_TEST_CONTEXTS:-k3d-dr-drill}"; printf '\n'; exit 0
+elif [[ "$args" == *'config view'* ]]; then printf 'https://127.0.0.1:%s\n' "${DR_TEST_SERVER_PORT:-6445}"; exit 0
+elif [[ "$args" == *' run dr-egress-check-'* ]]; then exit 0
 elif [[ "$args" == *'wait --for=condition=Ready pod/dr-egress-check-'* ]]; then [[ "${DR_TEST_NOT_READY:-0}" == 1 ]] && exit 1; exit 0
 elif [[ "$args" == *'exec dr-egress-check-'* ]]; then [[ "${DR_TEST_EXEC_FAIL:-0}" == 1 ]] && { printf 'rc=7\n'; exit 1; }; printf 'rc=%s\n' "${DR_TEST_CURL_RC:-7}"; exit 0
 elif [[ "$args" == *'delete pod dr-egress-check-'* ]]; then exit 0
@@ -136,7 +142,7 @@ esac
 STUB
   chmod +x "$STUB_BIN"/*
   chmod +x "$STUB_BIN"/* "$TEST_ROOT/hub-up" "$TEST_ROOT/restore"
-  export PATH="$STUB_BIN:$PATH" DR_DRILL_HUB_UP_CMD="$TEST_ROOT/hub-up" DR_DRILL_RESTORE_CMD="$TEST_ROOT/restore"
+  export PATH="$STUB_BIN:$PATH" DR_SECURITY_REAL="$STUB_BIN/security" DR_DRILL_HUB_UP_CMD="$TEST_ROOT/hub-up" DR_DRILL_RESTORE_CMD="$TEST_ROOT/restore"
 }
 
 run_drill() { run "$PWD/bin/dr-drill" || true; }
@@ -147,6 +153,39 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
   for pair in "1 2" "2 3" "3 4" "4 5" "5 6"; do read -r before after <<<"$pair"; [ "$(grep -n "Phase $before/6" <<<"$output" | cut -d: -f1)" -lt "$(grep -n "Phase $after/6" <<<"$output" | cut -d: -f1)" ]; done
   result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
   [ "$(jq -r .success "$result")" = true ]
+}
+
+@test "dr drill: hub-up inherits its dedicated Vault cache service and teardown purges it" {
+  cat > "$STUB_BIN/secret-tool" <<'STUB'
+#!/usr/bin/env bash
+{ printf 'secret-tool'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
+[[ "$1" == lookup ]] || exit 0
+exec "$DR_SECURITY_REAL" find-generic-password -s "$3" -a "$5" -w
+STUB
+  chmod +x "$STUB_BIN/secret-tool"
+  run_drill
+  [ "$status" -eq 0 ]
+  grep -q 'hub-up k3d-dr-drill|dr-drill|.*|1|k3dm-vault-unseal-drill' "$PHASE_LOG"
+  grep -Eq '(security|secret-tool) .*k3dm-vault-unseal-drill' "$PHASE_LOG"
+  [ "$(grep -Ec '(security|secret-tool) .*k3d-manager-vault-unseal' "$PHASE_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: teardown uses the drill service even when its environment is unset" {
+  local harness="$TEST_ROOT/teardown-only"
+  sed '/^if _dr_drill_run; then/,$d' "$PWD/bin/dr-drill" | sed "s#^REPO_ROOT=.*#REPO_ROOT=\"$PWD\"#" > "$harness"
+  cat >> "$harness" <<'STUB'
+_vault_purge_unseal_cache() { printf '%s\n' "${VAULT_UNSEAL_CACHE_SERVICE:-unset}" > "$PURGE_LOG"; }
+_dr_drill_started=1
+_dr_drill_preflight_refused=0
+DR_DRILL_KEEP=1
+unset VAULT_UNSEAL_CACHE_SERVICE
+_dr_drill_teardown 0
+STUB
+  chmod +x "$harness"
+  export PURGE_LOG="$TEST_ROOT/purge.log"
+  run "$harness"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$PURGE_LOG")" = k3dm-vault-unseal-drill ]
 }
 
 @test "dr drill: name and host guards refuse before k3d" {
@@ -286,18 +325,20 @@ run_drill() { run "$PWD/bin/dr-drill" || true; }
 }
 
 @test "dr drill: deny-list remains absent" {
-  run ! grep -En 'hub-restore|hub_recovery_reconcile|install-.*port-forward|launchctl|cloudflared' bin/dr-drill
+  run grep -En 'hub-restore|hub_recovery_reconcile|install-.*port-forward|launchctl|cloudflared' bin/dr-drill
+  [ "$status" -eq 1 ]
 }
 
 @test "dr drill: free disk is measured inside Docker, not on the host" {
   unset DR_DRILL_DOCKER_FREE_GB
   cat > "$STUB_BIN/docker" <<'STUB'
 #!/usr/bin/env bash
-printf 'docker'; printf ' %q' "$@"; printf '\n' >> "$PHASE_LOG"
+{ printf 'docker'; printf ' %q' "$@"; printf '\n'; } >> "$PHASE_LOG"
 if [[ "$1" == run && " $* " == *" --entrypoint df "* ]]; then
   printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
   printf 'overlay 382205952 23533724 %s 6%% /\n' "$DR_TEST_DOCKER_AVAIL_KB"
 fi
+if [[ "$1" == ps ]]; then printf 'k3d-dr-drill-serverlb 0.0.0.0:6445->6443/tcp\n'; fi
 STUB
   chmod +x "$STUB_BIN/docker"
   DR_TEST_DOCKER_AVAIL_KB=358672228 run_drill
@@ -319,4 +360,39 @@ STUB
   [ "$status" -eq 2 ]
   [[ "$output" == *"cannot clone the snapshots branch"* ]]
   [[ "$output" != *"older than 26h"* ]]
+}
+
+@test "dr drill: audit records an unexpected credential and still succeeds" {
+  export DR_TEST_EXTRA_CREDENTIAL=1 DR_DRILL_CREDENTIAL_POLICY=audit
+  run_drill
+  [ "$status" -eq 0 ]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  jq -e '.credentials_unexpected[] | select(.service == "hidden-service" and .account == "hidden-account")' "$result" >/dev/null
+}
+
+@test "dr drill: enforce rejects an unexpected credential before the real security" {
+  export DR_TEST_EXTRA_CREDENTIAL=1 DR_DRILL_CREDENTIAL_POLICY=enforce
+  run_drill
+  [ "$status" -ne 0 ]
+  [ "$(grep -c '^security .*hidden-service' "$PHASE_LOG" || true)" -eq 0 ]
+  [[ "$output" != *"hidden-service"* ]]
+}
+
+@test "dr drill: the credential policy defaults to enforce" {
+  unset DR_DRILL_CREDENTIAL_POLICY
+  export DR_TEST_EXTRA_CREDENTIAL=1
+  run_drill
+  [ "$status" -ne 0 ]
+  [ "$(grep -c '^security .*hidden-service' "$PHASE_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: target guard refuses bad contexts and ports before restore or delete" {
+  export DR_TEST_CONTEXTS=$'k3d-dr-drill\nk3d-cluster'
+  run_drill
+  [ "$status" -eq 2 ]; [[ "$output" == *"target is not the drill cluster"* ]]
+  [ "$(grep -c '^k3d cluster delete' "$PHASE_LOG" || true)" -eq 0 ]
+  : > "$PHASE_LOG"; unset DR_TEST_CONTEXTS; export DR_TEST_SERVER_PORT=6446
+  run_drill
+  [ "$status" -eq 2 ]; [[ "$output" == *"target is not the drill cluster"* ]]
+  [ "$(grep -c '^k3d cluster delete' "$PHASE_LOG" || true)" -eq 0 ]
 }

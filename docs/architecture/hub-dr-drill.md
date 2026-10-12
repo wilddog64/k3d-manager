@@ -86,6 +86,37 @@ sequenceDiagram
     M4->>M4: push metrics to Pushgateway
 ```
 
+## Hub restore sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Op as Operator on M4
+    participant Engine as hub_data_recover
+    participant Argo as ArgoCD
+    participant Hub as k3d-cluster
+    participant Repo as encrypted export
+    Op->>Engine: type selected export timestamp
+    Engine->>Engine: validate context, serverlb, node and export
+    Engine->>Argo: pause parent, then shopping-cart-identity
+    Engine->>Repo: decrypt claims through age process substitution
+    Engine->>Hub: replace claims, unseal Vault, re-point Kubernetes auth
+    Engine->>Hub: restart Keycloak and force-sync ExternalSecrets
+    Engine->>Hub: verify metadata, identity digests, placement and V8
+    Engine->>Argo: resume child, then parent with recorded policies
+    Engine-->>Op: report.json with checks and RTO
+```
+
+The full `hub-recover-all` path is approval-first: preflight clones the
+snapshots branch once into the run directory, selects the export, and records
+its exact directory before `hub-recover` runs. A resumed run uses that same
+directory. Checkpoints support `RESUME`; interrupted destructive steps 4 and 6
+require `REDO_STEP`. The V8 check waits for ExternalSecrets to clear
+`SecretSyncedError`. `report.json` records the export timestamp, checkpoint
+states/return codes, approval, target, V1/V2/V3/V4/V5/V8 results, ArgoCD resume
+status, and RTO. Inventory format 2 carries Vault `current_version` metadata,
+image majors, and hashed Keycloak/LDAP identity proofs, never secret values.
+
 ## Trust boundaries
 
 | Item | Lives on | Never |
@@ -96,6 +127,7 @@ sequenceDiagram
 | Export contents | GitHub, encrypted | plaintext Kubernetes Secrets (`state.db` is not exported) |
 | Write access to the data repo | M4 deploy key `m4-write` | the M2 (read-only key `m2-read`) |
 | Metrics | M4 → hub Pushgateway | pushed from the M2 |
+| Keychain credential access | M2 `security` shim + `credential-allowlist.tsv` | service/account values, `-w` values and stdin secrets in logs |
 
 The drill cluster gets a default-deny egress policy in every drill namespace before any workload
 starts. It allows only DNS, traffic between pods in the drill namespaces (ESO to Vault, Keycloak to
@@ -126,6 +158,8 @@ reads the realm's users straight from postgres. The image major version must mat
 |---|---|---|
 | `leftover drill cluster exists` | Phase 1 | A kept cluster from an earlier run; `k3d cluster delete dr-drill` on the M2 |
 | `failed: phase2` | result JSON | The drill hub did not build; read the `[hub-up]` step that failed |
+| `[dr-drill] refusing: target is not the drill cluster (...)` | drill output | kubeconfig, context, serverlb port or restore target is not isolated; no destructive step runs |
+| `checks.V9: false` / `credentials_unexpected` | result JSON | audit observed a Keychain service/account outside the allowlist; investigate before enforce mode |
 | `operator init … cannot be recovered` | Phase 2 | Vault initialised but the keys were lost; delete the cluster and rerun |
 | `could not record the inventory` | `make hub-data-export` on the M4 | The Vault, Keycloak or LDAP count failed; nothing was pushed. Fix that service, then export again |
 | `unable to scale <workload>` | Phase 3 | A restored workload is missing from the drill hub. Postgres comes from `scripts/etc/dr/postgres-keycloak.yaml`; Vault and LDAP from `hub-up` Steps 3–4 |
@@ -136,3 +170,6 @@ reads the realm's users straight from postgres. The image major version must mat
 | `cannot read drill results` / `prune failed` | scheduled export log | Results could not be fetched or a kept export failed manifest verification; nothing is pruned |
 | `Vault path missing after restore: secret/<name>` | Phase 4, V2 | The restored Vault lacks a path the hub had when exported |
 | `failed: V0` | result JSON | A drill pod reached the internet; the egress policy is not working |
+| restore stops before approval | Terminal | Context/serverlb identity, node, export compatibility, or typed approval failed; no destructive call was made |
+| ArgoCD auto-sync returned during pause | Terminal and report | Parent self-healed the child; restore stops before claim replacement and resumes recorded policies |
+| V8 `SecretSyncedError` | report.json | An ExternalSecret did not converge after the refresh; do not declare the restore complete |
