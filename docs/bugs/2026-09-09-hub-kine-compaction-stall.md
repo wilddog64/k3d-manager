@@ -1,6 +1,7 @@
 # Hub Kine compaction stall causes control-plane saturation
 
 **Status:** REOPENED 2026-10-11 — compaction died again on the rebuilt hub on 2026-10-08 (see "Recurrence — 2026-10-08"); the 2026-10-03 rebuild bought five days. A restart does not fix it.
+**Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
 
 ## What was observed
 
