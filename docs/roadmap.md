@@ -259,7 +259,9 @@ v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve
 **Bug-count questions in plain English.** Slack count questions that miss the regex router are
 translated by the model into a small query object (releases, priority, state, Filed date range),
 validated against a closed schema, and answered by `bug-tally`. The model never sees a bug doc or
-produces a number, and every reply states what was counted. Split into a patch release because
+produces a number, and every reply states what was counted. Amended 2026-10-12 (operator): a follow-up in the same
+Slack thread (`ask-docs how about v1.43.2`) reuses the thread's query with the named field changed,
+and count replies list the docs they counted instead of `Sources: none`. Split into a patch release because
 v1.45.0 is at its five-plan cap (Claude, 2026-10-10); it also needs the v1.44.0 Filed date. Scope:
 [`v1.45.1-bug-count-query-translation.md`](plans/v1.45.1-bug-count-query-translation.md).
 
