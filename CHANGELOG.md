@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the
+  `HubKineCompactionStalled` warning alert so a dead compaction loop is detected
+  without relying on Slow SQL or a short log window. The alert directs operators
+  to a planned rebuild and warns not to restart the k3s server.
+
 ## [1.43.1] - 2026-10-11
 
 - Changed: the DR drill's Keychain guard now defaults to `enforce`: a call outside the scoped allowlist exits 44 before it reaches `security`. The audit drill on the M2 after the unseal-cache fix reported no unexpected calls, which was the condition for the flip; `DR_DRILL_CREDENTIAL_POLICY=audit` still records without refusing.

@@ -79,7 +79,7 @@ setup() {
   local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
   local rendered="${BATS_TEST_TMPDIR}/alertmanager.yaml"
   env ALERTMANAGER_GMAIL_FROM=a@example.com \
-    ALERTMANAGER_GMAIL_APP_PASSWORD=x \
+    ALERTMANAGER_GMAIL_APP_PW=x \
     ALERTMANAGER_SMS_GATEWAY=1234567890@example.com \
     envsubst < "${tmpl}" > "${rendered}"
 
@@ -98,6 +98,19 @@ setup() {
   run amtool config routes test --config.file="${rendered}" alertname=TrivyCriticalVulnerabilityDetected severity=critical cluster=hub
   [ "${status}" -eq 0 ]
   [ "${output}" = "null" ]
+}
+
+@test "Alertmanager amtool routes HubKineCompactionStalled to email" {
+  command -v amtool >/dev/null 2>&1 || skip "amtool is not installed"
+  local tmpl="${ETC_DIR}/prometheus/alertmanager.yaml.tmpl"
+  local rendered="${BATS_TEST_TMPDIR}/alertmanager.yaml"
+  env ALERTMANAGER_GMAIL_FROM=a@example.com \
+    ALERTMANAGER_GMAIL_APP_PW=x \
+    ALERTMANAGER_SMS_GATEWAY=1234567890@example.com \
+    envsubst < "${tmpl}" > "${rendered}"
+  run amtool config routes test --config.file="${rendered}" alertname=HubKineCompactionStalled group=hermes severity=warning cluster=hub
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "platform-warning" ]
 }
 
 @test "Alertmanager routes KubeJobFailed to platform-warning" {

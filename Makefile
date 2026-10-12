@@ -1341,7 +1341,7 @@ test-pytest:
 	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 test-alertmanager-behaviour:
-	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py -v
+	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py -v
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest

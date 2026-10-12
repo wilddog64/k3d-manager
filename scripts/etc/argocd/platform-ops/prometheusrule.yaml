@@ -160,6 +160,16 @@ spec:
           annotations:
             summary: "Hermes has not completed a poll in over 15 minutes"
             description: "Hermes runs every 300 s. Check launchctl print gui/$UID/com.k3d-manager.hermes for the last exit code and ~/Library/Logs/k3dm-hermes.log. Exit 78 (EX_CONFIG) means launchd could not start the interpreter named in the plist."
+        - alert: HubKineCompactionStalled
+          expr: time() - k3dm_hub_kine_last_compaction_timestamp_seconds > 1800
+          for: 15m
+          labels:
+            group: hermes
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hub kine has not compacted in over 30 minutes"
+            description: "Healthy kine compacts every 5 minutes. A dead compaction loop never restarts and state.db grows until the hub is rebuilt. Do NOT restart the k3s server (it can crash-loop the bootstrap); see docs/bugs/2026-09-09-hub-kine-compaction-stall.md."
     - name: dr.alerts
       rules:
         - alert: DRDrillFailed

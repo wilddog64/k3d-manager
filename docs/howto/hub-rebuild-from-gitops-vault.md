@@ -14,6 +14,15 @@ This is the indicated remedy for the kine compaction stall
 place on this hardware, and a bare `docker restart` of the k3s server makes it strictly worse by
 forfeiting an already-bootstrapped process (that mistake is recorded in the same doc).
 
+### Dead kine compaction
+
+Treat `HubKineCompactionStalled` as the trigger for a planned rebuild. It is a
+warning sent to `platform-warning` after the last `COMPACT deleted` event has
+been stale for 30 minutes plus the 15-minute alert hold. Do **not** restart
+the k3s server or its container: restarting can crash-loop the bootstrapped
+hub. Follow this controlled rebuild after confirming the alert and preserving
+the pre-teardown evidence below.
+
 ## Why a rebuild is the fix
 
 The hub datastore is saturated: `state.db` ~2.4 GiB and growing ~580 MB/day, `slow_sql` climbing
