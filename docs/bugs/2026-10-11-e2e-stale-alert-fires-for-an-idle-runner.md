@@ -8,6 +8,14 @@
 **Files:** `scripts/etc/argocd/platform-ops/prometheusrule.yaml`,
 `scripts/tests/plugins/e2e_observability.bats`, `CHANGELOG.md`
 
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/etc/argocd/platform-ops/prometheusrule.yaml` | File 1 below |
+| `scripts/tests/plugins/e2e_observability.bats` | File 2 below |
+| `CHANGELOG.md` | File 3 below |
+
 ## Symptom
 
 The operator received, on 2026-10-11:

@@ -43,6 +43,14 @@ Nothing tests the panel's expression, so the exporter test passed while the pane
    two sides are both aggregated — the numerator starts with `sum(` — so a bare-series numerator
    against an aggregated denominator is red.
 
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` | Fix 1 |
+| `scripts/tests/plugins/agent_dispatch_dashboard.bats` | Fix 2 |
+| `CHANGELOG.md` | `[Unreleased]` → `### Fixed` entry |
+
 ## Tests
 
 - The new BATS assertion is red against the current dashboard and green after the fix.
