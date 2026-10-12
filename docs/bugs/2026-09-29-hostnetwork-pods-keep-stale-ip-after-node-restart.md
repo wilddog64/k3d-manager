@@ -119,3 +119,29 @@ hook, hub recovery and R8 would never have acted. Codex's fixtures were a few hu
 could see it. Fix: both documents go through temp files (`--slurpfile nodes`, and the pods file as jq's
 input), removed by a single-quoted `EXIT` trap. Added a regression test with a pod list over 256 KiB;
 Codex's original script fails it, and the fixed one passes (4/4).
+
+## Recurrence (2026-10-12)
+
+The OrbStack 2.2.4 upgrade (about 11:35Z, operator clicked **Upgrade** in the app) restarted every
+hub container. Two nodes came back on new IPs, and two node-exporter pods kept the old ones:
+
+| Pod | Node | Pod IP | Node IP |
+|---|---|---|---|
+| `kube-prometheus-stack-prometheus-node-exporter-74b5v` | `agent-0` | 192.168.97.4 | 192.168.97.5 |
+| `kube-prometheus-stack-prometheus-node-exporter-p4fxm` | `agent-1` | 192.168.97.5 | 192.168.97.6 |
+
+The Hermes `hostnet_drift` sensor reported it (`degraded: 2 host-network pods on stale IPs`), so
+detection worked. The automatic fix did not run, and by design it could not:
+
+- the node-health-watch hook runs only after its own `docker restart`, and OrbStack did the restart;
+- `hub_recovery_reconcile` was not run;
+- R8 is approval-gated.
+
+**Gap:** a restart that comes from outside k3d-manager (an OrbStack update or restart, or a host
+reboot) is fixed only when someone approves R8 or deletes the pods by hand. Whether to auto-approve
+R8 for a restart from outside is part of the OrbStack phase 2 (scheduled install) decision in
+`docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md`. Phase 2 should run the drift
+fix after `orbctl update`.
+
+Live fix (operator): approve R8, or
+`kubectl --context k3d-k3d-cluster -n monitoring delete pod -l app.kubernetes.io/name=prometheus-node-exporter`.

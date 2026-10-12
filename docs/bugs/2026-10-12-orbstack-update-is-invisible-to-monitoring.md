@@ -194,6 +194,7 @@ Do not start phase 2 until all three of these hold:
   real restart, so Vault unseals itself in the same watchdog run.
 - `2026-10-12-hermes-has-no-vault-sealed-sensor.md` has landed, so a failed unseal is visible.
 - The operator approves an unattended hub restart window.
+- The job runs the host-network drift fix (`bin/k3dm-hostnet-drift --fix`) after the update, because an outside restart leaves host-network pods on stale IPs (recurrence 2026-10-12 in `2026-09-29-hostnetwork-pods-keep-stale-ip-after-node-restart.md`).
 
 File phase 2 as its own bug then.
 
