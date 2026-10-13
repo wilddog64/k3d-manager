@@ -322,7 +322,7 @@ first. Its life is bounded: v2.0.0 retires shopping-cart and v1.50.0 re-points t
 Scope: [`v1.48.0-loadtest-credentials-and-preflight.md`](plans/v1.48.0-loadtest-credentials-and-preflight.md),
 then [`v1.48.0-scheduled-baseline-loadtest.md`](plans/v1.48.0-scheduled-baseline-loadtest.md).
 
-**Operational quality and incident severity** (operator, 2026-10-12; specs not yet written). A
+**Operational quality and incident severity** (operator, 2026-10-12; specs written 2026-10-12). A
 "k3dm Operational Quality" dashboard, rolling 30 days, with six headline numbers and targets:
 availability ≥99.5%, deployment success ≥95%, DR drill pass rate 100%, automation success ≥90%,
 security SLA ≥95%, detection coverage ≥95%; a weekly history of the rates; and a row per severity.
@@ -330,24 +330,24 @@ Severity levels: SEV1 hub unavailable or unrecoverable data loss (frequency, rec
 Argo CD unavailable or a production-like app outage (frequency, duration); SEV3 agent task fails or a
 monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no operational impact
 (backlog, resolution time).
-- `v1.48.0-incident-severity-records.md`: bug docs carry a SEV1–SEV4 level (the existing
+- [`v1.48.0-incident-severity-records.md`](plans/v1.48.0-incident-severity-records.md): bug docs carry a SEV1–SEV4 level (the existing
   `**Severity:**` low/medium line is migrated or renamed — decide in the spec) and
   `**Detected by:** alert | sensor | human`; the bug-docs exporter counts both.
-- `v1.48.0-operational-quality-dashboard.md`: producers push `*_runs_total` / `*_success_total`
+- [`v1.48.0-operational-quality-dashboard.md`](plans/v1.48.0-operational-quality-dashboard.md): producers push `*_runs_total` / `*_success_total`
   counters (deployment, DR drill, dispatch); rates are `increase(success) / increase(runs)`. Pushgateway
   keeps only the last value, so a rate from the success gauge alone is time-weighted, not per run.
-  Check Prometheus retention covers 30 days. Key availability and deployment measures to the
+  Hub Prometheus keeps 3 days, so 30-day rates come from per-run records via an aggregator. Key availability and deployment measures to the
   platform, not shopping-cart, which v2.0.0 retires.
 
 Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.44.0), CVE
 remediation data (v1.45.0), the offsite availability probe and the weekly DR drill (v1.46.0), and
 platform RTO (v1.47.0).
 
-**Human effort per verified release** (operator, 2026-10-12; spec not yet written). One number per
+**Human effort per verified release** (operator, 2026-10-12; spec written 2026-10-12). One number per
 release that passed the v1.47.0 `hub-e2e` gate: how many times the operator had to act. It starts
 here so v1.48–v2.x give the baseline that v3.0.0 (multi-agent product team) must push down; it is
 the same measure as that section's "coordinator interventions".
-- `v1.48.0-human-effort-per-release.md`: counts explicit approvals (Decision Digest, v1.45.1),
+- [`v1.48.0-human-effort-per-release.md`](plans/v1.48.0-human-effort-per-release.md): counts explicit approvals (Decision Digest, v1.45.1),
   operator-authored commits, and operator-only steps and agent corrections recorded through a new
   `make log-intervention KIND=… NOTE=…` ledger (git cannot see these); branch-cut-to-merge hours as
   context. Minutes are optional and self-reported. A trend panel on the Operational Quality
