@@ -1865,3 +1865,7 @@ Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status cou
 - 2026-10-11: v1.43.1 round-2 recovery defects and behavioral tests fixed; see git log.
 - 2026-10-11: feat(dr): drill credential allowlist and target isolation guard; see git log.
 2026-10-11: Fixed DR drill Vault unseal-cache isolation and teardown purge (see git log).
+
+## 2026-10-13 — E2E release HEAD synchronization proposal
+
+Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` executions fetch and test current release branch remote HEAD (not `main`) including approved shopping-cart inputs, without arbitrary git pull permissions or changes to operator worktrees. Proposal added to `docs/plans/e2e-current-release-head-sync.md` on `k3d-manager-v1.43.2` (`b72e58cb`). Implementation milestone TBD; no runnable code changed. Existing M2 SHA pinning does not establish M4's revision freshness; candidate image provenance must also be verified.
