@@ -336,7 +336,9 @@ monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no ope
 - [`v1.48.0-operational-quality-dashboard.md`](plans/v1.48.0-operational-quality-dashboard.md): hub Prometheus keeps
   3 days and Pushgateway gauges are time-weighted, so a new `bin/k3dm-quality-metrics` computes per-run
   30-day and weekly ratios from durable records (a new webhook deployment ledger, drill results, the
-  dispatch ledger, classified bug docs) and pushes the finished ratios. Key availability and deployment measures to the
+  dispatch ledger, classified bug docs) and pushes the finished ratios. Closed weeks are frozen in a
+  `weekly-summary.jsonl` (all weeks shown; `--rebuild` recomputes), and the local ledgers ride in each
+  hub-data export, age-encrypted, so the v2 → v3 history survives a lost laptop. Key availability and deployment measures to the
   platform, not shopping-cart, which v2.0.0 retires.
 
 Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.44.0), CVE
