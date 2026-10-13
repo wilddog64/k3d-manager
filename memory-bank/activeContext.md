@@ -1869,3 +1869,7 @@ Triaged all 19 requested September bug docs on `k3d-manager-v1.42.0`; status cou
 ## 2026-10-13 — E2E release HEAD synchronization proposal
 
 Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` executions fetch and test current release branch remote HEAD (not `main`) including approved shopping-cart inputs, without arbitrary git pull permissions or changes to operator worktrees. Proposal added to `docs/plans/e2e-current-release-head-sync.md` on `k3d-manager-v1.43.2` (`b72e58cb`). Implementation milestone TBD; no runnable code changed. Existing M2 SHA pinning does not establish M4's revision freshness; candidate image provenance must also be verified.
+
+## 2026-10-13 — Hermes alert_delivery UNKNOWN triage
+
+Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `alert delivery probe unavailable`. Read-only branch review found `scripts/lib/hermes/sensors.py` suppresses all probe errors with broad `except Exception`; actual live cause remains unverified and no Alertmanager outage is established. Filed P2 bug `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (`2c2225b8`) for safe diagnostic reasons and probe verification; no executable changes.
