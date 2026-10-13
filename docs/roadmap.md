@@ -330,13 +330,13 @@ Severity levels: SEV1 hub unavailable or unrecoverable data loss (frequency, rec
 Argo CD unavailable or a production-like app outage (frequency, duration); SEV3 agent task fails or a
 monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no operational impact
 (backlog, resolution time).
-- [`v1.48.0-incident-severity-records.md`](plans/v1.48.0-incident-severity-records.md): bug docs carry a SEV1–SEV4 level (the existing
-  `**Severity:**` low/medium line is migrated or renamed — decide in the spec) and
-  `**Detected by:** alert | sensor | human`; the bug-docs exporter counts both.
-- [`v1.48.0-operational-quality-dashboard.md`](plans/v1.48.0-operational-quality-dashboard.md): producers push `*_runs_total` / `*_success_total`
-  counters (deployment, DR drill, dispatch); rates are `increase(success) / increase(runs)`. Pushgateway
-  keeps only the last value, so a rate from the success gauge alone is time-weighted, not per run.
-  Hub Prometheus keeps 3 days, so 30-day rates come from per-run records via an aggregator. Key availability and deployment measures to the
+- [`v1.48.0-incident-severity-records.md`](plans/v1.48.0-incident-severity-records.md): bug docs gain a new
+  `**Incident:** SEV1–SEV4` line (the existing `**Severity:**` line is left as is) and
+  `**Detected by:** alert | sensor | test | human`; the bug-docs exporter counts both over 30 days.
+- [`v1.48.0-operational-quality-dashboard.md`](plans/v1.48.0-operational-quality-dashboard.md): hub Prometheus keeps
+  3 days and Pushgateway gauges are time-weighted, so a new `bin/k3dm-quality-metrics` computes per-run
+  30-day and weekly ratios from durable records (a new webhook deployment ledger, drill results, the
+  dispatch ledger, classified bug docs) and pushes the finished ratios. Key availability and deployment measures to the
   platform, not shopping-cart, which v2.0.0 retires.
 
 Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.44.0), CVE
