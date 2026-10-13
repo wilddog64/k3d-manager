@@ -274,7 +274,9 @@ inherit an approved spec), enforced by a new `commit-msg` hook and derived from 
 dashboard (incl. spec approval by release) and an `/ask-docs` fast path. Scope:
 [`v1.45.1-engineering-decision-digest.md`](plans/v1.45.1-engineering-decision-digest.md).
 
-v1.45.1 is at 2 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+Also queued: [`v1.45.1-codex-model-routing-and-efficiency.md`](plans/v1.45.1-codex-model-routing-and-efficiency.md) — optional operator-approved Luna/Astra Codex model routing and per-task Grafana efficiency metrics; depends on v1.43.2 dispatch telemetry, no automatic escalation.
+
+v1.45.1 is at 3 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.46.0
 
