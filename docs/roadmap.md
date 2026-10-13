@@ -315,9 +315,6 @@ commit, unless a recorded override is given. Scope:
 
 ### Candidate milestone — v1.48.0
 
-**Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0) on 2026-10-10. Scope:
-[`v1.48.0-e2e-failure-artifacts.md`](plans/v1.48.0-e2e-failure-artifacts.md).
-
 **Scheduled baseline load test** (operator, 2026-10-11, after the Checkout Load Test dashboard was
 found empty). A light 5–10 VU baseline every 12h keeps the k6 panels filled, plus a full stress run
 as a gate for major releases. Moved from the never-cut v1.41.1. Credentials and preflight come
@@ -344,7 +341,26 @@ monitoring panel misleads (frequency, recurrence); SEV4 minor defect with no ope
 
 Placed here because its inputs land earlier: bug Filed/Recurred/Verified dates (v1.44.0), CVE
 remediation data (v1.45.0), the offsite availability probe and the weekly DR drill (v1.46.0), and
-platform RTO (v1.47.0). v1.48.0 is **full at 5 of 5 plans**; the next v1.48.0 item goes to v1.48.1.
+platform RTO (v1.47.0).
+
+**Human effort per verified release** (operator, 2026-10-12; spec not yet written). One number per
+release that passed the v1.47.0 `hub-e2e` gate: how many times the operator had to act. It starts
+here so v1.48–v2.x give the baseline that v3.0.0 (multi-agent product team) must push down; it is
+the same measure as that section's "coordinator interventions".
+- `v1.48.0-human-effort-per-release.md`: counts explicit approvals (Decision Digest, v1.45.1),
+  operator-authored commits, and operator-only steps and agent corrections recorded through a new
+  `make log-intervention KIND=… NOTE=…` ledger (git cannot see these); branch-cut-to-merge hours as
+  context. Minutes are optional and self-reported. A trend panel on the Operational Quality
+  dashboard, one point per verified release.
+
+v1.48.0 is **full at 5 of 5 plans**; the next v1.48.0 item goes to v1.48.1.
+
+### Candidate milestone — v1.48.1 (patch)
+
+**Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0 and v1.48.0) on 2026-10-12,
+when v1.48.0 took the operational-quality bundle. It depends on nothing in that bundle. Scope:
+[`v1.48.1-e2e-failure-artifacts.md`](plans/v1.48.1-e2e-failure-artifacts.md). Branch
+`k3d-manager-v1.48.1` is cut from `main` after v1.48.0 merges.
 
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
@@ -491,7 +507,7 @@ contract" under Where we actually are), so the agents can take intent, not hand-
 2. **QA tests from the spec, never from A's or B's code.**
 3. **Gates decide, not the coordinator.** Claude steps in on a gate failure or a conflict.
 4. **Measure the experiment.** Time per agent from task handed out to work landed,
-   coordinator interventions per feature, bugs caught by QA versus e2e, and tokens per role.
+   coordinator interventions per feature, bugs caught by QA versus e2e, and tokens per role. The baseline is v1.48.0's "human effort per verified release", collected from v1.48 through v2.x.
 
 On 2026-10-12, eight finished Codex worktrees were waiting on Claude's verify-and-land step. That
 step is the known bottleneck the experiment must test.
