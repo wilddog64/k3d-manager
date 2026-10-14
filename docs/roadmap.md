@@ -363,6 +363,9 @@ the same measure as that section's "coordinator interventions".
 
 v1.48.0 is **full at 5 of 5 plans**; the next v1.48.0 item goes to v1.48.1.
 
+**Deferred to v1.48.1:** [`v1.48.1-semantic-change-approval-gate.md`](plans/v1.48.1-semantic-change-approval-gate.md) introduces trusted PR risk classification and SHA-bound approval (P2, approval pending, advisory-first). Authored on the current v1.43.2 branch; do not start implementation before its release is cut and operator approves.
+
+
 ### Candidate milestone — v1.48.1 (patch)
 
 **Structured E2E failure evidence**, moved from v1.43.0 (via v1.47.0 and v1.48.0) on 2026-10-12,
