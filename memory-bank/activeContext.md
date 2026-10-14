@@ -1887,3 +1887,7 @@ Operator requested that HIGH-risk semantic PR approvals be actionable from Slack
 ## 2026-10-14 — GitHub Mobile added as preferred PR approval interface
 
 Updated `docs/plans/v1.48.1-semantic-change-approval-gate.md` on current `k3d-manager-v1.43.2` branch. Slack notifies with PR link; GitHub Mobile native Review changes → Approve is the preferred choice where the operator is an eligible non-author reviewer. Trusted CI must independently verify GitHub review identity, current head SHA, policy and required checks. GitHub self-approval is not valid: for operator-authored PRs use authenticated Slack Approve/Deny/Delay plus an independently enforced required check (only if repository rulesets support it), otherwise stay blocked. SMS notification remains optional. Proposed only; no implementation or changes to main.
+
+## 2026-10-14 — Weekly bug backlog trend added to existing v1.44.0 spec
+
+Operator requested the missing weekly bug arrival/closure and net backlog trend in the existing (already full, 5/5) v1.44.0 Bug Lifecycle Metrics spec, not a new spec. Amended `docs/plans/v1.44.0-bug-lifecycle-metrics.md` on current `k3d-manager-v1.43.2` branch: last 12 completed ISO weeks plus current partial week, `filed`, `closed`, and `net = filed - closed` metrics from existing bug docs, unknown-date counters, Grafana flow visualization, regression tests. Explicitly label net as a document-derived proxy: historical close/reopen transitions cannot be reconstructed reliably from today's bug doc alone. No new store, no changes to main, no implementation.
