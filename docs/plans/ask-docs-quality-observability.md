@@ -57,6 +57,18 @@ The evaluator must not send production questions or credentials to an external m
 judge is used for fixture evaluation, prompts and outputs stay in disposable test artifacts and
 are redacted before publication.
 
+## Document authority and supersession evaluation
+
+Retrieval quality also depends on **which version of a document is authoritative**. The corpus may legitimately contain an older `docs/issues/` investigation that has been promoted to a `docs/bugs/` record, an obsolete fix superseded by a newer bug, or an earlier plan revised in a subsequent release. Indexing both documents successfully does not mean the older one should be recommended as the current answer.
+
+- **Authority source of truth:** Derive relationships from explicit repository metadata and links (for example, `Status: SUPERSEDED`, a replacement path, or a documented current-release decision). Do not assume every file in `docs/bugs/` outranks every file in `docs/issues/`, or that newest file timestamps always win.
+- **Preserve history:** Keep superseded documents retrievable for audit/history questions and citations; for questions about *current* behavior, prominently select or link to the canonical successor and label older evidence as historical. Do not delete, hide, or silently rewrite indexed sources.
+- **Conservative ambiguity:** If the documents conflict but no supported supersession relationship exists, report the conflict or insufficient evidence instead of inventing an authoritative winner.
+- **Evaluation fixtures:** Add versioned offline fixtures covering (1) an issue promoted to a research-required bug, (2) a closed bug superseded by a later recurrence, (3) a plan amended in a later release, (4) a user explicitly requesting historical behavior, and (5) conflicting documents with no explicit successor. Pin expected current and historical source paths and expected disposition.
+- **Metrics:** Evaluate `current_authority_at_k`, `superseded_only_answer`, and `unresolved_conflict` in offline fixtures; use bounded aggregate metrics, never document paths, raw user queries, or IDs as Prometheus labels. A retrieved high-similarity obsolete document is not automatically a quality pass.
+- **Regression gate:** For current-state questions, answer citations must include the canonical record if the fixture identifies one. Historical questions may cite an older record if clearly labeled. Regression tests must verify that both documents remain indexed and that the final summary does not present superseded instructions as current facts.
+- **Existing taxonomy research dependency:** Coordinate authority rules with `docs/bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md`. That investigation determines directory policy; this spec must not preempt its findings or initiate any bulk migration.
+
 ## Feedback and follow-up
 
 Feedback should be explicit and low-friction, for example Slack actions or a `/ask-docs
