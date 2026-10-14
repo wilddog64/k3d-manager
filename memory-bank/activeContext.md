@@ -1875,3 +1875,7 @@ Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` e
 ## 2026-10-13 — Hermes alert_delivery UNKNOWN triage
 
 Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `alert delivery probe unavailable`. Read-only branch review found `scripts/lib/hermes/sensors.py` suppresses all probe errors with broad `except Exception`; actual live cause remains unverified and no Alertmanager outage is established. Filed P2 bug `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (`2c2225b8`) for safe diagnostic reasons and probe verification; no executable changes.
+
+## 2026-10-14 — Semantic change approval gate proposed for v1.48.1
+
+Operator requested risk-based semantic approval for Claude/Codex changes. Spec: `docs/plans/v1.48.1-semantic-change-approval-gate.md` on current `k3d-manager-v1.43.2` release branch. v1.48.0 is full (5/5), so implementation is deferred to v1.48.1; **Approval: pending**, P2, advisory-first, no implementation or enforcement authorized. Pre-commit offers hints; the trusted PR/merge CI gate must enforce minimum deterministic risk, SHA-bound evidence, and explicit operator approval for HIGH risk, without self-approval or weakening existing tests. Important workflow rule from operator: future-release specs are authored on the **current release branch and recorded in memory-bank**, never committed directly to `main` and never introduced by a separate PR against `main`. Prior draft PR #142 targeting `main` is withdrawn. No executable changes.
