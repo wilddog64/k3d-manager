@@ -22,6 +22,16 @@ Operator screenshots of the dashboard (last seven days / thirty-day KPI cards) s
 3. Inspect the successful/failed job queries and metric types. Determine whether fractional values are mathematically valid counter extrapolations rather than observed job counts. Choose a query/aggregation that truthfully reports the intended metric; never silently round away a semantic error.
 4. Confirm which zero-valued KPIs represent a real zero versus missing samples; avoid converting `No data` to zero without evidence.
 
+## Explicit investigation: fractional successful Job count (3.02)
+
+The operator explicitly requests that the observed **3.02 successful jobs in 30 days** be investigated, not merely reformatted. Kubernetes completed Jobs are discrete; a fractional display must be reconciled with the precise metric and query semantics.
+
+- Copy the panel's exact PromQL, Grafana reducer/calculation, query range and override. Identify its source metric type (counter, gauge, kube-state-metrics series, or recording rule).
+- If the expression uses `increase(...[30d])`, determine whether scrape extrapolation and/or sparse samples produce the fractional output. If it uses `sum`, check whether multiple labeled series or duplicated jobs are aggregated unexpectedly.
+- Compare the query with actual successful Job transitions in the same available time window, accounting for completed-job deletion, retention, and missing history. Do not interpret unavailable historical evidence as zero successful jobs.
+- Decide whether the panel should report an **observed integer event count**, an **estimated counter increase**, or another quantity; use a title and precision matching its actual semantics. Do not simply apply `round()` until the source and aggregation are validated.
+- Validate that success and failure panels use compatible counting rules, job selectors and 30-day windows; add an offline PromQL/dashboard regression test where practical.
+
 ## Expected behavior
 
 - Related Image Updater KPIs appear as a coherent, equal-height row/grid; CVE scan outcome KPIs are similarly grouped, aligned and legible.
