@@ -278,7 +278,9 @@ Also queued: [`v1.45.1-codex-model-routing-and-efficiency.md`](plans/v1.45.1-cod
 
 Also queued: [`v1.45.1-cve-post-remediation-rescan-verification.md`](plans/v1.45.1-cve-post-remediation-rescan-verification.md) — correlate each deployed immutable digest and targeted CVE list with a fresh post-deployment scan; distinguish “applied and healthy” from “CVE eliminated” in Grafana. Coordinate with v1.45.0 terminal notifications.
 
-v1.45.1 is at 4 of 5 plans; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
+Also queued: [`v1.45.1-per-suite-test-metrics.md`](plans/v1.45.1-per-suite-test-metrics.md) — publish independent BATS/Python suite results with parent-child run correlation, prevent double-counting in Grafana, and preserve existing test exit-code semantics.
+
+v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.46.0
 
