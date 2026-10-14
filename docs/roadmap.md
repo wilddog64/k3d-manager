@@ -306,7 +306,9 @@ as a gate for major releases. Moved from the never-cut v1.41.1. Credentials and 
 first. Its life is bounded: v2.0.0 retires shopping-cart and v1.50.0 re-points the load test.
 Scope: [`v1.48.0-loadtest-credentials-and-preflight.md`](plans/v1.48.0-loadtest-credentials-and-preflight.md),
 then [`v1.48.0-scheduled-baseline-loadtest.md`](plans/v1.48.0-scheduled-baseline-loadtest.md).
-v1.48.0 is at 3 of 5 plans.
+**Semantic change approval gate** (operator, 2026-10-14). A risk-based, trusted PR/merge check classifies changes LOW/MEDIUM/HIGH/UNKNOWN. Local pre-commit provides only advisory feedback; CI verifies exact SHA-bound evidence and explicit operator approval for high-risk changes. Start advisory-only, then enable enforcement after operator acceptance. Align with v1.45.1 decision digest, release evidence, and existing auto-merge without weakening the v1.47.0 promotion gate. Scope: [`v1.48.0-semantic-change-approval-gate.md`](plans/v1.48.0-semantic-change-approval-gate.md).
+
+v1.48.0 is at 4 of 5 plans.
 
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
