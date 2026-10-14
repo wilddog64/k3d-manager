@@ -38,3 +38,29 @@ Operator ran `make test` and received `make: *** [test] Error 1`. The visible ta
 - [ ] No vacuous test passing or false-green dashboards; skipped live tests and unknown environments are recorded honestly.
 
 No runtime or tests changed by this bug report.
+
+## Cross-suite offline-contract audit — 2026-10-14 (source inspection only)
+
+The operator requested a check of **other offline test suites**, not just `make test`. Current `Makefile` declarations show:
+
+| Target | Coverage and safeguards | Finding |
+|---|---|---|
+| `make test` | `tripwire.sh ./scripts/k3d-manager test all` | Observed failure; failing BATS case unknown |
+| `make test-bin` | `tripwire.sh bats scripts/tests/bin` | Offline host-tool guard present; same class of unexpected blocked-read/fixture assertions **possible**, not reproduced |
+| `make test-python-unit` | Each non-`test_*.py` `scripts/tests/bin/*.py` run via `tripwire.sh python3` | Guard present for each script; same class possible, not reproduced |
+| `make test-pytest` | `tripwire.sh pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | Guard present; same class possible, not reproduced |
+| `make test-python` | Depends on `test-python-unit` and `test-pytest` | Inherits both suites' behavior; no separate test logic |
+| `make test-all` | Sequential `make test && make test-bin && make test-python` | Inherits failure of any child; short-circuits remaining children and publishes aggregate failure |
+| `make test-alertmanager-behaviour` | Direct `python3 -m pytest` on two observability modules | **No tripwire wrapper** in this target. This is a verified difference in safety isolation; whether the specific tests access live host tools is unverified. Assess whether an explicit integration-test exception is warranted or wrap appropriately. |
+
+Repository searches identify host-tool references inside offline test locations, including `scripts/tests/plugins/acg.bats` and `scripts/tests/bin/cluster_down.bats` for CloudFormation probes, and `scripts/tests/bin/makefile_keychain_read.bats` and `scripts/tests/hermes/test_pager.py` for Keychain probes. **These references are not proof of bugs**: they may be intentionally stubbed and properly asserted. Existing tripwire intercepts host access, while tests can still incorrectly depend on a successful real probe or fail on a blocked read (exit 97). Check fixture/mocking setup and output before changing assertions.
+
+### Expanded investigation and regression matrix
+
+1. Run each leaf target individually **without a provisioned ACG sandbox** and with controlled (simulated) missing, stale, and present `ubuntu-k3s` contexts: `test`, `test-bin`, `test-python-unit`, `test-pytest`. Capture named failing cases and tripwire reports separately. Do not trigger real AWS or destructive operations.
+2. Prove all offline targets remain deterministic when AWS, kubeconfig, Keychain and GitHub authorization are absent; distinguish an intentionally mocked dependency from a genuine required fixture.
+3. Verify `test-all` aggregates correct failure and does not silently suppress failures or report unexecuted suites as passing.
+4. Audit `test-alertmanager-behaviour` separately for the missing tripwire safety wrapper; if live dependencies are required, classify and document it as an explicit opt-in integration gate rather than treating it as an offline suite.
+5. Regression-test that **unmocked unsafe calls remain failures**. Only optional environment unavailability should become warning/skip when that is the documented contract.
+
+**Audit result:** Common offline tripwire protection exists on the four main leaf suites. Other suite failures are **not confirmed** from source inspection alone; the uncovered `test-alertmanager-behaviour` target is a specific hardening candidate, not an established live-access incident. Keep this in the same bug pending test evidence rather than spawning speculative duplicates.
