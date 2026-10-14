@@ -1,13 +1,13 @@
 # Slack logs command substitutes unrelated job ID (2026-10-13)
 
-**Status:** OPEN — reported by operator, not yet source-confirmed
+**Status:** OPEN — reproducible symptom; source confirms explicit argument is ignored; exact selected job requires live log verification
 **Priority:** P2 (ChatOps observability / job correlation)
 **Release:** v1.43.2 (triage; reschedule explicitly if the patch is full)
 **Reported:** 2026-10-13, operator
 **Approval:** standing bug-filing (report only; no runtime changes approved)
 **Component:** Slack /k3dm thread command routing; job-ID resolution; webhook job log lookup
 **Related:** `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md` (thread association vs arbitrary ID lookup distinction)
-**Evidence:** Operator Slack screenshot, 2026-10-13 ~17:01 Pacific. No access to live job directories or webhook logs; root cause unverified.
+**Evidence:** Operator Slack screenshots, 2026-10-13 and 2026-10-14; source inspection of `bin/k3dm-webhook` on `k3d-manager-v1.43.2`. No access to live job directories or webhook logs.
 
 ## Symptom
 
@@ -56,3 +56,14 @@ Both replies were:
 ## Files
 
 Locate and modify only relevant Slack webhook thread-command parsing, job lookup, tests and documentation after root-cause verification. No infrastructure/E2E-runner modification is implied by this report.
+
+## Additional reproduction and source investigation — 2026-10-14
+
+The operator queued `k3dm test` in Slack. Bot confirmed `k3dm test queued — job e45ba2fd` and `make test started by slack-thread:admin`. In the same thread the operator sent `logs e45ba2fd`, but the bot replied `No log found for job e45ba2fd`. Unlike the Oct 13 example, this response uses the same visible ID; it still does **not** demonstrate a lookup of the requested ID, because the message is constructed with the resolved thread job ID. The test may still have been running. Its outcome and the contents of its real log were not established.
+
+Code inspection confirms a defect:
+- `bin/k3dm-webhook` `_handle_thread_command`, around lines 841–847, handles `logs` with `read_job_output(JOB_DIR / job_id, ...)`, ignoring every argument after the command. Thus `logs e45ba2fd` does **not** explicitly resolve `e45ba2fd`.
+- `/slack/events`, around lines 2052–2064, determines `job_id` via `_find_job_by_thread_ts(thread_ts)`.
+- `_find_job_by_thread_ts`, around lines 624–637, returns the **first** matching `*/thread_ts` found by an unsorted glob. The original thread anchor and newly spawned test job share the same `thread_ts`, so selection can be ambiguous. This may cause lookup of an anchor without output, but the exact lookup result is not established without runtime evidence.
+
+**Expected fix:** Parse and validate optional explicit `logs <job-id>` and use that specific authorized job. Define the default for bare `logs` in a multi-job thread deterministically (e.g. most recent relevant child), rather than first arbitrary glob match. Ensure a running job with no output yet is distinct from absent job/log; preserve redaction and per-user authorization. Add regression cases for `k3dm test` followed by immediate `logs <queued-id>`, both while running and after completion. Do not silently replace a supplied ID with any thread ancestor.
