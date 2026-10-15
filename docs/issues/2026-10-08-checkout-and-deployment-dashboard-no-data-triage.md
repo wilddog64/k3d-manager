@@ -146,3 +146,25 @@ The above outcomes are based on the Slack lifecycle notifications, **not** verif
 5. Add deterministic regression checks of successful and failed metric publication, dashboard datasource resolution, and history retention across sandbox teardown. Preserve nonfatal lifecycle execution if intended, but make telemetry publication failures visible to the operator.
 
 **Scope and status:** Existing October 8 triage issue updated with a new recurrence; no specific root cause proven without live Prometheus/Pushgateway and Grafana inspection. No code, dashboard, infrastructure, or runtime changes in this documentation update.
+
+
+## Follow-up evidence — 2026-10-15 `DeploymentMetricsStale` alert
+
+An operator screenshot shows a firing `DeploymentMetricsStale` warning from Hostinger-side Prometheus. Its displayed labels include `action=up`, `provider=aws`, `instance=up-aws`, `job=k3dm-webhook`, `cluster=ubuntu-hostinger`, `status=failed`, and `severity=warning`. The alert annotation states that the deployment dashboard had zero series for **64 days** because the Pushgateway port-forward was removed on access-layer refresh, and summarizes `no k3dm deployment metric pushed for up/aws in >14d`.
+
+**Verified source rule:** `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` defines:
+
+```promql
+time() - k3dm_deployment_last_timestamp_seconds > 1209600
+```
+
+with `for: 1h`. It detects a **stale existing time series** (>14 days old), not necessarily the absence of all time series, and does not itself verify whether Pushgateway is currently unreachable. The 64-day port-forward statement is historical rule annotation, not a fresh runtime diagnosis. The `status=failed` label belongs to the last observed deployment time series; it does **not** establish failure of the 2026-10-15 successful AWS `cluster-up` job `5f5cff23`. Likewise, the alert origin `cluster=ubuntu-hostinger` is a monitoring/source label, not proof that the AWS sandbox is down.
+
+**New diagnostic leads:**
+1. Confirm whether current webhook `PUSHGATEWAY_URL` is reachable from the machine running the webhook, including the relevant local port-forward lifecycle and post-refresh behavior (the rule's accompanying test-metrics annotation mentions `localhost:9091`, which must not be assumed to be the actual deployment publisher URL without checking configuration).
+2. Read sanitized webhook logs around `5f5cff23` (up) and `b0e9616d` (down) for `metrics pushed`, `metrics push skipped`, missing configuration, or retry failures; compare producer metric samples against Prometheus scraped samples.
+3. Query `k3dm_deployment_last_timestamp_seconds{action="up",provider="aws"}` and `k3dm_deployment_success{action="up",provider="aws"}` from Hostinger Prometheus and from the Grafana dashboard's chosen datasource, preserving `status` and `job_id` labels. Determine whether recent data reached a different destination, was lost when the ACG sandbox was destroyed, or is obscured by the hardcoded datasource UID.
+4. Reconcile the contradictory-seeming observations: Prometheus alert sees an old `up/aws` series while Grafana displays `No data`. Investigate datasource, time range, and query errors before concluding the metric was never published.
+5. Test the actual 14-day staleness behavior and explicitly cover **never-published / absent series**, which this particular expression alone will not alert on. Preserve `unknown` for unavailable data rather than manufacturing zero successes.
+
+**Status:** Additional evidence appended; producer connectivity and active root cause remain unverified. No dashboard, rule, code, service or cloud changes made.
