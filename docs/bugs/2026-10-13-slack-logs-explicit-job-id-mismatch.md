@@ -1,6 +1,8 @@
-# Slack logs command substitutes unrelated job ID (2026-10-13)
+# Bug: Slack logs command substitutes unrelated job ID (2026-10-13)
 
+**Filed:** 2026-10-13
 **Status:** OPEN — reproducible symptom; source confirms explicit argument is ignored; exact selected job requires live log verification
+**Branch:** `k3d-manager-v1.43.2` (triage; not a promise of implementation in this patch)
 **Priority:** P2 (ChatOps observability / job correlation)
 **Release:** v1.43.2 (triage; reschedule explicitly if the patch is full)
 **Reported:** 2026-10-13, operator
