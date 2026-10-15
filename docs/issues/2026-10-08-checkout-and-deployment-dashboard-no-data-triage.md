@@ -168,3 +168,19 @@ with `for: 1h`. It detects a **stale existing time series** (>14 days old), not 
 5. Test the actual 14-day staleness behavior and explicitly cover **never-published / absent series**, which this particular expression alone will not alert on. Preserve `unknown` for unavailable data rather than manufacturing zero successes.
 
 **Status:** Additional evidence appended; producer connectivity and active root cause remain unverified. No dashboard, rule, code, service or cloud changes made.
+
+
+## Explicit additional finding — stale-series alert cannot detect never-published metrics
+
+**Confirmed rule limitation (source review, 2026-10-15):** `DeploymentMetricsStale` uses `time() - k3dm_deployment_last_timestamp_seconds > 1209600`. PromQL evaluates this only for existing `k3dm_deployment_last_timestamp_seconds` series. If the publisher has **never** emitted a series for the required `action/provider` pair, the comparison yields **no result**, so this rule cannot fire for that missing pair. If an old series itself disappears due to retention or target removal, this expression likewise ceases to detect that pair.
+
+**Operational impact:** A new or completely disconnected deployment telemetry stream can leave the dashboard empty with **no `DeploymentMetricsStale` alert**. The current screenshot's firing `up/aws` alert merely proves that one historical series exists in the alert evaluator's datasource, not that all expected lifecycle metrics are covered.
+
+**Required remediation / acceptance tests:**
+1. Define which `action/provider` series are **expected** in each deployment environment, and when they become expected (do not alert on AWS sandbox activity if no run has ever been scheduled and no freshness SLA applies). Keep this expected-series signal independently observable and persist it outside ephemeral AWS clusters.
+2. Add an explicit absent-series / missing-telemetry check for *required* action/provider pairs (for example, carefully scoped `absent` or comparison against an expected-series inventory). Don't apply an unscoped `absent(k3dm_deployment_last_timestamp_seconds)` and incorrectly assume it validates every label combination.
+3. Separate alert states and annotations: `stale existing series`, `expected series never published`, `telemetry publisher or scrape unavailable`, and `source not expected/temporarily inactive`. Do not represent missing telemetry as a failed deployment.
+4. Test deterministic cases: fresh metric, stale metric, never-published required metric, series aged out, unsupported or intentionally inactive runner/provider, datasource failure, and recovery after publication. Verify expected alert firing and resolution with mocked/evaluation fixtures.
+5. Preserve low-noise warnings and the 14-day threshold until the expected-series semantics and run cadence are agreed; do not invent an automatic freshness SLA for intentionally infrequent sandbox runs.
+
+**Classification:** Observability coverage defect within this existing deployment-metrics issue, not evidence of an actual failed AWS deployment. No rule/config changes made by this documentation update.
