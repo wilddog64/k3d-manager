@@ -1,6 +1,8 @@
-# make test fails when disposable ACG ubuntu-k3s context is unavailable
+# Bug: make test fails when disposable ACG ubuntu-k3s context is unavailable
 
+**Filed:** 2026-10-14
 **Status:** OPEN — investigation required; failing BATS case not yet identified
+**Branch:** `k3d-manager-v1.43.2` (triage; implementation scheduling unchanged)
 **Priority:** P2 — offline regression environment coupling
 **Reported:** 2026-10-14 by operator
 **Release:** v1.43.2 triage; reschedule if current patch scope is full
