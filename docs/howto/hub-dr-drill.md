@@ -217,7 +217,7 @@ the hub and restores its data; the data-only flow leaves the running hub in
 place. Approval is typed at the prompt and the identity is held only in memory.
 
 ```bash
-make hub-recover-all       # rebuild, credentials, then data
+make hub-recover-all       # approve, delete and rebuild the hub, credentials, then data
 make hub-data-recover      # data only; hub is still running
 ```
 
@@ -229,8 +229,10 @@ identity digests, and writes an auditable report under
 an unfinished destructive step requires its explicit `REDO_STEP`.
 
 `make hub-recover-all` is approval-first: it clones and validates one snapshots
-export, prints live/export counts, and asks for that export timestamp before it
-rebuilds the hub. `RESUME` reuses the recorded export; `REDO_STEP=4` or
+export, prints live/export counts when the hub is present, and asks for that export timestamp before it
+deletes and rebuilds the hub. It also works when the hub is already gone and clears the
+exact k3d container, network and images-volume leftovers after the snapshot guard approves teardown.
+Data changed after the selected export is lost. `RESUME` reuses the recorded export; `REDO_STEP=4` or
 `REDO_STEP=6` is required after an interrupted destructive step. The report
 contains the selected export, checkpoint steps and return codes, every V1/V2/V3/V4/V5/V8
 check, ArgoCD resume status, whether the unseal keys were cached in the Keychain

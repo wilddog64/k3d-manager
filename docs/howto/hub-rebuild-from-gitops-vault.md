@@ -20,7 +20,7 @@ Treat `HubKineCompactionStalled` as the trigger for a planned rebuild. It is a
 warning sent to `platform-warning` after the last `COMPACT deleted` event has
 been stale for 30 minutes plus the 15-minute alert hold. Do **not** restart
 the k3s server or its container: restarting can crash-loop the bootstrapped
-hub. Follow this controlled rebuild after confirming the alert and preserving
+hub. Follow `make hub-recover-all` for this controlled rebuild after confirming the alert and preserving
 the pre-teardown evidence below.
 
 ## Why a rebuild is the fix
@@ -46,8 +46,11 @@ None of these have independent fixes. The rebuild clears all of them together.
 Run the complete recovery from Terminal.app (or iTerm):
 
 ```bash
-make hub-recover
+make hub-recover-all
 ```
+
+Afterward, verify that `docker logs k3d-k3d-cluster-server-0 2>&1 | grep 'msg="COMPACT deleted'`
+returns a line about every five minutes. Do not restart the server as a shortcut.
 
 This runs `hub-up`, restores the Alertmanager credentials and signing material that have backups,
 reconciles the rebuilt Hub, restores the Embeddings key to Vault from a hidden prompt, reapplies

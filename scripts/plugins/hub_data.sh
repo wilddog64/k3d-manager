@@ -1009,7 +1009,7 @@ function hub_data_verify() {
 
 function hub_data_recover_preflight() {
   local context="${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" repo export_dir export_ts run_id run_dir
-  local server nodes live_users live_ldap export_users export_ldap export_paths
+  local server='' nodes='' live_users='' live_ldap='' export_users export_ldap export_paths
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
   run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}"
   mkdir -p "$run_dir"
@@ -1025,16 +1025,28 @@ function hub_data_recover_preflight() {
   [[ -d "$export_dir" ]] || return 1
   _hub_data_verify_export "$export_dir" || return 1
   _hub_data_check_compatibility "$export_dir" || return 1
-  _hub_data_validate_target "$context" "$cluster" || return 2
   export_ts="${export_dir##*/}"
-  server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
-  nodes="$(_kubectl --context "$context" get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}')"
   export_users="$(jq -r '.keycloak_realm_user_count' "$export_dir/inventory.json")"
   export_ldap="$(jq -r '.ldap_entry_count' "$export_dir/inventory.json")"
   export_paths="$(jq -r '.vault_paths | length' "$export_dir/inventory.json")"
-  live_users="$(_hub_data_keycloak_user_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
-  live_ldap="$(_hub_data_ldap_entry_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
-  printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live n/a (needs Vault login)/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap" >&2
+  local present_rc=0
+  _hub_data_cluster_exists "$cluster" || present_rc=$?
+  if [[ "$present_rc" -gt 1 ]]; then
+    _err "[hub-recover] cannot list k3d clusters; refusing to guess whether '${cluster}' exists"
+  fi
+  if [[ "$present_rc" -eq 0 ]]; then
+    printf '%s\n' 1 > "${run_dir}/hub_present"
+    _hub_data_validate_target "$context" "$cluster" || return 2
+    server="$(_kubectl --context "$context" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+    nodes="$(_kubectl --context "$context" get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}')"
+    live_users="$(_hub_data_keycloak_user_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
+    live_ldap="$(_hub_data_ldap_entry_count _kubectl --context "$context" 2>/dev/null || printf 'n/a')"
+    printf '[hub-recover] Target context: %s\n[hub-recover] Server URL: %s\n[hub-recover] Nodes: %s\n[hub-recover] Export: %s\n[hub-recover] Counts (Vault paths, Keycloak users, LDAP entries): live n/a (needs Vault login)/%s/%s; export %s/%s/%s\n' "$context" "$server" "$nodes" "$export_ts" "$live_users" "$live_ldap" "$export_paths" "$export_users" "$export_ldap" >&2
+    printf "[hub-recover] This DELETES the local hub '%s' and rebuilds it, then restores export %s.\n" "$cluster" "$export_ts" >&2
+  else
+    printf '%s\n' 0 > "${run_dir}/hub_present"
+    printf "[hub-recover] No local hub '%s': it will be built from scratch, then export %s restored.\n" "$cluster" "$export_ts" >&2
+  fi
   mkdir -p "$K3DM_HUB_DATA_RECOVER_RUN_ROOT"
   jq -n --arg context "$context" --arg server "$server" --arg cluster "$cluster" --arg nodes "$nodes" '{context:$context,server_url:$server,cluster:$cluster,nodes:($nodes|split(" ")|map(select(length>0)))}' > "${run_dir}/target.json"
   _hub_data_recover_approval "$export_ts" || return 2
@@ -1042,6 +1054,53 @@ function hub_data_recover_preflight() {
   date +%s > "${run_dir}/approval_epoch"
   printf '%s\n' "$export_dir" > "${run_dir}/export_dir"
   printf 'RUN_ID=%s\n' "$run_id"
+}
+
+function _hub_data_cluster_down() {
+  local cluster="$1"
+  CLUSTER_PROVIDER=k3d HUB_CLUSTER_NAME="$cluster" "${_HUB_DATA_ROOT}/bin/cluster-down" --confirm --delete-hub
+}
+
+function _hub_data_cluster_exists() {
+  local cluster="$1" listing
+  listing="$(k3d cluster list 2>/dev/null)" || return 2
+  grep -q "^${cluster}[[:space:]]" <<<"$listing"
+}
+
+function hub_data_recover_teardown() {
+  local run_id="${1:?run id required}" cluster="${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}" hub_present containers network volume
+  local run_dir="${K3DM_HUB_DATA_RECOVER_RUN_ROOT}/${run_id}" networks volumes
+  [[ -r "${run_dir}/hub_present" ]] || { _err "[hub-recover] missing hub_present for run ${run_id}"; return 1; }
+  hub_present="$(cat "${run_dir}/hub_present")"
+  [[ "$hub_present" == 0 || "$hub_present" == 1 ]] || { _err "[hub-recover] invalid hub_present for run ${run_id}"; return 1; }
+  if [[ "$hub_present" == 0 ]]; then
+    printf '%s\n' '[hub-recover] no hub to delete'
+  else
+    _hub_data_cluster_down "$cluster" || return $?
+  fi
+  local exists_rc=0
+  _hub_data_cluster_exists "$cluster" || exists_rc=$?
+  if [[ "$exists_rc" -ne 1 ]]; then
+    _err "[hub-recover] cluster ${cluster} still exists or cannot be listed after teardown"
+    return 1
+  fi
+  containers="$(docker ps -a --filter "label=k3d.cluster=${cluster}" --format '{{.Names}}')"
+  while IFS= read -r container; do
+    [[ -n "$container" ]] || continue
+    docker rm -f -- "$container"
+  done <<<"$containers"
+  network="k3d-${cluster}"
+  networks="$(docker network ls --format '{{.Name}}')"
+  if grep -Fxq "$network" <<<"$networks"; then
+    docker network rm -- "$network"
+  fi
+  volume="k3d-${cluster}-images"
+  volumes="$(docker volume ls --format '{{.Name}}')"
+  if grep -Fxq "$volume" <<<"$volumes"; then
+    docker volume rm -- "$volume"
+  fi
+  containers="$(docker ps -a --filter "label=k3d.cluster=${cluster}" --format '{{.Names}}')"
+  [[ -z "$containers" ]] || { _err "[hub-recover] leftover containers for ${cluster}: ${containers}"; return 1; }
 }
 
 function _hub_data_recover_step2() {

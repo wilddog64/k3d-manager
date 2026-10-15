@@ -91,7 +91,7 @@ hub-data-prune:
 hub-data-recover:
 	@./scripts/k3d-manager hub_data_recover
 
-## Full hub disaster recovery: rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
+## Full hub disaster recovery: approve, delete the hub, rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
 hub-recover-all:
 	@set -e; \
 	run_root="$${K3DM_HUB_DATA_RECOVER_RUN_ROOT:-$$HOME/.k3dm/hub-recover}"; \
@@ -102,6 +102,7 @@ hub-recover-all:
 	if test "$$preflight_rc" -ne 0; then exit "$$preflight_rc"; fi; \
 	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
 	test -n "$$run_id"; \
+	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
 	$(MAKE) --no-print-directory hub-recover; \
 	RESUME=$$run_id ./scripts/k3d-manager hub_data_recover
 
