@@ -1,7 +1,7 @@
 # Bug: shopping-cart frontend login rejected by Keycloak (Invalid redirect uri)
 
 **Filed:** 2026-10-13
-**Status:** OPEN — reported from browser screenshot; live configuration not yet inspected
+**Status:** OPEN — root cause reproduced 2026-10-15 (read-only): the failure is on **logout**, not login; see "Investigation 2026-10-15". Fix not started
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P1
 **Date:** 2026-10-13
@@ -61,3 +61,65 @@ Do **not** add permissive wildcard redirect URIs or disable redirect validation 
 - `docs/bugs/v1.6.0-bugfix-shopping-cart-images-keycloak.md`: previously documented frontend callback `https://frontend.3ai-talk.org/callback`.
 
 This may be a recurrence of client reconciliation/drift. Determine the live client state before assigning root cause. No cluster settings or code were changed as part of filing.
+
+## Investigation 2026-10-15 (Claude, read-only, operator-approved)
+
+No credentials were used and nothing was changed. Every request was an anonymous public GET.
+
+**What the frontend sends.** The deployed bundle (`/assets/index-DiHAdjCP.js`) configures
+oidc-client-ts with:
+
+- authority `https://keycloak.3ai-talk.org/realms/shopping-cart`, `client_id` `frontend`;
+- `redirect_uri` = `${window.location.origin}/callback`;
+- `post_logout_redirect_uri` = `window.location.origin`, i.e. `https://frontend.3ai-talk.org`, with
+  no path.
+
+**Login is fine.** These are the results of the authorize endpoint:
+
+| Request | Result |
+|---|---|
+| `redirect_uri=https://frontend.3ai-talk.org/callback` with PKCE S256 | 200, "Sign in to shopping-cart" form |
+| the same without PKCE | 302 back to `/callback?error=invalid_request` (PKCE required; the real client sends it) |
+| `https://evil.example/callback`, `https://www.3ai-talk.org/callback`, `https://shop.3ai-talk.org/callback`, `http://frontend.3ai-talk.org/callback` | 400 "Invalid parameter: redirect_uri" (correctly rejected) |
+
+**Logout fails, and it shows the exact text in the report.** These are the results of the logout
+endpoint:
+
+| `post_logout_redirect_uri` | Result |
+|---|---|
+| `https://frontend.3ai-talk.org` (what the frontend sends) | **400 "Invalid redirect uri"** |
+| `https://frontend.3ai-talk.org/callback` | 302 (accepted) |
+
+Keycloak words an invalid login redirect as "Invalid parameter: redirect_uri". It uses "Invalid
+redirect uri" for an invalid **post-logout** redirect. So the screenshot came from signing out (or
+from a login started right after a failed sign-out), not from a rejected login.
+
+**Cause.** In `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json`, the `frontend` client
+has `redirectUris` containing only the exact `https://frontend.3ai-talk.org/callback` for the public
+host. It has no `post.logout.redirect.uris` attribute. Keycloak's default for post-logout URIs is
+the client's redirect URIs, so the bare origin the frontend sends is not allowed. The live realm
+matches git: the file last changed on 2026-09-12 (#96), the `/callback` URI was added 2026-06-01
+(#82), and the hub Keycloak pod has run since 2026-10-03. Nothing drifted. The logout path has most
+likely never worked on the public host. Hub recovery is not the cause (hypothesis 2 above is ruled
+out).
+
+**Fix options for the plan, not started.** Either of these is exact, with no wildcard:
+
+1. Realm: add `"post.logout.redirect.uris": "https://frontend.3ai-talk.org"` to the `frontend` client's
+   `attributes` in `shopping-cart-infra`. Before choosing this, find out how the realm reaches the
+   live Keycloak. If the realm is imported once at startup with `IGNORE_EXISTING`, a JSON change will
+   not update the live client, and an idempotent `kcadm` update is needed too.
+2. Frontend: send `post_logout_redirect_uri = ${origin}/callback`, which is already allowed, and treat
+   a `/callback` that has no `code` as "signed out". This is a code change in `shopping-cart-frontend`.
+
+Option 1 matches the intended behaviour (return to the home page) and needs no frontend release.
+Regression test: a public logout request with the frontend's own `post_logout_redirect_uri` must not
+return 400, and an unlisted origin must still be rejected.
+
+**Priority.** Login works. Logout does not end the Keycloak session, because the request is rejected
+before the session is cleared, so a user cannot sign out except by clearing cookies. That may be P2
+rather than P1. It is left at P1 for the operator to decide.
+
+**Possibly related:** `2026-10-13-shopping-cart-cart-lost-after-logout-login.md`. That report
+involves the same logout step, which errors here. Check it after this fix.
+
