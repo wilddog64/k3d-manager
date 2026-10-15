@@ -282,6 +282,11 @@ Also queued: [`v1.45.1-per-suite-test-metrics.md`](plans/v1.45.1-per-suite-test-
 
 v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
+### Candidate milestone — v1.45.2 (patch)
+
+**Engineering Work Tracking / spec lifecycle** (operator, 2026-10-14). v1.45.1 already has a full five-spec load and ships the Decision Digest approval metrics. Extend that existing collector and dashboard with an **independent implementation status**, verified completion, and per-release five-spec capacity, without mixing bug counts with feature specs. Link from Bug Tracking to the spec view. Specification authored on the current v1.43.2 branch; implementation after v1.45.1 lands. Scope: [`v1.45.2-engineering-work-tracking.md`](plans/v1.45.2-engineering-work-tracking.md). v1.45.2 currently has **1 of 5 plans**.
+
+
 ### Candidate milestone — v1.46.0
 
 **Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
