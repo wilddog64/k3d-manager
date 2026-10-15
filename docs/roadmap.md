@@ -484,6 +484,53 @@ Initial action contracts (each precondition is drawn from an incident on this pl
 | v2.3 | Execution of allowlisted reversible actions, with retest and audit |
 | v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
 
+### Candidate theme — v2.x: intent interpretation and planning engine
+
+**Proposed 2026-10-15 (operator; roadmap candidate only, not yet scoped or approved for implementation).**
+Build a reusable, channel-neutral **intent-to-contract** layer for k3d-manager. It is **not** merely
+an enhancement to `find-similar-docs`, nor is it a new unrestricted natural-language command runner.
+Its purpose is to translate user requests into **typed, inspectable, verifiable plans** that can
+be validated by deterministic code and existing policy gates before any execution.
+
+- **Inputs:** Slack, CLI, authenticated API, and later a customer-facing text/voice interface.
+  Voice is an input adapter, not a separate execution authority.
+- **Read-only query intent:** identify topic, document kind, dates, release/status and requested
+  answer; combine semantic retrieval with authoritative metadata filtering and cited sources.
+  Return uncertainty when constraints cannot be grounded. `find-similar-docs` remains a
+  similarity-only prior-art tool.
+- **Engineering intent:** clarify missing requirements; produce a bounded application or
+  infrastructure change contract with scope, acceptance tests, resource limits, security
+  constraints, rollout/rollback and estimated work. Present the proposed contract for review.
+- **Deterministic validation:** closed schemas, explicit capabilities, input limits, policy/RBAC,
+  approval, test evidence and auditable decisions live in code. An LLM may *propose* an intent
+  interpretation but cannot grant itself authority or treat a proposed plan as executed.
+- **Provider-independent:** reuse the v2.x MCP gateway and provider adapter; start read-only,
+  measure correctness on fixed ambiguous/negative query fixtures, and fail closed for unsupported,
+  expensive or destructive requests.
+- **Reuse existing work:** `v1.45.1-bug-count-query-translation.md` is a narrow predecessor
+  (natural language to a validated bug-count query object); do not duplicate it. Build on
+  /ask-docs retrieval improvements and the established Git-backed spec/memory-bank conventions.
+
+**Placement / dependencies:** Candidate **after the v2.0.0 TwinkleAI reference workload is stable**,
+alongside the v2.x diagnostics/healing gateway; exact v2.x minor release is **TBD**. Do not
+reassign the already proposed v2.1–v2.4 gateway sequence or consume a v1.x spec slot merely by
+recording this theme. Sequence a scoped proposal after the gateway's read-only interface and
+policy boundaries are defined.
+
+**v3.0.0 dependency:** The multi-agent product team must consume **validated engineering intent
+contracts**, not raw prompts that directly launch builds. Its future customer-facing application
+factory can add text/voice requirements intake, AI-assisted scope/price proposals, ACG/k3s
+verification, acceptance, and portable Git repository handoff (source, tests, memory-bank,
+agent instructions). Customer-selected hosting and ongoing operations are separate from the
+delivery acceptance contract. These are directional product goals, **not** committed v3.0.0
+deliverables or a promise that arbitrary apps can be built for a fixed price.
+
+**Proof before claiming readiness:** Demonstrate a read-only recent-bugs query with explicit
+date/release/status constraints, an ambiguous request requiring clarification, a rejected
+unauthorized operation, and an engineering request that results in a reviewable spec without
+executing it. Later end-to-end application delivery requires deployment, functional/security
+tests, handoff, and independent customer-agent continuation evidence.
+
 ### Engineering-contract gaps (assessed 2026-10-10)
 
 The platform's working model rests on three principles. Each was assessed against the repo as it
@@ -519,8 +566,9 @@ Their work lands through merge gates → CI → e2e → deployment, on k3d-manag
 Grafana, security, recovery).
 
 **Ordering:** the v1.4x releases through v1.50.0 first, then v2.0.0 (the TwinkleAI workload). This
-waits for the intent / natural-language development infrastructure ("Intent as an engineering
-contract" under Where we actually are), so the agents can take intent, not hand-written specs.
+explicitly depends on the proposed **v2.x intent interpretation and planning engine** above,
+in addition to the existing "Intent as an engineering contract" work, so the agents receive
+validated intent contracts rather than unreviewed prompts or hand-written specs.
 
 **Design notes to carry into the scope doc:**
 
