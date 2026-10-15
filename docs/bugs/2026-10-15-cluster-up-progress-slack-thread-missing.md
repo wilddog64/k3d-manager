@@ -86,3 +86,12 @@ The fallback to `SLACK_WEBHOOK_URL` calls `_slack_post(SLACK_WEBHOOK_URL, text)`
 6. Demonstrate red-before/green-after: the pre-fix test fails for the observed contract violation, passes after correction, and the relevant existing suites remain green. Record any remaining limitations of source-only tests versus actual Slack rendering.
 
 **Acceptance condition added:** do not close the bug solely because the messaging helper's unit tests pass. Show that the complete asynchronous dispatcher-to-Slack-payload behavior is covered and that the original error cannot recur unnoticed by the regression suite.
+
+
+## Additional operator evidence — 2026-10-15 ~08:44 PDT: threading starts partway through job
+
+**Observed:** A later Slack screenshot of the same AWS `cluster-up` job `5f5cff23` shows the 8-minute progress update and 10-minute progress update as top-level channel messages; the 10-minute update has a **“6 replies”** thread indicator. The previous screenshot showed subsequent 14-minute, 16-minute, 18-minute, terminal-success and post-provision messages in a conversation pane. Together these screenshots support a **mid-job switch in message placement** rather than consistent threading from the original job announcement. The earlier interpretation that all progress updates were correctly threaded was mistaken. A thread appearing on the 10-minute message does not establish it was the intended original parent.
+
+**Investigation focus:** Obtain the actual Slack message `ts`, `thread_ts`, and `channel` for the initial announcement, the 2/4/6/8/10-minute updates, and later replies. Compare these to job-local `thread_ts`, `thread_source`, `channel_id`, and `response_url` values as persisted over time (redact response URL). Determine whether the bot starts a new thread after an earlier fallback fails, or whether child-job metadata is introduced or overwritten mid-execution. Account for the code's `_notify_job` branch ordering and thread-parent creation behavior. Do not assert a root cause without these timestamps or a deterministic reproduction.
+
+**Additional regression requirement:** Exercise successive 120-second timer callbacks with the same child job, including empty/partial thread metadata and changes in posting backend. Verify that *every* notification uses the **original intended thread parent**, and that a failure to post in-thread never silently switches later notifications to a different parent. The test must fail before fixing this observed behavior.
