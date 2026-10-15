@@ -70,3 +70,19 @@ The fallback to `SLACK_WEBHOOK_URL` calls `_slack_post(SLACK_WEBHOOK_URL, text)`
 6. Do not mark all lifecycle commands as currently broken based solely on one `cluster-up` screenshot. Document independently verified failures and passing paths in the bug before closure.
 
 **Result of this audit:** one **observed** `cluster-up` symptom; two **confirmed source-level omissions** of `thread_ts` in refresh-family `response_url` calls; shared structural threading/correlation risk for `up/down/resume`; status/diagnostics already thread-aware in source. End-to-end live confirmation remains outstanding.
+
+
+## Suspected regression and test-coverage escape — 2026-10-15
+
+**Classification:** suspected regression, not yet confirmed by a last-known-good version or introducing commit. The operator observed that existing tests did not catch the misthreaded lifecycle progress notification. Existing Slack threading support and recent asynchronous routing changes make regression plausible, but the source history still needs inspection.
+
+### Required regression investigation
+
+1. Trace `git log` / `git blame` for child-job dispatch, `_notify_job`, `thread_ts`/`channel_id`/`thread_source` propagation, timer-based progress, and refresh response handling. Identify a demonstrable last-known-good behavior and the earliest offending change, if one exists.
+2. Audit the current Slack/webhook tests: determine which paths they execute and which assertions merely check that a message was sent, without verifying the **destination thread and channel**. Record the actual coverage gap rather than assuming all tests are weak.
+3. **Before implementing the fix**, introduce a deterministic regression test that fails on the current behavior, specifically for the parent-request → child-job → async progress → outbound Slack payload path. Assert exact `thread_ts`, `channel`, and job correlation, not only send-call count or returned success.
+4. Cover start, 120-second timer progress, completion, failure, retry/fallback, and a persisted/restarted child job as applicable. Matrix: `cluster-up`, `cluster-down`, `cluster-resume`, `cluster-refresh`, and Hostinger refresh. Verify dedicated `cluster-status`/diagnostics do not regress.
+5. Use stubbed Slack requests and stubbed lifecycle commands for automated tests; never run real AWS provisioning or destructive cluster commands just to test message routing. Include negative tests for lost/mismatched thread metadata and Slack API rejection with safe diagnostic fallback.
+6. Demonstrate red-before/green-after: the pre-fix test fails for the observed contract violation, passes after correction, and the relevant existing suites remain green. Record any remaining limitations of source-only tests versus actual Slack rendering.
+
+**Acceptance condition added:** do not close the bug solely because the messaging helper's unit tests pass. Show that the complete asynchronous dispatcher-to-Slack-payload behavior is covered and that the original error cannot recur unnoticed by the regression suite.
