@@ -1,3 +1,4 @@
+- [ ] Keycloak post-logout redirect fix — spec fd313ce0, Codex dispatched 2026-10-15 in shopping-cart-infra fix/frontend-post-logout-redirect; verify, commit, push, PR after operator go; live logout probe after sync.
 - [x] v1.43.2 step 1: hub_data.bats prune clock fix — landed + pushed 24c5e960 2026-10-15 (88/88; full make test only unpushed-HEAD e2e_remote reds; post-push green).
 - [x] 2026-10-15 backlog triage: placements recorded in docs/roadmap.md + each bug's Branch line; alert_delivery docs merged; kine bug → MONITORING. Next: v1.43.2 plan (prune clock fix → land hub-recover-all-rebuild → 7 worktrees → smoke prefix → /create-pr); P1 Keycloak redirect investigation.
 - [x] v1.43.1 PR #140 MERGED 38fbf3ab; tag + release v1.43.1; enforce_admins restored; next branch k3d-manager-v1.43.2.
