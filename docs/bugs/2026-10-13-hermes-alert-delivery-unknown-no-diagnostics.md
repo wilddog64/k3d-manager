@@ -1,6 +1,7 @@
-# Hermes alert_delivery reports opaque unknown despite healthy manual probe (2026-10-13)
+# Bug: Hermes alert_delivery reports opaque unknown despite healthy manual probe (2026-10-13)
 
 **Status:** OPEN — root cause of individual poll not yet established
+**Branch:** `k3d-manager-v1.43.2` (triage / documentation; future implementation release not assigned)
 **Priority:** P2 — observability diagnostic blind spot
 **Filed:** 2026-10-13 at operator request
 **Release:** v1.43.2 (bug triage; may be deferred explicitly if release already full)
