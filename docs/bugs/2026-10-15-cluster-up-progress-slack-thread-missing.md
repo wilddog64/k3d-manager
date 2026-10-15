@@ -1,9 +1,9 @@
-# Bug: asynchronous cluster-up progress posts outside initiating Slack thread
+# Bug: cluster lifecycle asynchronous notifications may lose Slack thread context
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN — reproduce and trace timestamp propagation; root cause unconfirmed
-**Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost
+**Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low
 **Approval:** explicit operator request 2026-10-15 to file bug; no implementation approved
 **Evidence:** operator Slack screenshot 2026-10-15 approximately 07:35 PDT, AWS ACG sandbox `cluster-up` job `5f5cff23`
@@ -37,3 +37,36 @@ Trace the **actual async `cluster-up` notification path**, not only `cluster-sta
 - No change to cluster provisioning, execution permissions, or AWS resources is required to correct message routing.
 
 **Implementation:** not started.
+
+
+## Expanded source audit — 2026-10-15 (operator-requested)
+
+**Scope:** Inspect cluster lifecycle commands for the same threading failure mode, not just the observed AWS `cluster-up`. **Method:** read-only source review of `bin/k3dm-webhook`, `scripts/lib/webhook/lifecycle.py`, `scripts/lib/webhook/status.py`, and `scripts/lib/webhook/render.py` on `k3d-manager-v1.43.2`. No live Slack API inspection, runtime replay, AWS action, or confirmation of each individual symptom; distinguish structural risks from verified defects.
+
+| Command | Routing and notification evidence | Assessment |
+|---|---|---|
+| `cluster-up` / `up` | Dispatcher creates a child job, copies the parent's `thread_ts` only, starts `_run_cluster(job_id, "up", ...)`; worker emits started, 120-second progress, stall, failure-analysis, terminal success/failure via `_notify_job`. Operator screenshot of job `5f5cff23` showed top-level-looking progress message. | **Observed symptom; cause unconfirmed.** Shared metadata propagation is a strong lead. |
+| `cluster-down` / `down` | Same child-job creation and same `_run_cluster` implementation, including start/progress/end notifications and `thread_ts`-only copy. | **Same structural risk as up**, not independently observed live. |
+| `cluster-resume` / `resume` | Child job also copies only `thread_ts`; `_run_cluster_resume` posts through `_notify_job`. | **Same metadata risk**; assess start, progress (if any), and terminal replies. |
+| `cluster-refresh` / `refresh` | Child handler passes `thread_ts` into `_run_cluster_refresh`, but `_finish` calls `_slack_post(response_url, output)` **without** the optional `thread_ts` whenever `response_url` exists. | **Confirmed source-level omission**; whether Slack actually starts a new top-level message depends on response_url behavior. |
+| `hostinger-refresh` | `_run_hostinger_refresh` similarly calls `_slack_post(response_url, output)` without `thread_ts` in `_finish`. | **Confirmed source-level omission**; runtime outcome unverified. |
+| `cluster-status` and `hostinger-status` | Dedicated `scripts/lib/webhook/status.py` accepts `thread_ts` and chooses bot-thread post when channel/context are available; fallback may create a new status thread. | **Thread-aware by design**, but test original-parent correlation and fallback; do not claim observed failure. |
+| `cluster-diagnose` | Dedicated status/diagnostic path explicitly accepts `thread_ts`. | **Thread-aware by design**, but this does not verify live command routing or successful delivery. |
+| `cleanup-stale-sandbox` | Uses the original job and `_notify_job`, and can create a bot thread if absent. | **Different implementation**, review fallback/original-thread handling; do not equate with cluster-up bug without evidence. |
+
+### Strong leads from the shared notification helper
+
+`bin/k3dm-webhook:_notify_job` reads job-local `thread_ts`, `channel_id`, `thread_source`, and `response_url`. When `thread_source == "bot"` plus token/channel/timestamp are present it uses `chat.postMessage` with `thread_ts`; otherwise it may use `response_url`, then bot fallback, then incoming webhook. For `up/down/resume`, the dispatcher explicitly copies only `thread_ts` into the child directory. Check whether missing `channel_id`, `thread_source`, and `response_url` in the child change the chosen post mechanism or silently prevent notification. The bot fallback may still thread when the global channel/token are valid; do **not** claim the partial copy is proven root cause without tracing the actual runtime values.
+
+The fallback to `SLACK_WEBHOOK_URL` calls `_slack_post(SLACK_WEBHOOK_URL, text)` without `thread_ts`, creating an unthreaded-post risk when earlier delivery attempts fail. `_post_slack_bot` and `_slack_post` largely return empty/False on error without capturing actionable Slack API diagnostic details; failures can be silent.
+
+### Expanded implementation acceptance and tests
+
+1. Define an explicit canonical thread-context record (`channel_id`, `thread_ts`, `thread_source`, allowed `response_url` where relevant) propagated to **every child lifecycle job**; avoid copying only one field, and preserve thread/job correlation across dispatch, progress and completion.
+2. Test `cluster-up`, `cluster-down`, `cluster-resume`, `cluster-refresh`, `hostinger-refresh` and status/diagnostics separately with stubbed Slack backends; assert payload destination, `thread_ts`, and channel, including timer callbacks, worker failures, and fallbacks. Do not run actual cluster up/down for regression tests.
+3. Ensure `_run_cluster_refresh` and `_run_hostinger_refresh` honor the saved thread context even when a `response_url` is available. Avoid guessing Slack response_url semantics: verify payload and reply placement with a safe integration test.
+4. Capture **redacted**, operator-actionable delivery errors and fallback reasons. Distinguish inability to thread from inability to notify; no tokens, raw response URLs or sensitive output in logs.
+5. Check whether the dispatcher emits its queued message to the original parent job while the worker posts against a new job. Assert both refer to the same intended Slack conversation; avoid duplicate top-level parent messages when a thread exists.
+6. Do not mark all lifecycle commands as currently broken based solely on one `cluster-up` screenshot. Document independently verified failures and passing paths in the bug before closure.
+
+**Result of this audit:** one **observed** `cluster-up` symptom; two **confirmed source-level omissions** of `thread_ts` in refresh-family `response_url` calls; shared structural threading/correlation risk for `up/down/resume`; status/diagnostics already thread-aware in source. End-to-end live confirmation remains outstanding.
