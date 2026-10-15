@@ -1895,3 +1895,7 @@ Operator requested the missing weekly bug arrival/closure and net backlog trend 
 ## 2026-10-14 — Slack CR thread approval amendment to v1.48.1
 
 Operator requested HIGH-risk approval notifications be posted in Slack with a meaningful CR subject and that Approve/Reject/Delay decisions occur **in the CR thread**, not scattered across the channel. Amended `docs/plans/v1.48.1-semantic-change-approval-gate.md` on `k3d-manager-v1.43.2`: one top-level `[CR-<PR>] Approval required — <subject> [HIGH]` message per pending head SHA; all action responses, evidence updates, and acknowledgments stay under stored channel/`thread_ts`. Only authenticated, allowlisted operator instructions/actions in the matching unexpired thread/commit are valid. Reject maps to Deny. New SHA supersedes prior request; trusted CI still independently gates merge. GitHub Mobile remains optional; SMS notification-only. Planning only, no implementation or changes to main.
+
+## 2026-10-14 — Short commit SHA in Slack CR subject
+
+Operator requested the CR approval notification subject include the current short commit SHA. Amended `docs/plans/v1.48.1-semantic-change-approval-gate.md` on `k3d-manager-v1.43.2`: format `[CR-123] [a1b2c3d4] Approval required — <subject> (HIGH)` with the short SHA linked to the GitHub commit. Only the full commit SHA is trusted for approving; a new push invalidates the prior approval/thread request and posts a new SHA-bearing subject. Planning only; no implementation or main changes.
