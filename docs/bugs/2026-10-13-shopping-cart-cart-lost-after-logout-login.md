@@ -1,6 +1,8 @@
-# Suspected regression: shopping-cart items disappear after logout and login
+# Bug: Suspected regression: shopping-cart items disappear after logout and login
 
+**Filed:** 2026-10-13
 **Status:** OPEN — unverified user observation; reproduce after Keycloak login is repaired
+**Branch:** `k3d-manager-v1.43.2` (triage; not a promise of implementation in this patch)
 **Priority:** P2
 **Date:** 2026-10-13
 **Detected by:** human
