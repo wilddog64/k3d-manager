@@ -121,3 +121,28 @@ verification. Do not treat old runbooks as fresh live measurement.
 
 No dashboard/datasource edits, new bug declaration, runtime changes, stress traffic or service restart.
 Documentation checks only; BATS/ShellCheck runtime tests are not applicable.
+
+
+## Follow-up evidence — 2026-10-15 AWS ACG lifecycle jobs (dashboard still empty)
+
+**Operator screenshot (2026-10-15 ~17:41 UTC):** The `k3dm Deployment Metrics` dashboard showed **No data** for all five panels: `Last acg-up Duration`, `Last acg-down Duration`, `Last Deployment Success`, `Last Deployment Time`, and `Deployment Duration Over Time`. The first three stat panels and the time-series panel show warning/error indicators; **No data + warning indicators does not establish that the underlying samples were never generated.**
+
+Recent lifecycle jobs expected to be represented:
+
+| Action | Webhook job ID | Reported outcome | Timing |
+|---|---|---|---|
+| AWS ACG `cluster-up` | `5f5cff23` | Success | approximately 18 minutes |
+| AWS ACG `cluster-down` | `b0e9616d` | Success | approximately 1 minute |
+
+The above outcomes are based on the Slack lifecycle notifications, **not** verified metric samples. They also do not independently prove full infrastructure readiness/deletion; separate lifecycle bugs track those distinctions.
+
+**Confirmed source behavior:** `scripts/lib/webhook/lifecycle.py:_finish` calls `_push_metrics(action, provider, status, elapsed_secs, job_id)` for non-dry-run lifecycle completion. `bin/k3dm-webhook:_push_metrics` writes the three `k3dm_deployment_*` gauges to Pushgateway, but only if `PUSHGATEWAY_URL` is configured; failed pushes are logged as non-fatal warnings and can leave the lifecycle job green. As previously established, the dashboard uses fixed datasource UID `P5A1115AEDF367D43`; its deployed UID and reachability must be checked where the screenshot originated.
+
+**Investigate before fixing:**
+1. Capture the exact Grafana panel Query Inspector error, identify whether this is hub or app Grafana, and verify that UID `P5A1115AEDF367D43` resolves to the intended reachable Prometheus datasource.
+2. Query `k3dm_deployment_success`, `k3dm_deployment_duration_seconds`, and `k3dm_deployment_last_timestamp_seconds` on the intended Prometheus datasource; inspect actual labels (`action`, `provider`, `job_id`) for the two named jobs and check panel time range.
+3. Inspect the webhook metric-push logs for both job IDs (including `PUSHGATEWAY_URL` configuration, health-check/retry result and any `metrics push skipped` warning); check Pushgateway `/metrics` and the associated Prometheus scrape target. Distinguish producer failure, scrape/federation gaps, datasource mismatch, and query error.
+4. Verify data persistence expectations after AWS sandbox down: metrics pushed only to an ephemeral app-cluster Pushgateway/Prometheus may disappear when that sandbox is destroyed. Establish an appropriate durable hub-side telemetry destination if historical lifecycle visibility is intended across sandbox deletions.
+5. Add deterministic regression checks of successful and failed metric publication, dashboard datasource resolution, and history retention across sandbox teardown. Preserve nonfatal lifecycle execution if intended, but make telemetry publication failures visible to the operator.
+
+**Scope and status:** Existing October 8 triage issue updated with a new recurrence; no specific root cause proven without live Prometheus/Pushgateway and Grafana inspection. No code, dashboard, infrastructure, or runtime changes in this documentation update.
