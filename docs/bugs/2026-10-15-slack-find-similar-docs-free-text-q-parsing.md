@@ -1,7 +1,7 @@
 # P3 — Slack k3dm find-similar-docs rejects natural-language Q arguments containing spaces
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
 **Status:** OPEN — observed in Slack and parser confirmed; implementation not started
 **Approval:** operator explicitly requested P3 bug filing; no implementation authorized

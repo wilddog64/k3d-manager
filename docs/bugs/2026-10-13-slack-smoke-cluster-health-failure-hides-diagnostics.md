@@ -4,7 +4,7 @@
 **Priority:** P2
 **Filed:** 2026-10-13
 **Detected by:** human
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Component:** Slack /k3dm Make dispatch, `scripts/plugins/smoke.sh`, `bin/smoke-test-cluster-health`
 
 ## Observed behavior

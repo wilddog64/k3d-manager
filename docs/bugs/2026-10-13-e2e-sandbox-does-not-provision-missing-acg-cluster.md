@@ -5,7 +5,7 @@
 **Filed:** 2026-10-13
 **Detected by:** human
 **Affected:** `make e2e-sandbox`, Slack dispatch, ACG/k3s-aws Tier 2 E2E
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
 
 ## Observed failure
 

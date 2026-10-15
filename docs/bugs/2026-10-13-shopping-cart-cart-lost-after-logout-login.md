@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-13
 **Status:** OPEN — unverified user observation; reproduce after Keycloak login is repaired
-**Branch:** `k3d-manager-v1.43.2` (triage; not a promise of implementation in this patch)
+**Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2
 **Date:** 2026-10-13
 **Detected by:** human

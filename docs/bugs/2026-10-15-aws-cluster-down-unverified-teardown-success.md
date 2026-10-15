@@ -1,7 +1,7 @@
 # Bug: AWS cluster-down can report success without verified sandbox deletion
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — confirmed control-flow risk; AWS resources not independently checked
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium

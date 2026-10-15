@@ -1,10 +1,10 @@
 # Bug: ArgoCD Apps & Image Updater Hub dashboard KPI cards misaligned
 
 **Status:** OPEN — UI defect observed; fractional job metric requires investigation
-**Branch:** `k3d-manager-v1.43.2` (triage / documentation; future implementation release not assigned)
+**Branch:** unscheduled P3 backlog (triage 2026-10-15, operator-approved placement)
 **Priority:** P3
 **Filed:** 2026-10-13, operator request
-**Release:** v1.43.2 (triage; reschedule if release capacity is exhausted)
+**Release:** unscheduled (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file a P3 bug; no implementation authorized
 **Component:** Grafana dashboard `ArgoCD Apps & Image Updater Hub` (locate its source ConfigMap before editing)
 

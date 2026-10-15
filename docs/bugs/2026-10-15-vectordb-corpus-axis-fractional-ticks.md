@@ -1,7 +1,7 @@
 # Bug: VectorDB row/corpus chart shows fractional ticks and hides overlapping series
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.45.2` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — presentation defect, no data corruption observed
 **Priority:** P3 — Grafana readability/presentation only; document counts remain integers
 **Severity:** low

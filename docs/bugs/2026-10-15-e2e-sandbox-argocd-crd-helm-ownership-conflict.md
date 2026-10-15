@@ -1,7 +1,7 @@
 # P2 — e2e-sandbox fails when Argo CD CRDs already exist on a provisioned AWS sandbox
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — E2E verification blocked
 **Status:** OPEN — observed reproduction and unconditional install confirmed; implementation not started
 **Approval:** operator explicitly requested P2 bug filing; no implementation authorized

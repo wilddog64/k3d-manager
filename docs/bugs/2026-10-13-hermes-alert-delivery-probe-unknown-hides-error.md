@@ -1,7 +1,7 @@
 # Bug: Hermes alert_delivery reports UNKNOWN with no diagnostic reason
 
 **Filed:** 2026-10-13, operator screenshot
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.44.0` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — observed in Hermes/Grafana screenshot; exact live probe failure **not yet verified**
 **Priority:** P2 — alert delivery monitoring unavailable; manual read-only probe is a workaround
 **Severity:** Medium — blind spot in monitoring the alert delivery path; **not evidence of an actual alert blackout**
@@ -46,3 +46,24 @@ Source inspection on `k3d-manager-v1.43.2` confirms `alert_delivery()` runs `bin
 ## Scheduling
 
 Bug doc only; assign a repair release in regular triage. No implementation changes were made.
+
+## Consolidated 2026-10-15 (operator-approved merge)
+
+Two later docs reported the same `alert_delivery` → `unknown` symptom and are now marked DUPLICATE of
+this one. Their extra evidence and scope carry over here:
+
+- `2026-10-13-hermes-alert-delivery-unknown-no-diagnostics.md`: the operator ran
+  `bin/k3dm-alert-delivery-status --json` by hand on the M4 while Hermes showed `unknown`. It exited 0,
+  `available=true`, two clusters (`k3d-k3d-cluster` 6 child routes, `ubuntu-hostinger` 5), both with a
+  null root receiver. So the probe can succeed by hand while the Hermes poll fails. Compare the
+  launchd environment (PATH, python3, PyYAML, kubeconfig) with the interactive shell. The sensor's
+  blanket `except Exception:` is what hides the cause.
+- `2026-10-15-hermes-alert-delivery-unknown-masks-probe-errors.md`: seen after an ACG sandbox bring-up
+  and teardown. The probe picks contexts by **kubeconfig presence**, not by whether the cluster
+  is live, so a torn-down sandbox's leftover context is a likely trigger. Required: per-context
+  status (`healthy`, `degraded`, `skipped_expected_offline`, `unknown`), one dead context must not fail
+  the whole probe, a required cluster with no evidence stays `unknown`, and docs must say this checks
+  routing configuration, not real email/Slack delivery. Tests: an offline sandbox, an unreachable
+  persistent cluster, a missing Secret, invalid JSON, no clusters, partial success, and a real
+  null-route blackout.
+

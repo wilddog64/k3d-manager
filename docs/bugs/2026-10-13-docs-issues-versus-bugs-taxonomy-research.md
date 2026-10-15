@@ -1,10 +1,10 @@
 # Bug: Research required: clarify docs/issues versus docs/bugs lifecycle and migration
 
 **Status:** OPEN — RESEARCH REQUIRED; documentation taxonomy defect/ambiguity, solution not decided
-**Branch:** `k3d-manager-v1.43.2` (triage / documentation; future implementation release not assigned)
+**Branch:** `k3d-manager-v1.50.1` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (tracking and retrieval reliability)
 **Filed:** 2026-10-13, operator request
-**Release:** v1.43.2 — research/triage only; implementation release to be selected after findings
+**Release:** v1.50.1 (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file research bug; no bulk rename or migration authorized
 **Component:** docs taxonomy, bug dashboard, doc indexing/RAG, references, decision tracking
 

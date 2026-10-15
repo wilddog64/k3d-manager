@@ -2,10 +2,10 @@
 
 **Filed:** 2026-10-14
 **Status:** OPEN — investigation required; failing BATS case not yet identified
-**Branch:** `k3d-manager-v1.43.2` (triage; implementation scheduling unchanged)
+**Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — offline regression environment coupling
 **Reported:** 2026-10-14 by operator
-**Release:** v1.43.2 triage; reschedule if current patch scope is full
+**Release:** v1.43.2 (triage 2026-10-15, operator-approved placement)
 **Component:** offline BATS tests, test environment contracts, optional ACG context
 **Approval:** bug documentation only; no test or runtime behavior modified
 

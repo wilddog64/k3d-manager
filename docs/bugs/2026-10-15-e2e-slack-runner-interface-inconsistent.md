@@ -1,7 +1,7 @@
 # P3 — Slack E2E command interface is inconsistent across execution environments
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — operator-facing command contract / interface consistency
 **Status:** OPEN — interface gap verified, design change proposed; no implementation
 **Approval:** operator explicitly requested appropriate bug filing on 2026-10-15

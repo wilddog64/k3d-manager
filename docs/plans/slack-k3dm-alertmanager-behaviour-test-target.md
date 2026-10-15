@@ -3,7 +3,7 @@
 **Status:** PROPOSED — not implemented
 **Priority:** P3 enhancement
 **Requested:** 2026-10-14, operator
-**Release:** Unscheduled; assign during release planning, not an extra v1.43.2 feature
+**Release:** unscheduled P3 backlog (triage 2026-10-15)
 **Component:** Slack /k3dm allowlist, offline observability tests
 **Approval:** specification only, no permission to alter execution policy or runtime
 

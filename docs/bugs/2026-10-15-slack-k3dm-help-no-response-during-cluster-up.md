@@ -1,7 +1,7 @@
 # Bug: Slack `k3dm help` has no visible reply while cluster-up is running
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — missing response observed; delivery root cause not yet established
 **Priority:** P2 — ChatOps command reliability
 **Reported incident:** AWS `cluster-up` job `f58814c3`, Oct 15 around 10:52–10:54 local time

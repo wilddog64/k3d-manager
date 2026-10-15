@@ -1,9 +1,9 @@
 # P3 — Hermes alert_delivery unknown masks probe cause and offline sandbox scope
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.44.0` (follows the canonical doc)
 **Priority:** P3 — monitoring diagnostic fidelity
-**Status:** OPEN — source defect verified; runtime trigger unconfirmed
+**Status:** DUPLICATE 2026-10-15 — merged into `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (operator-approved); track and fix there
 **Approval:** operator explicitly requested P3 bug filing; implementation not authorized
 
 ## Observed behavior

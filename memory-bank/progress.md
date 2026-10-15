@@ -1,3 +1,4 @@
+- [x] 2026-10-15 backlog triage: placements recorded in docs/roadmap.md + each bug's Branch line; alert_delivery docs merged; kine bug → MONITORING. Next: v1.43.2 plan (prune clock fix → land hub-recover-all-rebuild → 7 worktrees → smoke prefix → /create-pr); P1 Keycloak redirect investigation.
 - [x] v1.43.1 PR #140 MERGED 38fbf3ab; tag + release v1.43.1; enforce_admins restored; next branch k3d-manager-v1.43.2.
 - [ ] v1.43.2 bug: hub-recover-all never rebuilds the hub (P2) — spec filed, dispatched to Codex; operator then runs `make hub-recover-all` to clear dead kine.
 - [ ] v1.44.0 bug (queued for Codex with the two Vault bugs): docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md — phase 1 detect/alert only.
@@ -2460,7 +2461,7 @@ Added one evidence-backed Status line to each of the 19 requested September bug 
 
 ## 2026-10-13 — E2E release HEAD synchronization proposal
 
-Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` executions fetch and test current release branch remote HEAD (not `main`) including approved shopping-cart inputs, without arbitrary git pull permissions or changes to operator worktrees. Proposal added to `docs/plans/e2e-current-release-head-sync.md` on `k3d-manager-v1.43.2` (`b72e58cb`). Implementation milestone TBD; no runnable code changed. Existing M2 SHA pinning does not establish M4's revision freshness; candidate image provenance must also be verified.
+Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` executions fetch and test current release branch remote HEAD (not `main`) including approved shopping-cart inputs, without arbitrary git pull permissions or changes to operator worktrees. Proposal added to `docs/plans/v1.48.1-e2e-current-release-head-sync.md` on `k3d-manager-v1.43.2` (`b72e58cb`). Implementation milestone TBD; no runnable code changed. Existing M2 SHA pinning does not establish M4's revision freshness; candidate image provenance must also be verified.
 
 ## 2026-10-13 — Hermes alert_delivery UNKNOWN triage
 

@@ -2,9 +2,9 @@
 
 **Filed:** 2026-10-13
 **Status:** OPEN — reproducible symptom; source confirms explicit argument is ignored; exact selected job requires live log verification
-**Branch:** `k3d-manager-v1.43.2` (triage; not a promise of implementation in this patch)
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (ChatOps observability / job correlation)
-**Release:** v1.43.2 (triage; reschedule explicitly if the patch is full)
+**Release:** v1.43.5 (triage 2026-10-15, operator-approved placement)
 **Reported:** 2026-10-13, operator
 **Approval:** standing bug-filing (report only; no runtime changes approved)
 **Component:** Slack /k3dm thread command routing; job-ID resolution; webhook job log lookup

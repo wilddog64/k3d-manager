@@ -1,7 +1,7 @@
 # Bug: short cluster-down jobs send no execution summary to Slack
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — implementation not started
 **Priority:** P3 — ChatOps observability / operator feedback
 **Severity:** low

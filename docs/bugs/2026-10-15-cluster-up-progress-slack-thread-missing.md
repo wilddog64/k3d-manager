@@ -1,7 +1,7 @@
 # Bug: cluster lifecycle asynchronous notifications may lose Slack thread context
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — reproduce and trace timestamp propagation; root cause unconfirmed
 **Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low

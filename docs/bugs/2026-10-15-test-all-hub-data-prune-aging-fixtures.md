@@ -1,7 +1,7 @@
 # Bug: test-all fails on aging hub-data prune fixtures and omits actual BATS diagnostics
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2` (current release branch; do not write against main)
+**Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — investigation required; do not modify pruning behavior before diagnosis
 **Priority:** P2 — blocks the canonical `test-all` release gate despite other tests passing; workaround is targeted investigation and rerun, not suppressing this test
 **Severity:** medium

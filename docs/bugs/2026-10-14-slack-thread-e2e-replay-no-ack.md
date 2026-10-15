@@ -1,10 +1,10 @@
 # Bug: Slack thread k3dm e2e-replay command receives no acknowledgment
 
 **Status:** OPEN — response failure observed; underlying cause requires investigation
-**Branch:** `k3d-manager-v1.43.2` (triage; implementation scheduling unchanged)
+**Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — ChatOps execution visibility
 **Filed:** 2026-10-14, operator request
-**Release:** v1.43.2 for triage; reschedule if patch capacity is exhausted
+**Release:** v1.43.5 (triage 2026-10-15, operator-approved placement)
 **Approval:** operator explicitly requested investigation and bug filing if necessary
 **Component:** Slack Events API / thread reply router / Make target dispatch / thread job association
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md`

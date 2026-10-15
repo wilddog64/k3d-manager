@@ -1,7 +1,7 @@
 # Bug: cluster-up reports success while AWS sandbox Prometheus port-forward is unavailable
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.2`
+**Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — investigation required; root cause not established
 **Priority:** P2 — misleading successful provisioning/observability verification, degraded telemetry; reclassify if the sandbox intentionally supports a partial-success state
 **Severity:** medium

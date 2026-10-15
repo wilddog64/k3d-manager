@@ -198,6 +198,20 @@ same file.
   - the e2e payments assertion needs only the operator's live Tier 1 rerun;
   - hub CPU overcommit (August) and data-layer `RespectIgnoreDifferences` (June) need re-triage
     against today's hub first.
+- **Added at the 2026-10-15 triage** (operator-approved). Only bugs that make the release tests give
+  false results:
+  - [`test-all-hub-data-prune-aging-fixtures`](bugs/2026-10-15-test-all-hub-data-prune-aging-fixtures.md)
+    (P2, **fix first**): `hub_data.bats` test 5 uses fixed October dates against the real clock and
+    5-day retention, so it has failed since about 2026-10-13. `make test` and `land --test` cannot
+    pass until the test's clock is fixed.
+  - [`make-test-acg-optional-context-failure`](bugs/2026-10-14-make-test-acg-optional-context-failure.md)
+    (P2): probably the same test 5 failure. Rerun `make test` after the fix above and close it as a
+    duplicate if it passes.
+  - [`smoke-obsolete-app-prefix-fallback-m4`](bugs/2026-10-13-smoke-obsolete-app-prefix-fallback-m4.md)
+    (P2): `make smoke` looks for `ubuntu-k3s-` apps and falls back to the hub, so the release gate
+    fails 0/9.
+- **Hub kine:** compaction resumed by itself on 2026-10-12 (288/day since). The planned hub rebuild
+  is no longer needed. `hub-recover-all-rebuild` still lands, because the target itself is broken.
 
 ### Candidate milestone — v1.43.3
 
@@ -210,6 +224,46 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
   one agent in lib-foundation, release, then a subtree-pull on `k3d-manager-v1.43.3`.
 - [`frontend-index-html-no-cache-control`](bugs/2026-10-10-frontend-index-html-no-cache-control.md):
   `shopping-cart-frontend`, branch `fix/index-html-no-cache`.
+- Added 2026-10-15 (triage):
+  - [`shopping-cart-frontend-keycloak-invalid-redirect-uri`](bugs/2026-10-13-shopping-cart-frontend-keycloak-invalid-redirect-uri.md)
+    (**P1**): public login stops at Keycloak with "Invalid redirect uri". The read-only investigation
+    starts now, outside the release order; see the bug doc. The fix ships where its cause lives.
+  - [`shopping-cart-cart-lost-after-logout-login`](bugs/2026-10-13-shopping-cart-cart-lost-after-logout-login.md)
+    (P2, not yet confirmed): reproduce first. It needs a working login, so it follows the P1.
+
+### Candidate milestone — v1.43.4 (patch)
+
+**Bug-fix-only: AWS/ACG lifecycle reports success it has not verified** (operator, 2026-10-15). Branch
+`k3d-manager-v1.43.4`, cut from `main` after v1.43.3 merges. One agent in sequence, because the fixes
+share `bin/cluster-down`, `bin/cluster-up` and the e2e-sandbox path. Every fix uses mocked AWS calls,
+and no test deletes a real resource.
+
+1. [`aws-cluster-down-unverified-teardown-success`](bugs/2026-10-15-aws-cluster-down-unverified-teardown-success.md)
+   (P2, first): a failed or skipped CloudFormation delete still reports green, which can leave billable
+   resources behind.
+2. [`acg-up-prometheus-forward-missing-after-success`](bugs/2026-10-15-acg-up-prometheus-forward-missing-after-success.md)
+   (P2): cluster-up reports success while the sandbox Prometheus port-forward is down.
+3. [`e2e-sandbox-argocd-crd-helm-ownership-conflict`](bugs/2026-10-15-e2e-sandbox-argocd-crd-helm-ownership-conflict.md)
+   (P2): e2e-sandbox fails when the Argo CD CRDs already exist.
+4. [`e2e-sandbox-does-not-provision-missing-acg-cluster`](bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md)
+   (P2): e2e-sandbox stops at a missing kubecontext instead of provisioning the sandbox.
+
+### Candidate milestone — v1.43.5 (patch)
+
+**Bug-fix-only: Slack/ChatOps reliability** (operator, 2026-10-15). Branch `k3d-manager-v1.43.5`, cut
+from `main` after v1.43.4 merges. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
+first:
+
+- P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
+  [`slack-thread-e2e-replay-no-ack`](bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md),
+  [`slack-logs-explicit-job-id-mismatch`](bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md),
+  [`slack-smoke-cluster-health-failure-hides-diagnostics`](bugs/2026-10-13-slack-smoke-cluster-health-failure-hides-diagnostics.md).
+- P3: [`cluster-up-progress-slack-thread-missing`](bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md),
+  [`cluster-down-short-job-no-slack-output`](bugs/2026-10-15-cluster-down-short-job-no-slack-output.md),
+  [`e2e-slack-runner-interface-inconsistent`](bugs/2026-10-15-e2e-slack-runner-interface-inconsistent.md),
+  [`slack-find-similar-docs-free-text-q-parsing`](bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md).
+- The 2026-10-06 Slack bugs with no Priority line go to the v1.50.1 status cleanup unless one of these
+  fixes covers them.
 
 ### Candidate milestone — v1.44.0
 
@@ -223,6 +277,13 @@ Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack up
 - `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (P2): the watchdog retries for up to a minute while Vault boots.
 - `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (P3): a read-only `vault_seal` Hermes sensor; no repair.
 - `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
+- Added 2026-10-15 (triage):
+  - `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (P2): `alert_delivery`
+    shows `unknown` with no reason. Two later docs about the same symptom were merged into it.
+  - `docs/bugs/2026-10-15-offline-suite-failing-no-email-after-40m.md` (P2): start with read-only checks
+    of the rule, ALERTS and Alertmanager state.
+  - `docs/bugs/2026-10-15-bug-tracking-stacked-chart-cross-comparison-readability.md` (P3): the same
+    dashboard as the lifecycle row.
 
 | Spec | What it adds |
 |---|---|
@@ -280,6 +341,8 @@ Also queued: [`v1.45.1-cve-post-remediation-rescan-verification.md`](plans/v1.45
 
 Also queued: [`v1.45.1-per-suite-test-metrics.md`](plans/v1.45.1-per-suite-test-metrics.md) — publish independent BATS/Python suite results with parent-child run correlation, prevent double-counting in Grafana, and preserve existing test exit-code semantics.
 
+Bug carried here (triage 2026-10-15): [`repeated-cve-remediation-needs-research`](bugs/2026-10-13-repeated-cve-remediation-needs-research.md) (P2 research), alongside the rescan spec.
+
 v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.45.2 (patch)
@@ -292,6 +355,8 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 **Gemini embedding API usage and quota visibility** (operator, 2026-10-15): instrument actual embedding HTTP attempts including retries and 429s, cache reuse, durable Pacific-day totals, and optional operator-configured daily cap; show trends and unknown quota explicitly in existing VectorDB dashboard. Scope: [`v1.45.2-gemini-embedding-usage-quota-visibility.md`](plans/v1.45.2-gemini-embedding-usage-quota-visibility.md). v1.45.2 is now **3 of 5 plans**.
 
 **Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.45.2-memory-bank-selective-vector-indexing.md`](plans/v1.45.2-memory-bank-selective-vector-indexing.md). v1.45.2 is now **4 of 5 plans**; scheduling remains subject to operator triage.
+
+Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
 
 ### Candidate milestone — v1.46.0
 
@@ -384,6 +449,14 @@ when v1.48.0 took the operational-quality bundle. It depends on nothing in that 
 [`v1.48.1-e2e-failure-artifacts.md`](plans/v1.48.1-e2e-failure-artifacts.md). Branch
 `k3d-manager-v1.48.1` is cut from `main` after v1.48.0 merges.
 
+Also here (triage 2026-10-15): [`v1.48.1-e2e-current-release-head-sync.md`](plans/v1.48.1-e2e-current-release-head-sync.md),
+which makes the E2E preflight test the current release-branch HEAD (renamed from the unversioned
+proposal). With the semantic approval gate, v1.48.1 holds 3 of 5 plans.
+
+**Unscheduled P3 backlog** (triage 2026-10-15):
+[`argocd-image-updater-dashboard-kpi-alignment`](bugs/2026-10-13-argocd-image-updater-dashboard-kpi-alignment.md),
+[`slack-k3dm-alertmanager-behaviour-test-target.md`](plans/slack-k3dm-alertmanager-behaviour-test-target.md).
+
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
 **Proposed 2026-10-10 (operator; not yet scoped).** The shopping-cart apps are a demo. Their
@@ -424,7 +497,7 @@ by editing lists, not code.
 | App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
 | v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
 | v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
-| v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
+| v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
 **Unfamiliar-app onboarding (proposed 2026-10-11).** Before TwinkleAI is onboarded by hand, test the
