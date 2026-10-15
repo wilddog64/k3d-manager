@@ -1,7 +1,7 @@
 # Bug: Suspected regression: shopping-cart items disappear after logout and login
 
 **Filed:** 2026-10-13
-**Status:** OPEN — unverified user observation; reproduce after Keycloak login is repaired
+**Status:** CLOSED — NOT REPRODUCED 2026-10-15: operator added 3 items, logged out and back in; cart intact (see "Verification 2026-10-15")
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2
 **Date:** 2026-10-13
@@ -49,3 +49,14 @@ If the product intends an **account-persistent** basket, items added while authe
 - [ ] Tests and live evidence verified; close as non-bug if intended session-only behavior is confirmed.
 
 **Do not** fix by introducing global/shared cart identifiers, weakening OAuth2 checks, or logging sensitive session credentials.
+
+## Verification 2026-10-15 (operator, live browser)
+
+Run after the Keycloak post-logout redirect fix (shopping-cart-infra #112, `556a4ea`) made logout
+actually end the session. The operator added three items (PrimeWave Desk Mat Pro 3.0 $37, SwiftEdge
+USB Hub Ultra 3.0 $53, SwiftEdge 24-inch Monitor Max 3.0 $259), logged out, logged back in: all three
+items were still in the cart, subtotal $349.00. Not reproduced.
+
+The likely origin of the 2026-10-13 observation: logout was rejected ("Invalid redirect uri"), so the
+operator cleared cookies as the workaround, which loses client-side session state. With logout working,
+basket persistence across a real logout/login holds. Reopen with a fresh repro if it recurs.
