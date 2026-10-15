@@ -4,6 +4,7 @@
 **Status:** OPEN — root cause reproduced 2026-10-15 (read-only): the failure is on **logout**, not login; see "Investigation 2026-10-15". Fix not started
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — lowered from P1 2026-10-15 (operator): login works; logout is rejected so the session is not ended, workaround is clearing cookies
+**Approval:** operator 2026-10-15 — approved the schedule with fix option 1 (realm attribute) and dispatch to Codex: "let's do what you suggest, and you can dispatch to codex"
 **Date:** 2026-10-13
 **Detected by:** human
 **Affected:** shopping-cart frontend login / Keycloak `shopping-cart` realm
@@ -130,3 +131,60 @@ no manual `kcadm` step is needed. One catch: the hook only warns when `partialIm
 so a failed import would still look like a green sync. Prove the fix with the public logout probe,
 not with sync status.
 
+
+## Fix spec (Codex, option 1) — 2026-10-15
+
+**Work repo:** `~/src/gitrepo/personal/shopping-carts/shopping-cart-infra`
+**Branch (work repo):** `fix/frontend-post-logout-redirect`, created from `origin/main`. Never commit to `main`.
+
+### Files
+
+- `identity/keycloak/realm-shopping-cart.json`
+- `CHANGELOG.md`
+
+### Change 1 — `identity/keycloak/realm-shopping-cart.json`, `frontend` client only
+
+Old (exact, unique — inside the client whose `clientId` is `frontend`):
+
+```json
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+```
+
+New:
+
+```json
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://frontend.3ai-talk.org"
+      },
+```
+
+Exact origin, no trailing slash, no path, no wildcard. Do not touch any other client, `redirectUris`,
+or `webOrigins`.
+
+### Change 2 — `CHANGELOG.md`
+
+Add under `## [Unreleased]` → `### Fixed` (first entry):
+
+```markdown
+- `identity/keycloak/realm-shopping-cart.json`: Keycloak rejected signing out of the public frontend with "Invalid redirect uri", so the session was never ended. The `frontend` client had no `post.logout.redirect.uris`, so Keycloak fell back to its `redirectUris`, which only allow `https://frontend.3ai-talk.org/callback`, while the frontend sends `post_logout_redirect_uri=https://frontend.3ai-talk.org`. Add that exact origin as the client's only post-logout redirect URI (no wildcard). The PostSync reconcile hook's `partialImport` with `OVERWRITE` applies it to the live realm on the next sync.
+```
+
+### Rules
+
+- `python3 -m json.tool identity/keycloak/realm-shopping-cart.json >/dev/null` must exit 0.
+- `git diff --stat` must show exactly the two files above; the realm diff is +2 −1.
+- `jq -r '.clients[] | select(.clientId=="frontend") | .attributes["post.logout.redirect.uris"]' identity/keycloak/realm-shopping-cart.json` prints `https://frontend.3ai-talk.org`; the same query for every other client prints `null`.
+- `kustomize build identity/keycloak >/dev/null` exits 0 if `kustomize` is installed.
+
+### Definition of done
+
+- [ ] Commit on `fix/frontend-post-logout-redirect` with message exactly:
+      `fix(keycloak): allow the frontend origin as post-logout redirect`
+- [ ] No PR, no merge, no push to `main`, no `--no-verify`, no files outside the list.
+
+### Live verification (Claude, after operator merge + Argo CD sync)
+
+Anonymous public probe: `GET /realms/shopping-cart/protocol/openid-connect/logout?client_id=frontend&post_logout_redirect_uri=https://frontend.3ai-talk.org` must no longer return 400 "Invalid redirect uri", and the same with `https://evil.example` must still return 400. Sync status alone is not proof: the hook only warns when `partialImport` fails.
