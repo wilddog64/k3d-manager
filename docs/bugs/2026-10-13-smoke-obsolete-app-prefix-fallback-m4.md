@@ -1,6 +1,7 @@
-# make smoke uses obsolete ubuntu-k3s app prefix and silently targets M4 (2026-10-13)
+# Bug: make smoke uses obsolete ubuntu-k3s app prefix and silently targets M4 (2026-10-13)
 
 **Status:** OPEN — root cause confirmed by live read-only ArgoCD inventory; fix not implemented
+**Branch:** `k3d-manager-v1.43.2` (triage; not a promise of implementation in this patch)
 **Priority:** P2 — false release-gate failures
 **Release:** v1.43.2 (triage; reschedule explicitly if patch scope is full)
 **Filed:** 2026-10-13, at operator request
