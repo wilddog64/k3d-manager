@@ -1899,3 +1899,7 @@ Operator requested HIGH-risk approval notifications be posted in Slack with a me
 ## 2026-10-14 — Short commit SHA in Slack CR subject
 
 Operator requested the CR approval notification subject include the current short commit SHA. Amended `docs/plans/v1.48.1-semantic-change-approval-gate.md` on `k3d-manager-v1.43.2`: format `[CR-123] [a1b2c3d4] Approval required — <subject> (HIGH)` with the short SHA linked to the GitHub commit. Only the full commit SHA is trusted for approving; a new push invalidates the prior approval/thread request and posts a new SHA-bearing subject. Planning only; no implementation or main changes.
+
+## 2026-10-14 — v1.45.2 Engineering Work Tracking spec queued
+
+Operator explicitly requested a **new spec** (not an amendment) to track feature/enhancement specs separately from bugs in Grafana. Because v1.45.1 is full at 5/5, wrote `docs/plans/v1.45.2-engineering-work-tracking.md` on the current `k3d-manager-v1.43.2` branch and queued it in `docs/roadmap.md` as v1.45.2 plan 1/5. Builds on the existing v1.45.1 Engineering Decision Digest: planned/approved/in-progress/completed/verified/blocked counts, implementation state independent of approval, five-spec release capacity, bounded Grafana metrics, and navigation from Bug Tracking to spec tracking. Completion requires CI/operational evidence, not merely an approval header. Implementation pending; do not modify main or start work before the future branch is ready. No runnable code changed.
