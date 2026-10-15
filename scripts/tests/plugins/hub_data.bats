@@ -185,6 +185,11 @@ make_prune_fixture() {
   export DR_TEST_REPO_FIXTURE="$TEST_ROOT/fixture" K3DM_HUB_DATA_DIR="$TEST_ROOT/prune-state"
 }
 
+freeze_clock() {
+  export DR_TEST_NOW="$1"
+  date() { if [[ "$*" == '-u +%s' ]]; then printf '%s\n' "$DR_TEST_NOW"; else command date "$@"; fi; }
+}
+
 @test "hub data restore: decrypts every claim and uses metadata" {
   make_fixture; source_plugin; export DR_DRILL_CONTEXT=ctx DR_DRILL_CLUSTER=test DR_DRILL_RESTORE_STAGE="$TEST_ROOT/stage"; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient"
   export DR_TEST_IDENTITY=IDENTITY-SENTINEL
@@ -440,7 +445,29 @@ _fake_vault_tree() {
 
 @test "5 prune keeps recent exports and the last passing export" {
   make_prune_fixture 20261009T120000Z 20261007T120000Z 20261004T120000Z 20261002T120000Z 20260928T120000Z
-  source_plugin; export DR_TEST_RESULT_EXPORT=20261002T120000Z; run hub_data_prune; [ "$status" -eq 0 ]; [[ "$output" == *'keep: 20261009T120000Z'* ]]; [[ "$output" == *'keep: 20261007T120000Z'* ]]; [[ "$output" == *'keep: 20261002T120000Z'* ]]; [[ "$output" == *'prune: 20261004T120000Z'* ]]; [[ "$output" == *'prune: 20260928T120000Z'* ]]
+  source_plugin; freeze_clock 1791590400; export DR_TEST_RESULT_EXPORT=20261002T120000Z
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keep: 20261009T120000Z'* ]]
+  [[ "$output" == *'keep: 20261007T120000Z'* ]]
+  [[ "$output" == *'keep: 20261002T120000Z'* ]]
+  [[ "$output" == *'prune: 20261004T120000Z'* ]]
+  [[ "$output" == *'prune: 20260928T120000Z'* ]]
+}
+
+@test "5b prune retention boundary follows the clock, not the calendar" {
+  make_prune_fixture 20261009T120000Z 20261007T120000Z
+  source_plugin; freeze_clock 1791806400
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keep: 20261007T120000Z'* ]]
+  freeze_clock 1791806401
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'prune: 20261007T120000Z'* ]]
 }
 
 @test "6 prune keeps the newest when all exports are old" {
