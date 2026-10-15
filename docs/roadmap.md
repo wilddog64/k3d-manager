@@ -283,6 +283,8 @@ Also queued: [`v1.45.1-per-suite-test-metrics.md`](plans/v1.45.1-per-suite-test-
 v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut from `main` after v1.45.0 merges.
 
 ### Candidate milestone — v1.45.2 (patch)
+**VectorDB indexing provenance and freshness dashboard** (operator, 2026-10-15): distinguish last attempt, last successful indexing, runtime duration, tracked/fetched Git SHA and last fully indexed SHA; do not infer successful indexing from `noop` or zero backlog. Scope: [`v1.45.2-vectordb-index-provenance-dashboard.md`](plans/v1.45.2-vectordb-index-provenance-dashboard.md). Complements v1.44.0 bounded read-only index diagnostics. v1.45.2 is now **2 of 5 plans**.
+
 
 **Engineering Work Tracking / spec lifecycle** (operator, 2026-10-14). v1.45.1 already has a full five-spec load and ships the Decision Digest approval metrics. Extend that existing collector and dashboard with an **independent implementation status**, verified completion, and per-release five-spec capacity, without mixing bug counts with feature specs. Link from Bug Tracking to the spec view. Specification authored on the current v1.43.2 branch; implementation after v1.45.1 lands. Scope: [`v1.45.2-engineering-work-tracking.md`](plans/v1.45.2-engineering-work-tracking.md). v1.45.2 currently has **1 of 5 plans**.
 
