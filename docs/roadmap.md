@@ -291,6 +291,8 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 
 **Gemini embedding API usage and quota visibility** (operator, 2026-10-15): instrument actual embedding HTTP attempts including retries and 429s, cache reuse, durable Pacific-day totals, and optional operator-configured daily cap; show trends and unknown quota explicitly in existing VectorDB dashboard. Scope: [`v1.45.2-gemini-embedding-usage-quota-visibility.md`](plans/v1.45.2-gemini-embedding-usage-quota-visibility.md). v1.45.2 is now **3 of 5 plans**.
 
+**Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.45.2-memory-bank-selective-vector-indexing.md`](plans/v1.45.2-memory-bank-selective-vector-indexing.md). v1.45.2 is now **4 of 5 plans**; scheduling remains subject to operator triage.
+
 ### Candidate milestone — v1.46.0
 
 **Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
