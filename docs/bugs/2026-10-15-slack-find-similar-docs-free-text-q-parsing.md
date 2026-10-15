@@ -67,3 +67,28 @@ should pass the full string as a single `Q` value to the existing validated exec
 - Intent-driven / natural-language command goals of k3d-manager.
 
 **Implementation:** not started. Filing this report does not change application code or live infrastructure.
+
+
+## Additional reproduction: slash command returns `invalid value for Q`
+
+The operator also invoked `/k3dm find-similar-docs` **outside a thread** and observed two private Slack responses:
+
+```text
+🛠️ Queuing make find-similar-docs…
+⚠️ invalid value for Q
+```
+
+This is a **distinct second-stage validation failure**, not the thread-parser usage response above. Confirmed against the current branch:
+
+- `workers/slack-relay/index.js:parseK3dm` tokenizes on whitespace but intentionally concatenates following unkeyed tokens to free-text `Q`. Thus the slash-command relay can preserve `what's recent e2e-remote issues` as a single value. This contrasts with `bin/k3dm-webhook:_handle_thread_command`, which currently rejects unkeyed trailing tokens.
+- `scripts/lib/webhook/make_targets.py:_ARG_PATTERNS["Q"]` is `[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}`. The apostrophe in `what's` is **not permitted** and `parse_make_request` consequently returns `invalid value for Q`. This is the confirmed source of that error *if the slash input included the apostrophe as in the earlier thread request*; the screenshot alone does not show the exact slash-command payload.
+- The restrictive pattern documents a security rationale: `Q` reaches a Makefile recipe where untrusted text is expanded into a shell command. Do **not** fix by simply adding quote/backslash/shell metacharacters to the regex without redesigning the invocation so the text cannot affect shell interpretation.
+- Slash-command relay returns `Queuing make ...` immediately, before asynchronous backend validation; this is only an acknowledgment, not confirmation that a job was accepted or started. The screenshot provides **no evidence that the text was truncated**.
+
+### Updated requirements / acceptance
+
+1. Make natural-language `Q` parsing consistent between Slack thread messages and slash commands while preserving distinct entrypoint semantics.
+2. Ensure safe full-text transport to the retrieval operation, preferably through an argv-safe execution boundary or other demonstrably non-shell-interpreted mechanism; review the Makefile recipe and intermediate quoting/expansion. Retain strict protections against command injection. Do not accept arbitrary shell metacharacters as a shortcut.
+3. Support a query with an apostrophe, e.g. `what's recent e2e-remote issues`, in both paths after end-to-end hardening; verify the **exact unchanged string** reaches the retrieval command.
+4. On invalid `Q`, surface a precise validation reason and distinguish `request received` from `accepted/queued` or `started`; do not tell the user it is queued before successful validation.
+5. Add separate regression tests for the Cloudflare relay parser, `/api/v1/make` backend validation, thread parser, and complete valid/invalid acknowledgment sequences, including malicious input cases.
