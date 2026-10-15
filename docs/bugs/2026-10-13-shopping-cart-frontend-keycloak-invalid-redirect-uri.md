@@ -3,7 +3,7 @@
 **Filed:** 2026-10-13
 **Status:** OPEN — root cause reproduced 2026-10-15 (read-only): the failure is on **logout**, not login; see "Investigation 2026-10-15". Fix not started
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
-**Priority:** P1
+**Priority:** P2 — lowered from P1 2026-10-15 (operator): login works; logout is rejected so the session is not ended, workaround is clearing cookies
 **Date:** 2026-10-13
 **Detected by:** human
 **Affected:** shopping-cart frontend login / Keycloak `shopping-cart` realm
@@ -118,8 +118,15 @@ return 400, and an unlisted origin must still be rejected.
 
 **Priority.** Login works. Logout does not end the Keycloak session, because the request is rejected
 before the session is cleared, so a user cannot sign out except by clearing cookies. That may be P2
-rather than P1. It is left at P1 for the operator to decide.
+rather than P1. Operator set P2 on 2026-10-15.
 
 **Possibly related:** `2026-10-13-shopping-cart-cart-lost-after-logout-login.md`. That report
 involves the same logout step, which errors here. Check it after this fix.
+
+**How the fix reaches the live Keycloak (checked 2026-10-15).** `identity/keycloak/keycloak-reconcile-hook-job.yaml`
+in `shopping-cart-infra` is an Argo CD **PostSync** hook. It runs `kcadm.sh create partialImport -s ifResourceExists=OVERWRITE`
+with the realm JSON. So once option 1 is merged, the next sync rewrites the live `frontend` client, and
+no manual `kcadm` step is needed. One catch: the hook only warns when `partialImport` exits non-zero,
+so a failed import would still look like a green sync. Prove the fix with the public logout probe,
+not with sync status.
 

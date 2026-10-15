@@ -226,8 +226,9 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
   `shopping-cart-frontend`, branch `fix/index-html-no-cache`.
 - Added 2026-10-15 (triage):
   - [`shopping-cart-frontend-keycloak-invalid-redirect-uri`](bugs/2026-10-13-shopping-cart-frontend-keycloak-invalid-redirect-uri.md)
-    (**P1**): public login stops at Keycloak with "Invalid redirect uri". The read-only investigation
-    starts now, outside the release order; see the bug doc. The fix ships where its cause lives.
+    (P2, lowered from P1 2026-10-15): the **logout** request is rejected with "Invalid redirect uri"
+    because the realm's `frontend` client has no exact post-logout URI. Login works. The fix is one
+    attribute in `shopping-cart-infra`, applied by its PostSync reconcile hook.
   - [`shopping-cart-cart-lost-after-logout-login`](bugs/2026-10-13-shopping-cart-cart-lost-after-logout-login.md)
     (P2, not yet confirmed): reproduce first. It needs a working login, so it follows the P1.
 
