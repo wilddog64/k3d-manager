@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — root cause confirmed 2026-10-15; fix spec below, dispatched to Codex
+**Status:** IMPLEMENTED — landed `24c5e960` (hub_data.bats freeze_clock + boundary test 5b; Claude verified 88/88 and mutations M1–M3 red). Was: OPEN — root cause confirmed 2026-10-15.
 **Approval:** explicit 2026-10-15 "let's do what you suggest, and you can dispatch to codex" (operator, to fixing this first in v1.43.2)
 **Priority:** P2 — blocks the canonical `test-all` release gate despite other tests passing; workaround is targeted investigation and rerun, not suppressing this test
 **Severity:** medium
