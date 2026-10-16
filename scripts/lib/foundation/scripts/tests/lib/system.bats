@@ -2,7 +2,7 @@
 # shellcheck shell=bash disable=SC1091,SC2329
 
 setup() {
-  SYSTEM_LIB="${BATS_TEST_DIRNAME}/../../lib/system.sh"
+  SYSTEM_LIB="${SYSTEM_LIB:-${BATS_TEST_DIRNAME}/../../lib/system.sh}"
   # shellcheck source=/dev/null
   source "$SYSTEM_LIB"
 }
@@ -45,6 +45,133 @@ foundation_vcluster_managed_binary() {
 }
 
 bats_require_minimum_version 1.5.0
+
+secret_store_fixture() {
+  export SECRET_STUB_DIR="${BATS_TEST_TMPDIR}/secret-bin"
+  export ARGV_LOG="${BATS_TEST_TMPDIR}/security.argv"
+  export STDIN_LOG="${BATS_TEST_TMPDIR}/security.stdin"
+  export STORE_FILE="${BATS_TEST_TMPDIR}/security.store"
+  mkdir -p "${SECRET_STUB_DIR}"
+  : > "${ARGV_LOG}"
+  : > "${STDIN_LOG}"
+  : > "${STORE_FILE}"
+  cat > "${SECRET_STUB_DIR}/security" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${ARGV_LOG}"
+input=""
+if [[ "${1:-}" == -i ]]; then
+  input="$(cat)"
+  printf '%s\n' "${input}" >> "${STDIN_LOG}"
+fi
+if [[ "${1:-}" == delete-generic-password ]]; then
+  : > "${STORE_FILE}"
+  exit 0
+fi
+if [[ "${1:-}" == find-generic-password ]]; then
+  if [[ -s "${STORE_FILE}" ]]; then
+    cat "${STORE_FILE}"
+    exit 0
+  fi
+  exit 44
+fi
+if [[ "${1:-}" == -i ]]; then
+  [[ "${FAIL_SECURITY:-0}" == 1 ]] && exit 36
+  hex="${input#* -X }"
+  hex="${hex#\"}"
+  hex="${hex%\"}"
+  printf '%s' "${hex}" | xxd -r -p > "${STORE_FILE}"
+  exit 0
+fi
+exit 45
+EOF
+  chmod 0755 "${SECRET_STUB_DIR}/security"
+  PATH="${SECRET_STUB_DIR}:${PATH}"
+  export PATH
+  _is_mac() { return 0; }
+  export -f _is_mac
+}
+
+@test "_secret_store_data: sends the value as hex on security stdin, never argv" {
+  secret_store_fixture
+  run _secret_store_data svc key SENTINEL-abc123
+  [ "$status" -eq 0 ]
+  run grep -Fq 'SENTINEL-abc123' "${ARGV_LOG}"
+  [ "$status" -ne 0 ]
+  run grep -Fq '53454e54494e454c2d616263313233' "${ARGV_LOG}"
+  [ "$status" -ne 0 ]
+  grep -Fq '53454e54494e454c2d616263313233' "${STDIN_LOG}"
+  run _secret_load_data svc key
+  [ "$status" -eq 0 ]
+  [ "$output" = 'SENTINEL-abc123' ]
+}
+
+@test "_secret_store_data: preserves spaces, quotes, backslash, and percent" {
+  secret_store_fixture
+  value='space "double" '\''single'\'' \\ percent%'
+  run _secret_store_data svc key "${value}"
+  [ "$status" -eq 0 ]
+  run _secret_load_data svc key
+  [ "$status" -eq 0 ]
+  [ "$output" = "${value}" ]
+}
+
+@test "_secret_store_data: reports a failed security write" {
+  secret_store_fixture
+  export FAIL_SECURITY=1
+  run _secret_store_data svc key value
+  [ "$status" -ne 0 ]
+}
+
+@test "_secret_store_data: failed update keeps the existing item and does not delete" {
+  secret_store_fixture
+  printf '%s' old-value > "${STORE_FILE}"
+  export FAIL_SECURITY=1
+  run _secret_store_data svc key new-value
+  [ "$status" -ne 0 ]
+  run _secret_load_data svc key
+  [ "$status" -eq 0 ]
+  [ "$output" = old-value ]
+  run grep -Fq delete-generic-password "${ARGV_LOG}"
+  [ "$status" -ne 0 ]
+  run grep -Fq delete-generic-password "${STDIN_LOG}"
+  [ "$status" -ne 0 ]
+}
+
+@test "_secret_store_data: rejects whitespace in service without calling security" {
+  secret_store_fixture
+  run _secret_store_data 'svc with-space' key value
+  [ "$status" -eq 1 ]
+  [ ! -s "${ARGV_LOG}" ]
+  [ ! -s "${STDIN_LOG}" ]
+}
+
+@test "_secret_store_data: rejects quotes and a backslash in service or key" {
+  secret_store_fixture
+  local name
+  for name in 'a"b' "a'b" 'a\b'; do
+    run _secret_store_data svc "${name}" value
+    [ "$status" -eq 1 ]
+    run _secret_store_data "${name}" key value
+    [ "$status" -eq 1 ]
+  done
+  [ ! -s "${ARGV_LOG}" ]
+  [ ! -s "${STDIN_LOG}" ]
+}
+
+@test "_secret_store_data: accepts ordinary names containing x, 2 and 7" {
+  secret_store_fixture
+  run _secret_store_data k3dm-vault-x27 'k3d-cluster:shard2' value
+  [ "$status" -eq 0 ]
+  grep -Fq 'add-generic-password -U -s k3dm-vault-x27 -a k3d-cluster:shard2 -X ' "${STDIN_LOG}"
+}
+
+@test "_secret_store_data: stores an empty value with an empty hex argument" {
+  secret_store_fixture
+  run _secret_store_data svc key ""
+  [ "$status" -eq 0 ]
+  grep -Fq 'add-generic-password -U -s svc -a key -X ""' "${STDIN_LOG}"
+  [ -f "${STORE_FILE}" ]
+}
 
 @test "_dry_run_active true only when DRY_RUN=1" {
   run bash -c "source \"$SYSTEM_LIB\"; DRY_RUN=1 _dry_run_active"

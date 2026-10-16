@@ -555,11 +555,26 @@ function _secret_store_data() {
 
    if _is_mac; then
       local rc=0
+      local name=""
+      local hex=""
+      local command=""
+      for name in "$service" "$key"; do
+         if [[ "$name" == *[[:space:]\"\'\\]* ]]; then
+            _warn "[secret] invalid service or key"
+            return 1
+         fi
+      done
+      hex=$(printf '%s' "$data" | xxd -p | tr -d '\n')
+      if [[ -n "$hex" ]]; then
+         command="add-generic-password -U -s ${service} -a ${key} -X ${hex}"
+      else
+         command="add-generic-password -U -s ${service} -a ${key} -X \"\""
+      fi
       # shellcheck disable=SC2016
-      _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
-      # shellcheck disable=SC2016
-      if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$key" "$data"; then
-         rc=$?
+      printf '%s\n' "$command" |
+         _no_trace bash -c 'security -i >/dev/null' || rc=$?
+      if (( rc != 0 )); then
+         _warn "[secret] unable to store data for ${service}/${key}"
       fi
       return "$rc"
    fi
