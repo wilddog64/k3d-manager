@@ -4,6 +4,8 @@
 
 - Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,
   with a dedicated k3dm PR Checks Grafana dashboard.
+- Added: the Bug Tracking dashboard now tracks lib-foundation bugs with a Repo selector and
+  lib-foundation's own release tags.
 - Added: the Bug Tracking dashboard counts fixes under the release that changed each bug to fixed,
   including fixed-in metrics, a priority chart, and a Fixed in table column.
 - Added: the Agent Dispatch dashboard now shows readable token averages, per-spec Codex cost and

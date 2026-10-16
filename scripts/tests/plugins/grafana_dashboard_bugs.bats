@@ -27,6 +27,22 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bug dashboard has a repo variable and scopes every bug selector" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+repo = next(v for v in data["templating"]["list"] if v["name"] == "repo")
+assert repo["type"] == "custom" and repo["query"] == "k3d-manager,lib-foundation"
+assert repo["multi"] is False and repo["current"]["value"] == "k3d-manager"
+for panel in data["panels"]:
+    for target in panel.get("targets", []):
+        expr = target["expr"]
+        for metric in re.findall(r"k3dm_bug_[a-z_]+", expr):
+            assert f'{metric}{{repo="$repo"' in expr, expr
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bug dashboard has a verified filter" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
@@ -45,7 +61,7 @@ PY
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
-assert variable["query"]["query"] == "label_values(k3dm_bug_info, release_order)"
+assert variable["query"]["query"] == 'label_values(k3dm_bug_info{repo="$repo"}, release_order)'
 table = next(panel for panel in data["panels"] if panel["id"] == 23)
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["release_order"] == 0
@@ -78,7 +94,7 @@ data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
 assert "k3dm_bug_fixed_in_release_docs" in panels[4]["targets"][0]["expr"]
 assert panels[8]["title"] == "Bugs filed per release, open vs fixed"
-assert panels[25]["targets"][0]["expr"] == "sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs) > 0"
+assert panels[25]["targets"][0]["expr"] == 'sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs{repo="$repo"}) > 0'
 assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
     {"x": 0, "y": 6, "w": 8, "h": 9},
     {"x": 8, "y": 6, "w": 8, "h": 9},

@@ -396,6 +396,12 @@ On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
 
+The Repo selector chooses between `k3d-manager` and `lib-foundation`. lib-foundation is read from
+its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
+`~/src/gitrepo/personal/lib-foundation`), and its release labels are its own tags such as
+`v0.5.3`. The "Fixed this release" and "Open in later releases" tiles remain k3d-manager-only
+because lib-foundation has no release branch.
+
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
 | Panel | Query |

@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+REPO_DIR = None
+REPO_NAME = "k3d-manager"
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 from hermes.prior_art import doc_meta, doc_release, doc_status  # noqa: E402
 
@@ -19,7 +21,8 @@ STATUS_LINE_RE = re.compile(r"^[+-](?:\*\*Status:\*\*|Status:)\s*(.*)$")
 
 
 def _git(*args):
-    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True,
+    repo_dir = REPO_DIR or ROOT
+    return subprocess.run(["git", "-C", str(repo_dir), *args], capture_output=True, text=True,
                           check=True).stdout
 
 
@@ -49,6 +52,8 @@ def _release_of_commit(commit, branch):
             if TAG_RE.match(tag)]
     if tags:
         return min(tags, key=lambda tag: tuple(int(part) for part in TAG_RE.match(tag).group(1).split("."))), "added_tag"
+    if REPO_NAME != "k3d-manager":
+        return None, None
     match = BRANCH_RE.search(branch)
     return (f"v{match.group(1)}", "added_branch") if match else (None, None)
 
@@ -107,7 +112,8 @@ def _release_for_added(path, added):
 
 def _read_blobs(ref, paths):
     request = "".join(f"{ref}:{path}\n" for path in paths).encode()
-    blob = subprocess.run(["git", "-C", str(ROOT), "cat-file", "--batch"], input=request,
+    repo_dir = REPO_DIR or ROOT
+    blob = subprocess.run(["git", "-C", str(repo_dir), "cat-file", "--batch"], input=request,
                           capture_output=True, check=True, timeout=60).stdout
     texts = {}
     offset = 0
@@ -136,6 +142,8 @@ def _scan(ref):
         priority, state = doc_meta(raw)
         added = _release_for_added(path, added_releases)
         release, source = doc_release(raw, added)
+        if REPO_NAME != "k3d-manager":
+            release, source = doc_release("" if source == "branch_line" else raw, added)
         bucket = result.setdefault(release, {"total": 0, "closed": 0, "open": 0, "unknown": 0,
                                               "by_source": {}, "by_priority": {p: {"total": 0, "closed": 0, "open": 0, "unknown": 0} for p in ("P0", "P1", "P2", "P3", "unset")},
                                               "open_paths": [], "unknown_paths": [], "closed_paths": []})
@@ -175,19 +183,25 @@ def fixed_in(ref):
 
 
 def main(argv=None):
+    global REPO_DIR, REPO_NAME
     parser = argparse.ArgumentParser()
     parser.add_argument("--ref", default=os.environ.get("K3DM_INDEX_REF", "HEAD"))
+    parser.add_argument("--repo-dir", type=Path, default=ROOT)
+    parser.add_argument("--repo-name", default="k3d-manager")
     parser.add_argument("--release")
     parser.add_argument("--priority", choices=("P0", "P1", "P2", "P3"))
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    REPO_DIR = args.repo_dir
+    REPO_NAME = args.repo_name
     try:
         releases, fixed = _scan(args.ref)
     except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
         return 2
     if args.json:
         print(json.dumps({"ref": args.ref, "generated_at": datetime.now(timezone.utc).isoformat(),
-                          "releases": releases, "fixed_in": fixed}, separators=(",", ":")))
+                          "releases": releases, "fixed_in": fixed, "repo": args.repo_name},
+                         separators=(",", ":")))
         return 0
     selected = {args.release: releases.get(args.release)} if args.release else releases
     for release in sorted((name for name, value in selected.items() if value), reverse=True):

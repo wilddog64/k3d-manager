@@ -28,12 +28,23 @@ data:
       "templating": {
         "list": [
           {
+            "name": "repo",
+            "label": "Repo",
+            "type": "custom",
+            "query": "k3d-manager,lib-foundation",
+            "options": [],
+            "multi": false,
+            "includeAll": false,
+            "current": {"selected": true, "text": "k3d-manager", "value": "k3d-manager"},
+            "hide": 0
+          },
+          {
             "name": "release",
             "label": "Release (filed in)",
             "type": "query",
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "query": {"query": "label_values(k3dm_bug_info, release_order)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
-            "definition": "label_values(k3dm_bug_info, release_order)",
+            "query": {"query": "label_values(k3dm_bug_info{repo=\"$repo\"}, release_order)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+            "definition": "label_values(k3dm_bug_info{repo=\"$repo\"}, release_order)",
             "regex": "/^\\S+ (?<value>\\S+)$/",
             "refresh": 2,
             "sort": 0,
@@ -87,7 +98,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_bug_current_release_info",
+              "expr": "k3dm_bug_current_release_info{repo=\"$repo\"}",
               "instant": true,
               "legendFormat": "{{release}}"
             }
@@ -134,7 +145,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_release_docs and on(release) k3dm_bug_current_release_info)",
+              "expr": "sum(k3dm_bug_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"})",
               "instant": true
             }
           ],
@@ -178,7 +189,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=~\"open|unknown\"} and on(release) k3dm_bug_current_release_info) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=~\"open|unknown\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -226,7 +237,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_fixed_in_release_docs and on(release) k3dm_bug_current_release_info) or vector(0)",
+              "expr": "sum(k3dm_bug_fixed_in_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -271,7 +282,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_later_release_open_docs)",
+              "expr": "sum(k3dm_bug_later_release_open_docs{repo=\"$repo\"})",
               "instant": true
             }
           ],
@@ -316,7 +327,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_docs{state=~\"open|unknown\",priority=\"unset\"})",
+              "expr": "sum(k3dm_bug_docs{repo=\"$repo\",state=~\"open|unknown\",priority=\"unset\"})",
               "instant": true
             }
           ],
@@ -383,7 +394,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (release, order, priority) (k3dm_bug_release_docs) > 0",
+              "expr": "sum by (release, order, priority) (k3dm_bug_release_docs{repo=\"$repo\"}) > 0",
               "instant": true,
               "format": "table"
             }
@@ -550,7 +561,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (release, order, state) (k3dm_bug_release_docs) > 0",
+              "expr": "sum by (release, order, state) (k3dm_bug_release_docs{repo=\"$repo\"}) > 0",
               "instant": true,
               "format": "table"
             }
@@ -685,7 +696,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs) > 0",
+              "expr": "sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs{repo=\"$repo\"}) > 0",
               "instant": true,
               "format": "table"
             }
@@ -758,7 +769,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"open\",priority=\"P0\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"open\",priority=\"P0\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -807,7 +818,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"open\",priority=\"P1\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"open\",priority=\"P1\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -856,7 +867,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"open\",priority=\"P2\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"open\",priority=\"P2\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -901,7 +912,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"open\",priority=\"P3\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"open\",priority=\"P3\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -946,7 +957,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"fixed\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -987,7 +998,7 @@ data:
           "type": "stat",
           "title": "Verified",
           "gridPos": {"x": 15, "y": 16, "w": 2, "h": 4},
-          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"fixed\",verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
+          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
           "description": "Follows the Release dropdown. Independently checked: the doc's Status is VERIFIED or LIVE-VERIFIED. Counts only releases from v1.43.2.",
@@ -998,7 +1009,7 @@ data:
           "type": "stat",
           "title": "Live-verified",
           "gridPos": {"x": 17, "y": 16, "w": 2, "h": 4},
-          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"fixed\",live_verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
+          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",live_verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
           "description": "Follows the Release dropdown. Proven on the real system: the doc's Status is LIVE-VERIFIED. Counts only releases from v1.43.2.",
@@ -1009,7 +1020,7 @@ data:
           "type": "stat",
           "title": "Deferred",
           "gridPos": {"x": 19, "y": 16, "w": 2, "h": 4},
-          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"deferred\",release=~\"$release\"}) or vector(0)", "instant": true}],
+          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"deferred\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#8e8e8e"}}},
           "description": "Follows the Release dropdown (the release the bug was filed in).",
@@ -1028,7 +1039,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "time() - k3dm_bug_docs_scan_timestamp_seconds",
+              "expr": "time() - k3dm_bug_docs_scan_timestamp_seconds{repo=\"$repo\"}",
               "instant": true
             }
           ],
@@ -1083,7 +1094,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_bug_info{release=~\"$release\",live_verified=~\"$verified\"}",
+              "expr": "k3dm_bug_info{repo=\"$repo\",release=~\"$release\",live_verified=~\"$verified\"}",
               "instant": true,
               "format": "table"
             }
@@ -1393,7 +1404,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (priority) (k3dm_bug_docs{state=\"open\"})",
+              "expr": "sum by (priority) (k3dm_bug_docs{repo=\"$repo\",state=\"open\"})",
               "legendFormat": "{{priority}}"
             }
           ],

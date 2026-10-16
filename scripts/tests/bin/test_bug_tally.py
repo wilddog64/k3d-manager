@@ -164,6 +164,24 @@ def test_json_main_includes_fixed_in_without_changing_releases(tally_module, cap
     assert payload["fixed_in"]["docs/bugs/fixed.md"]["source"] == "added_fixed"
 
 
+def test_lib_foundation_uses_tag_ancestry_and_reports_repo(tally_module, capsys):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "tagged.md").write_text(
+        "# tagged\n\n**Branch:** k3d-manager-v1.40.0\n**Status:** OPEN\n")
+    _commit(tally_module.ROOT, "tagged bug")
+    subprocess.run(["git", "tag", "v0.1.0"], cwd=tally_module.ROOT, check=True)
+    (bugs / "untagged.md").write_text("# untagged\n\n**Status:** OPEN\n")
+    _commit(tally_module.ROOT, "untagged bug")
+    assert tally_module.main(["--json", "--ref", "HEAD", "--repo-dir", str(tally_module.ROOT),
+                              "--repo-name", "lib-foundation"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["repo"] == "lib-foundation"
+    assert payload["releases"]["v0.1.0"]["open"] == 1
+    assert payload["releases"]["unknown"]["open"] == 1
+    assert "v1.40.0" not in payload["releases"]
+
+
 def test_fixed_in_status_backfilled_onto_an_existing_doc_is_unknown(tally_module, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)

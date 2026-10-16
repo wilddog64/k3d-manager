@@ -12,7 +12,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 
 @pytest.fixture
-def metrics():
+def metrics(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(tmp_path / "missing-lib-foundation"))
     return SimpleNamespace(**runpy.run_path(ROOT / "bin/k3dm-vectordb-metrics"))
 
 
@@ -43,9 +44,9 @@ def _git_repo(root, docs):
 
 def test_bug_metrics_has_exact_counts_all_15_series_and_scan_timestamp(metrics, tmp_path):
     output = metrics._bug_metrics(_repo(tmp_path))
-    assert 'k3dm_bug_docs{priority="P1",state="open"} 1' in output
-    assert 'k3dm_bug_docs{priority="P0",state="closed"} 1' in output
-    assert 'k3dm_bug_docs{priority="unset",state="unknown"} 1' in output
+    assert 'k3dm_bug_docs{repo="k3d-manager",priority="P1",state="open"} 1' in output
+    assert 'k3dm_bug_docs{repo="k3d-manager",priority="P0",state="closed"} 1' in output
+    assert 'k3dm_bug_docs{repo="k3d-manager",priority="unset",state="unknown"} 1' in output
     assert output.count("k3dm_bug_docs{") == 15
     assert "k3dm_bug_docs_scan_timestamp_seconds" in output
     assert "archive" not in output and "issues" not in output
@@ -252,8 +253,8 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     # agent-audit: allow assert-removed label tail now ends with release_order; release is still asserted
     assert all(line.split("}", 1)[0].endswith(
         'status="open",release_order="9998.9956.9998 v1.43.1"') for line in info)
-    assert 'k3dm_bug_status_docs{release="v1.43.1",priority="P1",status="open"} 2' in output
-    assert 'k3dm_bug_status_docs{release="v1.43.1",priority="P2",status="open"} 199' in output
+    assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P1",status="open"} 2' in output
+    assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P2",status="open"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
                if line.startswith("k3dm_bug_status_docs{")) == 201
 
@@ -322,8 +323,8 @@ def test_bug_status_metrics_title_fallback_truncation_and_cap(metrics, tmp_path)
     long_line = next(line for line in info if 'bug="long"' in line)
     assert len(long_line.split('title="', 1)[1].split('"', 1)[0]) == 120
     assert long_line.split('title="', 1)[1].split('"', 1)[0].endswith("…")
-    assert "k3dm_bug_info_skipped 1" in output
-    assert "k3dm_bug_info_truncated 0" in output
+    assert 'k3dm_bug_info_skipped{repo="k3d-manager"} 1' in output
+    assert 'k3dm_bug_info_truncated{repo="k3d-manager"} 0' in output
 
 
 def test_bug_status_metrics_undated_and_truncated(metrics, tmp_path):
@@ -335,7 +336,7 @@ def test_bug_status_metrics_undated_and_truncated(metrics, tmp_path):
     output = metrics._bug_status_metrics(tmp_path, now=datetime.now(timezone.utc))
     # agent-audit: allow assert-removed metrics renamed k3dm_bug_open_info -> k3dm_bug_info, cap 200 -> 1000, fixed rows now listed
     assert output.count("k3dm_bug_info{") == 1000
-    assert "k3dm_bug_info_truncated 1" in output
+    assert 'k3dm_bug_info_truncated{repo="k3d-manager"} 1' in output
 
 
 def test_bug_status_metrics_filed_line_wins_and_undated_sorts_last(metrics, tmp_path):
@@ -358,8 +359,8 @@ def test_bug_status_metrics_with_no_docs_still_emits_counters(metrics, tmp_path)
     (bugs / "closed.md").write_text("# closed\n**Status:** FIXED\n")
     output = metrics._bug_status_metrics(tmp_path)
     assert "k3dm_bug_info{" in output
-    assert "k3dm_bug_info_skipped 0" in output
-    assert "k3dm_bug_info_truncated 0" in output
+    assert 'k3dm_bug_info_skipped{repo="k3d-manager"} 0' in output
+    assert 'k3dm_bug_info_truncated{repo="k3d-manager"} 0' in output
 
 
 def test_bug_status_metrics_push_is_put_and_release_inventory_stays_post(metrics, monkeypatch, tmp_path):
@@ -426,9 +427,9 @@ def test_release_metrics_publishes_fixed_in_counts_and_unknown(metrics, monkeypa
         "docs/bugs/outside.md": {"release": "v1.99.0"},
     }
     output = metrics._release_metrics(tmp_path, tally=tally, fixed_in=fixed_in)
-    assert 'k3dm_bug_fixed_in_release_docs{release="v1.43.0",order="1",priority="P0"} 1' in output
-    assert 'k3dm_bug_fixed_in_release_docs{release="v1.43.0",order="1",priority="P1"} 0' in output
-    assert 'k3dm_bug_fixed_in_unknown_docs 1' in output
+    assert 'k3dm_bug_fixed_in_release_docs{repo="k3d-manager",release="v1.43.0",order="1",priority="P0"} 1' in output
+    assert 'k3dm_bug_fixed_in_release_docs{repo="k3d-manager",release="v1.43.0",order="1",priority="P1"} 0' in output
+    assert 'k3dm_bug_fixed_in_unknown_docs{repo="k3d-manager"} 1' in output
     assert 'release="v1.99.0"' not in output
     assert metrics._release_metrics(tmp_path, tally=tally, fixed_in=None).count("k3dm_bug_fixed_in_") == 0
 
@@ -472,13 +473,13 @@ def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metric
                 releases.append((release, order))
     assert releases == [("v1.38.0", "0"), ("v1.39.0", "1"), ("v1.40.0", "2"), ("v1.41.0", "3"),
                         ("v1.42.0", "4"), ("v1.43.0", "5")]
-    assert 'k3dm_bug_release_docs{release="v1.43.0",order="5",priority="P2",state="open"} 3' in output
-    assert 'k3dm_bug_release_docs{release="v1.42.0",order="4",priority="P1",state="closed"} 3' in output
+    assert 'k3dm_bug_release_docs{repo="k3d-manager",release="v1.43.0",order="5",priority="P2",state="open"} 3' in output
+    assert 'k3dm_bug_release_docs{repo="k3d-manager",release="v1.42.0",order="4",priority="P1",state="closed"} 3' in output
     assert output.count("k3dm_bug_release_docs{") == 6 * 15
-    assert 'k3dm_bug_current_release_info{release="v1.43.0"} 1' in output
-    assert 'k3dm_bug_later_release_open_docs{priority="P3"} 2' in output
-    assert 'k3dm_bug_later_release_open_docs{priority="P2"} 1' in output
-    assert 'k3dm_bug_later_release_open_docs{priority="P0"} 0' in output
+    assert 'k3dm_bug_current_release_info{repo="k3d-manager",release="v1.43.0"} 1' in output
+    assert 'k3dm_bug_later_release_open_docs{repo="k3d-manager",priority="P3"} 2' in output
+    assert 'k3dm_bug_later_release_open_docs{repo="k3d-manager",priority="P2"} 1' in output
+    assert 'k3dm_bug_later_release_open_docs{repo="k3d-manager",priority="P0"} 0' in output
 
 
 def test_release_metrics_on_a_non_release_branch_show_only_shipped_releases(metrics, monkeypatch, tmp_path):
@@ -523,3 +524,99 @@ def test_release_metrics_push_to_their_own_group(metrics, monkeypatch, tmp_path)
     inventory = [body for url, body in posts.items() if url.endswith("/metrics/job/k3dm-bug-docs")]
     assert len(releases) == 1 and "k3dm_bug_release_docs{" in releases[0]
     assert len(inventory) == 1 and "k3dm_bug_release_docs" not in inventory[0]
+
+
+# agent-audit: allow assert-removed every removed assertion is restated with the new leading repo="k3d-manager" label
+def _lib_foundation(tmp_path):
+    origin = tmp_path / "lf-origin.git"
+    clone = tmp_path / "lf"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    _git_repo(clone, {"lf-open.md": "# lf open\n\n**Branch:** k3d-manager-v1.40.0\n**Priority:** P1\n**Status:** OPEN\n"})
+    subprocess.run(["git", "tag", "v0.1.0"], cwd=clone, check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(origin)], cwd=clone, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "main", "--tags"], cwd=clone, check=True)
+    subprocess.run(["git", "fetch", "-q", "origin"], cwd=clone, check=True)
+    return clone
+
+
+def _publish_both(metrics, monkeypatch, tmp_path, lib_dir, lf_tally_error=False):
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+    requests = []
+    monkeypatch.setattr(metrics.urllib.request, "urlopen",
+                        lambda request, **_kwargs: requests.append(request) or Response())
+    monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
+    monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(lib_dir))
+    real_tally = metrics.publish_bug_metrics.__globals__["_tally"]
+    if lf_tally_error:
+        def real_tally(*_args):
+            raise RuntimeError("lib-foundation tally failed")
+    km_tally = {"releases": {"v1.43.0": _bucket()}, "fixed_in": {}}
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_tally",
+                        lambda root, ref=None, full=False, repo="k3d-manager", repo_dir=None:
+                        real_tally(root, ref, full, repo, repo_dir) if repo == "lib-foundation"
+                        else (km_tally if full else km_tally["releases"]))
+    km = tmp_path / "km"
+    _git_repo(km, {"km-open.md": "# km open\n\n**Priority:** P2\n**Status:** OPEN\n"})
+    result = metrics.publish_bug_metrics(km)
+    pushes = {r.full_url.split("/metrics/job/", 1)[1]: (r.method, r.data.decode())
+              for r in requests if getattr(r, "data", None)}
+    return result, pushes
+
+
+def test_lib_foundation_series_carry_repo_and_push_to_their_own_instance(metrics, monkeypatch, tmp_path):
+    result, pushes = _publish_both(metrics, monkeypatch, tmp_path, _lib_foundation(tmp_path))
+    assert result is True
+    assert {job: method for job, (method, _body) in pushes.items()} == {
+        "k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST",
+        "k3dm-bug-docs/instance/lib-foundation": "POST",
+        "k3dm-bug-open/instance/lib-foundation": "PUT",
+        "k3dm-bug-releases/instance/lib-foundation": "POST",
+    }
+    for job, (_method, body) in pushes.items():
+        repo = "lib-foundation" if job.endswith("/instance/lib-foundation") else "k3d-manager"
+        series = [line for line in body.splitlines() if line.startswith("k3dm_bug")]
+        assert series
+        assert all(line.split("{", 1)[1].startswith(f'repo="{repo}"') for line in series), job
+    lf_open = pushes["k3dm-bug-open/instance/lib-foundation"][1]
+    lf_releases = pushes["k3dm-bug-releases/instance/lib-foundation"][1]
+    assert 'bug="lf-open"' in lf_open and "km-open" not in lf_open
+    assert 'release="v0.1.0"' in lf_open and 'release="v1.40.0"' not in lf_open
+    assert 'k3dm_bug_release_docs{repo="lib-foundation",release="v0.1.0",order="0",priority="P1",state="open"} 1' in lf_releases
+    assert 'release="v1.' not in lf_releases
+    assert "k3dm_bug_current_release_info" not in lf_releases
+
+
+def _break_fetch(clone):
+    subprocess.run(["git", "remote", "set-url", "origin", str(clone.parent / "gone.git")], cwd=clone, check=True)
+
+
+def _drop_origin(clone):
+    subprocess.run(["git", "remote", "remove", "origin"], cwd=clone, check=True)
+
+
+@pytest.mark.parametrize("breakage", ["missing_dir", "fetch_fails", "no_origin_main", "tally_fails"])
+def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, monkeypatch, tmp_path, breakage, capsys):
+    clone = _lib_foundation(tmp_path)
+    if breakage == "missing_dir":
+        lib_dir = tmp_path / "absent"
+    elif breakage == "tally_fails":
+        lib_dir = clone
+    else:
+        (_break_fetch if breakage == "fetch_fails" else _drop_origin)(clone)
+        lib_dir = clone
+    result, pushes = _publish_both(metrics, monkeypatch, tmp_path, lib_dir,
+                                   lf_tally_error=breakage == "tally_fails")
+    assert result is True
+    km_jobs = {job for job in pushes if "/instance/" not in job}
+    assert km_jobs == {"k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases"}
+    lf_jobs = {job for job in pushes if job.endswith("/instance/lib-foundation")}
+    assert lf_jobs == {
+        "missing_dir": set(), "no_origin_main": set(),
+        "tally_fails": {"k3dm-bug-docs/instance/lib-foundation"},
+        "fetch_fails": {"k3dm-bug-docs/instance/lib-foundation", "k3dm-bug-open/instance/lib-foundation",
+                        "k3dm-bug-releases/instance/lib-foundation"},
+    }[breakage]
+    assert "lib-foundation" in capsys.readouterr().err

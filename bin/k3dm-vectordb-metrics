@@ -90,7 +90,7 @@ def publish(payload):
     return False
 
 
-def _bug_texts(root, ref=None):
+def _bug_texts(root, ref=None, repo="k3d-manager"):
     root = Path(root)
     if ref:
         listing = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", ref,
@@ -117,7 +117,7 @@ def _bug_texts(root, ref=None):
     return texts
 
 
-def _bug_metrics(root, ref=None, texts=None):
+def _bug_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     """Return a complete bug inventory snapshot, or raise on any read/parse failure."""
     texts = _bug_texts(root, ref) if texts is None else texts
     counts = {(priority, state): 0 for priority in ("P0", "P1", "P2", "P3", "unset")
@@ -125,9 +125,9 @@ def _bug_metrics(root, ref=None, texts=None):
     for text in texts.values():
         priority, state = doc_meta(text)
         counts[(priority, state)] += 1
-    lines = [f'k3dm_bug_docs{{priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
+    lines = [f'k3dm_bug_docs{{repo="{repo}",priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
              for priority, state in counts]
-    lines.append(f"k3dm_bug_docs_scan_timestamp_seconds {time.time()}")
+    lines.append(f'k3dm_bug_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}')
     return "\n".join(lines) + "\n"
 
 
@@ -153,7 +153,8 @@ def _release_at_least(release, minimum):
     return version is not None and version >= minimum
 
 
-def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_in=None):
+def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_in=None,
+                        repo="k3d-manager"):
     root = Path(root)
     branch = _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
@@ -218,6 +219,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
                   f'status="{status}",release_order="{_release_order(release)}"')
+        labels = f'repo="{repo}",' + labels
         if status == "fixed":
             fixed_release = (fixed_in or {}).get(path, {}).get("release")
             if not _VERSION_RE.fullmatch(fixed_release or ""):
@@ -232,13 +234,13 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         release, priority, status, verified, live_verified = item[0]
         return (release, PRIORITIES.index(priority), STATUS_RANK[status], verified or "", live_verified or "")
     for (release, priority, status, verified, live_verified), count in sorted(aggregates.items(), key=aggregate_key):
-        labels = f'release="{release}",priority="{priority}",status="{status}"'
+        labels = f'repo="{repo}",release="{release}",priority="{priority}",status="{status}"'
         if verified is not None:
             labels += f',verified="{verified}"'
             labels += f',live_verified="{live_verified}"'
         lines.append(f"k3dm_bug_status_docs{{{labels}}} {count}")
-    lines.append(f"k3dm_bug_info_skipped {skipped}")
-    lines.append(f"k3dm_bug_info_truncated {truncated}")
+    lines.append(f'k3dm_bug_info_skipped{{repo="{repo}"}} {skipped}')
+    lines.append(f'k3dm_bug_info_truncated{{repo="{repo}"}} {truncated}')
     return "\n".join(lines) + "\n"
 
 
@@ -258,20 +260,23 @@ def _current_release(root, ref):
     return match.group(1) if match else None
 
 
-def _tally(root, ref=None, full=False):
+def _tally(root, ref=None, full=False, repo="k3d-manager", repo_dir=None):
     root = Path(root)
-    result = subprocess.run([sys.executable, str(root / "scripts" / "bug-tally.py"), "--json", "--ref", ref or "HEAD"],
+    args = [sys.executable, str(root / "scripts" / "bug-tally.py"), "--json", "--ref", ref or "HEAD"]
+    if repo != "k3d-manager":
+        args.extend(["--repo-dir", str(repo_dir or root), "--repo-name", repo])
+    result = subprocess.run(args,
                             cwd=root, capture_output=True, text=True, check=True, timeout=90)
     payload = json.loads(result.stdout)
     return payload if full else payload["releases"]
 
 
-def _release_metrics(root, ref=None, tally=None, fixed_in=None):
+def _release_metrics(root, ref=None, tally=None, fixed_in=None, repo="k3d-manager"):
     """Bug docs per release for the current release branch and the shipped releases before it."""
     root = Path(root)
     ref = ref or "HEAD"
     tally = tally if tally is not None else _tally(root, ref)
-    current = _current_release(root, ref)
+    current = _current_release(root, ref) if repo == "k3d-manager" else None
     shipped = sorted((tag for tag in _git_out(root, "tag", "--list", "v*", "--merged", ref).split()
                       if _version(tag) and (current is None or _version(tag) < _version(current))),
                      key=_version)[-RELEASE_HISTORY:]
@@ -282,7 +287,7 @@ def _release_metrics(root, ref=None, tally=None, fixed_in=None):
         for priority in PRIORITIES:
             counts = by_priority.get(priority, {})
             for state in STATES:
-                lines.append(f'k3dm_bug_release_docs{{release="{release}",order="{order}",priority="{priority}",'
+                lines.append(f'k3dm_bug_release_docs{{repo="{repo}",release="{release}",order="{order}",priority="{priority}",'
                              f'state="{state}"}} {int(counts.get(state, 0))}')
     if fixed_in is not None:
         priorities_by_path = {
@@ -297,18 +302,18 @@ def _release_metrics(root, ref=None, tally=None, fixed_in=None):
                 if item.get("release") == release:
                     counts[priorities_by_path.get(path, "unset")] += 1
             for priority in PRIORITIES:
-                lines.append(f'k3dm_bug_fixed_in_release_docs{{release="{release}",order="{order}",'
+                lines.append(f'k3dm_bug_fixed_in_release_docs{{repo="{repo}",release="{release}",order="{order}",'
                              f'priority="{priority}"}} {counts[priority]}')
         unknown_count = sum(item.get("release") == "unknown" for item in fixed_in.values())
-        lines.append(f"k3dm_bug_fixed_in_unknown_docs {unknown_count}")
+        lines.append(f'k3dm_bug_fixed_in_unknown_docs{{repo="{repo}"}} {unknown_count}')
     if current:
-        lines.append(f'k3dm_bug_current_release_info{{release="{current}"}} 1')
+        lines.append(f'k3dm_bug_current_release_info{{repo="{repo}",release="{current}"}} 1')
         later = {priority: 0 for priority in PRIORITIES}
         for release, data in tally.items():
             if _version(release) and _version(release) > _version(current):
                 for priority in PRIORITIES:
                     later[priority] += int(data.get("by_priority", {}).get(priority, {}).get("open", 0))
-        lines.extend(f'k3dm_bug_later_release_open_docs{{priority="{priority}"}} {count}'
+        lines.extend(f'k3dm_bug_later_release_open_docs{{repo="{repo}",priority="{priority}"}} {count}'
                      for priority, count in later.items())
     return "\n".join(lines) + "\n"
 
@@ -319,6 +324,7 @@ def publish_bug_metrics(root, ref=None):
         payload = _bug_metrics(root, ref, texts=texts)
     except Exception as exc:
         print(f"bug metrics scan skipped (non-fatal): {exc}", file=sys.stderr)
+        _publish_lib_foundation_bugs()
         return False
     pushed = _push_bug_group("k3dm-bug-docs", payload)
     try:
@@ -336,20 +342,63 @@ def publish_bug_metrics(root, ref=None):
         print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)
     if tally is None:
         print("bug release metrics skipped (non-fatal): no tally", file=sys.stderr)
+        _publish_lib_foundation_bugs()
         return pushed
     try:
         releases = _release_metrics(root, ref, tally=tally, fixed_in=fixed_in)
     except Exception as exc:
         print(f"bug release metrics skipped (non-fatal): {exc}", file=sys.stderr)
+        _publish_lib_foundation_bugs()
         return pushed
     _push_bug_group("k3dm-bug-releases", releases)
+    _publish_lib_foundation_bugs()
     return pushed
 
 
-def _push_bug_group(job, payload, method="POST"):
+def _publish_lib_foundation_bugs():
+    configured = os.environ.get("K3DM_LIB_FOUNDATION_DIR", "~/src/gitrepo/personal/lib-foundation")
+    root = Path(configured).expanduser()
+    if not root.is_dir():
+        print(f"lib-foundation bug metrics skipped (missing directory): {root}", file=sys.stderr)
+        return
+    try:
+        try:
+            fetched = subprocess.run(["git", "-C", str(root), "fetch", "--quiet", "origin", "main"],
+                                     capture_output=True, text=True, timeout=30, check=False)
+            if fetched.returncode != 0:
+                print("lib-foundation bug fetch failed; using existing origin/main", file=sys.stderr)
+        except Exception as exc:
+            print(f"lib-foundation bug fetch failed; using existing origin/main: {exc}",
+                  file=sys.stderr)
+        _git_out(root, "rev-parse", "--verify", "origin/main")
+        texts = _bug_texts(root, "origin/main", repo="lib-foundation")
+        payload = _bug_metrics(root, "origin/main", texts=texts, repo="lib-foundation")
+        _push_bug_group("k3dm-bug-docs", payload, instance="lib-foundation")
+    except Exception as exc:
+        print(f"lib-foundation bug inventory skipped (non-fatal): {exc}", file=sys.stderr)
+        return
+    try:
+        payload = _tally(ROOT, "origin/main", full=True, repo="lib-foundation", repo_dir=root)
+        tally = payload["releases"]
+        fixed_in = payload.get("fixed_in", {})
+        open_bugs = _bug_status_metrics(root, "origin/main", tally=tally, texts=texts,
+                                         fixed_in=fixed_in, repo="lib-foundation")
+        _push_bug_group("k3dm-bug-open", open_bugs, method="PUT", instance="lib-foundation")
+    except Exception as exc:
+        print(f"lib-foundation open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)
+        return
+    try:
+        releases = _release_metrics(root, "origin/main", tally=tally, fixed_in=fixed_in,
+                                    repo="lib-foundation")
+        _push_bug_group("k3dm-bug-releases", releases, instance="lib-foundation")
+    except Exception as exc:
+        print(f"lib-foundation release metrics skipped (non-fatal): {exc}", file=sys.stderr)
+
+
+def _push_bug_group(job, payload, method="POST", instance=None):
     base = _pushgateway_url()
     healthy_url = f"{base}/-/healthy"
-    url = f"{base}/metrics/job/{job}"
+    url = f"{base}/metrics/job/{job}" + (f"/instance/{instance}" if instance else "")
     for attempt in range(1, PUSH_RETRIES + 1):
         try:
             with urllib.request.urlopen(healthy_url, timeout=2) as response:
