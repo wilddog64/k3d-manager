@@ -6,6 +6,10 @@
   including fixed-in metrics, a priority chart, and a Fixed in table column.
 - Fixed: a slow VectorDB metrics publish no longer marks a completed index run as failed, and bug
   metrics read tracked documents in batches.
+- Security: lib-foundation v0.5.3 (subtree). On macOS, `_secret_store_data` no longer puts the
+  stored value (Vault unseal shards, signing keys) on the `security` command line where any
+  same-user process could read it, reports a failed Keychain write instead of returning success,
+  and keeps the existing item when a write fails.
 
 ## [1.43.2] - 2026-10-16
 

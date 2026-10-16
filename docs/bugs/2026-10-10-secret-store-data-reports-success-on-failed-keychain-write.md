@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-10
-**Status:** IMPLEMENTED (upstream) — lib-foundation PR #67 `6b57344`, merged `457f3d7` 2026-10-16 (Codex + Claude fixes: name check matched the letters x/2/7, stub hung on open stdin; Claude verified 8 new BATS red on old code, 5 mutations red, make bats 183/183, real `security -i` round-trip on a throwaway keychain). Pending: v0.5.3 release, subtree-pull on `k3d-manager-v1.43.3`
+**Status:** IMPLEMENTED — lib-foundation v0.5.3 (release PR #68 `288aed9`), subtree-pulled on `k3d-manager-v1.43.3` as `e1847454`; fix PR #67 `6b57344`, merged `457f3d7` 2026-10-16 (Codex + Claude fixes: name check matched the letters x/2/7, stub hung on open stdin; Claude verified 8 new BATS red on old code, 5 mutations red, make bats 183/183, real `security -i` round-trip on a throwaway keychain). Subtree tree equals tag v0.5.3; k3d-manager vault_dr_shards + signing BATS 49/49
 **Priority:** P2
 **Severity:** Medium — a failed Keychain write reports success, so callers carry on as if the secret were stored
 **Files:** `scripts/lib/foundation/scripts/lib/system.sh` (upstream: lib-foundation `scripts/lib/system.sh`)
