@@ -247,6 +247,11 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     contains it). Adds `k3dm_bug_fixed_in_release_docs`, a Bugs-fixed-per-release chart, a Fixed in
     column, and moves the Fixed this release tile to it. Dispatch **after** the vectordb P3 above: both
     edit `bug-tally.py` and `k3dm-vectordb-metrics`.
+  - [`v1.43.3-pr-checks-dashboard`](plans/v1.43.3-pr-checks-dashboard.md) (plan 2 of 5, operator
+    2026-10-16): Hermes publishes the check runs of every open k3d-manager PR each poll
+    (Pushgateway job `k3dm-pr-checks`), shown on a new **k3dm PR Checks** dashboard. k3d-manager
+    only (shopping-cart retires after v1.50.x); Copilot reviews are not checks. Independent of the
+    two above.
 
 ### Candidate milestone — v1.43.4 (patch)
 
