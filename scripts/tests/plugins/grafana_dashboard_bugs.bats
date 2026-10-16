@@ -194,3 +194,16 @@ PY
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }
+
+@test "open bugs table shows age in days, not a duration that rolls up to weeks" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Open bugs")
+age = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Open for")
+unit = next(p["value"] for p in age["properties"] if p["id"] == "unit")
+assert unit == "suffix: d", unit
+PY
+  [ "${status}" -eq 0 ]
+}
