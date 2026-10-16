@@ -1,3 +1,4 @@
+- 2026-10-16: filed P3 docs/bugs/2026-10-16-e2e-setup-failure-invisible-in-failure-panels.md (operator "file a P3 bug and send to codex"): publish phase in both event writers + exporter synthesizes an "aborted at <phase>" failure group; dispatched to Codex.
 - 2026-10-16: dispatched to Codex (operator "dispatch 1, 2, and 4"): make test with ubuntu-k3s present + absent (closes make-test-acg-optional-context-failure as dup if green) and the test-all-hub-data-prune status fix; task section in the make-test bug doc.
 - 2026-10-16: e2e-sandbox failed again (run 1792155966-29279) on a fresh sandbox with the known Helm CRD ownership bug (v1.43.4). Recurrence recorded in the bug doc: cluster-up already installs ArgoCD in `cicd` (not Helm); e2e.sh:395 installs a second one. E2EResultsMissing rule is live on the hub (in `cicd`).
 - 2026-10-16: landed live-verified column `c3f194f1`; marked 10 v1.43.2 fixes VERIFIED (offline evidence, awaiting live proof).
