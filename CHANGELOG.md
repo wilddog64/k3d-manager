@@ -21,6 +21,9 @@
   and keeps the existing item when a write fails.
 - Fixed: `e2e-sandbox` now reuses the Argo CD installed by `cluster-up` in `cicd` instead of
   attempting a second Helm installation that conflicts with existing CRD ownership.
+- Fixed: the Bug Tracking table no longer drops its Fixed in, Verified and Live-verified columns
+  when the selected release has only open bugs. Unfixed bugs now carry a `-` placeholder on those
+  labels, shown as a dash, and the Hide live-verified filter keeps them.
 
 ## [1.43.2] - 2026-10-16
 

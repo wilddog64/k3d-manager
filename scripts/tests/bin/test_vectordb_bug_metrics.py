@@ -200,9 +200,9 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line and line.endswith(" -2") for line in info)
     # agent-audit: allow assert-removed verified assertions rewritten to also check live_verified
     assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line for line in info)
-    assert any('bug="open"' in line and 'status="open"' in line and 'verified=' not in line for line in info)
-    assert any('bug="open"' in line and 'live_verified=' not in line for line in info)
-    assert any('bug="deferred"' in line and 'status="deferred"' in line and 'verified=' not in line for line in info)
+    assert any('bug="open"' in line and 'status="open"' in line and ',verified="-"' in line for line in info)
+    assert any('bug="open"' in line and 'live_verified="-"' in line and 'fixed_in="-"' in line for line in info)
+    assert any('bug="deferred"' in line and 'status="deferred"' in line and ',verified="-"' in line for line in info)
     statuses = [line.split('status="', 1)[1].split('"', 1)[0]
                 for line in info if 'release="v1.43.2"' in line]
     assert statuses == sorted(statuses, key={"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}.get)
@@ -250,9 +250,10 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert len(info) == 201
-    # agent-audit: allow assert-removed label tail now ends with release_order; release is still asserted
+    # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",release_order="9998.9956.9998 v1.43.1"') for line in info)
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-"')
+        for line in info)
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P1",status="open"} 2' in output
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P2",status="open"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
@@ -455,7 +456,7 @@ def test_bug_status_metrics_adds_fixed_in_only_to_fixed_info(metrics, tmp_path):
     fixed_lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert any('bug="fixed"' in line and 'fixed_in="v1.43.0"' in line for line in fixed_lines)
     assert any('bug="unknown-fixed"' in line and 'fixed_in="unknown"' in line for line in fixed_lines)
-    assert all('fixed_in=' not in line for line in fixed_lines if 'bug="open"' in line)
+    assert all('fixed_in="-"' in line for line in fixed_lines if 'bug="open"' in line)
 
 
 def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metrics, monkeypatch, tmp_path):

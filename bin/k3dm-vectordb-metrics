@@ -226,9 +226,11 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
                 fixed_release = "unknown"
             labels = labels.replace(f',release_order="{_release_order(release)}"',
                                     f',fixed_in="{fixed_release}",release_order="{_release_order(release)}"')
-        if verified is not None:
-            labels += f',verified="{verified}"'
-            labels += f',live_verified="{live_verified}"'
+        else:
+            labels = labels.replace(f',release_order="{_release_order(release)}"',
+                                    f',fixed_in="-",release_order="{_release_order(release)}"')
+        labels += f',verified="{verified if verified is not None else "-"}"'
+        labels += f',live_verified="{live_verified if live_verified is not None else "-"}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
         release, priority, status, verified, live_verified = item[0]

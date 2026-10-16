@@ -58,11 +58,11 @@ data:
             "name": "verified",
             "label": "Verified fixes",
             "type": "custom",
-            "query": "Hide live-verified : ^(false)?$,Show all : .*",
+            "query": "Hide live-verified : ^(false|-)?$,Show all : .*",
             "options": [],
             "multi": false,
             "includeAll": false,
-            "current": {"selected": true, "text": "Hide live-verified", "value": "^(false)?$"},
+            "current": {"selected": true, "text": "Hide live-verified", "value": "^(false|-)?$"},
             "hide": 0
           }
         ]
@@ -1175,7 +1175,8 @@ data:
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "true": {"text": "✓ live", "color": "green", "index": 0},
                     "false": {"text": "not yet", "color": "orange", "index": 1},
-                    "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2}
+                    "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
+                    "-": {"text": "—", "color": "#8e8e8e", "index": 3}
                   }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
                 ]
               },
@@ -1378,9 +1379,18 @@ data:
                     {"type": "value", "options": {
                       "true": {"text": "✓ verified", "color": "green", "index": 0},
                       "false": {"text": "not yet", "color": "orange", "index": 1},
-                      "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2}
+                      "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
+                      "-": {"text": "—", "color": "#8e8e8e", "index": 3}
                     }},
                     {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}
+                  ]}
+                ]
+              },
+              {
+                "matcher": {"id": "byName", "options": "Fixed in"},
+                "properties": [
+                  {"id": "mappings", "value": [
+                    {"type": "value", "options": {"-": {"text": "—", "index": 0}}}
                   ]}
                 ]
               }

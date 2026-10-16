@@ -369,14 +369,18 @@ Fixed documents also have a Verified and Live-verified label:
 | `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
 | `false` | fixed, release v1.43.2 or later, any other fixed status |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
-| no label | not fixed |
+| `-` | not fixed (table series only; shown as —) |
 
 | Live-verified | When |
 |---|---|
 | `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
 | `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
-| no label | not fixed |
+| `-` | not fixed (table series only; shown as —) |
+
+`k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
+columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
+has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
