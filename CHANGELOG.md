@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.3] - 2026-10-16
+
 - Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,
   with a dedicated k3dm PR Checks Grafana dashboard.
 - Added: the Bug Tracking dashboard now tracks lib-foundation bugs with a Repo selector and
