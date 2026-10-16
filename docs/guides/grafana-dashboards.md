@@ -30,7 +30,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | Bug tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `make platform-ops` | hub |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
-| Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
+| Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | `grafana-dashboards-acg` ApplicationSet (app clusters except the hub) | **Hostinger/ACG** |
 | k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` + hub dashboard ApplicationSet | **hub + ACG** |
 | Public endpoint probes | `probe_*` | Prometheus blackbox-exporter | Hub observability ApplicationSet + `Probe` resources | hub |
 
@@ -39,10 +39,10 @@ All eight are `ConfigMap`s in the `monitoring` namespace carrying
 discovers and imports. A dashboard that does not appear at all is usually a sidecar /
 namespace / label problem; a dashboard that appears but is blank is a producer problem.
 
-> **`checkout-loadtest-configmap.yaml` has no applier.** No plugin, Makefile target or
-> ApplicationSet references it — only `docs/bugs/2026-08-29-loadtest-slice-f-generator.md`
-> does. It reaches a cluster only if applied by hand. Treat "the load-test dashboard is
-> missing" as expected, not as a regression.
+> **`checkout-loadtest-configmap.yaml` is deployed to app clusters, not the hub.** The
+> `grafana-dashboards-acg` ApplicationSet applies it to Hostinger/ACG and deliberately
+> excludes it from the hub, where the shopping-cart workload and load-test metrics do not
+> exist. Treat a missing copy on the hub as expected.
 
 ### Which Grafana am I looking at?
 
@@ -450,15 +450,14 @@ matching zero log lines is a query-drift bug that has happened before
 
 Seven panels over `k6_checkout_load_*` and `k6_vus`, templated on `$run_id`.
 
-This is a **planned view with no producer wired up**: there is no applier for the ConfigMap,
-no k6 run in the normal flow, and Prometheus's remote-write receiver is off by default.
-Verified live: `count(k6_checkout_load_requests_total_total) = 0`. `No data` here is the
-correct steady state (`docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
+This dashboard is deployed to app clusters only; it is deliberately excluded from the hub.
+The **shopping-cart-apps CPU saturation** panel fills there at all times because it uses
+ordinary Kubernetes metrics. The six k6 panels fill only during and after a load test;
+Hostinger retains 15 days of remote-write data. Until a run exists, `count(k6_checkout_load_requests_total_total) = 0`
+and `No data` is expected for those panels (`docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
+The scheduled baseline in [`v1.48.0-scheduled-baseline-loadtest.md`](../plans/v1.48.0-scheduled-baseline-loadtest.md)
+is the plan that keeps those panels filled.
 
-The one panel that *does* populate is **shopping-cart-apps CPU saturation**, because it uses
-`container_cpu_usage_seconds_total` / `kube_pod_container_resource_limits` — ordinary
-Kubernetes metrics, independent of the load test. A dashboard where exactly one panel has
-data is the signature of "the native metrics work, the custom producer never ran."
 
 ---
 

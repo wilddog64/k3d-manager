@@ -25,6 +25,27 @@ _assert_acg_excludes_hub_owned_tests() {
   [[ "$exclude" == *"k3dm-tests-configmap.yaml"* ]] || return 1
 }
 
+_render_acg_exclude_for_server() {
+  local appset="$1"
+  local server="$2"
+  local exclude
+  exclude="$(yq -r '.spec.template.spec.source.directory.exclude // ""' "$appset")" || return 1
+  if [[ "$server" == "https://kubernetes.default.svc" ]]; then
+    exclude="$(sed 's/{{if eq .server "https:\/\/kubernetes.default.svc"}}//; s/{{end}}//' <<<"$exclude")" || return 1
+  else
+    [[ "$exclude" =~ ^(.*),\{\{if\ eq\ \.server ]] || return 1
+    exclude="${BASH_REMATCH[1]}"
+  fi
+  printf '%s\n' "$exclude"
+}
+
+_assert_checkout_dashboard_excluded_for_hub() {
+  local appset="$1"
+  local exclude
+  exclude="$(_render_acg_exclude_for_server "$appset" "https://kubernetes.default.svc")" || return 1
+  [[ "$exclude" == *"checkout-loadtest-configmap.yaml"* ]]
+}
+
 _assert_collision_files_excluded() {
   local appset="$1"
   local platform_ops_dir="$2"
@@ -117,6 +138,25 @@ _assert_no_panel_overlap() {
   _assert_hub_exclude_contract "${ACG}" "${PLATFORM_OPS_DIR}" "${DASHBOARDS_DIR}"
 }
 
+@test "acg dashboard appset renders the checkout dashboard exclusion only for the hub" {
+  local hub_exclude acg_exclude
+  hub_exclude="$(_render_acg_exclude_for_server "${ACG}" "https://kubernetes.default.svc")"
+  acg_exclude="$(_render_acg_exclude_for_server "${ACG}" "https://hostinger.example")"
+  [[ "$hub_exclude" == *"checkout-loadtest-configmap.yaml"* ]]
+  [[ "$acg_exclude" != *"checkout-loadtest-configmap.yaml"* ]]
+}
+
+@test "acg dashboard appset checkout exclusion guard rejects a missing filename" {
+  local snapshot="${BATS_TEST_TMPDIR}/grafana-dashboards-acg-checkout.yaml"
+  sed 's/,checkout-loadtest-configmap.yaml//' "${ACG}" > "$snapshot"
+  run _assert_checkout_dashboard_excluded_for_hub "$snapshot"
+  printf 'mutation (d) checkout exclusion: status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+  cp "${ACG}" "$snapshot"
+  cmp -s "${ACG}" "$snapshot"
+  printf 'mutation (d) restore: cmp=identical\n'
+}
+
 @test "acg dashboard appset does not manage the hub-owned k3dm tests dashboard" {
   _assert_acg_excludes_hub_owned_tests "${ACG}"
 }
@@ -151,7 +191,7 @@ _assert_no_panel_overlap() {
   local second_snapshot="${BATS_TEST_TMPDIR}/grafana-dashboard-second-collision.snapshot.yaml"
   cp -R "${PLATFORM_OPS_DIR}" "$platform_copy"
   cp "${HUB_OVERVIEW}" "$second_collision"
-  yq -i '.metadata.name = "checkout-loadtest-dashboard"' "$second_collision"
+  yq -i '.metadata.name = "k3dm-deployment-metrics"' "$second_collision"
   cp "$second_collision" "$second_snapshot"
   run _assert_hub_exclude_contract "${ACG}" "$platform_copy" "${DASHBOARDS_DIR}"
   printf 'mutation (c) second collision: status=%s output=%s\n' "$status" "$output"
