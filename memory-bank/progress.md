@@ -1,3 +1,4 @@
+- 2026-10-16: Fix commit / Verified commit columns LIVE-VERIFIED on the hub (operator screenshot, v1.43.3, 8 rows; widths fixed in e62be4d6/1697a55a).
 - 2026-10-16: Fix commit + Verified commit columns implemented by Codex, Claude-verified (pytest 935/1 skip, BATS 21/21, mutations red); committed + pushed; operator to hard-refresh hub-grafana-dashboards after next Hermes pass.
 - 2026-10-16: Spec docs/plans/v1.43.4-bug-table-fix-and-verified-commits.md (plan 2/5; operator: "add both after Fix in") — Fix commit + Verified commit columns after Fixed in; dispatched to Codex.
 - 2026-10-16: Four-column verification layout (e7c1beae) LIVE on hub after operator hard-refreshed hub-grafana-dashboards; operator confirmed in Grafana (Verified | Verified at | Live-verified | Live-verified at).
