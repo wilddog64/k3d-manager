@@ -92,7 +92,7 @@ absent. **It runs tests only; it fixes no test or runtime code.**
    `**Status:**` line to:
    `**Status:** IMPLEMENTED — landed \`24c5e960\` (hub_data.bats freeze_clock + boundary test 5b; Claude verified 88/88 and mutations M1–M3 red). Was: OPEN — root cause confirmed 2026-10-15.`
 
-### Files
+## Files
 
 | File | Change |
 |---|---|
@@ -100,7 +100,7 @@ absent. **It runs tests only; it fixes no test or runtime code.**
 
 No other file.
 
-### What NOT to Do
+## What NOT to Do
 
 - Do NOT edit any test, script or `Makefile`, even if a test fails: report the failure only.
 - Do NOT bypass, disable or edit `scripts/tests/tripwire.sh`.
