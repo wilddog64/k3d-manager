@@ -157,7 +157,7 @@ No other `helm`, CRD, label or annotation change. Do not touch `bin/cluster-up` 
   fails at phase `checking-argocd` with a "run make up" message when that install is missing.
 - `CHANGELOG.md` `[Unreleased]`: one `Fixed:` entry.
 
-### Files
+## Files
 
 | File | Change |
 |---|---|
