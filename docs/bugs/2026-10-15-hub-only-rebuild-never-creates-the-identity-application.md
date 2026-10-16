@@ -58,35 +58,136 @@ RESUME=<run_id> ./scripts/k3d-manager hub_data_recover
 The data restore brings back the Keycloak database (realm and users), so the realm import in
 `bin/cluster-up` Step 10d is not needed on this path.
 
-## Fix
+## Fix (covers this section and the two "Also missing" sections below)
 
-Move the manifest out of the `bin/cluster-up` heredoc into a file, for example
-`scripts/etc/argocd/applications/shopping-cart-identity.yaml`, and have both paths apply it:
+### F1 — new file `scripts/etc/argocd/identity/shopping-cart-identity-application.yaml`
 
-- `bin/cluster-up` Step 10c applies the file instead of the heredoc. The behaviour does not change.
-- `bin/hub-up` (or `_hub_recovery_reconcile`, before `_hub_recovery_replay_identity_hook`) runs
-  `keycloak_smoke_vault_preseed`, applies the file, and waits for `deploy/postgres-keycloak` to be
-  available, with the same timeout and diagnostics as Step 10c.
+Move the `shopping-cart-identity` Application out of the `bin/cluster-up` Step 10c heredoc,
+**byte for byte**: everything between `kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'` and
+`IDEOF`. Do not change any field.
 
-Then `hub_data_recover` Step 1 finds its target on a fresh hub.
+### F2 — `bin/cluster-up` Step 10c
 
-## Files
+Replace the whole heredoc, from the `kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'` line
+through the closing `IDEOF` line, with:
 
-- `bin/cluster-up`
-- `bin/hub-up` or `scripts/plugins/hub_recovery.sh`
-- `scripts/etc/argocd/applications/shopping-cart-identity.yaml` (new)
-- BATS for the hub-up / reconcile path
-- `docs/howto/hub-rebuild-from-gitops-vault.md`
+```bash
+kubectl apply --context k3d-k3d-cluster -f "${REPO_ROOT}/scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
+```
 
-## Definition of Done
+Keep the comment line above it and everything after it unchanged.
 
-- [ ] A test proves the hub-only path applies the identity Application. Check the test fails against
-      the pre-fix source.
-- [ ] `bin/cluster-up` still applies the identical manifest (diff the rendered object).
-- [ ] Live: the 2026-10-29 rebuild drill
-      (`docs/bugs/2026-10-15-hub-recover-all-checks-keychain-after-deleting-the-hub.md`) finishes
-      `make hub-recover-all` with no manual apply.
-- [ ] Commit message: `fix(hub-up): create the shopping-cart-identity Application on the hub-only path`
+### F3 — `scripts/plugins/hub_recovery.sh`: identity bootstrap on the hub-only path
+
+Add this function directly above `function _hub_recovery_retry_failed_identity_sync()`:
+
+```bash
+function _hub_recovery_ensure_identity_bootstrap() {
+  local hub_context="$1"
+  local app_file="${SCRIPT_DIR}/etc/argocd/identity/shopping-cart-identity-application.yaml"
+  local oidc_es="${HUB_RECOVERY_INFRA_ROOT:-${SCRIPT_DIR}/../../shopping-carts/shopping-cart-infra}/argocd/config/argocd-secret.yaml"
+  if ! _kubectl --no-exit --context "$hub_context" -n cicd get application shopping-cart-identity >/dev/null 2>&1; then
+    _info "[hub-recovery] shopping-cart-identity Application missing; applying ${app_file}"
+    _kubectl --context "$hub_context" apply -f "$app_file" || return 1
+  fi
+  if [[ -f "$oidc_es" ]]; then
+    _kubectl --context "$hub_context" apply -f "$oidc_es" || return 1
+  else
+    _warn "[hub-recovery] ${oidc_es} not found; ArgoCD SSO needs ExternalSecret cicd/argocd-oidc-secret from shopping-cart-infra"
+  fi
+}
+```
+
+In `hub_recovery_reconcile`, call it immediately before the existing
+`_hub_recovery_retry_failed_identity_sync "$hub_context"` line:
+
+```bash
+  _hub_recovery_ensure_identity_bootstrap "$hub_context" || return 1
+```
+
+Add `"Identity Application + ArgoCD OIDC secret"` as the **first** entry of the `steps=(...)`
+listing array in `hub_recovery_reconcile`. Update any test that counts or prints that list.
+
+### F4 — `bin/hub-restore` Step 8: ArgoCD and Keycloak port-forward agents
+
+Add this helper directly above the `_step_start 8` line:
+
+```bash
+_hub_restore_ensure_pf_agent() {
+  local name="$1" label="com.k3d-manager.$1-port-forward" state_dir wrapper plist log
+  state_dir="$(_acg_provider_state_dir k3s-aws)"
+  wrapper="${state_dir}/bin/${name}-port-forward.sh"
+  plist="${HOME}/Library/LaunchAgents/${label}.plist"
+  log="${state_dir}/logs/${name}-pf.log"
+  if [[ ! -f "${wrapper}" ]]; then
+    _info "[hub-restore] ${label}: wrapper ${wrapper} missing; run make up once to generate it"
+    return 1
+  fi
+  if [[ ! -f "${plist}" ]]; then
+    mkdir -p "$(dirname "${log}")" "$(dirname "${plist}")"
+    cat > "${plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log}</string>
+  <key>StandardErrorPath</key>
+  <string>${log}</string>
+</dict>
+</plist>
+PLIST
+  fi
+  launchctl list "${label}" >/dev/null 2>&1 && return 0
+  launchctl bootstrap "gui/$(id -u)" "${plist}"
+}
+```
+
+In Step 8, after the `install-hub-pushgateway-port-forward` line, add:
+
+```bash
+for _pf_name in argocd keycloak; do
+  _hub_restore_ensure_pf_agent "${_pf_name}" || _local_agents_ok=0
+done
+```
+
+This is the same plist that `bin/cluster-refresh` writes, so either path can manage the agent.
+
+### F5 — tests
+
+- `scripts/tests/bin/cluster_up.bats`: the two tests that extract the `IDEOF` heredoc now read
+  `scripts/etc/argocd/identity/shopping-cart-identity-application.yaml` instead. Keep their
+  assertions: `syncOptions` == `["CreateNamespace=true", "ServerSideApply=true"]`, the
+  `ServerSideDiff=true` compare-options annotation, and no `Replace=true` anywhere. Add one test that
+  `bin/cluster-up` applies that file and no longer contains `<<'IDEOF'`.
+- `scripts/tests/plugins/hub_recovery.bats`: (a) Application absent → `apply -f` is called with the
+  app file; (b) Application present → it is not applied; (c) the OIDC ExternalSecret file present
+  (point `HUB_RECOVERY_INFRA_ROOT` at a temp dir) → `apply -f` is called with it; (d) file absent →
+  warning, rc 0; (e) `hub_recovery_reconcile --confirm` calls the bootstrap before
+  `_hub_recovery_retry_failed_identity_sync`.
+- `scripts/tests/bin/hub_restore.bats`: with `HOME` and the state dir in temp dirs and
+  `launchctl` stubbed: (a) wrapper present, plist absent, not loaded → plist written (passes
+  `plutil -lint` if available, otherwise contains the wrapper path) and `bootstrap` called;
+  (b) already loaded → no bootstrap; (c) wrapper missing → rc 1 and no plist.
+- Mutation: remove the `_hub_recovery_ensure_identity_bootstrap` call from `hub_recovery_reconcile`
+  on a snapshot; show test (e) red; restore and `cmp`.
+
+### F6 — docs
+
+`docs/howto/hub-rebuild-from-gitops-vault.md`, "Identity app stuck after a rebuild": say that
+`make hub-recover` now creates the identity Application and the ArgoCD OIDC ExternalSecret, and
+`make hub-restore` installs the ArgoCD and Keycloak port-forward agents.
 
 ## Also missing on the hub-only path: the ArgoCD and Keycloak port-forward agents
 
@@ -116,3 +217,20 @@ wait for `SecretSynced`, then `rollout restart deploy/argocd-server`.
 
 **Fix:** the same shared "identity bootstrap" step that applies the identity Application also
 applies this ExternalSecret and restarts `argocd-server` once it syncs.
+
+## Files
+
+- `scripts/etc/argocd/identity/shopping-cart-identity-application.yaml` (new)
+- `bin/cluster-up`
+- `scripts/plugins/hub_recovery.sh`
+- `bin/hub-restore`
+- `scripts/tests/bin/cluster_up.bats`, `scripts/tests/plugins/hub_recovery.bats`, `scripts/tests/bin/hub_restore.bats`
+- `docs/howto/hub-rebuild-from-gitops-vault.md`
+
+## Definition of Done
+
+- [ ] F5 tests pass; test (e) is shown red under the F5 mutation.
+- [ ] The new YAML file is byte-identical to the removed heredoc body (show `diff` against the body extracted from `git show HEAD:bin/cluster-up` with the same sed).
+- [ ] `shellcheck bin/cluster-up bin/hub-restore scripts/plugins/hub_recovery.sh` has no new warnings; the cluster_up, hub_recovery, hub_restore and hub_data suites are green.
+- [ ] Live: the 2026-10-29 rebuild drill finishes `make hub-recover-all` with no manual identity, OIDC or port-forward step.
+- [ ] Commit message: `fix(hub-recovery): bootstrap the identity app, ArgoCD OIDC secret and port-forwards on the hub-only path`
