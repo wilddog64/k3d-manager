@@ -68,3 +68,43 @@ Repository searches identify host-tool references inside offline test locations,
 **Audit result:** Common offline tripwire protection exists on the four main leaf suites. Other suite failures are **not confirmed** from source inspection alone; the uncovered `test-alertmanager-behaviour` target is a specific hardening candidate, not an established live-access incident. Keep this in the same bug pending test evidence rather than spawning speculative duplicates.
 
 **Additional investigation requirement (operator, 2026-10-14):** Inventory **all other test-related Make targets**, not only `test`, `test-bin`, `test-python-unit`, `test-pytest`, and `test-all` (including dedicated targets such as `test-alertmanager-behaviour`). For each, determine whether it is intended to be offline or live/opt-in; check isolation, sandbox/cluster/Keychain/cloud dependencies, and missing-environment behavior. Document any separately confirmed defects or enhancements, without automatically adding special-purpose tests to `test-all` or weakening the tripwire.
+
+## Codex verification task — 2026-10-16
+
+**Approval:** explicit 2026-10-16 "go ahead and dispatch 1, 2, and 4 to codex" (operator)
+
+The test-clock fix (`24c5e960`, `docs/bugs/2026-10-15-test-all-hub-data-prune-aging-fixtures.md`)
+may have been this failure. This task checks that, with the `ubuntu-k3s` context both present and
+absent. **It runs tests only; it fixes no test or runtime code.**
+
+### Steps
+
+1. `make test 2>&1 | tee "$RUN_LOG_PRESENT"` with your normal environment, where the real
+   kubeconfig has an `ubuntu-k3s` context. Put both logs in a temp dir outside the repo.
+   The suite takes about 15 minutes and goes quiet for long stretches. That is not a hang: run it
+   in the background and watch the log's modification time, and never abandon it.
+2. Make an absent-context kubeconfig: `tmp=$(mktemp -d)`; write `$tmp/config` containing only
+   `apiVersion: v1`, `kind: Config`, `clusters: []`, `contexts: []`, `users: []`. Then run
+   `KUBECONFIG="$tmp/config" make test 2>&1 | tee "$RUN_LOG_ABSENT"`.
+3. For each run, report the final BATS summary line (`N tests, M failures`), the make exit code,
+   and, for every `not ok` line, its number, name and the assertion output under it.
+4. In `docs/bugs/2026-10-15-test-all-hub-data-prune-aging-fixtures.md`, change only its
+   `**Status:**` line to:
+   `**Status:** IMPLEMENTED — landed \`24c5e960\` (hub_data.bats freeze_clock + boundary test 5b; Claude verified 88/88 and mutations M1–M3 red). Was: OPEN — root cause confirmed 2026-10-15.`
+
+### Files
+
+| File | Change |
+|---|---|
+| `docs/bugs/2026-10-15-test-all-hub-data-prune-aging-fixtures.md` | step 4, Status line only |
+
+No other file.
+
+### What NOT to Do
+
+- Do NOT edit any test, script or `Makefile`, even if a test fails: report the failure only.
+- Do NOT bypass, disable or edit `scripts/tests/tripwire.sh`.
+- Do NOT contact the hub, the sandbox, AWS or any cluster; do NOT run `kubectl` yourself.
+- Do NOT modify the real `~/.kube/config`; the absent case uses `KUBECONFIG` only.
+- Do NOT create a PR, commit, switch branches, or use `--no-verify`.
+- Do NOT modify files outside the Files table, including this doc and `memory-bank/`.
