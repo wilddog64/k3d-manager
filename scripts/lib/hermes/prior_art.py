@@ -156,6 +156,19 @@ def doc_status(text):
     return priority, "open", False
 
 
+_LIVE_VERIFIED_RE = re.compile(r"^LIVE-VERIFIED\b", re.IGNORECASE)
+
+
+def doc_verification(text):
+    """Return ``"live"``, ``"verified"`` or ``""`` from the doc's Status value."""
+    value = _status_value(text) or ""
+    if _LIVE_VERIFIED_RE.search(value):
+        return "live"
+    if _VERIFIED_RE.search(value):
+        return "verified"
+    return ""
+
+
 def doc_release(text, added_release=None):
     match = _BRANCH_RELEASE_RE.search(text)
     if match:

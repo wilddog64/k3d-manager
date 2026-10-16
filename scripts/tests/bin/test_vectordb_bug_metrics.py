@@ -126,7 +126,8 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     docs = {
         "implemented.md": "**Priority:** P1\n**Status:** IMPLEMENTED — landed\n",
         "verified.md": "**Priority:** P1\n**Status:** VERIFIED — live\n",
-        "old-fixed.md": "**Priority:** P2\n**Status:** FIXED\n",
+        "live-verified.md": "**Priority:** P1\n**Status:** LIVE-VERIFIED — hub proof\n",
+        "old-fixed.md": "**Priority:** P2\n**Status:** LIVE-VERIFIED — historical proof\n",
         "unassigned-fixed.md": "**Priority:** P3\n**Status:** FIXED\n",
         "open.md": "**Priority:** P0\n**Status:** OPEN\n",
         "deferred.md": "**Priority:** P1\n**Status:** DEFERRED\n",
@@ -134,16 +135,20 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     for name, text in docs.items():
         (bugs / name).write_text(text)
     tally = {
-        "v1.43.2": {"open_paths": [{"path": f"docs/bugs/{name}"} for name in ("implemented.md", "verified.md", "open.md", "deferred.md")]},
+        "v1.43.2": {"open_paths": [{"path": f"docs/bugs/{name}"} for name in ("implemented.md", "verified.md", "live-verified.md", "open.md", "deferred.md")]},
         "v1.40.0": {"closed_paths": [{"path": "docs/bugs/old-fixed.md"}]},
     }
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -2") for line in info)
-    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and line.endswith(" -2") for line in info)
-    assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and line.endswith(" -2") for line in info)
-    assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line for line in info)
+    assert any('bug="implemented"' in line and 'live_verified="false"' in line for line in info)
+    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and 'live_verified="false"' in line and line.endswith(" -2") for line in info)
+    assert any('bug="live-verified"' in line and 'verified="true"' in line and 'live_verified="true"' in line for line in info)
+    assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line and line.endswith(" -2") for line in info)
+    # agent-audit: allow assert-removed verified assertions rewritten to also check live_verified
+    assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line for line in info)
     assert any('bug="open"' in line and 'status="open"' in line and 'verified=' not in line for line in info)
+    assert any('bug="open"' in line and 'live_verified=' not in line for line in info)
     assert any('bug="deferred"' in line and 'status="deferred"' in line and 'verified=' not in line for line in info)
     statuses = [line.split('status="', 1)[1].split('"', 1)[0]
                 for line in info if 'release="v1.43.2"' in line]
@@ -165,6 +170,18 @@ def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
     lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert [line.split('bug="', 1)[1].split('"', 1)[0] for line in lines] == [
         "new-p0", "new-p2", "old-p0", "unassigned"]
+
+
+def test_bug_status_metrics_puts_live_verified_last_on_fixed_metrics(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "live.md").write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED\n")
+    output = metrics._bug_status_metrics(tmp_path, tally={
+        "v1.43.2": {"closed_paths": [{"path": "docs/bugs/live.md"}]},
+    })
+    lines = [line for line in output.splitlines() if "live_verified=\"true\"" in line]
+    assert len(lines) == 2
+    assert all('verified="true",live_verified="true"' in line for line in lines)
 
 
 def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metrics, tmp_path):

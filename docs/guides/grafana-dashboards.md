@@ -330,7 +330,13 @@ scan age, a **Bugs** table, and open-by-priority over time. Each document is cla
 | `unknown` | there is no status line |
 | `open` | anything else |
 
-Fixed documents also have a Verified label:
+The verification ladder is `OPEN → IMPLEMENTED → VERIFIED → LIVE-VERIFIED`. VERIFIED means
+someone other than the implementer checked the fix offline: tests ran, the new tests were shown
+red on the old code, and mutations were red. LIVE-VERIFIED means the fix was proven on the real
+system (hub, cluster, Slack, or email). The ladder is cumulative, so LIVE-VERIFIED is also
+VERIFIED.
+
+Fixed documents also have a Verified and Live-verified label:
 
 | Verified | When |
 |---|---|
@@ -339,12 +345,19 @@ Fixed documents also have a Verified label:
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | no label | not fixed |
 
-The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified, Deferred,
-and scan age. The table reads `k3dm_bug_info`, includes Release, Bug, Priority, Open for, Filed,
-Status, and Verified, and clicking a title opens that document on the scanned branch. The
-**Hide verified** toggle is the default: it keeps open, unknown, deferred, and not-yet-verified
-rows visible while hiding live-proven and historic `n/a` fixes. To mark a fix live-proven, change
-its Status to `VERIFIED — <evidence>`.
+| Live-verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| no label | not fixed |
+
+The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
+Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
+Priority, Open for, Filed, Status, Verified, and Live-verified, and clicking a title opens that
+document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
+unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
+`n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.
 
 The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
 group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.

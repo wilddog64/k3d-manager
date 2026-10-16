@@ -47,11 +47,11 @@ data:
             "name": "verified",
             "label": "Verified fixes",
             "type": "custom",
-            "query": "Hide verified : ^(false)?$,Show all : .*",
+            "query": "Hide live-verified : ^(false)?$,Show all : .*",
             "options": [],
             "multi": false,
             "includeAll": false,
-            "current": {"selected": true, "text": "Hide verified", "value": "^(false)?$"},
+            "current": {"selected": true, "text": "Hide live-verified", "value": "^(false)?$"},
             "hide": 0
           }
         ]
@@ -928,18 +928,29 @@ data:
           "id": 16,
           "type": "stat",
           "title": "Verified",
-          "gridPos": {"x": 15, "y": 16, "w": 3, "h": 4},
+          "gridPos": {"x": 15, "y": 16, "w": 2, "h": 4},
           "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"fixed\",verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
-          "description": "Follows the Release dropdown. Live-proven: the doc's Status moved IMPLEMENTED → VERIFIED. Counts only releases from v1.43.2.",
+          "description": "Follows the Release dropdown. Independently checked: the doc's Status is VERIFIED or LIVE-VERIFIED. Counts only releases from v1.43.2.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
+        },
+        {
+          "id": 24,
+          "type": "stat",
+          "title": "Live-verified",
+          "gridPos": {"x": 17, "y": 16, "w": 2, "h": 4},
+          "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"fixed\",live_verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
+          "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
+          "description": "Follows the Release dropdown. Proven on the real system: the doc's Status is LIVE-VERIFIED. Counts only releases from v1.43.2.",
           "datasource": {"type": "prometheus", "uid": "prometheus"}
         },
         {
           "id": 17,
           "type": "stat",
           "title": "Deferred",
-          "gridPos": {"x": 18, "y": 16, "w": 3, "h": 4},
+          "gridPos": {"x": 19, "y": 16, "w": 2, "h": 4},
           "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{status=\"deferred\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#8e8e8e"}}},
@@ -1010,11 +1021,11 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide verified is the default; n/a means the doc was filed before the VERIFIED convention. Click a name to open the doc on the scanned branch.",
+          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch.",
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_bug_info{release=~\"$release\",verified=~\"$verified\"}",
+              "expr": "k3dm_bug_info{release=~\"$release\",live_verified=~\"$verified\"}",
               "instant": true,
               "format": "table"
             }
@@ -1041,7 +1052,8 @@ data:
                   "Value": 3,
                   "filed": 4,
                   "status": 5,
-                  "verified": 6
+                  "verified": 6,
+                  "live_verified": 7
                 },
                 "excludeByName": {
                   "bug": true,
@@ -1060,7 +1072,8 @@ data:
                   "filed": "Filed",
                   "Value": "Open for",
                   "status": "Status",
-                  "verified": "Verified"
+                  "verified": "Verified",
+                  "live_verified": "Live-verified"
                 }
               }
             }
@@ -1082,6 +1095,18 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {"id": "byName", "options": "Live-verified"},
+                "properties": [
+                  {"id": "custom.width", "value": 90},
+                  {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+                  {"id": "mappings", "value": [{"type": "value", "options": {
+                    "true": {"text": "✓ live", "color": "green", "index": 0},
+                    "false": {"text": "not yet", "color": "orange", "index": 1},
+                    "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2}
+                  }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                ]
+              },
               {
                 "matcher": {
                   "id": "byName",

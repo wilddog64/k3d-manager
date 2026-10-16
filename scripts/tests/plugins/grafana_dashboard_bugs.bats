@@ -34,6 +34,8 @@ data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "verified")
 assert variable["type"] == "custom"
 assert variable["current"]["value"] == "^(false)?$"
+assert variable["current"]["text"] == "Hide live-verified"
+assert variable["query"] == "Hide live-verified : ^(false)?$,Show all : .*"
 PY
   [ "${status}" -eq 0 ]
 }
@@ -87,7 +89,7 @@ module = runpy.run_path(metrics_path)
 with tempfile.TemporaryDirectory() as tmp:
     bugs = Path(tmp) / "docs/bugs"
     bugs.mkdir(parents=True)
-    (bugs / "one.md").write_text("**Priority:** P1\n**Status:** Open\n")
+    (bugs / "one.md").write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED\n")
     output = module["_bug_metrics"](Path(tmp)) + module["_bug_status_metrics"](Path(tmp))
 source = Path(metrics_path).read_text()
 assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs", "k3dm_bug_info", "k3dm_bug_status_docs"} <= queries
@@ -95,6 +97,7 @@ missing = [name for name in queries if name + "{" not in output and name + " " n
 assert not missing, missing
 assert "k3dm_bug_docs_scan_timestamp_seconds" in output
 assert "k3dm_bug_open_info" not in output and "k3dm_bug_open_release_docs" not in output
+assert "live_verified=" in output
 PY
   [ "${status}" -eq 0 ]
 }
@@ -199,7 +202,10 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Verified"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Verified", "Live-verified"]
+    assert organize["indexByName"]["verified"] == 6
+    assert organize["indexByName"]["live_verified"] == 7
+    assert organize["renameByName"]["live_verified"] == "Live-verified"
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -213,6 +219,23 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bug dashboard separates verified and live-verified summary and table" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+live = panels[24]
+assert live["title"] == "Live-verified"
+assert 'live_verified="true"' in live["targets"][0]["expr"]
+assert panels[16]["gridPos"] == {"x": 15, "y": 16, "w": 2, "h": 4}
+assert live["gridPos"] == {"x": 17, "y": 16, "w": 2, "h": 4}
+assert panels[17]["gridPos"] == {"x": 19, "y": 16, "w": 2, "h": 4}
+table = panels[23]
+assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "open bugs table sorts by sort_key before hiding it" {
   run _open_bugs_table_check sort
   [ "${status}" -eq 0 ]
@@ -223,7 +246,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Verified" {
+@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Verified, Live-verified" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }

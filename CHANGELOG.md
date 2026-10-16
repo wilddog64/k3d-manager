@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The k3dm Bug Tracking dashboard now separates VERIFIED from LIVE-VERIFIED with a dedicated label, column, tile, and filter.
+
 ### Fixed
 
 - `make smoke` now discovers the shopping-cart target from ArgoCD and refuses ambiguous or mismatched application/context selections instead of silently checking the infra context.

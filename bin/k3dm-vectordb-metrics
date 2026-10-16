@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import doc_meta, doc_status  # noqa: E402
+from hermes.prior_art import doc_meta, doc_status, doc_verification  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -154,7 +154,8 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None):
     rows = []
     skipped = 0
     for path, text in _bug_texts(root, ref).items():
-        priority, status, live_verified = doc_status(text)
+        priority, status, _live_verified = doc_status(text)
+        verification = doc_verification(text)
         stem = Path(path).name.removesuffix(".md")
         if not _BUG_STEM_RE.fullmatch(stem):
             skipped += 1
@@ -178,39 +179,44 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None):
         if len(title) > 120:
             title = title[:119] + "…"
         verified = None
+        live_verified = None
         if status == "fixed":
-            verified = "true" if live_verified else "false"
+            verified = "true" if verification in ("verified", "live") else "false"
+            live_verified = "true" if verification == "live" else "false"
             if not _release_at_least(release, (1, 43, 2)):
                 verified = "n/a"
+                live_verified = "n/a"
             value = -2
         elif filed:
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
         else:
             value = -1
         sort_key = f"{_release_order(release)} {STATUS_RANK[status]} {priority} {filed or '9999-99-99'} {stem}"
-        rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified))
+        rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified,
+                     live_verified))
     rows.sort(key=lambda row: row[0])
     truncated = int(len(rows) > 1000)
     aggregates = {}
-    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified in rows:
-        key = (release, priority, status, verified)
+    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified in rows:
+        key = (release, priority, status, verified, live_verified)
         aggregates[key] = aggregates.get(key, 0) + 1
     lines = []
-    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified in rows[:1000]:
+    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified in rows[:1000]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
-                  f'status="{status}"')
+                  f'status="{status}",release_order="{_release_order(release)}"')
         if verified is not None:
             labels += f',verified="{verified}"'
-        labels += f',release_order="{_release_order(release)}"'
+            labels += f',live_verified="{live_verified}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
-        release, priority, status, verified = item[0]
-        return (release, PRIORITIES.index(priority), STATUS_RANK[status], verified or "")
-    for (release, priority, status, verified), count in sorted(aggregates.items(), key=aggregate_key):
+        release, priority, status, verified, live_verified = item[0]
+        return (release, PRIORITIES.index(priority), STATUS_RANK[status], verified or "", live_verified or "")
+    for (release, priority, status, verified, live_verified), count in sorted(aggregates.items(), key=aggregate_key):
         labels = f'release="{release}",priority="{priority}",status="{status}"'
         if verified is not None:
             labels += f',verified="{verified}"'
+            labels += f',live_verified="{live_verified}"'
         lines.append(f"k3dm_bug_status_docs{{{labels}}} {count}")
     lines.append(f"k3dm_bug_info_skipped {skipped}")
     lines.append(f"k3dm_bug_info_truncated {truncated}")
