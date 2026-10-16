@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `make smoke` now discovers the shopping-cart target from ArgoCD and refuses ambiguous or mismatched application/context selections instead of silently checking the infra context.
+
 - Added: the k3dm Bug Tracking dashboard now classifies bug documents by status and live verification,
   shows a per-release Open/Fixed/Verified/Deferred summary, and includes fixed documents in its table.
 - Added: the k3dm Bug Tracking dashboard now lists open bug documents with priority, title,
