@@ -405,6 +405,10 @@ function vault_dr_shards_save() {
       done
    fi
    if (( differs == 1 )); then
+      if [[ "${K3DM_DR_SHARDS_PRESERVE:-0}" == 1 ]]; then
+         _warn "[vault] hub recovery in progress — keeping the existing DR shards for the restore; do not export until the restore finishes"
+         return 0
+      fi
       _warn "[vault] replacing older DR shards; older exports need the old shards — run make hub-data-export now"
    fi
    _vault_dr_store_shards "$cluster" "${shards[@]}"

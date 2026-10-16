@@ -82,8 +82,9 @@ rm -P /tmp/k3dm-dr-shards    # on both Macs
 
 Do not automate this transfer. When the real hub's Vault is re-initialised (a
 full rebuild), Vault init replaces the M4 copy and warns that older exports
-need the old shards. Run `make hub-data-export` straight away, then repeat this
-transfer for the M2.
+need the old shards. `make hub-recover-all` sets `K3DM_DR_SHARDS_PRESERVE=1`, so
+a recovery keeps the existing shards for its restore. Export only after the
+restore finishes.
 
 ### 4. Freshness workflow
 

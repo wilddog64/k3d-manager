@@ -894,6 +894,12 @@ STUB
   [ "$status" -eq 0 ]; [ "$(cat "$CALL_LOG")" = $'hub_data_recover_teardown\nmake --no-print-directory hub-recover\nhub_data_recover' ]
 }
 
+@test "recover B4-21: hub-recover-all preserves DR shards during hub rebuild" {
+  local recipe
+  recipe="$(awk '/^hub-recover-all:/{found=1; next} found && /^$/{exit} found' Makefile)"
+  [[ "$recipe" == *'K3DM_DR_SHARDS_PRESERVE=1 $(MAKE) --no-print-directory hub-recover;'* ]]
+}
+
 @test "recover B4-22: teardown failure prevents rebuild and resume" {
   local script="$TEST_ROOT/k3d-manager" copy="$TEST_ROOT/repo"
   cat > "$script" <<'STUB'

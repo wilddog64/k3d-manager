@@ -103,7 +103,7 @@ hub-recover-all:
 	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
 	test -n "$$run_id"; \
 	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
-	$(MAKE) --no-print-directory hub-recover; \
+	K3DM_DR_SHARDS_PRESERVE=1 $(MAKE) --no-print-directory hub-recover; \
 	RESUME=$$run_id ./scripts/k3d-manager hub_data_recover
 
 dr-drill:
