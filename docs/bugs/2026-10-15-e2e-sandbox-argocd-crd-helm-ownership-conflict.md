@@ -3,7 +3,7 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.3` (moved from v1.43.4 on 2026-10-16 at operator request)
 **Priority:** P2 — E2E verification blocked
-**Status:** OPEN — fix spec below, dispatched to Codex 2026-10-16
+**Status:** IMPLEMENTED — `e809f9c5` (v1.43.3; Codex + Claude full-flow test; 7 new BATS red on the old code, 3 of 4 mutations red, `return 0` equivalent because `_err` exits); live proof: `make e2e-sandbox` passes `checking-argocd`
 **Approval:** explicit 2026-10-16 "can you move e2e-sandbox bug to v1.43.3 and send to codex" (operator)
 
 ## Observed failure
