@@ -236,6 +236,24 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "Verified column reads verified, and only Live-verified reads live" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = {panel["id"]: panel for panel in data["panels"]}[23]
+def true_text(column):
+    matches = [prop["value"][0]["options"]["true"]["text"]
+               for override in table["fieldConfig"]["overrides"]
+               if override["matcher"].get("options") == column
+               for prop in override["properties"] if prop["id"] == "mappings"]
+    assert len(matches) == 1, (column, matches)
+    return matches[0]
+assert true_text("Verified") == "✓ verified", true_text("Verified")
+assert true_text("Live-verified") == "✓ live", true_text("Live-verified")
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "open bugs table sorts by sort_key before hiding it" {
   run _open_bugs_table_check sort
   [ "${status}" -eq 0 ]

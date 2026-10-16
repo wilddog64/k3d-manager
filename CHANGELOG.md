@@ -18,7 +18,7 @@
 
 ### Changed
 
-- The k3dm Bug Tracking dashboard now separates VERIFIED from LIVE-VERIFIED with a dedicated label, column, tile, and filter.
+- The k3dm Bug Tracking dashboard now separates VERIFIED from LIVE-VERIFIED with a dedicated label, column, tile, and filter. The Verified column reads "✓ verified"; only Live-verified reads "✓ live".
 
 ### Fixed
 

@@ -1304,7 +1304,7 @@ data:
                   {"id": "custom.cellOptions", "value": {"type": "color-text"}},
                   {"id": "mappings", "value": [
                     {"type": "value", "options": {
-                      "true": {"text": "✓ live", "color": "green", "index": 0},
+                      "true": {"text": "✓ verified", "color": "green", "index": 0},
                       "false": {"text": "not yet", "color": "orange", "index": 1},
                       "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2}
                     }},
