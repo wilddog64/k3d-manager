@@ -217,7 +217,8 @@ rules = groups["e2e.alerts"]["rules"]
 alerts = [rule["alert"] for rule in rules]
 assert alerts == ["E2EVerificationFailing", "E2EVerificationStale"], alerts
 for rule in rules:
-    assert "$labels.runner" in rule["annotations"]["summary"], rule["alert"]
+    has_runner = "$labels.runner" in rule["annotations"]["summary"]
+    assert has_runner == (rule["alert"] == "E2EVerificationFailing"), rule["alert"]
 print("ok")
 PY
   [ "${status}" -eq 0 ]
@@ -231,7 +232,9 @@ r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
 groups = {g["name"]: g for g in r["spec"]["groups"]}
 for rule in groups["e2e.alerts"]["rules"]:
     expr = rule["expr"]
-    assert "max by (tier, exported_service, project, runner)" in expr, (rule["alert"], expr)
+    want = ("max by (tier, exported_service, project)" if rule["alert"] == "E2EVerificationStale"
+            else "max by (tier, exported_service, project, runner)")
+    assert want + " (" in expr, (rule["alert"], expr)
     for field in ("summary", "description"):
         text = rule["annotations"][field]
         assert "$labels.service " not in text and "$labels.service}" not in text, (rule["alert"], field)
@@ -240,6 +243,59 @@ print("ok")
 PY
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
+}
+
+@test "e2e staleness is fresh if any runner passed recently" {
+  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
+  rules_file="${BATS_TEST_TMPDIR}/e2e-rules.yml"
+  test_file="${BATS_TEST_TMPDIR}/e2e-staleness.test.yml"
+  python3 - "${RULE}" "${rules_file}" <<'PY'
+import sys, yaml
+document = next(d for d in yaml.safe_load_all(open(sys.argv[1]))
+                if d and d.get("kind") == "PrometheusRule")
+yaml.safe_dump({"groups": document["spec"]["groups"]}, open(sys.argv[2], "w"), sort_keys=False)
+PY
+  python3 - "${rules_file}" "${test_file}" <<'PY'
+import sys
+rules_file, test_file = sys.argv[1:]
+open(test_file, "w").write(f"""rule_files:
+  - {rules_file}
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"local-m4\"}}'
+        values: '0x7200'
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"m2\"}}'
+        values: '259200x7200'
+    alert_rule_test:
+      - eval_time: 5d
+        alertname: E2EVerificationStale
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"local-m4\"}}'
+        values: '0x7200'
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"m2\"}}'
+        values: '0x7200'
+    alert_rule_test:
+      - eval_time: 5d
+        alertname: E2EVerificationStale
+        exp_alerts:
+          - exp_labels:
+              alertname: E2EVerificationStale
+              exported_service: product-catalog
+              project: api+flows
+              tier: e2e
+              group: e2e
+              severity: warning
+            exp_annotations:
+              summary: 'no passing e2e for product-catalog/vcluster on any runner in >3d'
+              description: 'No passing e2e run for product-catalog on the vcluster substrate on any runner in over 3 days; the verification signal is stale.'
+""")
+PY
+  run promtool test rules "${test_file}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "argocd platform-ops deploy applies the e2e dashboard" {
