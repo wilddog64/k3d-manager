@@ -82,3 +82,16 @@ refusal, print the resume hint (unlock, then rerun `make hub-recover-all`; nothi
 - [ ] A passing preflight still reaches the teardown, `hub-recover` and the `RESUME` restore.
 - [ ] `docs/howto` / guide page for hub recovery documents the resume sequence above.
 - [ ] Commit message: `fix(hub-data): check Keychain access before hub-recover-all deletes the hub`
+
+## Live verification — scheduled 2026-10-29
+
+Operator asked 2026-10-15 for a second rebuild two weeks after run `20261016T012103Z` to prove
+the fix live. Needs the fix landed and green first; move the date if it is not.
+
+1. `make hub-data-export` — a fresh export, under 24h old for the snapshot guard.
+2. Negative check: `security lock-keychain`, then `make hub-recover-all` and approve. It must
+   refuse before the teardown, and `k3d cluster list` must still show `k3d-cluster`.
+3. `security unlock-keychain`, then `make hub-recover-all` again: teardown, rebuild and restore in
+   one run with no manual resume.
+4. Claude verifies: `COMPACT deleted` about every 5 minutes, the run report green,
+   `HubKineCompactionStalled` resolved, SSO login to Grafana and ArgoCD.
