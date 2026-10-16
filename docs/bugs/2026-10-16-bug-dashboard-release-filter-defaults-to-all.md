@@ -40,6 +40,12 @@ within one release a Fixed P3 can sit above an open P2. Reorder the key to
 sorts after P3 because "unset" > "P3" in byte order; assert that in a test. With All releases
 selected, rows still group by release first. The column header stays sortable by hand.
 
+Check first: the operator's 2026-10-16 screenshot of v1.43.2 shows Fixed P1/P2 rows above Open P3
+rows, which a status-first key would not produce. `organize` excludes `sort_key` before the
+table's `sortBy` can use it, so the sort may not be applied at all and the visible order may come
+from the series order. Confirm in Grafana which one holds. If the sort is not applied, sort with a
+`sortBy` transformation **before** `organize`.
+
 ## Proof
 
 Open the dashboard with no URL parameters while on `k3d-manager-v1.43.4`: Release shows v1.43.4;
