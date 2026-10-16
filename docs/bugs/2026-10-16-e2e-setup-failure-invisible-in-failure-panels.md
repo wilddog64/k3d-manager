@@ -1,6 +1,6 @@
 # Bug: an e2e run that fails before any test runs is invisible in the failure panels (2026-10-16)
 
-**Status:** IMPLEMENTED — landed `c92c4311` (Codex; Claude verified: BATS 181/181, 3 new tests red on the old code, all 4 mutations red, shellcheck unchanged). Live proof pending.
+**Status:** IMPLEMENTED — landed `c92c4311` (Codex; Claude verified: BATS 181/181, 3 new tests red on the old code, all 4 mutations red, shellcheck unchanged). Live proof blocked: the hub exporter predates the fix (see Live check)
 **Priority:** P3 — the failure shows on the status tiles; only the failure-analysis panels miss it
 **Branch:** `k3d-manager-v1.43.2`
 **Release:** v1.43.2
@@ -144,3 +144,17 @@ Each must turn a test red:
 - Do NOT change the remote validator's ALLOWED, REQUIRED or STR_FIELDS.
 - Do NOT create a PR, commit, switch branches, or use `--no-verify`.
 - Do NOT modify files outside the Files table, including `memory-bank/`.
+
+## Live check 2026-10-16 — fix not deployed
+
+- The hub's `platform-ops/vulnerability-inventory-exporter` ConfigMap has no `e2e_failure_groups`;
+  git at `47e304f1` has it. Prometheus has no `e2e_failure_info` series for the three failed
+  sandbox runs (`1792155966-29279`, `1792169623-15778`, `1792169905-3394`), which `e2e_run_info`
+  does list.
+- Cause: the exporter is applied by `deploy_argocd_platform_ops` (`make platform-ops`), not by
+  Argo CD. `hub-platform-ops` syncs only `app-cluster-kubeconfig-externalsecret.yaml`, so
+  `make appsets-reapply` never delivers exporter changes. A `rollout restart` alone does not help
+  either, because the ConfigMap is still the old one.
+- To prove it: operator runs `make platform-ops` (applies the manifest and restarts the exporter),
+  then Claude re-queries `e2e_failure_info{run_id="1792169905-3394"}` for
+  `aborted at configuring-vault`.
