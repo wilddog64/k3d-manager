@@ -95,15 +95,110 @@ After this, `storageClassName` was owned by `k3dm-hub-restore`, the sync went `S
 `last-applied-configuration` is written. Apply the same rule to the other two restored claims
 (`data-vault-0`, `data-openldap-0`). Test: assert the restore's apply argv for claims.
 
+## Fix spec (exact; covers D1–D3 and the Grafana, ArgoCD, export-SA and credential-audit notes)
+
+All edits are in `scripts/plugins/hub_data.sh` unless stated.
+
+### F1 — D1, shim scope (`_hub_data_install_credential_guard`)
+
+Old: `  local run_dir="$1" context="$2" shim="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"`
+
+New (two lines):
+
+```bash
+  local run_dir="$1" context="$2"
+  _HUB_DATA_SECURITY_SHIM="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
+```
+
+Old: `  ln -sf "$shim" "${shim_dir}/security"` → New: `  ln -sf "$_HUB_DATA_SECURITY_SHIM" "${shim_dir}/security"`
+
+Old: `  security() { "$shim" "$@"; }` → New: `  security() { "$_HUB_DATA_SECURITY_SHIM" "$@"; }`
+
+### F2 — D2, refresh order, plus Grafana and ArgoCD restarts (`_hub_data_refresh_dependents`)
+
+Replace the two lines after the drill early-return:
+
+```bash
+  _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
+  _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite
+```
+
+with:
+
+```bash
+  local waited=0 limit="${K3DM_HUB_DATA_KEYCLOAK_WAIT_S:-600}"
+  _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite || return 1
+  _kubectl --context "$context" -n identity wait externalsecret --all --for=condition=Ready --timeout=180s || return 1
+  until _kubectl --no-exit --context "$context" -n identity get deployment/keycloak >/dev/null 2>&1; do
+    (( waited >= limit )) && { _err "[hub-recover] deployment/keycloak not created by ArgoCD within ${limit}s; check the shopping-cart-identity Application"; return 1; }
+    sleep "${K3DM_HUB_DATA_KEYCLOAK_POLL_S:-10}"; waited=$(( waited + ${K3DM_HUB_DATA_KEYCLOAK_POLL_S:-10} ))
+  done
+  _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
+  _kubectl --context "$context" -n monitoring rollout restart deployment/kube-prometheus-stack-grafana || _warn "[hub-recover] could not restart Grafana; its admin password may not match Vault until it restarts"
+  _kubectl --context "$context" -n cicd rollout restart deployment/argocd-server || _warn "[hub-recover] could not restart argocd-server; SSO may use a stale client secret until it restarts"
+```
+
+### F3 — D3, restored claims use server-side apply (Step 4 claim restore, the line ending `| _kubectl --context "$context" apply -f -` that writes a `PersistentVolumeClaim`)
+
+Old ending: `| _kubectl --context "$context" apply -f -`
+
+New ending: `| _kubectl --context "$context" apply --server-side --field-manager=k3dm-hub-restore -f -`
+
+Only that line. The `hub-data-export` ServiceAccount line (`create sa ... | _kubectl apply -f -`) is unchanged.
+
+### F4 — export ServiceAccount reminder (`_hub_data_recover_step9`)
+
+Before `_hub_data_run_step "$steps" 9 true`, add:
+
+```bash
+  printf '%s\n' '[hub-recover] next: make hub-data-export-setup && make hub-data-export (the rebuilt hub has no hub-data-export ServiceAccount until setup runs)'
+```
+
+### F5 — credential allowlist (`scripts/etc/dr/credential-allowlist.tsv`)
+
+After the line `restore-hub<TAB>add<TAB>k3d-manager-vault-unseal<TAB>secrets/vault:*`, add (tab-separated):
+
+```text
+restore-hub	find	k3d-manager-vault-unseal	secrets/vault:*
+```
+
+### F6 — tests (`scripts/tests/plugins/hub_data.bats`)
+
+1. D1: install the guard inside a function, return, then call `security show-keychain-info` under
+   `set -u` with the shim path stubbed. Assert it runs the shim and does not print `unbound variable`.
+2. D2 order: with `_kubectl` logging its argv, assert the order is force-sync annotate, then
+   `wait externalsecret`, then `get deployment/keycloak`, then the Keycloak restart, then the Grafana
+   restart, then the `argocd-server` restart.
+3. D2 wait: `get deployment/keycloak` fails twice, then succeeds (`K3DM_HUB_DATA_KEYCLOAK_POLL_S=0`).
+   Assert the restart still happens. With it always failing and `K3DM_HUB_DATA_KEYCLOAK_WAIT_S=0`,
+   assert rc 1 and the `not created by ArgoCD` message.
+4. D2 Grafana restart failure → warning, rc 0.
+5. D3: the claim-restore apply argv contains `--server-side` and `--field-manager=k3dm-hub-restore`.
+6. F4: Step 9 output contains `make hub-data-export-setup`.
+7. F5: the allowlist has the `restore-hub find k3d-manager-vault-unseal secrets/vault:*` row
+   (parse the TSV fields; do not grep a whole line).
+
+Never use a bare mid-test `! grep`; use `run ! grep` or `|| false`. Mutation: on snapshots,
+(a) swap the D2 restart back before the annotate and show test 2 red; (b) drop
+`--server-side` and show test 5 red. Restore each and `cmp`.
+
+### F7 — docs
+
+`docs/howto/hub-dr-drill.md` recovery runbook: Step 7 now force-syncs secrets, waits for
+Keycloak and restarts Keycloak, Grafana and `argocd-server`; after the report, run
+`make hub-data-export-setup && make hub-data-export`.
+
 ## Files
 
-- `scripts/plugins/hub_data.sh` (`_hub_data_install_credential_guard`, `_hub_data_refresh_dependents`, the Step 4 claim restore)
+- `scripts/plugins/hub_data.sh`
+- `scripts/etc/dr/credential-allowlist.tsv`
 - `scripts/tests/plugins/hub_data.bats`
-- `docs/howto/hub-dr-drill.md` (recovery runbook troubleshooting)
+- `docs/howto/hub-dr-drill.md`
 
 ## Definition of Done
 
-- [ ] D1, D2 and D3 each have a test that fails against the pre-fix source.
+- [ ] F6 tests 1–7 pass; tests 2 and 5 are shown red under their mutations.
+- [ ] `shellcheck scripts/plugins/hub_data.sh` has no new warnings; the hub_data, vault_dr_shards and hub_recovery suites are green.
 - [ ] Live: the 2026-10-29 rebuild drill passes Steps 6–7 with no manual step.
 - [ ] Commit message: `fix(hub-data): recover Steps 6-7 on a fresh hub (shim scope, refresh order, claim ownership)`
 
