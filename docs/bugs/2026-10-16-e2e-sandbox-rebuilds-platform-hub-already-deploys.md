@@ -1,12 +1,12 @@
 # Bug: e2e-sandbox rebuilds a platform the hub already deploys to the sandbox
 
-**Status:** OPEN — reproduced 2026-10-16; design decision needed before a spec
+**Status:** OPEN — reproduced 2026-10-16; design chosen 2026-10-16 (option a′), spec next
 **Priority:** P2
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make e2e-sandbox`, verified by Claude)
 **Affected:** `make e2e-sandbox` (Tier 2), `scripts/plugins/e2e.sh` `e2e_verify_sandbox`
 **Branch:** `k3d-manager-v1.43.4` (proposed, next to the other two e2e-sandbox bugs)
-**Approval:** pending — operator to confirm the placement and the design question below
+**Approval:** explicit 2026-10-16 "let's do a`" (operator) — option (a′) below
 **Related:** `docs/bugs/2026-10-15-e2e-sandbox-argocd-crd-helm-ownership-conflict.md` (same class,
 fixed in v1.43.3), `docs/bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md`
 
@@ -78,6 +78,48 @@ Deployments?
 
 Claude's recommendation: check (c) first, otherwise (a). Option (b) leaves state that a crashed run
 would never restore.
+
+### (c) checked 2026-10-16: not viable
+
+Live sandbox (`ubuntu-k3s`, read-only) against what the e2e overrides set:
+
+| Setting | Hub deploys | e2e needs |
+|---|---|---|
+| `payment.gateway.default` | `mock` | `stripe` |
+| `mock.gateway.enabled` | `true` | `false` |
+| order `BASKET_URL` / `PAYMENT_URL` | absent | in-cluster service URLs |
+| payment `oauth2.jwk-set-uri` | `keycloak.identity.svc` (no `identity` namespace on the sandbox) | `keycloak.3ai-talk.org` |
+
+The last two rows are wrong on the sandbox whatever the mode; fix them in the hub's base values for
+`ubuntu-k3s`, not in the e2e overlay.
+
+## Decision: (a′) — hub overlay switched on by a cluster label, only during a run
+
+Chosen over (a) "always Stripe on the sandbox": e2e runs rarely, so the sandbox keeps the mock
+gateway between runs, the Stripe key stays ephemeral (Keychain → `stripe-e2e` during the run, no
+Vault/ESO change), and an idle sandbox does not depend on Stripe.
+
+Shape, and the guards the spec must carry:
+
+1. **One ApplicationSet, label-selected values.** The order/payment sets pick an extra values file
+   from the cluster label `k3dm.k3d.io/e2e-profile`, defaulting to `none` (an empty
+   `values-none.yaml`) so an unlabelled cluster renders. Not two ApplicationSets: both would claim
+   the same Application names and Argo CD would delete and recreate them on each flip.
+2. **Run flow in `e2e_verify_sandbox`:** label the hub's `ubuntu-k3s` registration Secret
+   `e2e-profile=stripe` → wait (bounded) until the sandbox ConfigMap shows
+   `payment.gateway.default=stripe` → `rollout restart` + `rollout status` order and payment →
+   Playwright. Restarting before the sync lands would run on the old config.
+3. **Exit trap removes the label** on success and failure, then waits for the mock values to return
+   (best effort, logged).
+4. **`cluster-up` registers the sandbox without the label**, so a label left by a crash cannot carry
+   into a rebuilt sandbox (where payment would start in Stripe mode with no key). Verify the
+   registration path overwrites labels; add the removal if it does not.
+5. **Delete** `_e2e_sandbox_configure_vault_token_review`, the `applying-appsets` step and the
+   in-cluster registration from `e2e_verify_sandbox` (items 1–2 of Cause). Keep the `checking-argocd`
+   phase, reworded to check the hub's `ubuntu-k3s-*` Applications are Synced and Healthy.
+6. New hub coupling: the run needs the hub context to set the label. A down hub fails the run early
+   with a clear message.
+7. Live proof only after `make appsets-reapply` on the release branch.
 
 ## Workaround
 
