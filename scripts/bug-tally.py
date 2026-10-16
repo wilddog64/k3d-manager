@@ -11,10 +11,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import doc_meta, doc_release  # noqa: E402
+from hermes.prior_art import doc_meta, doc_release, doc_status  # noqa: E402
 
 TAG_RE = re.compile(r"^v(\d+\.\d+\.\d+)$")
 BRANCH_RE = re.compile(r"k3d-manager-v(\d+\.\d+\.\d+)")
+STATUS_LINE_RE = re.compile(r"^[+-](?:\*\*Status:\*\*|Status:)\s*(.*)$")
 
 
 def _git(*args):
@@ -36,17 +37,68 @@ def _added_releases(ref, branch):
         by_commit.setdefault(commit, []).append(path)
     result = {}
     for commit, commit_paths in by_commit.items():
-        tags = [tag for tag in _git("tag", "--contains", commit, "--list", "v*").splitlines() if TAG_RE.match(tag)]
-        if tags:
-            release = min(tags, key=lambda tag: tuple(int(part) for part in TAG_RE.match(tag).group(1).split(".")))
-            source = "added_tag"
-        else:
-            match = BRANCH_RE.search(branch)
-            release = f"v{match.group(1)}" if match else None
-            source = "added_branch"
+        release, source = _release_of_commit(commit, branch)
         for path in commit_paths:
             result[path] = (release, source) if release else None
     return result
+
+
+def _release_of_commit(commit, branch):
+    """Return (release, "added_tag"|"added_branch") from tag ancestry, else (None, None)."""
+    tags = [tag for tag in _git("tag", "--contains", commit, "--list", "v*").splitlines()
+            if TAG_RE.match(tag)]
+    if tags:
+        return min(tags, key=lambda tag: tuple(int(part) for part in TAG_RE.match(tag).group(1).split("."))), "added_tag"
+    match = BRANCH_RE.search(branch)
+    return (f"v{match.group(1)}", "added_branch") if match else (None, None)
+
+
+def _fixed_commits(ref):
+    """Map each bug doc to the commit at which its Status last became fixed."""
+    output = _git("log", "--reverse", "-p", "-U0", "--no-renames", "--format=commit %H",
+                  "-G", "Status:", ref, "--", "docs/bugs/")
+    fixed = {}
+    is_fixed = {}
+    commit = None
+    path = None
+    created = False
+    for line in output.splitlines():
+        if line.startswith("commit ") and re.fullmatch(r"[0-9a-f]{40}", line[7:]):
+            commit = line[7:]
+            path = None
+        elif line.startswith("--- "):
+            created = line == "--- /dev/null"
+        elif line.startswith("+++ "):
+            name = line[4:].removeprefix("b/")
+            path = name if name.startswith("docs/bugs/") and "/" not in name[len("docs/bugs/"):] else None
+        elif path and line.startswith("+") and not line.startswith("+++"):
+            match = STATUS_LINE_RE.match(line)
+            if not match:
+                continue
+            now_fixed = doc_status(f"**Status:** {match.group(1)}\n")[1] == "fixed"
+            if now_fixed and not is_fixed.get(path):
+                if path in is_fixed:
+                    source = "status_change"
+                else:
+                    source = "added_fixed" if created else "status_backfill"
+                fixed[path] = (commit, source)
+            elif not now_fixed:
+                fixed.pop(path, None)
+            is_fixed[path] = now_fixed
+    return fixed
+
+
+def _fixed_releases(ref, branch, paths_fixed):
+    releases = {}
+    by_commit = {}
+    for path, (commit, source) in paths_fixed.items():
+        if source == "status_backfill":
+            releases[path] = ("unknown", source)
+            continue
+        if commit not in by_commit:
+            by_commit[commit] = _release_of_commit(commit, branch)[0]
+        releases[path] = (by_commit[commit] or "unknown", source)
+    return releases
 
 
 def _release_for_added(path, added):
@@ -71,7 +123,7 @@ def _read_blobs(ref, paths):
     return texts
 
 
-def tally(ref):
+def _scan(ref):
     listing = _git("ls-tree", "-r", "--name-only", ref, "docs/bugs")
     paths = [path for path in listing.splitlines()
              if path.startswith("docs/bugs/") and "/" not in path[len("docs/bugs/"):]]
@@ -102,7 +154,24 @@ def tally(ref):
         elif state == "closed":
             item = {"path": path, "priority": priority}
             bucket["closed_paths"].append(item)
-    return result
+    fixed_commits = _fixed_commits(ref)
+    fixed_releases = _fixed_releases(ref, branch, fixed_commits)
+    fixed_in = {}
+    for path in paths:
+        if doc_status(texts[path])[1] != "fixed":
+            continue
+        commit_info = fixed_releases.get(path)
+        fixed_in[path] = ({"release": commit_info[0], "source": commit_info[1]}
+                          if commit_info else {"release": "unknown", "source": "no_transition"})
+    return result, fixed_in
+
+
+def tally(ref):
+    return _scan(ref)[0]
+
+
+def fixed_in(ref):
+    return _scan(ref)[1]
 
 
 def main(argv=None):
@@ -113,11 +182,12 @@ def main(argv=None):
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
-        releases = tally(args.ref)
+        releases, fixed = _scan(args.ref)
     except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
         return 2
     if args.json:
-        print(json.dumps({"ref": args.ref, "generated_at": datetime.now(timezone.utc).isoformat(), "releases": releases}, separators=(",", ":")))
+        print(json.dumps({"ref": args.ref, "generated_at": datetime.now(timezone.utc).isoformat(),
+                          "releases": releases, "fixed_in": fixed}, separators=(",", ":")))
         return 0
     selected = {args.release: releases.get(args.release)} if args.release else releases
     for release in sorted((name for name, value in selected.items() if value), reverse=True):
@@ -128,12 +198,18 @@ def main(argv=None):
         if not args.priority:
             source_text = "   (" + ", ".join(f"{key} {value}" for key, value in data["by_source"].items()) + ")"
         print(f"{release}  total {data['total']} · closed {data['closed']} · open {data['open']} · unknown {data['unknown']}{source_text}")
+        fixed_count = sum(item["release"] == release for item in fixed.values())
+        if fixed_count:
+            print(f"  fixed here: {fixed_count}")
         for item in data.get("open_paths", []):
             print(f"  open:    {item['path']} [{item['priority']}]")
         for item in data.get("unknown_paths", []):
             print(f"  unknown: {item['path']}")
         if args.priority:
             print(f"({releases[release]['by_priority']['unset']['total']} docs in {release} have no Priority line)")
+    unknown_fixed = sum(item["release"] == "unknown" for item in fixed.values())
+    if unknown_fixed:
+        print(f"fixed in an unknown release: {unknown_fixed}")
     return 0
 
 

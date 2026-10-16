@@ -317,6 +317,16 @@ indexes and the five shipped releases before it, in `k3dm_bug_release_docs{relea
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
+Bug counts have two release meanings. **Filed in** is the doc's `**Branch:**` line or the first tag
+that contains its add commit. **Fixed in** is the first tag that contains the commit that changed
+its status to fixed, or the current release branch when no tag does yet. A bug fixed, reopened and
+fixed again counts once under its latest fix. A fixed bug with no detectable status change shows
+`unknown` and is not counted under any release. So does a doc whose first Status line was added
+already fixed to an existing doc, such as the 2026-10-09 status sweep: that commit records the
+sweep, not the fix; release comes from tag ancestry, never dates. Tile 4
+and panel 25 use fixed-in, while panels 7 and 8 and the `$release` row use filed-in. The table shows
+both.
+
 The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
 untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
 open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a

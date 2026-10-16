@@ -226,10 +226,11 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{status=\"fixed\"} and on(release) k3dm_bug_current_release_info) or vector(0)",
+              "expr": "sum(k3dm_bug_fixed_in_release_docs and on(release) k3dm_bug_current_release_info) or vector(0)",
               "instant": true
             }
           ],
+          "description": "Bugs whose status became fixed on this release, whenever they were filed.\nBugs with no detectable fix commit are not counted here; see the table's Fixed in = unknown.",
           "options": {
             "graphMode": "none",
             "colorMode": "value",
@@ -376,7 +377,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 6,
-            "w": 12,
+            "w": 8,
             "h": 9
           },
           "targets": [
@@ -538,12 +539,12 @@ data:
         {
           "id": 8,
           "type": "barchart",
-          "title": "Bugs per release, open vs fixed",
+          "title": "Bugs filed per release, open vs fixed",
           "description": "closed = FIXED, RESOLVED, CLOSED or similar; unknown = no recognisable status line. Hover a bar for every count.",
           "gridPos": {
-            "x": 12,
+            "x": 8,
             "y": 6,
-            "w": 12,
+            "w": 8,
             "h": 9
           },
           "targets": [
@@ -669,6 +670,63 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           }
+        },
+        {
+          "id": 25,
+          "type": "barchart",
+          "title": "Bugs fixed per release, by priority",
+          "description": "Counted by the release whose commits changed the bug's status to fixed. A bug filed in one release and fixed in a later one counts here under the later one.",
+          "gridPos": {
+            "x": 16,
+            "y": 6,
+            "w": 8,
+            "h": 9
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs) > 0",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {"sort": [{"field": "order"}]}
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {"rowField": "release", "columnField": "priority", "valueField": "Value", "emptyValue": "null"}
+            },
+            {
+              "id": "renameByRegex",
+              "options": {"regex": "release\\\\priority", "renamePattern": "release"}
+            },
+            {
+              "id": "organize",
+              "options": {"indexByName": {"release": 0, "P0": 1, "P1": 2, "P2": 3, "P3": 4, "unset": 5}}
+            }
+          ],
+          "options": {
+            "xField": "release",
+            "stacking": "normal",
+            "showValue": "never",
+            "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+            "xTickLabelRotation": 0,
+            "tooltip": {"mode": "multi", "sort": "none"}
+          },
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80}},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "P0"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "dark-red"}}]},
+              {"matcher": {"id": "byName", "options": "P1"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+              {"matcher": {"id": "byName", "options": "P2"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+              {"matcher": {"id": "byName", "options": "P3"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]},
+              {"matcher": {"id": "byName", "options": "unset"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#8e8e8e"}}]}
+            ]
+          },
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         },
         {
           "id": 22,
@@ -1052,8 +1110,9 @@ data:
                   "Value": 3,
                   "filed": 4,
                   "status": 5,
-                  "verified": 6,
-                  "live_verified": 7
+                  "fixed_in": 6,
+                  "verified": 7,
+                  "live_verified": 8
                 },
                 "excludeByName": {
                   "bug": true,
@@ -1072,6 +1131,7 @@ data:
                   "filed": "Filed",
                   "Value": "Open for",
                   "status": "Status",
+                  "fixed_in": "Fixed in",
                   "verified": "Verified",
                   "live_verified": "Live-verified"
                 }

@@ -269,7 +269,7 @@ def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch
     monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
     _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
     monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_tally",
-                        lambda *_args: calls.append(True) or {"v1.43.0": _bucket()})
+                        lambda *_args, **_kwargs: calls.append(True) or {"releases": {"v1.43.0": _bucket()}, "fixed_in": {}})
     assert metrics.publish_bug_metrics(tmp_path) is True
     assert len(calls) == 1
     methods = {r.full_url.rsplit("/", 1)[-1]: r.method for r in requests if getattr(r, "data", None)}
@@ -403,11 +403,58 @@ def _fake_git(monkeypatch, metrics, tally, tags, branch="k3d-manager-v1.43.0"):
             return SimpleNamespace(stdout=branch + "\n", returncode=0)
         raise AssertionError(argv)
     monkeypatch.setattr(metrics.subprocess, "run", run)
-    monkeypatch.setitem(metrics._release_metrics.__globals__, "_tally", lambda *_args: tally)
+    monkeypatch.setitem(metrics._release_metrics.__globals__, "_tally",
+                        lambda *_args, **kwargs: {"releases": tally, "fixed_in": {}}
+                        if kwargs.get("full") else tally)
 
 
 def _bucket(**counts):
     return {"by_priority": {p: dict(counts.get(p, {})) for p in ("P0", "P1", "P2", "P3", "unset")}}
+
+
+def test_release_metrics_publishes_fixed_in_counts_and_unknown(metrics, monkeypatch, tmp_path):
+    tally = {
+        "v1.43.0": {"by_priority": {p: {} for p in metrics.PRIORITIES},
+                     "closed_paths": [{"path": "docs/bugs/fixed-p0.md", "priority": "P0"},
+                                      {"path": "docs/bugs/fixed-p1.md", "priority": "P1"}]},
+        "v1.42.0": _bucket(),
+    }
+    _fake_git(monkeypatch, metrics, tally, ["v1.42.0"])
+    fixed_in = {
+        "docs/bugs/fixed-p0.md": {"release": "v1.43.0"},
+        "docs/bugs/fixed-p1.md": {"release": "unknown"},
+        "docs/bugs/outside.md": {"release": "v1.99.0"},
+    }
+    output = metrics._release_metrics(tmp_path, tally=tally, fixed_in=fixed_in)
+    assert 'k3dm_bug_fixed_in_release_docs{release="v1.43.0",order="1",priority="P0"} 1' in output
+    assert 'k3dm_bug_fixed_in_release_docs{release="v1.43.0",order="1",priority="P1"} 0' in output
+    assert 'k3dm_bug_fixed_in_unknown_docs 1' in output
+    assert 'release="v1.99.0"' not in output
+    assert metrics._release_metrics(tmp_path, tally=tally, fixed_in=None).count("k3dm_bug_fixed_in_") == 0
+
+
+def test_bug_status_metrics_adds_fixed_in_only_to_fixed_info(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "fixed.md").write_text("**Priority:** P1\n**Status:** FIXED\n")
+    (bugs / "unknown-fixed.md").write_text("**Priority:** P2\n**Status:** IMPLEMENTED\n")
+    (bugs / "open.md").write_text("**Priority:** P0\n**Status:** OPEN\n")
+    tally = {"v1.43.0": {"closed_paths": [
+        {"path": "docs/bugs/fixed.md", "priority": "P1"},
+        {"path": "docs/bugs/unknown-fixed.md", "priority": "P2"}],
+        "open_paths": [{"path": "docs/bugs/open.md", "priority": "P0"}]}}
+    base = metrics._bug_status_metrics(tmp_path, tally=tally)
+    output = metrics._bug_status_metrics(tmp_path, tally=tally, fixed_in={
+        "docs/bugs/fixed.md": {"release": "v1.43.0"},
+        "docs/bugs/unknown-fixed.md": {"release": "unknown"},
+    })
+    base_aggregates = [line for line in base.splitlines() if line.startswith("k3dm_bug_status_docs")]
+    output_aggregates = [line for line in output.splitlines() if line.startswith("k3dm_bug_status_docs")]
+    assert base_aggregates == output_aggregates
+    fixed_lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    assert any('bug="fixed"' in line and 'fixed_in="v1.43.0"' in line for line in fixed_lines)
+    assert any('bug="unknown-fixed"' in line and 'fixed_in="unknown"' in line for line in fixed_lines)
+    assert all('fixed_in=' not in line for line in fixed_lines if 'bug="open"' in line)
 
 
 def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metrics, monkeypatch, tmp_path):

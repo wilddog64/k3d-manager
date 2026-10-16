@@ -71,6 +71,27 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bug dashboard separates filed-in and fixed-in release views" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+assert "k3dm_bug_fixed_in_release_docs" in panels[4]["targets"][0]["expr"]
+assert panels[8]["title"] == "Bugs filed per release, open vs fixed"
+assert panels[25]["targets"][0]["expr"] == "sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs) > 0"
+assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
+    {"x": 0, "y": 6, "w": 8, "h": 9},
+    {"x": 8, "y": 6, "w": 8, "h": 9},
+    {"x": 16, "y": 6, "w": 8, "h": 9},
+]
+organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
+assert organize["indexByName"]["fixed_in"] == 6
+assert organize["renameByName"]["fixed_in"] == "Fixed in"
+assert organize["indexByName"]["verified"] == 7 and organize["indexByName"]["live_verified"] == 8
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "every bug metric queried by dashboard is emitted" {
   run python3 - "${dashboard}" "${metrics}" <<'PY'
 import json, runpy, sys, tempfile
@@ -125,7 +146,7 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 2
+assert len(bars) == 3
 for panel in bars:
     assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
     matrix = next(x for x in panel["transformations"] if x["id"] == "groupingToMatrix")
@@ -143,8 +164,8 @@ data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1
 def colours(panel):
     return {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
             for o in panel["fieldConfig"]["overrides"] if o["properties"][0]["id"] == "color"}
-by_priority = [p for p in data["panels"] if p["type"] in ("barchart", "timeseries")
-               and "priority)" in " ".join(t["expr"] for t in p["targets"])]
+panels = {panel["id"]: panel for panel in data["panels"]}
+by_priority = [panels[index] for index in (7, 25)]
 by_state = [p for p in data["panels"] if p["type"] == "barchart"
             and "state)" in " ".join(t["expr"] for t in p["targets"])]
 assert len(by_priority) == 2 and len(by_state) == 1
@@ -162,7 +183,7 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 2
+assert len(bars) == 3
 for panel in bars:
     assert panel["options"]["showValue"] == "never", panel["title"]
     assert panel["options"]["tooltip"]["mode"] == "multi", panel["title"]
@@ -202,9 +223,10 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Verified", "Live-verified"]
-    assert organize["indexByName"]["verified"] == 6
-    assert organize["indexByName"]["live_verified"] == 7
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Fixed in", "Verified", "Live-verified"]
+    assert organize["indexByName"]["fixed_in"] == 6
+    assert organize["indexByName"]["verified"] == 7
+    assert organize["indexByName"]["live_verified"] == 8
     assert organize["renameByName"]["live_verified"] == "Live-verified"
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
@@ -264,7 +286,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Verified, Live-verified" {
+@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Fixed in, Verified, Live-verified" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added: the Bug Tracking dashboard counts fixes under the release that changed each bug to fixed,
+  including fixed-in metrics, a priority chart, and a Fixed in table column.
 - Fixed: a slow VectorDB metrics publish no longer marks a completed index run as failed, and bug
   metrics read tracked documents in batches.
 
