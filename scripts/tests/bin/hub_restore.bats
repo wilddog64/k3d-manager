@@ -4,8 +4,11 @@ setup() {
   export WORK="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-restore.XXXXXX")"
   export STUB="${WORK}/stub"
   export FAKE_HOME="${WORK}/home"
+  export STATE_BASE="${WORK}/state"
   export CALL_LOG="${WORK}/calls.log"
-  mkdir -p "${STUB}" "${FAKE_HOME}/.cloudflared"
+  mkdir -p "${STUB}" "${FAKE_HOME}/.cloudflared" "${STATE_BASE}/k3s-aws/bin"
+  printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh"
+  printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
   : > "${CALL_LOG}"
   printf 'placeholder-config\n' > "${FAKE_HOME}/.cloudflared/config.yml"
 
@@ -48,7 +51,14 @@ case "${name}" in
     ;;
   launchctl)
     if [[ "${1:-}" == "list" ]]; then
+      if [[ -n "${2:-}" ]]; then
+        [[ "${LOADED_PF:-both}" == "both" || "${LOADED_PF:-both}" == *"${2#com.k3d-manager.}"* ]]
+        exit $?
+      fi
       printf '101 0 com.k3d-manager.grafana-port-forward\n202 0 com.k3d-manager.cloudflare-tunnel\n'
+    fi
+    if [[ "${1:-}" == "bootstrap" ]]; then
+      exit 0
     fi
     ;;
   curl)
@@ -83,9 +93,11 @@ EOF
   export GRAFANA_CALL_LOG="${WORK}/grafana-calls.log"
   export PATH="${STUB}:/usr/bin:/bin"
   export HOME="${FAKE_HOME}"
+  export _ACG_STATE_BASE="${STATE_BASE}"
   export K3DM_MAKE="${STUB}/make-stub"
   export K3DM_DISPATCHER="${STUB}/dispatcher"
   export HUB_RESTORE_SKIP_PREFLIGHT=1
+  export LOADED_PF=both
 }
 
 _run_with_tty() {
@@ -101,6 +113,42 @@ _run_noninteractive_restore() {
 }
 
 teardown() { rm -rf "${WORK}"; }
+
+@test "hub-restore Step 8 writes missing ArgoCD and Keycloak plists and bootstraps them" {
+  export LOADED_PF=none
+  _run_noninteractive_restore
+  [ "${status}" -eq 0 ]
+  for _pf_name in argocd keycloak; do
+    _plist="${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.${_pf_name}-port-forward.plist"
+    [ -f "${_plist}" ]
+    if command -v plutil >/dev/null 2>&1; then
+      run plutil -lint "${_plist}"
+      [ "${status}" -eq 0 ]
+    else
+      run grep -F "${STATE_BASE}/k3s-aws/bin/${_pf_name}-port-forward.sh" "${_plist}"
+      [ "${status}" -eq 0 ]
+    fi
+  done
+  run grep -Ec 'launchctl bootstrap .*com\.k3d-manager\.(argocd|keycloak)-port-forward' "${CALL_LOG}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 2 ]
+}
+
+@test "hub-restore Step 8 does not bootstrap already-loaded port-forward agents" {
+  _run_noninteractive_restore
+  [ "${status}" -eq 0 ]
+  run grep -Ec 'launchctl bootstrap .*com\.k3d-manager\.(argocd|keycloak)-port-forward' "${CALL_LOG}"
+  [ "${output}" -eq 0 ]
+}
+
+@test "hub-restore Step 8 fails without a port-forward wrapper and writes no plist" {
+  rm -f "${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+  export LOADED_PF=none
+  _run_noninteractive_restore
+  [ "${status}" -eq 1 ]
+  run test -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist"
+  [ "${status}" -ne 0 ]
+}
 
 @test "hub-restore rejects a non-TTY before any make step" {
   unset HUB_RESTORE_SKIP_PREFLIGHT

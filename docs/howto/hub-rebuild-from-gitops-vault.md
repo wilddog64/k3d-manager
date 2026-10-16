@@ -300,7 +300,9 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 
 Seen 2026-10-03 ([incident](../issues/2026-10-03-hub-deleted-by-sandbox-teardown.md)).
 `shopping-cart-identity` stays `OutOfSync/Degraded`, `deployment/keycloak` is never created, and the
-operation message names `ExternalSecret/k3dm-smoke-user`.
+operation message names `ExternalSecret/k3dm-smoke-user`. `make hub-recover` now creates the identity
+Application and the ArgoCD OIDC ExternalSecret; `make hub-restore` installs the ArgoCD and Keycloak
+port-forward agents.
 
 1. **The Vault entry must exist.** `bin/cluster-up` and `hub_recovery_reconcile` pre-seed it
    (`keycloak_smoke_vault_preseed`, `d5b986f4`). To run it on its own:

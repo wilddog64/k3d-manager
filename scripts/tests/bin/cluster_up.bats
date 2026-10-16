@@ -1,9 +1,7 @@
 #!/usr/bin/env bats
 
 @test "acg-up identity Application uses server-side apply with server-side diff" {
-  local manifest="${BATS_TEST_TMPDIR}/shopping-cart-identity.yaml"
-  sed -n "/^kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'$/,/^IDEOF$/p" bin/cluster-up \
-    | sed '1d;$d' > "${manifest}"
+  local manifest="scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 
   run yq -r '.spec.syncPolicy.syncOptions | join("|")' "${manifest}"
   [ "${status}" -eq 0 ]
@@ -21,8 +19,15 @@
 @test "acg-up preseeds smoke-user Vault before the identity Application apply" {
   local preseed_line apply_line
   preseed_line=$(grep -nF 'keycloak_smoke_vault_preseed' bin/cluster-up | cut -d: -f1)
-  apply_line=$(grep -nF 'kubectl apply --context k3d-k3d-cluster -f - <<'"'"'IDEOF'"'"'' bin/cluster-up | cut -d: -f1)
+  apply_line=$(grep -nF 'kubectl apply --context k3d-k3d-cluster -f "${REPO_ROOT}/scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"' bin/cluster-up | cut -d: -f1)
   [ "$preseed_line" -lt "$apply_line" ]
+}
+
+@test "acg-up applies the extracted identity Application file without an inline heredoc" {
+  run grep -nF 'kubectl apply --context k3d-k3d-cluster -f "${REPO_ROOT}/scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"' bin/cluster-up
+  [ "${status}" -eq 0 ]
+  run grep -nF "<<'IDEOF'" bin/cluster-up
+  [ "${status}" -ne 0 ]
 }
 
 @test "acg-up leaves the hub Grafana port-forward wrapper path untouched" {
