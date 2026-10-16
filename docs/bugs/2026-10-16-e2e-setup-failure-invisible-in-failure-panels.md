@@ -1,6 +1,6 @@
 # Bug: an e2e run that fails before any test runs is invisible in the failure panels (2026-10-16)
 
-**Status:** OPEN — spec ready, dispatched to Codex
+**Status:** IMPLEMENTED — landed `c92c4311` (Codex; Claude verified: BATS 181/181, 3 new tests red on the old code, all 4 mutations red, shellcheck unchanged). Live proof pending.
 **Priority:** P3 — the failure shows on the status tiles; only the failure-analysis panels miss it
 **Branch:** `k3d-manager-v1.43.2`
 **Release:** v1.43.2
