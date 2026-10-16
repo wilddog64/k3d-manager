@@ -102,6 +102,7 @@ hub-recover-all:
 	if test "$$preflight_rc" -ne 0; then exit "$$preflight_rc"; fi; \
 	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
 	test -n "$$run_id"; \
+	bin/hub-restore --preflight-only || { echo "[hub-recover] preflight refused before teardown — nothing was deleted; run security unlock-keychain, then rerun make hub-recover-all" >&2; exit 2; }; \
 	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
 	K3DM_DR_SHARDS_PRESERVE=1 $(MAKE) --no-print-directory hub-recover; \
 	RESUME=$$run_id ./scripts/k3d-manager hub_data_recover

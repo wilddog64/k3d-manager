@@ -231,7 +231,9 @@ an unfinished destructive step requires its explicit `REDO_STEP`.
 
 `make hub-recover-all` is approval-first: it clones and validates one snapshots
 export, prints live/export counts when the hub is present, and asks for that export timestamp before it
-deletes and rebuilds the hub. It also works when the hub is already gone and clears the
+deletes and rebuilds the hub. Just before teardown it re-checks interactive Keychain access; if the
+Keychain is locked, it refuses with nothing deleted. Unlock it with `security unlock-keychain` and rerun
+`make hub-recover-all`. It also works when the hub is already gone and clears the
 exact k3d container, network and images-volume leftovers after the snapshot guard approves teardown.
 Data changed after the selected export is lost. `RESUME` reuses the recorded export; `REDO_STEP=4` or
 `REDO_STEP=6` is required after an interrupted destructive step. The report

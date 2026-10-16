@@ -756,6 +756,12 @@ STUB
   chmod +x "$script"
   cp -R "$PWD" "$copy"
   cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
   run env PATH="$fakebin:$PATH" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" make -C "$copy" hub-recover-all
   [ "$status" -eq 2 ]
   run grep -q hub-recover "$CALL_LOG"
@@ -890,8 +896,14 @@ STUB
 printf 'make %s\n' "$*" >> "$CALL_LOG"
 STUB
   chmod +x "$script" "$fake_make"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
   run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE="$fake_make" make -C "$copy" hub-recover-all
-  [ "$status" -eq 0 ]; [ "$(cat "$CALL_LOG")" = $'hub_data_recover_teardown\nmake --no-print-directory hub-recover\nhub_data_recover' ]
+  [ "$status" -eq 0 ]; [ "$(cat "$CALL_LOG")" = $'hub-restore --preflight-only\nhub_data_recover_teardown\nmake --no-print-directory hub-recover\nhub_data_recover' ]
 }
 
 @test "recover B4-21: hub-recover-all preserves DR shards during hub rebuild" {
@@ -909,8 +921,35 @@ printf '%s\n' "$1" >> "$CALL_LOG"
 [[ "$1" == hub_data_recover_teardown ]] && exit 2
 STUB
   chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
   run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE=true make -C "$copy" hub-recover-all
-  [ "$status" -ne 0 ]; [ "$(cat "$CALL_LOG")" = hub_data_recover_teardown ]
+  [ "$status" -ne 0 ]; [ "$(cat "$CALL_LOG")" = $'hub-restore --preflight-only\nhub_data_recover_teardown' ]
+}
+
+@test "recover B4-23: keychain preflight refusal stops hub-recover-all before teardown" {
+  local script="$TEST_ROOT/k3d-manager" copy="$TEST_ROOT/repo"
+  cat > "$script" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; fi
+printf '%s\n' "$1" >> "$CALL_LOG"
+STUB
+  chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 2
+STUB
+  chmod +x "$copy/bin/hub-restore"
+  run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE=true make -C "$copy" hub-recover-all
+  [ "$status" -eq 2 ]
+  grep -Fxq 'hub-restore --preflight-only' "$CALL_LOG"
+  ! grep -Eq 'hub_data_recover_teardown|hub-recover|hub_data_recover$' "$CALL_LOG" || false
+  [[ "$output" == *"nothing was deleted"* ]]
 }
 
 @test "recover B4-D1: a failed step records its rc and does not run the next step" {
