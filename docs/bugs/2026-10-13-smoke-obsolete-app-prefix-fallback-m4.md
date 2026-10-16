@@ -1,6 +1,6 @@
 # Bug: make smoke uses obsolete ubuntu-k3s app prefix and silently targets M4 (2026-10-13)
 
-**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `98928092` (Codex; Claude verified: BATS 12/12 (8 new red on the old script), shellcheck clean, all 4 spec mutations red). Live proof pending.
+**Status:** LIVE-VERIFIED — 2026-10-16 read-only on M4 against the hub: with Hostinger and the ACG sandbox both registered, `bin/smoke-test-cluster-health` exits 2 naming both targets; `ARGOCD_APP_PREFIX=ubuntu-hostinger-` infers `APP_CONTEXT=ubuntu-hostinger` and passes 9/9, and `ubuntu-k3s-` passes 9/9. Was: VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Was: IMPLEMENTED — landed `98928092` (Codex; Claude verified: BATS 12/12 (8 new red on the old script), shellcheck clean, all 4 spec mutations red). Live proof pending.
 **Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — false release-gate failures
 **Release:** v1.43.2 (triage 2026-10-15, operator-approved placement)
