@@ -188,6 +188,53 @@ STUB
   [ "$(cat "$PURGE_LOG")" = k3dm-vault-unseal-drill ]
 }
 
+@test "dr drill: KEEP preserves kubeconfig and removes staging data" {
+  local harness="$TEST_ROOT/teardown-keep"
+  local kubeconfig="$TEST_ROOT/dr-drill-kubeconfig" stage="$TEST_ROOT/stage"
+  sed '/^if _dr_drill_run; then/,$d' "$PWD/bin/dr-drill" | sed "s#^REPO_ROOT=.*#REPO_ROOT=\"$PWD\"#" > "$harness"
+  cat >> "$harness" <<STUB
+_vault_purge_unseal_cache() { :; }
+_dr_drill_started=1
+_dr_drill_preflight_refused=0
+DR_DRILL_KEEP=1
+DR_DRILL_KUBECONFIG="$kubeconfig"
+DR_DRILL_STAGE="$stage"
+mkdir -p "\$DR_DRILL_STAGE"
+: > "\$DR_DRILL_KUBECONFIG"
+_dr_drill_teardown 0
+STUB
+  chmod +x "$harness"
+  run "$harness"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"kubeconfig kept: $kubeconfig; use: kubectl --kubeconfig $kubeconfig --context k3d-dr-drill"* ]]
+  [ -f "$kubeconfig" ]
+  [ ! -e "$stage" ]
+  [ "$(grep -c '^k3d cluster delete' "$PHASE_LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill: deleting cluster removes kubeconfig" {
+  local harness="$TEST_ROOT/teardown-delete"
+  local kubeconfig="$TEST_ROOT/dr-drill-kubeconfig" stage="$TEST_ROOT/stage"
+  sed '/^if _dr_drill_run; then/,$d' "$PWD/bin/dr-drill" | sed "s#^REPO_ROOT=.*#REPO_ROOT=\"$PWD\"#" > "$harness"
+  cat >> "$harness" <<STUB
+_vault_purge_unseal_cache() { :; }
+_dr_drill_started=1
+_dr_drill_preflight_refused=0
+DR_DRILL_KEEP=0
+DR_DRILL_KUBECONFIG="$kubeconfig"
+DR_DRILL_STAGE="$stage"
+mkdir -p "\$DR_DRILL_STAGE"
+: > "\$DR_DRILL_KUBECONFIG"
+_dr_drill_teardown 0
+STUB
+  chmod +x "$harness"
+  run "$harness"
+  [ "$status" -eq 0 ]
+  [ ! -e "$kubeconfig" ]
+  [ ! -e "$stage" ]
+  [ "$(grep -c 'cluster delete dr-drill' "$PHASE_LOG" || true)" -ge 1 ]
+}
+
 @test "dr drill: name and host guards refuse before k3d" {
   export DR_DRILL_CLUSTER=k3d-cluster
   run_drill; [ "$status" -eq 2 ]; [ "$(grep -c k3d "$PHASE_LOG" || true)" -eq 0 ]

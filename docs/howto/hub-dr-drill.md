@@ -136,7 +136,8 @@ old. If list-only Vault login fails, rerun `make hub-data-export-setup`.
    4. verify V0–V7;
    5. write the result;
    6. tear down. `DR_DRILL_KEEP=1` keeps the cluster and prints the delete
-      command.
+      command and keeps `~/.k3dm/dr-drill/kubeconfig`; use it with
+      `kubectl --kubeconfig ~/.k3dm/dr-drill/kubeconfig --context k3d-dr-drill`.
 3. **M4:** `make dr-drill-publish`. This copies the newest M2 result over
    `ssh m2jump`, commits it as `results/<run_timestamp>.json` on the `results`
    branch, and pushes the metrics to the hub Pushgateway (`localhost:19094`, job
@@ -255,7 +256,6 @@ Keep the drill cluster and rehearse the data path before a real hub window:
 
 ```bash
 DR_DRILL_KEEP=1 script -q ~/.k3dm/dr-drill/run.log make dr-drill   # not | tee: the drill needs a TTY
-k3d kubeconfig get dr-drill > ~/.k3dm/dr-drill/kubeconfig          # KEEP deletes it (bug 2026-10-10)
 KUBECONFIG=~/.k3dm/dr-drill/kubeconfig K3DM_HUB_DATA_CONTEXT=k3d-dr-drill \
   K3DM_HUB_DATA_CLUSTER=dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 \
   K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1 make hub-data-recover

@@ -16,6 +16,8 @@
   of showing No data.
 - Fixed: the Checkout Load Test dashboard is now deployed to app clusters only; the ACG
   dashboard ApplicationSet excludes its empty copy from the hub.
+- Fixed: `DR_DRILL_KEEP=1` now preserves the drill kubeconfig with the kept cluster and prints
+  the exact `kubectl` command for inspecting it; deleted or never-started drills still remove it.
 - Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and
   `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
 - Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the
