@@ -606,6 +606,15 @@ def test_health_metrics_count_the_corpus_at_the_indexed_ref(monkeypatch):
     assert commands[-1][1]["env"] is None
 
 
+def test_health_metrics_timeout_is_nonfatal(monkeypatch, capsys):
+    def timeout(*_args, **_kwargs):
+        raise k3dm_hermes.subprocess.TimeoutExpired("k3dm-vectordb-metrics", 120)
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", timeout)
+    k3dm_hermes._publish_health_metrics()
+    assert "vectordb health metrics publish skipped" in capsys.readouterr().err
+
+
 def test_refresh_index_records_the_ref_for_health_metrics(monkeypatch):
     commands, pushed = [], []
     ok = SimpleNamespace(returncode=0, stderr="",

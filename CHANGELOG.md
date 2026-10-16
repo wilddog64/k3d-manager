@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Fixed: a slow VectorDB metrics publish no longer marks a completed index run as failed, and bug
+  metrics read tracked documents in batches.
+
 ## [1.43.2] - 2026-10-16
 
 ### Added

@@ -1,4 +1,5 @@
 import runpy
+import subprocess
 import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -26,6 +27,18 @@ def _repo(tmp_path):
     (tmp_path / "docs/issues").mkdir(parents=True)
     (tmp_path / "docs/issues/ignored.md").write_text("**Priority:** P0\n**Status:** Open\n")
     return tmp_path
+
+
+def _git_repo(root, docs):
+    bugs = root / "docs/bugs"
+    bugs.mkdir(parents=True)
+    for name, text in docs.items():
+        (bugs / name).write_text(text, encoding="utf-8")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+    subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
 
 
 def test_bug_metrics_has_exact_counts_all_15_series_and_scan_timestamp(metrics, tmp_path):
@@ -62,6 +75,45 @@ def test_bug_metrics_read_failure_does_not_push(metrics, monkeypatch, tmp_path):
     monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda *_a, **_k: pushed.append(True))
     assert metrics.publish_bug_metrics(root) is False
     assert pushed == []
+
+
+def test_bug_texts_reads_committed_docs_with_one_cat_file(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    expected = {
+        "docs/bugs/one.md": "# one\n\nCafé — 日本語\n",
+        "docs/bugs/two.md": "# two\n\nplain\n",
+        "docs/bugs/three.md": "# three\n\nthird\n",
+    }
+    _git_repo(root, {path.removeprefix("docs/bugs/"): text for path, text in expected.items()})
+    original_run = metrics.subprocess.run
+    calls = []
+
+    def tracked_run(argv, *args, **kwargs):
+        calls.append(argv)
+        return original_run(argv, *args, **kwargs)
+
+    monkeypatch.setattr(metrics.subprocess, "run", tracked_run)
+    assert metrics._bug_texts(root, "HEAD") == expected
+    assert sum("cat-file" in call for call in calls) == 1
+    assert not any("show" in call for call in calls)
+
+
+def test_bug_texts_rejects_missing_batch_object(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git_repo(root, {"present.md": "# present\n"})
+    original_run = metrics.subprocess.run
+
+    def add_missing_path(argv, *args, **kwargs):
+        result = original_run(argv, *args, **kwargs)
+        if "ls-tree" in argv:
+            result.stdout += "docs/bugs/missing.md\n"
+        return result
+
+    monkeypatch.setattr(metrics.subprocess, "run", add_missing_path)
+    with pytest.raises(RuntimeError):
+        metrics._bug_texts(root, "HEAD")
 
 
 def test_bug_metric_labels_are_fixed_enums(metrics, tmp_path):
@@ -226,6 +278,17 @@ def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch
                      if getattr(r, "full_url", "").endswith("/metrics/job/k3dm-bug-open"))
     assert "k3dm_bug_open_info" not in open_body
     assert "k3dm_bug_open_release_docs" not in open_body
+
+
+def test_publish_bug_metrics_reads_bug_texts_once(metrics, monkeypatch, tmp_path):
+    calls = []
+    texts = {"docs/bugs/one.md": "**Priority:** P1\n**Status:** Open\n"}
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__,
+                        "_bug_texts", lambda *_args: calls.append(True) or texts)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_push_bug_group", lambda *_args, **_kwargs: True)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_tally", lambda *_args: None)
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert len(calls) == 1
 
 
 def test_publish_bug_metrics_tally_failure_still_pushes_open(metrics, monkeypatch, tmp_path):

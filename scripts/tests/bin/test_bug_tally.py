@@ -46,6 +46,23 @@ def test_tally_releases_sources_and_excludes_archive(tally_module, tmp_path):
     assert all("archive" not in item["path"] for item in result["v1.0.0"]["unknown_paths"])
 
 
+def test_tally_reads_docs_without_git_show(tally_module, tmp_path, monkeypatch):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "open.md").write_text("# open\n\n**Status:** Open\n")
+    _commit(tmp_path, "seed")
+    original_git = tally_module._git
+    calls = []
+
+    def tracked_git(*args):
+        calls.append(args)
+        return original_git(*args)
+
+    monkeypatch.setattr(tally_module, "_git", tracked_git)
+    assert tally_module.tally("HEAD")["unknown"]["total"] == 1
+    assert not any(args and args[0] == "show" for args in calls)
+
+
 def test_tally_unknown_status_and_all_priority_buckets(tally_module, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)

@@ -270,8 +270,11 @@ def main(argv=None):
     print(f"index-docs: {len(docs)} docs, {written} written ({from_cache} from cache, {embedded} embedded), "
           f"{counts.get('pruned', '0')} pruned, {counts.get('indexed', '?')} in store, "
           f"{remaining} remaining")
-    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
-                   cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                       cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"index-docs: metrics publish skipped: {exc}", file=sys.stderr)
     return 0
 
 

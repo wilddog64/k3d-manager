@@ -97,17 +97,29 @@ def _bug_texts(root, ref=None):
                                   "docs/bugs"], capture_output=True, text=True, check=True)
         paths = [p for p in listing.stdout.splitlines()
                  if p.startswith("docs/bugs/") and "/" not in p[len("docs/bugs/"):]]
-        texts = {p: subprocess.run(["git", "-C", str(root), "show", f"{ref}:{p}"],
-                                   capture_output=True, text=True, check=True).stdout for p in paths}
+        request = "".join(f"{ref}:{p}\n" for p in paths).encode()
+        blob = subprocess.run(["git", "-C", str(root), "cat-file", "--batch"], input=request,
+                              capture_output=True, check=True, timeout=60).stdout
+        texts = {}
+        offset = 0
+        for p in paths:
+            header_end = blob.index(b"\n", offset)
+            header = blob[offset:header_end].split()
+            if len(header) != 3 or header[1] != b"blob":
+                raise RuntimeError(f"git cat-file: unexpected header for {p}: {blob[offset:header_end]!r}")
+            start = header_end + 1
+            size = int(header[2])
+            texts[p] = blob[start:start + size].decode("utf-8")
+            offset = start + size + 1
     else:
         paths = sorted(p.relative_to(root).as_posix() for p in (root / "docs/bugs").glob("*.md"))
         texts = {p: (root / p).read_text(encoding="utf-8") for p in paths}
     return texts
 
 
-def _bug_metrics(root, ref=None):
+def _bug_metrics(root, ref=None, texts=None):
     """Return a complete bug inventory snapshot, or raise on any read/parse failure."""
-    texts = _bug_texts(root, ref)
+    texts = _bug_texts(root, ref) if texts is None else texts
     counts = {(priority, state): 0 for priority in ("P0", "P1", "P2", "P3", "unset")
               for state in ("open", "closed", "unknown")}
     for text in texts.values():
@@ -141,7 +153,7 @@ def _release_at_least(release, minimum):
     return version is not None and version >= minimum
 
 
-def _bug_status_metrics(root, ref=None, now=None, tally=None):
+def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None):
     root = Path(root)
     branch = _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
@@ -153,7 +165,8 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None):
                   for item in data.get(path_key, [])}
     rows = []
     skipped = 0
-    for path, text in _bug_texts(root, ref).items():
+    texts = _bug_texts(root, ref) if texts is None else texts
+    for path, text in texts.items():
         priority, status, _live_verified = doc_status(text)
         verification = doc_verification(text)
         stem = Path(path).name.removesuffix(".md")
@@ -278,7 +291,8 @@ def _release_metrics(root, ref=None, tally=None):
 
 def publish_bug_metrics(root, ref=None):
     try:
-        payload = _bug_metrics(root, ref)
+        texts = _bug_texts(root, ref)
+        payload = _bug_metrics(root, ref, texts=texts)
     except Exception as exc:
         print(f"bug metrics scan skipped (non-fatal): {exc}", file=sys.stderr)
         return False
@@ -289,7 +303,7 @@ def publish_bug_metrics(root, ref=None):
         print(f"bug tally skipped (non-fatal): {exc}", file=sys.stderr)
         tally = None
     try:
-        open_bugs = _bug_status_metrics(root, ref, tally=tally)
+        open_bugs = _bug_status_metrics(root, ref, tally=tally, texts=texts)
         _push_bug_group("k3dm-bug-open", open_bugs, method="PUT")
     except Exception as exc:
         print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)

@@ -670,8 +670,11 @@ def _refresh_index(state, now=None):
 
 def _publish_health_metrics(ref=None):
     env = {**os.environ, "K3DM_INDEX_REF": ref} if ref else None
-    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
-                   env=env, capture_output=True, text=True, timeout=120, check=False)
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                       env=env, capture_output=True, text=True, timeout=120, check=False)
+    except Exception as exc:
+        print(f"vectordb health metrics publish skipped: {exc}", file=sys.stderr)
 
 
 def _publish_disk_metrics():

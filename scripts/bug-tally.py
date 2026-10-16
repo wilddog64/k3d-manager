@@ -53,15 +53,34 @@ def _release_for_added(path, added):
     return added.get(path)
 
 
+def _read_blobs(ref, paths):
+    request = "".join(f"{ref}:{path}\n" for path in paths).encode()
+    blob = subprocess.run(["git", "-C", str(ROOT), "cat-file", "--batch"], input=request,
+                          capture_output=True, check=True, timeout=60).stdout
+    texts = {}
+    offset = 0
+    for path in paths:
+        header_end = blob.index(b"\n", offset)
+        header = blob[offset:header_end].split()
+        if len(header) != 3 or header[1] != b"blob":
+            raise RuntimeError(f"git cat-file: unexpected header for {path}: {blob[offset:header_end]!r}")
+        start = header_end + 1
+        size = int(header[2])
+        texts[path] = blob[start:start + size].decode("utf-8")
+        offset = start + size + 1
+    return texts
+
+
 def tally(ref):
     listing = _git("ls-tree", "-r", "--name-only", ref, "docs/bugs")
     paths = [path for path in listing.splitlines()
              if path.startswith("docs/bugs/") and "/" not in path[len("docs/bugs/"):]]
     branch = ref.removeprefix("origin/") if ref != "HEAD" else _git("branch", "--show-current").strip()
     added_releases = _added_releases(ref, branch)
+    texts = _read_blobs(ref, paths)
     result = {}
     for path in paths:
-        raw = _git("show", f"{ref}:{path}")
+        raw = texts[path]
         priority, state = doc_meta(raw)
         added = _release_for_added(path, added_releases)
         release, source = doc_release(raw, added)
