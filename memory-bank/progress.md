@@ -1,3 +1,4 @@
+- 2026-10-16: PR #144 lint red: ruff F541 (placeholder-less f-string) in `scripts/tests/hermes/test_pr_checks.py:21`. Fixed in `4072343c` (pyflakes clean, test 2 passed); CI rerunning.
 - 2026-10-16: `make up` fails at Step 10d.5 on both of today's runs: the hub LDAP rejects the `openldap-admin` Secret's password (err=49), while Keycloak binds fine. Filed P1 `docs/bugs/2026-10-16-cluster-up-ldap-seed-admin-bind-invalid-credentials.md` (v1.43.4 proposed; cause open, needs an operator hash compare). The pasted e2e-sandbox failure (run 1792169905-3394, vault CLI 127) is the already-filed P2. PR #144: Copilot 0 findings.
 - 2026-10-16: release checklist now includes `make platform-ops` after appsets-reapply (CLAUDE.md rule + docs/howto/makefile.md), operator request.
 - 2026-10-16: operator killed stale watcher 89270; cluster-up watcher bug LIVE-VERIFIED. Gap filed P3 docs/bugs/2026-10-16-cluster-up-launchd-skip-leaves-old-shell-watcher.md (v1.43.4, approval pending).
