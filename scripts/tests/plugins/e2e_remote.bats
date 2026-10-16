@@ -590,6 +590,7 @@ assert e["candidate_digest"]=="", e["candidate_digest"]
 assert e["duration_seconds"]=="", e["duration_seconds"]
 assert e["total"]=="", e["total"]
 assert e["passed"]=="false", e["passed"]
+assert e["phase"]=="job", e["phase"]
 print("ok")' "$outf"
   [ "$status" -eq 0 ]
 }

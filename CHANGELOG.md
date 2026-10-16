@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- E2E failure panels now count a run that fails before any test runs as one `aborted at <phase>` failure group while keeping Top failing specs empty.
+
 - `make smoke` now discovers the shopping-cart target from ArgoCD and refuses ambiguous or mismatched application/context selections instead of silently checking the infra context.
 
 - Added: the k3dm Bug Tracking dashboard now classifies bug documents by status and live verification,

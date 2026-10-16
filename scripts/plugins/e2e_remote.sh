@@ -674,6 +674,7 @@ event = {
     "passed": "true" if result == "pass" else "false",
     "total": total, "failed": failed, "duration_seconds": dur_s,
     "timestamp": timestamp, "commit": commit,
+    "phase": vals["phase"],
     "failure_groups": groups,
     "failure_details": details,
 }

@@ -97,6 +97,34 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "exporter synthesizes one failure group for a test-less failed run" {
+  run python3 - "${EXPORTER}" <<'PY'
+import ast, sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+tree = ast.parse(src)
+node = next(n for n in tree.body
+            if isinstance(n, ast.FunctionDef) and n.name == "e2e_failure_groups")
+ns = {}
+exec(compile(ast.Module(body=[node], type_ignores=[]), "exporter", "exec"), ns)
+groups = ns["e2e_failure_groups"]
+assert groups({"phase": "installing-argocd"}, False, "product-catalog") == [{
+    "kind": "aborted at installing-argocd", "target": "installing-argocd",
+    "service": "product-catalog", "count": 1,
+}]
+assert groups({}, False, "product-catalog")[0]["kind"] == "aborted at unknown"
+assert groups({}, True, "product-catalog") == []
+existing = [{"kind": "auth", "target": "api", "service": "basket", "count": 2}]
+assert groups({"failure_groups": existing}, False, "product-catalog") is existing
+assert groups({"failure_details": [{"file": "api/cart.spec.ts"}]}, False, "product-catalog") == []
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "embedded exporter.py compiles cleanly" {
   if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
   run python3 - "${EXPORTER}" <<'PY'

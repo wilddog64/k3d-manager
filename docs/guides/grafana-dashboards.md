@@ -223,6 +223,8 @@ Traps:
   Older result ConfigMaps carried only `failed=/total=`; with no per-failure payload the
   exporter falls back to ConfigMap metadata and emits no `e2e_failure_group_info`
   (`docs/issues/2026-09-16-live-e2e-failure-groups-empty.md`).
+- A run that fails before any test runs counts as one failure group, `aborted at <phase>`;
+  Top failing specs stays empty because no spec ran.
 - A table rendering raw label soup instead of columns is a transform problem, not a query
   problem — `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md`.
 
