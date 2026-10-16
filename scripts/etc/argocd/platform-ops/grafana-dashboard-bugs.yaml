@@ -1133,7 +1133,8 @@ data:
                   "__name__": true,
                   "job": true,
                   "instance": true,
-                  "Time": true
+                  "Time": true,
+                  "repo": true
                 },
                 "renameByName": {
                   "priority": "Priority",

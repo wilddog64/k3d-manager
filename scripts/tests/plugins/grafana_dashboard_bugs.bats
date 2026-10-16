@@ -237,7 +237,7 @@ elif check == "layout":
 elif check == "columns":
     organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
-    assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
+    assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
     assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Verified", "Live-verified"]
     assert organize["indexByName"]["fixed_in"] == 6

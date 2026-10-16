@@ -40,11 +40,10 @@ within one release a Fixed P3 can sit above an open P2. Reorder the key to
 sorts after P3 because "unset" > "P3" in byte order; assert that in a test. With All releases
 selected, rows still group by release first. The column header stays sortable by hand.
 
-Check first: the operator's 2026-10-16 screenshot of v1.43.2 shows Fixed P1/P2 rows above Open P3
-rows, which a status-first key would not produce. `organize` excludes `sort_key` before the
-table's `sortBy` can use it, so the sort may not be applied at all and the visible order may come
-from the series order. Confirm in Grafana which one holds. If the sort is not applied, sort with a
-`sortBy` transformation **before** `organize`.
+Checked 2026-10-16: the sort is applied (`sortBy` runs before `organize`), and the live
+`sort_key` for v1.43.2 is status-first (`… v1.43.2 0 P3 …` for open, `… 3 P2 …` for fixed), so
+open P3s sort above fixed P1s by default. The operator's screenshot shows the requested order,
+not the current default. Changing the key is the whole fix.
 
 ## Proof
 
