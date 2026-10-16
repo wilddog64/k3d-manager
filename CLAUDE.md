@@ -27,7 +27,7 @@ Uses a dispatcher pattern with lazy plugin loading.
 
 ## Environment Constraints
 - **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
-- **Context Management:** Manual `/compact` required at 60% utilization.
+- **Context Management:** 1M-token window. Manual `/compact` at a natural break (between tasks, never mid-step) once past ~300K tokens; do not wait for 60%.
 - **Output Compression:** RTK (Rust Token Killer) is active for all CLI output.
 
 ---
