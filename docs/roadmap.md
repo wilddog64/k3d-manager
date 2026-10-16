@@ -186,10 +186,6 @@ same file.
   - [`checkout-loadtest-dashboard-deployed-to-hub`](bugs/2026-10-11-checkout-loadtest-dashboard-deployed-to-hub.md)
     (operator, 2026-10-11): `grafana-dashboards-acg.yaml` (in-cluster exclude),
     `grafana_dashboard_appsets.bats`, `docs/guides/grafana-dashboards.md`.
-  - [`dispatch-dashboard-no-per-spec-cost-or-time`](bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md)
-    (operator, 2026-10-11): same agent and dispatch as the landing-success fix (same dashboard file),
-    plus `bin/k3dm-dispatch-metrics` and its pytest. Readable token stat, a Per spec table (tokens,
-    Codex time, time to land, runs) and two time-per-spec stats.
 - **Batch 2:** one agent, after v1.43.1 lands, because both edit `bin/dr-drill`.
   - [`dr-drill-keep-deletes-kubeconfig`](bugs/2026-10-10-dr-drill-keep-deletes-kubeconfig.md)
   - [`dr-drill-set-u-wrappers`](bugs/2026-10-10-dr-drill-set-u-wrappers.md)
@@ -231,6 +227,11 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     attribute in `shopping-cart-infra`, applied by its PostSync reconcile hook.
   - [`shopping-cart-cart-lost-after-logout-login`](bugs/2026-10-13-shopping-cart-cart-lost-after-logout-login.md)
     (P2, not yet confirmed): reproduce first. It needs a working login, so it follows the P1.
+- Moved from v1.43.2 (operator, 2026-10-16): never dispatched there.
+  - [`dispatch-dashboard-no-per-spec-cost-or-time`](bugs/2026-10-11-dispatch-dashboard-no-per-spec-cost-or-time.md)
+    (P3): `grafana-dashboard-agent-dispatch.yaml`, `bin/k3dm-dispatch-metrics` and its pytest. Readable
+    token stat, a Per spec table (tokens, Codex time, time to land, runs) and two time-per-spec stats.
+    This one is in k3d-manager, so it can go through the dispatcher.
 
 ### Candidate milestone — v1.43.4 (patch)
 

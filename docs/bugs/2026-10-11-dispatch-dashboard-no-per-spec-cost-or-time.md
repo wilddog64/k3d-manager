@@ -1,8 +1,8 @@
 # Bug: the Agent Dispatch dashboard shows an unreadable token average and no per-spec cost or time
 
 **Filed:** 2026-10-11
-**Branch:** `k3d-manager-v1.43.2`
-**Status:** OPEN — spec ready (v1.43.2 batch 1, same agent as `dispatch-dashboard-landing-success-no-data`)
+**Branch:** `k3d-manager-v1.43.3` (moved from v1.43.2, operator 2026-10-16)
+**Status:** OPEN — spec ready; moved to v1.43.3 2026-10-16 (never dispatched on v1.43.2)
 **Approval:** explicit 2026-10-12 "approved for per-spec dashboard" (operator)
 **Priority:** P3 — the ledger holds every number; only the dashboard cannot show them
 **Severity:** low — no metric is wrong; the view cannot answer "what did each spec cost"
