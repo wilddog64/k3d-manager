@@ -1,6 +1,6 @@
 # Bug: Bug Tracking opens on All releases, and its table is not ordered by priority
 
-**Status:** OPEN — spec `docs/plans/v1.43.4-bug-dashboard-defaults.md` dispatched to Codex 2026-10-16 (item 1 approach changed: Grafana 11.4 falls back to All, so the saved Release is pinned to the branch version)
+**Status:** LIVE-VERIFIED — 2026-10-16: operator opened /d/k3dm-bugs with no URL parameters; Release = v1.43.4, rows P1 → P2 → P3, Verified fixes = Show all (fixed in df9c8e4c, spec `docs/plans/v1.43.4-bug-dashboard-defaults.md`)
 **Priority:** P3
 **Filed:** 2026-10-16
 **Detected by:** human (operator)
