@@ -1,3 +1,4 @@
+- 2026-10-16: landed live-verified column `c3f194f1`; marked 10 v1.43.2 fixes VERIFIED (offline evidence, awaiting live proof).
 - 2026-10-16: live-verified column spec approved ("go ahead") and dispatched to Codex.
 - 2026-10-16: landed smoke target discovery `98928092` and e2e republish + E2EResultsMissing `af654222` (Claude fixed: skipped/broken promtool test, dropped .PHONY entries, false slash-command row, if-count extraction); marked 6 v1.43.2 fixes LIVE-VERIFIED (`9e104398`); wrote docs/plans/v1.43.2-bug-dashboard-live-verified-column.md (Approval pending).
 - 2026-10-16: filed docs/bugs/2026-10-16-hub-rebuild-loses-e2e-results.md (P3: M4-side `make e2e-republish`, `E2EResultsMissing` alert, rebuild runbook step) and added an exact fix spec to docs/bugs/2026-10-13-smoke-obsolete-app-prefix-fallback-m4.md (discover target from ArgoCD, exit 2 on missing/ambiguous). Both dispatched to Codex.

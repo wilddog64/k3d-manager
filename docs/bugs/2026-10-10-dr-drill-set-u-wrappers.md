@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `c90c0391` (Codex, Claude verified: BATS 31/31 after rebase, shellcheck clean; restoring a `set +u` wrapper turns the nounset test red; the spec's drop-`|| rc=$?` mutation is equivalent in the `if` context, so not a gap). Live proof at the next drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `c90c0391` (Codex, Claude verified: BATS 31/31 after rebase, shellcheck clean; restoring a `set +u` wrapper turns the nounset test red; the spec's drop-`|| rc=$?` mutation is equivalent in the `if` context, so not a gap). Live proof at the next drill.
 **Priority:** P3 — hygiene; nothing fails today
 **Severity:** low
 

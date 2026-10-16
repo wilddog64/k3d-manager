@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `68aa8aa1` (Codex `2523ad56`); Claude verified the Step 7 order, server-side claim apply, 179/179, own D1 mutation red. Pending the 2026-10-29 live drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `68aa8aa1` (Codex `2523ad56`); Claude verified the Step 7 order, server-side claim apply, 179/179, own D1 mutation red. Pending the 2026-10-29 live drill.
 **Priority:** P2 — each one stops the restore; each has a manual workaround (below)
 **Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — the first real `hub-recover-all` on a fresh hub needed three manual interventions in Steps 6–7

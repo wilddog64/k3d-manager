@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `89b45f56` (Codex, Claude verified: BATS 41/41, mutation red. Live proof after `make appsets-reapply`.)
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `89b45f56` (Codex, Claude verified: BATS 41/41, mutation red. Live proof after `make appsets-reapply`.)
 **Approval:** explicit 2026-10-11 "yes" (to "file the bug … and schedule the baseline?")
 **Priority:** P3 — a blank dashboard; the Hostinger copy is correct
 **Severity:** low — misleading, nothing broken

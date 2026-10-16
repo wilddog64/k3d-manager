@@ -1,6 +1,6 @@
 # Bug: make smoke uses obsolete ubuntu-k3s app prefix and silently targets M4 (2026-10-13)
 
-**Status:** IMPLEMENTED — landed `98928092` (Codex; Claude verified: BATS 12/12 (8 new red on the old script), shellcheck clean, all 4 spec mutations red). Live proof pending.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `98928092` (Codex; Claude verified: BATS 12/12 (8 new red on the old script), shellcheck clean, all 4 spec mutations red). Live proof pending.
 **Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — false release-gate failures
 **Release:** v1.43.2 (triage 2026-10-15, operator-approved placement)

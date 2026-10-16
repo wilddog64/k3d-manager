@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `c3f01f89` (Codex, Claude verified: BATS 4/4, mutation red; promtool: new expr 0.8333 for 5 landed / 1 tests, old expr empty. Live proof waits for `make dispatch-metrics` (hub has no dispatch series since the rebuild).)
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `c3f01f89` (Codex, Claude verified: BATS 4/4, mutation red; promtool: new expr 0.8333 for 5 landed / 1 tests, old expr empty. Live proof waits for `make dispatch-metrics` (hub has no dispatch series since the rebuild).)
 **Approval:** explicit 2026-10-11 "go ahead to file bug at v1.43.2"
 **Priority:** P3 — the raw counts are on the same dashboard in "Land outcomes"
 **Severity:** low — one stat panel is blank; no metric is wrong or lost

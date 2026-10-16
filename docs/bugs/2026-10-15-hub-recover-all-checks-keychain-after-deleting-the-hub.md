@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `e5b93aee` (Codex `8b6cfb26`; Claude hardened the B4-23 negated grep with `|| false`, verified 118/118 and own mutation red). Pending the 2026-10-29 live drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `e5b93aee` (Codex `8b6cfb26`; Claude hardened the B4-23 negated grep with `|| false`, verified 118/118 and own mutation red). Pending the 2026-10-29 live drill.
 **Priority:** P2 — the hub is left deleted with no rebuild; a manual resume (below) recovers it
 **Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — a refusal that should cost nothing instead leaves the operator with no hub

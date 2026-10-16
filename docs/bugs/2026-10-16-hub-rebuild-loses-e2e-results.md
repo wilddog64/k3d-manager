@@ -1,6 +1,6 @@
 # Bug: a hub rebuild silently erases all e2e results, and no alert notices (2026-10-16)
 
-**Status:** IMPLEMENTED — landed `af654222` (Codex; Claude verified: BATS 113/113 with promtool; all 4 spec mutations red. Claude fixed: the promtool test always skipped and was broken once run (annotations), its present-case now uses a failing-only run so the absent(success) mutation goes red; restored 2 `.PHONY` entries Codex dropped; removed a Slack table row that advertised e2e-republish as a slash command; moved the selector into `_e2e_republish_select` for the if-count audit). Live proof pending.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `af654222` (Codex; Claude verified: BATS 113/113 with promtool; all 4 spec mutations red. Claude fixed: the promtool test always skipped and was broken once run (annotations), its present-case now uses a failing-only run so the absent(success) mutation goes red; restored 2 `.PHONY` entries Codex dropped; removed a Slack table row that advertised e2e-republish as a slash command; moved the selector into `_e2e_republish_select` for the if-count audit). Live proof pending.
 **Priority:** P3 — the dashboard is empty and staleness is unalerted, but no workload is affected
 **Branch:** `k3d-manager-v1.43.2`
 **Release:** v1.43.2

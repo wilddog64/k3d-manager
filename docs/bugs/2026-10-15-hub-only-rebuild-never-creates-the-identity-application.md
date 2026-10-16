@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `ffe7ce6a` (Codex `30fb784c`); Claude verified byte-identical manifest, 229/229 combined (one intermittent pty failure in pre-existing hub_restore TTY tests, 0/12 on rerun on both trees), own mutation red. Pending the 2026-10-29 live drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `ffe7ce6a` (Codex `30fb784c`); Claude verified byte-identical manifest, 229/229 combined (one intermittent pty failure in pre-existing hub_restore TTY tests, 0/12 on rerun on both trees), own mutation red. Pending the 2026-10-29 live drill.
 **Priority:** P2 — `hub-recover-all` cannot finish on a fresh hub; a manual apply (below) unblocks it
 **Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — the recovery path built in `0214f363` stops before the data restore on every fresh hub

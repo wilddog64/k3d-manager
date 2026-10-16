@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `861abb7b` (Codex `2f0a7896`, option B); Claude verified shellcheck clean, vault_dr_shards + hub_data 117/117, own mutation red. Pending the 2026-10-29 live drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `861abb7b` (Codex `2f0a7896`, option B); Claude verified shellcheck clean, vault_dr_shards + hub_data 117/117, own mutation red. Pending the 2026-10-29 live drill.
 **Priority:** P1 — on a single Mac the recovery cannot unseal the restored Vault; it works only if the M2 still holds the old shards and the operator copies them back by hand
 **Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** critical — the M4 copy of the only key that opens the exported Vault data is destroyed by the recovery itself

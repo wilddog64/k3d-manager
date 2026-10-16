@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `97ef9098` (Codex, Claude verified: BATS 31/31, mutation red — `rm` back in the KEEP branch fails the KEEP test; shellcheck clean). Live proof at the next `DR_DRILL_KEEP=1` drill.
+**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `97ef9098` (Codex, Claude verified: BATS 31/31, mutation red — `rm` back in the KEEP branch fails the KEEP test; shellcheck clean). Live proof at the next `DR_DRILL_KEEP=1` drill.
 **Priority:** P3 — debugging aid; the workaround is `k3d kubeconfig get dr-drill`
 **Severity:** low
 
