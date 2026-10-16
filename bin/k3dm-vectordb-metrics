@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import doc_meta  # noqa: E402
+from hermes.prior_art import doc_meta, doc_status  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -25,6 +25,7 @@ _SCAN_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 _BUG_STEM_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _FILED_RE = re.compile(r"^\*\*Filed:\*\*\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 _HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
+STATUS_RANK = {"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}
 
 
 def _pushgateway_url():
@@ -135,7 +136,12 @@ def _release_order(release):
     return ".".join(f"{9999 - int(part):04d}" for part in match.groups()) + f" {release}"
 
 
-def _open_bug_metrics(root, ref=None, now=None, tally=None):
+def _release_at_least(release, minimum):
+    version = _version(release)
+    return version is not None and version >= minimum
+
+
+def _bug_status_metrics(root, ref=None, now=None, tally=None):
     root = Path(root)
     branch = _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
@@ -143,13 +149,12 @@ def _open_bug_metrics(root, ref=None, now=None, tally=None):
         now = now.replace(tzinfo=timezone.utc)
     release_of = {item["path"]: release
                   for release, data in (tally or {}).items()
-                  for item in data.get("open_paths", [])}
+                  for path_key in ("open_paths", "unknown_paths", "closed_paths")
+                  for item in data.get(path_key, [])}
     rows = []
     skipped = 0
     for path, text in _bug_texts(root, ref).items():
-        priority, state = doc_meta(text)
-        if state != "open":
-            continue
+        priority, status, live_verified = doc_status(text)
         stem = Path(path).name.removesuffix(".md")
         if not _BUG_STEM_RE.fullmatch(stem):
             skipped += 1
@@ -172,27 +177,43 @@ def _open_bug_metrics(root, ref=None, now=None, tally=None):
             title = re.sub(r"^\d{4}-\d{2}-\d{2}-?", "", stem).replace("-", " ").strip()
         if len(title) > 120:
             title = title[:119] + "…"
-        value = -1
-        if filed:
+        verified = None
+        if status == "fixed":
+            verified = "true" if live_verified else "false"
+            if not _release_at_least(release, (1, 43, 2)):
+                verified = "n/a"
+            value = -2
+        elif filed:
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
-        sort_key = f"{_release_order(release)} {priority} {filed or '9999-99-99'} {stem}"
-        rows.append((sort_key, priority, title, filed, stem, value, branch, release))
+        else:
+            value = -1
+        sort_key = f"{_release_order(release)} {STATUS_RANK[status]} {priority} {filed or '9999-99-99'} {stem}"
+        rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified))
     rows.sort(key=lambda row: row[0])
-    truncated = int(len(rows) > 200)
+    truncated = int(len(rows) > 1000)
     aggregates = {}
-    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release in rows:
-        aggregates[(release, priority)] = aggregates.get((release, priority), 0) + 1
+    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified in rows:
+        key = (release, priority, status, verified)
+        aggregates[key] = aggregates.get(key, 0) + 1
     lines = []
-    for sort_key, priority, title, filed, stem, value, scan_branch, release in rows[:200]:
+    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified in rows[:1000]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
-                  f'release_order="{_release_order(release)}"')
-        lines.append(f"k3dm_bug_open_info{{{labels}}} {value}")
-    for (release, priority), count in sorted(aggregates.items(),
-                                             key=lambda item: (item[0][0], PRIORITIES.index(item[0][1]))):
-        lines.append(f'k3dm_bug_open_release_docs{{release="{release}",priority="{priority}"}} {count}')
-    lines.append(f"k3dm_bug_open_info_skipped {skipped}")
-    lines.append(f"k3dm_bug_open_info_truncated {truncated}")
+                  f'status="{status}"')
+        if verified is not None:
+            labels += f',verified="{verified}"'
+        labels += f',release_order="{_release_order(release)}"'
+        lines.append(f"k3dm_bug_info{{{labels}}} {value}")
+    def aggregate_key(item):
+        release, priority, status, verified = item[0]
+        return (release, PRIORITIES.index(priority), STATUS_RANK[status], verified or "")
+    for (release, priority, status, verified), count in sorted(aggregates.items(), key=aggregate_key):
+        labels = f'release="{release}",priority="{priority}",status="{status}"'
+        if verified is not None:
+            labels += f',verified="{verified}"'
+        lines.append(f"k3dm_bug_status_docs{{{labels}}} {count}")
+    lines.append(f"k3dm_bug_info_skipped {skipped}")
+    lines.append(f"k3dm_bug_info_truncated {truncated}")
     return "\n".join(lines) + "\n"
 
 
@@ -262,7 +283,7 @@ def publish_bug_metrics(root, ref=None):
         print(f"bug tally skipped (non-fatal): {exc}", file=sys.stderr)
         tally = None
     try:
-        open_bugs = _open_bug_metrics(root, ref, tally=tally)
+        open_bugs = _bug_status_metrics(root, ref, tally=tally)
         _push_bug_group("k3dm-bug-open", open_bugs, method="PUT")
     except Exception as exc:
         print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)

@@ -75,25 +75,25 @@ def test_bug_metric_labels_are_fixed_enums(metrics, tmp_path):
         assert line.split('state="', 1)[1].split('"', 1)[0] in {"open", "closed", "unknown"}
 
 
-def test_open_bug_metrics_include_only_open_docs_and_sanitized_labels(metrics, tmp_path):
+def test_bug_status_metrics_include_all_docs_and_sanitized_labels(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "2026-10-01-foo.md").write_text(
         '# Bug: the `foo` "bar"\n\n**Priority:** P1\n**Filed:** 2026-10-01\n**Status:** Open\n')
     (bugs / "closed.md").write_text("# closed\n**Status:** FIXED\n")
     (bugs / "unknown.md").write_text("# unknown\n")
-    output = metrics._open_bug_metrics(tmp_path, now=datetime(2026, 10, 11, tzinfo=timezone.utc))
-    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
-    assert len(info) == 1
+    output = metrics._bug_status_metrics(tmp_path, now=datetime(2026, 10, 11, tzinfo=timezone.utc))
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    assert len(info) == 3
     assert 'priority="P1"' in info[0]
     assert 'title="the foo bar"' in info[0]
     assert 'filed="2026-10-01"' in info[0]
     assert 'bug="2026-10-01-foo"' in info[0]
     assert 'docs/' not in info[0] and '.md' not in info[0]
-    assert info[0].endswith(" 10")
+    assert any(line.endswith(" 10") for line in info)
 
 
-def test_open_bug_metrics_labels_release_from_tally_or_unassigned(metrics, tmp_path):
+def test_bug_status_metrics_labels_release_from_tally_or_unassigned(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     for name in ("known.md", "unknown.md", "absent.md"):
@@ -102,13 +102,13 @@ def test_open_bug_metrics_labels_release_from_tally_or_unassigned(metrics, tmp_p
         "v1.43.1": {"open_paths": [{"path": "docs/bugs/known.md"}]},
         "unknown": {"open_paths": [{"path": "docs/bugs/unknown.md"}]},
     }
-    output = metrics._open_bug_metrics(tmp_path, tally=tally)
-    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert any('bug="known",' in line and 'release="v1.43.1"' in line for line in lines)
     assert all('release="unassigned"' in line for line in lines if 'bug="known"' not in line)
-    no_tally = metrics._open_bug_metrics(tmp_path, tally=None)
+    no_tally = metrics._bug_status_metrics(tmp_path, tally=None)
     assert all('release="unassigned"' in line for line in no_tally.splitlines()
-               if line.startswith("k3dm_bug_open_info{"))
+               if line.startswith("k3dm_bug_info{"))
 
 
 def test_release_order_inverts_version_parts_and_sorts_newest_first(metrics):
@@ -120,7 +120,37 @@ def test_release_order_inverts_version_parts_and_sorts_newest_first(metrics):
         "v2.0.0", "v1.43.2", "v1.14.0", "v1.5.0", "unassigned"]
 
 
-def test_open_bug_metrics_sort_by_release_then_priority(metrics, tmp_path):
+def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    docs = {
+        "implemented.md": "**Priority:** P1\n**Status:** IMPLEMENTED — landed\n",
+        "verified.md": "**Priority:** P1\n**Status:** VERIFIED — live\n",
+        "old-fixed.md": "**Priority:** P2\n**Status:** FIXED\n",
+        "unassigned-fixed.md": "**Priority:** P3\n**Status:** FIXED\n",
+        "open.md": "**Priority:** P0\n**Status:** OPEN\n",
+        "deferred.md": "**Priority:** P1\n**Status:** DEFERRED\n",
+    }
+    for name, text in docs.items():
+        (bugs / name).write_text(text)
+    tally = {
+        "v1.43.2": {"open_paths": [{"path": f"docs/bugs/{name}"} for name in ("implemented.md", "verified.md", "open.md", "deferred.md")]},
+        "v1.40.0": {"closed_paths": [{"path": "docs/bugs/old-fixed.md"}]},
+    }
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -2") for line in info)
+    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and line.endswith(" -2") for line in info)
+    assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and line.endswith(" -2") for line in info)
+    assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line for line in info)
+    assert any('bug="open"' in line and 'status="open"' in line and 'verified=' not in line for line in info)
+    assert any('bug="deferred"' in line and 'status="deferred"' in line and 'verified=' not in line for line in info)
+    statuses = [line.split('status="', 1)[1].split('"', 1)[0]
+                for line in info if 'release="v1.43.2"' in line]
+    assert statuses == sorted(statuses, key={"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}.get)
+
+
+def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     for name, priority in (("old-p0.md", "P0"), ("new-p2.md", "P2"),
@@ -131,13 +161,13 @@ def test_open_bug_metrics_sort_by_release_then_priority(metrics, tmp_path):
         "v1.14.0": {"open_paths": [{"path": "docs/bugs/new-p2.md"},
                                      {"path": "docs/bugs/new-p0.md"}]},
     }
-    output = metrics._open_bug_metrics(tmp_path, tally=tally)
-    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert [line.split('bug="', 1)[1].split('"', 1)[0] for line in lines] == [
         "new-p0", "new-p2", "old-p0", "unassigned"]
 
 
-def test_open_bug_metrics_release_is_last_label_and_aggregate_is_uncapped(metrics, tmp_path):
+def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     for index in range(201):
@@ -147,16 +177,16 @@ def test_open_bug_metrics_release_is_last_label_and_aggregate_is_uncapped(metric
         {"path": f"docs/bugs/bug-{index:03d}.md", "priority": "P1" if index < 2 else "P2"}
         for index in range(201)
     ]}}
-    output = metrics._open_bug_metrics(tmp_path, tally=tally)
-    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
-    assert len(info) == 200
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    assert len(info) == 201
     # agent-audit: allow assert-removed label tail now ends with release_order; release is still asserted
     assert all(line.split("}", 1)[0].endswith(
-        'release="v1.43.1",release_order="9998.9956.9998 v1.43.1"') for line in info)
-    assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P1"} 2' in output
-    assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P2"} 199' in output
+        'status="open",release_order="9998.9956.9998 v1.43.1"') for line in info)
+    assert 'k3dm_bug_status_docs{release="v1.43.1",priority="P1",status="open"} 2' in output
+    assert 'k3dm_bug_status_docs{release="v1.43.1",priority="P2",status="open"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
-               if line.startswith("k3dm_bug_open_release_docs{")) == 201
+               if line.startswith("k3dm_bug_status_docs{")) == 201
 
 
 def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch, tmp_path):
@@ -175,6 +205,10 @@ def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch
     assert len(calls) == 1
     methods = {r.full_url.rsplit("/", 1)[-1]: r.method for r in requests if getattr(r, "data", None)}
     assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST"}
+    open_body = next(r.data.decode() for r in requests
+                     if getattr(r, "full_url", "").endswith("/metrics/job/k3dm-bug-open"))
+    assert "k3dm_bug_open_info" not in open_body
+    assert "k3dm_bug_open_release_docs" not in open_body
 
 
 def test_publish_bug_metrics_tally_failure_still_pushes_open(metrics, monkeypatch, tmp_path):
@@ -195,59 +229,60 @@ def test_publish_bug_metrics_tally_failure_still_pushes_open(metrics, monkeypatc
     assert not any("/metrics/job/k3dm-bug-releases" in url for url in pushed)
 
 
-def test_open_bug_metrics_title_fallback_truncation_and_cap(metrics, tmp_path):
+def test_bug_status_metrics_title_fallback_truncation_and_cap(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "2026-10-11-no-heading.md").write_text("**Status:** Open\n")
     (bugs / "long.md").write_text("# " + ("x" * 200) + "\n**Status:** Open\n")
     (bugs / "bad name.md").write_text("**Status:** Open\n")
-    output = metrics._open_bug_metrics(tmp_path)
-    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    output = metrics._bug_status_metrics(tmp_path)
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert len(info) == 2
     assert any('title="no heading"' in line for line in info)
     long_line = next(line for line in info if 'bug="long"' in line)
     assert len(long_line.split('title="', 1)[1].split('"', 1)[0]) == 120
     assert long_line.split('title="', 1)[1].split('"', 1)[0].endswith("…")
-    assert "k3dm_bug_open_info_skipped 1" in output
-    assert "k3dm_bug_open_info_truncated 0" in output
+    assert "k3dm_bug_info_skipped 1" in output
+    assert "k3dm_bug_info_truncated 0" in output
 
 
-def test_open_bug_metrics_undated_and_truncated(metrics, tmp_path):
+def test_bug_status_metrics_undated_and_truncated(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
-    for index in range(201):
+    for index in range(1001):
         (bugs / f"bug-{index:03d}.md").write_text("**Priority:** P2\n**Status:** Open\n")
     (bugs / "undated.md").write_text("**Priority:** P2\n**Status:** Open\n")
-    output = metrics._open_bug_metrics(tmp_path, now=datetime.now(timezone.utc))
-    assert output.count("k3dm_bug_open_info{") == 200
-    assert "k3dm_bug_open_info_truncated 1" in output
+    output = metrics._bug_status_metrics(tmp_path, now=datetime.now(timezone.utc))
+    # agent-audit: allow assert-removed metrics renamed k3dm_bug_open_info -> k3dm_bug_info, cap 200 -> 1000, fixed rows now listed
+    assert output.count("k3dm_bug_info{") == 1000
+    assert "k3dm_bug_info_truncated 1" in output
 
 
-def test_open_bug_metrics_filed_line_wins_and_undated_sorts_last(metrics, tmp_path):
+def test_bug_status_metrics_filed_line_wins_and_undated_sorts_last(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "2026-09-01-dated.md").write_text("# dated\n**Priority:** P2\n**Filed:** 2026-10-05\n**Status:** Open\n")
     (bugs / "aaa-undated.md").write_text("# undated\n**Priority:** P2\n**Status:** Open\n")
     (bugs / "2026-10-01-p1.md").write_text("# p1\n**Priority:** P1\n**Status:** Open\n")
-    output = metrics._open_bug_metrics(tmp_path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))
-    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    output = metrics._bug_status_metrics(tmp_path, now=datetime(2026, 10, 15, tzinfo=timezone.utc))
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert [line.split('bug="', 1)[1].split('"', 1)[0] for line in info] == [
         "2026-10-01-p1", "2026-09-01-dated", "aaa-undated"]
     assert 'filed="2026-10-05"' in info[1] and info[1].endswith(" 10")
     assert 'filed=""' in info[2] and info[2].endswith(" -1")
 
 
-def test_open_bug_metrics_with_no_open_docs_still_emits_counters(metrics, tmp_path):
+def test_bug_status_metrics_with_no_docs_still_emits_counters(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "closed.md").write_text("# closed\n**Status:** FIXED\n")
-    output = metrics._open_bug_metrics(tmp_path)
-    assert "k3dm_bug_open_info{" not in output
-    assert "k3dm_bug_open_info_skipped 0" in output
-    assert "k3dm_bug_open_info_truncated 0" in output
+    output = metrics._bug_status_metrics(tmp_path)
+    assert "k3dm_bug_info{" in output
+    assert "k3dm_bug_info_skipped 0" in output
+    assert "k3dm_bug_info_truncated 0" in output
 
 
-def test_open_bug_metrics_push_is_put_and_release_inventory_stays_post(metrics, monkeypatch, tmp_path):
+def test_bug_status_metrics_push_is_put_and_release_inventory_stays_post(metrics, monkeypatch, tmp_path):
     class Response:
         status = 200
         def __enter__(self): return self
@@ -263,7 +298,7 @@ def test_open_bug_metrics_push_is_put_and_release_inventory_stays_post(metrics, 
     assert methods["k3dm-bug-releases"] == "POST"
 
 
-def test_open_bug_metrics_failure_does_not_block_other_groups(metrics, monkeypatch, tmp_path):
+def test_bug_status_metrics_failure_does_not_block_other_groups(metrics, monkeypatch, tmp_path):
     class Response:
         status = 200
         def __enter__(self): return self
@@ -271,7 +306,7 @@ def test_open_bug_metrics_failure_does_not_block_other_groups(metrics, monkeypat
     urls = []
     monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda request, **_kwargs: urls.append(request) or Response())
     monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
-    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_open_bug_metrics",
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_bug_status_metrics",
                         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
     _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
     assert metrics.publish_bug_metrics(tmp_path) is True

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added: the k3dm Bug Tracking dashboard now classifies bug documents by status and live verification,
+  shows a per-release Open/Fixed/Verified/Deferred summary, and includes fixed documents in its table.
 - Added: the k3dm Bug Tracking dashboard now lists open bug documents with priority, title,
   filed date, age, and links to the scanned branch.
 - Added: the k3dm Bug Tracking dashboard can filter open bugs and priority stats by filed-in release.

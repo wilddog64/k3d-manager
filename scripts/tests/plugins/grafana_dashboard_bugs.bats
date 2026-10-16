@@ -19,10 +19,21 @@ data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
 assert variable["includeAll"] is True and variable["multi"] is True
 assert variable["allValue"] == ".*"
-assert "k3dm_bug_open_info" in variable["definition"]
+assert "k3dm_bug_info" in variable["definition"]
 assert variable["sort"] == 0
 assert variable["regex"] == r"/^\S+ (?<value>\S+)$/"
 assert "release_order" in variable["definition"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard has a verified filter" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+variable = next(v for v in data["templating"]["list"] if v["name"] == "verified")
+assert variable["type"] == "custom"
+assert variable["current"]["value"] == "^(false)?$"
 PY
   [ "${status}" -eq 0 ]
 }
@@ -32,10 +43,10 @@ PY
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
-assert variable["query"]["query"] == "label_values(k3dm_bug_open_info, release_order)"
+assert variable["query"]["query"] == "label_values(k3dm_bug_info, release_order)"
 table = next(panel for panel in data["panels"] if panel["id"] == 23)
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
-assert organize["indexByName"]["release_order"] == 1
+assert organize["indexByName"]["release_order"] == 0
 assert organize["excludeByName"]["release"] is True
 assert organize["renameByName"]["release_order"] == "Release"
 release = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Release")
@@ -45,14 +56,14 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "release filters only the current open stats and table" {
+@test "release filters status summary stats and table" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
-for panel_id in (9, 10, 11, 12, 23):
+for panel_id in (9, 10, 11, 12, 13, 16, 17, 23):
     assert 'release=~"$release"' in panels[panel_id]["targets"][0]["expr"]
-for panel_id in (13, 14, 15):
+for panel_id in (14, 15):
     assert 'release=~"$release"' not in " ".join(t["expr"] for t in panels[panel_id]["targets"])
 PY
   [ "${status}" -eq 0 ]
@@ -77,12 +88,13 @@ with tempfile.TemporaryDirectory() as tmp:
     bugs = Path(tmp) / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "one.md").write_text("**Priority:** P1\n**Status:** Open\n")
-    output = module["_bug_metrics"](Path(tmp)) + module["_open_bug_metrics"](Path(tmp))
+    output = module["_bug_metrics"](Path(tmp)) + module["_bug_status_metrics"](Path(tmp))
 source = Path(metrics_path).read_text()
-assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs", "k3dm_bug_open_release_docs"} <= queries
+assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs", "k3dm_bug_info", "k3dm_bug_status_docs"} <= queries
 missing = [name for name in queries if name + "{" not in output and name + " " not in output and name + "{{" not in source]
 assert not missing, missing
 assert "k3dm_bug_docs_scan_timestamp_seconds" in output
+assert "k3dm_bug_open_info" not in output and "k3dm_bug_open_release_docs" not in output
 PY
   [ "${status}" -eq 0 ]
 }
@@ -161,7 +173,7 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
-table = next(panel for panel in data["panels"] if panel["type"] == "table" and panel["title"] == "Open bugs")
+table = next(panel for panel in data["panels"] if panel["type"] == "table" and panel["title"] == "Bugs")
 check = sys.argv[2]
 if check == "link":
     links = [prop["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Bug"
@@ -177,7 +189,7 @@ elif check == "sort":
 elif check == "layout":
     assert panels[22]["type"] == "row"
     assert table["gridPos"] == {"x": 0, "y": 20, "w": 24, "h": 12}, table["gridPos"]
-    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 20 for i in range(9, 15))
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 20 for i in (9, 10, 11, 12, 13, 14, 16, 17))
     assert panels[15]["gridPos"]["y"] == 32
     rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
     owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
@@ -187,7 +199,7 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Priority", "Release", "Bug", "Filed", "Open for"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Verified"]
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -211,7 +223,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "open bugs table shows only Priority, Release, Bug, Filed, Open for, coloured like panel 7" {
+@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Verified" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }
@@ -221,7 +233,7 @@ PY
 import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
-table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Open bugs")
+table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
 age = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Open for")
 unit = next(p["value"] for p in age["properties"] if p["id"] == "unit")
 assert unit == "suffix: d", unit

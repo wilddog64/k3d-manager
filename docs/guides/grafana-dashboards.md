@@ -320,12 +320,34 @@ untriaged docs. The middle row has two stacked bar charts across the six release
 open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
-where Grafana placed them on the wrong segment. The bottom row has the
-all-time open counts per priority, scan age, an **Open bugs** table, and open-by-priority over time.
-The table reads `k3dm_bug_open_info` and shows every open document with its priority, title,
-filed date, and age; clicking a title opens that document on the scanned branch. The exporter
-publishes it in the separate `k3dm-bug-open` Pushgateway group with `PUT`, so closed bugs and an
-empty final list are removed rather than lingering in Pushgateway. The list is capped at 200.
+where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
+scan age, a **Bugs** table, and open-by-priority over time. Each document is classified by status:
+
+| Status | Doc `**Status:**` value begins with |
+|---|---|
+| `deferred` | `DEFERRED` |
+| `fixed` | `IMPLEMENTED`, or a closed value such as `FIXED`, `VERIFIED`, or `CLOSED` |
+| `unknown` | there is no status line |
+| `open` | anything else |
+
+Fixed documents also have a Verified label:
+
+| Verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, any other fixed status |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| no label | not fixed |
+
+The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified, Deferred,
+and scan age. The table reads `k3dm_bug_info`, includes Release, Bug, Priority, Open for, Filed,
+Status, and Verified, and clicking a title opens that document on the scanned branch. The
+**Hide verified** toggle is the default: it keeps open, unknown, deferred, and not-yet-verified
+rows visible while hiding live-proven and historic `n/a` fixes. To mark a fix live-proven, change
+its Status to `VERIFIED — <evidence>`.
+
+The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
+group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.
 The Release dropdown filters the table and the Open P0–P3 stats by the release the bug was filed in:
 the doc's `**Branch:** k3d-manager-vX.Y.Z` line, otherwise the first tag containing the commit that
 added the file, otherwise the current release branch. Bugs without a valid release use the `unassigned`
