@@ -1,6 +1,6 @@
 # Bug: e2e-sandbox rebuilds a platform the hub already deploys to the sandbox
 
-**Status:** OPEN — reproduced 2026-10-16; design chosen 2026-10-16 (option a′), spec next
+**Status:** OPEN — reproduced 2026-10-16; design a′ specced in `docs/plans/v1.43.4-e2e-sandbox-hub-stripe-profile.md`, dispatched to Codex 2026-10-16
 **Priority:** P2
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make e2e-sandbox`, verified by Claude)

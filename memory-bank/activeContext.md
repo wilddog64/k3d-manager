@@ -1,3 +1,4 @@
+- 2026-10-16: Spec docs/plans/v1.43.4-e2e-sandbox-hub-stripe-profile.md (plan 4/5) written for the e2e-sandbox P2 (design a′: hub Stripe overlay via `k3dm.k3d.io/e2e-profile` on the ubuntu-k3s registration; drops vault/appsets phases); dispatched to Codex. Frontend Cache-Control P2: not Codex work — operator reruns shopping-cart-frontend run 38932270738.
 - 2026-10-16: Bug Tracking defaults LIVE-VERIFIED (operator screenshot, fresh URL: v1.43.4, P1→P3, Show all); P3 bug closed. Note: a URL with var-release=… overrides the default.
 - 2026-10-16: Bug Tracking defaults (plan 3/5) IMPLEMENTED + verified; needs hard refresh of hub-grafana-dashboards for live proof.
 - 2026-10-16: Spec docs/plans/v1.43.4-bug-dashboard-defaults.md (plan 3/5) written for the Bug Tracking defaults P3; dispatched to Codex.
