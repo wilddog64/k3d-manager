@@ -241,6 +241,12 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     (P3): an unguarded 120s metrics publish at the end of `index-docs.py` marks a finished index run
     failed; Hermes has the same unguarded call per poll; the bug metrics fork ~2,300 `git` processes
     per run. Guard both calls and read the bug docs with one `git cat-file --batch`. Dispatcher-able.
+- Feature, added 2026-10-16 by operator call (this release is otherwise bug-fix-only; plan 1 of 5):
+  - [`v1.43.3-bug-fixed-in-release`](plans/v1.43.3-bug-fixed-in-release.md): count each bug under the
+    release that fixed it, derived from git (the commit that turned its Status fixed → first tag that
+    contains it). Adds `k3dm_bug_fixed_in_release_docs`, a Bugs-fixed-per-release chart, a Fixed in
+    column, and moves the Fixed this release tile to it. Dispatch **after** the vectordb P3 above: both
+    edit `bug-tally.py` and `k3dm-vectordb-metrics`.
 
 ### Candidate milestone — v1.43.4 (patch)
 
