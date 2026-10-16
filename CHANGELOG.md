@@ -4,6 +4,8 @@
 
 - Added: the Bug Tracking dashboard counts fixes under the release that changed each bug to fixed,
   including fixed-in metrics, a priority chart, and a Fixed in table column.
+- Added: the Agent Dispatch dashboard now shows readable token averages, per-spec Codex cost and
+  run counts, and mean Codex and wall-clock time to land, with a bounded per-spec table.
 - Fixed: `cluster-up` keeps the fallback ACG TTL watcher out of the terminal and leaves ownership to launchd.
 - Fixed: a slow VectorDB metrics publish no longer marks a completed index run as failed, and bug
   metrics read tracked documents in batches.

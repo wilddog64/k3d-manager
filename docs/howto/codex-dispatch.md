@@ -47,6 +47,12 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
   Codex exit to land. Waiting time is not active minutes.
 - Agent efficiency is Codex tokens per landed task. It excludes Claude's verification tokens and
   is not converted to dollars because token pricing is not stable.
+- Per-spec series include the latest Codex token total, Codex seconds summed across runs, elapsed
+  seconds from the first start to land, and the number of Codex runs. They use validated version
+  and slug labels only on these task series, with at most 50 newest landed tasks per window; the
+  exporter exposes skipped and truncated counts. The two per-spec means cover all landed tasks,
+  not only the displayed rows.
 
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
-Pushgateway. The exporter uses the latest resumed Codex token total for a task.
+Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
+task recorded.

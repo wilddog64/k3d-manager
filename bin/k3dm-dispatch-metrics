@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import re
 import time
 import urllib.request
 from collections import defaultdict
@@ -11,6 +12,9 @@ from pathlib import Path
 
 WINDOWS = {"1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
 RESULTS = ("landed", "tests", "scope", "rebase")
+TASK_CAP = 50
+VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
+SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
 
 def _root():
@@ -54,6 +58,35 @@ def _task_state(task_events):
     return "awaiting"
 
 
+def _task_metrics(task_events, land_event):
+    ordered = sorted(enumerate(task_events), key=lambda item: (item[1]["ts"], item[0]))
+    exits = [event for _, event in ordered if event.get("event") == "codex_exit"]
+    launches = [event for _, event in ordered if event.get("event") in {"start", "resume"}]
+    codex_seconds = 0
+    previous_exit = None
+    for exit_event in exits:
+        candidates = [
+            launch for launch in launches
+            if launch["ts"] <= exit_event["ts"]
+            and (previous_exit is None or launch["ts"] > previous_exit)
+        ]
+        if candidates:
+            codex_seconds += exit_event["ts"] - max(candidates, key=lambda event: event["ts"])["ts"]
+        previous_exit = exit_event["ts"]
+
+    token_events = [event for event in exits if isinstance(event.get("tokens"), int)]
+    start_events = [event for event in task_events if event.get("event") == "start"]
+    elapsed = None
+    if start_events:
+        elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
+    return {
+        "tokens": token_events[-1]["tokens"] if token_events else None,
+        "codex_seconds": codex_seconds,
+        "elapsed_seconds": elapsed,
+        "runs": len(exits),
+    }
+
+
 def _window_metrics(events, now, seconds):
     cutoff = now - seconds
     current = [event for event in events if event["ts"] >= cutoff]
@@ -61,28 +94,38 @@ def _window_metrics(events, now, seconds):
     landed = {}
     for event in current:
         if event.get("event") == "land":
-            landed[(event.get("version"), event.get("slug"))] = event
             attempts["landed"] += 1
         elif event.get("event") == "land_refused" and event.get("reason") in attempts:
             attempts[event["reason"]] += 1
+    for event in events:
+        if event.get("event") != "land":
+            continue
+        key = (event.get("version"), event.get("slug"))
+        if key not in landed or event["ts"] >= landed[key]["ts"]:
+            landed[key] = event
+    landed = {key: event for key, event in landed.items() if event["ts"] >= cutoff}
 
     states = _task_states(events)
     token_values = []
     verifier_values = []
     wait_values = []
-    latest_exit = {}
-    for key, task_events in states.items():
-        exits = [e for e in task_events if e.get("event") == "codex_exit"]
-        if exits:
-            latest_exit[key] = exits[-1]
+    elapsed_values = []
+    codex_values = []
+    tasks = []
     for key, event in landed.items():
-        exit_event = latest_exit.get(key, {})
-        if isinstance(exit_event.get("tokens"), int):
-            token_values.append(exit_event["tokens"])
+        task = _task_metrics(states[key], event)
+        if task["tokens"] is not None:
+            token_values.append(task["tokens"])
         if isinstance(event.get("verifier_lines"), (int, float)):
             verifier_values.append(event["verifier_lines"])
         if isinstance(event.get("wait_seconds"), (int, float)):
             wait_values.append(event["wait_seconds"] / 60)
+        if task["elapsed_seconds"] is not None:
+            elapsed_values.append(task["elapsed_seconds"] / 60)
+        if task["runs"]:
+            codex_values.append(task["codex_seconds"] / 60)
+        tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
+                      task["elapsed_seconds"], task["runs"]))
 
     return {
         "landed": len(landed),
@@ -90,6 +133,9 @@ def _window_metrics(events, now, seconds):
         "tokens": sum(token_values) / len(token_values) if token_values else 0,
         "verifier": sum(verifier_values) / len(verifier_values) if verifier_values else 0,
         "wait": sum(wait_values) / len(wait_values) if wait_values else None,
+        "elapsed": sum(elapsed_values) / len(elapsed_values) if elapsed_values else None,
+        "codex_minutes": sum(codex_values) / len(codex_values) if codex_values else None,
+        "tasks": tasks,
     }
 
 
@@ -109,6 +155,32 @@ def render(events, bad_lines, now=None):
         if metrics["wait"] is not None:
             lines.append(f'k3dm_dispatch_wait_minutes_per_landed{{window="{window}"}} '
                          f'{metrics["wait"]}')
+        if metrics["elapsed"] is not None:
+            lines.append(f'k3dm_dispatch_elapsed_minutes_per_landed{{window="{window}"}} '
+                         f'{metrics["elapsed"]}')
+        if metrics["codex_minutes"] is not None:
+            lines.append(f'k3dm_dispatch_codex_minutes_per_landed{{window="{window}"}} '
+                         f'{metrics["codex_minutes"]}')
+        valid_tasks = []
+        skipped = 0
+        for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):
+            _, version, slug, *_ = task
+            if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
+                    and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
+                skipped += 1
+                continue
+            valid_tasks.append(task)
+        for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs in valid_tasks[:TASK_CAP]:
+            labels = f'window="{window}",version="{version}",slug="{slug}"'
+            if tokens is not None:
+                lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
+            lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
+            if elapsed_seconds is not None:
+                lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
+            lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
+        lines.append(f'k3dm_dispatch_task_skipped{{window="{window}"}} {skipped}')
+        truncated = int(len(valid_tasks) > TASK_CAP)
+        lines.append(f'k3dm_dispatch_task_truncated{{window="{window}"}} {truncated}')
     task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
     lines.append(f"k3dm_dispatch_running {task_states.count('running')}")
     lines.append(f"k3dm_dispatch_awaiting_land {task_states.count('awaiting')}")

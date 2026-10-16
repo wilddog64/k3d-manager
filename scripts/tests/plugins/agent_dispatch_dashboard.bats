@@ -70,3 +70,20 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
+
+@test "agent dispatch dashboard: per-spec panels use readable units and grouped targets" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+panel5 = next(panel for panel in panels if panel["id"] == 5)
+assert panel5["fieldConfig"]["defaults"]["unit"] == "short"
+panel12 = next(panel for panel in panels if panel["id"] == 12)
+assert len(panel12["targets"]) == 4
+assert all(target["expr"].startswith("sum by (version, slug)") for target in panel12["targets"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}

@@ -305,7 +305,12 @@ accepted specs, integration-test landing success, verifier lines changed, wait m
 tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
 minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens
 only, excludes Claude verification, and is not converted to dollars because token pricing is not
-stable. Scope and rebase refusals are excluded from the integration success ratio.
+stable. Scope and rebase refusals are excluded from the integration success ratio. The dashboard
+also shows mean minutes to land (from the first Codex start through land, including verification)
+and mean Codex minutes (Codex runtime summed across runs) for landed specs. The **Per spec** table
+lists Codex tokens, Codex time, time to land, and Codex runs for the newest 50 landed specs in the
+selected window. Tokens are the session total from the spec's last run; only dispatcher-launched
+specs appear, because a bare `codex exec` writes no ledger event.
 
 ### k3dm Bug Tracking (`k3dm-bugs`) — hub
 
