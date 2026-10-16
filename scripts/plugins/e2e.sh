@@ -157,13 +157,28 @@ function _e2e_sandbox_preflight_cluster() {
   _info "[e2e] sandbox preflight: context=${ctx} readyz=ok"
 }
 
+function _e2e_sandbox_argocd_ready() {
+  local ns="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" server controller
+  server="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get deployment \
+    -l app.kubernetes.io/name=argocd-server -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
+  controller="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get statefulset \
+    -l app.kubernetes.io/name=argocd-application-controller -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "$server" || -z "$controller" || "$server" == *" "* || "$controller" == *" "* ]]; then
+    _err "[e2e] sandbox Argo CD: expected exactly one argocd-server Deployment and one argocd-application-controller StatefulSet in namespace ${ns} on ubuntu-k3s (found server='${server}' controller='${controller}'); cluster-up installs Argo CD there and e2e-sandbox never installs it — run make up with the k3s-aws provider, then rerun Tier 2"
+    return 1
+  fi
+  _info "[e2e] sandbox Argo CD: reusing ${ns}/${server}"
+  _e2e_sandbox_kc -n "$ns" wait --for=condition=available "deployment/${server}" --timeout=600s
+  _e2e_sandbox_kc -n "$ns" rollout status "statefulset/${controller}" --timeout=600s
+}
+
 function _e2e_sandbox_argocd_cluster_manifest() {
-  cat <<'YAML'
+  cat <<YAML
 apiVersion: v1
 kind: Secret
 metadata:
   name: ubuntu-k3s
-  namespace: argocd
+  namespace: ${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}
   labels:
     argocd.argoproj.io/secret-type: cluster
     k3d-manager/role: app-cluster
@@ -391,11 +406,9 @@ function e2e_verify_sandbox() {
   _E2E_ACTIVE_PHASE="provisioning-secrets"
   _e2e_sandbox_provision_secrets
 
-  _E2E_ACTIVE_PHASE="installing-argocd"
-  _run_command -- helm upgrade --install argocd argo/argo-cd --kube-context ubuntu-k3s \
-    -n argocd --create-namespace --set server.insecure=true --set server.service.type=ClusterIP
-  _e2e_sandbox_kc -n argocd apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
-  _e2e_sandbox_kc -n argocd wait --for=condition=available deployment/argocd-server --timeout=600s
+  _E2E_ACTIVE_PHASE="checking-argocd"
+  _e2e_sandbox_argocd_ready
+  _e2e_sandbox_kc -n "${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
 
   _E2E_ACTIVE_PHASE="configuring-vault"
   shopping_cart_create_vault_bridge
@@ -407,7 +420,7 @@ function e2e_verify_sandbox() {
   local appset_file rendered_file
   for appset_file in "${SCRIPT_DIR}/etc/argocd/applicationsets"/*.yaml; do
     rendered_file="$(mktemp -t e2e-sandbox-appset.XXXXXX)"
-    ARGOCD_NAMESPACE=argocd APP_CLUSTER_NAME=ubuntu-k3s \
+    ARGOCD_NAMESPACE="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" APP_CLUSTER_NAME=ubuntu-k3s \
       K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)}" \
       AMBIENT_CNI_CONF_DIR="${AMBIENT_CNI_CONF_DIR:-/opt/cni/bin}" \
       AMBIENT_CNI_BIN_DIR="${AMBIENT_CNI_BIN_DIR:-/opt/cni/bin}" \

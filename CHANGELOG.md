@@ -17,6 +17,8 @@
   stored value (Vault unseal shards, signing keys) on the `security` command line where any
   same-user process could read it, reports a failed Keychain write instead of returning success,
   and keeps the existing item when a write fails.
+- Fixed: `e2e-sandbox` now reuses the Argo CD installed by `cluster-up` in `cicd` instead of
+  attempting a second Helm installation that conflicts with existing CRD ownership.
 
 ## [1.43.2] - 2026-10-16
 
