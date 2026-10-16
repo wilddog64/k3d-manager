@@ -698,6 +698,11 @@ milestone only when it gets a scope doc.
   immutable audit logging, network/egress controls, backup/restore testing, incident response,
   periodic risk analysis, and independent legal/security review. Scope document required before
   assigning a release; v1.42.0 remains at its five-plan cap.
+- **Claude Code self-hosted runner (evaluation)** — sessions started from Slack that run on the
+  M4, so they can reach the hub and the webhook. The cloud bridge can't do that, but the same reach
+  exposes the operator's credentials, so this starts as a read-only go/no-go evaluation in a separate
+  OS user. Not before v1.43.5. Plan: `docs/plans/claude-self-hosted-runner-evaluation.md`
+  (operator, 2026-10-15).
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio
