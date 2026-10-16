@@ -24,6 +24,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
@@ -267,6 +268,14 @@ or the Pushgateway port-forward is down.
 The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet. The alert rules
 do not: apply them with `make prometheus-rules`, which applies only
 `scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
+
+### k3dm PR Checks (`k3dm-pr-checks`) — hub
+
+Shows every open pull request's GitHub check-run state, overall verdict, and check duration for
+k3d-manager and lib-foundation. Hermes publishes it every five minutes through Pushgateway job
+`k3dm-pr-checks`, using one group per repo; the Repo filter is at the top. A Copilot review is not
+a check. Merged or closed PRs disappear on the next good poll. `GitHub read = failed` keeps the
+last good rows and usually means the Hermes GitHub token expired or was rejected.
 
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
 
