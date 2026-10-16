@@ -101,3 +101,18 @@ bootstrapped with `launchctl bootstrap gui/$(id -u)`. All three public URLs then
 
 **Fix:** the hub-only path (`bin/hub-restore` Step 8 "Local agents") installs both agents, reusing
 the `bin/cluster-refresh` plist block through a shared helper.
+
+## Also missing: the ArgoCD OIDC client-secret ExternalSecret
+
+ArgoCD SSO then failed with `failed to get token: oauth2: "unauthorized_client" "Invalid client or
+Invalid client credentials"`. `argocd-cm` references `$oidc.keycloak.clientSecret`, but
+`argocd-secret` had no such key. The key comes from `ExternalSecret/argocd-oidc-secret`
+(`shopping-cart-infra/argocd/config/argocd-secret.yaml`: Vault `secret/keycloak/clients`
+`argocd_client_secret`, merged into `argocd-secret`). Only `bin/cluster-up` applies it, around
+line 1559. The hub-only path never does.
+
+**Workaround (used):** `kubectl apply -f ../shopping-carts/shopping-cart-infra/argocd/config/argocd-secret.yaml`,
+wait for `SecretSynced`, then `rollout restart deploy/argocd-server`.
+
+**Fix:** the same shared "identity bootstrap" step that applies the identity Application also
+applies this ExternalSecret and restarts `argocd-server` once it syncs.
