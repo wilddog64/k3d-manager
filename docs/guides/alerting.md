@@ -13,7 +13,7 @@ or added to an explicit child-route matcher.
   initial firing text. The `platform-warning` email receiver also names resolved alerts.
 - `platform-warning` emails the operator's `ALERTMANAGER_GMAIL_FROM` mailbox for the
   explicitly allowlisted warning alerts: `KubeJobFailed`, `KubeJobNotCompleted`,
-  `E2EVerificationFailing`, `E2EVerificationStale`, and
+  `E2EVerificationFailing`, `E2EVerificationStale`, `E2EResultsMissing`, and
   `PrometheusDuplicateTimestamps`.
 - ACG sandbox criticals email through `platform-warning`; only hub criticals text through
   `sms-critical`.

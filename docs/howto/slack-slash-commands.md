@@ -378,6 +378,8 @@ bin/k3dm-webhook-setup --uninstall
 | `fix-delete-pod` | admin | `APP`, `NS` | `FIX_CONTEXT` | yes | 300 |
 | `fix-force-sync` | admin | `APP` | | yes | 300 |
 
+`e2e-replay` republishes only `publication_pending` files left by a failed original publish. After a hub rebuild, use `make e2e-republish RUNNER=m2` to select and republish the newest retained summary for each service and tier from the runner. It is not a slash command: run it from a terminal on the M4.
+
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
 

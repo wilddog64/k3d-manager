@@ -80,6 +80,7 @@ that session, so Keychain reads fail with `User interaction is not allowed` even
 - The hub Vault's own storage — `bin/cluster-down:330` runs `k3d cluster delete`, which destroys
   the PVC. The unseal shards are worthless without it.
 - All PersistentVolumes: Postgres, Redis, RabbitMQ, MinIO data.
+- E2E result ConfigMaps in `platform-ops` (label `k3dm.k3d.io/e2e-result=true`); the runner keeps the summaries.
 - Docker build cache and unused images (`bin/cluster-down` runs `docker system prune --force`).
 
 ## BLOCKER — CLEARED in `f28a4539` before the rebuild ran
@@ -281,6 +282,7 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 - [ ] `./bin/public-endpoint-probe --json` → `verdict: ok`. With the 401 fix landed,
       prometheus/alertmanager/webhook count healthy while still reporting 401.
 - [ ] `make status`
+- [ ] `make e2e-republish RUNNER=m2`, then confirm the E2E Verification dashboard has data.
 - [ ] Grafana port-forward stable — the restart loop should stop:
       ```bash
       wc -l < ~/.local/share/k3d-manager/logs/grafana-pf.log   # compare after 10 min

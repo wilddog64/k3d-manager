@@ -18,6 +18,8 @@
   incomplete runs are reported separately when a stage stops before later suites execute.
 - Fixed: `E2EVerificationStale` now checks the latest successful e2e run across
   all runners, so an idle runner cannot make a recently verified service look stale.
+- Fixed: `make e2e-republish RUNNER=m2` restores retained runner E2E results after a hub rebuild,
+  and `E2EResultsMissing` alerts when the hub has no E2E results.
 - Fixed: the Agent Dispatch dashboard's Landing success panel now aggregates
   both sides of its PromQL ratio, so the 7d success percentage renders instead
   of showing No data.

@@ -917,6 +917,91 @@ function e2e_runner_replay() {
   _e2e_remote_ssh "export E2E_REPORT_DIR=${E2E_M2_REMOTE_REPORT_DIR}; ${backenv}cd ${E2E_M2_REPO} && ./scripts/k3d-manager e2e_runner_publish_replay"
 }
 
+function _e2e_republish_select() {
+  python3 - "$1" <<'PY'
+import datetime
+import json
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+pattern = re.compile(r"^[0-9]+-[0-9]+\.json$")
+newest = {}
+skipped = 0
+for path in root.rglob("*.json"):
+    if not pattern.fullmatch(path.name):
+        continue
+    try:
+        with path.open(encoding="utf-8") as fh:
+            payload = json.load(fh)
+        if (not isinstance(payload, dict)
+                or any(not isinstance(payload.get(key), str)
+                       for key in ("service", "tier", "timestamp"))):
+            skipped += 1
+            continue
+        stamp = datetime.datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        skipped += 1
+        continue
+    key = (payload["service"], payload["tier"])
+    current = newest.get(key)
+    if current is None or (stamp, path.name) > (current[0], current[1].name):
+        newest[key] = (stamp, path)
+
+print("SKIPPED=%d" % skipped)
+for _, path in sorted(newest.values(), key=lambda item: (item[0], item[1].name)):
+    print(path)
+PY
+}
+
+# Public (M4): republish the newest retained result per service and tier from a
+# remote runner after a hub rebuild. Never runs automatically.
+function e2e_runner_republish() {
+  local runner="${1:-}"
+  _e2e_remote_load_conf
+  [[ -n "$runner" ]] || _err "usage: e2e_runner_republish <runner>"
+  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  if ! _e2e_remote_ssh "true"; then
+    _err "[e2e-remote] runner ${runner} unreachable; cannot republish"
+  fi
+
+  local tmp selection skipped=0 f published=0 failed=0
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmp'" RETURN
+  if ! _e2e_remote_ssh "cd ${E2E_M2_REMOTE_REPORT_DIR} && tar -cf - -- [0-9]*.json 2>/dev/null" \
+      | tar -xf - -C "$tmp"; then
+    _warn "[e2e-remote] nothing to republish"
+    return 0
+  fi
+  if ! find "$tmp" -type f -name '*.json' -print -quit | grep -q .; then
+    _warn "[e2e-remote] nothing to republish"
+    return 0
+  fi
+
+  if ! selection="$(_e2e_republish_select "$tmp")"; then
+    _warn "[e2e-remote] nothing to republish"
+    return 0
+  fi
+  local -a files=()
+  if [[ -n "$selection" ]]; then
+    mapfile -t files <<<"$selection"
+    skipped="${files[0]#SKIPPED=}"
+    files=("${files[@]:1}")
+  fi
+  for f in "${files[@]}"; do
+    [[ -n "$f" ]] || continue
+    if ( e2e_result_publish < "$f" ); then
+      published=$((published + 1))
+    else
+      failed=$((failed + 1))
+    fi
+  done
+  _info "[e2e-remote] republish complete: published=${published} failed=${failed} skipped=${skipped}"
+  return "$(( failed > 0 ? 1 : 0 ))"
+}
+
 # Public (M4): clear a STALE runner lock with bounded age + no-live-run checks.
 # Never automatic; refuses a fresh lock or one whose runner still has an E2E
 # process running.
