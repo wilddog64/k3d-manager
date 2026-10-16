@@ -264,13 +264,98 @@ YAML
   export -f _kubectl security register_app_cluster docker_stub
   run hub_recovery_reconcile
   [ "$status" -eq 0 ]
-  for step in {1..12}; do
+  for step in {1..13}; do
     [[ "$output" == *"${step}."* ]]
   done
   [[ "$output" == *"k3d serverlb upstreams"* ]]
   [[ "$output" == *"ArgoCD admin Vault mirror"* ]]
   [[ "$output" == *"Other app-cluster registrations"* ]]
   [ ! -s "$calls" ]
+}
+
+@test "_hub_recovery_ensure_identity_bootstrap: missing Application is applied" {
+  local calls="${BATS_TEST_TMPDIR}/identity-bootstrap-calls"
+  : >"$calls"
+  _kubectl() {
+    printf '%s\n' "$*" >>"$calls"
+    [[ "$*" == *"get application shopping-cart-identity"* ]] && return 1
+    return 0
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_ensure_identity_bootstrap hub-context
+  [ "$status" -eq 0 ]
+  run grep -F -- "apply -f ${SCRIPT_DIR}/etc/argocd/identity/shopping-cart-identity-application.yaml" "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "_hub_recovery_ensure_identity_bootstrap: existing Application is not applied" {
+  local calls="${BATS_TEST_TMPDIR}/identity-bootstrap-present-calls"
+  : >"$calls"
+  export HUB_RECOVERY_INFRA_ROOT="${BATS_TEST_TMPDIR}/no-infra"
+  _kubectl() {
+    printf '%s\n' "$*" >>"$calls"
+    return 0
+  }
+  _info() { :; }
+  _warn() { :; }
+  run _hub_recovery_ensure_identity_bootstrap hub-context
+  [ "$status" -eq 0 ]
+  run grep -F -- 'apply -f' "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_ensure_identity_bootstrap: present OIDC ExternalSecret is applied" {
+  local calls="${BATS_TEST_TMPDIR}/identity-bootstrap-oidc-calls"
+  local infra="${BATS_TEST_TMPDIR}/infra"
+  mkdir -p "${infra}/argocd/config"
+  : >"${infra}/argocd/config/argocd-secret.yaml"
+  : >"$calls"
+  _kubectl() {
+    printf '%s\n' "$*" >>"$calls"
+    return 0
+  }
+  _info() { :; }
+  _warn() { :; }
+  HUB_RECOVERY_INFRA_ROOT="$infra" run _hub_recovery_ensure_identity_bootstrap hub-context
+  [ "$status" -eq 0 ]
+  run grep -F -- "apply -f ${infra}/argocd/config/argocd-secret.yaml" "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "_hub_recovery_ensure_identity_bootstrap: absent OIDC ExternalSecret warns and succeeds" {
+  export HUB_RECOVERY_INFRA_ROOT="${BATS_TEST_TMPDIR}/no-infra"
+  _kubectl() { return 0; }
+  _info() { :; }
+  _warn() { printf '%s\n' "$*"; }
+  run _hub_recovery_ensure_identity_bootstrap hub-context
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not found; ArgoCD SSO needs ExternalSecret"* ]]
+}
+
+@test "hub_recovery_reconcile: bootstraps identity before retrying its sync" {
+  local calls="${BATS_TEST_TMPDIR}/identity-bootstrap-order"
+  : >"$calls"
+  keycloak_smoke_vault_preseed() { :; }
+  _hub_recovery_ensure_identity_bootstrap() { echo bootstrap >>"$calls"; }
+  _hub_recovery_retry_failed_identity_sync() { echo retry >>"$calls"; }
+  _hub_recovery_ensure_serverlb_upstreams() { :; }
+  _hub_recovery_reconcile_hostnet_drift() { :; }
+  _hub_recovery_sync_vault_root_token() { :; }
+  _hub_recovery_ensure_eso_apps_role() { :; }
+  _hub_recovery_restore_signing() { :; }
+  register_app_cluster() { :; }
+  argocd_reconcile_app_cluster_registrations() { :; }
+  _hub_recovery_seed_app_cluster_reader() { :; }
+  _hub_recovery_scale_openldap() { :; }
+  _hub_recovery_replay_identity_hook() { :; }
+  keycloak_seed_smoke_user() { :; }
+  _hub_recovery_mirror_argocd_admin() { :; }
+  _hub_recovery_install_cloudflared_config() { :; }
+  run hub_recovery_reconcile --confirm
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$calls")" = bootstrap ]
+  [ "$(sed -n '2p' "$calls")" = retry ]
 }
 
 @test "_hub_recovery_retry_failed_identity_sync: Failed phase requests one cicd patch" {
@@ -337,6 +422,7 @@ exit 1
 STUB
   chmod +x "$drift"
   export HOSTNET_DRIFT_BIN="$drift" HOSTNET_CALLS="$calls"
+  _hub_recovery_ensure_identity_bootstrap() { :; }
   _hub_recovery_ensure_serverlb_upstreams() { echo serverlb >>"$calls"; }
   _hub_recovery_sync_vault_root_token() { :; }
   _hub_recovery_ensure_eso_apps_role() { :; }
@@ -463,7 +549,7 @@ STUB
 @test "hub_recovery_reconcile: the dry list names the cosign step" {
   run hub_recovery_reconcile
   [ "$status" -eq 0 ]
-  [[ "$output" == *"5. Cosign signing key"* ]]
+  [[ "$output" == *"6. Cosign signing key"* ]]
 }
 
 @test "hub_recovery never generates or rotates a signing key" {

@@ -139,15 +139,24 @@ spec:
             summary: "e2e {{ $labels.project }} failing on {{ $labels.tier }} for {{ $labels.exported_service }} (runner {{ $labels.runner }})"
             description: "The most recent e2e run for {{ $labels.exported_service }}/{{ $labels.project }} on the {{ $labels.tier }} substrate (runner {{ $labels.runner }}) failed and has stayed red for 10 minutes."
         - alert: E2EVerificationStale
-          expr: time() - max by (tier, exported_service, project, runner) (e2e_last_success_timestamp_seconds) > 259200
+          expr: time() - max by (tier, exported_service, project) (e2e_last_success_timestamp_seconds) > 259200
           for: 30m
           labels:
             group: e2e
             severity: warning
             tier: e2e
           annotations:
-            summary: "no passing e2e for {{ $labels.exported_service }}/{{ $labels.tier }} (runner {{ $labels.runner }}) in >3d"
-            description: "No passing e2e run for {{ $labels.exported_service }} on the {{ $labels.tier }} substrate (runner {{ $labels.runner }}) in over 3 days; the verification signal is stale."
+            summary: "no passing e2e for {{ $labels.exported_service }}/{{ $labels.tier }} on any runner in >3d"
+            description: "No passing e2e run for {{ $labels.exported_service }} on the {{ $labels.tier }} substrate on any runner in over 3 days; the verification signal is stale."
+        - alert: E2EResultsMissing
+          expr: absent(e2e_last_run_pass)
+          for: 6h
+          labels:
+            group: e2e
+            severity: warning
+          annotations:
+            summary: "no e2e results on the hub"
+            description: "The hub has no e2e result ConfigMaps (k3dm.k3d.io/e2e-result=true), so E2EVerificationStale cannot fire. After a hub rebuild run make e2e-republish RUNNER=m2; otherwise check vulnerability-inventory-exporter in platform-ops."
     - name: hermes.alerts
       rules:
         - alert: HermesNotRunning
@@ -160,6 +169,16 @@ spec:
           annotations:
             summary: "Hermes has not completed a poll in over 15 minutes"
             description: "Hermes runs every 300 s. Check launchctl print gui/$UID/com.k3d-manager.hermes for the last exit code and ~/Library/Logs/k3dm-hermes.log. Exit 78 (EX_CONFIG) means launchd could not start the interpreter named in the plist."
+        - alert: HubKineCompactionStalled
+          expr: time() - k3dm_hub_kine_last_compaction_timestamp_seconds > 1800
+          for: 15m
+          labels:
+            group: hermes
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "Hub kine has not compacted in over 30 minutes"
+            description: "Healthy kine compacts every 5 minutes. A dead compaction loop never restarts and state.db grows until the hub is rebuilt. Do NOT restart the k3s server (it can crash-loop the bootstrap); see docs/bugs/2026-09-09-hub-kine-compaction-stall.md."
     - name: dr.alerts
       rules:
         - alert: DRDrillFailed

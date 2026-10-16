@@ -14,6 +14,15 @@ This is the indicated remedy for the kine compaction stall
 place on this hardware, and a bare `docker restart` of the k3s server makes it strictly worse by
 forfeiting an already-bootstrapped process (that mistake is recorded in the same doc).
 
+### Dead kine compaction
+
+Treat `HubKineCompactionStalled` as the trigger for a planned rebuild. It is a
+warning sent to `platform-warning` after the last `COMPACT deleted` event has
+been stale for 30 minutes plus the 15-minute alert hold. Do **not** restart
+the k3s server or its container: restarting can crash-loop the bootstrapped
+hub. Follow `make hub-recover-all` for this controlled rebuild after confirming the alert and preserving
+the pre-teardown evidence below.
+
 ## Why a rebuild is the fix
 
 The hub datastore is saturated: `state.db` ~2.4 GiB and growing ~580 MB/day, `slow_sql` climbing
@@ -37,8 +46,11 @@ None of these have independent fixes. The rebuild clears all of them together.
 Run the complete recovery from Terminal.app (or iTerm):
 
 ```bash
-make hub-recover
+make hub-recover-all
 ```
+
+Afterward, verify that `docker logs k3d-k3d-cluster-server-0 2>&1 | grep 'msg="COMPACT deleted'`
+returns a line about every five minutes. Do not restart the server as a shortcut.
 
 This runs `hub-up`, restores the Alertmanager credentials and signing material that have backups,
 reconciles the rebuilt Hub, restores the Embeddings key to Vault from a hidden prompt, reapplies
@@ -68,6 +80,7 @@ that session, so Keychain reads fail with `User interaction is not allowed` even
 - The hub Vault's own storage — `bin/cluster-down:330` runs `k3d cluster delete`, which destroys
   the PVC. The unseal shards are worthless without it.
 - All PersistentVolumes: Postgres, Redis, RabbitMQ, MinIO data.
+- E2E result ConfigMaps in `platform-ops` (label `k3dm.k3d.io/e2e-result=true`); the runner keeps the summaries.
 - Docker build cache and unused images (`bin/cluster-down` runs `docker system prune --force`).
 
 ## BLOCKER — CLEARED in `f28a4539` before the rebuild ran
@@ -269,6 +282,7 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 - [ ] `./bin/public-endpoint-probe --json` → `verdict: ok`. With the 401 fix landed,
       prometheus/alertmanager/webhook count healthy while still reporting 401.
 - [ ] `make status`
+- [ ] `make e2e-republish RUNNER=m2`, then confirm the E2E Verification dashboard has data.
 - [ ] Grafana port-forward stable — the restart loop should stop:
       ```bash
       wc -l < ~/.local/share/k3d-manager/logs/grafana-pf.log   # compare after 10 min
@@ -288,7 +302,9 @@ unless `--no-verify` is passed, so no separate verify call is needed. Do not set
 
 Seen 2026-10-03 ([incident](../issues/2026-10-03-hub-deleted-by-sandbox-teardown.md)).
 `shopping-cart-identity` stays `OutOfSync/Degraded`, `deployment/keycloak` is never created, and the
-operation message names `ExternalSecret/k3dm-smoke-user`.
+operation message names `ExternalSecret/k3dm-smoke-user`. `make hub-recover` now creates the identity
+Application and the ArgoCD OIDC ExternalSecret; `make hub-restore` installs the ArgoCD and Keycloak
+port-forward agents.
 
 1. **The Vault entry must exist.** `bin/cluster-up` and `hub_recovery_reconcile` pre-seed it
    (`keycloak_smoke_vault_preseed`, `d5b986f4`). To run it on its own:

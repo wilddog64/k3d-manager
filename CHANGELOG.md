@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+## [1.43.2] - 2026-10-16
+
+### Added
+
+- The k3dm Bug Tracking dashboard now classifies bug documents by status and live verification,
+  shows a per-release Open/Fixed/Verified/Deferred summary, and includes fixed documents in its table.
+- The k3dm Bug Tracking dashboard now lists open bug documents with priority, title,
+  filed date, age, and links to the scanned branch.
+- The k3dm Bug Tracking dashboard can filter open bugs and priority stats by filed-in release.
+- Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the
+  `HubKineCompactionStalled` warning alert so a dead compaction loop is detected
+  without relying on Slow SQL or a short log window. The alert directs operators
+  to a planned rebuild and warns not to restart the k3s server.
+
+### Changed
+
+- The k3dm Bug Tracking dashboard now separates VERIFIED from LIVE-VERIFIED with a dedicated label, column, tile, and filter. The Verified column reads "✓ verified"; only Live-verified reads "✓ live".
+
+### Fixed
+
+- E2E failure panels now count a run that fails before any test runs as one `aborted at <phase>` failure group while keeping Top failing specs empty.
+- `make smoke` now discovers the shopping-cart target from ArgoCD and refuses ambiguous or mismatched application/context selections instead of silently checking the infra context.
+- The k3dm Bug Tracking dashboard now orders releases newest first by version in its table and dropdown.
+- `make hub-recover-all` now approves first, tears down the existing hub and exact-name
+  k3d leftovers, rebuilds it, and resumes the selected data export, including when the hub is absent.
+- Offline suite case-count alerts now apply only to complete `test-all` runs, and
+  incomplete runs are reported separately when a stage stops before later suites execute.
+- `E2EVerificationStale` now checks the latest successful e2e run across
+  all runners, so an idle runner cannot make a recently verified service look stale.
+- `make e2e-republish RUNNER=m2` restores retained runner E2E results after a hub rebuild,
+  and `E2EResultsMissing` alerts when the hub has no E2E results.
+- The Agent Dispatch dashboard's Landing success panel now aggregates
+  both sides of its PromQL ratio, so the 7d success percentage renders instead
+  of showing No data.
+- The Checkout Load Test dashboard is now deployed to app clusters only; the ACG
+  dashboard ApplicationSet excludes its empty copy from the hub.
+- `DR_DRILL_KEEP=1` now preserves the drill kubeconfig with the kept cluster and prints
+  the exact `kubectl` command for inspecting it; deleted or never-started drills still remove it.
+- The DR drill's Vault checks now run under `nounset`, preserving their true or false
+  result instead of masking unbound-variable failures with temporary `set +u` wrappers.
+- Hermes Kine evidence now puts the compaction age first and formats ages and
+  `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
+
 ## [1.43.1] - 2026-10-11
 
 - Changed: the DR drill's Keychain guard now defaults to `enforce`: a call outside the scoped allowlist exits 44 before it reaches `security`. The audit drill on the M2 after the unseal-cache fix reported no unexpected calls, which was the condition for the flip; `DR_DRILL_CREDENTIAL_POLICY=audit` still records without refusing.

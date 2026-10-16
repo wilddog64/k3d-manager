@@ -2,8 +2,8 @@
 
 **Filed:** 2026-10-09, Claude (operator received a `PublicEndpointDown` SMS for argocd)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — `90d8942a`; live-checked 2026-10-09 (see "Live verification"); the restart path waits for the first natural recurrence. Release decision 2026-10-09: ships in v1.42.0 as **verify on next occurrence**; a fault drill to prove it on demand is queued as `docs/plans/v1.45.0-node-tunnel-fault-drill.md`
-**Priority:** P1 — a public endpoint stays down until a human restarts the agent
+**Status:** IMPLEMENTED — `90d8942a`, shipped in v1.42.0 (on `main`); the watchdog is loaded and running. The restart path has not been seen end to end yet; that proof belongs to `docs/plans/v1.45.0-node-tunnel-fault-drill.md`. Close at the v1.50.1 status cleanup unless it recurs and the restart fails
+**Priority:** P3 — reclassified 2026-10-15 from P1 (operator-approved): the fix has shipped, so no outage is waiting on this doc; what remains is test-only proof (see "Reclassified 2026-10-15")
 **Severity:** High
 **Component:** `bin/k3dm-node-health-watch` (`_healthy`, `_tick`)
 **Related:**
@@ -283,3 +283,23 @@ consecutive ticks (default 6), while a slow `/healthz` stays advisory; link this
   since 2026-10-05, usually after a host sleep or wake. Check with:
   `grep -E 'kubelet tunnel dead|restarting' ~/.local/share/k3d-manager/logs/node-health-watch.log | tail`.
   The expected sequence is `(1/6)` … `(6/6)`, then `restarting k3d-k3d-cluster-agent-0`, then `recovered`. Close this doc when that appears.
+
+## Reclassified 2026-10-15 — P1 → P3
+
+P1 described the **unfixed** defect: a public endpoint stayed down until a person restarted the agent.
+That is no longer true:
+
+- The fix `90d8942a` is in the `v1.42.0` tag and on `main`. The `com.k3d-manager.node-health-watch`
+  LaunchAgent is loaded and running.
+- The new detector has already fired live once. On 2026-10-12T04:35 (the OrbStack upgrade restart) it
+  logged `Ready but kubelet tunnel dead (1/6)`. The tunnel came back before the streak reached the
+  threshold, so correctly no restart was issued. Since then the log has been quiet, which is how this
+  watchdog reports healthy (it writes only on a problem).
+- What remains is proof that the **restart** branch works on a real dead tunnel. That is a test-only
+  gap, covered by the queued fault drill (`v1.45.0-node-tunnel-fault-drill.md`). A test gap is P3 by
+  this repo's priority scale.
+
+Leaving it at P1 kept one "open P1" on the Bug Tracking dashboard for something with no outage and
+no fix to wait for, which hid real P1s (2026-10-13 Keycloak redirect). If the defect recurs and the
+watchdog does **not** restart the agent, reopen this doc as P1.
+

@@ -11,53 +11,53 @@ AM_TMPL="${BATS_TEST_DIRNAME}/../../etc/prometheus/alertmanager.yaml.tmpl"
   run grep -F -- 'refresh_e2e_events' "${EXPORTER}"
   [ "${status}" -eq 0 ]
   run grep -F -- 'k3dm.k3d.io%2Fe2e-result%3Dtrue' "${EXPORTER}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- 'refresh_e2e_events()' "${EXPORTER}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "Hermes dashboard exposes current findings and history" {
   run grep -F -- 'hermes_sensor_status' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- '"title": "Current Hermes findings"' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- '"title": "Sensor status history"' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "Hermes dashboard exposes failure evidence and status meanings" {
   for field in 'failed_hosts' 'ci_run_url' 'Failed hosts' 'CI run' 'Open GitHub Actions run'; do
     run grep -F -- "${field}" "${HERMES_DASH}"
-    [ "${status}" -eq 0 ]
+    echo "$output"; [ "${status}" -eq 0 ]
   done
   run grep -F -- '0 = healthy, 1 = degraded, 2 = unknown' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- '{{sensor}} ({{status}}): {{evidence}}' "${HERMES_DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- 'run_url' "${EXPORTER}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "exporter emits all five e2e_* gauges" {
   for metric in e2e_run_info e2e_last_run_pass e2e_last_run_timestamp_seconds \
                 e2e_last_run_duration_seconds e2e_last_success_timestamp_seconds; do
     run grep -F -- "${metric}{" "${EXPORTER}"
-    [ "${status}" -eq 0 ]
+    echo "$output"; [ "${status}" -eq 0 ]
   done
 }
 
 @test "exporter emits grouped e2e failure metric and dashboard table" {
   run grep -F -- 'e2e_failure_group_info{' "${EXPORTER}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- '"title": "Failure groups"' "${DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "exporter emits test-level failure metric and dashboard table" {
   run grep -F -- 'e2e_failure_info{' "${EXPORTER}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   run grep -F -- '"title": "Failure details"' "${DASH}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "exporter normalizes nested JSON and skips invalid E2E payloads" {
@@ -72,7 +72,7 @@ assert 'if not payload.get("run_id"):' in src
 assert 'continue' in src
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -93,7 +93,35 @@ assert 'runner="%s"' in src, "runner not in emitted label body"
 assert '"run_id", "tier", "runner", "service"' in src, "runner not in e2e_run_info"
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
+@test "exporter synthesizes one failure group for a test-less failed run" {
+  run python3 - "${EXPORTER}" <<'PY'
+import ast, sys, yaml
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap"
+          and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+tree = ast.parse(src)
+node = next(n for n in tree.body
+            if isinstance(n, ast.FunctionDef) and n.name == "e2e_failure_groups")
+ns = {}
+exec(compile(ast.Module(body=[node], type_ignores=[]), "exporter", "exec"), ns)
+groups = ns["e2e_failure_groups"]
+assert groups({"phase": "installing-argocd"}, False, "product-catalog") == [{
+    "kind": "aborted at installing-argocd", "target": "installing-argocd",
+    "service": "product-catalog", "count": 1,
+}]
+assert groups({}, False, "product-catalog")[0]["kind"] == "aborted at unknown"
+assert groups({}, True, "product-catalog") == []
+existing = [{"kind": "auth", "target": "api", "service": "basket", "count": 2}]
+assert groups({"failure_groups": existing}, False, "product-catalog") is existing
+assert groups({"failure_details": [{"file": "api/cart.spec.ts"}]}, False, "product-catalog") == []
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -112,7 +140,7 @@ finally:
     os.unlink(f.name)
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -129,7 +157,7 @@ assert r["resources"] == ["configmaps"], r["resources"]
 assert sorted(r["verbs"]) == ["get", "list"], r["verbs"]
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -145,7 +173,7 @@ assert 'if score >= 9.0:' in src
 assert '"severity": severity_for(finding)' in src
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -163,7 +191,7 @@ assert 'except Exception:\n        # Preserve the last successful cache' in bloc
 assert 'remediation_state = []' not in block
 print('ok')
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -178,7 +206,7 @@ assert 'if event["display_state"] in ("superseded", "deployment_advanced"):' in 
 assert 'event["current"] = False' in src
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -203,11 +231,11 @@ for p in dash["panels"]:
         assert 'runner=~"$runner"' in t["expr"], "panel %s not filtered by runner" % p["id"]
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
-@test "prometheusrule defines the e2e alerts group and both alerts" {
+@test "prometheusrule defines the e2e alerts group and all alerts" {
   run python3 - "${RULE}" <<'PY'
 import sys, yaml
 r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
@@ -215,12 +243,15 @@ groups = {g["name"]: g for g in r["spec"]["groups"]}
 assert "e2e.alerts" in groups, list(groups)
 rules = groups["e2e.alerts"]["rules"]
 alerts = [rule["alert"] for rule in rules]
-assert alerts == ["E2EVerificationFailing", "E2EVerificationStale"], alerts
+assert alerts == ["E2EVerificationFailing", "E2EVerificationStale", "E2EResultsMissing"], alerts
 for rule in rules:
-    assert "$labels.runner" in rule["annotations"]["summary"], rule["alert"]
+    if rule["alert"] == "E2EResultsMissing":
+        continue
+    has_runner = "$labels.runner" in rule["annotations"]["summary"]
+    assert has_runner == (rule["alert"] == "E2EVerificationFailing"), rule["alert"]
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }
 
@@ -230,26 +261,107 @@ import sys, yaml
 r = list(yaml.safe_load_all(open(sys.argv[1])))[0]
 groups = {g["name"]: g for g in r["spec"]["groups"]}
 for rule in groups["e2e.alerts"]["rules"]:
+    if rule["alert"] == "E2EResultsMissing":
+        continue
     expr = rule["expr"]
-    assert "max by (tier, exported_service, project, runner)" in expr, (rule["alert"], expr)
+    want = ("max by (tier, exported_service, project)" if rule["alert"] == "E2EVerificationStale"
+            else "max by (tier, exported_service, project, runner)")
+    assert want + " (" in expr, (rule["alert"], expr)
     for field in ("summary", "description"):
         text = rule["annotations"][field]
         assert "$labels.service " not in text and "$labels.service}" not in text, (rule["alert"], field)
         assert "$labels.exported_service" in text, (rule["alert"], field)
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
+}
+
+@test "e2e staleness is fresh if any runner passed recently" {
+  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
+  rules_file="${BATS_TEST_TMPDIR}/e2e-rules.yml"
+  test_file="${BATS_TEST_TMPDIR}/e2e-staleness.test.yml"
+  python3 - "${RULE}" "${rules_file}" <<'PY'
+import sys, yaml
+document = next(d for d in yaml.safe_load_all(open(sys.argv[1]))
+                if d and d.get("kind") == "PrometheusRule")
+yaml.safe_dump({"groups": document["spec"]["groups"]}, open(sys.argv[2], "w"), sort_keys=False)
+PY
+  python3 - "${rules_file}" "${test_file}" <<'PY'
+import sys
+rules_file, test_file = sys.argv[1:]
+open(test_file, "w").write(f"""rule_files:
+  - {rules_file}
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"local-m4\"}}'
+        values: '0x7200'
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"m2\"}}'
+        values: '259200x7200'
+    alert_rule_test:
+      - eval_time: 5d
+        alertname: E2EVerificationStale
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"local-m4\"}}'
+        values: '0x7200'
+      - series: 'e2e_last_success_timestamp_seconds{{tier=\"vcluster\", exported_service=\"product-catalog\", project=\"api+flows\", runner=\"m2\"}}'
+        values: '0x7200'
+    alert_rule_test:
+      - eval_time: 5d
+        alertname: E2EVerificationStale
+        exp_alerts:
+          - exp_labels:
+              alertname: E2EVerificationStale
+              exported_service: product-catalog
+              project: api+flows
+              tier: e2e
+              group: e2e
+              severity: warning
+            exp_annotations:
+              summary: 'no passing e2e for product-catalog/vcluster on any runner in >3d'
+              description: 'No passing e2e run for product-catalog on the vcluster substrate on any runner in over 3 days; the verification signal is stale.'
+""")
+PY
+  run promtool test rules "${test_file}"
+  echo "$output"; [ "${status}" -eq 0 ]
+}
+
+@test "E2EResultsMissing fires only when the hub has no e2e results" {
+  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
+  rules_file="${BATS_TEST_TMPDIR}/e2e-rules-missing.yml"
+  test_file="${BATS_TEST_TMPDIR}/e2e-missing.test.yml"
+  python3 - "${RULE}" "${rules_file}" <<'PY'
+import sys, yaml
+document = next(d for d in yaml.safe_load_all(open(sys.argv[1]))
+                if d and d.get("kind") == "PrometheusRule")
+group = next(g for g in document["spec"]["groups"] if g["name"] == "e2e.alerts")
+yaml.safe_dump({"groups": [group]}, open(sys.argv[2], "w"), sort_keys=False)
+PY
+  {
+    printf '%s\n' 'rule_files:' "  - ${rules_file}" 'evaluation_interval: 1m' 'tests:'
+    printf '%s\n' '  - interval: 1m' '    input_series: []' '    alert_rule_test:'
+    printf '%s\n' '      - eval_time: 7h' '        alertname: E2EResultsMissing' '        exp_alerts:'
+    printf '%s\n' '          - exp_labels:' '              alertname: E2EResultsMissing' '              group: e2e' '              severity: warning'
+    printf '%s\n' '            exp_annotations:' "              summary: 'no e2e results on the hub'" "              description: 'The hub has no e2e result ConfigMaps (k3dm.k3d.io/e2e-result=true), so E2EVerificationStale cannot fire. After a hub rebuild run make e2e-republish RUNNER=m2; otherwise check vulnerability-inventory-exporter in platform-ops.'"
+    printf '%s\n' '  - interval: 1m' '    input_series:' '      - series: '\''e2e_last_run_pass{tier="vcluster", exported_service="basket", project="api+flows", runner="m2"}'\''' '        values: '\''0x420'\''' '    alert_rule_test:'
+    printf '%s\n' '      - eval_time: 7h' '        alertname: E2EResultsMissing' '        exp_alerts: []'
+  } > "${test_file}"
+  run promtool test rules "${test_file}"
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "argocd platform-ops deploy applies the e2e dashboard" {
   run grep -F -- 'grafana-dashboard-e2e.yaml' "${ARGOCD}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
 }
 
 @test "Alertmanager has a non-null severity warning route" {
   run yq -r '.route.routes[] | select(.matchers[] == "severity = warning") | .receiver' "${AM_TMPL}"
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [ -n "${output}" ]
   [ "${output}" != "null" ]
 }
@@ -295,6 +407,6 @@ assert org["renameByName"]["run_status"] == "Status now"
 assert panel["options"]["sortBy"][0] == {"displayName": "Run date", "desc": True}
 print("ok")
 PY
-  [ "${status}" -eq 0 ]
+  echo "$output"; [ "${status}" -eq 0 ]
   [[ "${output}" == *"ok"* ]]
 }

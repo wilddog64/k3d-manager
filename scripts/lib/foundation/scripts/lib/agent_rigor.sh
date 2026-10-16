@@ -229,15 +229,25 @@ _agent_audit() {
       fi
    done < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.yaml' '*.yml' 2>/dev/null || true)
 
-   local py_file py_status py_path
-   local py_test_diff="" removed_py_tests=0 added_py_tests=0 removed_py_assertions=""
+   local py_file py_status py_path py_file_diff py_file_removed
+   local py_test_diff="" removed_py_tests=0 added_py_tests=0 removed_py_assertions="" allowed_py_assertions=""
+   local assert_allow_re='^\+.*#[[:space:]]*agent-audit:[[:space:]]*allow[[:space:]]+assert-removed[[:space:]]+[^[:space:]]'
    while IFS= read -r -d '' py_file; do
       py_status="${py_file%"${py_file#?}"}"
       py_path="${py_file#?}"
       if { [[ "$py_status" == D ]] && _agent_audit_is_python "$py_path" HEAD; } ||
          { [[ "$py_status" == A ]] && _agent_audit_is_python "$py_path" ""; }; then
          _agent_audit_is_py_test "$py_path" || continue
-         py_test_diff+="$(git diff --cached --no-renames -- "$py_path" 2>/dev/null || true)"$'\n'
+         py_file_diff="$(git diff --cached --no-renames -- "$py_path" 2>/dev/null || true)"
+         py_test_diff+="$py_file_diff"$'\n'
+         py_file_removed=$(grep -E '^-[[:space:]]*(assert([[:space:](]|$)|self\.assert)' <<<"$py_file_diff" || true)
+         if [[ -n "$py_file_removed" ]]; then
+            if grep -Eq "$assert_allow_re" <<<"$py_file_diff"; then
+               allowed_py_assertions+="$py_path:"$'\n'"$py_file_removed"$'\n'
+            else
+               removed_py_assertions+="$py_path:"$'\n'"$py_file_removed"$'\n'
+            fi
+         fi
       fi
    done < <(_agent_audit_py_files)
    if [[ -n "$py_test_diff" ]]; then
@@ -247,10 +257,14 @@ _agent_audit() {
          _warn "Agent audit: number of test functions decreased in Python test files"
          status=1
       fi
-      removed_py_assertions=$(grep -E '^-[[:space:]]*(assert([[:space:](]|$)|self\.assert)' <<<"$py_test_diff" || true)
       if [[ -n "$removed_py_assertions" ]]; then
-         _warn "Agent audit: assertions removed from Python test files"
+         _warn "Agent audit: assertions removed from Python test files (add '# agent-audit: allow assert-removed <reason>' on an added line in that file if intended):"
+         _warn "${removed_py_assertions%$'\n'}"
          status=1
+      fi
+      if [[ -n "$allowed_py_assertions" ]]; then
+         _info "Agent audit: Python assertions removed under an assert-removed allow marker:"
+         _info "${allowed_py_assertions%$'\n'}"
       fi
    fi
 

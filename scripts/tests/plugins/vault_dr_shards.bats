@@ -60,6 +60,37 @@ setup() {
   [ "$(cat "$BATS_TEST_TMPDIR/value-secrets_vault_shard2")" = SHARDSENTINEL2 ]
 }
 
+@test "vault DR shards: K3DM_DR_SHARDS_PRESERVE keeps existing different shards" {
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:count']=2
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']=OLD_SHARD1
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard2']=OLD_SHARD2
+  export K3DM_DR_SHARDS_PRESERVE=1
+  run --separate-stderr vault_dr_shards_save
+  [ "$status" -eq 0 ]
+  [ ! -s "$STORE_LOG" ]
+  [ "${FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']}" = OLD_SHARD1 ]
+  [ "${FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard2']}" = OLD_SHARD2 ]
+  [[ "$stderr" == *"keeping the existing DR shards"* ]]
+  unset K3DM_DR_SHARDS_PRESERVE
+}
+
+@test "vault DR shards: without the flag, different shards are replaced" {
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:count']=2
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']=OLD_SHARD1
+  FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard2']=OLD_SHARD2
+  run --separate-stderr vault_dr_shards_save
+  [ "$status" -eq 0 ]
+  [ -s "$STORE_LOG" ]
+  [[ "$stderr" == *"replacing older DR shards"* ]]
+}
+
+@test "vault DR shards: K3DM_DR_SHARDS_PRESERVE still saves when none are stored" {
+  export K3DM_DR_SHARDS_PRESERVE=1
+  vault_dr_shards_save
+  [ -s "$STORE_LOG" ]
+  unset K3DM_DR_SHARDS_PRESERVE
+}
+
 @test "vault DR shards: export and import round-trip through stdin" {
   FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:count']=2
   FAKE_SECRET['k3dm-vault-unseal-dr|secrets/vault:shard1']=SHARDSENTINEL1

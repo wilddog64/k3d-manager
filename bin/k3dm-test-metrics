@@ -36,7 +36,7 @@ def run_classification(exit_code):
 
 
 def parse_log(text):
-    """Return suite counts, totals, failures, durations, and last step."""
+    """Return suite counts, totals, failures, durations, and completed stages."""
     suites = defaultdict(lambda: {"ok": 0, "not_ok": 0})
     durations = {}
     current_suite = None
@@ -46,8 +46,12 @@ def parse_log(text):
     failures = []
     total = 0
     failed = 0
+    completed_stages = set()
 
     for line in text.splitlines():
+        stage_complete = re.search(r"^\s*\[test-all\] stage-complete ([^\s]+)\s*$", line)
+        if stage_complete:
+            completed_stages.add(stage_complete.group(1))
         step_match = re.search(r"\[make\]\s+(test(?:-all|-bin|-python(?:-unit|-pytest)?)?)\b", line)
         if step_match:
             last_step = step_match.group(1)
@@ -144,10 +148,11 @@ def parse_log(text):
         "failed": failed,
         "failures": failures,
         "last_step": last_step,
+        "completed_stages": completed_stages,
     }
 
 
-def build_payload(parsed, target, exit_code, now=None, run_duration=None):
+def build_payload(parsed, target, exit_code, now=None, run_duration=None, expected_stages=None):
     now = int(time.time()) if now is None else now
     lines = [
         "# HELP k3dm_test_suite_cases Test cases by suite and result",
@@ -194,6 +199,13 @@ def build_payload(parsed, target, exit_code, now=None, run_duration=None):
             "# HELP k3dm_test_run_duration_seconds Wall-clock duration of the whole run",
             "# TYPE k3dm_test_run_duration_seconds gauge",
             f'k3dm_test_run_duration_seconds{{target="{target}"}} {run_duration}',
+        ]
+    if expected_stages is not None:
+        complete = all(stage in parsed["completed_stages"] for stage in expected_stages)
+        lines += [
+            "# HELP k3dm_test_run_complete Whether every expected test-all stage completed",
+            "# TYPE k3dm_test_run_complete gauge",
+            f'k3dm_test_run_complete{{target="{_metric_label(target)}"}} {int(complete)}',
         ]
     if parsed["failed"] == 0 and exit_code == 0:
         lines += [
@@ -262,12 +274,19 @@ def main(argv=None):
     parser.add_argument("--origin", choices=("local", "ci"), default="local")
     parser.add_argument("--exit-code", type=int, default=0)
     parser.add_argument("--run-duration", type=int, default=None)
+    parser.add_argument("--expected-stages", default=None)
     args = parser.parse_args(argv)
     parsed = parse_log(Path(args.log_path).read_text())
+    expected_stages = None
+    if args.expected_stages is not None:
+        expected_stages = [stage.strip() for stage in args.expected_stages.split(",") if stage.strip()]
     now = int(time.time())
     print(f"[k3dm-test-metrics] {parsed['total']} cases, {parsed['failed']} failed")
     push_metrics(
-        build_payload(parsed, args.target, args.exit_code, now=now, run_duration=args.run_duration),
+        build_payload(
+            parsed, args.target, args.exit_code, now=now,
+            run_duration=args.run_duration, expected_stages=expected_stages,
+        ),
         args.target, args.origin,
     )
     if parsed["failed"] == 0 and args.exit_code == 0:

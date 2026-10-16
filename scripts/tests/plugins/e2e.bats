@@ -824,7 +824,7 @@ PY
   if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
   mkdir -p "$E2E_REPORT_DIR"
   cat > "$E2E_REPORT_DIR/failrun.json" <<'JSON'
-{"run_id":"failrun","tier":"vcluster","service":"product-catalog","project":"api+flows","candidate_digest":null,"passed":4,"total":6,"failed":2,"duration_seconds":9.0,"timestamp":"2026-08-16T00:00:00+00:00","commit":"def456","exit_code":1,"result":"fail"}
+{"run_id":"failrun","tier":"vcluster","service":"product-catalog","project":"api+flows","candidate_digest":null,"passed":4,"total":6,"failed":2,"duration_seconds":9.0,"timestamp":"2026-08-16T00:00:00+00:00","commit":"def456","exit_code":1,"phase":"installing-argocd","result":"fail"}
 JSON
   local capture="$BATS_TEST_TMPDIR/fail-manifest.json"
   _kubectl() {
@@ -837,7 +837,9 @@ JSON
   run python3 - "$capture" <<'PY'
 import sys, json
 m = json.load(open(sys.argv[1]))
-assert json.loads(m["data"]["event.json"])["passed"] == "false"
+event = json.loads(m["data"]["event.json"])
+assert event["passed"] == "false"
+assert event["phase"] == "installing-argocd"
 print("ok")
 PY
   [ "$status" -eq 0 ]

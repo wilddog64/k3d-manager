@@ -170,6 +170,36 @@ def test_doc_meta_open_and_unknown_states():
     assert pa.doc_meta("## Status\n\nFixed on 2026-10-09\n") == ("unset", "closed")
 
 
+@pytest.mark.parametrize(("status", "expected", "verified"), [
+    ("OPEN", "open", False),
+    ("OPEN — spec ready", "open", False),
+    ("IMPLEMENTED — landed abc", "fixed", False),
+    ("VERIFIED — live", "fixed", True),
+    ("LIVE-VERIFIED", "fixed", True),
+    ("FIXED", "fixed", False),
+    ("DEFERRED to v1.48.1", "deferred", False),
+])
+def test_doc_status_classifies_without_changing_doc_meta(status, expected, verified):
+    text = f"**Priority:** P2\n**Status:** {status}\n"
+    assert pa.doc_status(text) == ("P2", expected, verified)
+    old_state = "closed" if status.startswith(("FIXED", "VERIFIED", "LIVE-VERIFIED")) else "open"
+    assert pa.doc_meta(text) == ("P2", old_state)
+
+
+def test_doc_status_classifies_missing_status_as_unknown():
+    assert pa.doc_status("**Priority:** P1\nno status\n") == ("P1", "unknown", False)
+
+
+@pytest.mark.parametrize(("status", "expected"), [
+    ("LIVE-VERIFIED — hub proof", "live"),
+    ("VERIFIED — offline checks", "verified"),
+    ("IMPLEMENTED — landed", ""),
+    ("OPEN — spec ready", ""),
+])
+def test_doc_verification_classifies_the_verification_ladder(status, expected):
+    assert pa.doc_verification(f"**Status:** {status}\n") == expected
+
+
 def test_doc_meta_priority_wins_and_only_first_line_counts():
     assert pa.doc_meta("**Priority:** P1 — urgent\n**Severity:** P2\n") == ("P1", "unknown")
     assert pa.doc_meta("**Priority:** P3\n**Priority:** P0\n") == ("P3", "unknown")

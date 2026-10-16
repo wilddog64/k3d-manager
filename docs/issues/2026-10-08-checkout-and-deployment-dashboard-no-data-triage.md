@@ -121,3 +121,66 @@ verification. Do not treat old runbooks as fresh live measurement.
 
 No dashboard/datasource edits, new bug declaration, runtime changes, stress traffic or service restart.
 Documentation checks only; BATS/ShellCheck runtime tests are not applicable.
+
+
+## Follow-up evidence — 2026-10-15 AWS ACG lifecycle jobs (dashboard still empty)
+
+**Operator screenshot (2026-10-15 ~17:41 UTC):** The `k3dm Deployment Metrics` dashboard showed **No data** for all five panels: `Last acg-up Duration`, `Last acg-down Duration`, `Last Deployment Success`, `Last Deployment Time`, and `Deployment Duration Over Time`. The first three stat panels and the time-series panel show warning/error indicators; **No data + warning indicators does not establish that the underlying samples were never generated.**
+
+Recent lifecycle jobs expected to be represented:
+
+| Action | Webhook job ID | Reported outcome | Timing |
+|---|---|---|---|
+| AWS ACG `cluster-up` | `5f5cff23` | Success | approximately 18 minutes |
+| AWS ACG `cluster-down` | `b0e9616d` | Success | approximately 1 minute |
+
+The above outcomes are based on the Slack lifecycle notifications, **not** verified metric samples. They also do not independently prove full infrastructure readiness/deletion; separate lifecycle bugs track those distinctions.
+
+**Confirmed source behavior:** `scripts/lib/webhook/lifecycle.py:_finish` calls `_push_metrics(action, provider, status, elapsed_secs, job_id)` for non-dry-run lifecycle completion. `bin/k3dm-webhook:_push_metrics` writes the three `k3dm_deployment_*` gauges to Pushgateway, but only if `PUSHGATEWAY_URL` is configured; failed pushes are logged as non-fatal warnings and can leave the lifecycle job green. As previously established, the dashboard uses fixed datasource UID `P5A1115AEDF367D43`; its deployed UID and reachability must be checked where the screenshot originated.
+
+**Investigate before fixing:**
+1. Capture the exact Grafana panel Query Inspector error, identify whether this is hub or app Grafana, and verify that UID `P5A1115AEDF367D43` resolves to the intended reachable Prometheus datasource.
+2. Query `k3dm_deployment_success`, `k3dm_deployment_duration_seconds`, and `k3dm_deployment_last_timestamp_seconds` on the intended Prometheus datasource; inspect actual labels (`action`, `provider`, `job_id`) for the two named jobs and check panel time range.
+3. Inspect the webhook metric-push logs for both job IDs (including `PUSHGATEWAY_URL` configuration, health-check/retry result and any `metrics push skipped` warning); check Pushgateway `/metrics` and the associated Prometheus scrape target. Distinguish producer failure, scrape/federation gaps, datasource mismatch, and query error.
+4. Verify data persistence expectations after AWS sandbox down: metrics pushed only to an ephemeral app-cluster Pushgateway/Prometheus may disappear when that sandbox is destroyed. Establish an appropriate durable hub-side telemetry destination if historical lifecycle visibility is intended across sandbox deletions.
+5. Add deterministic regression checks of successful and failed metric publication, dashboard datasource resolution, and history retention across sandbox teardown. Preserve nonfatal lifecycle execution if intended, but make telemetry publication failures visible to the operator.
+
+**Scope and status:** Existing October 8 triage issue updated with a new recurrence; no specific root cause proven without live Prometheus/Pushgateway and Grafana inspection. No code, dashboard, infrastructure, or runtime changes in this documentation update.
+
+
+## Follow-up evidence — 2026-10-15 `DeploymentMetricsStale` alert
+
+An operator screenshot shows a firing `DeploymentMetricsStale` warning from Hostinger-side Prometheus. Its displayed labels include `action=up`, `provider=aws`, `instance=up-aws`, `job=k3dm-webhook`, `cluster=ubuntu-hostinger`, `status=failed`, and `severity=warning`. The alert annotation states that the deployment dashboard had zero series for **64 days** because the Pushgateway port-forward was removed on access-layer refresh, and summarizes `no k3dm deployment metric pushed for up/aws in >14d`.
+
+**Verified source rule:** `scripts/etc/prometheus/rules-acg/k3dm-tests.yaml` defines:
+
+```promql
+time() - k3dm_deployment_last_timestamp_seconds > 1209600
+```
+
+with `for: 1h`. It detects a **stale existing time series** (>14 days old), not necessarily the absence of all time series, and does not itself verify whether Pushgateway is currently unreachable. The 64-day port-forward statement is historical rule annotation, not a fresh runtime diagnosis. The `status=failed` label belongs to the last observed deployment time series; it does **not** establish failure of the 2026-10-15 successful AWS `cluster-up` job `5f5cff23`. Likewise, the alert origin `cluster=ubuntu-hostinger` is a monitoring/source label, not proof that the AWS sandbox is down.
+
+**New diagnostic leads:**
+1. Confirm whether current webhook `PUSHGATEWAY_URL` is reachable from the machine running the webhook, including the relevant local port-forward lifecycle and post-refresh behavior (the rule's accompanying test-metrics annotation mentions `localhost:9091`, which must not be assumed to be the actual deployment publisher URL without checking configuration).
+2. Read sanitized webhook logs around `5f5cff23` (up) and `b0e9616d` (down) for `metrics pushed`, `metrics push skipped`, missing configuration, or retry failures; compare producer metric samples against Prometheus scraped samples.
+3. Query `k3dm_deployment_last_timestamp_seconds{action="up",provider="aws"}` and `k3dm_deployment_success{action="up",provider="aws"}` from Hostinger Prometheus and from the Grafana dashboard's chosen datasource, preserving `status` and `job_id` labels. Determine whether recent data reached a different destination, was lost when the ACG sandbox was destroyed, or is obscured by the hardcoded datasource UID.
+4. Reconcile the contradictory-seeming observations: Prometheus alert sees an old `up/aws` series while Grafana displays `No data`. Investigate datasource, time range, and query errors before concluding the metric was never published.
+5. Test the actual 14-day staleness behavior and explicitly cover **never-published / absent series**, which this particular expression alone will not alert on. Preserve `unknown` for unavailable data rather than manufacturing zero successes.
+
+**Status:** Additional evidence appended; producer connectivity and active root cause remain unverified. No dashboard, rule, code, service or cloud changes made.
+
+
+## Explicit additional finding — stale-series alert cannot detect never-published metrics
+
+**Confirmed rule limitation (source review, 2026-10-15):** `DeploymentMetricsStale` uses `time() - k3dm_deployment_last_timestamp_seconds > 1209600`. PromQL evaluates this only for existing `k3dm_deployment_last_timestamp_seconds` series. If the publisher has **never** emitted a series for the required `action/provider` pair, the comparison yields **no result**, so this rule cannot fire for that missing pair. If an old series itself disappears due to retention or target removal, this expression likewise ceases to detect that pair.
+
+**Operational impact:** A new or completely disconnected deployment telemetry stream can leave the dashboard empty with **no `DeploymentMetricsStale` alert**. The current screenshot's firing `up/aws` alert merely proves that one historical series exists in the alert evaluator's datasource, not that all expected lifecycle metrics are covered.
+
+**Required remediation / acceptance tests:**
+1. Define which `action/provider` series are **expected** in each deployment environment, and when they become expected (do not alert on AWS sandbox activity if no run has ever been scheduled and no freshness SLA applies). Keep this expected-series signal independently observable and persist it outside ephemeral AWS clusters.
+2. Add an explicit absent-series / missing-telemetry check for *required* action/provider pairs (for example, carefully scoped `absent` or comparison against an expected-series inventory). Don't apply an unscoped `absent(k3dm_deployment_last_timestamp_seconds)` and incorrectly assume it validates every label combination.
+3. Separate alert states and annotations: `stale existing series`, `expected series never published`, `telemetry publisher or scrape unavailable`, and `source not expected/temporarily inactive`. Do not represent missing telemetry as a failed deployment.
+4. Test deterministic cases: fresh metric, stale metric, never-published required metric, series aged out, unsupported or intentionally inactive runner/provider, datasource failure, and recovery after publication. Verify expected alert firing and resolution with mocked/evaluation fixtures.
+5. Preserve low-noise warnings and the 14-day threshold until the expected-series semantics and run cadence are agreed; do not invent an automatic freshness SLA for intentionally infrequent sandbox runs.
+
+**Classification:** Observability coverage defect within this existing deployment-metrics issue, not evidence of an actual failed AWS deployment. No rule/config changes made by this documentation update.

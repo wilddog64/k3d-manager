@@ -116,23 +116,57 @@ _CLOSED_RE = re.compile(
     r"|^Fixed (?:on|in)\b", re.IGNORECASE
 )
 _BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTILINE)
+_DEFERRED_RE = re.compile(r"^DEFERRED\b", re.IGNORECASE)
+_IMPLEMENTED_RE = re.compile(r"^IMPLEMENTED\b", re.IGNORECASE)
+_VERIFIED_RE = re.compile(r"^(?:VERIFIED|LIVE-VERIFIED)\b", re.IGNORECASE)
 
 
-def doc_meta(text):
-    """Return the canonical ``(priority, state)`` metadata for a bug document."""
-    priority_match = _PRIORITY_RE.search(text) or _SEVERITY_RE.search(text)
-    priority = priority_match.group(1).upper() if priority_match else "unset"
+def _status_value(text):
     match = _BOLD_STATUS_RE.search(text) or _BARE_STATUS_RE.search(text)
     value = match.group(1).strip() if match else None
     if value is None:
         heading = _STATUS_HEADING_RE.search(text)
         if heading:
             value = next((line.strip() for line in text[heading.end():].splitlines() if line.strip()), None)
+    return value
+
+
+def doc_meta(text):
+    """Return the canonical ``(priority, state)`` metadata for a bug document."""
+    priority_match = _PRIORITY_RE.search(text) or _SEVERITY_RE.search(text)
+    priority = priority_match.group(1).upper() if priority_match else "unset"
+    value = _status_value(text)
     if value is None:
         state = "unknown"
     else:
         state = "closed" if _CLOSED_RE.search(value) else "open"
     return priority, state
+
+
+def doc_status(text):
+    """Return ``(priority, status, live_verified)``: status is open, fixed, deferred or unknown."""
+    priority, state = doc_meta(text)
+    value = _status_value(text)
+    if state == "unknown":
+        return priority, "unknown", False
+    if _DEFERRED_RE.search(value):
+        return priority, "deferred", False
+    if state == "closed" or _IMPLEMENTED_RE.search(value):
+        return priority, "fixed", bool(_VERIFIED_RE.search(value))
+    return priority, "open", False
+
+
+_LIVE_VERIFIED_RE = re.compile(r"^LIVE-VERIFIED\b", re.IGNORECASE)
+
+
+def doc_verification(text):
+    """Return ``"live"``, ``"verified"`` or ``""`` from the doc's Status value."""
+    value = _status_value(text) or ""
+    if _LIVE_VERIFIED_RE.search(value):
+        return "live"
+    if _VERIFIED_RE.search(value):
+        return "verified"
+    return ""
 
 
 def doc_release(text, added_release=None):

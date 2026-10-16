@@ -1,8 +1,8 @@
 # Bug: the frontend serves `index.html` with no Cache-Control header, so a deploy can leave browsers on the old app
 
 **Filed:** 2026-10-10
-**Branch:** k3d-manager `k3d-manager-v1.43.2` (this spec); work repo `shopping-cart-frontend`, branch `fix/index-html-no-cache`, cut from `origin/main`
-**Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Branch:** k3d-manager `k3d-manager-v1.43.3` (this spec; moved from v1.43.2 2026-10-12); work repo `shopping-cart-frontend`, branch `fix/index-html-no-cache`, cut from `origin/main`
+**Status:** OPEN — spec ready (v1.43.3; moved from v1.43.2 batch 1 by the operator 2026-10-12)
 **Priority:** P2 — after a deploy, a returning browser can keep running the previous build; the workaround is a hard refresh
 **Severity:** medium
 

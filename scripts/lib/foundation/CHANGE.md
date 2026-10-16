@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [v0.5.2] — 2026-10-11
+
+### Fixed
+- `_agent_audit`: allow an intentional staged Python assertion replacement when the file adds
+  `# agent-audit: allow assert-removed <reason>`. The marker is per-file, requires a reason, must
+  be on an added line, and does not exempt a decrease in test functions. Unmarked removals now
+  report the file and assertion lines.
+
 ## [v0.5.1] — 2026-10-06
 
 ### Changed

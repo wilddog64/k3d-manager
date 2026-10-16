@@ -90,9 +90,18 @@ To find one in Slack, open a profile, click ⋮ (More), then **Copy member ID**.
 ## Hub Kine circuit breaker
 
 Hermes samples the local hub datastore read-only: `state.db` size, recent K3s
-`Slow SQL`/`COMPACT` messages, and ArgoCD cluster-registration metadata. Kine
+`Slow SQL`/`COMPACT` messages, the age of the last `COMPACT deleted` event, and ArgoCD cluster-registration metadata. Kine
 history is Kubernetes control-plane state—not observability data—so Hermes
 never deletes rows, runs `VACUUM`, or applies a five-day retention rule.
+
+The Kine row becomes degraded after two consecutive samples when the last
+case-sensitive `msg="COMPACT deleted` event is more than 15 minutes old
+(`900s`), even when the quiet log window has no Slow SQL. The timestamp is
+persisted across polls and a fresh container uses its start time until the
+first compaction. Hermes publishes the timestamp and `state.db` size to the
+hub Pushgateway. Prometheus raises `HubKineCompactionStalled` after 30 minutes
+stale and 15 minutes pending; it is a warning routed to `platform-warning`,
+not SMS.
 
 Set `K3DM_HERMES_AUTO_KINE_GUARD=1` only after reviewing
 [`v1.33.0-hermes-kine-circuit-breaker.md`](../plans/v1.33.0-hermes-kine-circuit-breaker.md).

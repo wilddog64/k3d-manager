@@ -239,6 +239,47 @@ def test_run_duration_is_omitted_when_not_measured():
     assert "k3dm_test_run_duration_seconds" not in payload
 
 
+def test_complete_expected_stages_publish_run_complete_one():
+    parsed = METRICS.parse_log(
+        "[test-all] stage-complete test\n"
+        "[test-all] stage-complete test-bin\n"
+        "[test-all] stage-complete test-python\n"
+    )
+    payload = METRICS.build_payload(
+        parsed, "test-all", 0, expected_stages=["test", "test-bin", "test-python"]
+    )
+    assert 'k3dm_test_run_complete{target="test-all"} 1' in payload
+
+
+def test_partial_expected_stages_publish_run_complete_zero():
+    parsed = METRICS.parse_log("[test-all] stage-complete test\n")
+    payload = METRICS.build_payload(
+        parsed, "test-all", 2, expected_stages=["test", "test-bin", "test-python"]
+    )
+    assert 'k3dm_test_run_complete{target="test-all"} 0' in payload
+
+
+def test_run_complete_is_not_published_without_expected_stages():
+    parsed = METRICS.parse_log("[test-all] stage-complete test\n")
+    payload = METRICS.build_payload(parsed, "test-all", 0)
+    assert "k3dm_test_run_complete" not in payload
+
+
+def test_main_publishes_run_complete_from_expected_stages_flag(monkeypatch, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_text(
+        "[test-all] stage-complete test\n"
+        "[test-all] stage-complete test-bin\n"
+        "[test-all] stage-complete test-python\n"
+    )
+    pushed = []
+    monkeypatch.setattr(METRICS, "push_metrics", lambda payload, *args, **kwargs: pushed.append(payload))
+    METRICS.main([
+        str(log), "--target", "test-all", "--expected-stages", "test,test-bin,test-python",
+    ])
+    assert 'k3dm_test_run_complete{target="test-all"} 1' in pushed[0]
+
+
 def test_main_forwards_run_duration(monkeypatch, tmp_path):
     log = tmp_path / "run.log"
     log.write_text("# file: clean.bats\n1..1\nok 1 works\n")

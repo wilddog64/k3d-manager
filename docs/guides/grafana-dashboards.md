@@ -30,7 +30,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | Bug tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `make platform-ops` | hub |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | **ACG** |
 | Trivy Security | `trivy-security` | `etc/grafana/dashboards/trivy-security-configmap.yaml` | `make observability-acg` | **ACG** |
-| Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | **nothing — see below** | — |
+| Checkout Load Test | `checkout-loadtest` | `etc/grafana/dashboards/checkout-loadtest-configmap.yaml` | `grafana-dashboards-acg` ApplicationSet (app clusters except the hub) | **Hostinger/ACG** |
 | k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `make observability-acg` + hub dashboard ApplicationSet | **hub + ACG** |
 | Public endpoint probes | `probe_*` | Prometheus blackbox-exporter | Hub observability ApplicationSet + `Probe` resources | hub |
 
@@ -39,10 +39,10 @@ All eight are `ConfigMap`s in the `monitoring` namespace carrying
 discovers and imports. A dashboard that does not appear at all is usually a sidecar /
 namespace / label problem; a dashboard that appears but is blank is a producer problem.
 
-> **`checkout-loadtest-configmap.yaml` has no applier.** No plugin, Makefile target or
-> ApplicationSet references it — only `docs/bugs/2026-08-29-loadtest-slice-f-generator.md`
-> does. It reaches a cluster only if applied by hand. Treat "the load-test dashboard is
-> missing" as expected, not as a regression.
+> **`checkout-loadtest-configmap.yaml` is deployed to app clusters, not the hub.** The
+> `grafana-dashboards-acg` ApplicationSet applies it to Hostinger/ACG and deliberately
+> excludes it from the hub, where the shopping-cart workload and load-test metrics do not
+> exist. Treat a missing copy on the hub as expected.
 
 ### Which Grafana am I looking at?
 
@@ -223,6 +223,8 @@ Traps:
   Older result ConfigMaps carried only `failed=/total=`; with no per-failure payload the
   exporter falls back to ConfigMap metadata and emits no `e2e_failure_group_info`
   (`docs/issues/2026-09-16-live-e2e-failure-groups-empty.md`).
+- A run that fails before any test runs counts as one failure group, `aborted at <phase>`;
+  Top failing specs stays empty because no spec ran.
 - A table rendering raw label soup instead of columns is a transform problem, not a query
   problem — `docs/issues/2026-08-25-e2e-grafana-table-raw-labels.md`.
 
@@ -320,8 +322,53 @@ untriaged docs. The middle row has two stacked bar charts across the six release
 open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
-where Grafana placed them on the wrong segment. The bottom row has the
-all-time open counts per priority, scan age, and open-by-priority over time. On `main`, which is
+where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
+scan age, a **Bugs** table, and open-by-priority over time. Each document is classified by status:
+
+| Status | Doc `**Status:**` value begins with |
+|---|---|
+| `deferred` | `DEFERRED` |
+| `fixed` | `IMPLEMENTED`, or a closed value such as `FIXED`, `VERIFIED`, or `CLOSED` |
+| `unknown` | there is no status line |
+| `open` | anything else |
+
+The verification ladder is `OPEN → IMPLEMENTED → VERIFIED → LIVE-VERIFIED`. VERIFIED means
+someone other than the implementer checked the fix offline: tests ran, the new tests were shown
+red on the old code, and mutations were red. LIVE-VERIFIED means the fix was proven on the real
+system (hub, cluster, Slack, or email). The ladder is cumulative, so LIVE-VERIFIED is also
+VERIFIED.
+
+Fixed documents also have a Verified and Live-verified label:
+
+| Verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, any other fixed status |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| no label | not fixed |
+
+| Live-verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| no label | not fixed |
+
+The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
+Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
+Priority, Open for, Filed, Status, Verified, and Live-verified, and clicking a title opens that
+document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
+unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
+`n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.
+
+The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
+group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.
+The Release dropdown filters the table and the Open P0–P3 stats by the release the bug was filed in:
+the doc's `**Branch:** k3d-manager-vX.Y.Z` line, otherwise the first tag containing the commit that
+added the file, otherwise the current release branch. Bugs without a valid release use the `unassigned`
+bucket. The table and dropdown list releases newest first, by version. The dropdown does not filter
+Open, any release or the history.
+On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
 
@@ -394,6 +441,7 @@ cannot overwrite each other.
 | Failing cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` (empty on a clean run) |
 | Run duration over time | `k3dm_test_run_duration_seconds`, `k3dm_test_suite_duration_seconds` |
 | Total cases | `k3dm_test_cases_total` |
+| Run completion | `k3dm_test_run_complete` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
 **Duration.** `make test-all` times the whole run and pushes it as
@@ -411,8 +459,12 @@ values until the next `make test-metrics`.
 `federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`
 (minus the k3s control-plane `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` series, which
 k3s exposes on the kubelet endpoint and which made the scrape outgrow its timeout),
-and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
-never fire. `DeploymentMetricsStale` moved for the same reason.
+so the rules were placed with the Pushgateway on the app cluster. The hub now also imports the
+`k3dm_test_*` series from the Hostinger Pushgateway (see above), but only for the dashboard: the
+alerts stay on Hostinger so each fires once. Apply a change to them with
+`kubectl --context ubuntu-hostinger apply -f scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`;
+`make prometheus-rules` applies only the hub-side `rules/` directory. `DeploymentMetricsStale`
+moved for the same reason.
 `OfflineSuiteRunMissed` fires when no run, pass or fail, has been pushed for 26h, which is the
 signature of a failed push.
 
@@ -440,15 +492,14 @@ matching zero log lines is a query-drift bug that has happened before
 
 Seven panels over `k6_checkout_load_*` and `k6_vus`, templated on `$run_id`.
 
-This is a **planned view with no producer wired up**: there is no applier for the ConfigMap,
-no k6 run in the normal flow, and Prometheus's remote-write receiver is off by default.
-Verified live: `count(k6_checkout_load_requests_total_total) = 0`. `No data` here is the
-correct steady state (`docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
+This dashboard is deployed to app clusters only; it is deliberately excluded from the hub.
+The **shopping-cart-apps CPU saturation** panel fills there at all times because it uses
+ordinary Kubernetes metrics. The six k6 panels fill only during and after a load test;
+Hostinger retains 15 days of remote-write data. Until a run exists, `count(k6_checkout_load_requests_total_total) = 0`
+and `No data` is expected for those panels (`docs/issues/2026-09-17-checkout-loadtest-dashboard-no-data.md`).
+The scheduled baseline in [`v1.48.0-scheduled-baseline-loadtest.md`](../plans/v1.48.0-scheduled-baseline-loadtest.md)
+is the plan that keeps those panels filled.
 
-The one panel that *does* populate is **shopping-cart-apps CPU saturation**, because it uses
-`container_cpu_usage_seconds_total` / `kube_pod_container_resource_limits` — ordinary
-Kubernetes metrics, independent of the load test. A dashboard where exactly one panel has
-data is the signature of "the native metrics work, the custom producer never ran."
 
 ---
 

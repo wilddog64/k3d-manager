@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-10
-**Status:** OPEN — spec ready (v1.43.2 batch 1); fixed in the same lib-foundation change as `2026-10-09-secret-store-data-puts-value-in-security-argv.md` (see its Dispatch section)
+**Status:** OPEN — spec ready (v1.43.3; moved from v1.43.2 batch 1 by the operator 2026-10-12); fixed in the same lib-foundation change as `2026-10-09-secret-store-data-puts-value-in-security-argv.md` (see its Dispatch section)
 **Priority:** P2
 **Severity:** Medium — a failed Keychain write reports success, so callers carry on as if the secret were stored
 **Files:** `scripts/lib/foundation/scripts/lib/system.sh` (upstream: lib-foundation `scripts/lib/system.sh`)

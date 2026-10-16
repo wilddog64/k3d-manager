@@ -1036,40 +1036,7 @@ _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak) via ArgoCD..
 kubectl config use-context k3d-k3d-cluster >/dev/null 2>&1 || true
 "${REPO_ROOT}/scripts/k3d-manager" keycloak_smoke_vault_preseed || _warn "[acg-up] smoke-user Vault preseed failed; identity reconcile will retry"
 # Force ArgoCD to pick up the identity Application from shopping-cart-infra
-kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: shopping-cart-identity
-  namespace: cicd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-    argocd.argoproj.io/compare-options: ServerSideDiff=true
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: platform
-  sources:
-    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
-      targetRevision: HEAD
-      path: identity/keycloak
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: identity
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 10s
-        factor: 2
-        maxDuration: 3m
-IDEOF
+kubectl apply --context k3d-k3d-cluster -f "${REPO_ROOT}/scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 
 _kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"
 _kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"

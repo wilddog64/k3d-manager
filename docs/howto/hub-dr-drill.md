@@ -82,8 +82,9 @@ rm -P /tmp/k3dm-dr-shards    # on both Macs
 
 Do not automate this transfer. When the real hub's Vault is re-initialised (a
 full rebuild), Vault init replaces the M4 copy and warns that older exports
-need the old shards. Run `make hub-data-export` straight away, then repeat this
-transfer for the M2.
+need the old shards. `make hub-recover-all` sets `K3DM_DR_SHARDS_PRESERVE=1`, so
+a recovery keeps the existing shards for its restore. Export only after the
+restore finishes.
 
 ### 4. Freshness workflow
 
@@ -135,7 +136,8 @@ old. If list-only Vault login fails, rerun `make hub-data-export-setup`.
    4. verify V0–V7;
    5. write the result;
    6. tear down. `DR_DRILL_KEEP=1` keeps the cluster and prints the delete
-      command.
+      command and keeps `~/.k3dm/dr-drill/kubeconfig`; use it with
+      `kubectl --kubeconfig ~/.k3dm/dr-drill/kubeconfig --context k3d-dr-drill`.
 3. **M4:** `make dr-drill-publish`. This copies the newest M2 result over
    `ssh m2jump`, commits it as `results/<run_timestamp>.json` on the `results`
    branch, and pushes the metrics to the hub Pushgateway (`localhost:19094`, job
@@ -217,20 +219,25 @@ the hub and restores its data; the data-only flow leaves the running hub in
 place. Approval is typed at the prompt and the identity is held only in memory.
 
 ```bash
-make hub-recover-all       # rebuild, credentials, then data
+make hub-recover-all       # approve, delete and rebuild the hub, credentials, then data
 make hub-data-recover      # data only; hub is still running
 ```
 
 The restore validates the pinned local k3d target and encrypted export, pauses
 ArgoCD before replacing claims, restores and unseals Vault, re-points Kubernetes
-auth, refreshes Keycloak and ExternalSecrets, verifies Vault metadata and
+auth, force-syncs ExternalSecrets, waits for Keycloak and restarts Keycloak,
+Grafana and `argocd-server`, verifies Vault metadata and
 identity digests, and writes an auditable report under
 `~/.k3dm/hub-recover/<run_id>/`. A failed run can resume with `RESUME=<run_id>`;
 an unfinished destructive step requires its explicit `REDO_STEP`.
 
 `make hub-recover-all` is approval-first: it clones and validates one snapshots
-export, prints live/export counts, and asks for that export timestamp before it
-rebuilds the hub. `RESUME` reuses the recorded export; `REDO_STEP=4` or
+export, prints live/export counts when the hub is present, and asks for that export timestamp before it
+deletes and rebuilds the hub. Just before teardown it re-checks interactive Keychain access; if the
+Keychain is locked, it refuses with nothing deleted. Unlock it with `security unlock-keychain` and rerun
+`make hub-recover-all`. It also works when the hub is already gone and clears the
+exact k3d container, network and images-volume leftovers after the snapshot guard approves teardown.
+Data changed after the selected export is lost. `RESUME` reuses the recorded export; `REDO_STEP=4` or
 `REDO_STEP=6` is required after an interrupted destructive step. The report
 contains the selected export, checkpoint steps and return codes, every V1/V2/V3/V4/V5/V8
 check, ArgoCD resume status, whether the unseal keys were cached in the Keychain
@@ -240,13 +247,15 @@ fixing a failed step counts. Inventory format 2 records Vault metadata
 versions and identity digests without secret values. V8 confirms that
 ExternalSecrets are no longer in `SecretSyncedError`.
 
+After the report, run `make hub-data-export-setup && make hub-data-export` to recreate
+the export ServiceAccount and record a fresh export.
+
 ### M2 rehearsal
 
 Keep the drill cluster and rehearse the data path before a real hub window:
 
 ```bash
 DR_DRILL_KEEP=1 script -q ~/.k3dm/dr-drill/run.log make dr-drill   # not | tee: the drill needs a TTY
-k3d kubeconfig get dr-drill > ~/.k3dm/dr-drill/kubeconfig          # KEEP deletes it (bug 2026-10-10)
 KUBECONFIG=~/.k3dm/dr-drill/kubeconfig K3DM_HUB_DATA_CONTEXT=k3d-dr-drill \
   K3DM_HUB_DATA_CLUSTER=dr-drill K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 \
   K3DM_HUB_DATA_AGE_IDENTITY_FROM_KEYCHAIN=1 make hub-data-recover

@@ -1,6 +1,7 @@
 # Hub Kine compaction stall causes control-plane saturation
 
-**Status:** REOPENED 2026-10-11 — compaction died again on the rebuilt hub on 2026-10-08 (see "Recurrence — 2026-10-08"); the 2026-10-03 rebuild bought five days. A restart does not fix it.
+**Status:** MONITORING 2026-10-15 — compaction resumed by itself at 2026-10-12T11:40:07Z, 5 min after the OrbStack upgrade restarted the server container (11:35:01Z); 651 catch-up events that day, then 288/day on 10-13 and 10-14, 0 `Compact failed` in 72h, `state.db` 2.12 GiB. Close after 14 clean days (2026-10-26). No hub rebuild needed now; earlier stall history below
+**Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
 
 ## What was observed
 
@@ -377,3 +378,25 @@ reproduced.
   `caffeinate` does not stop lid-closed sleep; `pmset -a disablesleep 1` does (operator's call).
 - k3s `v1.32.0+k3s1` is old; check whether a newer kine restarts compaction after an error before
   upgrading for that reason alone.
+
+## Recovery — 2026-10-12 (recorded 2026-10-15)
+
+The OrbStack 2.2.4 upgrade restarted the hub server container at 2026-10-12T11:35:01Z. Compaction
+came back at 11:40:07Z with no operator action and has held the healthy rate since:
+
+| Day (UTC) | `msg="COMPACT deleted"` events |
+|---|---|
+| 2026-10-12 | 651 (backlog catch-up) |
+| 2026-10-13 | 288 |
+| 2026-10-14 | 288 |
+| 2026-10-15 | 272 (to 22:30Z) |
+
+No `Compact failed` in the last 72 hours. `state.db` stays at 2.12 GiB because SQLite does not
+shrink the file without a `VACUUM`. That is not growth.
+
+This differs from 2026-09-20, when a `docker restart` at an 8 GiB database failed every cycle and
+caused a bootstrap crash loop. At about 2 GiB the restart recovered. So a restart is not a fix that
+can be counted on: what decides it is how large the backlog is. The rebuild path
+(`make hub-recover-all`, fixed in v1.43.2) stays the remedy if the stall returns. Hermes'
+`HubKineCompactionStalled` alert watches for it.
+

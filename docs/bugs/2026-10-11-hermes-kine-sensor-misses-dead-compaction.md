@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** OPEN — spec ready (v1.43.2)
+**Status:** LIVE-VERIFIED 2026-10-11 (`6e1c82a4`, v1.43.2); live: alert fired 02:02:12Z and routed to `platform-warning`; operator confirmed the `[FIRING] HubKineCompactionStalled on hub (1)` email — live proof complete
 **Approval:** explicit 2026-10-11 "yes" (to "Want me to file it?")
 **Priority:** P2 — the datastore degrades for days unnoticed; the workaround is reading `docker logs` by hand
 **Severity:** medium — the third dead-compaction episode; each one has ended in a hub rebuild
@@ -81,8 +81,8 @@ Healthy kine compacts every 5 minutes (288 cycles a day, each one logs three `CO
 
 ### 4. Docs
 
-- `docs/guides/grafana-dashboards.md` or the Hermes guide that documents the `kine` row: the new
-  stall rule, the 15-minute sensor threshold and the alert.
+- `docs/guides/hermes.md` (the guide that documents the `kine` row): the new stall rule, the
+  15-minute sensor threshold and the alert.
 - `docs/howto/hub-rebuild-from-gitops-vault.md`: "Dead kine compaction" names the alert as the
   trigger for a planned rebuild and repeats the do-not-restart warning.
 - `CHANGELOG.md` `[Unreleased]`.
@@ -97,9 +97,10 @@ Healthy kine compacts every 5 minutes (288 cycles a day, each one logs three `CO
 | `scripts/tests/hermes/test_hermes.py` | sensor and probe tests |
 | `scripts/tests/plugins/hermes_alert_rules.bats` | rule assertions |
 | `scripts/tests/observability/test_kine_compaction_stalled.py` | new: promtool fire, delivery to `platform-warning` |
+| `scripts/tests/observability/conftest.py`, `scripts/tests/observability/test_alertmanager_notify_behaviour.py` | only if `Sink` and the Alertmanager fixture move to a shared conftest |
 | `scripts/tests/plugins/alertmanager_config_secret.bats` | amtool route assertion |
 | `Makefile` | `test-alertmanager-behaviour` also runs the new file |
-| `docs/howto/hub-rebuild-from-gitops-vault.md`, Hermes guide | sections above |
+| `docs/howto/hub-rebuild-from-gitops-vault.md`, `docs/guides/hermes.md` | sections above |
 | `CHANGELOG.md` | `[Unreleased]` entry |
 
 ## Tests

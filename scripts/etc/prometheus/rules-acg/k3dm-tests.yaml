@@ -28,14 +28,23 @@ spec:
             summary: "suite {{ $labels.suite }} recorded 0 cases — it executed nothing"
             description: "A suite that runs no cases reports no failures, so OfflineSuiteFailing cannot see it. cloud_bridge.py passed this way for a full release because it was a pytest-style file that no make target collected. A suite present in the run with zero cases is a wiring bug, not a pass."
         - alert: OfflineSuiteCaseCountDropped
-          expr: k3dm_test_cases_total < 1500
+          expr: k3dm_test_cases_total < 2600 and on(target) k3dm_test_run_complete == 1
           for: 30m
           labels:
             group: k3dm-tests
             severity: warning
           annotations:
             summary: "offline suite total is {{ $value }}, below the expected floor"
-            description: "A floor catches whole suites silently dropping out of collection, which a failure count cannot. Raise the floor as the suite grows; the first live push on 2026-09-27 measured 1692 total (1304 dispatcher BATS + 308 pytest + the unittest suites)."
+            description: "A floor catches whole suites silently dropping out of collection, which a failure count cannot. This 2600-case floor applies only to complete runs; the 2026-10-10 full run measured 2847 cases (1914 BATS + 838 pytest + 95 unittest)."
+        - alert: OfflineSuiteRunIncomplete
+          expr: k3dm_test_run_complete == 0
+          for: 30m
+          labels:
+            group: k3dm-tests
+            severity: warning
+          annotations:
+            summary: "offline test run incomplete for target {{ $labels.target }}"
+            description: "A stage failed before the later suites ran. Check the [test-all] metrics log: path printed by the run."
         - alert: OfflineSuiteStale
           expr: time() - k3dm_test_last_success_timestamp_seconds > 604800
           for: 1h

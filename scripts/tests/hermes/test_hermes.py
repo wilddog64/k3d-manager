@@ -2,6 +2,7 @@ import base64
 import importlib.machinery
 import importlib.util
 import json
+import re
 import sys
 from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
@@ -13,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
 from hermes.correlator import Correlator
 from hermes import repairs
 from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, kine, kine_log_signals,
-                            hostnet_drift, node_pressure, reachability, stale_acg_registration,
+                            _human_age, _human_bytes, hostnet_drift, node_pressure, reachability,
+                            stale_acg_registration,
                             status_checks, token_expiry_advisory, values_branch)
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -979,6 +981,169 @@ def test_kine_log_signals_ignores_compact_rev_key_in_slow_sql():
         'revision: sql: transaction has already been committed or rolled back"\n'
     )
     assert kine_log_signals(failing)["compaction_failed"] is True
+
+
+def test_kine_log_signals_keeps_only_the_last_case_sensitive_compaction_timestamp():
+    text = (
+        '2026-10-11T10:00:00.000000000Z time="..." level=info msg="COMPACT deleted 1 rows"\n'
+        '2026-10-11T10:05:00.000000000Z time="..." level=info msg="COMPACT deleted 2 rows"\n'
+        '2026-10-11T10:06:00.000000000Z time="..." level=info msg="compact deleted 3 rows"\n'
+    )
+    assert kine_log_signals(text)["last_compaction_ts"] == datetime(
+        2026, 10, 11, 10, 5, tzinfo=timezone.utc).timestamp()
+
+
+def test_kine_human_bytes_uses_binary_units():
+    assert _human_bytes(2043133952) == "1.9 GiB"
+    assert _human_bytes(554 * 1024 * 1024) == "554.0 MiB"
+    assert _human_bytes(512) == "512 B"
+    assert _human_bytes(1023) == "1023 B"
+    assert _human_bytes(1024) == "1.0 KiB"
+
+
+def test_kine_human_age_uses_compact_units():
+    assert _human_age(240) == "4m"
+    assert _human_age(3600) == "1h 0m"
+    assert _human_age(726883) == "8d 9h"
+    assert _human_age(59) == "<1m"
+    assert _human_age(60) == "1m"
+    assert _human_age(86399) == "23h 59m"
+    assert _human_age(86400) == "1d 0h"
+
+
+def test_kine_quiet_stalled_loop_degrades_without_slow_sql_after_debounce(monkeypatch):
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc).timestamp()
+    monkeypatch.setattr("hermes.sensors.time.time", lambda: now)
+    payload = json.dumps({"available": True, "state_db_bytes": 554 * 1024 * 1024,
+                          "slow_sql_count": 0, "compaction_recent": False,
+                          "compaction_failed": False,
+                          "last_compaction_ts": now - 3600,
+                          "stale_acg_registration": False})
+    state = {}
+    assert [kine(lambda *_: (0, payload), state)["status"] for _ in range(3)] == [
+        "healthy", "healthy", "degraded"]
+    # agent-audit: allow assert-removed last_compaction_age=3600s evidence replaced by
+    # the readable format (docs/bugs/2026-10-11-hermes-kine-evidence-not-human-readable.md)
+    evidence = kine(lambda *_: (0, payload), state)["evidence"]
+    assert evidence.startswith("last compaction 1h 0m ago;")
+    assert "state.db 554.0 MiB" in evidence
+    assert "state_db_bytes" not in evidence
+
+
+def test_kine_recent_compaction_with_slow_sql_is_healthy(monkeypatch):
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc).timestamp()
+    monkeypatch.setattr("hermes.sensors.time.time", lambda: now)
+    payload = json.dumps({"available": True, "state_db_bytes": 554 * 1024 * 1024,
+                          "slow_sql_count": 3, "compaction_recent": False,
+                          "compaction_failed": False,
+                          "last_compaction_ts": now - 240,
+                          "stale_acg_registration": False})
+    assert kine(lambda *_: (0, payload), {})["status"] == "healthy"
+
+
+def test_kine_old_probe_without_compaction_timestamp_keeps_existing_behavior():
+    payload = json.dumps({"available": True, "state_db_bytes": 554 * 1024 * 1024,
+                          "slow_sql_count": 0, "compaction_recent": False,
+                          "compaction_failed": False, "stale_acg_registration": False})
+    assert kine(lambda *_: (0, payload), {})["status"] == "healthy"
+
+
+def test_kine_degraded_evidence_reports_compaction_failure():
+    payload = json.dumps({"available": True, "state_db_bytes": 554 * 1024 * 1024,
+                          "slow_sql_count": 133, "compaction_recent": False,
+                          "compaction_failed": True, "stale_acg_registration": False})
+    state = {}
+    result = [kine(lambda *_: (0, payload), state) for _ in range(3)][-1]
+    assert result["status"] == "degraded"
+    assert "compaction failed: yes" in result["evidence"]
+
+
+def test_kine_healthy_evidence_is_human_readable_and_data_stays_raw(monkeypatch):
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc).timestamp()
+    monkeypatch.setattr("hermes.sensors.time.time", lambda: now)
+    payload = json.dumps({"available": True, "state_db_bytes": 2043133952,
+                          "slow_sql_count": 0, "compaction_recent": True,
+                          "compaction_failed": False, "last_compaction_ts": now - 240,
+                          "stale_acg_registration": False})
+    result = kine(lambda *_: (0, payload), {})
+    assert "GiB" in result["evidence"] or "MiB" in result["evidence"]
+    assert not re.search(r"\d{7,}", result["evidence"])
+    assert result["data"]["state_db_bytes"] == 2043133952
+
+
+def test_datastore_probe_persists_history_and_falls_back_to_container_start(monkeypatch):
+    class Result:
+        def __init__(self, stdout="", returncode=0):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_run(command, **_kwargs):
+        if command[:2] == ["docker", "exec"]:
+            return Result("2048\n")
+        if command[:3] == ["docker", "logs", "--since"] and "--timestamps" in command:
+            return Result("2026-10-11T10:05:00.000000000Z msg=\"COMPACT deleted 2 rows\"\n")
+        if command[:2] == ["docker", "logs"]:
+            return Result("")
+        if command[:2] == ["docker", "inspect"]:
+            return Result("2026-10-11T09:00:00.000000000Z\n")
+        return Result('{"items": []}')
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", fake_run)
+    code, output = k3dm_hermes._datastore_run([], {})
+    payload = json.loads(output)
+    assert code == 0
+    assert payload["last_compaction_ts"] == datetime(
+        2026, 10, 11, 10, 5, tzinfo=timezone.utc).timestamp()
+    assert payload["container_started_ts"] == datetime(
+        2026, 10, 11, 9, tzinfo=timezone.utc).timestamp()
+
+
+def test_datastore_probe_uses_stored_timestamp_when_history_is_empty(monkeypatch):
+    class Result:
+        def __init__(self, stdout="", returncode=0):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_run(command, **_kwargs):
+        if command[:2] == ["docker", "exec"]:
+            return Result("2048\n")
+        if command[:2] == ["docker", "logs"]:
+            return Result("")
+        if command[:2] == ["docker", "inspect"]:
+            return Result("2026-10-11T09:00:00Z\n")
+        return Result('{"items": []}')
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", fake_run)
+    stored = datetime(2026, 10, 11, 9, 30, tzinfo=timezone.utc).timestamp()
+    code, output = k3dm_hermes._datastore_run([], {"kine_last_compaction_ts": stored})
+    payload = json.loads(output)
+    assert code == 0
+    assert payload["last_compaction_ts"] == stored
+
+    code, output = k3dm_hermes._datastore_run([], {"kine_last_compaction_ts": 123.0})
+    assert json.loads(output)["last_compaction_ts"] == datetime(
+        2026, 10, 11, 9, tzinfo=timezone.utc).timestamp()
+
+
+def test_kine_metrics_use_dedicated_put_endpoint_and_skip_unavailable(monkeypatch):
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda request, **_kwargs: requests.append(request) or Response())
+    monkeypatch.setenv("K3DM_KINE_PUSHGATEWAY_URL", "http://example.invalid:1234")
+    k3dm_hermes._push_kine_metrics({"data": {"last_compaction_ts": 10,
+                                                "state_db_bytes": 2048}})
+    assert requests[0].method == "PUT"
+    assert requests[0].full_url == "http://example.invalid:1234/metrics/job/k3dm-hub-kine"
+    assert "k3dm_hub_kine_state_db_bytes 2048" in requests[0].data.decode()
+    k3dm_hermes._push_kine_metrics({"status": "unknown"})
+    assert len(requests) == 1
 
 
 def test_stale_acg_registration_decodes_base64_secret_data():

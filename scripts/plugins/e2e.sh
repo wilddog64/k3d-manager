@@ -942,6 +942,7 @@ event = {
     "duration_seconds": str(s.get("duration_seconds") if s.get("duration_seconds") is not None else ""),
     "timestamp": s.get("timestamp") or created_at,
     "commit": s.get("commit") or "",
+    "phase": s.get("phase") or "",
     "failure_groups": s.get("failure_groups") or [],
     "failure_details": s.get("failure_details") or [],
 }

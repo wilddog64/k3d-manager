@@ -58,7 +58,7 @@ elif [[ "$args" == *"get pv"* && "$args" == *"hostname"* ]]; then
   if [[ "${DR_TEST_MISMATCH:-0}" == 1 ]]; then printf node-z; else case "$pv" in pv-data-vault-0) printf node-a;; pv-postgres-keycloak-pvc) printf node-b;; pv-data-openldap-0) printf node-c;; esac; fi
 elif [[ "$args" == *"get pv"* && "$args" == *"local.path"* ]]; then pv="${args#*get pv }"; pv="${pv%% *}"; printf '/var/lib/k3s/%s\n' "${pv#pv-}"
 elif [[ -n "${DR_TEST_SCALE_FAIL:-}" && "$args" == *"scale ${DR_TEST_SCALE_FAIL} "* ]]; then printf 'Error from server (NotFound): %s\n' "$DR_TEST_SCALE_FAIL" >&2; exit 1
-elif [[ "$args" == *"apply -f -"* ]]; then cat > "$TEST_ROOT/applied-$RANDOM.yaml"
+elif [[ "$args" == *"apply"* && "$args" == *"-f -"* ]]; then cat > "$TEST_ROOT/applied-$RANDOM.yaml"
 elif [[ "$args" == *"get pods"* ]]; then printf 'postgres-keycloak-abc\n'; fi
 STUB
   cat > "$STUB_BIN/docker" <<'STUB'
@@ -183,6 +183,11 @@ make_prune_fixture() {
   rm -rf "$TEST_ROOT/fixture"; mkdir -p "$root"
   for stamp in "$@"; do make_export_dir "$root/$stamp"; done
   export DR_TEST_REPO_FIXTURE="$TEST_ROOT/fixture" K3DM_HUB_DATA_DIR="$TEST_ROOT/prune-state"
+}
+
+freeze_clock() {
+  export DR_TEST_NOW="$1"
+  date() { if [[ "$*" == '-u +%s' ]]; then printf '%s\n' "$DR_TEST_NOW"; else command date "$@"; fi; }
 }
 
 @test "hub data restore: decrypts every claim and uses metadata" {
@@ -440,7 +445,29 @@ _fake_vault_tree() {
 
 @test "5 prune keeps recent exports and the last passing export" {
   make_prune_fixture 20261009T120000Z 20261007T120000Z 20261004T120000Z 20261002T120000Z 20260928T120000Z
-  source_plugin; export DR_TEST_RESULT_EXPORT=20261002T120000Z; run hub_data_prune; [ "$status" -eq 0 ]; [[ "$output" == *'keep: 20261009T120000Z'* ]]; [[ "$output" == *'keep: 20261007T120000Z'* ]]; [[ "$output" == *'keep: 20261002T120000Z'* ]]; [[ "$output" == *'prune: 20261004T120000Z'* ]]; [[ "$output" == *'prune: 20260928T120000Z'* ]]
+  source_plugin; freeze_clock 1791590400; export DR_TEST_RESULT_EXPORT=20261002T120000Z
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keep: 20261009T120000Z'* ]]
+  [[ "$output" == *'keep: 20261007T120000Z'* ]]
+  [[ "$output" == *'keep: 20261002T120000Z'* ]]
+  [[ "$output" == *'prune: 20261004T120000Z'* ]]
+  [[ "$output" == *'prune: 20260928T120000Z'* ]]
+}
+
+@test "5b prune retention boundary follows the clock, not the calendar" {
+  make_prune_fixture 20261009T120000Z 20261007T120000Z
+  source_plugin; freeze_clock 1791806400
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keep: 20261007T120000Z'* ]]
+  freeze_clock 1791806401
+  run hub_data_prune
+  printf 'status=%s\n%s\n' "$status" "$output"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'prune: 20261007T120000Z'* ]]
 }
 
 @test "6 prune keeps the newest when all exports are old" {
@@ -659,6 +686,100 @@ _fake_vault_tree() {
   grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
 }
 
+@test "recover D1: credential guard security shim survives its installer function" {
+  source_plugin; local run_dir="$TEST_ROOT/guard"; mkdir -p "$run_dir"
+  cat > "$TEST_ROOT/real-security" <<'STUB'
+#!/usr/bin/env bash
+printf 'real-security %s\n' "$*" >> "$CALL_LOG"
+STUB
+  chmod +x "$TEST_ROOT/real-security"
+  export DR_SECURITY_REAL="$TEST_ROOT/real-security" DR_DRILL_CREDENTIAL_POLICY=audit
+  install_guard_and_return() { _hub_data_install_credential_guard "$run_dir" ctx; }
+  install_guard_and_return; set -u
+  run --separate-stderr security show-keychain-info
+  set +u
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"unbound variable"* ]]
+  grep -q 'real-security show-keychain-info' "$CALL_LOG"
+}
+
+@test "recover D2: refresh force-syncs, waits, discovers Keycloak, then restarts dependents" {
+  source_plugin; local calls=()
+  _kubectl() {
+    calls+=("$*")
+    [[ "$*" == *"get deployment/keycloak"* ]] && return 0
+    return 0
+  }
+  K3DM_HUB_DATA_KEYCLOAK_POLL_S=0 _hub_data_refresh_dependents ctx
+  [[ "${calls[0]}" == *"annotate externalsecret --all"* ]]
+  [[ "${calls[1]}" == *"wait externalsecret --all --for=condition=Ready"* ]]
+  [[ "${calls[2]}" == *"get deployment/keycloak"* ]]
+  [[ "${calls[3]}" == *"rollout restart deployment/keycloak"* ]]
+  [[ "${calls[4]}" == *"rollout restart deployment/kube-prometheus-stack-grafana"* ]]
+  [[ "${calls[5]}" == *"rollout restart deployment/argocd-server"* ]]
+}
+
+@test "recover D2: waits for ArgoCD to create Keycloak before restarting it" {
+  source_plugin; local get_count=0
+  _kubectl() {
+    if [[ "$*" == *"get deployment/keycloak"* ]]; then
+      get_count=$((get_count + 1)); (( get_count >= 3 )) || return 1
+    fi
+  }
+  K3DM_HUB_DATA_KEYCLOAK_POLL_S=0 _hub_data_refresh_dependents ctx
+  [ "$get_count" -eq 3 ]
+}
+
+@test "recover D2: missing Keycloak reports the bounded ArgoCD timeout" {
+  source_plugin
+  _kubectl() { [[ "$*" == *"get deployment/keycloak"* ]] && return 1; return 0; }
+  export K3DM_HUB_DATA_KEYCLOAK_WAIT_S=0 K3DM_HUB_DATA_KEYCLOAK_POLL_S=0
+  run --separate-stderr _hub_data_refresh_dependents ctx
+  unset K3DM_HUB_DATA_KEYCLOAK_WAIT_S K3DM_HUB_DATA_KEYCLOAK_POLL_S
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"not created by ArgoCD"* ]]
+}
+
+@test "recover D2: Grafana restart failure is a warning" {
+  source_plugin
+  _kubectl() {
+    [[ "$*" == *"kube-prometheus-stack-grafana"* ]] && return 1
+    [[ "$*" == *"get deployment/keycloak"* ]] && return 0
+    return 0
+  }
+  run --separate-stderr _hub_data_refresh_dependents ctx
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"could not restart Grafana"* ]]
+}
+
+@test "recover D3: restored claims use server-side hub-restore field ownership" {
+  make_fixture; source_plugin; _hub_data_scale() { :; }; _hub_data_target_context() { printf ctx; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    case "$*" in
+      *" apply "*) cat >/dev/null ;;
+      *"get pvc"*"volumeName"*) printf 'pv-data-vault-0\n' ;;
+      *"get pv"*"hostname"*) printf 'node-a\n' ;;
+      *"get pv"*"local.path"*) printf '/var/lib/k3s/data-vault-0\n' ;;
+    esac
+  }
+  _hub_data_prepare_claim "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" secrets data-vault-0 ignored
+  run grep -F -- '--server-side --field-manager=k3dm-hub-restore -f -' "$CALL_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "recover F4: Step 9 reminds the operator to recreate the export ServiceAccount" {
+  source_plugin; _hub_data_step_finished() { return 1; }; _hub_data_run_step() { :; }
+  run _hub_data_recover_step9 "$TEST_ROOT/steps"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"make hub-data-export-setup"* ]]
+}
+
+@test "recover F5: restore-hub allows finding the unseal-key cache" {
+  run awk -F '\t' '$1 == "restore-hub" && $2 == "find" && $3 == "k3d-manager-vault-unseal" && $4 == "secrets/vault:*" { found=1 } END { exit !found }' scripts/etc/dr/credential-allowlist.tsv
+  [ "$status" -eq 0 ]
+}
+
 @test "recover K3: a missing ArgoCD Application is skipped, not a fatal kubectl exit" {
   source_plugin; mkdir -p "$TEST_ROOT/run"
   _kubectl() { [[ "$1" == --no-exit ]] && return 1; printf 'fatal kubectl exit\n' >&2; exit 1; }
@@ -729,10 +850,200 @@ STUB
   chmod +x "$script"
   cp -R "$PWD" "$copy"
   cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
   run env PATH="$fakebin:$PATH" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" make -C "$copy" hub-recover-all
   [ "$status" -eq 2 ]
   run grep -q hub-recover "$CALL_LOG"
   [ "$status" -eq 1 ]
+  run grep -q hub_data_recover_teardown "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "recover preflight: present hub is marked and approval warns before deletion" {
+  make_fixture; source_plugin
+  jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
+  printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
+  cat > "$STUB_BIN/k3d" <<'STUB'
+#!/usr/bin/env bash
+printf 'k3d-cluster  running\n'
+STUB
+  chmod +x "$STUB_BIN/k3d"
+  _hub_data_validate_target() { printf called >> "$CALL_LOG"; }
+  run --separate-stderr hub_data_recover_preflight
+  [ "$status" -eq 0 ]; [[ "$output" == RUN_ID=* ]]; [ "$(cat "$TEST_ROOT/run/"*/hub_present)" = 1 ]
+  grep -q called "$CALL_LOG"; [[ "$stderr" == *"DELETES the local hub"* ]]; [[ "$stderr" == *"Type export timestamp"* ]]
+}
+
+@test "recover preflight: absent hub skips validation and still asks approval" {
+  make_fixture; source_plugin
+  jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
+  printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
+  cat > "$STUB_BIN/k3d" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+  chmod +x "$STUB_BIN/k3d"
+  _hub_data_validate_target() { printf called >> "$CALL_LOG"; return 1; }
+  run --separate-stderr hub_data_recover_preflight
+  [ "$status" -eq 0 ]; [[ "$output" == RUN_ID=* ]]; [ "$(cat "$TEST_ROOT/run/"*/hub_present)" = 0 ]
+  preflight_stderr="$stderr"; run grep -q called "$CALL_LOG"; [ "$status" -eq 1 ]; [[ "$preflight_stderr" == *"built from scratch"* ]]; [[ "$preflight_stderr" == *"Type export timestamp"* ]]
+  [ "$(jq -c '.server_url,.nodes' "$TEST_ROOT/run/"*/target.json)" = $'""\n[]' ]
+}
+
+@test "recover teardown: present removes only exact k3d leftovers" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"; printf 1 > "$TEST_ROOT/run/t1/hub_present"
+  cluster_exists=1
+  k3d() { [[ "$cluster_exists" == 1 ]] && printf 'k3d-cluster  running\n'; return 0; }
+  _hub_data_cluster_down() { [ "$1" = k3d-cluster ]; cluster_exists=0; printf 'down %s\n' "$*" >> "$CALL_LOG"; }
+  docker() {
+    { printf 'docker'; printf ' %s' "$@"; printf '\n'; } >> "$CALL_LOG"
+    case "$1 $2" in
+      'ps -a') [[ "$*" == *'--format'* ]] && { [[ "${removed:-0}" == 0 ]] && printf 'k3d-k3d-cluster-agent-1\n'; return; } ;;
+      'network ls') printf 'k3d-k3d-cluster\n';;
+      'volume ls') printf 'k3d-k3d-cluster-images\nk3d-k3d-cluster-recovery-server-data\n';;
+      'rm -f') removed=1;;
+      'network rm'|'volume rm') :;;
+    esac
+  }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 0 ]; grep -Fq 'docker rm -f -- k3d-k3d-cluster-agent-1' "$CALL_LOG"; grep -Fq 'docker network rm -- k3d-k3d-cluster' "$CALL_LOG"; grep -Fq 'docker volume rm -- k3d-k3d-cluster-images' "$CALL_LOG"; ! grep -Fq recovery-server-data "$CALL_LOG"
+}
+
+@test "recover teardown: cluster-down wrapper deletes the hub and never discards hub data" {
+  source_plugin; local root="$TEST_ROOT/root"; mkdir -p "$root/bin"
+  cat > "$root/bin/cluster-down" <<'STUB'
+#!/usr/bin/env bash
+printf '%s|%s|%s\n' "$CLUSTER_PROVIDER" "$HUB_CLUSTER_NAME" "$*" >> "$CALL_LOG"
+STUB
+  chmod +x "$root/bin/cluster-down"
+  _HUB_DATA_ROOT="$root" _hub_data_cluster_down k3d-cluster
+  [ "$(cat "$CALL_LOG")" = 'k3d|k3d-cluster|--confirm --delete-hub' ]
+}
+
+@test "recover teardown: absent hub checks leftovers without cluster-down" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"; printf 0 > "$TEST_ROOT/run/t1/hub_present"
+  k3d() { :; }; _hub_data_cluster_down() { printf called >> "$CALL_LOG"; return 1; }; docker() { printf 'docker %s\n' "$*" >> "$CALL_LOG"; }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 0 ]; [[ "$output" == *"no hub to delete"* ]]; run grep -q called "$CALL_LOG"; [ "$status" -eq 1 ]
+}
+
+@test "recover teardown: snapshot guard refusal stops before docker cleanup" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"; printf 1 > "$TEST_ROOT/run/t1/hub_present"
+  _hub_data_cluster_down() { return 2; }; docker() { printf called >> "$CALL_LOG"; }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 2 ]; [ ! -s "$CALL_LOG" ]
+}
+
+@test "recover teardown: surviving cluster stops before docker cleanup" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"; printf 1 > "$TEST_ROOT/run/t1/hub_present"
+  k3d() { printf 'k3d-cluster  running\n'; }; _hub_data_cluster_down() { :; }; docker() { printf called >> "$CALL_LOG"; }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 1 ]; run grep -q called "$CALL_LOG"; [ "$status" -eq 1 ]
+}
+
+@test "recover preflight: a failed k3d listing refuses instead of treating the hub as absent" {
+  make_fixture; source_plugin
+  jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
+  printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
+  k3d() { return 1; }
+  _hub_data_recover_approval() { printf approval >> "$CALL_LOG"; }
+  run --separate-stderr hub_data_recover_preflight
+  [ "$status" -eq 1 ]; [ -z "$output" ]; [[ "$stderr" == *"cannot list k3d clusters"* ]]
+  run grep -q approval "$CALL_LOG"; [ "$status" -eq 1 ]
+  run compgen -G "$TEST_ROOT/run/*/hub_present"; [ "$status" -ne 0 ]
+}
+
+@test "recover teardown: a failed k3d listing stops before docker cleanup" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"; printf 0 > "$TEST_ROOT/run/t1/hub_present"
+  k3d() { return 1; }; _hub_data_cluster_down() { :; }; docker() { printf called >> "$CALL_LOG"; }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 1 ]; run grep -q called "$CALL_LOG"; [ "$status" -eq 1 ]
+}
+
+@test "recover teardown: missing hub_present fails before cluster-down" {
+  source_plugin; export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run"; mkdir -p "$TEST_ROOT/run/t1"
+  _hub_data_cluster_down() { printf called >> "$CALL_LOG"; }
+  run hub_data_recover_teardown t1
+  [ "$status" -eq 1 ]; [ ! -s "$CALL_LOG" ]
+}
+
+@test "recover B4-21: teardown precedes rebuild and resume" {
+  local script="$TEST_ROOT/k3d-manager" copy="$TEST_ROOT/repo" fake_make="$TEST_ROOT/make"
+  cat > "$script" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; fi
+printf '%s\n' "$1" >> "$CALL_LOG"
+STUB
+  cat > "$fake_make" <<'STUB'
+#!/usr/bin/env bash
+printf 'make %s\n' "$*" >> "$CALL_LOG"
+STUB
+  chmod +x "$script" "$fake_make"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
+  run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE="$fake_make" make -C "$copy" hub-recover-all
+  [ "$status" -eq 0 ]; [ "$(cat "$CALL_LOG")" = $'hub-restore --preflight-only\nhub_data_recover_teardown\nmake --no-print-directory hub-recover\nhub_data_recover' ]
+}
+
+@test "recover B4-21: hub-recover-all preserves DR shards during hub rebuild" {
+  local recipe
+  recipe="$(awk '/^hub-recover-all:/{found=1; next} found && /^$/{exit} found' Makefile)"
+  [[ "$recipe" == *'K3DM_DR_SHARDS_PRESERVE=1 $(MAKE) --no-print-directory hub-recover;'* ]]
+}
+
+@test "recover B4-22: teardown failure prevents rebuild and resume" {
+  local script="$TEST_ROOT/k3d-manager" copy="$TEST_ROOT/repo"
+  cat > "$script" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; fi
+printf '%s\n' "$1" >> "$CALL_LOG"
+[[ "$1" == hub_data_recover_teardown ]] && exit 2
+STUB
+  chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$copy/bin/hub-restore"
+  run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE=true make -C "$copy" hub-recover-all
+  [ "$status" -ne 0 ]; [ "$(cat "$CALL_LOG")" = $'hub-restore --preflight-only\nhub_data_recover_teardown' ]
+}
+
+@test "recover B4-23: keychain preflight refusal stops hub-recover-all before teardown" {
+  local script="$TEST_ROOT/k3d-manager" copy="$TEST_ROOT/repo"
+  cat > "$script" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; fi
+printf '%s\n' "$1" >> "$CALL_LOG"
+STUB
+  chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  cat > "$copy/bin/hub-restore" <<'STUB'
+#!/usr/bin/env bash
+printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
+exit 2
+STUB
+  chmod +x "$copy/bin/hub-restore"
+  run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE=true make -C "$copy" hub-recover-all
+  [ "$status" -eq 2 ]
+  grep -Fxq 'hub-restore --preflight-only' "$CALL_LOG"
+  [[ "$output" == *"nothing was deleted"* ]]
+  run ! grep -Eq 'hub_data_recover_teardown|hub-recover|hub_data_recover$' "$CALL_LOG"
 }
 
 @test "recover B4-D1: a failed step records its rc and does not run the next step" {
@@ -992,6 +1303,7 @@ _shim_env() {
   _hub_data_keycloak_user_count() { printf 6; }
   _hub_data_ldap_entry_count() { printf 12; }
   _kubectl() { printf 'value'; }
+  k3d() { printf 'k3d-cluster  running\n'; }
   _hub_data_recover_approval() { printf 'approval\n' >> "$CALL_LOG"; }
   run --separate-stderr hub_data_recover_preflight
   [ "$status" -eq 0 ]

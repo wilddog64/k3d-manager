@@ -67,7 +67,7 @@ def tally(ref):
         release, source = doc_release(raw, added)
         bucket = result.setdefault(release, {"total": 0, "closed": 0, "open": 0, "unknown": 0,
                                               "by_source": {}, "by_priority": {p: {"total": 0, "closed": 0, "open": 0, "unknown": 0} for p in ("P0", "P1", "P2", "P3", "unset")},
-                                              "open_paths": [], "unknown_paths": []})
+                                              "open_paths": [], "unknown_paths": [], "closed_paths": []})
         bucket["total"] += 1
         bucket[state] += 1
         bucket["by_source"][source] = bucket["by_source"].get(source, 0) + 1
@@ -80,6 +80,9 @@ def tally(ref):
         elif state == "unknown":
             item = {"path": path, "priority": priority}
             bucket["unknown_paths"].append(item)
+        elif state == "closed":
+            item = {"path": path, "priority": priority}
+            bucket["closed_paths"].append(item)
     return result
 
 

@@ -40,6 +40,7 @@ def test_tally_releases_sources_and_excludes_archive(tally_module, tmp_path):
     assert result["v1.0.0"]["total"] == 2
     assert result["v1.0.0"]["closed"] == 1
     assert result["v1.0.0"]["unknown"] == 1
+    assert result["v1.0.0"]["closed_paths"] == [{"path": "docs/bugs/fixed.md", "priority": "P1"}]
     assert result["v1.1.0"]["open"] == 1
     assert result["v1.1.0"]["by_source"]["added_branch"] == 1
     assert all("archive" not in item["path"] for item in result["v1.0.0"]["unknown_paths"])

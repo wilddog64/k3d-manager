@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Status:** LIVE-VERIFIED — 2026-10-16 the hub read `k3dm_test_run_complete{target="test-all"}` 0 for the partial run, then 1 with `k3dm_test_cases_total` 3052 for a full one. Was: IMPLEMENTED — landed `63d29a47` (Codex, Claude verified: pytest 28/28, BATS 11/11, both spec mutations red). Rolled out 2026-10-16: Hostinger rule applied, first push read `k3dm_test_run_complete{target="test-all"} 0` (that run stopped at the negation lint, fixed `a0cf5ecd`).
 **Priority:** P3 — alert hygiene; no outage, but the alert can no longer catch what it exists for
 **Severity:** low
 
@@ -83,7 +83,7 @@ Mutation checks (each must turn the named tests red):
 
 ## Rollout
 
-The operator runs `make prometheus-rules` (Hostinger), then `make test-metrics` on the M4.
+The operator runs `kubectl --context ubuntu-hostinger apply -f scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`, then `make test-metrics` on the M4. (Corrected 2026-10-16: `make prometheus-rules` applies only the hub-side `rules/` directory, not `rules-acg/`.)
 Afterwards, `k3dm_test_run_complete{target="test-all"}` reads `1` in Hostinger Prometheus.
 
 ## Files

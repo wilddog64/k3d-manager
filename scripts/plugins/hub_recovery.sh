@@ -144,6 +144,21 @@ function _hub_recovery_replay_identity_hook() {
   return 1
 }
 
+function _hub_recovery_ensure_identity_bootstrap() {
+  local hub_context="$1"
+  local app_file="${SCRIPT_DIR}/etc/argocd/identity/shopping-cart-identity-application.yaml"
+  local oidc_es="${HUB_RECOVERY_INFRA_ROOT:-${SCRIPT_DIR}/../../shopping-carts/shopping-cart-infra}/argocd/config/argocd-secret.yaml"
+  if ! _kubectl --no-exit --context "$hub_context" -n cicd get application shopping-cart-identity >/dev/null 2>&1; then
+    _info "[hub-recovery] shopping-cart-identity Application missing; applying ${app_file}"
+    _kubectl --context "$hub_context" apply -f "$app_file" || return 1
+  fi
+  if [[ -f "$oidc_es" ]]; then
+    _kubectl --context "$hub_context" apply -f "$oidc_es" || return 1
+  else
+    _warn "[hub-recovery] ${oidc_es} not found; ArgoCD SSO needs ExternalSecret cicd/argocd-oidc-secret from shopping-cart-infra"
+  fi
+}
+
 function _hub_recovery_retry_failed_identity_sync() {
   local hub_context="$1" phase
   if ! phase=$(_kubectl --no-exit --context "$hub_context" -n cicd \
@@ -297,13 +312,14 @@ function hub_recovery_reconcile() {
   local confirm=0 hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}" app_context="${HUB_RECOVERY_APP_CONTEXT:-ubuntu-hostinger}"
   if [[ "${1:-}" == "--confirm" ]]; then confirm=1
   elif [[ -n "${1:-}" ]]; then _err "[hub-recovery] only --confirm is accepted"; return 1; fi
-  local -a steps=("k3d serverlb upstreams" "Host-network IP drift" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
+  local -a steps=("Identity Application + ArgoCD OIDC secret" "k3d serverlb upstreams" "Host-network IP drift" "Vault root token ↔ Keychain" "ESO policy" "Cosign signing key" "Hub registration" "CVE reader credential" "OpenLDAP replicas" "Identity hook replay" "Smoke user" "ArgoCD admin Vault mirror" "Cloudflare origins" "Other app-cluster registrations")
   local index
   if (( ! confirm )); then
     for index in "${!steps[@]}"; do printf '%d. %s\n' "$((index + 1))" "${steps[index]}"; done
     return 0
   fi
   keycloak_smoke_vault_preseed || _warn "[hub-recovery] smoke-user Vault preseed failed; continuing recovery"
+  _hub_recovery_ensure_identity_bootstrap "$hub_context" || return 1
   _hub_recovery_retry_failed_identity_sync "$hub_context"
   _hub_recovery_ensure_serverlb_upstreams "$hub_context" || return 1
   _hub_recovery_reconcile_hostnet_drift "$hub_context"

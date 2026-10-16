@@ -590,6 +590,7 @@ assert e["candidate_digest"]=="", e["candidate_digest"]
 assert e["duration_seconds"]=="", e["duration_seconds"]
 assert e["total"]=="", e["total"]
 assert e["passed"]=="false", e["passed"]
+assert e["phase"]=="job", e["phase"]
 print("ok")' "$outf"
   [ "$status" -eq 0 ]
 }
@@ -735,7 +736,7 @@ print("ok")' "$outf"
 
 @test "public failure/ops functions are dispatchable (no leading underscore)" {
   for fn in e2e_runner_publish_back e2e_runner_publish_replay \
-            e2e_runner_replay e2e_runner_unlock e2e_runner_health; do
+            e2e_runner_replay e2e_runner_republish e2e_runner_unlock e2e_runner_health; do
     run declare -f "$fn"
     [ "$status" -eq 0 ]
     [[ "$fn" != _* ]]
@@ -924,6 +925,77 @@ print("ok")' "$f"
   [ "$status" -eq 0 ]
   run cat "$SSHLOG"
   [[ "$output" == *"e2e_runner_publish_replay"* ]]
+}
+
+@test "M4 republish keeps the newest result per service and tier in run order" {
+  local fixture="$BATS_TEST_TMPDIR/remote"; mkdir -p "$fixture"
+  printf '%s\n' '{"run_id":"1-1","service":"product-catalog","tier":"vcluster","timestamp":"2026-10-14T01:00:00Z"}' > "$fixture/1-1.json"
+  printf '%s\n' '{"run_id":"2-2","service":"basket","tier":"vcluster","timestamp":"2026-10-14T02:00:00Z"}' > "$fixture/2-2.json"
+  printf '%s\n' '{"run_id":"3-3","service":"product-catalog","tier":"vcluster","timestamp":"2026-10-14T03:00:00Z"}' > "$fixture/3-3.json"
+  printf '%s\n' '{"run_id":"4-4","service":"product-catalog","tier":"vcluster"}' > "$fixture/4-4.json"
+  printf '%s\n' '{}' > "$fixture/5-5.failures.json"
+  printf '%s\n' '{}' > "$fixture/6-6.publication_pending.json"
+  printf '%s\n' 'not json' > "$fixture/7-7.json"
+  PUBLISH_LOG="$BATS_TEST_TMPDIR/published.log"; : > "$PUBLISH_LOG"
+  local calls=0
+  _e2e_remote_ssh() {
+    calls=$((calls + 1))
+    if [ "$calls" -eq 1 ]; then return 0; fi
+    (cd "$fixture" && tar -cf - -- *.json)
+  }
+  e2e_result_publish() {
+    python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])' >> "$PUBLISH_LOG"
+  }
+  run e2e_runner_republish m2
+  [ "$status" -eq 0 ]
+  [ "$(cat "$PUBLISH_LOG")" = $'2-2\n3-3' ]
+  [[ "$output" == *"published=2 failed=0 skipped=2"* ]]
+}
+
+@test "M4 republish continues after a publish failure" {
+  local fixture="$BATS_TEST_TMPDIR/remote"; mkdir -p "$fixture"
+  printf '%s\n' '{"run_id":"1-1","service":"basket","tier":"vcluster","timestamp":"2026-10-14T01:00:00Z"}' > "$fixture/1-1.json"
+  printf '%s\n' '{"run_id":"2-2","service":"product-catalog","tier":"vcluster","timestamp":"2026-10-14T02:00:00Z"}' > "$fixture/2-2.json"
+  PUBLISH_LOG="$BATS_TEST_TMPDIR/published.log"; : > "$PUBLISH_LOG"
+  local calls=0
+  _e2e_remote_ssh() {
+    calls=$((calls + 1))
+    if [ "$calls" -eq 1 ]; then return 0; fi
+    (cd "$fixture" && tar -cf - -- *.json)
+  }
+  e2e_result_publish() {
+    local run_id; run_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')"
+    echo "$run_id" >> "$PUBLISH_LOG"
+    [ "$run_id" != "1-1" ]
+  }
+  run e2e_runner_republish m2
+  [ "$status" -ne 0 ]
+  [ "$(cat "$PUBLISH_LOG")" = $'1-1\n2-2' ]
+  [[ "$output" == *"published=1 failed=1 skipped=0"* ]]
+}
+
+@test "M4 republish treats a failed fetch as nothing to do" {
+  local calls=0
+  _e2e_remote_ssh() {
+    calls=$((calls + 1))
+    [ "$calls" -eq 1 ] && return 0
+    return 1
+  }
+  e2e_result_publish() { fail "publish must not run"; }
+  run e2e_runner_republish m2
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"nothing to republish"* ]]
+}
+
+@test "M4 republish enforces the allowlist and reachability guard" {
+  run e2e_runner_republish local-m4
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not in allowlist"* ]]
+
+  _e2e_remote_ssh() { return 1; }
+  run e2e_runner_republish m2
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unreachable"* ]]
 }
 
 @test "unlock reports nothing to clear when no lock is present" {

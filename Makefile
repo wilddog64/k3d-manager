@@ -31,7 +31,7 @@ K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -91,7 +91,7 @@ hub-data-prune:
 hub-data-recover:
 	@./scripts/k3d-manager hub_data_recover
 
-## Full hub disaster recovery: rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
+## Full hub disaster recovery: approve, delete the hub, rebuild, credentials, then data (Terminal.app; approval typed at the prompt)
 hub-recover-all:
 	@set -e; \
 	run_root="$${K3DM_HUB_DATA_RECOVER_RUN_ROOT:-$$HOME/.k3dm/hub-recover}"; \
@@ -102,7 +102,9 @@ hub-recover-all:
 	if test "$$preflight_rc" -ne 0; then exit "$$preflight_rc"; fi; \
 	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
 	test -n "$$run_id"; \
-	$(MAKE) --no-print-directory hub-recover; \
+	bin/hub-restore --preflight-only || { echo "[hub-recover] preflight refused before teardown — nothing was deleted; run security unlock-keychain, then rerun make hub-recover-all" >&2; exit 2; }; \
+	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
+	K3DM_DR_SHARDS_PRESERVE=1 $(MAKE) --no-print-directory hub-recover; \
 	RESUME=$$run_id ./scripts/k3d-manager hub_data_recover
 
 dr-drill:
@@ -1341,7 +1343,7 @@ test-pytest:
 	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 test-alertmanager-behaviour:
-	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py -v
+	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py -v
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest
@@ -1358,12 +1360,16 @@ test-all:
 	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
 	_start=$$(date -u +%s); \
 	{ $(MAKE) --no-print-directory test && \
+	  echo "[test-all] stage-complete test" && \
 	  $(MAKE) --no-print-directory test-bin && \
-	  $(MAKE) --no-print-directory test-python; \
+	  echo "[test-all] stage-complete test-bin" && \
+	  $(MAKE) --no-print-directory test-python && \
+	  echo "[test-all] stage-complete test-python"; \
 	} 2>&1 | tee "$${_log}"; \
 	_rc=$${PIPESTATUS[0]}; \
 	_dur=$$(( $$(date -u +%s) - _start )); \
-	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" || true; \
+	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" \
+	  --expected-stages test,test-bin,test-python || true; \
 	echo "[test-all] metrics log: $${_log}"; \
 	exit "$${_rc}"
 
@@ -1425,6 +1431,11 @@ e2e-replay:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-replay RUNNER=m2" >&2; exit 2; fi
 	./scripts/k3d-manager e2e_runner_replay $(RUNNER)
 
+## Republish a runner's newest E2E result per service and tier to the hub (after a hub rebuild). RUNNER=m2 required.
+e2e-republish:
+	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-republish RUNNER=m2" >&2; exit 2; fi
+	./scripts/k3d-manager e2e_runner_republish $(RUNNER)
+
 ## Clear a STALE remote-runner lock (bounded age + no-live-run checks; never automatic). RUNNER=m2 required.
 e2e-runner-unlock:
 	@if [ -z "$(RUNNER)" ]; then echo "usage: make e2e-runner-unlock RUNNER=m2" >&2; exit 2; fi
@@ -1463,6 +1474,7 @@ help:
 	@echo "    make e2e-remote    Run Tier 1 e2e harness on a remote runner off the M4 (RUNNER=m2 [DIGEST=<image digest>]; no local fallback)"
 	@echo "    make e2e-runner-health  Report hub health vs remote-runner availability (RUNNER=m2 optional)"
 	@echo "    make e2e-replay    Replay a runner's retained publication_pending E2E results (RUNNER=m2)"
+	@echo "    make e2e-republish Republish a runner's newest E2E results to the hub after a rebuild (RUNNER=m2)"
 	@echo "    make e2e-runner-unlock  Clear a STALE remote-runner lock, guarded by age + no-live-run (RUNNER=m2)"
 	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep|--reuse, default --auto)"
 	@echo ""

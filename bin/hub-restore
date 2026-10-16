@@ -152,9 +152,52 @@ fi
 _step_start 7
 if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
 
+_hub_restore_ensure_pf_agent() {
+  local name="$1" label="com.k3d-manager.$1-port-forward" state_dir wrapper plist log
+  state_dir="$(_acg_provider_state_dir k3s-aws)"
+  wrapper="${state_dir}/bin/${name}-port-forward.sh"
+  plist="${HOME}/Library/LaunchAgents/${label}.plist"
+  log="${state_dir}/logs/${name}-pf.log"
+  if [[ ! -f "${wrapper}" ]]; then
+    _info "[hub-restore] ${label}: wrapper ${wrapper} missing; run make up once to generate it"
+    return 1
+  fi
+  if [[ ! -f "${plist}" ]]; then
+    mkdir -p "$(dirname "${log}")" "$(dirname "${plist}")"
+    cat > "${plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log}</string>
+  <key>StandardErrorPath</key>
+  <string>${log}</string>
+</dict>
+</plist>
+PLIST
+  fi
+  launchctl list "${label}" >/dev/null 2>&1 && return 0
+  launchctl bootstrap "gui/$(id -u)" "${plist}"
+}
+
 _step_start 8
 _local_agents_ok=1
 if ! "${_make}" install-hub-pushgateway-port-forward; then _local_agents_ok=0; fi
+for _pf_name in argocd keycloak; do
+  _hub_restore_ensure_pf_agent "${_pf_name}" || _local_agents_ok=0
+done
 if launchctl list 2>/dev/null | grep -q 'com.k3d-manager.grafana-port-forward'; then
   launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.grafana-port-forward" || _local_agents_ok=0
 fi

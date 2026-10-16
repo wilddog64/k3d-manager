@@ -129,17 +129,31 @@ def _datastore_run(_command, _additions):
                         capture_output=True, text=True, timeout=20, check=False)
     logs = subprocess.run(["docker", "logs", "--since", window, container],
                           capture_output=True, text=True, timeout=20, check=False)
+    history = subprocess.run(["docker", "logs", "--since", "6h", "--timestamps", container],
+                             capture_output=True, text=True, timeout=20, check=False)
+    started = subprocess.run(["docker", "inspect", "-f", "{{.State.StartedAt}}", container],
+                             capture_output=True, text=True, timeout=20, check=False)
     secrets = subprocess.run(["kubectl", "--context", "k3d-k3d-cluster", "-n", "cicd",
                               "get", "secret", "-l", "argocd.argoproj.io/secret-type=cluster",
                               "-o", "json"], capture_output=True, text=True, timeout=20, check=False)
-    if db.returncode != 0 or logs.returncode != 0 or secrets.returncode != 0:
+    if db.returncode != 0 or logs.returncode != 0 or history.returncode != 0 or secrets.returncode != 0:
         return 1, json.dumps({"available": False})
     try:
         registrations = json.loads(secrets.stdout).get("items", [])
         stale = stale_acg_registration(registrations)
         signals = kine_log_signals(logs.stdout + logs.stderr)
+        history_signals = kine_log_signals(history.stdout + history.stderr)
+        stored = _additions.get("kine_last_compaction_ts")
+        last_compaction = history_signals.get("last_compaction_ts") or stored
+        container_started = None
+        if started.returncode == 0 and started.stdout.strip():
+            container_started = _parse_docker_timestamp(started.stdout.strip())
+        if container_started is not None and (last_compaction is None or last_compaction < container_started):
+            last_compaction = container_started
         return 0, json.dumps({"available": True, "state_db_bytes": int(db.stdout.strip()),
-                              "stale_acg_registration": stale, **signals})
+                              "stale_acg_registration": stale, **signals,
+                              "last_compaction_ts": last_compaction,
+                              "container_started_ts": container_started})
     except (TypeError, ValueError, json.JSONDecodeError):
         return 1, json.dumps({"available": False})
 
@@ -485,6 +499,29 @@ def _publish_status(records, state):
         return _failed("exec", f"{type(exc).__name__}: {exc}")
 
 
+def _parse_docker_timestamp(value):
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def _push_kine_metrics(record):
+    """Publish non-zero Kine gauges only when the read-only probe is available."""
+    data = (record or {}).get("data", {})
+    if not data or data.get("state_db_bytes") is None or data.get("last_compaction_ts") is None:
+        return
+    body = (f"k3dm_hub_kine_last_compaction_timestamp_seconds {data['last_compaction_ts']}\n"
+            f"k3dm_hub_kine_state_db_bytes {data['state_db_bytes']}\n").encode()
+    base = os.environ.get("K3DM_KINE_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    try:
+        request = urllib.request.Request(f"{base}/metrics/job/k3dm-hub-kine", data=body,
+                                         method="PUT", headers={"Content-Type": "text/plain; charset=utf-8"})
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception as exc:
+        print(f"Kine metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+
+
 _INDEX_RESULTS = ("success", "noop", "paused", "failed")
 
 
@@ -701,6 +738,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
                 f"[{item['status']}] {item['target']}" for item in app_health_filed["groups"]
             ) + "; " + app_health_filed.get("push", "")))
     _publish_status(records, state)
+    _push_kine_metrics(next((item for item in records if item.get("sensor") == "kine"), None))
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
     _schedule_e2e(state)
