@@ -349,6 +349,10 @@ function _k3s_aws_deregister_cluster() {
 
 function _k3s_aws_start_watcher() {
   _info "[k3s-aws] Starting sandbox watcher..."
+  if launchctl list "${_ACG_WATCH_LAUNCHD_LABEL}" >/dev/null 2>&1; then
+    _info "[k3s-aws] launchd watcher ${_ACG_WATCH_LAUNCHD_LABEL} is loaded — skipping in-shell watcher"
+    return 0
+  fi
   local _existing_pid
   if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
     _existing_pid=$(cat "${_ACG_WATCH_PID_FILE}")
@@ -359,10 +363,10 @@ function _k3s_aws_start_watcher() {
     fi
   fi
   if [[ ! -f "${_ACG_WATCH_PID_FILE}" ]]; then
-    acg_watch &
+    mkdir -p "$(dirname "${_ACG_WATCH_PID_FILE}")"
+    acg_watch </dev/null >>"$(dirname "${_ACG_WATCH_PID_FILE}")/acg-watch-shell.log" 2>&1 &
     local _watcher_pid=$!
     disown "${_watcher_pid}"
-    mkdir -p "$(dirname "${_ACG_WATCH_PID_FILE}")"
     printf '%s\n' "${_watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
     _info "[k3s-aws] Watcher PID: ${_watcher_pid} (stored in ${_ACG_WATCH_PID_FILE})"
   fi

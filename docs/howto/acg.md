@@ -77,6 +77,9 @@ You rarely need to extend by hand. `make up` installs a TTL watcher (Step 12), t
 `com.k3d-manager.acg-watch` launchd agent, which checks the sandbox every 30 minutes and clicks
 Extend once 65 minutes or less remain:
 
+`cluster-up` relies on this launchd watcher. A provider-only `deploy_cluster` starts an in-shell
+fallback whose output is appended to `~/.local/share/k3d-manager/acg-watch-shell.log`.
+
 ```bash
 make acg-watch         # (re)install the watcher, e.g. after a lib-foundation subtree pull
 make acg-watch-check   # read-only: prints REMAINING_MINS:<n>, never clicks Extend
