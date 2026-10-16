@@ -1,3 +1,4 @@
+- 2026-10-16: Spec docs/plans/v1.43.4-bug-dashboard-defaults.md (plan 3/5) written for the Bug Tracking defaults P3; dispatched to Codex.
 - 2026-10-16: Added item 3 (open with Verified fixes = Show all) to docs/bugs/2026-10-16-bug-dashboard-release-filter-defaults-to-all.md (operator "go ahead").
 - 2026-10-16: Fix commit / Verified commit columns LIVE-VERIFIED on the hub (operator screenshot, v1.43.3, 8 rows; widths fixed in e62be4d6/1697a55a).
 - 2026-10-16: Fix commit + Verified commit columns implemented by Codex, Claude-verified (pytest 935/1 skip, BATS 21/21, mutations red); committed + pushed; operator to hard-refresh hub-grafana-dashboards after next Hermes pass.
