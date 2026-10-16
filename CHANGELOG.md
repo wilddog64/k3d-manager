@@ -11,6 +11,9 @@
   incomplete runs are reported separately when a stage stops before later suites execute.
 - Fixed: `E2EVerificationStale` now checks the latest successful e2e run across
   all runners, so an idle runner cannot make a recently verified service look stale.
+- Fixed: the Agent Dispatch dashboard's Landing success panel now aggregates
+  both sides of its PromQL ratio, so the 7d success percentage renders instead
+  of showing No data.
 - Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and
   `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
 - Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the

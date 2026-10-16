@@ -35,6 +35,23 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent dispatch dashboard: landing success aggregates both sides" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+panel = next(panel for panel in panels if panel["id"] == 2)
+expr = panel["targets"][0]["expr"]
+numerator, denominator = [side.strip() for side in expr.split(" / ")]
+assert numerator.startswith("sum("), numerator
+assert denominator.startswith("sum("), denominator
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "agent dispatch dashboard: panel rectangles do not overlap" {
   run python3 - "$DASH" <<'PY'
 import json, sys
