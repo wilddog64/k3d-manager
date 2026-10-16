@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.3` (moved from v1.43.2, operator 2026-10-16)
-**Status:** OPEN — spec ready; moved to v1.43.3 2026-10-16 (never dispatched on v1.43.2)
+**Status:** IMPLEMENTED — `eb45900e` (v1.43.3); live proof after appsets-reapply + `make dispatch-metrics`
 **Approval:** explicit 2026-10-12 "approved for per-spec dashboard" (operator)
 **Priority:** P3 — the ledger holds every number; only the dashboard cannot show them
 **Severity:** low — no metric is wrong; the view cannot answer "what did each spec cost"
