@@ -106,3 +106,17 @@ After this, `storageClassName` was owned by `k3dm-hub-restore`, the sync went `S
 - [ ] D1, D2 and D3 each have a test that fails against the pre-fix source.
 - [ ] Live: the 2026-10-29 rebuild drill passes Steps 6–7 with no manual step.
 - [ ] Commit message: `fix(hub-data): recover Steps 6-7 on a fresh hub (shim scope, refresh order, claim ownership)`
+
+## Related notes from the same run
+
+- **Grafana admin password mismatch.** `hub-restore` Step 3 seeds a fresh Grafana admin password
+  into the *new* Vault, and ESO syncs it into `grafana-admin-credentials`. The data restore then
+  brings back the *old* Vault value. `make show-service-passwords` reads Vault, so it shows a
+  password that Grafana does not accept. Grafana runs on an `emptyDir`, so a force-sync of the
+  ExternalSecret followed by `rollout restart deploy/kube-prometheus-stack-grafana` fixes it.
+  Step 7 should restart Grafana (and `argocd-server`, which also reads ESO-fed OIDC settings)
+  after its force-sync.
+- **Credential audit.** `credentials_unexpected.tsv` recorded 2 `find` calls on
+  `k3d-manager-vault-unseal` `secrets/vault:count`, from Step 6 `_vault_cache_unseal_keys`. Either
+  add the entry to `scripts/etc/dr/credential-allowlist.tsv` for the `restore-hub` scope, or stop
+  Step 6 from reading the cache.

@@ -166,3 +166,20 @@ kine compaction has been dead since 2026-10-08. After the run:
 - Do NOT run `make hub-recover-all`, `make down` or any real `k3d`/`docker` mutation in tests or while verifying.
 - Do NOT commit, push or create a PR. Claude verifies and commits.
 - Do NOT modify files outside the Files list.
+
+## Live proof 2026-10-15 — run `20261016T012103Z` (rebuild works; recovery needed manual steps)
+
+The fix did what this bug asked: `make hub-recover-all` deleted and rebuilt the hub. Kine compaction
+on the new server is healthy: `COMPACT deleted` every 5 minutes from the 02:01Z start, 17 runs by
+03:06Z. The run finished with all 9 restore steps `rc 0`, verify checks V1–V5 and V8 `true`, and
+an RTO of 4295 s.
+
+It did not finish unattended. Six manual interventions were needed, filed as:
+
+- `2026-10-15-hub-recover-all-checks-keychain-after-deleting-the-hub.md` (P2)
+- `2026-10-15-hub-only-rebuild-never-creates-the-identity-application.md` (P2; also the ArgoCD/Keycloak port-forward agents)
+- `2026-10-15-hub-recover-all-overwrites-the-dr-shards-its-restore-needs.md` (P1)
+- `2026-10-15-hub-data-recover-steps-6-7-fail-on-a-fresh-hub.md` (P2; D1–D3, plus Grafana and credential-audit notes)
+
+The `monitoring` namespace race in `make up` recurred on the hub path; see
+`2026-06-24-observability-acg-monitoring-namespace-race.md`.

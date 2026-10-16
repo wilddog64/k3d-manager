@@ -87,3 +87,17 @@ Then `hub_data_recover` Step 1 finds its target on a fresh hub.
       (`docs/bugs/2026-10-15-hub-recover-all-checks-keychain-after-deleting-the-hub.md`) finishes
       `make hub-recover-all` with no manual apply.
 - [ ] Commit message: `fix(hub-up): create the shopping-cart-identity Application on the hub-only path`
+
+## Also missing on the hub-only path: the ArgoCD and Keycloak port-forward agents
+
+After the restore, `argocd.3ai-talk.org` and `keycloak.3ai-talk.org` returned 502. The tunnel sends
+them to `127.0.0.1:8080` and `127.0.0.1:8880`. The teardown (`bin/cluster-down`) unloads and
+deletes `com.k3d-manager.argocd-port-forward` and `com.k3d-manager.keycloak-port-forward`. Only
+`bin/cluster-up` and `bin/cluster-refresh` install them, and `make refresh` also attempts an ACG
+login. The wrapper scripts under `~/.local/share/k3d-manager/k3s-aws/bin/` survived.
+
+**Workaround (used):** the two plists were generated from the `bin/cluster-refresh` template and
+bootstrapped with `launchctl bootstrap gui/$(id -u)`. All three public URLs then returned 200.
+
+**Fix:** the hub-only path (`bin/hub-restore` Step 8 "Local agents") installs both agents, reusing
+the `bin/cluster-refresh` plist block through a shared helper.
