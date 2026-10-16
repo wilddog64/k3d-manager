@@ -939,12 +939,240 @@ data:
           }
         },
         {
+          "id": 23,
+          "type": "table",
+          "title": "Open bugs",
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 12
+          },
+          "description": "Every open bug doc, from the same scan as the counts above. Click a name to open the doc on the branch the scan read. If k3dm_bug_open_info_truncated is 1, the list is capped at 200.",
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_bug_open_info",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "sort_key",
+                    "desc": false
+                  }
+                ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "priority": 0,
+                  "title": 1,
+                  "filed": 2,
+                  "Value": 3
+                },
+                "excludeByName": {
+                  "bug": true,
+                  "sort_key": true,
+                  "branch": true,
+                  "__name__": true,
+                  "job": true,
+                  "instance": true,
+                  "Time": true
+                },
+                "renameByName": {
+                  "priority": "Priority",
+                  "title": "Bug",
+                  "filed": "Filed",
+                  "Value": "Open for"
+                }
+              }
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "showHeader": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Priority"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  },
+                  {
+                    "id": "custom.filterable",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "P0": {"color": "dark-red", "index": 0},
+                          "P1": {"color": "red", "index": 1},
+                          "P2": {"color": "orange", "index": 2},
+                          "P3": {"color": "yellow", "index": 3},
+                          "unset": {"color": "#8e8e8e", "index": 4}
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Bug"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open bug document",
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/bugs/${__data.fields.bug}.md",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Filed"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "unknown"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Open for"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  },
+                  {
+                    "id": "unit",
+                    "value": "d"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "-1": {
+                            "text": "unknown"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "thresholds"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 14
+                        },
+                        {
+                          "color": "red",
+                          "value": 30
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
           "id": 15,
           "type": "timeseries",
           "title": "Open by priority over time",
           "gridPos": {
             "x": 0,
-            "y": 20,
+            "y": 32,
             "w": 24,
             "h": 8
           },

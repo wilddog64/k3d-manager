@@ -321,7 +321,12 @@ open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Eac
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
 where Grafana placed them on the wrong segment. The bottom row has the
-all-time open counts per priority, scan age, and open-by-priority over time. On `main`, which is
+all-time open counts per priority, scan age, an **Open bugs** table, and open-by-priority over time.
+The table reads `k3dm_bug_open_info` and shows every open document with its priority, title,
+filed date, and age; clicking a title opens that document on the scanned branch. The exporter
+publishes it in the separate `k3dm-bug-open` Pushgateway group with `PUT`, so closed bugs and an
+empty final list are removed rather than lingering in Pushgateway. The list is capped at 200.
+On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
 

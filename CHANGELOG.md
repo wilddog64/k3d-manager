@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added: the k3dm Bug Tracking dashboard now lists open bug documents with priority, title,
+  filed date, age, and links to the scanned branch.
 - Fixed: `make hub-recover-all` now approves first, tears down the existing hub and exact-name
   k3d leftovers, rebuilds it, and resumes the selected data export, including when the hub is absent.
 - Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and

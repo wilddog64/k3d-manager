@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,6 +21,10 @@ PRIORITIES = ("P0", "P1", "P2", "P3", "unset")
 STATES = ("open", "closed", "unknown")
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 _BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
+_SCAN_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
+_BUG_STEM_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+_FILED_RE = re.compile(r"^\*\*Filed:\*\*\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
+_HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 
 
 def _pushgateway_url():
@@ -84,8 +89,7 @@ def publish(payload):
     return False
 
 
-def _bug_metrics(root, ref=None):
-    """Return a complete bug inventory snapshot, or raise on any read/parse failure."""
+def _bug_texts(root, ref=None):
     root = Path(root)
     if ref:
         listing = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", ref,
@@ -97,6 +101,12 @@ def _bug_metrics(root, ref=None):
     else:
         paths = sorted(p.relative_to(root).as_posix() for p in (root / "docs/bugs").glob("*.md"))
         texts = {p: (root / p).read_text(encoding="utf-8") for p in paths}
+    return texts
+
+
+def _bug_metrics(root, ref=None):
+    """Return a complete bug inventory snapshot, or raise on any read/parse failure."""
+    texts = _bug_texts(root, ref)
     counts = {(priority, state): 0 for priority in ("P0", "P1", "P2", "P3", "unset")
               for state in ("open", "closed", "unknown")}
     for text in texts.values():
@@ -105,6 +115,64 @@ def _bug_metrics(root, ref=None):
     lines = [f'k3dm_bug_docs{{priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
              for priority, state in counts]
     lines.append(f"k3dm_bug_docs_scan_timestamp_seconds {time.time()}")
+    return "\n".join(lines) + "\n"
+
+
+def _scan_branch(root, ref=None):
+    name = ref.removeprefix("origin/") if ref and ref != "HEAD" else ""
+    if not name:
+        try:
+            name = _git_out(root, "branch", "--show-current").strip()
+        except Exception:
+            name = ""
+    return name if _SCAN_BRANCH_RE.fullmatch(name) else ""
+
+
+def _open_bug_metrics(root, ref=None, now=None):
+    root = Path(root)
+    branch = _scan_branch(root, ref)
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    rows = []
+    skipped = 0
+    for path, text in _bug_texts(root, ref).items():
+        priority, state = doc_meta(text)
+        if state != "open":
+            continue
+        stem = Path(path).name.removesuffix(".md")
+        if not _BUG_STEM_RE.fullmatch(stem):
+            skipped += 1
+            continue
+        filed_match = _FILED_RE.search(text)
+        filed = filed_match.group(1) if filed_match else ""
+        if not filed:
+            prefix = re.match(r"^(\d{4}-\d{2}-\d{2})", stem)
+            filed = prefix.group(1) if prefix else ""
+        heading = _HEADING_RE.search(text)
+        if heading:
+            title = re.sub(r"^Bug:\s*", "", heading.group(1).strip())
+            title = re.sub(r"[`*]", "", title)
+            title = re.sub(r'["\\\t\r\n]+', " ", title)
+            title = re.sub(r"\s+", " ", title).strip()
+        else:
+            title = re.sub(r"^\d{4}-\d{2}-\d{2}-?", "", stem).replace("-", " ").strip()
+        if len(title) > 120:
+            title = title[:119] + "…"
+        value = -1
+        if filed:
+            value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
+        sort_key = f"{priority} {filed or '9999-99-99'} {stem}"
+        rows.append((sort_key, priority, title, filed, stem, value, branch))
+    rows.sort(key=lambda row: row[0])
+    truncated = int(len(rows) > 200)
+    lines = []
+    for sort_key, priority, title, filed, stem, value, scan_branch in rows[:200]:
+        labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
+                  f'sort_key="{sort_key}",branch="{scan_branch}"')
+        lines.append(f"k3dm_bug_open_info{{{labels}}} {value}")
+    lines.append(f"k3dm_bug_open_info_skipped {skipped}")
+    lines.append(f"k3dm_bug_open_info_truncated {truncated}")
     return "\n".join(lines) + "\n"
 
 
@@ -119,7 +187,7 @@ def _git_out(root, *args):
 
 
 def _current_release(root, ref):
-    name = ref.removeprefix("origin/") if ref != "HEAD" else _git_out(root, "branch", "--show-current").strip()
+    name = _scan_branch(root, ref)
     match = _BRANCH_RE.search(name)
     return match.group(1) if match else None
 
@@ -164,6 +232,11 @@ def publish_bug_metrics(root, ref=None):
         return False
     pushed = _push_bug_group("k3dm-bug-docs", payload)
     try:
+        open_bugs = _open_bug_metrics(root, ref)
+        _push_bug_group("k3dm-bug-open", open_bugs, method="PUT")
+    except Exception as exc:
+        print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)
+    try:
         releases = _release_metrics(root, ref)
     except Exception as exc:
         print(f"bug release metrics skipped (non-fatal): {exc}", file=sys.stderr)
@@ -172,7 +245,7 @@ def publish_bug_metrics(root, ref=None):
     return pushed
 
 
-def _push_bug_group(job, payload):
+def _push_bug_group(job, payload, method="POST"):
     base = _pushgateway_url()
     healthy_url = f"{base}/-/healthy"
     url = f"{base}/metrics/job/{job}"
@@ -181,7 +254,7 @@ def _push_bug_group(job, payload):
             with urllib.request.urlopen(healthy_url, timeout=2) as response:
                 if response.status != 200:
                     raise RuntimeError(f"Pushgateway unhealthy (HTTP {response.status})")
-            request = urllib.request.Request(url, data=payload.encode(), method="POST",
+            request = urllib.request.Request(url, data=payload.encode(), method=method,
                                              headers={"Content-Type": "text/plain; charset=utf-8"})
             urllib.request.urlopen(request, timeout=5)
             return True

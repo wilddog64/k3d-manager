@@ -106,3 +106,64 @@ for panel in bars:
 PY
   [ "${status}" -eq 0 ]
 }
+
+_open_bugs_table_check() {
+  python3 - "${dashboard}" "$1" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+table = next(panel for panel in data["panels"] if panel["type"] == "table" and panel["title"] == "Open bugs")
+check = sys.argv[2]
+if check == "link":
+    links = [prop["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Bug"
+             for prop in o["properties"] if prop["id"] == "links"]
+    url = links[0][0]["url"]
+    assert "${__data.fields.branch}" in url and "${__data.fields.bug}" in url, url
+    assert links[0][0]["targetBlank"] is True
+elif check == "sort":
+    transforms = [t["id"] for t in table["transformations"]]
+    assert transforms.index("sortBy") < transforms.index("organize"), transforms
+    sort = next(t for t in table["transformations"] if t["id"] == "sortBy")["options"]["sort"]
+    assert sort == [{"field": "sort_key", "desc": False}], sort
+elif check == "layout":
+    assert panels[22]["type"] == "row"
+    assert table["gridPos"] == {"x": 0, "y": 20, "w": 24, "h": 12}, table["gridPos"]
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 20 for i in range(9, 15))
+    assert panels[15]["gridPos"]["y"] == 32
+    rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
+    owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
+    assert owner == 22, owner
+elif check == "columns":
+    organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+    hidden = {name for name, flag in organize["excludeByName"].items() if flag}
+    assert {"bug", "sort_key", "branch", "__name__", "job", "instance", "Time"} <= hidden, hidden
+    visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
+    assert [organize["renameByName"][name] for name in visible] == ["Priority", "Bug", "Filed", "Open for"]
+    priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
+    mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
+    pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
+              for o in panels[7]["fieldConfig"]["overrides"]}
+    assert {k: v["color"] for k, v in mapping.items()} == pinned, (mapping, pinned)
+PY
+}
+
+@test "open bugs table links each title to its doc on the scanned branch" {
+  run _open_bugs_table_check link
+  [ "${status}" -eq 0 ]
+}
+
+@test "open bugs table sorts by sort_key before hiding it" {
+  run _open_bugs_table_check sort
+  [ "${status}" -eq 0 ]
+}
+
+@test "open bugs table sits in row 22 under the stats, with the time series moved below" {
+  run _open_bugs_table_check layout
+  [ "${status}" -eq 0 ]
+}
+
+@test "open bugs table shows only Priority, Bug, Filed, Open for, coloured like panel 7" {
+  run _open_bugs_table_check columns
+  [ "${status}" -eq 0 ]
+}
