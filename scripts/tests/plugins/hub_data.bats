@@ -58,7 +58,7 @@ elif [[ "$args" == *"get pv"* && "$args" == *"hostname"* ]]; then
   if [[ "${DR_TEST_MISMATCH:-0}" == 1 ]]; then printf node-z; else case "$pv" in pv-data-vault-0) printf node-a;; pv-postgres-keycloak-pvc) printf node-b;; pv-data-openldap-0) printf node-c;; esac; fi
 elif [[ "$args" == *"get pv"* && "$args" == *"local.path"* ]]; then pv="${args#*get pv }"; pv="${pv%% *}"; printf '/var/lib/k3s/%s\n' "${pv#pv-}"
 elif [[ -n "${DR_TEST_SCALE_FAIL:-}" && "$args" == *"scale ${DR_TEST_SCALE_FAIL} "* ]]; then printf 'Error from server (NotFound): %s\n' "$DR_TEST_SCALE_FAIL" >&2; exit 1
-elif [[ "$args" == *"apply -f -"* ]]; then cat > "$TEST_ROOT/applied-$RANDOM.yaml"
+elif [[ "$args" == *"apply"* && "$args" == *"-f -"* ]]; then cat > "$TEST_ROOT/applied-$RANDOM.yaml"
 elif [[ "$args" == *"get pods"* ]]; then printf 'postgres-keycloak-abc\n'; fi
 STUB
   cat > "$STUB_BIN/docker" <<'STUB'
@@ -684,6 +684,100 @@ _fake_vault_tree() {
   K3DM_HUB_DATA_RECOVER_ALLOW_DRILL=1 run _hub_data_refresh_dependents other-ctx; [ "$status" -eq 0 ]; [ "$(wc -c < "$CALL_LOG")" -eq 0 ]
   run _hub_data_refresh_dependents k3d-k3d-cluster; [ "$status" -eq 0 ]
   grep -q 'rollout restart deployment/keycloak' "$CALL_LOG"; grep -q 'annotate externalsecret --all' "$CALL_LOG"
+}
+
+@test "recover D1: credential guard security shim survives its installer function" {
+  source_plugin; local run_dir="$TEST_ROOT/guard"; mkdir -p "$run_dir"
+  cat > "$TEST_ROOT/real-security" <<'STUB'
+#!/usr/bin/env bash
+printf 'real-security %s\n' "$*" >> "$CALL_LOG"
+STUB
+  chmod +x "$TEST_ROOT/real-security"
+  export DR_SECURITY_REAL="$TEST_ROOT/real-security" DR_DRILL_CREDENTIAL_POLICY=audit
+  install_guard_and_return() { _hub_data_install_credential_guard "$run_dir" ctx; }
+  install_guard_and_return; set -u
+  run --separate-stderr security show-keychain-info
+  set +u
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"unbound variable"* ]]
+  grep -q 'real-security show-keychain-info' "$CALL_LOG"
+}
+
+@test "recover D2: refresh force-syncs, waits, discovers Keycloak, then restarts dependents" {
+  source_plugin; local calls=()
+  _kubectl() {
+    calls+=("$*")
+    [[ "$*" == *"get deployment/keycloak"* ]] && return 0
+    return 0
+  }
+  K3DM_HUB_DATA_KEYCLOAK_POLL_S=0 _hub_data_refresh_dependents ctx
+  [[ "${calls[0]}" == *"annotate externalsecret --all"* ]]
+  [[ "${calls[1]}" == *"wait externalsecret --all --for=condition=Ready"* ]]
+  [[ "${calls[2]}" == *"get deployment/keycloak"* ]]
+  [[ "${calls[3]}" == *"rollout restart deployment/keycloak"* ]]
+  [[ "${calls[4]}" == *"rollout restart deployment/kube-prometheus-stack-grafana"* ]]
+  [[ "${calls[5]}" == *"rollout restart deployment/argocd-server"* ]]
+}
+
+@test "recover D2: waits for ArgoCD to create Keycloak before restarting it" {
+  source_plugin; local get_count=0
+  _kubectl() {
+    if [[ "$*" == *"get deployment/keycloak"* ]]; then
+      get_count=$((get_count + 1)); (( get_count >= 3 )) || return 1
+    fi
+  }
+  K3DM_HUB_DATA_KEYCLOAK_POLL_S=0 _hub_data_refresh_dependents ctx
+  [ "$get_count" -eq 3 ]
+}
+
+@test "recover D2: missing Keycloak reports the bounded ArgoCD timeout" {
+  source_plugin
+  _kubectl() { [[ "$*" == *"get deployment/keycloak"* ]] && return 1; return 0; }
+  export K3DM_HUB_DATA_KEYCLOAK_WAIT_S=0 K3DM_HUB_DATA_KEYCLOAK_POLL_S=0
+  run --separate-stderr _hub_data_refresh_dependents ctx
+  unset K3DM_HUB_DATA_KEYCLOAK_WAIT_S K3DM_HUB_DATA_KEYCLOAK_POLL_S
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"not created by ArgoCD"* ]]
+}
+
+@test "recover D2: Grafana restart failure is a warning" {
+  source_plugin
+  _kubectl() {
+    [[ "$*" == *"kube-prometheus-stack-grafana"* ]] && return 1
+    [[ "$*" == *"get deployment/keycloak"* ]] && return 0
+    return 0
+  }
+  run --separate-stderr _hub_data_refresh_dependents ctx
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"could not restart Grafana"* ]]
+}
+
+@test "recover D3: restored claims use server-side hub-restore field ownership" {
+  make_fixture; source_plugin; _hub_data_scale() { :; }; _hub_data_target_context() { printf ctx; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    case "$*" in
+      *" apply "*) cat >/dev/null ;;
+      *"get pvc"*"volumeName"*) printf 'pv-data-vault-0\n' ;;
+      *"get pv"*"hostname"*) printf 'node-a\n' ;;
+      *"get pv"*"local.path"*) printf '/var/lib/k3s/data-vault-0\n' ;;
+    esac
+  }
+  _hub_data_prepare_claim "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" secrets data-vault-0 ignored
+  run grep -F -- '--server-side --field-manager=k3dm-hub-restore -f -' "$CALL_LOG"
+  [ "$status" -eq 0 ]
+}
+
+@test "recover F4: Step 9 reminds the operator to recreate the export ServiceAccount" {
+  source_plugin; _hub_data_step_finished() { return 1; }; _hub_data_run_step() { :; }
+  run _hub_data_recover_step9 "$TEST_ROOT/steps"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"make hub-data-export-setup"* ]]
+}
+
+@test "recover F5: restore-hub allows finding the unseal-key cache" {
+  run awk -F '\t' '$1 == "restore-hub" && $2 == "find" && $3 == "k3d-manager-vault-unseal" && $4 == "secrets/vault:*" { found=1 } END { exit !found }' scripts/etc/dr/credential-allowlist.tsv
+  [ "$status" -eq 0 ]
 }
 
 @test "recover K3: a missing ArgoCD Application is skipped, not a fatal kubectl exit" {

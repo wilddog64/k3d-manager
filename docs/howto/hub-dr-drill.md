@@ -224,7 +224,8 @@ make hub-data-recover      # data only; hub is still running
 
 The restore validates the pinned local k3d target and encrypted export, pauses
 ArgoCD before replacing claims, restores and unseals Vault, re-points Kubernetes
-auth, refreshes Keycloak and ExternalSecrets, verifies Vault metadata and
+auth, force-syncs ExternalSecrets, waits for Keycloak and restarts Keycloak,
+Grafana and `argocd-server`, verifies Vault metadata and
 identity digests, and writes an auditable report under
 `~/.k3dm/hub-recover/<run_id>/`. A failed run can resume with `RESUME=<run_id>`;
 an unfinished destructive step requires its explicit `REDO_STEP`.
@@ -244,6 +245,9 @@ runs from the typed approval to the verified report, across every `RESUME`, so t
 fixing a failed step counts. Inventory format 2 records Vault metadata
 versions and identity digests without secret values. V8 confirms that
 ExternalSecrets are no longer in `SecretSyncedError`.
+
+After the report, run `make hub-data-export-setup && make hub-data-export` to recreate
+the export ServiceAccount and record a fresh export.
 
 ### M2 rehearsal
 

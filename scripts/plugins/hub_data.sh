@@ -632,7 +632,7 @@ function _hub_data_prepare_claim() {
   local context cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
   context="$(_hub_data_target_context)"
   _kubectl --context "$context" -n "$ns" delete pvc "$claim" --ignore-not-found >/dev/null
-  { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$cluster" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$context" apply -f -
+  { printf 'apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: %s\n  namespace: %s\n  annotations:\n    volume.kubernetes.io/selected-node: k3d-%s-%s\nspec:\n  storageClassName: %s\n  accessModes:\n' "$claim" "$ns" "$cluster" "$node" "$storage"; _hub_data_meta_modes "${stage}/pv-pvc.yaml" "$ns" "$claim" | sed 's/^/    - /'; printf '  resources:\n    requests:\n      storage: %s\n' "$size"; } | _kubectl --context "$context" apply --server-side --field-manager=k3dm-hub-restore -f -
   _kubectl --context "$context" -n "$ns" wait --for=jsonpath='{.status.phase}'=Bound "pvc/${claim}" --timeout=300s
   pv="$(_kubectl --context "$context" -n "$ns" get pvc "$claim" -o jsonpath='{.spec.volumeName}')"
   actual="$(_kubectl --context "$context" get pv "$pv" -o jsonpath='{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[?(@.key=="kubernetes.io/hostname")].values[0]}')"; logical="$(_hub_recovery_logical_node "$actual")"
@@ -792,8 +792,16 @@ function _hub_data_refresh_dependents() {
     printf '%s\n' '[hub-recover] drill target: no Keycloak or ESO to refresh; skipping' >&2
     return 0
   fi
+  local waited=0 limit="${K3DM_HUB_DATA_KEYCLOAK_WAIT_S:-600}"
+  _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite || return 1
+  _kubectl --context "$context" -n identity wait externalsecret --all --for=condition=Ready --timeout=180s || return 1
+  until _kubectl --no-exit --context "$context" -n identity get deployment/keycloak >/dev/null 2>&1; do
+    (( waited >= limit )) && { _err "[hub-recover] deployment/keycloak not created by ArgoCD within ${limit}s; check the shopping-cart-identity Application"; return 1; }
+    sleep "${K3DM_HUB_DATA_KEYCLOAK_POLL_S:-10}"; waited=$(( waited + ${K3DM_HUB_DATA_KEYCLOAK_POLL_S:-10} ))
+  done
   _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
-  _kubectl --context "$context" annotate externalsecret --all -A "force-sync=$(date +%s)" --overwrite
+  _kubectl --context "$context" -n monitoring rollout restart deployment/kube-prometheus-stack-grafana || _warn "[hub-recover] could not restart Grafana; its admin password may not match Vault until it restarts"
+  _kubectl --context "$context" -n cicd rollout restart deployment/argocd-server || _warn "[hub-recover] could not restart argocd-server; SSO may use a stale client secret until it restarts"
 }
 
 function _hub_data_record_rto() {
@@ -861,7 +869,8 @@ function _hub_data_validate_target() {
 }
 
 function _hub_data_install_credential_guard() {
-  local run_dir="$1" context="$2" shim="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
+  local run_dir="$1" context="$2"
+  _HUB_DATA_SECURITY_SHIM="${_HUB_DATA_ROOT}/scripts/etc/dr/security-shim"
   export DR_SECURITY_CREDENTIALS_FILE="${run_dir}/credentials.tsv"
   export DR_SECURITY_UNEXPECTED_FILE="${run_dir}/credentials_unexpected.tsv"
   export DR_SECURITY_ALLOWLIST="${_HUB_DATA_ROOT}/scripts/etc/dr/credential-allowlist.tsv"
@@ -874,9 +883,9 @@ function _hub_data_install_credential_guard() {
   touch "$DR_SECURITY_CREDENTIALS_FILE" "$DR_SECURITY_UNEXPECTED_FILE"
   local shim_dir="${run_dir}/bin"
   mkdir -p "$shim_dir"
-  ln -sf "$shim" "${shim_dir}/security"
+  ln -sf "$_HUB_DATA_SECURITY_SHIM" "${shim_dir}/security"
   export PATH="${shim_dir}:$PATH"
-  security() { "$shim" "$@"; }
+  security() { "$_HUB_DATA_SECURITY_SHIM" "$@"; }
 }
 
 function _hub_data_check_compatibility() {
@@ -1176,6 +1185,7 @@ function _hub_data_recover_step9() {
   local steps="$1"
   _hub_data_step_finished 9 "$steps" && return 0
   printf '[hub-recover] Step 9/9 — Report\n'
+  printf '%s\n' '[hub-recover] next: make hub-data-export-setup && make hub-data-export (the rebuilt hub has no hub-data-export ServiceAccount until setup runs)'
   _hub_data_run_step "$steps" 9 true
 }
 
