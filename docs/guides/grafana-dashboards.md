@@ -403,6 +403,7 @@ cannot overwrite each other.
 | Failing cases by suite | `k3dm_test_suite_cases{result="not_ok"} > 0` (empty on a clean run) |
 | Run duration over time | `k3dm_test_run_duration_seconds`, `k3dm_test_suite_duration_seconds` |
 | Total cases | `k3dm_test_cases_total` |
+| Run completion | `k3dm_test_run_complete` |
 | Exit code | `k3dm_test_exit_code` (informational only) |
 
 **Duration.** `make test-all` times the whole run and pushes it as

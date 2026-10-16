@@ -7,6 +7,8 @@
 - Added: the k3dm Bug Tracking dashboard can filter open bugs and priority stats by filed-in release.
 - Fixed: `make hub-recover-all` now approves first, tears down the existing hub and exact-name
   k3d leftovers, rebuilds it, and resumes the selected data export, including when the hub is absent.
+- Fixed: offline suite case-count alerts now apply only to complete `test-all` runs, and
+  incomplete runs are reported separately when a stage stops before later suites execute.
 - Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and
   `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
 - Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the

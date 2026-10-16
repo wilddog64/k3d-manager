@@ -17,12 +17,24 @@ HUB_RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml
   [ "${status}" -ne 0 ]
 }
 
-@test "all six k3dm test-suite alerts are present" {
+@test "all seven k3dm test-suite alerts are present" {
   for _alert in OfflineSuiteFailing OfflineSuiteVacuous OfflineSuiteCaseCountDropped \
-                OfflineSuiteStale OfflineSuiteRunMissed DeploymentMetricsStale; do
+                OfflineSuiteRunIncomplete OfflineSuiteStale OfflineSuiteRunMissed DeploymentMetricsStale; do
     run grep -F -- "alert: ${_alert}" "${ACG_RULE}"
     [ "${status}" -eq 0 ]
   done
+}
+
+@test "OfflineSuiteCaseCountDropped applies its floor only to complete runs" {
+  run grep -F -- 'k3dm_test_cases_total < 2600' "${ACG_RULE}"
+  [ "${status}" -eq 0 ]
+  run grep -F -- 'on(target) k3dm_test_run_complete == 1' "${ACG_RULE}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "OfflineSuiteRunIncomplete fires for an incomplete run" {
+  run grep -F -- 'expr: k3dm_test_run_complete == 0' "${ACG_RULE}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "OfflineSuiteVacuous names the result label value" {
@@ -37,13 +49,13 @@ HUB_RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml
 import sys, re
 text = open(sys.argv[1]).read()
 alerts = re.findall(r"- alert: (\S+)\n\s+expr: (.+)", text)
-assert len(alerts) == 6, f"expected 6 alerts, found {len(alerts)}"
+assert len(alerts) == 7, f"expected 7 alerts, found {len(alerts)}"
 for name, expr in alerts:
     assert expr.strip(), f"{name} has an empty expr"
 print("OK", len(alerts))
 PY
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"OK 6"* ]]
+  [[ "${output}" == *"OK 7"* ]]
 }
 
 @test "OfflineSuiteRunMissed keys on the per-run timestamp, not the last success" {

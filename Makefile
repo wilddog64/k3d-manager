@@ -1360,12 +1360,16 @@ test-all:
 	_log="$${TMPDIR:-/tmp}/k3dm-test-all-$$(date -u +%s).log"; \
 	_start=$$(date -u +%s); \
 	{ $(MAKE) --no-print-directory test && \
+	  echo "[test-all] stage-complete test" && \
 	  $(MAKE) --no-print-directory test-bin && \
-	  $(MAKE) --no-print-directory test-python; \
+	  echo "[test-all] stage-complete test-bin" && \
+	  $(MAKE) --no-print-directory test-python && \
+	  echo "[test-all] stage-complete test-python"; \
 	} 2>&1 | tee "$${_log}"; \
 	_rc=$${PIPESTATUS[0]}; \
 	_dur=$$(( $$(date -u +%s) - _start )); \
-	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" || true; \
+	./bin/k3dm-test-metrics "$${_log}" --target test-all --exit-code "$${_rc}" --run-duration "$${_dur}" \
+	  --expected-stages test,test-bin,test-python || true; \
 	echo "[test-all] metrics log: $${_log}"; \
 	exit "$${_rc}"
 
