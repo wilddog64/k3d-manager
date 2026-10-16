@@ -7,7 +7,8 @@
 - **Bug Tracking table shows when a bug was verified and live-verified.** `k3dm_bug_info` gains
   `verified_at` and `live_verified_at`: a date written right after the `VERIFIED` / `LIVE-VERIFIED`
   keyword in the Status line, otherwise the UTC time of the first commit that set that Status. The
-  Verified and Live-verified columns now render `✓ 2026-10-16 21:35Z` instead of a bare check. The
+  table shows each one in its own column next to its status: Verified, Verified at, Live-verified,
+  Live-verified at (`2026-10-16 21:35Z`, or `—` when not verified). The
   existing `verified` / `live_verified` labels, the summary tiles and the Hide live-verified filter
   are unchanged, and a git failure falls back to `true` rather than dropping the series.
 

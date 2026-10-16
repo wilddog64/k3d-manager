@@ -378,7 +378,9 @@ Fixed documents also have a Verified and Live-verified label:
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
-The table also exposes `verified_at` and `live_verified_at` on `k3dm_bug_info`. A verified or
+The table shows `verified_at` and `live_verified_at` from `k3dm_bug_info` as **Verified at** and
+**Live-verified at**, each next to its status column (`—` when not verified, `unknown` when no time
+was found). A verified or
 live-verified document gets `YYYY-MM-DD HH:MMZ` (UTC) or `YYYY-MM-DD`. The time comes from a date
 written directly after the keyword (`VERIFIED — <ISO date or time>: <evidence>` /
 `LIVE-VERIFIED — <ISO date or time>: <evidence>`); a date later in the Status text, such as a

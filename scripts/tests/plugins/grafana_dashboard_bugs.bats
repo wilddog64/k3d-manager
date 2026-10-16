@@ -103,7 +103,7 @@ assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["fixed_in"] == 6
 assert organize["renameByName"]["fixed_in"] == "Fixed in"
-assert organize["indexByName"]["verified_at"] == 7 and organize["indexByName"]["live_verified_at"] == 8
+assert [organize["indexByName"][k] for k in ("verified", "verified_at", "live_verified", "live_verified_at")] == [7, 8, 9, 10]
 PY
   [ "${status}" -eq 0 ]
 }
@@ -239,11 +239,13 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Verified", "Live-verified"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Verified", "Verified at", "Live-verified", "Live-verified at"]
     assert organize["indexByName"]["fixed_in"] == 6
-    assert organize["indexByName"]["verified_at"] == 7
-    assert organize["indexByName"]["live_verified_at"] == 8
-    assert organize["renameByName"]["live_verified_at"] == "Live-verified"
+    assert organize["indexByName"]["verified"] == 7
+    assert organize["indexByName"]["verified_at"] == 8
+    assert organize["indexByName"]["live_verified"] == 9
+    assert organize["indexByName"]["live_verified_at"] == 10
+    assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -302,7 +304,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table shows Release, Bug, Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified" {
+@test "bugs table shows Release, Bug, Priority, Filed, Open for, Status, Fixed in, Verified (at), Live-verified (at)" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }
@@ -335,22 +337,29 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table maps verification timestamps and hides old verification labels" {
+@test "bugs table pairs each verification column with its timestamp" {
   run python3 - "${dashboard}" <<'PY'
-import json, re, sys
+import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
-assert organize["renameByName"]["verified_at"] == "Verified"
-assert organize["renameByName"]["live_verified_at"] == "Live-verified"
-assert organize["excludeByName"]["verified"] is True
-assert organize["excludeByName"]["live_verified"] is True
+order = sorted(organize["indexByName"], key=organize["indexByName"].get)
+assert order[-4:] == ["verified", "verified_at", "live_verified", "live_verified_at"], order
+assert organize["renameByName"]["verified"] == "Verified"
+assert organize["renameByName"]["verified_at"] == "Verified at"
+assert organize["renameByName"]["live_verified"] == "Live-verified"
+assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
+for label in ("verified", "verified_at", "live_verified", "live_verified_at"):
+    assert not organize["excludeByName"].get(label), label
+overrides = {o["matcher"].get("options"): o for o in table["fieldConfig"]["overrides"]}
+for column in ("Verified at", "Live-verified at"):
+    values = next(m["options"] for p in overrides[column]["properties"] if p["id"] == "mappings"
+                  for m in p["value"] if m["type"] == "value")
+    assert {values[k]["text"] for k in ("false", "n/a", "-")} == {"—"}, column
+    assert values["true"]["text"] == "unknown", column
 for column in ("Verified", "Live-verified"):
-    override = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"].get("options") == column)
-    regex = next(m for p in override["properties"] if p["id"] == "mappings" for m in p["value"] if m["type"] == "regex")
-    pattern = regex["options"]["pattern"]
-    assert re.search(pattern, "2026-10-16 21:35Z")
-    assert re.search(pattern, "2026-10-15")
+    mappings = next(p["value"] for p in overrides[column]["properties"] if p["id"] == "mappings")
+    assert not any(m["type"] == "regex" for m in mappings), column
 PY
   [ "${status}" -eq 0 ]
 }
