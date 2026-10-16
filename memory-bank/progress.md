@@ -1,3 +1,4 @@
+- 2026-10-16: v1.43.2 milestone PR #143 opened (head c7ae317e); Copilot requested; CI run 38911091012 in progress.
 - 2026-10-16: v1.43.2 release prep: CHANGELOG promoted to [1.43.2] - 2026-10-16 (17 entries regrouped Added/Changed/Fixed), README + docs/releases.md rows, README issue log rotated. Live smoke: smoke-test-cluster-health 9/9 on ubuntu-hostinger and ubuntu-k3s; smoke-prefix bug LIVE-VERIFIED. Opening milestone PR.
 - 2026-10-16: operator moved dispatch-dashboard-no-per-spec-cost-or-time to v1.43.3 (roadmap + bug doc updated); e2e-sandbox ArgoCD CRD fix stays on v1.43.4. v1.43.2 has no undispatched work left.
 - 2026-10-16: make-test ACG recheck done (Codex, no network): present vs absent context identical (1637 tests, same 39 reds, all webhook curl reds from the sandbox; 74/74 pass outside it). Closed make-test-acg-optional-context-failure as DUPLICATE of the prune-aging fix 24c5e960; landed prune-aging status IMPLEMENTED.
