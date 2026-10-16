@@ -1,6 +1,6 @@
 # Bug: cluster-up Step 10d.5 fails — the hub LDAP rejects the `openldap-admin` Secret's password
 
-**Status:** OPEN — reproduced 2026-10-16 (two `make up` runs); root cause of the drift not yet found
+**Status:** OPEN — root cause found 2026-10-16 (third repro, 23:4xZ); fix not yet specified
 **Priority:** P1
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make up` before `make e2e-sandbox`, diagnosed by Claude, read-only)
@@ -41,7 +41,50 @@ watcher, ACG observability).
 - `ldappasswd`, `ldapwhoami`, `mktemp` exist in the image. The seed fails at the admin bind, not on
   a missing tool or TTY.
 
-## Cause (open)
+## Cause (found 2026-10-16, Claude, read-only; no value printed)
+
+The pod's environment is stale; the directory and the Secret are right.
+
+| Check (23:5xZ) | Result |
+|---|---|
+| bind with pod env `$LDAP_ADMIN_PASSWORD` | rc **49** |
+| bind with the current `openldap-admin` Secret value (stdin) | rc **0** |
+| Secret value == pod env | **no** |
+| Vault `secret/ldap/openldap-admin` versions | **1 only**, created 2026-10-03T15:55Z |
+| Secret writers (`managedFields`) | ESO only: created 02:06:23Z, last update **03:06:20Z** |
+| `data-vault-0` / `data-openldap-0` PVCs, `vault-0` / `openldap-0` start | 02:22:19Z / 02:22:28Z, 02:22:33Z |
+| container env sources | `envFrom` `openldap-env` (ConfigMap, no password keys) + Secret `openldap-admin` only |
+
+Sequence:
+
+1. 02:06Z: the rebuilt hub's first Vault held a freshly generated admin password, and ESO created
+   the Secret from it.
+2. 02:22Z: the hub-data restore replaced `data-vault-0` and `data-openldap-0` with the snapshot. The
+   restored directory and the restored Vault both carry the 2026-10-03 password. `openldap-0` started
+   from the Secret as it was, with the pre-restore password in its environment.
+3. 03:06Z: ESO's hourly refresh brought the Secret in line with the restored Vault. Keycloak binds
+   with the restored value (`err=0`). `openldap-0` was never restarted, so its environment still holds
+   the pre-restore password.
+4. Step 10d.5 binds with `-w "$LDAP_ADMIN_PASSWORD"` from that environment, which fails with 49 on
+   every run until the pod restarts.
+
+Code gap: `_hub_data_refresh_dependents` (`scripts/plugins/hub_data.sh:789`) force-syncs every
+ExternalSecret and then restarts `deployment/keycloak`, the Grafana deployment and
+`deployment/argocd-server`, but **not `statefulset/openldap`**, which reads the same Vault data
+through `envFrom`. `hub_data_verify_ldap` checks entry count and DN digest, not an admin bind, so
+the restore reports success. (The 2026-05-12 issue has the same symptom and probably the same
+class of cause.)
+
+Fix shape (to spec):
+- (a) Add `statefulset/openldap` to `_hub_data_refresh_dependents`: `rollout restart`, then
+  `rollout status` after the ExternalSecret wait.
+- (b) Make Step 10d.5 bind with the Secret's current value passed on stdin, not the pod
+  environment, so a stale environment cannot block it.
+- (c) Add an admin-bind check (rc only) to `hub_data_verify_ldap`.
+
+The earlier candidates (chart init source, a `cn=config` rewrite, two Vault paths) are ruled out.
+
+### Earlier hypotheses (superseded)
 
 The directory's admin password is not the value in the pod env, though the PVC was initialised
 fresh from a Secret that has not changed since. Keycloak holds the working value. Candidates to
@@ -63,4 +106,7 @@ seeds and verifies the three users.
 
 ## Workaround
 
-None found yet. A rerun hits the same failure.
+Operator only (cluster-mutating): `kubectl --context k3d-k3d-cluster -n identity rollout restart
+statefulset/openldap` and `rollout status`, then rerun `make up`. The 10d.5 checkpoint was not
+written, so the run resumes there. The PVC is kept, so no data changes; Keycloak's LDAP federation
+blips for the restart.
