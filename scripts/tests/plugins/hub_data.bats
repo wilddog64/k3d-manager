@@ -1042,8 +1042,8 @@ STUB
   run env CALL_LOG="$CALL_LOG" K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" MAKE=true make -C "$copy" hub-recover-all
   [ "$status" -eq 2 ]
   grep -Fxq 'hub-restore --preflight-only' "$CALL_LOG"
-  ! grep -Eq 'hub_data_recover_teardown|hub-recover|hub_data_recover$' "$CALL_LOG" || false
   [[ "$output" == *"nothing was deleted"* ]]
+  run ! grep -Eq 'hub_data_recover_teardown|hub-recover|hub_data_recover$' "$CALL_LOG"
 }
 
 @test "recover B4-D1: a failed step records its rc and does not run the next step" {
