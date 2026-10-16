@@ -18,7 +18,7 @@ def test_collect_keeps_newest_check_run_and_uses_repo_paths():
              "started_at": "2026-10-16T00:04:00Z", "completed_at": None},
         ]
     }
-    paths[f"/repos/wilddog64/lib-foundation/commits/abcdef0123456789/check-runs?per_page=100"] = {
+    paths["/repos/wilddog64/lib-foundation/commits/abcdef0123456789/check-runs?per_page=100"] = {
         "check_runs": []
     }
     seen = []
