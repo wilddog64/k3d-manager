@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Status:** IMPLEMENTED — landed `63d29a47` (Codex, Claude verified: pytest 28/28, BATS 11/11, both spec mutations red). Rollout pending: operator runs `make prometheus-rules` (Hostinger), then `make test-metrics`.
 **Priority:** P3 — alert hygiene; no outage, but the alert can no longer catch what it exists for
 **Severity:** low
 
