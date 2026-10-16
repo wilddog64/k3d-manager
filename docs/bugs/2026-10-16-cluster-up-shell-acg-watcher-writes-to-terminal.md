@@ -1,6 +1,6 @@
 # Bug: `cluster-up` leaves a second, in-shell ACG TTL watcher writing into the operator's terminal (2026-10-16)
 
-**Status:** OPEN — spec ready
+**Status:** IMPLEMENTED — `ca6b59ce` (v1.43.3); live proof pending: the next `make up` must end with only the launchd watcher
 **Priority:** P3 — cosmetic and redundant: the launchd watcher still extends the sandbox; the in-shell copy only prints into a terminal and runs a duplicate check
 **Branch:** `k3d-manager-v1.43.3`
 **Release:** v1.43.3
