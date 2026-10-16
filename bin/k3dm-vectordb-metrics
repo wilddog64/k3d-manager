@@ -204,7 +204,7 @@ def _verification_times(root, ref, texts):
             verified_at = verified_commit[1]
         if verification == "live" and verified_commit and live_commit and verified_commit[0] == live_commit[0]:
             verified_at = live_at
-        times[path] = (verified_at or "true", live_at)
+        times[path] = (verified_at or "true", live_at, verified_commit[0] if verified_commit else None)
     return times
 
 
@@ -287,7 +287,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
                                     f',fixed_in="-",release_order="{_release_order(release)}"')
         labels += f',verified="{verified if verified is not None else "-"}"'
         labels += f',live_verified="{live_verified if live_verified is not None else "-"}"'
-        values = verification_times.get(path) or (None, None)
+        values = verification_times.get(path) or (None, None, None)
         verified_value = verified if verified is not None else "-"
         live_verified_value = live_verified if live_verified is not None else "-"
         timestamp_values = (
@@ -301,6 +301,14 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             timestamp_labels.append(timestamp)
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
+        fixed_item = (fixed_in or {}).get(path) or {}
+        fix_sha = fixed_item.get("commit", "")[:8] if status == "fixed" and isinstance(fixed_item.get("commit", ""), str) else "-"
+        verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"
+        if not re.fullmatch(r"[0-9a-f]{8}|-", fix_sha):
+            fix_sha = "-"
+        if not re.fullmatch(r"[0-9a-f]{8}|-", verified_sha):
+            verified_sha = "-"
+        labels += f',fix_sha="{fix_sha}",verified_sha="{verified_sha}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
         release, priority, status, verified, live_verified = item[0]

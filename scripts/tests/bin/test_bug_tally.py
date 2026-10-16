@@ -100,6 +100,7 @@ def _dated_commit(root, message, date):
     subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
     env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
     subprocess.run(["git", "commit", "-qm", message], cwd=root, check=True, env=env)
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
 
 
 def test_fixed_in_tracks_latest_fix_by_tag_ancestry_and_branch(tally_module, tmp_path):
@@ -121,29 +122,29 @@ def test_fixed_in_tracks_latest_fix_by_tag_ancestry_and_branch(tally_module, tmp
     write("a", "IMPLEMENTED")
     write("d", "OPEN — reopened")
     write("f", "OPEN — reopened")
-    _dated_commit(tmp_path, "v1.1 fixes", "2025-01-01T00:00:00Z")
+    a_commit = _dated_commit(tmp_path, "v1.1 fixes", "2025-01-01T00:00:00Z")
     subprocess.run(["git", "tag", "v1.1.0"], cwd=tmp_path, check=True)
     write("a", "VERIFIED")
     write("f", "FIXED")
-    _dated_commit(tmp_path, "v1.2 fixes", "2024-01-01T00:00:00Z")
+    f_commit = _dated_commit(tmp_path, "v1.2 fixes", "2024-01-01T00:00:00Z")
     subprocess.run(["git", "tag", "v1.2.0"], cwd=tmp_path, check=True)
     subprocess.run(["git", "switch", "-q", "-c", "k3d-manager-v1.3.0"], cwd=tmp_path, check=True)
     write("b", "FIXED")
     write("c", "OPEN")
     write("e", "OPEN", "k3d-manager-v1.2.0")
     (bugs / "e.md").write_text("# e\n\n**Priority:** P1\n## Status\nOPEN\n")
-    _dated_commit(tmp_path, "branch docs", "2023-01-01T00:00:00Z")
+    branch_docs_commit = _dated_commit(tmp_path, "branch docs", "2023-01-01T00:00:00Z")
     write("c", "LIVE-VERIFIED")
     (bugs / "e.md").write_text("# e\n\n**Priority:** P1\n**Branch:** k3d-manager-v1.2.0\n## Status\nFIXED\n")
-    _dated_commit(tmp_path, "branch fix", "2022-01-01T00:00:00Z")
+    branch_fix_commit = _dated_commit(tmp_path, "branch fix", "2022-01-01T00:00:00Z")
 
     fixed = tally_module.fixed_in("HEAD")
     assert fixed == {
-        "docs/bugs/a.md": {"release": "v1.1.0", "source": "status_change"},
-        "docs/bugs/b.md": {"release": "v1.3.0", "source": "added_fixed"},
-        "docs/bugs/c.md": {"release": "v1.3.0", "source": "status_change"},
-        "docs/bugs/e.md": {"release": "unknown", "source": "no_transition"},
-        "docs/bugs/f.md": {"release": "v1.2.0", "source": "status_change"},
+        "docs/bugs/a.md": {"release": "v1.1.0", "source": "status_change", "commit": a_commit},
+        "docs/bugs/b.md": {"release": "v1.3.0", "source": "added_fixed", "commit": branch_docs_commit},
+        "docs/bugs/c.md": {"release": "v1.3.0", "source": "status_change", "commit": branch_fix_commit},
+        "docs/bugs/e.md": {"release": "unknown", "source": "no_transition", "commit": None},
+        "docs/bugs/f.md": {"release": "v1.2.0", "source": "status_change", "commit": f_commit},
     }
     before = tally_module.tally("k3d-manager-v1.3.0")
     subprocess.run(["git", "switch", "-q", "-c", "scratch"], cwd=tmp_path, check=True)
@@ -191,10 +192,10 @@ def test_fixed_in_status_backfilled_onto_an_existing_doc_is_unknown(tally_module
     subprocess.run(["git", "tag", "v1.0.0"], cwd=tmp_path, check=True)
     (bugs / "old.md").write_text("# old\n\n**Status:** CLOSED — status sweep\n\nno status line yet\n")
     (bugs / "new.md").write_text("# new\n\n**Status:** FIXED\n")
-    _dated_commit(tmp_path, "status sweep", "2026-02-01T00:00:00Z")
+    sweep_commit = _dated_commit(tmp_path, "status sweep", "2026-02-01T00:00:00Z")
     subprocess.run(["git", "tag", "v1.1.0"], cwd=tmp_path, check=True)
 
     assert tally_module.fixed_in("HEAD") == {
-        "docs/bugs/new.md": {"release": "v1.1.0", "source": "status_change"},
-        "docs/bugs/old.md": {"release": "unknown", "source": "status_backfill"},
+        "docs/bugs/new.md": {"release": "v1.1.0", "source": "status_change", "commit": sweep_commit},
+        "docs/bugs/old.md": {"release": "unknown", "source": "status_backfill", "commit": sweep_commit},
     }

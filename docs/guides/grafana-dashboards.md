@@ -388,6 +388,11 @@ planned drill or a `Was:` history note, is ignored. Without one, it is the UTC c
 earliest commit that set that Status. A verified doc with neither is `true`; unverified values stay
 `false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
 
+The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
+contain the first eight characters of the commit that marked the doc fixed (the commit used for
+**Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
+otherwise they are `-` and render as `—`.
+
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.

@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Bug Tracking table shows the fix and verification commits.** `k3dm_bug_info` gains `fix_sha`
+  and `verified_sha`, shown as Fix commit and Verified commit after Fixed in.
+
 - **Bug Tracking table shows when a bug was verified and live-verified.** `k3dm_bug_info` gains
   `verified_at` and `live_verified_at`: a date written right after the `VERIFIED` / `LIVE-VERIFIED`
   keyword in the Status line, otherwise the UTC time of the first commit that set that Status. The
