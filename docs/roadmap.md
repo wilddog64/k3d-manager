@@ -237,6 +237,10 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     (P3): `deploy_cluster` starts a disowned in-shell TTL watcher that keeps the operator's terminal
     as its output, and `cluster-up` then installs the launchd watcher too, so two watchers run.
     `k3s-aws.sh` and `bin/cluster-up` only; dispatcher-able.
+  - [`vectordb-index-failed-by-slow-metrics-publish`](bugs/2026-10-16-vectordb-index-failed-by-slow-metrics-publish.md)
+    (P3): an unguarded 120s metrics publish at the end of `index-docs.py` marks a finished index run
+    failed; Hermes has the same unguarded call per poll; the bug metrics fork ~2,300 `git` processes
+    per run. Guard both calls and read the bug docs with one `git cat-file --batch`. Dispatcher-able.
 
 ### Candidate milestone — v1.43.4 (patch)
 
