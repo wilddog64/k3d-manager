@@ -1438,7 +1438,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Verified commit"},
                 "properties": [
-                  {"id": "custom.width", "value": 100},
+                  {"id": "custom.width", "value": 130},
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "-": {"text": "—", "color": "#8e8e8e", "index": 0}
                   }}]}
