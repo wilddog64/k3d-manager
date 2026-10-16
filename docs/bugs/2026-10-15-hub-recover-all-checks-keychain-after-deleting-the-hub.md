@@ -56,31 +56,62 @@ Do not rerun `make hub-recover-all`; it would start a new run.
 ## Fix
 
 Run the `hub-recover` preflight after the approval and immediately before the teardown, so the
-check reflects the keychain state at the moment of the destructive step. In `Makefile`
-`hub-recover-all`:
+check reflects the keychain state at the moment of the destructive step.
+
+### F1 — `Makefile`, `hub-recover-all`
+
+Old:
 
 ```make
-	run_id=$$(sed -n 's/^RUN_ID=//p' "$$preflight"); \
 	test -n "$$run_id"; \
-	bin/hub-restore --preflight-only; \
 	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
 ```
 
-`set -e` is already in effect, so a non-zero preflight stops the recipe before the teardown. On
-refusal, print the resume hint (unlock, then rerun `make hub-recover-all`; nothing was deleted).
+New:
+
+```make
+	test -n "$$run_id"; \
+	bin/hub-restore --preflight-only || { echo "[hub-recover] preflight refused before teardown — nothing was deleted; run security unlock-keychain, then rerun make hub-recover-all" >&2; exit 2; }; \
+	K3DM_HUB_DATA_RECOVER_RUN_ROOT="$$run_root" ./scripts/k3d-manager hub_data_recover_teardown "$$run_id"; \
+```
+
+`bin/hub-restore --preflight-only` checks the TTY and `security show-keychain-info` only. The
+kube-context and root-owned-directory checks run only without `--preflight-only`, so it passes
+while the hub is still up.
+
+### F2 — tests, `scripts/tests/plugins/hub_data.bats`
+
+The existing recipe tests (`recover B4-20`, both `recover B4-21` recipe tests, `recover B4-22`)
+run the real Makefile against a copied repo. Each copy now also needs an executable stub
+`bin/hub-restore` that appends `hub-restore $*` to `$CALL_LOG` and exits 0. Update the expected
+call sequences to include `hub-restore --preflight-only` between the preflight and
+`hub_data_recover_teardown`.
+
+Add `recover B4-23: keychain preflight refusal stops hub-recover-all before teardown`. The stub
+`bin/hub-restore` exits 2. Assert `status` 2, `$CALL_LOG` contains `hub-restore --preflight-only`,
+`$CALL_LOG` does not contain `hub_data_recover_teardown`, `hub-recover` or `hub_data_recover`, and
+the output contains `nothing was deleted`.
+
+Mutation check: delete the F1 line from the copied Makefile in a snapshot; show B4-23 red; restore
+and `cmp`.
+
+### F3 — docs
+
+In `docs/howto/hub-dr-drill.md`, in the recovery runbook, note that `hub-recover-all` re-checks
+Keychain access just before the teardown and refuses with nothing deleted if it is locked.
 
 ## Files
 
 - `Makefile`
-- `scripts/tests/plugins/hub_data.bats` (or the suite that covers `hub-recover-all`)
+- `scripts/tests/plugins/hub_data.bats`
+- `docs/howto/hub-dr-drill.md`
 
 ## Definition of Done
 
-- [ ] A test proves that a failing `bin/hub-restore --preflight-only` (stubbed) stops
-      `hub-recover-all` before `hub_data_recover_teardown` runs, and that the teardown stub is
-      never called. Check the test fails against the pre-fix `Makefile`.
-- [ ] A passing preflight still reaches the teardown, `hub-recover` and the `RESUME` restore.
-- [ ] `docs/howto` / guide page for hub recovery documents the resume sequence above.
+- [ ] B4-23 passes and is shown red under the F2 mutation.
+- [ ] The updated B4-20/21/22 pass: a passing preflight still reaches the teardown, `hub-recover` and the `RESUME` restore.
+- [ ] `scripts/tests/plugins/hub_data.bats` and `scripts/tests/plugins/vault_dr_shards.bats` are fully green.
+- [ ] `docs/howto/hub-dr-drill.md` documents the check and the resume sequence above.
 - [ ] Commit message: `fix(hub-data): check Keychain access before hub-recover-all deletes the hub`
 
 ## Live verification — scheduled 2026-10-29
