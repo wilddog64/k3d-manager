@@ -1,3 +1,4 @@
+- 2026-10-16: e2e-sandbox failed again (run 1792155966-29279) on a fresh sandbox with the known Helm CRD ownership bug (v1.43.4). Recurrence recorded in the bug doc: cluster-up already installs ArgoCD in `cicd` (not Helm); e2e.sh:395 installs a second one. E2EResultsMissing rule is live on the hub (in `cicd`).
 - 2026-10-16: landed live-verified column `c3f194f1`; marked 10 v1.43.2 fixes VERIFIED (offline evidence, awaiting live proof).
 - 2026-10-16: live-verified column spec approved ("go ahead") and dispatched to Codex.
 - 2026-10-16: landed smoke target discovery `98928092` and e2e republish + E2EResultsMissing `af654222` (Claude fixed: skipped/broken promtool test, dropped .PHONY entries, false slash-command row, if-count extraction); marked 6 v1.43.2 fixes LIVE-VERIFIED (`9e104398`); wrote docs/plans/v1.43.2-bug-dashboard-live-verified-column.md (Approval pending).

@@ -61,3 +61,25 @@ It then applies Argo CD cluster registration and waits for `deployment/argocd-se
 - `docs/bugs/2026-10-15-acg-up-prometheus-forward-missing-after-success.md` — separate post-provision readiness verification issue.
 
 **Implementation:** not started. Filing this report did not run E2E, modify Helm releases or change the sandbox.
+
+## Recurrence — 2026-10-16
+
+The operator ran `make e2e-sandbox` against a freshly provisioned sandbox (built about 12:59Z). It
+failed with the same Helm ownership error. Run `1792155966-29279`, summary
+`~/.k3dm/e2e/1792155966-29279.json`, and the failing result was published to the hub.
+
+Read-only state of `ubuntu-k3s`, answering investigation item 1:
+
+- `cluster-up` already installs Argo CD into the **`cicd`** namespace. The deployments are named
+  `argocd-ubuntu-k3s-*` (server, repo-server, applicationset, dex, notifications, redis), and all are
+  Ready.
+- That install is not a Helm release. `helm list -A` shows only `cilium` and `external-secrets`. The
+  `applications.argoproj.io` CRD carries `kubectl.kubernetes.io/last-applied-configuration` and
+  `helm.sh/resource-policy: keep`, but no `meta.helm.sh/*` ownership.
+- `e2e-sandbox` (`scripts/plugins/e2e.sh:395`) then tries to install a **second** Argo CD, as Helm
+  release `argocd` in namespace `argocd`. It fails on every freshly built sandbox, not only on a
+  reused one.
+
+So the answer to investigation item 2 is that E2E needs no Argo CD install after `cluster-up`. The
+fix is to reuse the `cicd` install, which means retargeting the step's later registration and its
+`deployment/argocd-server` wait at that install, rather than deleting the install line alone.
