@@ -1090,7 +1090,7 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch.",
+          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Verified and Live-verified show when it happened (UTC): the date in the Status line, otherwise the commit that set it.",
           "targets": [
             {
               "refId": "A",
@@ -1122,8 +1122,8 @@ data:
                   "Value": 4,
                   "status": 5,
                   "fixed_in": 6,
-                  "verified": 7,
-                  "live_verified": 8
+                  "verified_at": 7,
+                  "live_verified_at": 8
                 },
                 "excludeByName": {
                   "bug": true,
@@ -1134,7 +1134,9 @@ data:
                   "job": true,
                   "instance": true,
                   "Time": true,
-                  "repo": true
+                  "repo": true,
+                  "verified": true,
+                  "live_verified": true
                 },
                 "renameByName": {
                   "priority": "Priority",
@@ -1144,8 +1146,8 @@ data:
                   "Value": "Open for",
                   "status": "Status",
                   "fixed_in": "Fixed in",
-                  "verified": "Verified",
-                  "live_verified": "Live-verified"
+                  "verified_at": "Verified",
+                  "live_verified_at": "Live-verified"
                 }
               }
             }
@@ -1170,14 +1172,30 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Live-verified"},
                 "properties": [
-                  {"id": "custom.width", "value": 90},
+                  {"id": "custom.width", "value": 150},
                   {"id": "custom.cellOptions", "value": {"type": "color-text"}},
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "true": {"text": "✓ live", "color": "green", "index": 0},
                     "false": {"text": "not yet", "color": "orange", "index": 1},
                     "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
                     "-": {"text": "—", "color": "#8e8e8e", "index": 3}
-                  }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                  }}, {"type": "regex", "options": {"pattern": "^(\\d{4}-\\d{2}-\\d{2}.*)$", "result": {"text": "✓ $1", "color": "green", "index": 4}}}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Verified"
+                },
+                "properties": [
+                  {"id": "custom.width", "value": 150},
+                  {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+                  {"id": "mappings", "value": [{"type": "value", "options": {
+                    "true": {"text": "✓ verified", "color": "green", "index": 0},
+                    "false": {"text": "not yet", "color": "orange", "index": 1},
+                    "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
+                    "-": {"text": "—", "color": "#8e8e8e", "index": 3}
+                  }}, {"type": "regex", "options": {"pattern": "^(\\d{4}-\\d{2}-\\d{2}.*)$", "result": {"text": "✓ $1", "color": "green", "index": 4}}}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
                 ]
               },
               {
@@ -1368,22 +1386,6 @@ data:
                     "fixed": {"text": "Fixed", "color": "green", "index": 2},
                     "unknown": {"text": "Unknown", "color": "#8e8e8e", "index": 3}
                   }}]}
-                ]
-              },
-              {
-                "matcher": {"id": "byName", "options": "Verified"},
-                "properties": [
-                  {"id": "custom.width", "value": 90},
-                  {"id": "custom.cellOptions", "value": {"type": "color-text"}},
-                  {"id": "mappings", "value": [
-                    {"type": "value", "options": {
-                      "true": {"text": "✓ verified", "color": "green", "index": 0},
-                      "false": {"text": "not yet", "color": "orange", "index": 1},
-                      "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
-                      "-": {"text": "—", "color": "#8e8e8e", "index": 3}
-                    }},
-                    {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}
-                  ]}
                 ]
               },
               {

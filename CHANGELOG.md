@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bug Tracking table shows when a bug was verified and live-verified.** `k3dm_bug_info` gains
+  `verified_at` and `live_verified_at`: a date written right after the `VERIFIED` / `LIVE-VERIFIED`
+  keyword in the Status line, otherwise the UTC time of the first commit that set that Status. The
+  Verified and Live-verified columns now render `✓ 2026-10-16 21:35Z` instead of a bare check. The
+  existing `verified` / `live_verified` labels, the summary tiles and the Hide live-verified filter
+  are unchanged, and a git failure falls back to `true` rather than dropping the series.
+
 ## [1.43.3] - 2026-10-16
 
 - Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,

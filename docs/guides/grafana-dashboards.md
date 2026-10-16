@@ -378,6 +378,14 @@ Fixed documents also have a Verified and Live-verified label:
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
+The table also exposes `verified_at` and `live_verified_at` on `k3dm_bug_info`. A verified or
+live-verified document gets `YYYY-MM-DD HH:MMZ` (UTC) or `YYYY-MM-DD`. The time comes from a date
+written directly after the keyword (`VERIFIED — <ISO date or time>: <evidence>` /
+`LIVE-VERIFIED — <ISO date or time>: <evidence>`); a date later in the Status text, such as a
+planned drill or a `Was:` history note, is ignored. Without one, it is the UTC committer time of the
+earliest commit that set that Status. A verified doc with neither is `true`; unverified values stay
+`false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
+
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.

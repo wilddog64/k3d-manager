@@ -1,3 +1,4 @@
+import os
 import runpy
 import subprocess
 import sys
@@ -40,6 +41,50 @@ def _git_repo(root, docs):
     subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
     subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
     subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
+
+
+def _commit(root, message, date):
+    subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
+    env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
+    subprocess.run(["git", "commit", "-qm", message], cwd=root, env=env, check=True)
+
+
+def test_status_date_formats_status_dates(metrics):
+    assert metrics._status_date("LIVE-VERIFIED — 2026-10-16T21:35:33Z: x") == "2026-10-16 21:35Z"
+    assert metrics._status_date("LIVE-VERIFIED 2026-10-15 — x") == "2026-10-15"
+    assert metrics._status_date("LIVE-VERIFIED — not reproduced, test 2026-10-15: x") is None
+    assert metrics._status_date("VERIFIED — offline. Drill 2026-10-29. Was: IMPLEMENTED 14:41Z") is None
+    assert metrics._status_date("VERIFIED — tests green") is None
+
+
+def test_verification_times_use_earliest_git_state_commits_and_utc(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** VERIFIED — tests green\n")
+    _commit(tmp_path, "verified", "2026-10-16T21:35:33-07:00")
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — hub proof\n")
+    _commit(tmp_path, "live", "2026-10-16T22:35:33+02:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times == {"docs/bugs/bug.md": ("2026-10-17 04:35Z", "2026-10-16 20:35Z")}
+
+
+def test_verification_times_copy_status_date_for_direct_live_verification(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-15: not reproduced\n")
+    _commit(tmp_path, "live", "2026-10-16T22:35:33+02:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times == {"docs/bugs/bug.md": ("2026-10-15", "2026-10-15")}
+
+
+def test_verification_times_git_failure_is_non_fatal_and_metrics_fall_back(metrics, tmp_path):
+    texts = {"docs/bugs/verified.md": "**Priority:** P1\n**Status:** VERIFIED\n"}
+    times = metrics._verification_times(tmp_path / "not-a-repo", "HEAD", texts)
+    assert times == {"docs/bugs/verified.md": ("true", None)}
+    output = metrics._bug_status_metrics(tmp_path, tally={
+        "v1.43.2": {"closed_paths": [{"path": "docs/bugs/verified.md"}]},
+    }, texts=texts, verification_times=times)
+    assert 'verified_at="true"' in output
 
 
 def test_bug_metrics_has_exact_counts_all_15_series_and_scan_timestamp(metrics, tmp_path):
@@ -202,6 +247,8 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line for line in info)
     assert any('bug="open"' in line and 'status="open"' in line and ',verified="-"' in line for line in info)
     assert any('bug="open"' in line and 'live_verified="-"' in line and 'fixed_in="-"' in line for line in info)
+    assert any('bug="implemented"' in line and 'verified_at="false"' in line and 'live_verified_at="false"' in line for line in info)
+    assert any('bug="old-fixed"' in line and 'verified_at="n/a"' in line and 'live_verified_at="n/a"' in line for line in info)
     assert any('bug="deferred"' in line and 'status="deferred"' in line and ',verified="-"' in line for line in info)
     statuses = [line.split('status="', 1)[1].split('"', 1)[0]
                 for line in info if 'release="v1.43.2"' in line]
@@ -252,8 +299,10 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     assert len(info) == 201
     # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-"')
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-"')
         for line in info)
+    assert all("_at=" not in line for line in output.splitlines()
+               if line.startswith("k3dm_bug_status_docs{"))
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P1",status="open"} 2' in output
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P2",status="open"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
