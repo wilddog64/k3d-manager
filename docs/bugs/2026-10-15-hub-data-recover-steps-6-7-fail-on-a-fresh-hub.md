@@ -120,3 +120,9 @@ After this, `storageClassName` was owned by `k3dm-hub-restore`, the sync went `S
   `k3d-manager-vault-unseal` `secrets/vault:count`, from Step 6 `_vault_cache_unseal_keys`. Either
   add the entry to `scripts/etc/dr/credential-allowlist.tsv` for the `restore-hub` scope, or stop
   Step 6 from reading the cache.
+- **The export ServiceAccount is not recreated.** After the recovery, `make hub-data-export` failed with
+  `serviceaccounts "hub-data-export" not found`, then `could not record the inventory ...; nothing was
+  pushed`. The SA (and the Vault `hub-data-inventory` policy and role) come from
+  `hub_data_export_setup` (`make hub-data-export-setup`), which the recovery never runs. Until
+  then, the scheduled export also fails. Fix: the recovery's final step runs `hub_data_export_setup`
+  (it is idempotent and self-tests).
