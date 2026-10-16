@@ -1,7 +1,7 @@
 # Bug: make test fails when disposable ACG ubuntu-k3s context is unavailable
 
 **Filed:** 2026-10-14
-**Status:** OPEN — investigation required; failing BATS case not yet identified
+**Status:** CLOSED — DUPLICATE of `docs/bugs/2026-10-15-test-all-hub-data-prune-aging-fixtures.md` (fixed `24c5e960`). 2026-10-16 recheck: `make test` with the `ubuntu-k3s` context present and with an empty KUBECONFIG gave the same result, 1637 tests and the same 39 failing names. All 39 were `webhook.bats`/`webhook_hub_eso.bats` curl calls that could not reach the local test server inside the Codex sandbox, and those two files pass 74/74 outside it. The ACG context does not affect `make test`. Was: OPEN — investigation required; failing BATS case not yet identified
 **Branch:** `k3d-manager-v1.43.2` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — offline regression environment coupling
 **Reported:** 2026-10-14 by operator
