@@ -118,9 +118,10 @@ change to the tally: same output, same JSON.
 
 ### 4. Docs
 
-- `docs/guides/grafana-dashboards.md`, VectorDB section, beside the Last run result tile: one
-  sentence saying that `failed` means the index run itself failed; a metrics publish failure is
-  logged as `metrics publish skipped` and does not count.
+- `docs/guides/vector-store.md`, where it describes the Hermes index refresh (add a short
+  paragraph if it has none): one sentence saying that the VectorDB dashboard's **Last run result**
+  `failed` means the index run itself failed; a metrics publish failure is logged as
+  `metrics publish skipped` and does not count.
 - `CHANGELOG.md` `[Unreleased]`: one `Fixed:` entry.
 
 ## Files
@@ -132,7 +133,7 @@ change to the tally: same output, same JSON.
 | `bin/k3dm-vectordb-metrics` | items 3a, 3b |
 | `scripts/bug-tally.py` | item 3c |
 | `scripts/tests/bin/test_index_docs.py`, `scripts/tests/bin/test_vectordb_bug_metrics.py`, `scripts/tests/bin/test_bug_tally.py`, and the Hermes test file that covers `_publish_disk_metrics` (find it with `grep -rln _publish_disk_metrics scripts/tests`) | tests below |
-| `docs/guides/grafana-dashboards.md`, `CHANGELOG.md` | item 4 |
+| `docs/guides/vector-store.md`, `CHANGELOG.md` | item 4 |
 
 No other file.
 
