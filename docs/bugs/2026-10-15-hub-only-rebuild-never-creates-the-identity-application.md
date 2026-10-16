@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN
 **Priority:** P2 — `hub-recover-all` cannot finish on a fresh hub; a manual apply (below) unblocks it
-**Approval:** pending — filed by Claude during the operator's live run `20261016T012103Z`; the fix needs operator approval
+**Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — the recovery path built in `0214f363` stops before the data restore on every fresh hub
 
 ## Symptom

@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN
 **Priority:** P2 — each one stops the restore; each has a manual workaround (below)
-**Approval:** pending — filed by Claude during the operator's live run `20261016T012103Z`; the fixes need operator approval
+**Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — the first real `hub-recover-all` on a fresh hub needed three manual interventions in Steps 6–7
 
 Live run `20261016T012103Z`, 2026-10-15. Related bugs filed from the same run:

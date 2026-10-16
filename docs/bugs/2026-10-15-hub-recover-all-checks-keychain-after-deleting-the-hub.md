@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.43.2`
 **Status:** OPEN
 **Priority:** P2 — the hub is left deleted with no rebuild; a manual resume (below) recovers it
-**Approval:** explicit 2026-10-15 "did you file P2 bug" (operator, to "I'd file it as P2 once your hub is back")
+**Approval:** explicit 2026-10-15 "you can dispatch four recovery fixes to codex" (operator)
 **Severity:** high — a refusal that should cost nothing instead leaves the operator with no hub
 
 ## Symptom
