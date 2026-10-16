@@ -49,9 +49,30 @@ import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "verified")
 assert variable["type"] == "custom"
-assert variable["current"]["value"] == "^(false|-)?$"
-assert variable["current"]["text"] == "Hide live-verified"
+assert variable["current"]["value"] == ".*"
+assert variable["current"]["text"] == "Show all"
 assert variable["query"] == "Hide live-verified : ^(false|-)?$,Show all : .*"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard opens on the release branch's version" {
+  branch="${GITHUB_HEAD_REF:-$(git -C "${BATS_TEST_DIRNAME}" branch --show-current)}"
+  if [[ ! "${branch}" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    skip "branch ${branch} is not a release branch"
+  fi
+  run env EXPECTED_BRANCH="${branch}" python3 - "${dashboard}" <<'PY'
+import json, os, re, sys
+path = sys.argv[1]
+branch = os.environ["EXPECTED_BRANCH"]
+data = json.loads(open(path).read().split("  k3dm-bugs.json: |\n", 1)[1])
+variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
+assert variable["includeAll"] is True and variable["allValue"] == ".*"
+match = re.fullmatch(r"k3d-manager-v([0-9]+\.[0-9]+\.[0-9]+)", branch)
+assert match, branch
+expected = f"v{match.group(1)}"
+assert variable["current"]["value"] == [expected]
+assert variable["current"]["text"] == [expected]
 PY
   [ "${status}" -eq 0 ]
 }

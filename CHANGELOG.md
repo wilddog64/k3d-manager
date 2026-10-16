@@ -15,6 +15,11 @@
   existing `verified` / `live_verified` labels, the summary tiles and the Hide live-verified filter
   are unchanged, and a git failure falls back to `true` rather than dropping the series.
 
+### Changed
+
+- Bug Tracking now opens on the current release, sorts rows by release then priority before status,
+  and defaults Verified fixes to Show all.
+
 ## [1.43.3] - 2026-10-16
 
 - Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,

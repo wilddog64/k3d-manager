@@ -275,6 +275,29 @@ def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
         "new-p0", "new-p2", "old-p0", "unassigned"]
 
 
+def test_bug_status_metrics_sort_priority_before_status(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    docs = {
+        "p3-open.md": "**Priority:** P3\n**Status:** Open\n",
+        "p1-fixed.md": "**Priority:** P1\n**Status:** FIXED\n",
+        "p2-open.md": "**Priority:** P2\n**Status:** Open\n",
+        "unset-open.md": "**Status:** Open\n",
+    }
+    for name, text in docs.items():
+        (bugs / name).write_text(text)
+    tally = {"v1.43.4": {
+        "open_paths": [{"path": f"docs/bugs/{name}"} for name in ("p3-open.md", "p2-open.md", "unset-open.md")],
+        "closed_paths": [{"path": "docs/bugs/p1-fixed.md"}],
+    }}
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    sort_keys = [line.split('sort_key="', 1)[1].split('"', 1)[0] for line in lines]
+    assert [line.split('priority="', 1)[1].split('"', 1)[0] for line in lines] == [
+        "P1", "P2", "P3", "unset"]
+    assert sort_keys == sorted(sort_keys)
+
+
 def test_bug_status_metrics_puts_live_verified_last_on_fixed_metrics(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)

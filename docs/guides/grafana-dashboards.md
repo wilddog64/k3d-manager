@@ -400,9 +400,15 @@ has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
 Priority, Filed, Open for, Status, Fixed in, Verified, and Live-verified, and clicking a title opens that
-document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
-unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
-`n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.
+document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
+other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
+live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to
+`LIVE-VERIFIED — <evidence>`.
+
+The dashboard opens on the release branch's own version, which is the saved Release value. When a
+new release branch is cut, bump that value; the BATS test fails until it matches. lib-foundation has
+no release branch value and falls back to All. Rows sort by release, then priority (P0 first and
+unset last), then status.
 
 The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
 group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.

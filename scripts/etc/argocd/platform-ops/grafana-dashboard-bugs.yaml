@@ -51,7 +51,7 @@ data:
             "multi": true,
             "includeAll": true,
             "allValue": ".*",
-            "current": {"selected": true, "text": ["All"], "value": ["$__all"]},
+            "current": {"selected": true, "text": ["v1.43.4"], "value": ["v1.43.4"]},
             "hide": 0
           },
           {
@@ -62,7 +62,7 @@ data:
             "options": [],
             "multi": false,
             "includeAll": false,
-            "current": {"selected": true, "text": "Hide live-verified", "value": "^(false|-)?$"},
+            "current": {"selected": true, "text": "Show all", "value": ".*"},
             "hide": 0
           }
         ]

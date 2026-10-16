@@ -261,7 +261,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
         else:
             value = -1
-        sort_key = f"{_release_order(release)} {STATUS_RANK[status]} {priority} {filed or '9999-99-99'} {stem}"
+        sort_key = f"{_release_order(release)} {priority} {STATUS_RANK[status]} {filed or '9999-99-99'} {stem}"
         rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified,
                      live_verified, path))
     rows.sort(key=lambda row: row[0])
