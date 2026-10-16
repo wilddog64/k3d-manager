@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-11
-**Status:** OPEN — spec ready (v1.43.2 batch 1)
+**Status:** IMPLEMENTED — landed `90a5a463` (Codex, Claude verified: BATS 21/21 with promtool (Claude fixed the promtool test: one-sample series went stale before 5d, and the expected annotations named the static tier); pre-fix grouping turns the promtool test red. Rollout: operator `make platform-ops`.)
 **Priority:** P3
 **Severity:** Low — a false warning e-mail; the e2e signal itself is fresh
 **Files:** `scripts/etc/argocd/platform-ops/prometheusrule.yaml`,

@@ -421,8 +421,12 @@ values until the next `make test-metrics`.
 `federate-acg` job selects only `{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}`
 (minus the k3s control-plane `apiserver_`, `etcd_`, `scheduler_` and `workqueue_` series, which
 k3s exposes on the kubelet endpoint and which made the scrape outgrow its timeout),
-and so the hub TSDB holds zero `k3dm_test_*` series. A rule on the hub for these metrics can
-never fire. `DeploymentMetricsStale` moved for the same reason.
+so the rules were placed with the Pushgateway on the app cluster. The hub now also imports the
+`k3dm_test_*` series from the Hostinger Pushgateway (see above), but only for the dashboard: the
+alerts stay on Hostinger so each fires once. Apply a change to them with
+`kubectl --context ubuntu-hostinger apply -f scripts/etc/prometheus/rules-acg/k3dm-tests.yaml`;
+`make prometheus-rules` applies only the hub-side `rules/` directory. `DeploymentMetricsStale`
+moved for the same reason.
 `OfflineSuiteRunMissed` fires when no run, pass or fail, has been pushed for 26h, which is the
 signature of a failed push.
 
