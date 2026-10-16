@@ -366,7 +366,7 @@ Fixed documents also have a Verified and Live-verified label:
 
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Open for, Filed, Status, Verified, and Live-verified, and clicking a title opens that
+Priority, Filed, Open for, Status, Fixed in, Verified, and Live-verified, and clicking a title opens that
 document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
 unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
 `n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.

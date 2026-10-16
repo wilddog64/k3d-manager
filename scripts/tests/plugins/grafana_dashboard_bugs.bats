@@ -223,7 +223,7 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Open for", "Filed", "Status", "Fixed in", "Verified", "Live-verified"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Verified", "Live-verified"]
     assert organize["indexByName"]["fixed_in"] == 6
     assert organize["indexByName"]["verified"] == 7
     assert organize["indexByName"]["live_verified"] == 8
@@ -286,7 +286,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table shows Release, Bug, Priority, Open for, Filed, Status, Fixed in, Verified, Live-verified" {
+@test "bugs table shows Release, Bug, Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }
