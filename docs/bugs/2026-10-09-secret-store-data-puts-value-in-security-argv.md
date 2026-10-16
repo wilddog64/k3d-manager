@@ -2,7 +2,7 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-09
-**Status:** OPEN — spec ready (v1.43.3; moved from v1.43.2 batch 1 by the operator 2026-10-12). Fix upstream in lib-foundation (branch `fix/secret-store-data-stdin` from `origin/main`, v0.5.1 still affected), then subtree-pull. One agent fixes this and `2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md` in one change
+**Status:** IMPLEMENTED (upstream) — lib-foundation PR #67 `6b57344` (Codex + Claude fixes: name check matched the letters x/2/7, stub hung on open stdin; Claude verified 8 new BATS red on old code, 5 mutations red, make bats 183/183, real `security -i` round-trip on a throwaway keychain). Pending: merge, v0.5.3 release, subtree-pull on `k3d-manager-v1.43.3`
 **Priority:** P2
 **Severity:** Medium — every Keychain write through the shared helper exposes the value in the process list for the life of the `security` call
 **Files:** `scripts/lib/foundation/scripts/lib/system.sh` (upstream: lib-foundation `scripts/lib/system.sh`)
