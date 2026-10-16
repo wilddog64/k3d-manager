@@ -24,6 +24,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | Grafana Health & Firing Alerts | `k3dm-grafana-health` | `platform-ops/grafana-dashboard-overview-readable.yaml` (hub); `etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` (ACG) | ArgoCD app `hub-grafana-dashboards` (hub; NOT `make platform-ops`); `grafana-dashboards-acg` ApplicationSet (ACG) | hub + **ACG** |
@@ -268,6 +269,14 @@ The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet
 do not: apply them with `make prometheus-rules`, which applies only
 `scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
 
+### k3dm PR Checks (`k3dm-pr-checks`) — hub
+
+Shows every open pull request's GitHub check-run state, overall verdict, and check duration for
+k3d-manager and lib-foundation. Hermes publishes it every five minutes through Pushgateway job
+`k3dm-pr-checks`, using one group per repo; the Repo filter is at the top. A Copilot review is not
+a check. Merged or closed PRs disappear on the next good poll. `GitHub read = failed` keeps the
+last good rows and usually means the Hermes GitHub token expired or was rejected.
+
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
 
 Shows whether alerts are actually being delivered. Stats at the top cover notifications sent and failed
@@ -305,7 +314,12 @@ accepted specs, integration-test landing success, verifier lines changed, wait m
 tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
 minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens
 only, excludes Claude verification, and is not converted to dollars because token pricing is not
-stable. Scope and rebase refusals are excluded from the integration success ratio.
+stable. Scope and rebase refusals are excluded from the integration success ratio. The dashboard
+also shows mean minutes to land (from the first Codex start through land, including verification)
+and mean Codex minutes (Codex runtime summed across runs) for landed specs. The **Per spec** table
+lists Codex tokens, Codex time, time to land, and Codex runs for the newest 50 landed specs in the
+selected window. Tokens are the session total from the spec's last run; only dispatcher-launched
+specs appear, because a bare `codex exec` writes no ledger event.
 
 ### k3dm Bug Tracking (`k3dm-bugs`) — hub
 
@@ -316,6 +330,16 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
+
+Bug counts have two release meanings. **Filed in** is the doc's `**Branch:**` line or the first tag
+that contains its add commit. **Fixed in** is the first tag that contains the commit that changed
+its status to fixed, or the current release branch when no tag does yet. A bug fixed, reopened and
+fixed again counts once under its latest fix. A fixed bug with no detectable status change shows
+`unknown` and is not counted under any release. So does a doc whose first Status line was added
+already fixed to an existing doc, such as the 2026-10-09 status sweep: that commit records the
+sweep, not the fix; release comes from tag ancestry, never dates. Tile 4
+and panel 25 use fixed-in, while panels 7 and 8 and the `$release` row use filed-in. The table shows
+both.
 
 The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
 untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
@@ -345,18 +369,22 @@ Fixed documents also have a Verified and Live-verified label:
 | `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
 | `false` | fixed, release v1.43.2 or later, any other fixed status |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
-| no label | not fixed |
+| `-` | not fixed (table series only; shown as —) |
 
 | Live-verified | When |
 |---|---|
 | `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
 | `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
-| no label | not fixed |
+| `-` | not fixed (table series only; shown as —) |
+
+`k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
+columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
+has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Open for, Filed, Status, Verified, and Live-verified, and clicking a title opens that
+Priority, Filed, Open for, Status, Fixed in, Verified, and Live-verified, and clicking a title opens that
 document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
 unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
 `n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.
@@ -371,6 +399,12 @@ Open, any release or the history.
 On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
+
+The Repo selector chooses between `k3d-manager` and `lib-foundation`. lib-foundation is read from
+its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
+`~/src/gitrepo/personal/lib-foundation`), and its release labels are its own tags such as
+`v0.5.3`. The "Fixed this release" and "Open in later releases" tiles remain k3d-manager-only
+because lib-foundation has no release branch.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 

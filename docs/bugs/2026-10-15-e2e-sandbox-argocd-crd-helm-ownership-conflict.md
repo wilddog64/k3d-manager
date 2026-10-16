@@ -1,10 +1,10 @@
 # P2 — e2e-sandbox fails when Argo CD CRDs already exist on a provisioned AWS sandbox
 
 **Filed:** 2026-10-15
-**Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
+**Branch:** `k3d-manager-v1.43.3` (moved from v1.43.4 on 2026-10-16 at operator request)
 **Priority:** P2 — E2E verification blocked
-**Status:** OPEN — observed reproduction and unconditional install confirmed; implementation not started
-**Approval:** operator explicitly requested P2 bug filing; no implementation authorized
+**Status:** LIVE-VERIFIED 2026-10-16 — `e809f9c5` (v1.43.3). Run `1792169905-3394` passed `checking-argocd` (`reusing cicd/argocd-ubuntu-k3s-server`, no Helm install), then failed at `configuring-vault`: a separate defect, `docs/bugs/2026-10-16-e2e-sandbox-rebuilds-platform-hub-already-deploys.md`
+**Approval:** explicit 2026-10-16 "can you move e2e-sandbox bug to v1.43.3 and send to codex" (operator)
 
 ## Observed failure
 
@@ -83,3 +83,131 @@ Read-only state of `ubuntu-k3s`, answering investigation item 1:
 So the answer to investigation item 2 is that E2E needs no Argo CD install after `cluster-up`. The
 fix is to reuse the `cicd` install, which means retargeting the step's later registration and its
 `deployment/argocd-server` wait at that install, rather than deleting the install line alone.
+
+## Fix (spec for Codex, 2026-10-16)
+
+Read-only state of a fresh sandbox, checked by Claude on 2026-10-16 at about 16:40Z, after the
+recurrence:
+
+- `cicd` has Deployment `argocd-ubuntu-k3s-server` (label
+  `app.kubernetes.io/name=argocd-server`) and StatefulSet `argocd-ubuntu-k3s-application-controller`
+  (label `app.kubernetes.io/name=argocd-application-controller`), both Ready.
+- `cicd` has no cluster Secret, no ApplicationSet and no Application. Namespace `argocd` does not
+  exist.
+
+So E2E keeps doing its own registration and appset apply, aimed at the `cicd` install, and installs
+nothing.
+
+### 1. `scripts/plugins/e2e.sh`: reuse the existing Argo CD
+
+**a.** Add this after `_e2e_sandbox_preflight_cluster` (before
+`_e2e_sandbox_argocd_cluster_manifest`):
+
+```bash
+function _e2e_sandbox_argocd_ready() {
+  local ns="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" server controller
+  server="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get deployment \
+    -l app.kubernetes.io/name=argocd-server -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
+  controller="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get statefulset \
+    -l app.kubernetes.io/name=argocd-application-controller -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "$server" || -z "$controller" || "$server" == *" "* || "$controller" == *" "* ]]; then
+    _err "[e2e] sandbox Argo CD: expected exactly one argocd-server Deployment and one argocd-application-controller StatefulSet in namespace ${ns} on ubuntu-k3s (found server='${server}' controller='${controller}'); cluster-up installs Argo CD there and e2e-sandbox never installs it — run make up with the k3s-aws provider, then rerun Tier 2"
+    return 1
+  fi
+  _info "[e2e] sandbox Argo CD: reusing ${ns}/${server}"
+  _e2e_sandbox_kc -n "$ns" wait --for=condition=available "deployment/${server}" --timeout=600s
+  _e2e_sandbox_kc -n "$ns" rollout status "statefulset/${controller}" --timeout=600s
+}
+```
+
+**b.** In `_e2e_sandbox_argocd_cluster_manifest`, the Secret namespace follows the same variable.
+Change the heredoc from quoted (`<<'YAML'`) to unquoted (`<<YAML`) and replace
+`  namespace: argocd` with `  namespace: ${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}`. No other line of
+that manifest contains `$`; confirm it before unquoting.
+
+**c.** In `e2e_verify_sandbox`, replace:
+
+```bash
+  _E2E_ACTIVE_PHASE="installing-argocd"
+  _run_command -- helm upgrade --install argocd argo/argo-cd --kube-context ubuntu-k3s \
+    -n argocd --create-namespace --set server.insecure=true --set server.service.type=ClusterIP
+  _e2e_sandbox_kc -n argocd apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
+  _e2e_sandbox_kc -n argocd wait --for=condition=available deployment/argocd-server --timeout=600s
+```
+
+with:
+
+```bash
+  _E2E_ACTIVE_PHASE="checking-argocd"
+  _e2e_sandbox_argocd_ready
+  _e2e_sandbox_kc -n "${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
+```
+
+**d.** In the appset loop, `ARGOCD_NAMESPACE=argocd` becomes
+`ARGOCD_NAMESPACE="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}"`.
+
+No other `helm`, CRD, label or annotation change. Do not touch `bin/cluster-up` or
+`scripts/plugins/argocd.sh`.
+
+### 2. Docs
+
+- `docs/guides/` or `docs/howto/`: wherever Tier 2 / `e2e-sandbox` is described (find it with
+  `grep -rln 'e2e-sandbox' docs/guides docs/howto`), say that it reuses the Argo CD that
+  `cluster-up` installs in `cicd` (`E2E_SANDBOX_ARGOCD_NAMESPACE` overrides it), installs none, and
+  fails at phase `checking-argocd` with a "run make up" message when that install is missing.
+- `CHANGELOG.md` `[Unreleased]`: one `Fixed:` entry.
+
+## Files
+
+| File | Change |
+|---|---|
+| `scripts/plugins/e2e.sh` | item 1 |
+| `scripts/tests/plugins/e2e.bats`, `scripts/tests/plugins/e2e_sandbox_preflight.bats` | tests |
+| the Tier 2 guide/howto found in item 2, `CHANGELOG.md` | item 2 |
+
+### Tests (BATS, stubbed kubectl via a fake on `PATH` or function stubs; no real cluster, no real helm)
+
+Show each new test failing against the pre-change `e2e.sh` (temp copy).
+
+1. **Reuse:** a fake `kubectl` that answers the two `get` calls with one name each and records all
+   argv. `e2e_verify_sandbox` (other phases stubbed, as in the existing "never invokes
+   register_app_cluster" test) exits 0, and no `helm` is ever called. Put a fake `helm` on `PATH`
+   that writes a marker, and assert the marker is absent. The recorded argv shows the `wait` on
+   `deployment/<server name>` and `rollout status statefulset/<controller name>` in `cicd`.
+2. **Registration target:** `_e2e_sandbox_argocd_cluster_manifest` renders `namespace: cicd` by
+   default and `namespace: other` with `E2E_SANDBOX_ARGOCD_NAMESPACE=other`. The `kubectl apply` of
+   it is in that namespace, and the appset loop's `envsubst` sees `ARGOCD_NAMESPACE=cicd`. Assert on
+   the env the stub sees, not whole lines.
+3. **Absent:** `get` returns nothing. `_e2e_sandbox_argocd_ready` returns non-zero with a message
+   containing `cicd` and `make up`, and no `wait`, `apply` or `helm` call follows.
+4. **Ambiguous:** two server names returned. Same non-zero result and no `wait`.
+5. **Phase:** on the absent case, `e2e_verify_sandbox` fails with `_E2E_ACTIVE_PHASE` =
+   `checking-argocd`. Assert through the summary stub's argument.
+6. The existing "never invokes register_app_cluster" test stays green. Update its stubs only as
+   needed for the two new `get` calls.
+
+### Mutations (Claude, at verification)
+
+- restore the `helm upgrade --install` line (test 1 red);
+- default namespace back to `argocd` (tests 1 and 2 red);
+- drop the exactly-one check (test 4 red);
+- `return 0` instead of `return 1` on absent (tests 3 and 5 red).
+
+### Definition of Done
+
+- [ ] Items 1–2 exactly as written; `shellcheck scripts/plugins/e2e.sh` adds no warning.
+- [ ] `bats scripts/tests/plugins/e2e.bats scripts/tests/plugins/e2e_sandbox_preflight.bats </dev/null`
+  green; paste the tail.
+- [ ] Leave the changes **uncommitted**. Claude verifies, commits and lands them with:
+  `fix(e2e): reuse the sandbox's cicd Argo CD instead of installing a second one with Helm`
+- [ ] Live proof (operator / Claude after landing): `make e2e-sandbox` on a running sandbox passes
+  `checking-argocd`, and `helm list -A --kube-context ubuntu-k3s` still shows only `cilium` and
+  `external-secrets`.
+
+### What NOT to Do
+
+- Do NOT run anything against a real cluster, real helm, the ACG sandbox or the Pushgateway.
+- Do NOT delete or patch CRDs, Helm ownership labels or annotations, or uninstall anything.
+- Do NOT modify files outside the Files table, `memory-bank/`, or `scripts/lib/foundation/`.
+- Do NOT create a PR, commit, switch branches, or use `--no-verify`.
+

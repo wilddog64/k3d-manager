@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.5.3] — 2026-10-16
+
+### Fixed
+- `_secret_store_data` now sends the value over `security -i` stdin as hex rather than on argv; failed writes return non-zero, and `-U` replaces the pre-delete so a failed write keeps the existing item. Service and key names containing whitespace, quotes or a backslash are rejected before `security` runs. Reference: k3d-manager `docs/bugs/2026-10-09-secret-store-data-puts-value-in-security-argv.md` and `docs/bugs/2026-10-10-secret-store-data-reports-success-on-failed-keychain-write.md`.
+
 ## [v0.5.2] — 2026-10-11
 
 ### Fixed

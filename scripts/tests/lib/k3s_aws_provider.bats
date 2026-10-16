@@ -54,6 +54,102 @@ setup() {
   [[ "$output" == *"--confirm"* ]]
 }
 
+@test "k3s-aws fallback watcher logs away from the terminal" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    launchctl() { return 1; }
+    disown() { :; }
+    acg_watch() { printf "WATCHER_MARKER\n"; }
+    _k3s_aws_start_watcher
+    for _i in 1 2 3 4 5; do
+      [[ -f "${BATS_TEST_TMPDIR}/acg-watch-shell.log" ]] && break
+      sleep 0.05
+    done
+    [[ -f "${BATS_TEST_TMPDIR}/acg-watch-shell.log" ]]
+    grep -q "WATCHER_MARKER" "${BATS_TEST_TMPDIR}/acg-watch-shell.log"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"WATCHER_MARKER"* ]]
+}
+
+@test "k3s-aws skips the fallback watcher when launchd is loaded" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    launchctl() { return 0; }
+    acg_watch() { printf "WATCHER_SHOULD_NOT_RUN\n"; }
+    _k3s_aws_start_watcher
+    [[ ! -e "${_ACG_WATCH_PID_FILE}" ]]
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"launchd watcher com.k3d-manager.acg-watch is loaded — skipping in-shell watcher"* ]]
+  [[ "$output" != *"WATCHER_SHOULD_NOT_RUN"* ]]
+}
+
+@test "k3s-aws preserves the already-running watcher branch" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    printf "%s\n" "$$" > "${_ACG_WATCH_PID_FILE}"
+    launchctl() { return 1; }
+    acg_watch() { printf "WATCHER_SHOULD_NOT_RUN\n"; }
+    _k3s_aws_start_watcher
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Watcher already running (PID"* ]]
+  [[ "$output" != *"WATCHER_SHOULD_NOT_RUN"* ]]
+}
+
+@test "cluster-up stops the shell watcher only after launchd succeeds" {
+  run bash -c '
+    set -euo pipefail
+    step12_block="$(awk "BEGIN {found=0} /^if acg_watch_start / {found=1} found && /^_info .*Step 13/ {exit} found {print}" bin/cluster-up)"
+    [[ -n "${step12_block}" ]]
+    eval "step12() { ${step12_block}
+}"
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
+    _ACG_SANDBOX_LIST_URL="https://example.invalid/sandbox"
+    sandbox_url=""
+    _info() { printf "%s\n" "$*"; }
+    _warn() { printf "%s\n" "$*"; }
+
+    sleep 30 &
+    success_pid=$!
+    printf "%s\n" "${success_pid}" > "${_ACG_WATCH_PID_FILE}"
+    acg_watch_start() { return 0; }
+    step12
+    wait "${success_pid}" 2>/dev/null || true
+    if kill -0 "${success_pid}" 2>/dev/null; then exit 11; fi
+    if [[ -e "${_ACG_WATCH_PID_FILE}" ]]; then exit 12; fi
+
+    sleep 30 &
+    failure_pid=$!
+    printf "%s\n" "${failure_pid}" > "${_ACG_WATCH_PID_FILE}"
+    acg_watch_start() { return 1; }
+    step12
+    kill -0 "${failure_pid}" 2>/dev/null || exit 21
+    [[ -e "${_ACG_WATCH_PID_FILE}" ]] || exit 22
+    kill "${failure_pid}"
+    echo STEP12_OK
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"STEP12_OK"* ]]
+}
+
 @test "_provider_k3s_aws_deploy_cluster runs acg_provision once" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

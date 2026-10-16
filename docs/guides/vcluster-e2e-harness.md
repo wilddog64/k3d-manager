@@ -177,8 +177,9 @@ mutable `latest` uses `Always` and other tags use `IfNotPresent`), `E2E_NAMESPAC
 ## Tier 2: ACG sandbox Stripe verification
 
 `e2e_verify_sandbox` is the opt-in, periodic Tier 2 path for the Stripe checkout
-flow. It extends the ACG sandbox TTL, installs disposable ArgoCD inside the
-`ubuntu-k3s` sandbox, applies the four ApplicationSets plus the sandbox-only
+flow. It extends the ACG sandbox TTL, reuses the Argo CD that `cluster-up` installs
+in the `cicd` namespace (or `E2E_SANDBOX_ARGOCD_NAMESPACE` when overridden), and
+installs no Argo CD of its own. It applies the four ApplicationSets plus the sandbox-only
 order/payment overrides, and runs the `flows` Playwright project with
 `OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
 
@@ -199,6 +200,11 @@ The preflight checks this before anything else and fails with the reason, becaus
 an ACG sandbox expires after 4h and takes its node addresses with it: a context
 left over from an earlier sandbox is still in your kubeconfig but points at a dead
 endpoint. If the sandbox itself is gone, `acg_restart` is the recovery path.
+
+The Argo CD check runs at phase `checking-argocd`. If the expected server Deployment
+or application-controller StatefulSet is absent or ambiguous, the run fails without
+changing ownership metadata and reports that the cluster should be brought up with
+`make up` before retrying Tier 2.
 
 The sandbox is never registered with hub ArgoCD and is not torn down by the
 harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,

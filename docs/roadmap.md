@@ -247,6 +247,16 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     contains it). Adds `k3dm_bug_fixed_in_release_docs`, a Bugs-fixed-per-release chart, a Fixed in
     column, and moves the Fixed this release tile to it. Dispatch **after** the vectordb P3 above: both
     edit `bug-tally.py` and `k3dm-vectordb-metrics`.
+  - [`v1.43.3-pr-checks-dashboard`](plans/v1.43.3-pr-checks-dashboard.md) (plan 2 of 5, operator
+    2026-10-16): Hermes publishes the check runs of every open k3d-manager PR each poll
+    (Pushgateway job `k3dm-pr-checks`), shown on a new **k3dm PR Checks** dashboard. k3d-manager
+    and lib-foundation (widened 2026-10-16, operator; shopping-cart retires after v1.50.x); Copilot
+    reviews are not checks. Independent of the two above.
+  - [`v1.43.3-lib-foundation-bug-tracking`](plans/v1.43.3-lib-foundation-bug-tracking.md) (plan 3
+    of 5, operator 2026-10-16): lib-foundation's own `docs/bugs/` on the Bug Tracking dashboard, read
+    from the lib-foundation clone at `origin/main`, a `repo` label and Repo selector, lib-foundation
+    releases on its own `v0.x` tags. Claude first normalizes the 26 docs' Priority/Status headers
+    in a lib-foundation PR. Dispatch **after** the PR-checks spec (both touch Hermes-side producers).
 
 ### Candidate milestone — v1.43.4 (patch)
 
@@ -620,6 +630,29 @@ date/release/status constraints, an ambiguous request requiring clarification, a
 unauthorized operation, and an engineering request that results in a reviewable spec without
 executing it. Later end-to-end application delivery requires deployment, functional/security
 tests, handoff, and independent customer-agent continuation evidence.
+
+### Candidate theme — v2.x: model economics
+
+**Proposed 2026-10-16 (operator; not yet scoped).** Compare Claude-only, Codex-only and
+multi-model collaboration on token consumption, quota utilisation and **cost per verified
+outcome**: a spec landed with its tests green and its recorded mutations red, and for releases the
+e2e gate passed.
+
+- **Placement:** with or right after v2.4. The v2.4 provider adapter is what lets one spec run
+  under each arm without hand-driving it.
+- **Method:** a controlled replay, not logs of real work. Real dispatches route work by kind, so
+  they confound the model with the task. Freeze about 10 landed specs of mixed kinds and run each
+  from the same base commit under each arm, with the spec's tests and mutations as the oracle.
+- **Units:** share of weekly quota per plan, plus tokens where the CLI reports them, not dollars;
+  record the model ID and plan for every run. Results are directional (small n).
+- **Inputs it reuses:** per-spec dispatch metrics (v1.43.3), Codex model routing and efficiency
+  (v1.45.1), human effort per verified release (v1.48.0).
+- **Cheap early step (separate item, not scheduled):** record Codex tokens per dispatch so real
+  data exists by v2.4.
+
+**v3.0.0 dependency:** this is the cost baseline the multi-agent product team must beat, alongside
+v1.48.0's human-effort baseline. It also answers RQ2–RQ4 of the research paper plan,
+[`docs/research/2026-10-16-research-paper-plan.md`](research/2026-10-16-research-paper-plan.md).
 
 ### Engineering-contract gaps (assessed 2026-10-10)
 

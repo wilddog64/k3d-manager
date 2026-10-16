@@ -289,6 +289,9 @@ The `k3dm-vectordb-index` Pushgateway job publishes the last result, backlog, du
 pruned counts, and quota pause time. `VectorDBIndexDrift` fires after two hours of backlog drift and
 `VectorDBIndexFailing` after thirty minutes of failed runs.
 
+The VectorDB dashboard's **Last run result** `failed` means the index run itself failed; a metrics
+publish failure is logged as `metrics publish skipped` and does not count.
+
 ```bash
 bin/k3dm-vectordb-status --offline
 bin/k3dm-vectordb-status --json

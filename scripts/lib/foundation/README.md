@@ -191,14 +191,15 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.3) | 2026-10-16 | `_secret_store_data` (macOS) keeps the secret off argv: hex value sent over `security -i` stdin; a failed Keychain write now returns non-zero and keeps the existing item (`-U` update instead of delete-then-add); service/key names with whitespace, quotes or a backslash are rejected |
 | [v0.5.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.2) | 2026-10-11 | `_agent_audit`: a replaced Python assertion can be committed with a per-file `# agent-audit: allow assert-removed <reason>` marker on an added line; unmarked removals now name the file and the removed lines; the test-count check keeps no escape |
 | [v0.5.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.1) | 2026-10-06 | ACG watcher checks every 30 min (was 3.5 h, which missed the 65 min extend window); yesterday's shutdown time read as expired, not ~22 h left; extend waits for the button and the launchd wrapper runs Node by absolute path; sudo runs bare names from system dirs, not the user's PATH; self-contained CDP readiness wait; `_agent_audit` no longer flags `_run_command`'s `*-sudo` flags |
-| [v0.5.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.0) | 2026-10-04 | `_agent_audit` audits staged Python files (test shrinkage, syntax, dangerous calls with `# agent-audit: allow` markers); `# agent-audit: remote-sudo` marker; session-check contract documented |
 
 <details><summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.0) | 2026-10-04 | `_agent_audit` audits staged Python files (test shrinkage, syntax, dangerous calls with `# agent-audit: allow` markers); `# agent-audit: remote-sudo` marker; session-check contract documented |
 | [v0.4.18](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.18) | 2026-09-24 | `ACG_SESSION_OK path=` marker and `K3DM_ACG_REQUIRE_CREDENTIALS=1` fail-closed gate; headless login selector fixes; package renamed `lib-foundation-acg`; brace-expansion / js-yaml audit fixes |
 | [v0.4.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.17) | 2026-09-12 | Explicit signed-out detection and Prism monogram login signal; chrome-cdp launchd agent uses the managed Chromium and `pw-profile`; credential-test no longer restarts a sandbox over a broken CLI; sign-in wait no longer targets the dead `id.pluralsight.com` host |
 | [v0.4.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.16) | 2026-09-12 | `browserslist` family lockfile bump (GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx) |

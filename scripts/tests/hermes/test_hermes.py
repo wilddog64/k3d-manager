@@ -243,6 +243,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None, raising=False)
+    monkeypatch.setattr(k3dm_hermes, "_publish_pr_checks", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
@@ -258,15 +259,120 @@ def test_poll_invokes_disk_publisher_and_publisher_failure_is_nonfatal(monkeypat
     assert publisher is not None
     calls, runner = _stub_status_poll(monkeypatch, status_payload("healthy"))
     published = []
-    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: published.append(True))
+    monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: published.append("disk"))
+    monkeypatch.setattr(k3dm_hermes, "_publish_pr_checks", lambda: published.append("pr"))
     k3dm_hermes._poll({}, tmp_path / "state.json", now=1000, status_runner=runner)
-    assert published == [True]
+    # agent-audit: allow assert-removed [True] replaced by the stricter disk-then-pr call order
+    assert published == ["disk", "pr"]
 
     def failed_run(*_args, **_kwargs):
         raise OSError("collector unavailable")
 
     monkeypatch.setattr(k3dm_hermes.subprocess, "run", failed_run)
     publisher()
+
+
+def test_publish_pr_checks_isolated_by_repo_and_preserves_token(monkeypatch, capsys):
+    from hermes import pr_checks
+    monkeypatch.setenv("K3DM_PR_CHECKS_PUSHGATEWAY_URL", "http://pushgateway.test")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "TOKEN_SENTINEL")
+    monkeypatch.setattr(pr_checks, "collect", lambda _fetch, repo: [{
+        "number": 66, "title": repo, "head": "12345678", "draft": False, "checks": []}])
+    requests = []
+
+    class Response:
+        def close(self):
+            pass
+
+    def urlopen(request, timeout):
+        requests.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", urlopen)
+    assert k3dm_hermes._publish_pr_checks(now=100) is True
+    assert [request.full_url for request, _ in requests] == [
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/k3d-manager",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/lib-foundation",
+    ]
+    assert all(request.method == "PUT" for request, _ in requests)
+    assert b'wilddog64/k3d-manager' in requests[0][0].data
+    assert b'wilddog64/lib-foundation' not in requests[0][0].data
+    captured = capsys.readouterr()
+    assert "TOKEN_SENTINEL" not in captured.out + captured.err
+
+
+def test_publish_pr_checks_posts_failure_and_continues(monkeypatch):
+    from hermes import pr_checks
+    monkeypatch.setenv("K3DM_PR_CHECKS_PUSHGATEWAY_URL", "http://pushgateway.test")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "secret")
+    calls = []
+
+    def collect(_fetch, repo):
+        if repo.endswith("lib-foundation"):
+            raise ValueError("lib read failed")
+        return []
+
+    monkeypatch.setattr(pr_checks, "collect", collect)
+
+    class Response:
+        def close(self):
+            pass
+
+    def urlopen(request, timeout):
+        calls.append(request)
+        return Response()
+
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", urlopen)
+    assert k3dm_hermes._publish_pr_checks(now=100) is False
+    assert [request.method for request in calls] == ["PUT", "POST"]
+    assert b"k3dm_pr_info" not in calls[1].data
+    assert b"scrape_success" in calls[1].data and b" 0" in calls[1].data
+
+
+def test_publish_pr_checks_without_token_sends_nothing(monkeypatch):
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "")
+    monkeypatch.setattr(k3dm_hermes, "_http_json",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("fetched")))
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("pushed")))
+    assert k3dm_hermes._publish_pr_checks(now=100) is False
+
+
+def test_publish_pr_checks_fetches_github_and_survives_push_failure(monkeypatch, capsys):
+    monkeypatch.setenv("K3DM_PR_CHECKS_PUSHGATEWAY_URL", "http://pushgateway.test")
+    monkeypatch.setattr(k3dm_hermes, "_keychain_secret", lambda _service: "github_pat_TESTSENTINEL0123")
+    fetched = []
+
+    def http_json(url, headers, timeout=None):
+        fetched.append(url)
+        assert headers["Authorization"] == "token github_pat_TESTSENTINEL0123"
+        if "/lib-foundation/" in url:
+            raise OSError("HTTP 401 for github_pat_TESTSENTINEL0123")
+        if url.endswith("/pulls?state=open&per_page=20"):
+            return [{"number": 7, "title": "t", "head": {"sha": "a" * 40}, "draft": False}]
+        return {"check_runs": []}
+
+    pushed = []
+
+    def urlopen(request, timeout):
+        pushed.append(request)
+        if len(pushed) == 1:
+            raise OSError("pushgateway down")
+
+        class Response:
+            def close(self):
+                pass
+        return Response()
+
+    monkeypatch.setattr(k3dm_hermes, "_http_json", http_json)
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", urlopen)
+    assert k3dm_hermes._publish_pr_checks(now=100) is False
+    assert fetched[0] == "https://api.github.com/repos/wilddog64/k3d-manager/pulls?state=open&per_page=20"
+    assert any(url.startswith("https://api.github.com/repos/wilddog64/lib-foundation/") for url in fetched)
+    assert [request.full_url.rsplit("/", 1)[1] for request in pushed] == ["k3d-manager", "lib-foundation"]
+    assert b'pr="7"' in pushed[0].data and pushed[1].method == "POST"
+    captured = capsys.readouterr()
+    assert "github_pat_TESTSENTINEL0123" not in captured.out + captured.err
 
 
 def test_status_poll_advances_gate_only_when_sampled_and_defaults_off(monkeypatch, tmp_path, capsys):
@@ -604,6 +710,15 @@ def test_health_metrics_count_the_corpus_at_the_indexed_ref(monkeypatch):
     assert commands[-1][1]["env"]["K3DM_INDEX_REF"] == "origin/k3d-manager-v1.40.0"
     k3dm_hermes._publish_health_metrics(None)
     assert commands[-1][1]["env"] is None
+
+
+def test_health_metrics_timeout_is_nonfatal(monkeypatch, capsys):
+    def timeout(*_args, **_kwargs):
+        raise k3dm_hermes.subprocess.TimeoutExpired("k3dm-vectordb-metrics", 120)
+
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", timeout)
+    k3dm_hermes._publish_health_metrics()
+    assert "vectordb health metrics publish skipped" in capsys.readouterr().err
 
 
 def test_refresh_index_records_the_ref_for_health_metrics(monkeypatch):

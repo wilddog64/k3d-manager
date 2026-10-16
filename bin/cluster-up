@@ -1907,7 +1907,18 @@ else
 fi
 
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
-acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
+if acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"; then
+  if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
+    _shell_watcher_pid=$(cat "${_ACG_WATCH_PID_FILE}")
+    if [[ "${_shell_watcher_pid}" =~ ^[0-9]+$ ]] && kill -0 "${_shell_watcher_pid}" 2>/dev/null; then
+      kill "${_shell_watcher_pid}" 2>/dev/null || true
+      _info "[acg-up] Stopped in-shell TTL watcher ${_shell_watcher_pid}; launchd ${_ACG_WATCH_LAUNCHD_LABEL} owns it now"
+    fi
+    rm -f "${_ACG_WATCH_PID_FILE}"
+  fi
+else
+  _warn "[acg-up] launchd TTL watcher install failed — the in-shell watcher (if any) keeps running"
+fi
 
 _info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.3:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 

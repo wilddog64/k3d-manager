@@ -210,6 +210,21 @@ class TestPerBatchCommit:
         assert ix.main([]) == 1
         assert "only the prune failed" in capsys.readouterr().err
 
+    def test_metrics_publish_timeout_does_not_fail_index(self, monkeypatch, capsys):
+        docs = [_doc("one")]
+        monkeypatch.setattr(ix, "iter_corpus", lambda _root: docs)
+        monkeypatch.setattr(ix, "ensure_schema", lambda: None)
+        monkeypatch.setattr(ix, "fetch_hashes", lambda: {})
+        monkeypatch.setattr(ix, "embed_batch", lambda texts, task_type=None: _vectors(len(texts)))
+        monkeypatch.setattr(ix, "run_sql", lambda _sql: "pruned=0 indexed=1")
+
+        def timeout(*_args, **_kwargs):
+            raise ix.subprocess.TimeoutExpired("k3dm-vectordb-metrics", 120)
+
+        monkeypatch.setattr(ix.subprocess, "run", timeout)
+        assert ix.main([]) == 0
+        assert "index-docs: metrics publish skipped" in capsys.readouterr().err
+
 
 class TestDryRun:
     def test_dry_run_neither_embeds_nor_writes(self, monkeypatch):

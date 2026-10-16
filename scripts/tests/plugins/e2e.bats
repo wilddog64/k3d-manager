@@ -103,6 +103,7 @@ FAKE
   acg_extend_playwright() { :; }
   shopping_cart_create_vault_bridge() { :; }
   _e2e_sandbox_kc() { :; }
+  _e2e_sandbox_argocd_ready() { :; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
   _e2e_write_summary() { :; }
@@ -112,6 +113,159 @@ FAKE
   ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 0 ]
   [ ! -e "$marker" ]
+}
+
+@test "sandbox Argo CD readiness reuses the single cicd installation without helm" {
+  local calls="$BATS_TEST_TMPDIR/argocd-calls"
+  : > "$calls"
+  _run_command() {
+    while [[ "$1" != "--" ]]; do shift; done
+    shift
+    printf '%s\n' "$*" >> "$calls"
+    if [[ "$*" == *"get deployment"* ]]; then
+      printf '%s\n' "argocd-ubuntu-k3s-server"
+    elif [[ "$*" == *"get statefulset"* ]]; then
+      printf '%s\n' "argocd-ubuntu-k3s-application-controller"
+    fi
+  }
+  run _e2e_sandbox_argocd_ready
+  [ "$status" -eq 0 ]
+  run grep -F -- "-n cicd wait --for=condition=available deployment/argocd-ubuntu-k3s-server" "$calls"
+  [ "$status" -eq 0 ]
+  run grep -F -- "-n cicd rollout status statefulset/argocd-ubuntu-k3s-application-controller" "$calls"
+  [ "$status" -eq 0 ]
+  run grep -F -- "helm" "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "sandbox Argo CD registration manifest follows the namespace override" {
+  run _e2e_sandbox_argocd_cluster_manifest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'  namespace: cicd'* ]]
+  export E2E_SANDBOX_ARGOCD_NAMESPACE=other
+  run _e2e_sandbox_argocd_cluster_manifest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'  namespace: other'* ]]
+}
+
+@test "sandbox ApplicationSet rendering passes the Argo CD namespace to envsubst" {
+  local env_log="$BATS_TEST_TMPDIR/envsubst-argocd-namespace"
+  : > "$env_log"
+  envsubst() {
+    printf '%s\n' "$ARGOCD_NAMESPACE" >> "$env_log"
+    cat
+  }
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  acg_extend_playwright() { :; }
+  _e2e_sandbox_provision_secrets() { :; }
+  _e2e_sandbox_argocd_ready() { :; }
+  _e2e_sandbox_configure_vault_token_review() { :; }
+  _e2e_sandbox_kc() { :; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  _run_command() { :; }
+  run e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  run grep -Fx -- "cicd" "$env_log"
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox Argo CD readiness rejects an absent installation without waiting" {
+  local calls="$BATS_TEST_TMPDIR/argocd-absent-calls"
+  : > "$calls"
+  _run_command() {
+    while [[ "$1" != "--" ]]; do shift; done
+    shift
+    printf '%s\n' "$*" >> "$calls"
+  }
+  run _e2e_sandbox_argocd_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cicd"* ]]
+  [[ "$output" == *"make up"* ]]
+  run grep -E -- 'wait|apply|helm' "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "sandbox Argo CD readiness rejects multiple server resources" {
+  local calls="$BATS_TEST_TMPDIR/argocd-ambiguous-calls"
+  : > "$calls"
+  _run_command() {
+    while [[ "$1" != "--" ]]; do shift; done
+    shift
+    printf '%s\n' "$*" >> "$calls"
+    if [[ "$*" == *"get deployment"* ]]; then
+      printf '%s\n' "argocd-server-a argocd-server-b"
+    elif [[ "$*" == *"get statefulset"* ]]; then
+      printf '%s\n' "argocd-application-controller"
+    fi
+  }
+  run _e2e_sandbox_argocd_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"expected exactly one"* ]]
+  run grep -E -- 'wait|rollout' "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "sandbox verification reports checking-argocd when Argo CD is absent" {
+  local phase="$BATS_TEST_TMPDIR/argocd-phase"
+  local calls="$BATS_TEST_TMPDIR/argocd-phase-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  acg_extend_playwright() { :; }
+  _e2e_sandbox_provision_secrets() { :; }
+  _run_command() {
+    while [[ "$1" != "--" ]]; do shift; done
+    shift
+    printf '%s\n' "$*" >> "$calls"
+  }
+  _e2e_write_summary() { printf '%s\n' "$4" > "$phase"; }
+  _e2e_write_result_event() { :; }
+  local rc=0
+  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  run cat "$phase"
+  [ "$output" = "checking-argocd" ]
+  run grep -E -- 'wait|apply|helm' "$calls"
+  [ "$status" -ne 0 ]
+}
+
+@test "sandbox verification registers the cluster in cicd and never runs helm" {
+  local calls="$BATS_TEST_TMPDIR/argocd-flow-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  acg_extend_playwright() { :; }
+  _e2e_sandbox_provision_secrets() { :; }
+  shopping_cart_create_vault_bridge() { :; }
+  _e2e_sandbox_configure_vault_token_review() { :; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  helm() { printf 'helm %s\n' "$*" >> "$calls"; }
+  _run_command() {
+    while [[ "$1" != "--" ]]; do shift; done
+    shift
+    printf '%s\n' "$*" >> "$calls"
+    if [[ "$*" == *"get deployment"* ]]; then
+      printf '%s\n' "argocd-ubuntu-k3s-server"
+    elif [[ "$*" == *"get statefulset"* ]]; then
+      printf '%s\n' "argocd-ubuntu-k3s-application-controller"
+    fi
+  }
+  local rc=0
+  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  run grep -E -- '(^| )helm ' "$calls"
+  [ "$status" -ne 0 ]
+  run grep -E -- '-n cicd apply -f -' "$calls"
+  [ "$status" -eq 0 ]
+  run grep -E -- '-n argocd' "$calls"
+  [ "$status" -ne 0 ]
 }
 
 @test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {

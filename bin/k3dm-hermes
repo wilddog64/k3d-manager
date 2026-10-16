@@ -670,8 +670,11 @@ def _refresh_index(state, now=None):
 
 def _publish_health_metrics(ref=None):
     env = {**os.environ, "K3DM_INDEX_REF": ref} if ref else None
-    subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
-                   env=env, capture_output=True, text=True, timeout=120, check=False)
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-vectordb-metrics")],
+                       env=env, capture_output=True, text=True, timeout=120, check=False)
+    except Exception as exc:
+        print(f"vectordb health metrics publish skipped: {exc}", file=sys.stderr)
 
 
 def _publish_disk_metrics():
@@ -680,6 +683,42 @@ def _publish_disk_metrics():
                        capture_output=True, text=True, timeout=120, check=False)
     except Exception as exc:
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
+
+
+def _publish_pr_checks(now=None):
+    """Publish open-PR check state for each repo; never fails the poll."""
+    from hermes import pr_checks
+    now = time.time() if now is None else now
+    base = os.environ.get("K3DM_PR_CHECKS_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    try:
+        token = _keychain_secret(GITHUB_SERVICE)
+    except Exception as exc:
+        print(f"pr checks publish skipped: {exc}", file=sys.stderr)
+        return False
+    if not token:
+        print("pr checks publish skipped: no GitHub token", file=sys.stderr)
+        return False
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+    ok = True
+    for repo in pr_checks.REPOS:
+        url = f"{base}/metrics/job/k3dm-pr-checks/instance/{repo.split('/')[1]}"
+        try:
+            try:
+                prs = pr_checks.collect(lambda path: _http_json(f"https://api.github.com{path}",
+                                                                headers, timeout=20), repo)
+                body, method = pr_checks.render(prs, now, repo), "PUT"
+            except Exception as exc:
+                print(f"pr checks fetch failed for {repo}: {scrub_credentials(str(exc))[:200]}",
+                      file=sys.stderr)
+                body, method = pr_checks.render_failure(now, repo), "POST"
+            request = urllib.request.Request(url, data=body.encode(), method=method,
+                                             headers={"Content-Type": "text/plain; charset=utf-8"})
+            urllib.request.urlopen(request, timeout=5).close()
+            ok = ok and method == "PUT"
+        except Exception as exc:
+            print(f"pr checks publish skipped for {repo}: {exc}", file=sys.stderr)
+            ok = False
+    return ok
 
 
 def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
@@ -741,6 +780,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _push_kine_metrics(next((item for item in records if item.get("sensor") == "kine"), None))
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
+    _publish_pr_checks()
     _schedule_e2e(state)
     _save_state(state_path, state)
     print(json.dumps({"records": records, "event": event, "approvals": approvals,

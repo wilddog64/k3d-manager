@@ -1,6 +1,6 @@
 # Bug: `cluster-up` leaves a second, in-shell ACG TTL watcher writing into the operator's terminal (2026-10-16)
 
-**Status:** OPEN — spec ready
+**Status:** LIVE-VERIFIED 2026-10-16 — two `make up` runs after `ca6b59ce` logged `launchd watcher com.k3d-manager.acg-watch is loaded — skipping in-shell watcher` and started none; after the operator stopped the pre-fix watcher (PID 89270), only the launchd job remains and `acg-watch.pid` names no live process. The leftover-watcher gap is `docs/bugs/2026-10-16-cluster-up-launchd-skip-leaves-old-shell-watcher.md`. Was: IMPLEMENTED, `ca6b59ce`
 **Priority:** P3 — cosmetic and redundant: the launchd watcher still extends the sandbox; the in-shell copy only prints into a terminal and runs a duplicate check
 **Branch:** `k3d-manager-v1.43.3`
 **Release:** v1.43.3
@@ -165,3 +165,17 @@ Each must turn a test red:
 - Do NOT run `launchctl`, `bin/cluster-up`, `make up` or any live ACG, sandbox or browser command.
 - Do NOT create a PR, commit, switch branches, or use `--no-verify`.
 - Do NOT modify files outside the Files table, including `memory-bank/`.
+
+## Live check 2026-10-16 — fix works, one gap
+
+- Both `make up` runs after `ca6b59ce` logged `launchd watcher com.k3d-manager.acg-watch is loaded
+  — skipping in-shell watcher`, and started none.
+- But `acg-watch.pid` still names a live in-shell watcher, PID 89270 (`bash bin/cluster-up`,
+  started 06:01 local by a `make up` before the fix). It still writes `[acg]` lines into the
+  operator's tmux pane after the prompt returns.
+- Gap: when launchd is loaded, `_k3s_aws_start_watcher` returns before it looks at the PID file,
+  so it never stops an in-shell watcher left by an earlier run. The pre-fix code never stopped one
+  either. It can recur whenever launchd is reloaded after an in-shell watcher started, so it is not
+  only a one-time migration.
+- Follow-up filed: `docs/bugs/2026-10-16-cluster-up-launchd-skip-leaves-old-shell-watcher.md`
+  (P3, v1.43.4). The operator stopped PID 89270 by hand.

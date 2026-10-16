@@ -79,6 +79,7 @@ After a rebuild, generate the new target map and restore with:
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
 | `make appsets-reapply` | **Every release:** reapply hub ApplicationSets, confirm their values pin and health, then reapply app-cluster sets; use `APPSETS_STAGE=hub` to stop after the hub soak (`BRANCH=`, `APPSETS_STAGE=all`, `K3DM_APPSET_CONFIRM_TIMEOUT=`, `K3DM_APPSET_CONFIRM_INTERVAL=`, default interval: 5s; refuses anything that is not `k3d-manager-vX.Y.Z`) |
 | `make appsets-check` | Read-only: list Applications whose k3d-manager values source is not on `BRANCH`; run after `appsets-reapply` |
+| `make platform-ops` | **Every release, after `appsets-reapply`:** re-apply the hub `platform-ops` resources that Argo CD does not manage (CVE CronJobs, script ConfigMaps, `vulnerability-inventory-exporter` and its restart, several Grafana dashboards). Needs a Keychain-readable shell |
 | `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
 | `make codex-status` | Show Codex task state, changes, and scope |
 | `make codex-land SLUG=... TEST='bats scripts/tests/...'` | Rebase, test, and land a verified, in-scope task; use `NO_TEST=1` for docs-only work |
@@ -97,6 +98,11 @@ changing the sandbox.
 ApplicationSets freeze their `$values` ref to the branch checked out when they were last applied, so
 config committed to a newer release branch is inert until `make appsets-reapply` runs. It is a required
 release step (see `CLAUDE.md`).
+
+`hub-platform-ops` syncs only the app-cluster kubeconfig ExternalSecret, so the rest of
+`scripts/etc/argocd/platform-ops/` reaches the hub only through `make platform-ops`. Run it after
+`appsets-reapply` on every release; otherwise an exporter or CronJob change ships in git and never
+runs.
 
 `argocd-registration` reads the `ubuntu-k3s` kubeconfig, switches to `k3d-k3d-cluster`
 context, calls `register_app_cluster`, and restarts the ArgoCD application controller.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** VERIFIED — Claude offline: tests green, new tests red on the old code, mutations red. Awaiting live proof. Was: IMPLEMENTED — landed `89b45f56` (Codex, Claude verified: BATS 41/41, mutation red. Live proof after `make appsets-reapply`.)
+**Status:** LIVE-VERIFIED 2026-10-16 — `kubectl --context k3d-k3d-cluster -n monitoring get cm checkout-loadtest-dashboard` returns NotFound; `ubuntu-hostinger` still has `monitoring/checkout-loadtest-dashboard`. The Hostinger CPU panel was not opened. Was: VERIFIED offline, `89b45f56`
 **Approval:** explicit 2026-10-11 "yes" (to "file the bug … and schedule the baseline?")
 **Priority:** P3 — a blank dashboard; the Hostinger copy is correct
 **Severity:** low — misleading, nothing broken

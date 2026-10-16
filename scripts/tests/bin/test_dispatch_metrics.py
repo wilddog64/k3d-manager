@@ -54,6 +54,62 @@ def test_dry_run_does_not_open_connection(monkeypatch, tmp_path, capsys):
     assert "k3dm_dispatch_ledger_timestamp_seconds" in capsys.readouterr().out
 
 
-def test_render_has_no_slug():
-    output = dispatch_metrics.render([event(1, "start", "secret-slug")], 0, 100)
-    assert "secret-slug" not in output
+def test_slug_only_in_task_series():
+    output = dispatch_metrics.render([
+        event(1, "start", "secret-slug"),
+        event(2, "codex_exit", "secret-slug", tokens=10),
+        event(3, "land", "secret-slug"),
+        event(4, "start", "pending-slug"),
+    ], 0, 100)
+    # agent-audit: allow assert-removed test_render_has_no_slug replaced per spec; both halves kept here
+    assert "pending-slug" not in output
+    assert 'slug="secret-slug"' in output
+    assert all("secret-slug" not in line or "k3dm_dispatch_task_" in line
+               for line in output.splitlines())
+
+
+def test_per_task_values():
+    output = dispatch_metrics.render([
+        event(0, "start"), event(100, "codex_exit", tokens=10),
+        event(150, "resume"), event(250, "codex_exit", tokens=30), event(400, "land"),
+    ], 0, 400)
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 30' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 200' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 400' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2' in output
+    assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 6.666666666666667' in output
+    assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 3.3333333333333335' in output
+
+
+def test_exit_without_launch_adds_nothing():
+    output = dispatch_metrics.render([
+        event(0, "start"), event(100, "codex_exit", tokens=10),
+        event(101, "codex_exit", tokens=20), event(200, "land"),
+    ], 0, 200)
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 100' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2' in output
+
+
+def test_invalid_label_values_skipped():
+    output = dispatch_metrics.render([
+        event(1, "start", "bad slug"), event(2, "codex_exit", "bad slug"),
+        event(3, "land", "bad slug"),
+        {"ts": 1, "event": "start", "version": "latest", "slug": "good"},
+        {"ts": 2, "event": "codex_exit", "version": "latest", "slug": "good"},
+        {"ts": 3, "event": "land", "version": "latest", "slug": "good"},
+    ], 0, 100)
+    assert 'k3dm_dispatch_task_skipped{window="1d"} 2' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="bad slug"}' not in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="latest",slug="good"}' not in output
+
+
+def test_task_cap():
+    events = []
+    for index in range(51):
+        slug = f"task-{index}"
+        events.extend([event(index, "start", slug), event(index + 100, "land", slug)])
+    output = dispatch_metrics.render(events, 0, 1000)
+    assert output.count('k3dm_dispatch_task_runs{window="1d"') == 50
+    assert 'slug="task-0"' not in output
+    assert 'k3dm_dispatch_task_truncated{window="1d"} 1' in output
+    assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 1.6666666666666667' in output

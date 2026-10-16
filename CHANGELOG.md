@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.43.3] - 2026-10-16
+
+- Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,
+  with a dedicated k3dm PR Checks Grafana dashboard.
+- Added: the Bug Tracking dashboard now tracks lib-foundation bugs with a Repo selector and
+  lib-foundation's own release tags.
+- Added: the Bug Tracking dashboard counts fixes under the release that changed each bug to fixed,
+  including fixed-in metrics, a priority chart, and a Fixed in table column.
+- Added: the Agent Dispatch dashboard now shows readable token averages, per-spec Codex cost and
+  run counts, and mean Codex and wall-clock time to land, with a bounded per-spec table.
+- Fixed: `cluster-up` keeps the fallback ACG TTL watcher out of the terminal and leaves ownership to launchd.
+- Fixed: a slow VectorDB metrics publish no longer marks a completed index run as failed, and bug
+  metrics read tracked documents in batches.
+- Security: lib-foundation v0.5.3 (subtree). On macOS, `_secret_store_data` no longer puts the
+  stored value (Vault unseal shards, signing keys) on the `security` command line where any
+  same-user process could read it, reports a failed Keychain write instead of returning success,
+  and keeps the existing item when a write fails.
+- Fixed: `e2e-sandbox` now reuses the Argo CD installed by `cluster-up` in `cicd` instead of
+  attempting a second Helm installation that conflicts with existing CRD ownership.
+- Fixed: the Bug Tracking table no longer drops its Fixed in, Verified and Live-verified columns
+  when the selected release has only open bugs. Unfixed bugs now carry a `-` placeholder on those
+  labels, shown as a dash, and the Hide live-verified filter keeps them.
+
 ## [1.43.2] - 2026-10-16
 
 ### Added

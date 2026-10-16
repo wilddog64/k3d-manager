@@ -174,6 +174,8 @@ flap does not trip it). All are read-only.
    missing entry or unavailable webhook is unknown.
 6. **`ci`** — GitHub Actions / required-check health via the GitHub read API (failed, timed-out,
    cancelled, or stuck in-progress runs).
+   The PR checks publisher also reads open k3d-manager and lib-foundation check runs every poll and
+   writes them to Pushgateway; override its endpoint with `K3DM_PR_CHECKS_PUSHGATEWAY_URL`.
 7. **`app_health`** — compares each configured service's aggregate `/actuator/health` with its
    liveness and readiness groups through the API-server service proxy. It reports a delta only
    when the aggregate is not `UP` while both groups are `UP`; this is the application failure
@@ -435,6 +437,7 @@ align to a hard boundary.
 | `K3DM_HERMES_APP_HEALTH_ENABLED` | (disabled) | Set to `1` to enable aggregate/probe health-delta sampling |
 | `K3DM_HERMES_APP_CONTEXT` | (unset) | Kubernetes context for the app-cluster service proxy |
 | `K3DM_HERMES_APP_KUBECONFIG` | (unset) | Optional kubeconfig path used by app-health kubectl calls |
+| `K3DM_PR_CHECKS_PUSHGATEWAY_URL` | `http://localhost:19094` | Pushgateway endpoint for the per-repo PR checks publisher |
 
 An unset `K3DM_HERMES_PROVIDER` falls back to the shared active-provider marker, which a sandbox
 that expired without `make down` leaves pointing at a dead cluster.

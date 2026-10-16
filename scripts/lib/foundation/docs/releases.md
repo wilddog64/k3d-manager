@@ -2,6 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.3) | 2026-10-16 | `_secret_store_data` (macOS) keeps the secret off argv: hex value sent over `security -i` stdin; a failed Keychain write now returns non-zero and keeps the existing item (`-U` update instead of delete-then-add); service/key names with whitespace, quotes or a backslash are rejected |
 | [v0.5.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.2) | 2026-10-11 | `_agent_audit`: a replaced Python assertion can be committed with a per-file `# agent-audit: allow assert-removed <reason>` marker on an added line; unmarked removals now name the file and the removed lines; the test-count check keeps no escape |
 | [v0.5.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.1) | 2026-10-06 | ACG watcher checks every 30 min (was 3.5 h, which missed the 65 min extend window); yesterday's shutdown time read as expired, not ~22 h left; extend waits for the button and the launchd wrapper runs Node by absolute path; sudo runs bare names from system dirs, not the user's PATH; self-contained CDP readiness wait; `_agent_audit` no longer flags `_run_command`'s `*-sudo` flags |
 | [v0.5.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.5.0) | 2026-10-04 | `_agent_audit` audits staged Python files (test shrinkage, syntax, dangerous calls with `# agent-audit: allow` markers); `# agent-audit: remote-sudo` marker; session-check contract documented |

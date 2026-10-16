@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.3` (moved from v1.43.2, operator 2026-10-16)
-**Status:** OPEN — spec ready; moved to v1.43.3 2026-10-16 (never dispatched on v1.43.2)
+**Status:** LIVE-VERIFIED 2026-10-16 — hub Pushgateway after the v1.43.3 appsets-reapply: 38 per-spec `k3dm_dispatch_task_*` series per metric; `hub-dr-drill` (v1.43.0) reads 1.599 M Codex tokens and 5,070 s (84.5 min) of Codex time, matching the proof. The 7d token average is now 217 K, not 434 K, because v1.43.3 dispatches joined the window. Dashboard ConfigMap is Argo CD-tracked. Was: IMPLEMENTED — `eb45900e` (v1.43.3)
 **Approval:** explicit 2026-10-12 "approved for per-spec dashboard" (operator)
 **Priority:** P3 — the ledger holds every number; only the dashboard cannot show them
 **Severity:** low — no metric is wrong; the view cannot answer "what did each spec cost"
