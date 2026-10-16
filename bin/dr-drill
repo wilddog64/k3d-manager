@@ -217,7 +217,7 @@ _dr_drill_metadata() { printf '%s/pv-pvc.yaml\n' "$DR_DRILL_RESTORE_STAGE"; }
 _dr_drill_verify_unsealed() {
   hub_data_verify_unsealed "$DR_DRILL_CONTEXT"
 }
-_dr_drill_verify_vault() { set +u; hub_data_verify "$(_dr_drill_inventory)" identity "$DR_DRILL_CONTEXT"; local rc=$?; set -u; return "$rc"; }
+_dr_drill_verify_vault() { local rc=0; hub_data_verify "$(_dr_drill_inventory)" identity "$DR_DRILL_CONTEXT" || rc=$?; return "$rc"; }
 _dr_drill_verify_keycloak() {
   hub_data_verify_keycloak "$(_dr_drill_inventory)" "$DR_DRILL_CONTEXT"
 }

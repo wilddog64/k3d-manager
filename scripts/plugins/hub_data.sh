@@ -557,7 +557,7 @@ function _hub_data_target_context() {
 }
 
 function _hub_data_wait_vault() {
-  local prefix="${1:-[dr-drill]}" limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc
+  local prefix="${1:-[dr-drill]}" limit="${DR_DRILL_VAULT_START_S:-300}" deadline phase="" rc=0
   deadline=$((SECONDS + limit))
   while (( SECONDS < deadline )); do
     phase="$(_kubectl --no-exit -n secrets get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"
@@ -568,7 +568,7 @@ function _hub_data_wait_vault() {
     printf '%s vault-0 is not Running after %ss (phase: %s)\n' "$prefix" "$limit" "${phase:-none}" >&2
     return 1
   fi
-  set +u; VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault; rc=$?; set -u
+  VAULT_API_WAIT_S="$limit" _vault_wait_api secrets vault || rc=$?
   (( rc == 0 )) || printf '%s the restored Vault API did not answer within %ss\n' "$prefix" "$limit" >&2
   return "$rc"
 }
@@ -932,7 +932,7 @@ function _hub_data_report() {
 }
 
 function hub_data_verify_unsealed() {
-  local context="$1" stage old_kubeconfig had_kubeconfig=0 rc
+  local context="$1" stage old_kubeconfig had_kubeconfig=0 rc=0
   stage="$(_hub_data_stage)"
   old_kubeconfig="${KUBECONFIG:-}"
   [[ -n "${KUBECONFIG+x}" ]] && had_kubeconfig=1
@@ -941,10 +941,7 @@ function hub_data_verify_unsealed() {
   else
     K3DM_HUB_DATA_CONTEXT="$context" _hub_data_pin_context "$stage" || { rm -rf -- "$stage"; return 1; }
   fi
-  set +u
-  _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null
-  rc=$?
-  set -u
+  _vault_exec secrets 'vault status -format=json' vault | jq -e '.sealed == false' >/dev/null || rc=$?
   if (( had_kubeconfig == 1 )); then export KUBECONFIG="$old_kubeconfig"; else unset KUBECONFIG; fi
   rm -rf -- "$stage"
   return "$rc"

@@ -18,6 +18,8 @@
   dashboard ApplicationSet excludes its empty copy from the hub.
 - Fixed: `DR_DRILL_KEEP=1` now preserves the drill kubeconfig with the kept cluster and prints
   the exact `kubectl` command for inspecting it; deleted or never-started drills still remove it.
+- Fixed: the DR drill's Vault checks now run under `nounset`, preserving their true or false
+  result instead of masking unbound-variable failures with temporary `set +u` wrappers.
 - Fixed: Hermes Kine evidence now puts the compaction age first and formats ages and
   `state.db` sizes with human-readable units, reducing noisy per-poll sensor labels.
 - Added Hermes Kine compaction-age persistence, Pushgateway gauges, and the

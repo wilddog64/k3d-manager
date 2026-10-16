@@ -2,7 +2,7 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-  unset DR_DRILL_CLUSTER DR_DRILL_CONTEXT DR_TEST_CLUSTER_LIST DR_TEST_HOST DR_TEST_NOT_READY DR_TEST_CURL_RC DR_TEST_EXEC_FAIL DR_TEST_UNSEAL_FAIL DR_TEST_RESTORE_FAIL
+  unset DR_DRILL_CLUSTER DR_DRILL_CONTEXT DR_TEST_CLUSTER_LIST DR_TEST_HOST DR_TEST_NOT_READY DR_TEST_CURL_RC DR_TEST_EXEC_FAIL DR_TEST_UNSEAL_FAIL DR_TEST_RESTORE_FAIL DR_TEST_VAULT_STATUS_FAIL DR_TEST_VAULT_LIST_FAIL
   export TEST_ROOT="$BATS_TEST_TMPDIR/root" STUB_BIN="$BATS_TEST_TMPDIR/root/bin" HOME="$BATS_TEST_TMPDIR/home"
   export KLOG="$TEST_ROOT/kubectl.log" VLOG="$TEST_ROOT/vault.log" SHARD_LOG="$TEST_ROOT/phase.log" PHASE_LOG="$TEST_ROOT/phase.log" RESTORE_LOG="$TEST_ROOT/restore.log"
   mkdir -p "$STUB_BIN" "$TEST_ROOT" "$HOME"
@@ -135,8 +135,12 @@ case "$*" in
   *'-decode=-'*) [[ "$*" == *OTP-SENTINEL* || "$*" == *ENCODED-SENTINEL* ]] && exit 97; cat >> "$SHARD_LOG"; printf ROOT-TOKEN ;;
   *'generate-root'*'-format=json -'*) [[ "${DR_TEST_KEY_FAIL:-0}" == 1 ]] && exit 1; cat >> "$SHARD_LOG"; printf '{"encoded_token":"ENCODED-SENTINEL"}' ;;
   *'generate-root -cancel'*) : > "${HOME}/cancel-seen" ;;
-  *'status'*) printf '{"sealed":false}' ;;
-  *'kv list'*) printf '["app/"]' ;;
+  *'status'*)
+    status_polls=$(( $(cat "$HOME/vault-status-polls" 2>/dev/null || echo 0) + 1 )); printf '%s' "$status_polls" > "$HOME/vault-status-polls"
+    [[ "${DR_TEST_VAULT_STATUS_FAIL:-0}" == 1 && "$status_polls" -gt 1 ]] && exit 1
+    printf '{"sealed":false}'
+    ;;
+  *'kv list'*) [[ "${DR_TEST_VAULT_LIST_FAIL:-0}" == 1 ]] && exit 1; printf '["app/"]' ;;
   *'token revoke -self'*) : ;;
 esac
 STUB
@@ -276,6 +280,25 @@ STUB
 
 @test "dr drill: V2 uses the fixed restored inventory" {
   run_drill; [ "$status" -eq 0 ]; grep -q 'inventory.json' "$PHASE_LOG"
+}
+
+@test "dr drill: Vault checks run under nounset and retain true and false results" {
+  run grep -c 'set +u' "$PWD/bin/dr-drill"
+  [ "$status" -eq 1 ]; [ "$output" = 0 ]
+
+  run_drill
+  [ "$status" -eq 0 ]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  [ "$(jq -r '.checks.V1' "$result")" = true ]
+  [ "$(jq -r '.checks.V2' "$result")" = true ]
+
+  rm -rf "$HOME/.k3dm/dr-drill" "$HOME/vault-status-polls"
+  export DR_TEST_VAULT_STATUS_FAIL=1 DR_TEST_VAULT_LIST_FAIL=1
+  run_drill
+  [ "$status" -ne 0 ]
+  result="$(find "$HOME/.k3dm/dr-drill" -type f -name '*.json' -print | head -1)"
+  [ "$(jq -r '.checks.V1' "$result")" = false ]
+  [ "$(jq -r '.checks.V2' "$result")" = false ]
 }
 
 @test "dr drill: V3-V5 use live workload names and label lookup" {
