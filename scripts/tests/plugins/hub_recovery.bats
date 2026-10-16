@@ -292,6 +292,7 @@ YAML
 @test "_hub_recovery_ensure_identity_bootstrap: existing Application is not applied" {
   local calls="${BATS_TEST_TMPDIR}/identity-bootstrap-present-calls"
   : >"$calls"
+  export HUB_RECOVERY_INFRA_ROOT="${BATS_TEST_TMPDIR}/no-infra"
   _kubectl() {
     printf '%s\n' "$*" >>"$calls"
     return 0
@@ -323,6 +324,7 @@ YAML
 }
 
 @test "_hub_recovery_ensure_identity_bootstrap: absent OIDC ExternalSecret warns and succeeds" {
+  export HUB_RECOVERY_INFRA_ROOT="${BATS_TEST_TMPDIR}/no-infra"
   _kubectl() { return 0; }
   _info() { :; }
   _warn() { printf '%s\n' "$*"; }
