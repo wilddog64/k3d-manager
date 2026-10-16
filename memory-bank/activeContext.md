@@ -1,3 +1,4 @@
+- 2026-10-15: test fix: pinned HUB_RECOVERY_INFRA_ROOT in 2 identity-bootstrap tests (passed in worktree, failed on main tree because the sibling shopping-cart-infra file exists). Combined hub suites 253/253 x3 on k3d-manager-v1.43.2. hub_restore pty tests 184/185 failed intermittently (2 of ~8 combined runs, 0/12 isolated) — pre-existing, not filed yet.
 - 2026-10-15: Fix 4 Steps 6-7 LANDED 68aa8aa1 (Codex 2523ad56). All 4 recovery fixes landed (861abb7b, e5b93aee, ffe7ce6a, 68aa8aa1); live proof = 2026-10-29 drill. Next: land bug-table worktree, then Release-dropdown spec.
 - 2026-10-15: Fix 3 identity bootstrap LANDED ffe7ce6a (Codex 30fb784c). Next: fix 4 (steps 6-7 D1-D3 + Grafana/argocd restart + export SA).
 - 2026-10-15: Fix 2 keychain preflight LANDED e5b93aee (Codex 8b6cfb26; Claude fixed a never-failing '! grep' assertion). Operator export 20261016T032919Z pushed (restored hub captured). Next: fix 3 identity bootstrap spec.
