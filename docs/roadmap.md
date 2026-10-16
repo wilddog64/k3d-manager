@@ -250,8 +250,13 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
   - [`v1.43.3-pr-checks-dashboard`](plans/v1.43.3-pr-checks-dashboard.md) (plan 2 of 5, operator
     2026-10-16): Hermes publishes the check runs of every open k3d-manager PR each poll
     (Pushgateway job `k3dm-pr-checks`), shown on a new **k3dm PR Checks** dashboard. k3d-manager
-    only (shopping-cart retires after v1.50.x); Copilot reviews are not checks. Independent of the
-    two above.
+    and lib-foundation (widened 2026-10-16, operator; shopping-cart retires after v1.50.x); Copilot
+    reviews are not checks. Independent of the two above.
+  - [`v1.43.3-lib-foundation-bug-tracking`](plans/v1.43.3-lib-foundation-bug-tracking.md) (plan 3
+    of 5, operator 2026-10-16): lib-foundation's own `docs/bugs/` on the Bug Tracking dashboard, read
+    from the lib-foundation clone at `origin/main`, a `repo` label and Repo selector, lib-foundation
+    releases on its own `v0.x` tags. Claude first normalizes the 26 docs' Priority/Status headers
+    in a lib-foundation PR. Dispatch **after** the PR-checks spec (both touch Hermes-side producers).
 
 ### Candidate milestone — v1.43.4 (patch)
 
