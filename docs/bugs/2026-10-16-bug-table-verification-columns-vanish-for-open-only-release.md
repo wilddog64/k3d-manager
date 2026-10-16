@@ -1,6 +1,6 @@
 # Bug: the Bug Tracking table drops Fixed in, Verified and Live-verified when a release has only open bugs
 
-**Status:** FIXED — producer, dashboard and tests changed on `k3d-manager-v1.43.3` (PR #144); live proof pending (see Live proof)
+**Status:** LIVE-VERIFIED — 2026-10-16: operator's Bug Tracking dashboard, Release = v1.43.4 (7 bugs, all open), Hide live-verified: the table lists all 7 rows with Fixed in, Verified and Live-verified present and shown as "—". Was: FIXED — producer, dashboard and tests changed on `k3d-manager-v1.43.3` (PR #144)
 **Priority:** P3
 **Filed:** 2026-10-16
 **Detected by:** operator (Grafana screenshot, Release = v1.43.4)
@@ -34,3 +34,10 @@ is fixed, the three columns do not exist and the organize transform has nothing 
 
 After the release's `make appsets-reapply` (the bugs dashboard is Argo-tracked) and the next
 Hermes metrics publish: Bug Tracking with Release = v1.43.4 shows the three columns with dashes.
+
+## Live proof result (2026-10-16)
+
+Operator screenshot, Release = v1.43.4, Verified fixes = Hide live-verified: 7 open rows, the three
+columns present with "—". The first attempt showed an empty table because a stale browser value
+`var-verified=^(false)?$` (the pre-fix filter) was still in the URL; it hides every `-` row. Re-selecting
+Hide live-verified set `^(false|-)?$`. A saved bookmark from before v1.43.3 will reproduce the empty table.
