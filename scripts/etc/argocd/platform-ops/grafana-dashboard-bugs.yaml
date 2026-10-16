@@ -1198,7 +1198,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Live-verified"},
                 "properties": [
-                  {"id": "custom.width", "value": 90},
+                  {"id": "custom.width", "value": 115},
                   {"id": "custom.cellOptions", "value": {"type": "color-text"}},
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "true": {"text": "✓ live", "color": "green", "index": 0},
