@@ -111,6 +111,32 @@ def test_open_bug_metrics_labels_release_from_tally_or_unassigned(metrics, tmp_p
                if line.startswith("k3dm_bug_open_info{"))
 
 
+def test_release_order_inverts_version_parts_and_sorts_newest_first(metrics):
+    releases = ["v1.5.0", "v1.14.0", "v1.43.2", "v2.0.0", "unassigned"]
+    labels = {metrics._release_order(release): release for release in releases}
+    assert metrics._release_order("v1.43.2") == "9998.9956.9997 v1.43.2"
+    assert metrics._release_order("unassigned") == "9999.9999.9999 unassigned"
+    assert [labels[label] for label in sorted(labels)] == [
+        "v2.0.0", "v1.43.2", "v1.14.0", "v1.5.0", "unassigned"]
+
+
+def test_open_bug_metrics_sort_by_release_then_priority(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    for name, priority in (("old-p0.md", "P0"), ("new-p2.md", "P2"),
+                           ("new-p0.md", "P0"), ("unassigned.md", "P1")):
+        (bugs / name).write_text(f"**Priority:** {priority}\n**Status:** Open\n")
+    tally = {
+        "v1.5.0": {"open_paths": [{"path": "docs/bugs/old-p0.md"}]},
+        "v1.14.0": {"open_paths": [{"path": "docs/bugs/new-p2.md"},
+                                     {"path": "docs/bugs/new-p0.md"}]},
+    }
+    output = metrics._open_bug_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    assert [line.split('bug="', 1)[1].split('"', 1)[0] for line in lines] == [
+        "new-p0", "new-p2", "old-p0", "unassigned"]
+
+
 def test_open_bug_metrics_release_is_last_label_and_aggregate_is_uncapped(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
@@ -124,7 +150,9 @@ def test_open_bug_metrics_release_is_last_label_and_aggregate_is_uncapped(metric
     output = metrics._open_bug_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
     assert len(info) == 200
-    assert all(line.split("}", 1)[0].endswith('release="v1.43.1"') for line in info)
+    # agent-audit: allow assert-removed label tail now ends with release_order; release is still asserted
+    assert all(line.split("}", 1)[0].endswith(
+        'release="v1.43.1",release_order="9998.9956.9998 v1.43.1"') for line in info)
     assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P1"} 2' in output
     assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P2"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()

@@ -128,6 +128,13 @@ def _scan_branch(root, ref=None):
     return name if _SCAN_BRANCH_RE.fullmatch(name) else ""
 
 
+def _release_order(release):
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", release)
+    if not match:
+        return "9999.9999.9999 unassigned"
+    return ".".join(f"{9999 - int(part):04d}" for part in match.groups()) + f" {release}"
+
+
 def _open_bug_metrics(root, ref=None, now=None, tally=None):
     root = Path(root)
     branch = _scan_branch(root, ref)
@@ -168,7 +175,7 @@ def _open_bug_metrics(root, ref=None, now=None, tally=None):
         value = -1
         if filed:
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
-        sort_key = f"{priority} {filed or '9999-99-99'} {stem}"
+        sort_key = f"{_release_order(release)} {priority} {filed or '9999-99-99'} {stem}"
         rows.append((sort_key, priority, title, filed, stem, value, branch, release))
     rows.sort(key=lambda row: row[0])
     truncated = int(len(rows) > 200)
@@ -178,7 +185,8 @@ def _open_bug_metrics(root, ref=None, now=None, tally=None):
     lines = []
     for sort_key, priority, title, filed, stem, value, scan_branch, release in rows[:200]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
-                  f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}"')
+                  f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
+                  f'release_order="{_release_order(release)}"')
         lines.append(f"k3dm_bug_open_info{{{labels}}} {value}")
     for (release, priority), count in sorted(aggregates.items(),
                                              key=lambda item: (item[0][0], PRIORITIES.index(item[0][1]))):

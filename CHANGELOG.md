@@ -5,6 +5,7 @@
 - Added: the k3dm Bug Tracking dashboard now lists open bug documents with priority, title,
   filed date, age, and links to the scanned branch.
 - Added: the k3dm Bug Tracking dashboard can filter open bugs and priority stats by filed-in release.
+- Fixed: the k3dm Bug Tracking dashboard now orders releases newest first by version in its table and dropdown.
 - Fixed: `make hub-recover-all` now approves first, tears down the existing hub and exact-name
   k3d leftovers, rebuilds it, and resumes the selected data export, including when the hub is absent.
 - Fixed: offline suite case-count alerts now apply only to complete `test-all` runs, and

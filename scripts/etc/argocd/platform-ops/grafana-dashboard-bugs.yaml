@@ -32,10 +32,11 @@ data:
             "label": "Release (filed in)",
             "type": "query",
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "query": {"query": "label_values(k3dm_bug_open_info, release)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
-            "definition": "label_values(k3dm_bug_open_info, release)",
+            "query": {"query": "label_values(k3dm_bug_open_info, release_order)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+            "definition": "label_values(k3dm_bug_open_info, release_order)",
+            "regex": "/^\\S+ (?<value>\\S+)$/",
             "refresh": 2,
-            "sort": 8,
+            "sort": 0,
             "multi": true,
             "includeAll": true,
             "allValue": ".*",
@@ -971,7 +972,7 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every open bug doc, from the same scan as the counts above. Click a name to open the doc on the branch the scan read. If k3dm_bug_open_info_truncated is 1, the list is capped at 200. Follows the Release dropdown (the release the bug was filed in).",
+          "description": "Every open bug doc, from the same scan as the counts above. Click a name to open the doc on the branch the scan read. If k3dm_bug_open_info_truncated is 1, the list is capped at 200. Follows the Release dropdown (the release the bug was filed in). Sorted newest release first, then by priority; click Release to re-sort by version.",
           "targets": [
             {
               "refId": "A",
@@ -997,7 +998,7 @@ data:
               "options": {
                 "indexByName": {
                   "priority": 0,
-                  "release": 1,
+                  "release_order": 1,
                   "title": 2,
                   "filed": 3,
                   "Value": 4
@@ -1006,6 +1007,7 @@ data:
                   "bug": true,
                   "sort_key": true,
                   "branch": true,
+                  "release": true,
                   "__name__": true,
                   "job": true,
                   "instance": true,
@@ -1013,7 +1015,7 @@ data:
                 },
                 "renameByName": {
                   "priority": "Priority",
-                  "release": "Release",
+                  "release_order": "Release",
                   "title": "Bug",
                   "filed": "Filed",
                   "Value": "Open for"
@@ -1047,6 +1049,21 @@ data:
                   {
                     "id": "custom.width",
                     "value": 90
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "regex",
+                        "options": {
+                          "pattern": "^\\S+ (\\S+)$",
+                          "result": {
+                            "text": "$1",
+                            "index": 0
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },

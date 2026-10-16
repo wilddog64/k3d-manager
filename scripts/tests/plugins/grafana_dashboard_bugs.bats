@@ -20,6 +20,27 @@ variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
 assert variable["includeAll"] is True and variable["multi"] is True
 assert variable["allValue"] == ".*"
 assert "k3dm_bug_open_info" in variable["definition"]
+assert variable["sort"] == 0
+assert variable["regex"] == r"/^\S+ (?<value>\S+)$/"
+assert "release_order" in variable["definition"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release dropdown and table use version-order labels" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
+assert variable["query"]["query"] == "label_values(k3dm_bug_open_info, release_order)"
+table = next(panel for panel in data["panels"] if panel["id"] == 23)
+organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+assert organize["indexByName"]["release_order"] == 1
+assert organize["excludeByName"]["release"] is True
+assert organize["renameByName"]["release_order"] == "Release"
+release = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Release")
+mapping = next(p["value"][0] for p in release["properties"] if p["id"] == "mappings")
+assert mapping["options"]["result"]["text"] == "$1"
 PY
   [ "${status}" -eq 0 ]
 }
@@ -164,7 +185,7 @@ elif check == "layout":
 elif check == "columns":
     organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
-    assert {"bug", "sort_key", "branch", "__name__", "job", "instance", "Time"} <= hidden, hidden
+    assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
     assert [organize["renameByName"][name] for name in visible] == ["Priority", "Release", "Bug", "Filed", "Open for"]
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")

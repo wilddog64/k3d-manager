@@ -329,7 +329,8 @@ empty final list are removed rather than lingering in Pushgateway. The list is c
 The Release dropdown filters the table and the Open P0–P3 stats by the release the bug was filed in:
 the doc's `**Branch:** k3d-manager-vX.Y.Z` line, otherwise the first tag containing the commit that
 added the file, otherwise the current release branch. Bugs without a valid release use the `unassigned`
-bucket. The dropdown does not filter Open, any release or the history.
+bucket. The table and dropdown list releases newest first, by version. The dropdown does not filter
+Open, any release or the history.
 On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
