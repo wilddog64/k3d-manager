@@ -1,6 +1,6 @@
 # Bug: a slow metrics publish marks a completed VectorDB index run as failed (2026-10-16)
 
-**Status:** OPEN — spec ready
+**Status:** IMPLEMENTED — landed `b7afa46d` (Codex; Claude verified: pytest 136/136, all 6 new tests red on the old code, all 4 mutations red). Live proof pending: the next Hermes index pass keeps Last run result `success`/`noop`.
 **Priority:** P3 — the index itself succeeds and the next pass self-heals; only the Last run result tile and its history are wrong
 **Branch:** `k3d-manager-v1.43.3`
 **Release:** v1.43.3
