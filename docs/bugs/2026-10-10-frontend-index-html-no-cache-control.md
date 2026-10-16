@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** k3d-manager `k3d-manager-v1.43.3` (this spec; moved from v1.43.2 2026-10-12); work repo `shopping-cart-frontend`, branch `fix/index-html-no-cache`, cut from `origin/main`
-**Status:** OPEN — spec ready (v1.43.3; moved from v1.43.2 batch 1 by the operator 2026-10-12)
+**Status:** IMPLEMENTED — shopping-cart-frontend PR #121 (`636514d2`), awaiting CI/Copilot and merge; live check after the image deploys
 **Priority:** P2 — after a deploy, a returning browser can keep running the previous build; the workaround is a hard refresh
 **Severity:** medium
 
