@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../services/shopping-cart-order
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: order-service-config
+      data:
+        BASKET_URL: http://basket-service.shopping-cart-apps:8083
+        PAYMENT_URL: http://payment-service.shopping-cart-payment:8084
+    target:
+      kind: ConfigMap
+      name: order-service-config

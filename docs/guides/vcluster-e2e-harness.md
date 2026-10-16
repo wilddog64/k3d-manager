@@ -177,11 +177,13 @@ mutable `latest` uses `Always` and other tags use `IfNotPresent`), `E2E_NAMESPAC
 ## Tier 2: ACG sandbox Stripe verification
 
 `e2e_verify_sandbox` is the opt-in, periodic Tier 2 path for the Stripe checkout
-flow. It extends the ACG sandbox TTL, reuses the Argo CD that `cluster-up` installs
-in the `cicd` namespace (or `E2E_SANDBOX_ARGOCD_NAMESPACE` when overridden), and
-installs no Argo CD of its own. It applies the four ApplicationSets plus the sandbox-only
-order/payment overrides, and runs the `flows` Playwright project with
-`OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
+flow. It extends the ACG sandbox TTL; the hub deploys the platform to the sandbox,
+and Tier 2 checks the hub's `ubuntu-k3s` Applications, sets
+`k3dm.k3d.io/e2e-profile=stripe` on the hub registration for the run (order/payment
+use the overlays in `services-e2e-stripe/`), and resets it to `none` on exit. `cluster-up` always
+registers with `none`. The run uses `E2E_HUB_CONTEXT`, `E2E_HUB_ARGOCD_NAMESPACE`,
+and `E2E_PROFILE_SYNC_TIMEOUT` for hub/profile coordination, and runs the `flows`
+Playwright project with `OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
 
 ```bash
 make e2e-sandbox                          # DIGEST=sha256:... optional
@@ -201,15 +203,11 @@ an ACG sandbox expires after 4h and takes its node addresses with it: a context
 left over from an earlier sandbox is still in your kubeconfig but points at a dead
 endpoint. If the sandbox itself is gone, `acg_restart` is the recovery path.
 
-The Argo CD check runs at phase `checking-argocd`. If the expected server Deployment
-or application-controller StatefulSet is absent or ambiguous, the run fails without
-changing ownership metadata and reports that the cluster should be brought up with
-`make up` before retrying Tier 2.
-
-The sandbox is never registered with hub ArgoCD and is not torn down by the
-harness; ACG TTL expiry provides cleanup. Tier 2 is best-effort and periodic,
-never a blocking per-candidate gate. Its summaries use `tier: sandbox` and
-`project: stripe` in the shared report directory.
+The hub must be running and its `ubuntu-k3s` Applications must be `Synced` and
+`Healthy` before the sandbox is extended. Live use needs `make appsets-reapply` on
+the release branch first. Tier 2 is best-effort and periodic, never a blocking
+per-candidate gate. Its summaries use `tier: sandbox` and `project: stripe` in the
+shared report directory.
 
 ### Tier 2 ACG auto-login enablement
 

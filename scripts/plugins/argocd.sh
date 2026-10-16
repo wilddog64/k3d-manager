@@ -1666,6 +1666,7 @@ ${_platform_labels}    k3d-manager/managed: "${_managed}"
     k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
+    k3dm.k3d.io/e2e-profile: "none"
   annotations:
     k3d-manager/sandbox-id: "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}"
     k3d-manager/registered-at: "${_registered_at}"

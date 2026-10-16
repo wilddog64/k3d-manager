@@ -259,3 +259,20 @@ _stub_kubectl() {
   extend_line="$(grep -n -- 'acg_extend_playwright "\${_ACG_SANDBOX_URL' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | cut -d: -f1)"
   [ "$cluster_line" -lt "$extend_line" ]
 }
+
+@test "hub preflight uses the default context and rejects an unavailable hub" {
+  _stub_kubectl
+  KUBECTL_READYZ_RC=1
+  run _e2e_sandbox_preflight_hub
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"k3d-k3d-cluster"* ]]
+  [[ "$output" == *"readyz"* ]]
+}
+
+@test "hub preflight honors E2E_HUB_CONTEXT" {
+  _stub_kubectl
+  export E2E_HUB_CONTEXT=custom-hub
+  run _e2e_sandbox_preflight_hub
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"context=custom-hub"* ]]
+}

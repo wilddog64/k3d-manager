@@ -15,6 +15,11 @@
   existing `verified` / `live_verified` labels, the summary tiles and the Hide live-verified filter
   are unchanged, and a git failure falls back to `true` rather than dropping the series.
 
+### Fixed
+
+- Tier 2 now uses the hub's sandbox deployment and switches Stripe on with a per-cluster profile
+  label, resetting the registration to mock mode when the run exits.
+
 ### Changed
 
 - Bug Tracking now opens on the current release, sorts rows by release then priority before status,

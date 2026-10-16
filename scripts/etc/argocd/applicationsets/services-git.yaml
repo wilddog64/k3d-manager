@@ -45,7 +45,7 @@ spec:
       source:
         repoURL: https://github.com/wilddog64/k3d-manager
         targetRevision: '${K3D_MANAGER_BRANCH}'
-        path: '{{.path.path}}'
+        path: '{{ if and (eq (index .metadata.labels "k3dm.k3d.io/e2e-profile") "stripe") (has .path.basename (list "shopping-cart-order" "shopping-cart-payment")) }}services-e2e-stripe/{{.path.basename}}{{ else }}{{.path.path}}{{ end }}'
       ignoreDifferences:
         - group: ""
           kind: Secret
