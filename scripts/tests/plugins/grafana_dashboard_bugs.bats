@@ -12,6 +12,31 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "bug dashboard has a release variable" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
+assert variable["includeAll"] is True and variable["multi"] is True
+assert variable["allValue"] == ".*"
+assert "k3dm_bug_open_info" in variable["definition"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release filters only the current open stats and table" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+for panel_id in (9, 10, 11, 12, 23):
+    assert 'release=~"$release"' in panels[panel_id]["targets"][0]["expr"]
+for panel_id in (13, 14, 15):
+    assert 'release=~"$release"' not in " ".join(t["expr"] for t in panels[panel_id]["targets"])
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "every bug metric queried by dashboard is emitted" {
   run python3 - "${dashboard}" "${metrics}" <<'PY'
 import json, runpy, sys, tempfile
@@ -24,14 +49,16 @@ queries = set()
 for panel in data["panels"]:
     for target in panel.get("targets", []):
         queries.update(re.findall(r"k3dm_bug_[a-z_]+", target["expr"]))
+for variable in data.get("templating", {}).get("list", []):
+    queries.update(re.findall(r"k3dm_bug_[a-z_]+", variable.get("definition", "")))
 module = runpy.run_path(metrics_path)
 with tempfile.TemporaryDirectory() as tmp:
     bugs = Path(tmp) / "docs/bugs"
     bugs.mkdir(parents=True)
     (bugs / "one.md").write_text("**Priority:** P1\n**Status:** Open\n")
-    output = module["_bug_metrics"](Path(tmp))
+    output = module["_bug_metrics"](Path(tmp)) + module["_open_bug_metrics"](Path(tmp))
 source = Path(metrics_path).read_text()
-assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs"} <= queries
+assert {"k3dm_bug_docs", "k3dm_bug_release_docs", "k3dm_bug_current_release_info", "k3dm_bug_later_release_open_docs", "k3dm_bug_open_release_docs"} <= queries
 missing = [name for name in queries if name + "{" not in output and name + " " not in output and name + "{{" not in source]
 assert not missing, missing
 assert "k3dm_bug_docs_scan_timestamp_seconds" in output
@@ -139,7 +166,7 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "__name__", "job", "instance", "Time"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Priority", "Bug", "Filed", "Open for"]
+    assert [organize["renameByName"][name] for name in visible] == ["Priority", "Release", "Bug", "Filed", "Open for"]
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -163,7 +190,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "open bugs table shows only Priority, Bug, Filed, Open for, coloured like panel 7" {
+@test "open bugs table shows only Priority, Release, Bug, Filed, Open for, coloured like panel 7" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }

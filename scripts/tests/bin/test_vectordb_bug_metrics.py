@@ -93,6 +93,80 @@ def test_open_bug_metrics_include_only_open_docs_and_sanitized_labels(metrics, t
     assert info[0].endswith(" 10")
 
 
+def test_open_bug_metrics_labels_release_from_tally_or_unassigned(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    for name in ("known.md", "unknown.md", "absent.md"):
+        (bugs / name).write_text("**Priority:** P1\n**Status:** Open\n")
+    tally = {
+        "v1.43.1": {"open_paths": [{"path": "docs/bugs/known.md"}]},
+        "unknown": {"open_paths": [{"path": "docs/bugs/unknown.md"}]},
+    }
+    output = metrics._open_bug_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    assert any('bug="known",' in line and 'release="v1.43.1"' in line for line in lines)
+    assert all('release="unassigned"' in line for line in lines if 'bug="known"' not in line)
+    no_tally = metrics._open_bug_metrics(tmp_path, tally=None)
+    assert all('release="unassigned"' in line for line in no_tally.splitlines()
+               if line.startswith("k3dm_bug_open_info{"))
+
+
+def test_open_bug_metrics_release_is_last_label_and_aggregate_is_uncapped(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    for index in range(201):
+        priority = "P1" if index < 2 else "P2"
+        (bugs / f"bug-{index:03d}.md").write_text(f"**Priority:** {priority}\n**Status:** Open\n")
+    tally = {"v1.43.1": {"open_paths": [
+        {"path": f"docs/bugs/bug-{index:03d}.md", "priority": "P1" if index < 2 else "P2"}
+        for index in range(201)
+    ]}}
+    output = metrics._open_bug_metrics(tmp_path, tally=tally)
+    info = [line for line in output.splitlines() if line.startswith("k3dm_bug_open_info{")]
+    assert len(info) == 200
+    assert all(line.split("}", 1)[0].endswith('release="v1.43.1"') for line in info)
+    assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P1"} 2' in output
+    assert 'k3dm_bug_open_release_docs{release="v1.43.1",priority="P2"} 199' in output
+    assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
+               if line.startswith("k3dm_bug_open_release_docs{")) == 201
+
+
+def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch, tmp_path):
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+    requests = []
+    calls = []
+    monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda request, **_kwargs: requests.append(request) or Response())
+    monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
+    _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_tally",
+                        lambda *_args: calls.append(True) or {"v1.43.0": _bucket()})
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert len(calls) == 1
+    methods = {r.full_url.rsplit("/", 1)[-1]: r.method for r in requests if getattr(r, "data", None)}
+    assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST"}
+
+
+def test_publish_bug_metrics_tally_failure_still_pushes_open(metrics, monkeypatch, tmp_path):
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+    requests = []
+    monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda request, **_kwargs: requests.append(request) or Response())
+    monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
+    def boom(*_args):
+        raise RuntimeError("tally failed")
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_tally", boom)
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    pushed = [str(getattr(url, "full_url", url)) for url in requests if getattr(url, "data", None)]
+    assert any("/metrics/job/k3dm-bug-docs" in url for url in pushed)
+    assert any("/metrics/job/k3dm-bug-open" in url for url in pushed)
+    assert not any("/metrics/job/k3dm-bug-releases" in url for url in pushed)
+
+
 def test_open_bug_metrics_title_fallback_truncation_and_cap(metrics, tmp_path):
     bugs = tmp_path / "docs/bugs"
     bugs.mkdir(parents=True)
@@ -169,7 +243,8 @@ def test_open_bug_metrics_failure_does_not_block_other_groups(metrics, monkeypat
     urls = []
     monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda request, **_kwargs: urls.append(request) or Response())
     monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
-    monkeypatch.setattr(metrics, "_open_bug_metrics", lambda *_args: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_open_bug_metrics",
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
     _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
     assert metrics.publish_bug_metrics(tmp_path) is True
     pushed = [str(getattr(url, "full_url", url)) for url in urls]
@@ -178,17 +253,14 @@ def test_open_bug_metrics_failure_does_not_block_other_groups(metrics, monkeypat
 
 
 def _fake_git(monkeypatch, metrics, tally, tags, branch="k3d-manager-v1.43.0"):
-    import json as _json
-
     def run(argv, **_kwargs):
-        if argv[1].endswith("bug-tally.py"):
-            return SimpleNamespace(stdout=_json.dumps({"releases": tally}), returncode=0)
         if "tag" in argv:
             return SimpleNamespace(stdout="\n".join(tags) + "\n", returncode=0)
         if "branch" in argv:
             return SimpleNamespace(stdout=branch + "\n", returncode=0)
         raise AssertionError(argv)
     monkeypatch.setattr(metrics.subprocess, "run", run)
+    monkeypatch.setitem(metrics._release_metrics.__globals__, "_tally", lambda *_args: tally)
 
 
 def _bucket(**counts):

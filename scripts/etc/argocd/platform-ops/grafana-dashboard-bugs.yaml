@@ -25,6 +25,25 @@ data:
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "templating": {
+        "list": [
+          {
+            "name": "release",
+            "label": "Release (filed in)",
+            "type": "query",
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "query": {"query": "label_values(k3dm_bug_open_info, release)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+            "definition": "label_values(k3dm_bug_open_info, release)",
+            "refresh": 2,
+            "sort": 8,
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "current": {"selected": true, "text": ["All"], "value": ["$__all"]},
+            "hide": 0
+          }
+        ]
+      },
       "panels": [
         {
           "id": 20,
@@ -642,7 +661,7 @@ data:
         {
           "id": 22,
           "type": "row",
-          "title": "All open bugs",
+          "title": "Open bugs — filed in $release",
           "collapsed": false,
           "gridPos": {
             "x": 0,
@@ -669,7 +688,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P0\"})",
+              "expr": "sum(k3dm_bug_open_release_docs{priority=\"P0\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -699,6 +718,7 @@ data:
               }
             }
           },
+          "description": "Follows the Release dropdown (the release the bug was filed in).",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -717,7 +737,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P1\"})",
+              "expr": "sum(k3dm_bug_open_release_docs{priority=\"P1\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -747,6 +767,7 @@ data:
               }
             }
           },
+          "description": "Follows the Release dropdown (the release the bug was filed in).",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -765,7 +786,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P2\"})",
+              "expr": "sum(k3dm_bug_open_release_docs{priority=\"P2\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -791,6 +812,7 @@ data:
               }
             }
           },
+          "description": "Follows the Release dropdown (the release the bug was filed in).",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -809,7 +831,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_docs{state=\"open\",priority=\"P3\"})",
+              "expr": "sum(k3dm_bug_open_release_docs{priority=\"P3\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -835,6 +857,7 @@ data:
               }
             }
           },
+          "description": "Follows the Release dropdown (the release the bug was filed in).",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -948,11 +971,11 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every open bug doc, from the same scan as the counts above. Click a name to open the doc on the branch the scan read. If k3dm_bug_open_info_truncated is 1, the list is capped at 200.",
+          "description": "Every open bug doc, from the same scan as the counts above. Click a name to open the doc on the branch the scan read. If k3dm_bug_open_info_truncated is 1, the list is capped at 200. Follows the Release dropdown (the release the bug was filed in).",
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_bug_open_info",
+              "expr": "k3dm_bug_open_info{release=~\"$release\"}",
               "instant": true,
               "format": "table"
             }
@@ -974,9 +997,10 @@ data:
               "options": {
                 "indexByName": {
                   "priority": 0,
-                  "title": 1,
-                  "filed": 2,
-                  "Value": 3
+                  "release": 1,
+                  "title": 2,
+                  "filed": 3,
+                  "Value": 4
                 },
                 "excludeByName": {
                   "bug": true,
@@ -989,6 +1013,7 @@ data:
                 },
                 "renameByName": {
                   "priority": "Priority",
+                  "release": "Release",
                   "title": "Bug",
                   "filed": "Filed",
                   "Value": "Open for"
@@ -1013,6 +1038,18 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Release"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
               {
                 "matcher": {
                   "id": "byName",
