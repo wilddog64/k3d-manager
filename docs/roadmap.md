@@ -232,6 +232,11 @@ repo first. Branch `k3d-manager-v1.43.3`, cut from `main` after v1.43.2 merges.
     (P3): `grafana-dashboard-agent-dispatch.yaml`, `bin/k3dm-dispatch-metrics` and its pytest. Readable
     token stat, a Per spec table (tokens, Codex time, time to land, runs) and two time-per-spec stats.
     This one is in k3d-manager, so it can go through the dispatcher.
+- Added 2026-10-16 (operator):
+  - [`cluster-up-shell-acg-watcher-writes-to-terminal`](bugs/2026-10-16-cluster-up-shell-acg-watcher-writes-to-terminal.md)
+    (P3): `deploy_cluster` starts a disowned in-shell TTL watcher that keeps the operator's terminal
+    as its output, and `cluster-up` then installs the launchd watcher too, so two watchers run.
+    `k3s-aws.sh` and `bin/cluster-up` only; dispatcher-able.
 
 ### Candidate milestone — v1.43.4 (patch)
 
