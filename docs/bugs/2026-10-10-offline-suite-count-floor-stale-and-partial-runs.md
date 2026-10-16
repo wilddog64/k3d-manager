@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `63d29a47` (Codex, Claude verified: pytest 28/28, BATS 11/11, both spec mutations red). Rolled out 2026-10-16: Hostinger rule applied, first push read `k3dm_test_run_complete{target="test-all"} 0` (that run stopped at the negation lint, fixed `a0cf5ecd`).
+**Status:** LIVE-VERIFIED — 2026-10-16 the hub read `k3dm_test_run_complete{target="test-all"}` 0 for the partial run, then 1 with `k3dm_test_cases_total` 3052 for a full one. Was: IMPLEMENTED — landed `63d29a47` (Codex, Claude verified: pytest 28/28, BATS 11/11, both spec mutations red). Rolled out 2026-10-16: Hostinger rule applied, first push read `k3dm_test_run_complete{target="test-all"} 0` (that run stopped at the negation lint, fixed `a0cf5ecd`).
 **Priority:** P3 — alert hygiene; no outage, but the alert can no longer catch what it exists for
 **Severity:** low
 

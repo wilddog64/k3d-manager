@@ -1,7 +1,7 @@
 # Bug: shopping-cart frontend login rejected by Keycloak (Invalid redirect uri)
 
 **Filed:** 2026-10-13
-**Status:** FIXED 2026-10-15 — shopping-cart-infra PR #112 merged `556a4ea`; Argo CD `shopping-cart-identity` synced 556a4ea (Succeeded 23:44:52Z); live probe verified (see "Verification 2026-10-15")
+**Status:** LIVE-VERIFIED 2026-10-15 — shopping-cart-infra PR #112 merged `556a4ea`; Argo CD `shopping-cart-identity` synced 556a4ea (Succeeded 23:44:52Z); live probe verified (see "Verification 2026-10-15")
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — lowered from P1 2026-10-15 (operator): login works; logout is rejected so the session is not ended, workaround is clearing cookies
 **Approval:** operator 2026-10-15 — approved the schedule with fix option 1 (realm attribute) and dispatch to Codex: "let's do what you suggest, and you can dispatch to codex"

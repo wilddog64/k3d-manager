@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** FIXED 2026-10-11 (`6e1c82a4`, v1.43.2); live: alert fired 02:02:12Z and routed to `platform-warning`; operator confirmed the `[FIRING] HubKineCompactionStalled on hub (1)` email — live proof complete
+**Status:** LIVE-VERIFIED 2026-10-11 (`6e1c82a4`, v1.43.2); live: alert fired 02:02:12Z and routed to `platform-warning`; operator confirmed the `[FIRING] HubKineCompactionStalled on hub (1)` email — live proof complete
 **Approval:** explicit 2026-10-11 "yes" (to "Want me to file it?")
 **Priority:** P2 — the datastore degrades for days unnoticed; the workaround is reading `docker logs` by hand
 **Severity:** medium — the third dead-compaction episode; each one has ended in a hub rebuild

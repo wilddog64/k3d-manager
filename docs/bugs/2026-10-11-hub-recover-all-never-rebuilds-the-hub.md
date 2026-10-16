@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `0214f363` (Codex a7e55457 + Claude: refuse on a failed `k3d cluster list`, real-wrapper test); `make test` 1594/1598 (4 reds = Python 3.15 `load_module` removal, env-only; 74/74 on 3.13), operator `make test-metrics` 3002 cases 0 failed. Pending the operator live proof below.
+**Status:** LIVE-VERIFIED — live rebuild run `20261016T012103Z` (2026-10-15) rebuilt the hub; the manual recovery steps it exposed are filed separately. Was: IMPLEMENTED — landed `0214f363` (Codex a7e55457 + Claude: refuse on a failed `k3d cluster list`, real-wrapper test); `make test` 1594/1598 (4 reds = Python 3.15 `load_module` removal, env-only; 74/74 on 3.13), operator `make test-metrics` 3002 cases 0 failed. Pending the operator live proof below.
 **Approval:** explicit 2026-10-11 "go ahead, please this a make <target> so that I won't make any mistake" (operator, to "Want me to file the `hub-recover-all` ordering bug")
 **Priority:** P2 — the documented one-command rebuild cannot run; the workaround is a four-step manual sequence with a destructive teardown
 **Severity:** medium — the operator needs this rebuild now to clear the dead kine compaction (`docs/bugs/2026-10-11-hermes-kine-sensor-misses-dead-compaction.md`)

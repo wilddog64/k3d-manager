@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-11
 **Branch:** `k3d-manager-v1.43.2`
-**Status:** IMPLEMENTED — landed `6e716f80` (Codex, Claude-fixed: priority cell colours used field-name matchers so never applied, empty Filed mapping matched `null` not `empty`, Open-for cell not coloured; added the 4 BATS and 2 missing pytest cases). pytest 15/15, BATS 10/10, all 4 spec mutations red. Live proof pending (next Hermes poll after the platform-ops sync). Follow-up: `docs/plans/v1.43.2-bug-dashboard-release-filter.md`
+**Status:** LIVE-VERIFIED — 2026-10-16 the hub serves 56 open rows in `k3dm_bug_info` and the table lists them. Was: IMPLEMENTED — landed `6e716f80` (Codex, Claude-fixed: priority cell colours used field-name matchers so never applied, empty Filed mapping matched `null` not `empty`, Open-for cell not coloured; added the 4 BATS and 2 missing pytest cases). pytest 15/15, BATS 10/10, all 4 spec mutations red. Live proof pending (next Hermes poll after the platform-ops sync). Follow-up: `docs/plans/v1.43.2-bug-dashboard-release-filter.md`
 **Priority:** P3 — the counts are correct; the workaround is listing `docs/bugs/` by hand
 **Severity:** low
 
