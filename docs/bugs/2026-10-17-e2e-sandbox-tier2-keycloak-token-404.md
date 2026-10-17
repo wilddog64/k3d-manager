@@ -1,6 +1,6 @@
 # e2e-sandbox Tier 2 cannot mint a Keycloak token (doubled realm path, no e2e client on the hub realm)
 
-**Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap below fixed (pending live proof).
+**Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap fixed `ff5f5d99`, live-proven in run `1792203807-7042`.
 **Priority:** P1
 **Approval:** operator, 2026-10-17 — "go with your recommendation (A)"
 **Severity:** High — every Tier 2 Stripe test fails 401 before reaching payment-service
@@ -300,3 +300,5 @@ normal (non-trap) path" fails when the normal path is reverted to `_e2e_sandbox_
 checked). **Live proof:** after the next `make e2e-sandbox`,
 `kubectl --context ubuntu-k3s -n shopping-cart-apps get externalsecret e2e-keycloak-credentials`
 returns NotFound.
+
+**Live proof (2026-10-17, run `1792203807-7042`):** after a normal finish, the ExternalSecret and the Secret both return NotFound.
