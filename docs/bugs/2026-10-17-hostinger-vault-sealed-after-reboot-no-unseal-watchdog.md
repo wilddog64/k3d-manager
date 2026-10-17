@@ -1,6 +1,6 @@
 # Bug: Hostinger Vault stays sealed after a node reboot — no unseal watchdog there
 
-**Status:** OPEN — fix specified 2026-10-17, dispatched to Codex; recovery of the current seal needs the operator
+**Status:** FIXED — 2026-10-17: Codex `a1c2f800`; Claude-verified offline (Codex BATS 24/24, independent verifier `scripts/tests/lib/hostinger_vault_watchdog_acceptance.bats` 9/9, N1/N3 red on pre-fix, shellcheck clean). E3 live pending: operator `make refresh CLUSTER_PROVIDER=k3s-hostinger`, then delete `secrets/vault-0` and confirm `Sealed false` within 10 min
 **Priority:** P1
 **Approval:** approved — operator, 2026-10-17: "apporve the fix"
 **Found:** 2026-10-17, Claude, while `make appsets-reapply` failed its final check
