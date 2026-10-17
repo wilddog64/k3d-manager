@@ -1,6 +1,6 @@
 # e2e-sandbox Tier 2 cannot mint a Keycloak token (doubled realm path, no e2e client on the hub realm)
 
-**Status:** OPEN — fix spec written 2026-10-17 (Option A, below); implementation pending
+**Status:** FIXED in `bc6b2df6` (BATS + mutation verified 2026-10-17); awaiting live proof (`make up` then `make e2e-sandbox`)
 **Priority:** P1
 **Approval:** operator, 2026-10-17 — "go with your recommendation (A)"
 **Severity:** High — every Tier 2 Stripe test fails 401 before reaching payment-service
