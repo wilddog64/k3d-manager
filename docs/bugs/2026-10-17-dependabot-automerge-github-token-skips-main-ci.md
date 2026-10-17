@@ -194,3 +194,52 @@ Claude then committed and pushed `fix/automerge-app-token`; origin matches local
 | shopping-cart-product-catalog | `a6d60fe` |
 
 PRs wait for the operator's App setup (secrets present in all five repos).
+
+## Follow-up: single condition (Copilot, frontend #123, 2026-10-17)
+
+Copilot flagged that the auto-merge policy condition is written twice, on the mint step and on
+the enable step, so the two can drift apart. Keep the policy on the mint step only, and gate the
+enable step on the minted token. Apply in all 5 repos on `fix/automerge-app-token` so they stay
+identical. The block is byte-identical in all 5 today.
+
+`.github/workflows/dependabot-automerge.yml`
+
+old:
+```yaml
+      - name: Mint the auto-merge App token
+        # auto-merge enabled with GITHUB_TOKEN merges as github-actions, and that push never starts the image build
+        id: app-token
+        if: >-
+```
+new:
+```yaml
+      - name: Mint the auto-merge App token
+        # auto-merge enabled with GITHUB_TOKEN merges as github-actions, and that push never starts the image build
+        # semver-minor OR semver-patch, OR any Dependabot security update (open alert) regardless of semver;
+        # non-security major bumps fall through → left open for review
+        id: app-token
+        if: >-
+```
+
+old:
+```yaml
+      - name: Enable auto-merge for minor/patch and security updates
+        # semver-minor OR semver-patch, OR any Dependabot security update (open alert) regardless of semver;
+        # non-security major bumps fall through → left open for review
+        if: >-
+          steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.alert-state == 'OPEN'
+        run: gh pr merge --auto --squash "$PR_URL"
+```
+new:
+```yaml
+      - name: Enable auto-merge for minor/patch and security updates
+        # runs only when the mint step ran; the auto-merge policy lives on that step's condition
+        if: steps.app-token.outputs.token != ''
+        run: gh pr merge --auto --squash "$PR_URL"
+```
+
+No CHANGELOG change: the existing `[Unreleased]` entry still describes the fix. Gate: `actionlint`
+on the file in each repo, and the mint/enable block hashes the same in all 5. Commit message (all
+repos): `ci(dependabot): gate auto-merge on the minted App token, one policy condition`.
