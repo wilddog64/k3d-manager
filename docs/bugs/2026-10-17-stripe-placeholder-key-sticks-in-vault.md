@@ -87,3 +87,94 @@ Then rerun `make e2e-sandbox`, which restarts payment on its own.
   restart erased the exception message again. To confirm, read the failed `POST /v1/payment_intents`
   in the Stripe dashboard (Developers → Logs, test mode, about 01:53Z), or capture the logs during
   a rerun.
+
+## Second cause confirmed: Stripe rejects server-side confirm without `return_url` (2026-10-17 02:13Z)
+
+- **The key is not the problem.** The Keychain key, and so Vault and the cluster, belongs to
+  `acct_1Tzo4gGSVhtK1dwe`, the same account as the frontend's `VITE_STRIPE_PUBLISHABLE_KEY`.
+  `GET /v1/account` with that key succeeds. The operator's only dashboard login is a different account,
+  `acct_1Tzo4YKH1dHRwQRM`, which is why no request ever showed up in Developers → Logs.
+- **Repro.** The operator replayed the payment service's exact call against `acct_1Tzo4gGSVhtK1dwe`
+  (`amount=1000 currency=usd payment_method=pm_card_visa confirm=true`). The key went through stdin
+  (`curl -K -`). Stripe answered `invalid_request_error`: "This PaymentIntent is configured to accept
+  payment methods enabled in your Dashboard … you must provide a `return_url`. If you don't want to
+  accept redirect-based payment methods, set `automatic_payment_methods[enabled]` to `true` and
+  `automatic_payment_methods[allow_redirects]` to `never`."
+- **Why it reads as a decline.** `StripeGateway.processPayment` turns every `StripeException` into a
+  failure result, and order-service maps that to 402. So an invalid request looks like a declined card.
+
+### Fix — shopping-cart-payment (separate repo; spec for Codex)
+
+**Repo:** `wilddog64/shopping-cart-payment`. **Branch:** `fix/stripe-intent-no-redirects`, cut from
+`origin/main` (`193ee6f`). Do NOT work on the local `fix/tomcat-jackson3-cve-overrides`.
+
+**F1. `src/main/java/com/shoppingcart/payment/gateway/stripe/StripeGateway.java`.** Move the
+parameter build into a package-private method so it can be tested, and disable redirect-based
+methods whenever the server confirms.
+
+Old (inside `processPayment`):
+```java
+            PaymentIntentCreateParams.Builder paramsBuilder = PaymentIntentCreateParams.builder()
+                    .setAmount(amountInCents)
+                    .setCurrency(request.getCurrency().toLowerCase())
+                    .setDescription("Order: " + request.getOrderId())
+                    .putMetadata("order_id", request.getOrderId())
+                    .putMetadata("customer_id", request.getCustomerId());
+
+            if (request.getPaymentMethodToken() != null) {
+                paramsBuilder.setPaymentMethod(request.getPaymentMethodToken());
+                paramsBuilder.setConfirm(true);
+            }
+```
+New:
+```java
+            PaymentIntentCreateParams.Builder paramsBuilder = buildPaymentIntentParams(request, amountInCents);
+```
+and add, as a new method of the class:
+```java
+    PaymentIntentCreateParams.Builder buildPaymentIntentParams(PaymentRequest request, long amountInCents) {
+        PaymentIntentCreateParams.Builder paramsBuilder = PaymentIntentCreateParams.builder()
+                .setAmount(amountInCents)
+                .setCurrency(request.getCurrency().toLowerCase())
+                .setDescription("Order: " + request.getOrderId())
+                .putMetadata("order_id", request.getOrderId())
+                .putMetadata("customer_id", request.getCustomerId());
+
+        if (request.getPaymentMethodToken() != null) {
+            paramsBuilder.setPaymentMethod(request.getPaymentMethodToken());
+            paramsBuilder.setConfirm(true);
+            paramsBuilder.setAutomaticPaymentMethods(
+                    PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
+                            .setEnabled(true)
+                            .setAllowRedirects(PaymentIntentCreateParams.AutomaticPaymentMethods.AllowRedirects.NEVER)
+                            .build());
+        }
+        return paramsBuilder;
+    }
+```
+
+**F2. New test `src/test/java/com/shoppingcart/payment/gateway/stripe/StripeGatewayParamsTest.java`.**
+1. With a payment-method token, `build().getAutomaticPaymentMethods()` is non-null, `getEnabled()` is
+   `true` and `getAllowRedirects()` is `NEVER`. `getConfirm()` is `true`, and the payment method is
+   the token.
+2. Without a token, `getAutomaticPaymentMethods()` is null and `getConfirm()` is null, so the
+   existing behaviour is unchanged.
+3. Mutation check: drop the `setAutomaticPaymentMethods` call and test 1 must fail. Report that.
+
+No network and no live Stripe key in tests (stripe-java 34.0.0, already pinned).
+
+**Definition of Done**
+- [ ] `./mvnw -q test` green; paste the summary.
+- [ ] Commit: `fix(stripe): disable redirect payment methods on server-side confirm` and push to
+      `origin/fix/stripe-intent-no-redirects`; report the SHA.
+- [ ] Do NOT create a PR, do NOT touch `main`, do NOT skip hooks, and do NOT modify files outside F1–F2.
+
+**Live proof:** after the image rolls, Tier 2 `make e2e-sandbox` reports 4/4. That also marks this
+bug's success path proven live for the first time.
+
+### Follow-up (not blocking)
+
+The operator can only log into `acct_1Tzo4YKH1dHRwQRM`, so nobody can read the Stripe logs for the
+account the platform actually uses. Moving to it means updating the Keychain `k3dm-stripe-sk-test`,
+Vault `payment/stripe`, `VITE_STRIPE_PUBLISHABLE_KEY` and a frontend rebuild. That is operator
+credential work, to be scheduled separately.
