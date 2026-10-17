@@ -212,6 +212,17 @@ if _is_mac; then
       _info "[acg-down] Pushgateway port-forward launchd agent unloaded"
   fi
   _dry_guard "remove Pushgateway port-forward plist" rm -f "${_pgw_pf_plist}"
+
+  _info "[acg-down] Stopping ACG Prometheus port-forward launchd agent..."
+  _acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+  _acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload ACG Prometheus port-forward LaunchAgent"
+  elif launchctl list "${_acg_prom_pf_label}" >/dev/null 2>&1; then
+      launchctl unload "${_acg_prom_pf_plist}" 2>/dev/null || true
+      _info "[acg-down] ACG Prometheus port-forward launchd agent unloaded"
+  fi
+  _dry_guard "remove ACG Prometheus port-forward plist" rm -f "${_acg_prom_pf_plist}"
 fi
 
 if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then

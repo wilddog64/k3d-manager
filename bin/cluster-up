@@ -1964,14 +1964,53 @@ else
     kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
     rm -f "${_acg_prom_pf_pid_file}"
   fi
-  kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
-    -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
-    >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
-  _acg_prom_pf_pid=$!
-  _ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
-  echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
-  disown "${_acg_prom_pf_pid}"
-  _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+  _acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+  _acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+  _acg_prom_pf_log="${_ACG_STATE_DIR}/logs/acg-prom-pf.log"
+  _acg_prom_kubectl_bin="$(command -v kubectl)"
+  _acg_prom_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_acg_prom_pf_log}")" "$(dirname "${_acg_prom_pf_plist}")"
+  cat > "${_acg_prom_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_acg_prom_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_acg_prom_kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>svc/prometheus-operated</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>${_acg_observability_context}</string>
+    <string>--address</string>
+    <string>0.0.0.0</string>
+    <string>${_acg_prom_local_port}:9090</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_acg_prom_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_acg_prom_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_acg_prom_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_acg_prom_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_acg_prom_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_acg_prom_pf_plist}"
+  _info "[acg-up] ACG Prometheus port-forward agent loaded (launchd: ${_acg_prom_pf_label}, localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_acg_prom_pf_log})"
 fi
 
 _info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9092 → ${_acg_observability_context})..."

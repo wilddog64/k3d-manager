@@ -335,11 +335,17 @@ _pf_ensure "Vault port-forward" \
   port-forward svc/vault -n secrets --context k3d-k3d-cluster 18200:8200
 
 _acg_prom_local_port=$((19190 + $(_acg_provider_port_offset "${_cluster_provider}")))
-_pf_ensure "ACG Prometheus port-forward" \
-  "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
-  "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
-  port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
-  -n monitoring --context "${_app_context}" --address 0.0.0.0
+_acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+_acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+if _is_mac && [[ -f "${_acg_prom_pf_plist}" ]]; then
+  _launchd_ensure "${_acg_prom_pf_label}" "${_acg_prom_pf_plist}" user
+else
+  _pf_ensure "ACG Prometheus port-forward" \
+    "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
+    "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
+    port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
+    -n monitoring --context "${_app_context}" --address 0.0.0.0
+fi
 
 # ── 4. launchd agents (user-domain, self-heal via KeepAlive) ──────────────────
 if _is_mac; then
