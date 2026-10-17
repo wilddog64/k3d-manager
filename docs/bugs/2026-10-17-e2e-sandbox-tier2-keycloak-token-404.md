@@ -1,6 +1,6 @@
 # e2e-sandbox Tier 2 cannot mint a Keycloak token (doubled realm path, no e2e client on the hub realm)
 
-**Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap below still open.
+**Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap below fixed (pending live proof).
 **Priority:** P1
 **Approval:** operator, 2026-10-17 — "go with your recommendation (A)"
 **Severity:** High — every Tier 2 Stripe test fails 401 before reaching payment-service
@@ -290,3 +290,13 @@ returns NotFound.
 run that reaches its summary leaves the ExternalSecret and its Secret (age 19m after three runs).
 Fix: delete it on the normal path too, before `trap - EXIT` (one shared cleanup function). Add a BATS
 test for the non-trap path. The existing test covers only the trap.
+
+### Fixed (2026-10-17)
+
+The new `_e2e_sandbox_cleanup` resets the profile and deletes the ExternalSecret. It is called from
+both the normal path, before `trap - EXIT`, and `_e2e_sandbox_exit_trap`. `creationPolicy: Owner`
+means the Secret is garbage-collected with it. BATS test "keycloak credentials are deleted on the
+normal (non-trap) path" fails when the normal path is reverted to `_e2e_sandbox_clear_profile` (mutation
+checked). **Live proof:** after the next `make e2e-sandbox`,
+`kubectl --context ubuntu-k3s -n shopping-cart-apps get externalsecret e2e-keycloak-credentials`
+returns NotFound.

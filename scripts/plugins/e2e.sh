@@ -463,17 +463,21 @@ function e2e_verify_sandbox() {
   _e2e_write_summary "$run_id" "$candidate_digest" "$rc" "${_E2E_ACTIVE_PHASE}"
   _E2E_SUMMARY_WRITTEN=1
   _e2e_write_result_event "$run_id"
-  _e2e_sandbox_clear_profile
+  _e2e_sandbox_cleanup
   E2E_TIER="$old_tier" E2E_PROJECT="$old_project" export E2E_TIER E2E_PROJECT
   trap - EXIT
   return "$rc"
 }
 
+function _e2e_sandbox_cleanup() {
+  _e2e_sandbox_clear_profile
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found || true
+}
+
 function _e2e_sandbox_exit_trap() {
   local rc=$?
   set +e
-  _e2e_sandbox_clear_profile
-  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found || true
+  _e2e_sandbox_cleanup
   if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
     _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
     _e2e_write_result_event "${_E2E_RUN_ID}" || true

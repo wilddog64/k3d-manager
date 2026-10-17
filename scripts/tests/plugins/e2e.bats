@@ -242,6 +242,18 @@ FAKE
   [ "$status" -eq 0 ]
 }
 
+@test "keycloak credentials are deleted on the normal (non-trap) path" {
+  run awk '/^function e2e_verify_sandbox\(\)/{f=1} f && /_e2e_sandbox_cleanup/{c=NR} f && /trap - EXIT/{t=NR} f && /^}/{exit !(c && t && c < t)}' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  [ "$status" -eq 0 ]
+  local calls="$BATS_TEST_TMPDIR/normal-cleanup-calls"
+  : > "$calls"
+  _E2E_PROFILE_SET=0
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_cleanup
+  run grep -F 'delete externalsecret e2e-keycloak-credentials' "$calls"
+  [ "$status" -eq 0 ]
+}
+
 # agent-audit: allow assert-removed sandbox registration and override assertions; replaced by hub profile and overlay assertions
 @test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {
   run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
