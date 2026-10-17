@@ -59,7 +59,8 @@ extract_prometheus_else() {
     plutil -lint "${plist}"
   fi
   grep -Fq "load ${plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
-  ! grep -Fq 'port-forward' "${BATS_TEST_TMPDIR}/kubectl.log"
+  run grep -Fq 'port-forward' "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "${status}" -ne 0 ]
   [ ! -f "${BATS_TEST_TMPDIR}/state/run/acg-prom-pf.pid" ]
 }
 
@@ -90,4 +91,59 @@ extract_prometheus_else() {
   [ "${status}" -eq 0 ]
   run grep -nF '_pf_ensure "ACG Prometheus port-forward"' bin/cluster-refresh
   [ "${status}" -eq 0 ]
+}
+
+extract_step_14b() {
+  local source="${1:-${CLUSTER_UP_SOURCE:-bin/cluster-up}}"
+  awk '
+    /^_acg_prom_svc_ready=0$/ { active=1 }
+    active { print }
+    active && /^fi$/ { exit }
+  ' "${source}"
+}
+
+run_step_14b() {
+  local block="${BATS_TEST_TMPDIR}/step14b.sh"
+  extract_step_14b > "${block}"
+  printf 'wait\n' >> "${block}"
+  run env _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state" \
+    _acg_prom_pf_pid_file="${BATS_TEST_TMPDIR}/state/run/acg-prom-pf.pid" \
+    _acg_prom_local_port=19191 _acg_observability_context=ubuntu-k3s \
+    K3DM_ACG_PROM_SVC_ATTEMPTS=1 K3DM_ACG_PROM_SVC_INTERVAL=0 \
+    bash -c 'mkdir -p "${_ACG_STATE_DIR}/logs" "${_ACG_STATE_DIR}/run"; _info() { :; }; _warn() { :; }; _ACG_UP_OWNED_PIDS=""; source "$1"' bash "${block}"
+}
+
+@test "N1: Step 14b with the service present never runs kubectl port-forward" {
+  run_step_14b
+  [ "${status}" -eq 0 ]
+  run grep -F 'port-forward' "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "${status}" -ne 0 ]
+  [ -f "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.prometheus-port-forward.plist" ]
+}
+
+@test "N3: Step 14b with the service missing writes and loads no agent" {
+  cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+exit 1
+EOF
+  run_step_14b
+  [ "${status}" -eq 0 ]
+  [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.prometheus-port-forward.plist" ]
+  run grep -E 'load|port-forward' "${BATS_TEST_TMPDIR}/launchctl.log" "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "${status}" -ne 0 ]
+}
+
+@test "N4: cluster-down with no sandbox Prometheus agent exits 0 and unloads nothing" {
+  local block="${BATS_TEST_TMPDIR}/down.sh"
+  awk '
+    index($0, "Stopping ACG Prometheus port-forward launchd agent") { active=1 }
+    active { print }
+    active && index($0, "remove ACG Prometheus port-forward plist") { exit }
+  ' bin/cluster-down > "${block}"
+  [ -s "${block}" ]
+  run env bash -c 'set -euo pipefail; _info() { :; }; _dry_run_active() { return 1; }; _dry_guard() { shift; "$@"; }; source "$1"' bash "${block}"
+  [ "${status}" -eq 0 ]
+  run grep -E 'unload|bootout|remove' "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "${status}" -ne 0 ]
 }
