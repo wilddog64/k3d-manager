@@ -1,6 +1,6 @@
 # e2e-sandbox hub-apps gate fails on a single poll while an Application is still converging
 
-**Status:** OPEN — fix spec below; dispatched to Codex 2026-10-17
+**Status:** FIXED (`45412d26`), awaiting live proof — dispatched to Codex and landed 2026-10-17
 **Priority:** P2
 **Severity:** Medium — a `make e2e-sandbox` run started right after `make up` fails before Playwright; rerunning a few minutes later passes
 **Found by:** Claude, live run `1792200825-26862` (2026-10-17), branch `k3d-manager-v1.43.4`
@@ -125,3 +125,16 @@ really waits:
 
 `make e2e-sandbox` started straight after `make up` passes `checking-hub-apps`, possibly after one or
 more "still converging" lines, and the log shows the gate's final `Synced and Healthy` line.
+
+## Landed (2026-10-17)
+
+`45412d26` on `k3d-manager-v1.43.4`, via `bin/k3dm-codex-dispatch` (task `hub-apps-settle-wait`).
+Claude checked it independently:
+- **Diff:** matches F1/F2 exactly, and only the two `## Files` paths changed.
+- **Gates:** `shellcheck -S warning` is clean and `bats scripts/tests/plugins/e2e.bats` passes 77/77.
+- **Mutations, on temporary copies:**
+  - removing the `break` makes the converge test hang, killed at 60s;
+  - moving the empty-listing check below the deadline check fails "empty hub Applications fail
+    without waiting".
+
+Live proof is still pending (see above).
