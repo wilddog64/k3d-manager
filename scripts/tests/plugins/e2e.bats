@@ -109,6 +109,7 @@ FAKE
   _e2e_sandbox_enable_stripe() { :; }
   acg_extend_playwright() { :; }
   _e2e_sandbox_provision_secrets() { :; }
+  _e2e_sandbox_provision_keycloak_credentials() { :; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
   _e2e_write_summary() { :; }
@@ -129,6 +130,7 @@ FAKE
   acg_extend_playwright() { :; }
   _e2e_sandbox_hub_apps_ready() { printf 'hub-apps\n' >> "$calls"; }
   _e2e_sandbox_provision_secrets() { printf 'provision\n' >> "$calls"; }
+  _e2e_sandbox_provision_keycloak_credentials() { printf 'keycloak-credentials\n' >> "$calls"; }
   _e2e_sandbox_enable_stripe() { :; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
@@ -140,6 +142,31 @@ FAKE
   run cat "$calls"
   [ "${lines[0]}" = "hub-apps" ]
   [ "${lines[1]}" = "provision" ]
+  [ "${lines[2]}" = "keycloak-credentials" ]
+}
+
+@test "sandbox provisions Keycloak credentials before enabling Stripe" {
+  local calls="$BATS_TEST_TMPDIR/keycloak-phase-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  _e2e_sandbox_preflight_hub() { :; }
+  _e2e_sandbox_hub_apps_ready() { :; }
+  acg_extend_playwright() { :; }
+  _e2e_sandbox_provision_secrets() { printf 'provisioning-secrets\n' >> "$calls"; }
+  _e2e_sandbox_provision_keycloak_credentials() { printf 'provisioning-keycloak-credentials\n' >> "$calls"; }
+  _e2e_sandbox_enable_stripe() { printf 'enabling-stripe\n' >> "$calls"; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  _run_command() { :; }
+  run e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  run cat "$calls"
+  [ "${lines[0]}" = "provisioning-secrets" ]
+  [ "${lines[1]}" = "provisioning-keycloak-credentials" ]
+  [ "${lines[2]}" = "enabling-stripe" ]
 }
 
 @test "sandbox phase checks hub before extending it" {
@@ -211,6 +238,8 @@ FAKE
   [ "$status" -ne 0 ]
   run grep -F 'profile none' "$calls"
   [ "$status" -eq 0 ]
+  run grep -F 'delete externalsecret e2e-keycloak-credentials' "$calls"
+  [ "$status" -eq 0 ]
 }
 
 # agent-audit: allow assert-removed sandbox registration and override assertions; replaced by hub profile and overlay assertions
@@ -219,7 +248,10 @@ FAKE
   [ "$status" -eq 0 ]
   [[ "$output" == *$'name: OAUTH2_ENABLED\n              value: "true"'* ]]
   [[ "$output" == *$'name: STRIPE_E2E\n              value: "true"'* ]]
-  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org/realms/shopping-cart"* ]]
+  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org"* ]]
+  [[ "$output" != *"https://keycloak.3ai-talk.org/realms"* ]]
+  [[ "$output" == *"KEYCLOAK_CLIENT_SECRET"*"e2e-keycloak-credentials"*"client-secret"* ]]
+  [[ "$output" == *"TEST_PASSWORD"*"e2e-keycloak-credentials"*"user-password"* ]]
   [[ "$output" == *"stripe-checkout-orchestrator.spec.ts"* ]]
 }
 

@@ -941,6 +941,24 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
     fi
   fi
+
+  if _vault_kv_exists "keycloak/e2e"; then
+    _info "[acg-up] Reusing existing Vault secret keycloak/e2e"
+    _e2e_kc_client_secret=$(_vault_kv_get_field "keycloak/e2e" "client_secret")
+    _e2e_kc_user_password=$(_vault_kv_get_field "keycloak/e2e" "user_password")
+  else
+    _src_json=$(_seed_source_data "keycloak/e2e")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/e2e from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/e2e
+      _e2e_kc_client_secret=$(printf '%s' "${_src_json}" | jq -r '.client_secret // empty')
+      _e2e_kc_user_password=$(printf '%s' "${_src_json}" | jq -r '.user_password // empty')
+    else
+      _e2e_kc_client_secret=$(openssl rand -base64 36 | tr -d '=+/')
+      _e2e_kc_user_password=$(openssl rand -base64 36 | tr -d '=+/')
+      _vault_kv_put "{\"client_secret\":\"${_e2e_kc_client_secret}\",\"user_password\":\"${_e2e_kc_user_password}\"}" keycloak/e2e
+    fi
+  fi
   _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, minio, ldap, keycloak sandbox secrets)"
 }
 

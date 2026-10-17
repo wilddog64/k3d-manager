@@ -74,6 +74,8 @@ source "${REPO_ROOT}/scripts/plugins/hub_recovery.sh"
 : "${_order_client_secret:=}"
 : "${_product_client_secret:=}"
 : "${_grafana_client_secret:=}"
+: "${_e2e_kc_client_secret:=}"
+: "${_e2e_kc_user_password:=}"
 : "${_ldap_admin_pass:=}"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
@@ -1129,6 +1131,14 @@ else
       _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
       if _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method"; then
         _info "[acg-up] Keycloak client 'argocd' PKCE attribute removed"
+        if E2E_KC_CLIENT_SECRET="${_e2e_kc_client_secret}" E2E_KC_USER_PASSWORD="${_e2e_kc_user_password}" \
+            _keycloak_ensure_e2e_identity "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart"; then
+          _info "[acg-up] Keycloak e2e identity ensured"
+        else
+          kill "${_kc_pf_pid}" 2>/dev/null || true
+          rm -f "${_realm_json_file}"
+          _acg_fail "[acg-up] Failed to ensure the Keycloak e2e identity"
+        fi
       else
         kill "${_kc_pf_pid}" 2>/dev/null || true
         rm -f "${_realm_json_file}"

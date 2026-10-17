@@ -273,7 +273,23 @@ spec:
             - name: STRIPE_E2E
               value: "true"
             - name: KEYCLOAK_URL
-              value: https://keycloak.3ai-talk.org/realms/shopping-cart
+              value: https://keycloak.3ai-talk.org
+            - name: KEYCLOAK_REALM
+              value: shopping-cart
+            - name: KEYCLOAK_CLIENT_ID
+              value: e2e-tests
+            - name: TEST_USERNAME
+              value: e2e-user
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: e2e-keycloak-credentials
+                  key: client-secret
+            - name: TEST_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: e2e-keycloak-credentials
+                  key: user-password
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -328,6 +344,39 @@ function _e2e_sandbox_provision_secrets() {
     --from-file=sk_test=/dev/stdin \
     -n "$E2E_NAMESPACE" \
     --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
+}
+
+function _e2e_sandbox_provision_keycloak_credentials() {
+  cat <<'YAML' | _e2e_sandbox_kc apply -f -
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: e2e-keycloak-credentials
+  namespace: shopping-cart-apps
+  labels:
+    app.kubernetes.io/part-of: k3dm-e2e
+spec:
+  refreshInterval: 0s
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: e2e-keycloak-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: client-secret
+      remoteRef:
+        key: secret/data/keycloak/e2e
+        property: client_secret
+    - secretKey: user-password
+      remoteRef:
+        key: secret/data/keycloak/e2e
+        property: user_password
+YAML
+  if ! _e2e_sandbox_kc -n "$E2E_NAMESPACE" wait --for=condition=Ready externalsecret/e2e-keycloak-credentials --timeout="${E2E_ESO_TIMEOUT:-90}s"; then
+    _err "[e2e] ExternalSecret e2e-keycloak-credentials did not become Ready — check Vault secret/keycloak/e2e and the sandbox ESO log"
+    return 1
+  fi
 }
 
 function _e2e_sandbox_preflight_auth() {
@@ -395,6 +444,8 @@ function e2e_verify_sandbox() {
 
   _E2E_ACTIVE_PHASE="provisioning-secrets"
   _e2e_sandbox_provision_secrets
+  _E2E_ACTIVE_PHASE="provisioning-keycloak-credentials"
+  _e2e_sandbox_provision_keycloak_credentials
 
   _E2E_ACTIVE_PHASE="enabling-stripe"
   _e2e_sandbox_enable_stripe
@@ -422,6 +473,7 @@ function _e2e_sandbox_exit_trap() {
   local rc=$?
   set +e
   _e2e_sandbox_clear_profile
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found || true
   if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
     _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
     _e2e_write_result_event "${_E2E_RUN_ID}" || true

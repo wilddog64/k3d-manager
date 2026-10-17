@@ -209,6 +209,16 @@ the release branch first. Tier 2 is best-effort and periodic, never a blocking
 per-candidate gate. Its summaries use `tier: sandbox` and `project: stripe` in the
 shared report directory.
 
+Tier 2 authenticates through the hub's public `shopping-cart` Keycloak realm. The
+hub seeds a confidential password-grant client named `e2e-tests` and a local
+Keycloak user named `e2e-user`, granting only `PAYMENT_USER` and `PAYMENT_WRITE`.
+The client secret and password are seeded once in Vault at `secret/keycloak/e2e`.
+Each run applies a run-scoped ExternalSecret in `shopping-cart-apps`; the sandbox
+ESO reads those two fields into `e2e-keycloak-credentials`, which the Job consumes.
+The harness does not read Vault on the laptop, and the credentials are not a
+GitOps ExternalSecret because that namespace is shared with the production
+Hostinger deployment.
+
 ### Tier 2 ACG auto-login enablement
 
 The ACG session gate is already wired into the browser path. Tier 2 extends the
