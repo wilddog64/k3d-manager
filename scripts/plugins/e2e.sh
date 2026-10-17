@@ -172,7 +172,7 @@ function _e2e_sandbox_preflight_hub() {
 
 function _e2e_sandbox_hub_apps_ready() {
   local ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" listing bad
-  local timeout="${E2E_HUB_APPS_TIMEOUT:-180}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
   deadline=$(( SECONDS + timeout ))
   while :; do
     listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \

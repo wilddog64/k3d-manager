@@ -257,6 +257,22 @@ FAKE
   [[ "$output" == *"none target ubuntu-k3s"* ]]
 }
 
+@test "hub Applications default window outlasts two ArgoCD reconciles" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-default-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+    printf '%s\n' "app OutOfSync Healthy"
+  }
+  sleep() { SECONDS=$(( SECONDS + $1 )); }
+  unset E2E_HUB_APPS_TIMEOUT E2E_HUB_APPS_INTERVAL
+  run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 420s"* ]]
+  [[ "$output" == *"rechecking in 10s"* ]]
+  [ "$(wc -l < "$calls")" -ge 40 ]
+}
+
 @test "stripe profile is set before rollout and reset after the run" {
   local calls="$BATS_TEST_TMPDIR/profile-calls"
   : > "$calls"

@@ -178,7 +178,9 @@ mutable `latest` uses `Always` and other tags use `IfNotPresent`), `E2E_NAMESPAC
 
 `e2e_verify_sandbox` is the opt-in, periodic Tier 2 path for the Stripe checkout
 flow. It extends the ACG sandbox TTL; the hub deploys the platform to the sandbox,
-and Tier 2 checks the hub's `ubuntu-k3s` Applications, sets
+and Tier 2 waits for the hub's `ubuntu-k3s` Applications to be `Synced Healthy` (re-polling every
+`E2E_HUB_APPS_INTERVAL`, default 10s, for up to `E2E_HUB_APPS_TIMEOUT`, default 420s — two ArgoCD
+reconciles, since a fresh sandbox can need a second one), sets
 `k3dm.k3d.io/e2e-profile=stripe` on the hub registration for the run (order/payment
 use the overlays in `services-e2e-stripe/`), and resets it to `none` on exit. `cluster-up` always
 registers with `none`. The run uses `E2E_HUB_CONTEXT`, `E2E_HUB_ARGOCD_NAMESPACE`,
