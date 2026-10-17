@@ -1,6 +1,6 @@
 # Tier 2 Stripe flow reads the payments-by-order object as an empty list
 
-**Status:** FIXED — shopping-cart-e2e-tests PR #12 merged `7ef0a5f8`; live 4/4 pending
+**Status:** FIXED — shopping-cart-e2e-tests PR #12 merged `7ef0a5f8`; live 4/4 confirmed (run `1792240129-27700`)
 **Priority:** P2
 **Severity:** Medium — Tier 2 can never reach 4/4. The flow it checks works; only its last assertion is wrong
 **Found by:** Claude, live run `1792236389-10503` (2026-10-17), branch `k3d-manager-v1.43.4`
@@ -98,3 +98,9 @@ Paste the output of all three.
 After the merge, `publish-image.yml` pushes `shopping-cart-e2e-tests:latest`. The Tier 2 harness
 pulls `latest` with `Always` (`scripts/plugins/e2e.sh:5`), so the next `make e2e-sandbox` picks it up
 with no pin change. Expect 4/4.
+
+## Live proof (2026-10-17)
+
+Run `1792240129-27700` (k3d-manager `a8b2dddd`, e2e image from `7ef0a5f8`): **4/4 passed**, `exit_code=0`,
+no failures. The gate passed on its first poll (15 Synced and Healthy), and `make e2e-sandbox` exited about 1s
+after its last log line.
