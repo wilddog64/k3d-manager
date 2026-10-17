@@ -1,3 +1,4 @@
+- 2026-10-17: rebase requested on shopping-cart-order dependabot #92/#90/#89. Reopened docs/bugs/2026-10-06-shopping-cart-order-go-dependabot-coverage-gap.md with spec F1-F3 (go get x/crypto 0.55, x/net 0.60, x/text 0.39 + golang:1.27-alpine builder; branch fix/go-x-deps-cves). Dispatching to Codex.
 - 2026-10-17: order is the Go rewrite (CI builds go/Dockerfile); 9 HIGH = musl (fix: dependabot #90/#89 alpine 3.24), stdlib (#92 golang 1.27), x/crypto+net+text indirect (needs go get spec). Awaiting operator.
 - 2026-10-17: order DRIFT checked: 4 CI/Dependabot-only commits (61568ccc..fc3fae5a), rebuild on floating temurin base; trivy HIGH/CRITICAL identical (0C/9H). Recommend NOT bumping; awaiting operator.
 - 2026-10-17: image-pin drift check LANDED dcf8f58a (make image-pin-drift; Claude fixed 12-char compare, ! grep no-op, missing prefix test; BATS 8/8, 3 mutations caught; live = order DRIFT 6412b131 vs 590832de). Open: operator decides on the order pin bump.
