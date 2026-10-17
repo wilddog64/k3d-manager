@@ -1,6 +1,6 @@
 # Bug: cluster-up Step 10d.5 fails — the hub LDAP rejects the `openldap-admin` Secret's password
 
-**Status:** OPEN — fix specified 2026-10-17 (F1–F3 below), dispatched to Codex
+**Status:** FIXED (`244701bf`) — live proof pending (hub rebuild drill 2026-10-29)
 **Priority:** P2 — degraded with a workaround (restart `statefulset/openldap`, rerun `make up`); downgraded from P1 2026-10-17 by the operator
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make up` before `make e2e-sandbox`, diagnosed by Claude, read-only)
@@ -275,3 +275,16 @@ fails; drop F3's call → the new B4-R3 test fails.
 
 The hub rebuild drill on 2026-10-29 (`project_hub_rebuild_drill_2026_10_29`): recover step 8 passes with
 the admin-bind check, and `make up` Step 10d.5 logs `LDAP password set and verified` for all three users.
+
+## Landed (2026-10-17)
+
+`244701bf` on `k3d-manager-v1.43.4`, via `bin/k3dm-codex-dispatch` (task `ldap-admin-bind-refresh`).
+Codex left the change uncommitted; Claude committed it with the spec's message after checking it:
+
+- The diff matches F1–F4 exactly and touches only the four files in `## Files`.
+- `shellcheck -S warning` is clean on both scripts.
+- `bats scripts/tests/plugins/hub_data.bats scripts/tests/bin/cluster_up.bats` passes 170/170.
+- Mutation checks, each on a temporary copy, all caught:
+  - dropping F1's restart fails D2;
+  - restoring `-w "$LDAP_ADMIN_PASSWORD"` fails the new cluster_up test;
+  - dropping F3's call fails the new B4-R3 test.
