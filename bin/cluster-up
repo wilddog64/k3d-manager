@@ -1177,6 +1177,11 @@ else
     _err "[acg-up] LDAP pod not found in identity namespace — cannot seed user passwords"
     exit 1
   else
+    _ldap_admin_pass="$(_acg_ldap_bind_pass)"
+    if [[ -z "${_ldap_admin_pass}" ]]; then
+      _err "[acg-up] LDAP admin password not readable from identity/openldap-admin — cannot seed user passwords"
+      exit 1
+    fi
     _ldap_seed_failed=0
     for _ldap_user in admin developer operator; do
       _ldap_user_vault_path="keycloak/users/${_ldap_user}"
@@ -1186,12 +1191,16 @@ else
         _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
         _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
       fi
-      if printf '%s\n%s\n' "${_ldap_user_pass}" "${_ldap_user_pass}" | \
+      if printf '%s\n%s\n%s\n' "${_ldap_admin_pass}" "${_ldap_user_pass}" "${_ldap_user_pass}" | \
           kubectl exec -i -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
             sh -ceu '
+              _ldap_admin_password_file=$(mktemp)
+              trap "rm -f \"${_ldap_admin_password_file}\"" EXIT
+              IFS= read -r _ldap_admin_password
+              printf "%s" "${_ldap_admin_password}" > "${_ldap_admin_password_file}"
               ldappasswd -x -H ldap://localhost:1389 \
                 -D "cn=ldap-admin,dc=home,dc=org" \
-                -w "$LDAP_ADMIN_PASSWORD" \
+                -y "${_ldap_admin_password_file}" \
                 -S "uid=$1,ou=users,dc=home,dc=org"
             ' sh "${_ldap_user}" >/dev/null 2>&1; then
         if printf '%s' "${_ldap_user_pass}" | \

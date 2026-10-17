@@ -212,6 +212,10 @@ function _hub_data_ldap_dn_digest() {
   "$@" -n identity exec statefulset/openldap -- sh -c 'ldapsearch -Q -Y EXTERNAL -H ldapi:/// -LLL -b "$LDAP_ROOT" dn' 2>/dev/null | awk '/^dn:/{print $2}' | sort | shasum -a 256 | awk '{print $1}'
 }
 
+function _hub_data_ldap_admin_bind() {
+  "$@" -n identity exec statefulset/openldap -- sh -c 'f=$(mktemp); trap "rm -f \"$f\"" EXIT; printf "%s" "$LDAP_ADMIN_PASSWORD" > "$f"; ldapwhoami -x -H ldap://localhost:1389 -D "cn=ldap-admin,dc=home,dc=org" -y "$f"' >/dev/null 2>&1
+}
+
 function _hub_data_inventory_images() {
   local context
   context="$(_hub_data_target_context)"
@@ -802,6 +806,8 @@ function _hub_data_refresh_dependents() {
   _kubectl --context "$context" -n identity rollout restart deployment/keycloak || return 1
   _kubectl --context "$context" -n monitoring rollout restart deployment/kube-prometheus-stack-grafana || _warn "[hub-recover] could not restart Grafana; its admin password may not match Vault until it restarts"
   _kubectl --context "$context" -n cicd rollout restart deployment/argocd-server || _warn "[hub-recover] could not restart argocd-server; SSO may use a stale client secret until it restarts"
+  _kubectl --context "$context" -n identity rollout restart statefulset/openldap || return 1
+  _kubectl --context "$context" -n identity rollout status statefulset/openldap --timeout=300s || return 1
 }
 
 function _hub_data_record_rto() {
@@ -957,6 +963,7 @@ function hub_data_verify_keycloak() {
 function hub_data_verify_ldap() {
   local inventory="$1" context="$2" want actual expected digest
   want="$(jq -r '.ldap_entry_count' "$inventory")"; actual="$(_hub_data_ldap_entry_count _kubectl --context "$context")"; [[ "$actual" == "$want" ]] || return 1
+  _hub_data_ldap_admin_bind _kubectl --context "$context" || { _err '[hub-data] LDAP admin bind failed with the openldap-admin password'; return 1; }
   if jq -e 'has("ldap_dns_sha256")' "$inventory" >/dev/null 2>&1; then
     expected="$(jq -r '.ldap_dns_sha256' "$inventory")"; digest="$(_hub_data_ldap_dn_digest _kubectl --context "$context")"
     [[ "$expected" == "$digest" ]] || { _err '[hub-data] LDAP DN digest mismatch'; return 1; }

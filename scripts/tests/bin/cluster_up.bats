@@ -355,6 +355,26 @@ STUB
   [ "$status" -eq 0 ]
 }
 
+@test "acg-up seeds LDAP users with the openldap-admin Secret, not the pod env" {
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q "_acg_ldap_bind_pass"
+  '
+  [ "$status" -eq 0 ]
+
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q -- "-y \\\"\${_ldap_admin_password_file}\\\""
+  '
+  [ "$status" -eq 0 ]
+
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q "LDAP_ADMIN_PASSWORD"
+  '
+  [ "$status" -ne 0 ]
+}
+
 @test "acg-up keeps LDAP user passwords out of command arguments" {
   run grep -nF 'ldappasswd -x -H ldap://localhost:1389' bin/cluster-up
   [ "$status" -eq 0 ]
