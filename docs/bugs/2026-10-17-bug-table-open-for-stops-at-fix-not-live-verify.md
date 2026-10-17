@@ -1,6 +1,6 @@
 # Bug: the Bug Tracking table's "Open for" stops counting at the fix, not at live verification
 
-**Status:** OPEN — spec ready, not dispatched
+**Status:** VERIFIED — 2026-10-17: fix `e9126805` (pytest 41/41); independent acceptance tests `test_open_for_acceptance.py` 12/12 on HEAD, N1 red on pre-fix. E3 live (dashboard after next bug scan) pending
 **Priority:** P3
 **Approval:** approved — operator, 2026-10-17: "Open for to remind until we verify bug live instead of day we fix it"
 **Found:** 2026-10-17, operator
