@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — fix spec written 2026-10-16 (below); implementation pending
+**Status:** OPEN — part A landed in lib-foundation `c2fd0a5` (PR #70, CI pending); part B waits for v0.5.4 + subtree pull
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium
 **Approval:** operator explicitly requested filing P2 on 2026-10-15; fix approved 2026-10-16 "go for that green + warning" (operator) — credential-invalid stays exit 0 with an `UNVERIFIED` warning
