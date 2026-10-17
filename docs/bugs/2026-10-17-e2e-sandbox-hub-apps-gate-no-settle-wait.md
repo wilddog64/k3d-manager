@@ -240,3 +240,11 @@ As for F1/F2 above (with the third file added to `## Files`), except:
 
 A `make e2e-sandbox` started straight after `make up` passes `checking-hub-apps` even when an Application
 needs a second reconcile.
+
+### Landed — F3–F5 (2026-10-17)
+
+`2de544dc` on `k3d-manager-v1.43.4`, via `bin/k3dm-codex-dispatch` (task `hub-apps-timeout-two-reconciles`).
+Claude checked it independently: the diff matches F3–F5 exactly (three files); `shellcheck -S warning` is
+clean; `bats scripts/tests/plugins/e2e.bats` passes 78/78; the new test runs in about 0.3s. Mutations, on a
+temporary copy: a default of `180` fails `after 420s`; an interval default of `0` fails `rechecking in 10s`
+(after spinning the real 420s, since the stub then never advances `SECONDS`). Live proof still pending.
