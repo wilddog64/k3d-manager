@@ -271,6 +271,7 @@ docs/
 - **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
 - **[ArgoCD Alerts](docs/howto/argocd-alerts.md)** — ArgoCD Degraded/OutOfSync alert wiring, visibility, and test steps
 - **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
+- **[Check service image pins](docs/howto/check-service-image-pins.md)** — Compare shopping-cart service digests with the newest GHCR `:latest` images
 
 **Cloud Sandbox**
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown

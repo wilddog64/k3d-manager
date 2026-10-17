@@ -4,6 +4,7 @@
 .DEFAULT_GOAL := help
 
 .PHONY: lint-python
+.PHONY: image-pin-drift
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -1318,6 +1319,10 @@ embed-cache-restore:
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
 	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
+
+## Compare services/*/kustomization.yaml image digests with :latest in GHCR (read-only; needs gh read:packages)
+image-pin-drift:
+	@./bin/k3dm-image-pin-drift
 
 ## Fail if test/job debris (empty-mktemp derived paths) exists at the repo root
 check-repo-root:
