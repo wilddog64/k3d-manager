@@ -1,6 +1,6 @@
 # e2e-sandbox hub-apps gate fails on a single poll while an Application is still converging
 
-**Status:** FIXED (`45412d26`), awaiting live proof — dispatched to Codex and landed 2026-10-17
+**Status:** REOPENED (recurrence, 2026-10-17) — the retry path is live-proven, but the 180s default is shorter than one ArgoCD reconcile; fix F3–F5 below, dispatched to Codex. The first fix `45412d26` stays.
 **Priority:** P2
 **Severity:** Medium — a `make e2e-sandbox` run started right after `make up` fails before Playwright; rerunning a few minutes later passes
 **Found by:** Claude, live run `1792200825-26862` (2026-10-17), branch `k3d-manager-v1.43.4`
@@ -144,3 +144,99 @@ first poll ("15 Synced and Healthy"), so the new code causes no regression on a 
 retry path was not exercised, because nothing was converging. Live proof of the retry still waits
 for a run started straight after `make up`. The run was 3/4; the one failure is the deferred Stripe
 402 (`docs/bugs/2026-10-17-stripe-placeholder-key-sticks-in-vault.md`).
+
+## Recurrence — 180s is shorter than an ArgoCD reconcile (2026-10-17)
+
+**Approval:** explicit 2026-10-17 "go for those" (operator), on Claude's write-up of this run.
+
+**Live run `1792235425-21547`** (commit `5ab6b236`) was started straight after `make up`. It exercised the
+retry path for the first time. Every converging Application but one settled within the window
+(`acg-kube-prometheus-stack`, `istio-base-ubuntu-k3s`, `ubuntu-k3s-data-layer`, and the frontend and payment
+apps), and the gate logged each "still converging" line as specified. The retry path is therefore
+**live-proven**. But the run still failed:
+
+```
+ERROR: [e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy after 180s: acg-trivy-operator OutOfSync Healthy;
+```
+
+`acg-trivy-operator`'s four `ClusterComplianceReport`s (`k8s-cis-1.23`, `k8s-nsa-1.0`,
+`k8s-pss-baseline-0.1`, `k8s-pss-restricted-0.1`) stayed OutOfSync after the sync operation had
+`Succeeded` at 11:12:36Z. Their live spec matched the hub's own `trivy-operator`, which is `Synced`. The app
+went `Synced` on its own at 11:18:28Z, with nobody touching it — about six minutes after the sync, at the next
+reconcile. The rerun (`1792235987-31168`) then passed the gate on its first poll.
+
+**Cause.** The gate's window equals ArgoCD's default reconcile period (`timeout.reconciliation`, 180s, plus
+jitter). A diff that only clears at the next reconcile can outlast a 180s window that starts while the sync is still running. The window must cover at least two
+reconcile periods. Why these four reports need a second reconcile is not established (one guess: they are
+diffed before the CRD the same sync installs is cached). F3 works either way.
+
+### Fix
+
+**F3.** In `scripts/plugins/e2e.sh`, `_e2e_sandbox_hub_apps_ready`, raise the default from 180s to 420s
+(two reconcile periods plus a minute of jitter).
+
+Old:
+```bash
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-180}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+```
+
+New:
+```bash
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+```
+
+**F4.** In `scripts/tests/plugins/e2e.bats`, add this test directly after "empty hub Applications fail without
+waiting". It pins the default without waiting: the `sleep` stub advances bash's `SECONDS` instead of sleeping.
+
+```bash
+@test "hub Applications default window outlasts two ArgoCD reconciles" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-default-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+    printf '%s\n' "app OutOfSync Healthy"
+  }
+  sleep() { SECONDS=$(( SECONDS + $1 )); }
+  unset E2E_HUB_APPS_TIMEOUT E2E_HUB_APPS_INTERVAL
+  run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 420s"* ]]
+  [[ "$output" == *"rechecking in 10s"* ]]
+  [ "$(wc -l < "$calls")" -ge 40 ]
+}
+```
+
+**Mutation checks** (on a temporary copy, not the tree; report each as caught):
+- reverting the default to `180` → the new test fails (`after 180s`, about 19 calls);
+- changing the interval default from `10` to `0` → the new test fails (`rechecking in 0s`).
+
+**F5.** In `docs/guides/vcluster-e2e-harness.md`, Tier 2 intro paragraph, document the gate's knobs.
+
+Old:
+```markdown
+Tier 2 checks the hub's `ubuntu-k3s` Applications, sets
+```
+
+New:
+```markdown
+Tier 2 waits for the hub's `ubuntu-k3s` Applications to be `Synced Healthy` (re-polling every
+`E2E_HUB_APPS_INTERVAL`, default 10s, for up to `E2E_HUB_APPS_TIMEOUT`, default 420s — two ArgoCD
+reconciles, since a fresh sandbox can need a second one), sets
+```
+
+### Files
+
+- `scripts/plugins/e2e.sh`
+- `scripts/tests/plugins/e2e.bats`
+- `docs/guides/vcluster-e2e-harness.md`
+
+### Rules, Definition of Done, What NOT to Do
+
+As for F1/F2 above (with the third file added to `## Files`), except:
+- Commit message: `fix(e2e): give the hub Applications gate two ArgoCD reconciles by default`.
+- The new test must finish in under 5 seconds; paste its timing from `bats --timing`.
+
+### Live proof
+
+A `make e2e-sandbox` started straight after `make up` passes `checking-hub-apps` even when an Application
+needs a second reconcile.

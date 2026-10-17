@@ -290,8 +290,11 @@ release after it, shows no date. Plan 3 of 5 is
 [`dispatch-release-scope`](plans/v1.43.5-dispatch-release-scope.md). It lets the dispatch dashboard's
 Window selector also pick a release, from v1.43.0 (the first ledger release) onward. Plan 4 of 5 is
 [`dispatch-api-cost`](plans/v1.43.5-dispatch-api-cost.md). It prices Codex's tokens at API rates by
-spec, model and landed spec, alongside the flat subscriptions. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
-first:
+spec, model and landed spec, alongside the flat subscriptions. Plan 5 of 5 is
+[`dispatch-claude-cost`](plans/v1.43.5-dispatch-claude-cost.md). It prices Claude's own sessions at
+API-equivalent rates on the same dashboard, reusing plan 4's price file, so it dispatches after plan 4.
+The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fixes edit
+`bin/k3dm-webhook`, so one agent in sequence, P2s first:
 
 - P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
   [`slack-thread-e2e-replay-no-ack`](bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md),
