@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** k3d-manager `k3d-manager-v1.43.3` (this spec; moved from v1.43.2 2026-10-12); work repo `shopping-cart-frontend`, branch `fix/index-html-no-cache`, cut from `origin/main`
-**Status:** IMPLEMENTED — shopping-cart-frontend PR #121 (`636514d2`), awaiting CI/Copilot and merge; live check after the image deploys
+**Status:** LIVE-VERIFIED — 2026-10-17: Hostinger `frontend` on `sha-b874b3d8` (`sha256:1c589d0d…`, k3d-manager `ae5fc114`); `/` and `/cart` return `Cache-Control: no-cache`, hashed assets keep `max-age=31536000` + `public, immutable` (shopping-cart-frontend PR #121 `636514d2`)
 **Priority:** P2 — after a deploy, a returning browser can keep running the previous build; the workaround is a hard refresh
 **Severity:** medium
 
