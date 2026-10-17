@@ -1,6 +1,6 @@
 # Bug: Hostinger node went unresponsive for ~25 minutes, then rebooted
 
-**Status:** OPEN — evidence gathered; cause not established (previous-boot kernel log not yet read)
+**Status:** OPEN — previous-boot journal read 2026-10-17: the outage was a hypervisor-initiated power-off, not a hang; who triggered it is unconfirmed
 **Priority:** P2
 **Approval:** pending
 **Found:** 2026-10-17, operator paged by `PublicEndpointDown` for `https://frontend.3ai-talk.org/`
@@ -45,3 +45,18 @@ It added about a minute here; it did not cause the outage.
 2. Check the Hostinger panel for a maintenance or auto-recovery event at 17:45–18:11 UTC.
 3. If memory pressure is confirmed: compare summed memory limits against 7.9 GiB, and decide
    between swap, lower limits, or moving workloads.
+
+## Previous-boot journal — 2026-10-17 (Claude, read via SSH; host key matched `known_hosts`)
+
+- The host key was **not** the problem: ED25519, ECDSA and RSA keys served now all match
+  `~/.ssh/known_hosts`, and SSH as `ubuntu` works. The earlier `Host key verification failed`
+  is unexplained.
+- 17:46:15 UTC `qemu-ga: guest-shutdown called`, then `systemd-logind: System is powering down
+  (hypervisor initiated shutdown)` and an orderly `poweroff.target`. Nothing in the guest asked for
+  it: no kernel OOM, hung-task or soft-lockup lines.
+- The VM was then off until boot at 18:10:52 (journal resumes 18:12:02). The ~25 min gap is the
+  machine being powered off, not unresponsive.
+- Open question for the operator: was it stopped/restarted from hPanel, or did Hostinger do it
+  (maintenance)? hPanel's VPS activity log shows which.
+- Unrelated finding during this read: pod IP pool exhausted for days — filed as
+  `docs/bugs/2026-10-17-hostinger-pod-ip-pool-exhausted-leaked-cni-reservations.md`.
