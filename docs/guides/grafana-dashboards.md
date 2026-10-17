@@ -610,6 +610,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
 | k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
 | Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
+| Pod IP pool panels show `No data` or a high reservation ratio | Hermes, the Hostinger sweep timer, or the hub Pushgateway port-forward is unavailable | check `k3dm_cni_ipam_reservations`, `k3dm_cni_ipam_range_size`, and the sweep timer/state file |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub's own

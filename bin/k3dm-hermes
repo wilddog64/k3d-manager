@@ -685,6 +685,14 @@ def _publish_disk_metrics():
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
 
 
+def _publish_cni_ipam_metrics():
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-cni-ipam-metrics")],
+                       capture_output=True, text=True, timeout=120, check=False)
+    except Exception as exc:
+        print(f"cni ipam metrics publish skipped: {exc}", file=sys.stderr)
+
+
 def _publish_pr_checks(now=None):
     """Publish open-PR check state for each repo; never fails the poll."""
     from hermes import pr_checks
@@ -780,6 +788,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _push_kine_metrics(next((item for item in records if item.get("sensor") == "kine"), None))
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
+    _publish_cni_ipam_metrics()
     _publish_pr_checks()
     _schedule_e2e(state)
     _save_state(state_path, state)

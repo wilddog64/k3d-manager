@@ -28,6 +28,9 @@ general `severity = critical` SMS route.
 | Alert fires in Prometheus but no notification arrives | Check the Alertmanager route matcher and receiver, not the Prometheus rule. An unmatched warning alert falls through to the root `null` receiver. |
 | A critical alert is not sent by SMS | Check that the `severity = critical` route remains before later child routes. |
 | A platform warning has no email recipient | Check `ALERTMANAGER_GMAIL_FROM` and the rendered `platform-warning` receiver. |
+| `HostPodIPPoolHigh` fires | On Hostinger run `sudo /usr/local/sbin/k3dm-cni-ipam-sweep --dry-run` and check `systemctl status k3dm-cni-ipam-sweep.timer`; inspect the reservation count and stale files. |
+| `HostPodIPAllocationFailing` fires | Check the Hostinger k3s journal for `no IP addresses available`, run the sweep dry-run, and confirm new pods can start after stale reservations are removed. |
+| `HostCniIpamSweepStale` fires | Check the timer, the sweep state file, Hermes, and the hub Pushgateway port-forward; verify `mode=apply` and a recent `last_run`. |
 
 ## Verification
 

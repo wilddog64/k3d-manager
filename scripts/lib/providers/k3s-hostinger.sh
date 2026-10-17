@@ -969,6 +969,36 @@ function _hostinger_reconcile_vault_cluster_store() {
   fi
 }
 
+function _hostinger_ensure_cni_ipam_sweep() {
+  local host ssh_user ssh_key src_dir remote_dir
+  host="$(_hostinger_require_host)" || return 1
+  ssh_user="${_HOSTINGER_SSH_USER}"
+  ssh_key="${_HOSTINGER_SSH_KEY}"
+  src_dir="${SCRIPT_DIR}/etc/hostinger"
+  local -a ssh_opts=(-i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+  if _dry_run_active; then
+    _info "DRY_RUN: would install the k3dm-cni-ipam-sweep timer on ${ssh_user}@${host}"
+    return 0
+  fi
+  _info "[k3s-hostinger] Ensuring CNI IP reservation sweep timer on ${host}..."
+  remote_dir="$(_run_command -- ssh "${ssh_opts[@]}" "${ssh_user}@${host}" 'mktemp -d /tmp/k3dm-cni-ipam.XXXXXX')" || return 1
+  if [[ ! "${remote_dir}" =~ ^/tmp/k3dm-cni-ipam\.[A-Za-z0-9]+$ ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] unexpected staging directory from ${host}: ${remote_dir}" >&2
+    return 1
+  fi
+  _run_command -- scp "${ssh_opts[@]}" \
+    "${src_dir}/k3dm-cni-ipam-sweep.sh" \
+    "${src_dir}/k3dm-cni-ipam-sweep.service" \
+    "${src_dir}/k3dm-cni-ipam-sweep.timer" \
+    "${ssh_user}@${host}:${remote_dir}/" || return 1
+  if ! _run_command -- ssh "${ssh_opts[@]}" "${ssh_user}@${host}" \
+      "sudo -n install -m 0755 ${remote_dir}/k3dm-cni-ipam-sweep.sh /usr/local/sbin/k3dm-cni-ipam-sweep && sudo -n install -m 0644 ${remote_dir}/k3dm-cni-ipam-sweep.service ${remote_dir}/k3dm-cni-ipam-sweep.timer /etc/systemd/system/ && rm -rf -- ${remote_dir} && sudo -n systemctl daemon-reload && sudo -n systemctl enable --now k3dm-cni-ipam-sweep.timer"; then # agent-audit: remote-sudo
+    printf 'ERROR: %s\n' "[k3s-hostinger] CNI IP reservation sweep install failed on ${host} — leaked reservations will refill the pod IP pool" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] CNI IP reservation sweep timer enabled on ${host}"
+}
+
 function _provider_k3s_hostinger_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -1026,6 +1056,7 @@ HELP
   _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
   _dry_guard "register Hostinger cluster with hub" _hostinger_register_cluster || return 1
   _dry_guard "record Hostinger active provider" _acg_record_provider "k3s-hostinger"
+  _hostinger_ensure_cni_ipam_sweep || return 1
 
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
@@ -1124,6 +1155,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_refresh_frontend_dns || return 1
   _hostinger_refresh_access_layer || return 1
   _hostinger_ensure_vault_unseal_watchdog || return 1
+  _hostinger_ensure_cni_ipam_sweep || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"
     _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"
