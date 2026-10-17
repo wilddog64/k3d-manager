@@ -22,6 +22,10 @@
 
 - Tier 2 now uses the hub's sandbox deployment and switches Stripe on with a per-cluster profile
   label, resetting the registration to mock mode when the run exits.
+- `make down` / `bin/cluster-down` on AWS now prints a cloud-teardown summary and exits 1 when the
+  CloudFormation stack lookup or delete fails, instead of reporting success; invalid credentials
+  stay exit 0 but are reported as UNVERIFIED, not "sandbox already removed". See
+  `docs/bugs/2026-10-15-aws-cluster-down-unverified-teardown-success.md`.
 
 ### Changed
 

@@ -67,10 +67,13 @@ STUB
 }
 
 setup() {
+  local _bash
+  _bash="$(command -v bash)"
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin"
   export DRY_RUN=1
   mkdir -p "${BATS_TEST_TMPDIR}/bin" "${HOME}/.local/share/k3d-manager" "${HOME}/Library/LaunchAgents"
+  ln -sf "${_bash}" "${BATS_TEST_TMPDIR}/bin/bash"
   : > "${BATS_TEST_TMPDIR}/aws.log"
   : > "${BATS_TEST_TMPDIR}/kubectl.log"
   : > "${BATS_TEST_TMPDIR}/k3d.log"
@@ -87,10 +90,34 @@ set -euo pipefail
 echo "aws $*" >> "${BATS_TEST_TMPDIR}/aws.log"
 case "$*" in
   *"sts get-caller-identity"*)
+    if [[ "${STUB_AWS_STS_FAIL:-0}" == "1" ]]; then
+      exit 1
+    fi
     printf '%s\n' "arn:aws:sts::123456789012:assumed-role/test"
     ;;
   *"cloudformation describe-stacks"*)
-    printf '%s\n' "None"
+    case "${STUB_AWS_DESCRIBE:-none}" in
+      throttling)
+        printf '%s\n' "An error occurred (Throttling) when calling the DescribeStacks operation: Rate exceeded" >&2
+        exit 2
+        ;;
+      complete)
+        printf '%s\n' "CREATE_COMPLETE"
+        ;;
+      *)
+        printf '%s\n' "None"
+        ;;
+    esac
+    ;;
+  *"cloudformation delete-stack"*)
+    if [[ "${STUB_AWS_DELETE_FAIL:-0}" == "1" ]]; then
+      exit 1
+    fi
+    ;;
+  *"cloudformation wait stack-delete-complete"*)
+    if [[ "${STUB_AWS_WAIT_FAIL:-0}" == "1" ]]; then
+      exit 1
+    fi
     ;;
 esac
 exit 0
@@ -223,6 +250,72 @@ STUB
     printf 'server-0|secrets|data-vault-0|node-server-0-storage\n'
   }
   export -f _hub_recovery_records
+}
+
+@test "acg-down verifies successful CloudFormation teardown and local cleanup" {
+  run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_DESCRIBE=complete \
+    bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cloud teardown: verified (stack k3d-manager-cluster deleted or absent in us-west-2)"* ]]
+  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [[ "$output" == *"Stopping Vault port-forward"* ]]
+  run grep -F "delete-stack" "${BATS_TEST_TMPDIR}/aws.log"
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-down reports lookup failure after local cleanup" {
+  run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_DESCRIBE=throttling \
+    bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cloud teardown: UNVERIFIED (stack lookup failed in us-west-2)"* ]]
+  [[ "$output" == *"Stopping Vault port-forward"* ]]
+  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [[ "$output" != *"cloud teardown: verified"* ]]
+  run grep -F "describe-stacks" "${BATS_TEST_TMPDIR}/aws.log"
+  [ "$status" -eq 0 ]
+  run grep -F "delete-stack" "${BATS_TEST_TMPDIR}/aws.log"
+  [ "$status" -ne 0 ]
+}
+
+@test "acg-down reports delete failure after local cleanup" {
+  run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_DESCRIBE=complete STUB_AWS_DELETE_FAIL=1 \
+    bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cloud teardown: UNVERIFIED (stack delete failed in us-west-2)"* ]]
+  [[ "$output" == *"Stopping Vault port-forward"* ]]
+  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [[ "$output" != *"cloud teardown: verified"* ]]
+}
+
+@test "acg-down reports wait failure after local cleanup" {
+  run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_DESCRIBE=complete STUB_AWS_WAIT_FAIL=1 \
+    bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cloud teardown: UNVERIFIED (stack delete failed in us-west-2)"* ]]
+  [[ "$output" == *"Stopping Vault port-forward"* ]]
+  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [[ "$output" != *"cloud teardown: verified"* ]]
+}
+
+@test "acg-down reports invalid credentials without cloud calls and stays green" {
+  run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_STS_FAIL=1 \
+    bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NOT verified."* ]]
+  [[ "$output" == *"cloud teardown: UNVERIFIED (AWS credentials invalid"* ]]
+  [[ "$output" != *"cloud teardown: verified"* ]]
+  [[ "$output" == *"Stopping Vault port-forward"* ]]
+  run grep -E "describe-stacks|delete-stack" "${BATS_TEST_TMPDIR}/aws.log"
+  [ "$status" -ne 0 ]
+  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+}
+
+@test "acg-down dry-run summarizes without CloudFormation delete" {
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cloud teardown: dry-run"* ]]
+  run grep -F "delete-stack" "${BATS_TEST_TMPDIR}/aws.log"
+  [ "$status" -ne 0 ]
 }
 
 @test "acg-down dry-run k3s-aws does not invoke hub deregistration" {

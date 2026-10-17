@@ -37,6 +37,8 @@ _dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/run" "${
 : "${SCRIPT_DIR}"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
+_cloud_teardown="not applicable (${_cluster_provider})"
+_cloud_teardown_failed=0
 _confirm=0
 _keep_hub=1
 _keep_hub_arg=0
@@ -116,11 +118,20 @@ case "${_cluster_provider}" in
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if _dry_run_active; then
       _info "[acg-down] DRY_RUN: would run acg_teardown --confirm (delete CloudFormation stack)"
+      _cloud_teardown="dry-run"
     elif aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
-      acg_teardown --confirm || \
-        _info "[acg-down] CloudFormation teardown failed — sandbox may have been recreated with new credentials. Stack cleanup skipped; continuing Hub teardown."
+      _acg_rc=0
+      acg_teardown --confirm || _acg_rc=$?
+      case "${_acg_rc}" in
+        0) _cloud_teardown="verified (stack ${_ACG_CF_STACK_NAME:-k3d-manager-cluster} deleted or absent in ${ACG_REGION})" ;;
+        2) _cloud_teardown="UNVERIFIED (stack lookup failed in ${ACG_REGION})"; _cloud_teardown_failed=1 ;;
+        3) _cloud_teardown="UNVERIFIED (stack delete failed in ${ACG_REGION})"; _cloud_teardown_failed=1 ;;
+        *) _cloud_teardown="UNVERIFIED (acg_teardown rc=${_acg_rc})"; _cloud_teardown_failed=1 ;;
+      esac
+      [[ "${_cloud_teardown_failed}" -eq 1 ]] && _warn "[acg-down] CloudFormation teardown ${_cloud_teardown} — continuing local teardown; check the AWS console before the sandbox is reused."
     else
-      _info "[acg-down] AWS credentials invalid or expired — sandbox already removed. Skipping CloudFormation teardown."
+      _cloud_teardown="UNVERIFIED (AWS credentials invalid — sandbox presumed expired, not checked)"
+      _warn "[acg-down] AWS credentials invalid or expired — CloudFormation teardown skipped and NOT verified. An expired ACG sandbox takes its account with it; a wrong profile or region does not."
     fi
     _info "[acg-down] Deregistering sandbox from hub ArgoCD..."
     if _dry_run_active; then
@@ -434,4 +445,10 @@ if [[ "${_keep_hub}" -eq 1 ]]; then
   _info "[acg-down] Done. Remote cluster deleted; local Hub preserved."
 else
   _info "[acg-down] Done. Remote cluster and local Hub deleted."
+fi
+
+_info "[acg-down] cloud teardown: ${_cloud_teardown}"
+if [[ "${_cloud_teardown_failed}" -eq 1 ]]; then
+  _warn "[acg-down] Local teardown finished, but the AWS stack was not verified deleted."
+  exit 1
 fi

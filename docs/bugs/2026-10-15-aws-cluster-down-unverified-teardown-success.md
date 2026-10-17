@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — part A released in lib-foundation v0.5.4 (PR #70 `856041a`, release #71 `c8e1822`), subtree-pulled into k3d-manager-v1.43.4 `cb573b61`; part B dispatched
+**Status:** OPEN — part A released in lib-foundation v0.5.4 (PR #70 `856041a`, release #71 `c8e1822`), subtree-pulled into k3d-manager-v1.43.4 `cb573b61`; part B implemented in `bin/cluster-down` (Codex + Claude test fixes, 28/28 BATS, new tests red on pre-fix); independent verifier pending
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium
 **Approval:** operator explicitly requested filing P2 on 2026-10-15; fix approved 2026-10-16 "go for that green + warning" (operator) — credential-invalid stays exit 0 with an `UNVERIFIED` warning
