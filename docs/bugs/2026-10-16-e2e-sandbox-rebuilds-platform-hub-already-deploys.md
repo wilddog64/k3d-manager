@@ -1,6 +1,6 @@
 # Bug: e2e-sandbox rebuilds a platform the hub already deploys to the sandbox
 
-**Status:** FIXED — 2026-10-16 in `fix(e2e)` on k3d-manager-v1.43.4 (spec `docs/plans/v1.43.4-e2e-sandbox-hub-stripe-profile.md`); live proof pending `make appsets-reapply` + `make e2e-sandbox`
+**Status:** VERIFIED — 2026-10-17: fix `4b510350` (spec `docs/plans/v1.43.4-e2e-sandbox-hub-stripe-profile.md`), e2e BATS green. Live proof pending `make appsets-reapply` + `make e2e-sandbox`
 **Priority:** P2
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make e2e-sandbox`, verified by Claude)

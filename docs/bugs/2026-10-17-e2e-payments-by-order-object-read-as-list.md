@@ -1,6 +1,6 @@
 # Tier 2 Stripe flow reads the payments-by-order object as an empty list
 
-**Status:** FIXED — shopping-cart-e2e-tests PR #12 merged `7ef0a5f8`; live 4/4 confirmed (run `1792240129-27700`)
+**Status:** LIVE-VERIFIED — 2026-10-17: shopping-cart-e2e-tests PR #12 merged `7ef0a5f8`; Tier 2 run `1792240129-27700` 4/4 PASS
 **Priority:** P2
 **Severity:** Medium — Tier 2 can never reach 4/4. The flow it checks works; only its last assertion is wrong
 **Found by:** Claude, live run `1792236389-10503` (2026-10-17), branch `k3d-manager-v1.43.4`

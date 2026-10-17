@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — part A released in lib-foundation v0.5.4 (PR #70 `856041a`, release #71 `c8e1822`), subtree-pulled into k3d-manager-v1.43.4 `cb573b61`; part B implemented in `bin/cluster-down` (Codex + Claude test fixes, 28/28 BATS, new tests red on pre-fix); independent verifier pending
+**Status:** VERIFIED — 2026-10-17: part A lib-foundation v0.5.4 (subtree `cb573b61`); part B `bin/cluster-down` `d0117dbf` (cluster_down.bats 28/28); independent acceptance suite `cluster_down_acceptance.bats` 11/11 on HEAD, 11/11 red on pre-fix. E3 live (`make down` on a live sandbox and after expiry) pending
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium
 **Approval:** operator explicitly requested filing P2 on 2026-10-15; fix approved 2026-10-16 "go for that green + warning" (operator) — credential-invalid stays exit 0 with an `UNVERIFIED` warning
@@ -254,4 +254,4 @@ interface:
   - stdout/stderr summary line "[acg-down] cloud teardown: ..."
 ```
 
-**Implementation:** part B not started. No AWS resources were queried or changed as part of filing.
+**Implementation:** part A in lib-foundation v0.5.4; part B `d0117dbf`. No AWS resources were queried or changed as part of filing or testing.
