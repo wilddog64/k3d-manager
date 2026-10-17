@@ -426,6 +426,43 @@ repo key. Scope: [`v1.46.0-scheduled-dr-drill.md`](plans/v1.46.0-scheduled-dr-dr
 **full at 5 of 5 plans** (also `v1.46.0-dr-drill-dashboard.md`,
 `v1.46.0-hub-data-backup-integrity.md`); the next v1.46.0 item goes to v1.46.1.
 
+### Candidate milestone — v1.46.1 (patch)
+
+Both items are from the operator, 2026-10-17. No specs have been written yet. Branch
+`k3d-manager-v1.46.1`, cut from `main` after v1.46.0 merges.
+
+**Monthly in-place hub rebuild.** The weekly drill restores into a separate drill cluster, so it
+never exercises the in-place path. That path is the restarts of hub dependents after the restore
+(Keycloak, Grafana, argocd-server, OpenLDAP) and the `make up` steps that read restored data. It is
+where the 2026-10-16 LDAP admin-bind bug lived
+(`docs/bugs/2026-10-16-cluster-up-ldap-seed-admin-bind-invalid-credentials.md`).
+
+The first rebuild is the 2026-10-29 drill. After that, the hub is rebuilt in place once a month,
+attended, from the operator's tmux shell (the Keychain must be readable). The scope:
+
+- A runbook, with a fresh export taken immediately before the rebuild.
+- An ArgoCD API token reissue step, because a rebuild invalidates every token.
+- The result is published to the Pushgateway: a success flag, the step that failed, and the RTO
+  from `_hub_data_record_rto`.
+- A "Last in-place rebuild" row on the v1.46.0 DR drill dashboard.
+- A `HubRebuildStale` alert after 35 days with no successful rebuild (email, `platform-warning`).
+
+Tests stub the publisher; they never push to the live hub's Pushgateway.
+
+**Maintenance page instead of the Cloudflare error page.** While the hub is down, the public hub
+hostnames show Cloudflare's tunnel error (530 / 1033). This applies to a planned rebuild and to an
+outage. Instead, a Worker on those routes passes requests to the origin. When the origin is
+unreachable, the Worker returns a small static maintenance page.
+
+- The page must carry HTTP **503 with `Retry-After`**, never 200. The v1.46.0 offsite hub watch
+  probes `argocd.3ai-talk.org/healthz`; a 200 from the Worker would hide a real outage from it.
+- A planned window is switched on explicitly, and pairs with `make hub-watch-silence`.
+- The page shows the window's expected end time.
+- The Worker is deployed with `make`, like the slack-relay Worker.
+
+Check whether Cloudflare's own custom error pages are available on this plan before choosing the
+Worker.
+
 ### Candidate milestone — v1.47.0
 
 **Infra e2e and promotion gate — the only item in this release** (operator, 2026-10-10). `make
