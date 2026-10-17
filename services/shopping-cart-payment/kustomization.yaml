@@ -31,4 +31,4 @@ patches:
       name: payment-service
 images:
   - name: ghcr.io/wilddog64/shopping-cart-payment
-    digest: sha256:2d930a9310bd68400a51997632d5374aba4534dbc395f8b844c6c4fc7a8f2876
+    digest: sha256:b3fb4b07152028807a3b9f01165f5805e6cb7be629251ceb8fb976ba1ade1e38
