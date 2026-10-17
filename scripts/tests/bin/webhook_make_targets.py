@@ -204,6 +204,19 @@ class MakeTargetTests(unittest.TestCase):
                 self.assertIsNone(argv)
                 self.assertIn("invalid value for DIGEST", error)
 
+    def test_e2e_sandbox_provision_requires_admin_confirmation(self):
+        spec = wh.MAKE_TARGETS["e2e-sandbox-provision"]
+        self.assertEqual(spec["min_role"], "admin")
+        self.assertTrue(spec["confirm"])
+        self.assertNotIn("e2e-sandbox-provision", wh.make_target_help("operator", wh._role_allows))
+        self.assertIn("e2e-sandbox-provision", wh.make_target_help("admin", wh._role_allows))
+        _, error = wh.parse_make_request("e2e-sandbox-provision", {}, None)
+        self.assertIn("rerun with `confirm`", error)
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox-provision", {}, True),
+            (["e2e-sandbox-provision"], None),
+        )
+
     def test_smoke_is_operator_tier_and_hidden_from_readers(self):
         """The cluster half performs real Vault reads and live logins."""
         self.assertEqual(wh.MAKE_TARGETS["smoke"]["min_role"], "operator")

@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added admin-confirmed `e2e-sandbox-provision`, which provisions a missing or dead disposable
+  ACG sandbox through the `k3s-aws` lifecycle before running Tier 2, while reusing healthy sandboxes.
+
 - **Bug Tracking table shows the fix and verification commits.** `k3dm_bug_info` gains `fix_sha`
   and `verified_sha`, shown as Fix commit and Verified commit after Fixed in.
 

@@ -150,8 +150,8 @@ function _e2e_hub_kc() {
 function _e2e_sandbox_preflight_cluster() {
   local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
 
-  if ! kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
-    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up) and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
+  if ! kubectl config get-contexts -o name 2>/dev/null | grep -x -- "$ctx" >/dev/null; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up), or run make e2e-sandbox-provision to provision it as part of the run, and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
     return 1
   fi
   if ! kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1; then
@@ -159,6 +159,24 @@ function _e2e_sandbox_preflight_cluster() {
     return 1
   fi
   _info "[e2e] sandbox preflight: context=${ctx} readyz=ok"
+}
+
+function _e2e_sandbox_cluster_ready() {
+  local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
+  kubectl config get-contexts -o name 2>/dev/null | grep -x -- "$ctx" >/dev/null || return 1
+  kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1
+}
+
+function _e2e_sandbox_provision_cluster() {
+  local provider="${CLUSTER_PROVIDER:-k3s-aws}"
+  if [[ "$provider" != "k3s-aws" ]]; then
+    _err "[e2e] sandbox provisioning: refusing CLUSTER_PROVIDER=${provider}; only k3s-aws provisions the disposable ACG sandbox"
+  fi
+  _info "[e2e] sandbox provisioning: ubuntu-k3s is absent or not answering /readyz; running make up CLUSTER_PROVIDER=k3s-aws"
+  if ! _run_command --soft -- make -C "${SCRIPT_DIR}/.." --no-print-directory up CLUSTER_PROVIDER=k3s-aws; then
+    _err "[e2e] sandbox provisioning: make up CLUSTER_PROVIDER=k3s-aws failed; see its output above"
+  fi
+  _info "[e2e] sandbox provisioning: make up finished; rechecking ubuntu-k3s"
 }
 
 function _e2e_sandbox_preflight_hub() {
@@ -438,6 +456,12 @@ function e2e_verify_sandbox() {
   trap '_e2e_sandbox_exit_trap' EXIT
 
   _e2e_sandbox_preflight_auth
+  if [[ "${E2E_SANDBOX_PROVISION:-0}" == "1" ]] && ! _e2e_sandbox_cluster_ready; then
+    _E2E_ACTIVE_PHASE="preflight-hub"
+    _e2e_sandbox_preflight_hub
+    _E2E_ACTIVE_PHASE="provisioning-sandbox"
+    _e2e_sandbox_provision_cluster
+  fi
   _E2E_ACTIVE_PHASE="preflight-cluster"
   _e2e_sandbox_preflight_cluster
   _E2E_ACTIVE_PHASE="preflight-hub"

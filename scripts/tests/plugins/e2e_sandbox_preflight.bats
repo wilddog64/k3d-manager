@@ -8,13 +8,16 @@ setup() {
   export PLAYWRIGHT_AUTH_DIR="$BATS_TEST_TMPDIR/no-pw-profile"
   SECURITY_ARGS="$BATS_TEST_TMPDIR/security.args"
   EXTEND_CALLED="$BATS_TEST_TMPDIR/extend.called"
+  CALL_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$SECURITY_ARGS"
+  : > "$CALL_LOG"
   rm -f "$EXTEND_CALLED"
   unset K3DM_ACG_REQUIRE_CREDENTIALS
 
   FAKE_BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$FAKE_BIN"
   export SECURITY_ARGS
+  export CALL_LOG
   export ACG_FAKE_VALUE="${ACG_FAKE_VALUE:-tr0ubadour}"
   PATH="$FAKE_BIN:$PATH"
   export PATH
@@ -221,6 +224,7 @@ _stub_kubectl() {
   [[ "$output" == *"ubuntu-k3s"* ]]
   [[ "$output" == *"is absent"* ]]
   [[ "$output" == *"make up"* ]]
+  [[ "$output" == *"make e2e-sandbox-provision"* ]]
 }
 
 @test "cluster preflight does not match a context by prefix" {
@@ -251,12 +255,11 @@ _stub_kubectl() {
 }
 
 @test "cluster preflight runs before the sandbox extension burns a browser step" {
-  run grep -n -A4 -- '_e2e_sandbox_preflight_auth$' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"_e2e_sandbox_preflight_cluster"* ]]
-  local cluster_line extend_line
+  local auth_line cluster_line extend_line
+  auth_line="$(grep -n -- '_e2e_sandbox_preflight_auth$' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | tail -1 | cut -d: -f1)"
   cluster_line="$(grep -n -- '_e2e_sandbox_preflight_cluster$' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | tail -1 | cut -d: -f1)"
   extend_line="$(grep -n -- 'acg_extend_playwright "\${_ACG_SANDBOX_URL' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh" | cut -d: -f1)"
+  [ "$auth_line" -lt "$cluster_line" ]
   [ "$cluster_line" -lt "$extend_line" ]
 }
 
@@ -275,4 +278,89 @@ _stub_kubectl() {
   run _e2e_sandbox_preflight_hub
   [ "$status" -eq 0 ]
   [[ "$output" == *"context=custom-hub"* ]]
+}
+
+@test "provision readiness reuses a healthy sandbox without calling make" {
+  _stub_kubectl
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=0
+  run _e2e_sandbox_cluster_ready
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "provisioning calls make up only for the k3s-aws provider" {
+  _run_command() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+  }
+  export SCRIPT_DIR="$BATS_TEST_DIRNAME/../.."
+  unset CLUSTER_PROVIDER
+  run _e2e_sandbox_provision_cluster
+  [ "$status" -eq 0 ]
+  grep -F -- '--soft -- make -C' "$CALL_LOG"
+  grep -F -- 'up CLUSTER_PROVIDER=k3s-aws' "$CALL_LOG"
+}
+
+@test "provisioning refuses a non-k3s-aws provider before make" {
+  _run_command() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+  }
+  _err() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+  }
+  export CLUSTER_PROVIDER=k3d
+  run _e2e_sandbox_provision_cluster
+  [ "$status" -ne 0 ]
+  [ ! -s "$CALL_LOG" ]
+  [[ "$output" == *"only k3s-aws"* ]]
+}
+
+@test "provisioning failure is reported by the provisioning step" {
+  _run_command() {
+    printf '%s\n' "$*" >> "$CALL_LOG"
+    return 1
+  }
+  _err() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+  }
+  export SCRIPT_DIR="$BATS_TEST_DIRNAME/../.."
+  run _e2e_sandbox_provision_cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"make up CLUSTER_PROVIDER=k3s-aws failed"* ]]
+}
+
+@test "provisioning orchestration checks auth and hub before provisioning" {
+  local source_file="${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  local auth_line hub_line provision_line
+  auth_line="$(grep -n -- '^[[:space:]]*_e2e_sandbox_preflight_auth' "$source_file" | tail -1 | cut -d: -f1)"
+  hub_line="$(grep -n -- '^[[:space:]]*_e2e_sandbox_preflight_hub' "$source_file" | head -1 | cut -d: -f1)"
+  provision_line="$(grep -n -- '^[[:space:]]*_e2e_sandbox_provision_cluster' "$source_file" | tail -1 | cut -d: -f1)"
+  [ "$auth_line" -lt "$hub_line" ]
+  [ "$hub_line" -lt "$provision_line" ]
+}
+
+_stub_kubectl_slow_context_list() {
+  kubectl() {
+    if [[ "$1" == "config" ]]; then
+      printf 'ubuntu-k3s\n'
+      sleep 0.3
+      printf 'k3d-k3d-cluster\n'
+      return 0
+    fi
+    return 0
+  }
+}
+
+@test "cluster preflight finds ubuntu-k3s when more contexts follow it in the listing" {
+  _stub_kubectl_slow_context_list
+  run _e2e_sandbox_preflight_cluster
+  [ "$status" -eq 0 ]
+}
+
+@test "provision readiness finds ubuntu-k3s when more contexts follow it in the listing" {
+  _stub_kubectl_slow_context_list
+  run _e2e_sandbox_cluster_ready
+  [ "$status" -eq 0 ]
 }
