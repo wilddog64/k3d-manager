@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- `make down` on `k3s-aws` now removes sandbox Pushgateway and frontend browser launchd agents
+  even when the Hub is kept; see `docs/bugs/2026-10-17-make-down-keep-hub-leaves-sandbox-pushgateway-forward.md`.
+
 - Bug Tracking now keeps Open for counting fixed bugs until they are LIVE-VERIFIED; see
   `docs/bugs/2026-10-17-bug-table-open-for-stops-at-fix-not-live-verify.md`.
 

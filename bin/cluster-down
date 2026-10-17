@@ -184,6 +184,36 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
     _info "[acg-down] Vault port-forward stopped"
   fi
 fi
+if _is_mac; then
+  _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
+  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist}"
+  _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
+  _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
+  _dry_run_active && _frontend_browser_log_target=/dev/null
+  _dry_guard "truncate frontend browser launchctl log" sh -c ': > "$1"' sh "${_frontend_browser_launchctl_log}"
+  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    _warn "[acg-down] no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"
+  else
+    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+        >"${_frontend_browser_log_target}" 2>&1; then
+      _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
+    fi
+  fi
+  _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
+
+  _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
+  _pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
+  _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload Pushgateway port-forward LaunchAgent"
+  elif launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
+      launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
+      _info "[acg-down] Pushgateway port-forward launchd agent unloaded"
+  fi
+  _dry_guard "remove Pushgateway port-forward plist" rm -f "${_pgw_pf_plist}"
+fi
+
 if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _vault_pf_label="com.k3d-manager.vault-port-forward"
   _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
@@ -311,34 +341,6 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
     _run_command --prefer-sudo --quiet --soft -- rm -f "${_cf_tunnel_plist_legacy}" \
       >/dev/null 2>&1 || true
   fi
-
-  _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
-  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist}"
-  _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
-  _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
-  _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
-  _dry_run_active && _frontend_browser_log_target=/dev/null
-  _dry_guard "truncate frontend browser launchctl log" sh -c ': > "$1"' sh "${_frontend_browser_launchctl_log}"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-    _warn "[acg-down] no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"
-  else
-    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
-        >"${_frontend_browser_log_target}" 2>&1; then
-      _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
-    fi
-  fi
-  _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
-
-  _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
-  _pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
-  _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
-  if _dry_run_active; then
-    _info "DRY_RUN: would unload Pushgateway port-forward LaunchAgent"
-  elif launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
-      launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
-      _info "[acg-down] Pushgateway port-forward launchd agent unloaded"
-  fi
-  _dry_guard "remove Pushgateway port-forward plist" rm -f "${_pgw_pf_plist}"
 
   # legacy-unscoped-cleanup:begin
   _legacy_frontend_plist="${LEGACY_FRONTEND_BROWSER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist}"

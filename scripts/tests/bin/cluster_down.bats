@@ -69,6 +69,7 @@ STUB
 setup() {
   local _bash
   _bash="$(command -v bash)"
+  export CLUSTER_DOWN_SCRIPT="${CLUSTER_DOWN_SCRIPT:-bin/cluster-down}"
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:/usr/bin:/bin"
   export DRY_RUN=1
@@ -162,7 +163,7 @@ cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/launchctl"
 set -euo pipefail
 echo "launchctl $*" >> "${BATS_TEST_TMPDIR}/launchctl.log"
 case "$*" in
-  *" unload "*|*" bootout "*|*" bootstrap "*")
+  unload*|bootout*|bootstrap*)
     touch "${BATS_TEST_TMPDIR}/launchctl-mutation-called"
     ;;
 esac
@@ -177,6 +178,10 @@ STUB
   cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/sudo"
 #!/usr/bin/env bash
 set -euo pipefail
+echo "sudo $*" >> "${BATS_TEST_TMPDIR}/sudo.log"
+if [[ "${STUB_SUDO_FAIL:-0}" == "1" ]]; then
+  exit 1
+fi
 args=()
 for arg in "$@"; do
   case "$arg" in
@@ -188,9 +193,21 @@ for arg in "$@"; do
       ;;
   esac
 done
+case "${args[0]:-}" in
+  /bin/launchctl|/usr/bin/launchctl) args[0]=launchctl ;;
+  /bin/rm|/usr/bin/rm) args[0]=rm ;;
+esac
 exec "${args[@]}"
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/sudo"
+
+  cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/rm"
+#!/usr/bin/env bash
+set -euo pipefail
+echo "rm $*" >> "${BATS_TEST_TMPDIR}/rm.log"
+exec /bin/rm "$@"
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/rm"
 
   cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/pgrep"
 #!/usr/bin/env bash
@@ -519,4 +536,75 @@ _make_down_flag() {
   [ -n "$output" ]
   run grep -nF 'cannot tear down the local Hub cluster' bin/cluster-down
   [ "$status" -eq 0 ]
+}
+
+@test "M1/N1: keep-hub removes sandbox Pushgateway and frontend agents exactly once" {
+  _stub_uname_darwin
+  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
+  pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
+  mkdir -p "$(dirname "${frontend_wrapper}")"
+  touch "${frontend_plist}" "${frontend_wrapper}" "${pgw_plist}"
+
+  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
+
+  [ "$status" -eq 0 ]
+  run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 0 ]
+  run grep -F "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 0 ]
+  run grep -F "${frontend_plist} ${frontend_wrapper}" "${BATS_TEST_TMPDIR}/rm.log"
+  [ "$status" -eq 0 ]
+  run grep -F "${pgw_plist}" "${BATS_TEST_TMPDIR}/rm.log"
+  [ "$status" -eq 0 ]
+  [ "$(grep -F -c "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  [ "$(grep -F -c "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+}
+
+@test "M2: headless keep-hub warns and skips sandbox frontend bootout without sudo" {
+  _stub_uname_darwin
+  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  touch "${frontend_plist}"
+
+  run env DRY_RUN=0 STUB_SUDO_FAIL=1 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"* ]]
+  run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 1 ]
+}
+
+@test "M3: delete-hub removes sandbox agents once without changing hub cleanup" {
+  _stub_uname_darwin
+  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
+  pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
+  mkdir -p "$(dirname "${frontend_wrapper}")"
+  touch "${frontend_plist}" "${frontend_wrapper}" "${pgw_plist}"
+
+  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --delete-hub --discard-hub-data 2>&1'
+
+  [ "$status" -eq 0 ]
+  [ "$(grep -F -c "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  [ "$(grep -F -c "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  run grep -F "Stopping Cloudflare named tunnel launchd agent" <<<"$output"
+  [ "$status" -eq 0 ]
+}
+
+@test "N2: keep-hub leaves hub and Hostinger agents untouched" {
+  _stub_uname_darwin
+  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  touch "${frontend_plist}"
+
+  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
+
+  [ "$status" -eq 0 ]
+  run grep -E 'com\.k3d-manager\.(pushgateway-port-forward|hub-pushgateway-port-forward|alertmanager-|keycloak-port-forward|argocd-browser-https|cloudflare-tunnel)' "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 1 ]
+  run grep -E 'com\.k3d-manager\.(pushgateway-port-forward|hub-pushgateway-port-forward|alertmanager-|keycloak-port-forward|argocd-browser-https|cloudflare-tunnel)' "${BATS_TEST_TMPDIR}/rm.log"
+  [ "$status" -eq 1 ]
 }
