@@ -50,6 +50,36 @@ One authorized `make e2e-sandbox` request should prepare the **disposable ACG E2
 
 `docs/plans/v1.41.0-cloud-bridge-sandbox-lifecycle.md` intentionally excluded `e2e-sandbox` from new sandbox-up/down permissions; do not bypass those boundaries. This bug records the newly clarified operator intent for the **single E2E workflow**; implementation must reconcile lifecycle authorization with that intent. No live provisioning or executable code changes were made when this bug was filed.
 
+## Acceptance
+
+Approval: operator "go ahead" 2026-10-17, including N1 as written (only the explicit
+`e2e-sandbox-provision` command may provision; plain `e2e-sandbox` never does).
+Every `must_not` needs a test shown red against the pre-fix code. The independent verifier is given
+this section only.
+
+```yaml
+acceptance:
+  must:
+    M1: "ubuntu-k3s absent or failing /readyz, run authorized: the sandbox is provisioned, then the normal Tier 2 run continues"
+    M2: "ubuntu-k3s healthy: it is reused and nothing is provisioned"
+    M3: "a provisioning failure is recorded as phase provisioning-sandbox, separate from preflight and test failures"
+  must_not:
+    N1: "provision without explicit authorization: plain make e2e-sandbox, or the Slack operator role"
+    N2: "provision before the credential preflight and the hub preflight have passed"
+    N3: "provision on any CLUSTER_PROVIDER other than k3s-aws"
+    N4: "report success when the provisioning step failed"
+  evidence:
+    E1: {proves: [M2, M3, N1, N2, N3, N4], kind: offline, how: "stubbed BATS from Codex and, separately, from the verifier; both green"}
+    E2: {proves: [N1], kind: offline, how: "pytest: Slack e2e-sandbox-provision is admin + confirm, absent from the cloud-runner set and the cloud-bridge"}
+    E3: {proves: [M1, M2], kind: live, how: "with no ubuntu-k3s, make e2e-sandbox-provision reaches running-playwright; a second run does not call make up"}
+  interface:
+    entry: "e2e_verify_sandbox in scripts/plugins/e2e.sh (via ./scripts/k3d-manager)"
+    authorize: "E2E_SANDBOX_PROVISION=1 (set by make e2e-sandbox-provision)"
+    provision_command: "make up CLUSTER_PROVIDER=k3s-aws"
+    phase_variable: "_E2E_ACTIVE_PHASE"
+    context: "ubuntu-k3s"
+```
+
 ## Fix (spec, 2026-10-17)
 
 **Authorization model.** Provisioning is a separate, explicit command, never a side effect of the

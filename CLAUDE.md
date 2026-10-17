@@ -95,6 +95,15 @@ Bug priority is urgency, separate from Severity: P0 outage/data loss/security no
 without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
 
+**Acceptance block (operator, 2026-10-17).** Every new `docs/bugs/` or `docs/plans/` spec that gets
+dispatched carries an `## Acceptance` section: a YAML block with `must`, `must_not` and `evidence`
+(IDs like M1/N1/E1; each evidence item names what it `proves`, and whether it is `offline` or `live`),
+plus an `interface` list of the entry points a black-box test needs. Rules: every `must_not` has a
+test shown red against the pre-fix code; an independent verifier (a separately tasked agent) writes
+its own tests from the Acceptance section only, never the fix spec or the diff, and both test sets
+must pass; live evidence is run by the operator or Claude, never Gemini. Example:
+`docs/bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md`.
+
 - **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
 - **`docs/issues/`** — Copilot PR findings and post-incident notes.
 - **Dedup before filing — two passes.** The exact-slug glob only matches a slug someone already
