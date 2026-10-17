@@ -2,10 +2,10 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — investigation required; root cause not established
+**Status:** OPEN — root cause found 2026-10-17 (unmanaged forward dies on Prometheus pod restart); fix specified, not dispatched
 **Priority:** P2 — misleading successful provisioning/observability verification, degraded telemetry; reclassify if the sandbox intentionally supports a partial-success state
 **Severity:** medium
-**Approval:** operator explicitly authorized filing if identified as bug, 2026-10-15; implementation not approved
+**Approval:** approved — operator, 2026-10-17: "go ahead to do that" (fix as a launchd agent like Step 14c, kept in v1.43.4)
 **Evidence:** Slack post-provision output from AWS ACG `cluster-up` job `5f5cff23` (completed in 18m)
 
 ## Observed
@@ -60,3 +60,266 @@ Other observed checks included ArgoCD 43/43 apps healthy, frontend and Keycloak 
   timestamps); live proof needs a sandbox.
 
 **Implementation:** not started.
+
+## Fix
+
+Run the sandbox Prometheus forward as a launchd user agent with `KeepAlive`, the same way Step 14c
+runs the Pushgateway forward. launchd restarts `kubectl port-forward` each time it exits, so a
+Prometheus pod restart costs a few seconds of forward instead of the rest of the sandbox's life.
+
+Label: `com.k3d-manager.sandbox.prometheus-port-forward`. It is **not** the hub's
+`com.k3d-manager.prometheus-port-forward` (`scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl`),
+and nothing in this fix may touch that one.
+
+Out of scope: the missing-service branch of Step 14b (its recovery hint is unchanged), the
+post-provision report wording in `scripts/lib/webhook/smoke.py`, and `_acg_up_cleanup`. The agent
+is not added to `_ACG_UP_OWNED_PIDS`; a failed run after Step 14b leaves it loaded, which is the
+same as the Pushgateway agent today, and `cluster-down` / `cleanup-stale-sandbox` remove it.
+
+### 1. `bin/cluster-up` — Step 14b `else` branch
+
+Old:
+
+```bash
+else
+  if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
+    kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_acg_prom_pf_pid_file}"
+  fi
+  kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
+    -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
+    >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
+  _acg_prom_pf_pid=$!
+  _ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
+  echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
+  disown "${_acg_prom_pf_pid}"
+  _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+fi
+```
+
+New (the `PLIST` terminator must stay in column 0):
+
+```bash
+else
+  if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
+    kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+    rm -f "${_acg_prom_pf_pid_file}"
+  fi
+  _acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+  _acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+  _acg_prom_pf_log="${_ACG_STATE_DIR}/logs/acg-prom-pf.log"
+  _acg_prom_kubectl_bin="$(command -v kubectl)"
+  _acg_prom_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_acg_prom_pf_log}")" "$(dirname "${_acg_prom_pf_plist}")"
+  cat > "${_acg_prom_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_acg_prom_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_acg_prom_kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>svc/prometheus-operated</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>${_acg_observability_context}</string>
+    <string>--address</string>
+    <string>0.0.0.0</string>
+    <string>${_acg_prom_local_port}:9090</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_acg_prom_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_acg_prom_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_acg_prom_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_acg_prom_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_acg_prom_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_acg_prom_pf_plist}"
+  _info "[acg-up] ACG Prometheus port-forward agent loaded (launchd: ${_acg_prom_pf_label}, localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_acg_prom_pf_log})"
+fi
+```
+
+The pidfile kill stays: it stops a bare forward left by a sandbox brought up before this fix.
+
+### 2. `bin/cluster-down` — unload the agent
+
+Insert directly after the Pushgateway block's
+`  _dry_guard "remove Pushgateway port-forward plist" rm -f "${_pgw_pf_plist}"` line (inside the same
+`if _is_mac; then` block, before its closing `fi`):
+
+```bash
+
+  _info "[acg-down] Stopping ACG Prometheus port-forward launchd agent..."
+  _acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+  _acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload ACG Prometheus port-forward LaunchAgent"
+  elif launchctl list "${_acg_prom_pf_label}" >/dev/null 2>&1; then
+      launchctl unload "${_acg_prom_pf_plist}" 2>/dev/null || true
+      _info "[acg-down] ACG Prometheus port-forward launchd agent unloaded"
+  fi
+  _dry_guard "remove ACG Prometheus port-forward plist" rm -f "${_acg_prom_pf_plist}"
+```
+
+Keep the existing `Stopping ACG Prometheus port-forward...` pidfile block unchanged (legacy forwards).
+
+### 3. `bin/cluster-refresh` — repair through launchd when the agent exists
+
+Old:
+
+```bash
+_acg_prom_local_port=$((19190 + $(_acg_provider_port_offset "${_cluster_provider}")))
+_pf_ensure "ACG Prometheus port-forward" \
+  "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
+  "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
+  port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
+  -n monitoring --context "${_app_context}" --address 0.0.0.0
+```
+
+New:
+
+```bash
+_acg_prom_local_port=$((19190 + $(_acg_provider_port_offset "${_cluster_provider}")))
+_acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+_acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+if _is_mac && [[ -f "${_acg_prom_pf_plist}" ]]; then
+  _launchd_ensure "${_acg_prom_pf_label}" "${_acg_prom_pf_plist}" user
+else
+  _pf_ensure "ACG Prometheus port-forward" \
+    "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
+    "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
+    port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
+    -n monitoring --context "${_app_context}" --address 0.0.0.0
+fi
+```
+
+The `_pf_ensure` fallback keeps a sandbox from before this fix repairable.
+
+### 4. `bin/cleanup-stale-sandbox` — add the label
+
+Old:
+
+```bash
+agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.sandbox.pushgateway-port-forward)
+```
+
+New:
+
+```bash
+agents=(com.k3d-manager.frontend-port-forward com.k3d-manager.sandbox.pushgateway-port-forward com.k3d-manager.sandbox.prometheus-port-forward)
+```
+
+### 5. Tests
+
+- `scripts/tests/bin/cluster_up.bats` — test `acg-up records Vault and Prometheus port-forward
+  ownership` reads `_acg_prom_pf_pid=\$!`, which this fix removes. Rename it to
+  `acg-up records Vault port-forward ownership` and delete its `prom_line` lines; keep the Vault
+  assertion as is.
+- New `scripts/tests/bin/sandbox_prometheus_port_forward.bats`:
+  - extract the Step 14b `else` branch (from `^else$` after `_acg_prom_svc_ready` to the matching
+    `^fi$`), run it with `HOME`, `_ACG_STATE_DIR`, `_acg_prom_local_port=19191`,
+    `_acg_observability_context=ubuntu-k3s` set and stub `launchctl`/`kubectl` (`kubectl` must log
+    and fail if called with `port-forward`). Assert: the plist exists; `plutil -lint` passes when
+    `plutil` is available; it has `KeepAlive` true, `--address` `0.0.0.0`, `19191:9090`,
+    `--context` `ubuntu-k3s`; `launchctl load <plist>` was called; `kubectl port-forward` was
+    **not** run directly; a pre-existing `acg-prom-pf.pid` was removed.
+  - `cluster-down --confirm --keep-hub` with the stubs from `cluster_down.bats` and an existing
+    `com.k3d-manager.sandbox.prometheus-port-forward.plist`: `launchctl unload <plist>` once, the
+    plist is removed, and the hub `com.k3d-manager.prometheus-port-forward.plist` is untouched.
+  - `cluster-refresh`: with the agent plist present, the Prometheus repair goes through
+    `_launchd_ensure` and starts no bare `kubectl port-forward svc/prometheus-operated`; without it,
+    `_pf_ensure` runs as before. (Extract the block by its `_acg_prom_local_port=` line if running the
+    whole script is impractical.)
+- `scripts/tests/bin/cleanup_stale_sandbox.bats` — add: `--apply` boots out
+  `com.k3d-manager.sandbox.prometheus-port-forward` and removes its plist, and never boots out
+  `com.k3d-manager.prometheus-port-forward`.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: cluster-up Step 14b (service found) writes ~/Library/LaunchAgents/com.k3d-manager.sandbox.prometheus-port-forward.plist with KeepAlive true, RunAtLoad true, ProgramArguments kubectl port-forward svc/prometheus-operated --namespace monitoring --context <sandbox context> --address 0.0.0.0 <19190+offset>:9090, and loads it with launchctl.
+  - id: M2
+    text: The plist is a valid property list (plutil -lint passes).
+  - id: M3
+    text: cluster-down (keep-hub and delete-hub) unloads that agent once and removes its plist; DRY_RUN=1 changes neither.
+  - id: M4
+    text: cleanup-stale-sandbox --apply boots out that agent and removes its plist.
+  - id: M5
+    text: cluster-refresh repairs the forward through _launchd_ensure when the plist exists, and falls back to the pidfile forward when it does not.
+  - id: M6
+    text: A pidfile from an earlier bare forward is killed and removed by Step 14b.
+must_not:
+  - id: N1
+    text: Step 14b (service found) never starts a bare background kubectl port-forward for prometheus-operated (red on pre-fix code, which does exactly that).
+  - id: N2
+    text: No script in this fix loads, unloads, boots out or removes the hub agent com.k3d-manager.prometheus-port-forward.
+  - id: N3
+    text: The missing-service branch of Step 14b never writes or loads the agent plist.
+  - id: N4
+    text: cluster-down never removes the agent when the plist is absent and launchctl does not list it (no error, exit 0).
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3, N4]
+    kind: offline
+    text: BATS with stubbed launchctl/kubectl and a temp HOME; N1 shown red on cluster-up at the commit before the fix.
+  - id: E2
+    proves: [M1]
+    kind: live
+    text: Claude, on the next sandbox bring-up — launchctl list com.k3d-manager.sandbox.prometheus-port-forward shows a PID; curl localhost:19190/-/ready returns 200.
+  - id: E3
+    proves: [M1]
+    kind: live
+    text: Claude or the operator deletes the sandbox Prometheus pod (kubectl -n monitoring delete pod prometheus-<release>-0 --context ubuntu-k3s); within 2 minutes of the new pod Ready, localhost:19190/-/ready returns 200 again with no manual action.
+interface:
+  - bin/cluster-up Step 14b (inputs _acg_prom_svc_ready, _acg_prom_local_port, _acg_observability_context, _ACG_STATE_DIR, HOME)
+  - bin/cluster-down --confirm [--keep-hub | --delete-hub --discard-hub-data], DRY_RUN
+  - bin/cluster-refresh Prometheus repair block
+  - bin/cleanup-stale-sandbox [--dry-run|--apply]
+  - launchd label com.k3d-manager.sandbox.prometheus-port-forward; plist ~/Library/LaunchAgents/<label>.plist; log ${_ACG_STATE_DIR}/logs/acg-prom-pf.log
+```
+
+## Before You Start
+
+- Read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+- `git pull origin k3d-manager-v1.43.4`; work on that branch only.
+- Read `bin/cluster-up` Steps 14b–14c, `bin/cluster-down` lines 185–250, `bin/cluster-refresh`
+  `_pf_ensure` / `_launchd_ensure` and section 3, `bin/cleanup-stale-sandbox`, and the tests named in §5.
+
+## Definition of Done
+
+- [ ] §1–§4 applied exactly; §5 tests added/updated.
+- [ ] `shellcheck bin/cluster-up bin/cluster-down bin/cluster-refresh bin/cleanup-stale-sandbox` — no new warnings.
+- [ ] `bats scripts/tests/bin/sandbox_prometheus_port_forward.bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/cluster_down.bats scripts/tests/bin/cleanup_stale_sandbox.bats scripts/tests/bin/sandbox_launchd_scope.bats scripts/tests/plugins/observability_acg_crd_discovery.bats` green; paste the output.
+- [ ] N1 shown red: run the new Step 14b test against `git show HEAD~1:bin/cluster-up` (or the pre-fix commit) and paste the failure.
+- [ ] `docs/guides/grafana-dashboards.md` triage table (near the `k3dm Deployment panels blank` row): add a row — symptom "sandbox Prometheus panels blank / `federate-acg` TargetDown", cause "the `com.k3d-manager.sandbox.prometheus-port-forward` agent is not loaded", check `launchctl list com.k3d-manager.sandbox.prometheus-port-forward` and `curl -s -o /dev/null -w '%{http_code}' http://localhost:19190/-/ready`.
+- [ ] Commit message, verbatim: `fix(cluster-up): run the sandbox Prometheus port-forward as a launchd agent`
+- [ ] `git push origin k3d-manager-v1.43.4`; confirm with `git rev-parse origin/k3d-manager-v1.43.4`.
+- [ ] Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with the SHA; report the SHA.
+
+## What NOT to Do
+
+- Do NOT create a PR.
+- Do NOT skip pre-commit hooks (`--no-verify`).
+- Do NOT modify files outside the listed targets (the four `bin/` scripts, the tests in §5, `docs/guides/grafana-dashboards.md`, memory-bank).
+- Do NOT commit to `main`.
+- Do NOT touch the hub agent `com.k3d-manager.prometheus-port-forward` or its template.
+- Do NOT run `cluster-up`, `cluster-down`, `make up/down` or any real `launchctl` — stubs only.
+- Do NOT change `_acg_up_cleanup`, `smoke.py` or the missing-service branch of Step 14b.
