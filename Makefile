@@ -5,6 +5,7 @@
 
 .PHONY: lint-python
 .PHONY: image-pin-drift
+.PHONY: check-bug-evidence
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -1278,6 +1279,9 @@ lint-python:
 check-doc-links:
 	@python3 scripts/check-doc-links.py
 	@./scripts/check-repo-root-debris.sh
+
+check-bug-evidence:
+	@python3 scripts/check-bug-evidence.py docs/bugs/*.md
 
 ## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
 ## make validate-manifests [FILES="path/a.yaml path/b.yaml"]

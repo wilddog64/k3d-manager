@@ -389,7 +389,26 @@ planned drill or a `Was:` history note, is ignored. Without one, it is the UTC c
 earliest commit that set that Status. A verified doc with neither is `true`; unverified values stay
 `false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
 
-The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
+The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. It
+also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
+fix commit:
+
+| Live evidence | Meaning |
+|---|---|
+| `ok` | `✓ current`: at least one evidence commit contains the fix |
+| `stale` | `stale proof`: no evidence commit contains the fix |
+| `missing` | no well-formed evidence line is recorded |
+| `unchecked` | evidence exists, but the fix commit is unknown |
+| `n/a` | LIVE-VERIFIED release predates v1.43.4 |
+| `-` | not fixed or not LIVE-VERIFIED |
+
+Each live proof uses one line in this form (multiple lines are allowed):
+`**Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>`.
+The separators may also be written as ` | `, and `proves` contains comma-separated Acceptance
+IDs such as `E1,E3`. Open for keeps counting from Filed for `missing` and `stale`; `ok`,
+`unchecked`, and historic `n/a` rows keep the live-verified value of `-2`.
+
+They
 contain the first eight characters of the commit that marked the doc fixed (the commit used for
 **Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
 otherwise they are `-` and render as `—`.
@@ -400,7 +419,7 @@ has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for
 
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Filed, Open for, Status, Fixed in, Verified, and Live-verified, and clicking a title opens that
+Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
 document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
 other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
 live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to

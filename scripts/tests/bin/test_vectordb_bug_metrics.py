@@ -15,7 +15,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 @pytest.fixture
 def metrics(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(tmp_path / "missing-lib-foundation"))
-    return SimpleNamespace(**runpy.run_path(ROOT / "bin/k3dm-vectordb-metrics"))
+    module = Path(os.environ.get("METRICS_MODULE", ROOT / "bin/k3dm-vectordb-metrics"))
+    return SimpleNamespace(**runpy.run_path(module))
 
 
 def _repo(tmp_path):
@@ -55,6 +56,53 @@ def test_status_date_formats_status_dates(metrics):
     assert metrics._status_date("LIVE-VERIFIED — not reproduced, test 2026-10-15: x") is None
     assert metrics._status_date("VERIFIED — offline. Drill 2026-10-29. Was: IMPLEMENTED 14:41Z") is None
     assert metrics._status_date("VERIFIED — tests green") is None
+
+
+def test_M1_doc_live_evidence_accepts_both_separators_and_skips_malformed(metrics):
+    text = "\n".join([
+        "**Live evidence:** 2026-10-17 · run 123 · env sandbox/local-m4 · scenario stripe/product-catalog · commit abcdef1 · proves E1,E3",
+        "**Live evidence:** 2026-10-18 | run logs/proof.log | env hostinger | scenario make-down | commit 0123456789abcdef | proves E4",
+        "**Live evidence:** 2026-10-19 · run 123 · env missing-commit · scenario bad · commit nope · proves E1",
+    ])
+    assert metrics.doc_live_evidence(text) == [
+        {"date": "2026-10-17", "run": "123", "env": "sandbox/local-m4",
+         "scenario": "stripe/product-catalog", "commit": "abcdef1", "proves": "E1,E3"},
+        {"date": "2026-10-18", "run": "logs/proof.log", "env": "hostinger",
+         "scenario": "make-down", "commit": "0123456789abcdef", "proves": "E4"},
+    ]
+
+
+def test_M2_M3_M4_live_evidence_states_and_open_for(metrics, tmp_path):
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    texts = {
+        "docs/bugs/current.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit abcdef1 · proves E3\n",
+        "docs/bugs/missing.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n",
+        "docs/bugs/stale.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit deadbee · proves E3\n",
+    }
+    tally = {"v1.43.4": {"closed_paths": [{"path": path} for path in texts]}}
+    fixed = {path: {"release": "v1.43.4", "commit": "abc1234"} for path in texts}
+    output = metrics._bug_status_metrics(
+        tmp_path, now=now, tally=tally, texts=texts, fixed_in=fixed,
+        evidence_check=lambda fix, evidence: fix == "abc1234" and evidence == "abcdef1",
+    )
+    rows = {line.split('bug="', 1)[1].split('"', 1)[0]: line
+            for line in output.splitlines() if line.startswith("k3dm_bug_info{")}
+    assert 'live_evidence="ok"' in rows["current"] and rows["current"].endswith(" -2")
+    assert 'live_evidence="missing"' in rows["missing"] and rows["missing"].endswith(" 7")
+    assert 'live_evidence="stale"' in rows["stale"] and rows["stale"].endswith(" 7")
+
+
+def test_N1_stale_evidence_never_counts_as_current(metrics, tmp_path):
+    path = "docs/bugs/stale.md"
+    text = "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit deadbee · proves E3\n"
+    output = metrics._bug_status_metrics(
+        tmp_path, now=datetime(2026, 10, 17, tzinfo=timezone.utc),
+        tally={"v1.43.4": {"closed_paths": [{"path": path}]}}, texts={path: text},
+        fixed_in={path: {"release": "v1.43.4", "commit": "abc1234"}},
+        evidence_check=lambda *_args: False,
+    )
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_bug_info{"))
+    assert 'live_evidence="stale"' in line and not line.endswith(" -2")
 
 
 def test_verification_times_use_earliest_git_state_commits_and_utc(metrics, tmp_path):
@@ -372,7 +420,7 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     assert len(info) == 201
     # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-"')
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-"')
         for line in info)
     assert all("_at=" not in line for line in output.splitlines()
                if line.startswith("k3dm_bug_status_docs{"))

@@ -52,6 +52,25 @@ if [[ "${K3DM_SKIP_DOC_LINKS:-0}" != "1" && -f "${SCRIPT_DIR}/check-doc-links.py
    fi
 fi
 
+# Guard: newly LIVE-VERIFIED bug documents must record the live proof.
+# Staged files only — already-live documents may be edited without retroactive evidence.
+# Bypass: K3DM_SKIP_BUG_EVIDENCE=1
+if [[ "${K3DM_SKIP_BUG_EVIDENCE:-0}" != "1" && -f "${SCRIPT_DIR}/check-bug-evidence.py" ]]; then
+   staged_bug_docs=()
+   while IFS= read -r _f; do
+      [[ -n "${_f}" && -f "${_f}" ]] && staged_bug_docs+=("${_f}")
+   done < <(git diff --cached --name-only --diff-filter=ACMR -- 'docs/bugs/*.md')
+   if (( ${#staged_bug_docs[@]} > 0 )); then
+      if ! python3 "${SCRIPT_DIR}/check-bug-evidence.py" "${staged_bug_docs[@]}"; then
+         echo "Pre-commit hook: newly LIVE-VERIFIED bug docs need a well-formed Live evidence line" >&2
+         echo "  format: **Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>" >&2
+         echo "  guide:   docs/guides/grafana-dashboards.md" >&2
+         echo "  bypass:  K3DM_SKIP_BUG_EVIDENCE=1 git commit ..." >&2
+         exit 1
+      fi
+   fi
+fi
+
 # Guard: test/job debris at the repo root, written by a path derived from an empty
 # variable (usually an unchecked "$(mktemp)"). Staged files only.
 # Bypass: K3DM_SKIP_ROOT_DEBRIS=1

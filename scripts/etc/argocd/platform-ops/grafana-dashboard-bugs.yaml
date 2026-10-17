@@ -1090,7 +1090,7 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified.",
+          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Live evidence reports whether the recorded proof commit contains the fix: current, stale proof, missing, unchecked, n/a, or —. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified.",
           "targets": [
             {
               "refId": "A",
@@ -1127,7 +1127,8 @@ data:
                   "verified": 9,
                   "verified_at": 10,
                   "live_verified": 11,
-                  "live_verified_at": 12
+                  "live_verified_at": 12,
+                  "live_evidence": 13
                 },
                 "excludeByName": {
                   "bug": true,
@@ -1153,7 +1154,8 @@ data:
                   "verified": "Verified",
                   "verified_at": "Verified at",
                   "live_verified": "Live-verified",
-                  "live_verified_at": "Live-verified at"
+                  "live_verified_at": "Live-verified at",
+                  "live_evidence": "Live evidence"
                 }
               }
             }
@@ -1209,6 +1211,21 @@ data:
                     "false": {"text": "not yet", "color": "orange", "index": 1},
                     "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 2},
                     "-": {"text": "—", "color": "#8e8e8e", "index": 3}
+                  }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                ]
+              },
+              {
+                "matcher": {"id": "byName", "options": "Live evidence"},
+                "properties": [
+                  {"id": "custom.width", "value": 125},
+                  {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+                  {"id": "mappings", "value": [{"type": "value", "options": {
+                    "ok": {"text": "✓ current", "color": "green", "index": 0},
+                    "stale": {"text": "stale proof", "color": "red", "index": 1},
+                    "missing": {"text": "missing", "color": "orange", "index": 2},
+                    "unchecked": {"text": "unchecked", "color": "#8e8e8e", "index": 3},
+                    "n/a": {"text": "n/a", "color": "#8e8e8e", "index": 4},
+                    "-": {"text": "—", "color": "#8e8e8e", "index": 5}
                   }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
                 ]
               },

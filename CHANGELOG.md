@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Bug Tracking records live-verification evidence.** Bug docs can record the date, run,
+  environment, scenario, proving commit, and Acceptance IDs for each live proof. Metrics expose
+  whether that proof is current, stale, missing, unchecked, historic, or not applicable; the
+  pre-commit guard and `make check-bug-evidence` flag newly LIVE-VERIFIED docs without evidence.
+  See `docs/plans/v1.43.4-bug-live-evidence-record.md`.
+
 - Added admin-confirmed `e2e-sandbox-provision`, which provisions a missing or dead disposable
   ACG sandbox through the `k3s-aws` lifecycle before running Tier 2, while reusing healthy sandboxes.
 

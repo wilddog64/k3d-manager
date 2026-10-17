@@ -13,7 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import _status_value, doc_meta, doc_status, doc_verification  # noqa: E402
+from hermes.prior_art import (doc_live_evidence, _status_value, doc_meta, doc_status,
+                              doc_verification)  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -183,6 +184,16 @@ def _verification_commit(root, ref, path, pattern):
     return sha, timestamp.strftime("%Y-%m-%d %H:%MZ")
 
 
+def _evidence_contains_fix(root, fix_commit, evidence_commit):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", fix_commit, evidence_commit],
+            capture_output=True, text=True, timeout=10, check=False)
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
 def _verification_times(root, ref, texts):
     times = {}
     for path, text in texts.items():
@@ -209,7 +220,7 @@ def _verification_times(root, ref, texts):
 
 
 def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_in=None,
-                        repo="k3d-manager", verification_times=None):
+                        repo="k3d-manager", verification_times=None, evidence_check=None):
     root = Path(root)
     branch = _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
@@ -250,13 +261,37 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             title = title[:119] + "…"
         verified = None
         live_verified = None
+        live_evidence = "-"
+        evidence = doc_live_evidence(text)
+        fixed_item = (fixed_in or {}).get(path) or {}
+        fix_commit = fixed_item.get("commit")
+        evidence_tracking = isinstance(fixed_in, dict) and path in fixed_in
+        if status == "fixed" and verification == "live" and evidence_tracking:
+            if not _release_at_least(release, (1, 43, 4)):
+                live_evidence = "n/a"
+            elif not evidence:
+                live_evidence = "missing"
+            elif not isinstance(fix_commit, str) or not re.fullmatch(r"[0-9a-f]{7,40}", fix_commit):
+                live_evidence = "unchecked"
+            else:
+                checker = evidence_check or (lambda fix, commit: _evidence_contains_fix(root, fix, commit))
+                live_evidence = "stale"
+                for item in evidence:
+                    try:
+                        if checker(fix_commit, item["commit"]):
+                            live_evidence = "ok"
+                            break
+                    except Exception:
+                        continue
         if status == "fixed":
             verified = "true" if verification in ("verified", "live") else "false"
             live_verified = "true" if verification == "live" else "false"
             if not _release_at_least(release, (1, 43, 2)):
                 verified = "n/a"
                 live_verified = "n/a"
-            if not _release_at_least(release, (1, 43, 2)) or verification == "live":
+            if verification == "live" and live_evidence in ("missing", "stale"):
+                value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days if filed else -1
+            elif not _release_at_least(release, (1, 43, 2)) or verification == "live":
                 value = -2
             elif filed:
                 value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
@@ -268,15 +303,15 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             value = -1
         sort_key = f"{_release_order(release)} {priority} {STATUS_RANK[status]} {filed or '9999-99-99'} {stem}"
         rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified,
-                     live_verified, path))
+                     live_verified, live_evidence, path))
     rows.sort(key=lambda row: row[0])
     truncated = int(len(rows) > 1000)
     aggregates = {}
-    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _path in rows:
+    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _live_evidence, _path in rows:
         key = (release, priority, status, verified, live_verified)
         aggregates[key] = aggregates.get(key, 0) + 1
     lines = []
-    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, path in rows[:1000]:
+    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, live_evidence, path in rows[:1000]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
                   f'status="{status}",release_order="{_release_order(release)}"')
@@ -306,7 +341,6 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             timestamp_labels.append(timestamp)
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
-        fixed_item = (fixed_in or {}).get(path) or {}
         fix_sha = fixed_item.get("commit", "")[:8] if status == "fixed" and isinstance(fixed_item.get("commit", ""), str) else "-"
         verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"
         if not re.fullmatch(r"[0-9a-f]{8}|-", fix_sha):
@@ -314,6 +348,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         if not re.fullmatch(r"[0-9a-f]{8}|-", verified_sha):
             verified_sha = "-"
         labels += f',fix_sha="{fix_sha}",verified_sha="{verified_sha}"'
+        labels += f',live_evidence="{live_evidence}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
         release, priority, status, verified, live_verified = item[0]
