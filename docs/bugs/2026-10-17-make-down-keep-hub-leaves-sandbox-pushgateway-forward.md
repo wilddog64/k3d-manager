@@ -1,9 +1,9 @@
 # Bug: `make down` that keeps the hub leaves the sandbox's Pushgateway port-forward crash-looping
 
-**Status:** OPEN — cause confirmed by code read and live state; not yet fixed
+**Status:** OPEN — dispatched to Codex 2026-10-17
 **Priority:** P3
 **Severity:** low
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-17: "go ahead to dispatch that P3 bug to codex"
 **Found:** 2026-10-17, Claude, checking the operator's `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`
 **Affected:** `bin/cluster-down` (sandbox launchd cleanup), macOS laptop launchd state
 
