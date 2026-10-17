@@ -1,0 +1,70 @@
+# A placeholder Stripe key in Vault is reused forever, so Tier 2's success checkout gets 402
+
+**Status:** OPEN — root cause confirmed 2026-10-17; fix spec pending
+**Priority:** P1
+**Severity:** High — Tier 2 `make e2e-sandbox` cannot pass; every real Stripe charge fails
+**Found by:** Claude, live runs `1792200904-21736` and the 01:44Z rerun (2026-10-17), branch `k3d-manager-v1.43.4`
+**Related:** `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md` (fixed the clobber, not this),
+`docs/bugs/2026-10-17-e2e-sandbox-tier2-keycloak-token-404.md` (the blocker in front of this one)
+
+## Symptom
+
+With the Keycloak identity fixed, Tier 2 got to 3/4. The remaining failure:
+
+```
+✘ stripe-checkout-orchestrator.spec.ts:51 › completes checkout, marks order PAID … Expected: 200 Received: 402
+```
+
+The test failed the same way on both retries. The declined-card test passes only because it expects 402 anyway.
+payment-service logged `StripeGateway: Payment failed`, thrown from `PaymentIntent.create` →
+`LiveStripeResponseGetter.exceptionFromStatus`, for every charge. Claude's redacting log capture dropped
+the exception message line, because it contained a key-shaped token.
+
+## Cause
+
+`secret/payment-gateway-secrets` in `shopping-cart-payment` (ESO, from Vault `secret/payment/stripe`)
+has `stripe-api-key: 19 bytes` and `stripe-webhook-secret: 17 bytes`, read with `kubectl describe`
+(sizes only). Those lengths match the seeder's placeholders exactly:
+
+- `sk_test_placeholder` = 19 bytes;
+- `whsec_placeholder` = 17 bytes.
+
+`shopping_cart_seed_sandbox_vault_kv` (`scripts/plugins/shopping_cart.sh:816`):
+
+```bash
+  if _vault_kv_exists "payment/stripe"; then
+    _info "[acg-up] Reusing existing Vault secret payment/stripe"
+  else
+    … seed source → Keychain k3dm-stripe-sk-test → placeholder
+```
+
+Once any run has written the placeholder, every later run sees the path exists and keeps it. That
+happens on a run with no seed source and no unlocked Keychain, or on a run before `f28a4539`. The
+2026-09-20 fix stopped a real key being overwritten, but nothing ever upgrades a placeholder. The
+Keychain does hold the real key: the same e2e run built `secret/stripe-e2e` from
+`k3dm-stripe-sk-test` with no warning.
+
+The Playwright pod gets the real key (`STRIPE_SECRET_KEY` from `stripe-e2e`). payment-service gets
+the placeholder, so Stripe rejects the call and order-service maps it to 402.
+
+## Fix (to spec)
+
+1. **Treat a placeholder as absent.** In the reuse branch, read `api_key` without printing it and
+   compare it to `sk_test_placeholder`. If it matches, fall through to the seed source → Keychain
+   path and overwrite only `api_key`, keeping the existing `webhook_secret`. Log only
+   `payment/stripe api_key was a placeholder — restored from <source>`.
+2. **Preflight in `make e2e-sandbox` (Tier 2).** Before enabling the Stripe profile, fail fast if the
+   payment key is the placeholder, with a message that names the repair. Compare in-process and
+   never print the value.
+3. **Harness log capture.** The e2e exit trap restarts order and payment, which erases the evidence.
+   Save their last 10 minutes of logs, redacted, into the run directory before the restart.
+
+## Operator repair (now, without waiting for the fix)
+
+Write the Keychain key into the hub Vault through stdin, so it is never echoed, then let ESO refresh.
+Then rerun `make e2e-sandbox`, which restarts payment on its own.
+
+## Live proof
+
+`make e2e-sandbox` Tier 2 reports 4/4, and `payment-gateway-secrets` `stripe-api-key` is no longer
+19 bytes.
