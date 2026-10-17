@@ -23,7 +23,7 @@ def _ssh_destination():
 
 def _read_state():
     command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", *_ssh_destination(), "--",
-               STATE_PATH]
+               "cat", STATE_PATH]
     result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"ssh exited {result.returncode}")

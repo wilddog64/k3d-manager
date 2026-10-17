@@ -40,6 +40,18 @@ def test_valid_state_emits_all_series(monkeypatch, capsys):
     assert "k3dm_cni_ipam_probe_success{host=\"hostinger\"} 1" in output
 
 
+
+def test_remote_command_reads_the_state_file(monkeypatch):
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return _run()
+
+    monkeypatch.setattr(cni.subprocess, "run", fake_run)
+    cni._read_state()
+    assert calls[0][-2:] == ["cat", "/var/lib/k3dm/cni-ipam-sweep.state"]
+
 def test_ssh_failure_emits_only_probe_failure(monkeypatch, capsys):
     monkeypatch.setenv("K3DM_CNI_IPAM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
     monkeypatch.setattr(cni.subprocess, "run", lambda *_args, **_kwargs: _run("", 255))
