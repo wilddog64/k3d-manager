@@ -1,5 +1,8 @@
 # acg module package name still claims the retired `lib-acg` repo
 
+**Status:** FIXED — v0.4.18 (#52 `a1331a6`)
+**Priority:** P3 — package metadata only
+
 **Date:** 2026-09-12
 **Module:** `scripts/lib/acg/`
 **Severity:** low (metadata only — no runtime behaviour)

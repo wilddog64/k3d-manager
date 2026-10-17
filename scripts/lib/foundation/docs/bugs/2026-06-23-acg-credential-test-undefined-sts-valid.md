@@ -1,5 +1,8 @@
 # Bugfix: v0.4.1 — `acg-credential-test` calls undefined `_sts_valid`
 
+**Status:** FIXED — v0.4.1 (#33 `b7c849c`)
+**Priority:** P1 — `acg-credential-test` died on an undefined function; no workaround
+
 **Branch:** `feat/v0.4.1`
 **Files:** `scripts/lib/acg/bin/acg-credential-test`
 

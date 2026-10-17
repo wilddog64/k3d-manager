@@ -2,7 +2,8 @@
 
 **Filed:** 2026-10-04, Claude
 **Branch:** `fix/agent-audit-remote-sudo-marker`
-**Status:** remote-sudo marker FIXED in `44e7e8d` (#57). Recurrence (2026-10-05, `_run_command` flag false positive) FIXED `16908e5`.
+**Status:** FIXED — v0.5.0 (#57 `44e7e8d`); recurrence fixed in v0.5.1 (#60 `c6876cc`). Was: remote-sudo marker FIXED in `44e7e8d` (#57). Recurrence (2026-10-05, `_run_command` flag false positive) FIXED `16908e5`.
+**Priority:** P3 — audit false positive on a remote `sudo`; no runtime effect
 **Severity:** low. It leads agents to defeat the audit instead of passing it.
 
 ## Observed

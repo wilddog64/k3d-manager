@@ -88,6 +88,22 @@ to the instant within 6 hours of now, because a sandbox never has more than 6 ho
 A zero or negative result skips the button wait and takes the expired-sandbox path. Passing
 `--check` as the second argument prints `REMAINING_MINS:<n>` and exits without extending.
 
+## Teardown
+
+### `acg_teardown [--confirm]`
+
+Deletes the ACG CloudFormation stack and removes the `ubuntu-k3s` kubeconfig context. The
+`--confirm` flag is required. A missing stack is treated as an already-complete teardown. Lookup
+and deletion failures return without removing the kubeconfig context, because the sandbox may
+still be alive.
+
+| Return code | Meaning |
+|---|---|
+| `0` | Stack deleted, or no stack found (including a missing stack). |
+| `1` | Confirmation or AWS credential check failed. |
+| `2` | CloudFormation stack lookup failed or was unverified. |
+| `3` | Stack deletion request or delete wait failed. |
+
 ## Validation
 
 - `npm run check` runs the module JS syntax checks.

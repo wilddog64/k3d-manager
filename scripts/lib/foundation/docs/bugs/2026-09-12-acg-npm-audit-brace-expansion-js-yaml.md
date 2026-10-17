@@ -1,5 +1,8 @@
 # acg module: 2 high-severity npm advisories (`brace-expansion`, `js-yaml`)
 
+**Status:** FIXED — v0.4.18 (#53 `9c0af5b`)
+**Priority:** P3 — dev-only transitive dependencies of jest; nothing at runtime
+
 **Date:** 2026-09-12
 **Module:** `scripts/lib/acg/`
 **Severity:** high (per advisory) — but both are **dev-only transitive deps of `jest`**, not runtime

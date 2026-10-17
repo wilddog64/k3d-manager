@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.5.4] — 2026-10-17
+
+### Fixed
+- `acg_teardown` now returns 2 when the stack lookup fails (anything but "does not exist") and 3 when delete-stack or the delete wait fails; previously a failed lookup reported "nothing to tear down" and a failed delete exited the caller's shell. Reference: k3d-manager `docs/bugs/2026-10-15-aws-cluster-down-unverified-teardown-success.md`.
+
 ## [v0.5.3] — 2026-10-16
 
 ### Fixed

@@ -1,5 +1,8 @@
 # Bugfix: v0.4.2 (follow-up) — reuse a healthy CDP browser; reclaim a stale/zombie one instead of erroring
 
+**Status:** FIXED — v0.4.2 (#34 `ae9fc73`)
+**Priority:** P2 — a stale browser stopped the run; workaround: kill Chrome and rerun
+
 **Branch:** `feat/v0.4.2`
 **Files:** `scripts/lib/acg/cdp.sh`
 

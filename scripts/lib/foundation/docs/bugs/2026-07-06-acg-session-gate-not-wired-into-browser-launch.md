@@ -1,5 +1,8 @@
 # Bugfix: v0.4.2 — ACG headless session gate never wired into `_browser_launch`
 
+**Status:** FIXED — v0.4.2 (#34 `ae9fc73`)
+**Priority:** P1 — headless `make up` could not sign in; no workaround short of a manual login every run
+
 **Branch:** `feat/v0.4.2`
 **Files:** `scripts/lib/acg/cdp.sh`
 

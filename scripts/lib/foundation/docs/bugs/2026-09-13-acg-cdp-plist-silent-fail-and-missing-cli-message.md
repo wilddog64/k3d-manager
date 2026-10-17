@@ -1,5 +1,8 @@
 # acg: CDP plist writer fails silently; CLI preflight misreports a missing CLI
 
+**Status:** FIXED — v0.4.18 (#54 `023f76e`)
+**Priority:** P3 — diagnostics only; both paths already failed closed
+
 **Date:** 2026-09-13
 **Module:** `scripts/lib/acg/`
 **Severity:** low (diagnostics only — both paths already fail closed; the messages are wrong or absent)

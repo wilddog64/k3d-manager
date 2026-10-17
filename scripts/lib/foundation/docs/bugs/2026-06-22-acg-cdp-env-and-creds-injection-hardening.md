@@ -1,5 +1,8 @@
 # Bugfix: v0.4.0 — acg CDP env-var threading + gcp creds injection hardening
 
+**Status:** FIXED — v0.4.0 (#32 `aed8c56`)
+**Priority:** P2 — hardening of the imported lib-acg code (deferred Copilot findings); nothing broken in normal use
+
 **Branch:** `feat/v0.4.0`
 **Repo:** `lib-foundation`
 **Files:** `scripts/lib/acg/cdp.sh`, `scripts/lib/acg/acg.sh`, `scripts/lib/acg/gcp.sh`, `scripts/lib/acg/vars.sh`, `scripts/lib/acg/playwright/lib/output.js`, `scripts/lib/acg/playwright/acg_extend.js`, `scripts/lib/acg/playwright/acg_restart.js`, `scripts/lib/acg/acg_session_check.js`

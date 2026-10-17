@@ -1,5 +1,8 @@
 # Bug: ACG sandbox panel Open/Start/Resume clicks are no-ops (`force:true`)
 
+**Status:** FIXED — v0.4.14 (#45 `dddc18c`)
+**Priority:** P1 — sandbox start/restart was a no-op unless the sandbox was already running
+
 ## Symptom
 
 `acg_get_credentials` / `acg_restart` (directly, or via the Slack `/cluster-refresh`

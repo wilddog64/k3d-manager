@@ -1,5 +1,8 @@
 # Bug: _copilot_review missing --allow-all-tools + malformed --deny-tool patterns
 
+**Status:** FIXED — v0.3.19 (`09f42b1`)
+**Priority:** P2 — `_copilot_review` exited 1, so no Copilot review ran; workaround: review by hand
+
 **Date:** 2026-05-02
 **Branch:** `fix/copilot-deny-tool-patterns`
 **File:** `scripts/lib/system.sh`

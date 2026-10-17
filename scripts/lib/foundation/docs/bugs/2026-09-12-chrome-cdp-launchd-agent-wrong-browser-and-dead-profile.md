@@ -1,7 +1,8 @@
 # `com.k3d-manager.chrome-cdp` launchd agent launches the wrong browser against a dead profile
 
 **Date:** 2026-09-12
-**Status:** OPEN — root cause measured, fix not yet written.
+**Status:** FIXED — v0.4.17 (#50 `c87196d`). Was: OPEN — root cause measured, fix not yet written.
+**Priority:** P2 — the keep-alive agent never worked; workaround: manual re-login
 **Branch (all work):** `fix/acg-prism-monogram-selector`
 **Severity:** high — the agent is the designed mechanism for keeping the Pluralsight
 session alive between runs. Because it is broken, it has never been usable, so every run

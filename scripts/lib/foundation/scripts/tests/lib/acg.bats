@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # shellcheck shell=bash disable=SC1091,SC2317
+bats_require_minimum_version 1.5.0
 
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
@@ -151,7 +152,7 @@ EOF
 
   [ -f "${_ACG_CHROME_CDP_PLIST}" ]
   grep -F "<string>${browser_bin}</string>" "${_ACG_CHROME_CDP_PLIST}"
-  ! grep -F '/Applications/Google Chrome.app' "${_ACG_CHROME_CDP_PLIST}"
+  run ! grep -F '/Applications/Google Chrome.app' "${_ACG_CHROME_CDP_PLIST}"
   grep -F -- "--user-data-dir=${PLAYWRIGHT_AUTH_DIR}" "${_ACG_CHROME_CDP_PLIST}"
   [[ "${PLAYWRIGHT_AUTH_DIR}" == */pw-profile ]]
 }
@@ -325,4 +326,140 @@ NODE
   run acg_watch
   [ "${status}" -eq 0 ]
   [ "$(head -n1 "${BATS_TEST_TMPDIR}/sleep-args")" = "1800" ]
+}
+
+_acg_teardown_fixture() {
+  local fixture_dir="${BATS_TEST_TMPDIR}/teardown-fixture"
+  mkdir -p "${fixture_dir}"
+  cat >"${fixture_dir}/aws" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *"describe-stacks"*)
+    case "${ACG_TEARDOWN_SCENARIO}" in
+      success|delete-fails|wait-fails) printf 'CREATE_COMPLETE\n' ;;
+      missing) printf '%s\n' 'An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id k3d-manager-cluster does not exist' >&2; exit 255 ;;
+      throttled) printf '%s\n' 'An error occurred (Throttling) when calling the DescribeStacks operation: Rate exceeded' >&2; exit 255 ;;
+      denied) printf '%s\n' 'An error occurred (AccessDenied) when calling the DescribeStacks operation: User is not authorized' >&2; exit 255 ;;
+    esac
+    ;;
+  *"delete-stack"*)
+    if [[ "${ACG_TEARDOWN_SCENARIO}" == delete-fails ]]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+  *"stack-delete-complete"*)
+    if [[ "${ACG_TEARDOWN_SCENARIO}" == wait-fails ]]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+esac
+EOF
+  cat >"${fixture_dir}/kubectl" <<'EOF'
+#!/usr/bin/env bash
+printf 'kubectl %s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *"get-contexts"*) exit 0 ;;
+  *"delete-context"*) exit 0 ;;
+esac
+EOF
+  chmod +x "${fixture_dir}/aws" "${fixture_dir}/kubectl"
+  printf '%s\n' "${fixture_dir}"
+}
+
+@test "acg_teardown deletes a found stack and reports success" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=success \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Stack deleted"* ]]
+  grep -F 'cloudformation delete-stack' "${calls}"
+  grep -F 'cloudformation wait stack-delete-complete' "${calls}"
+  grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown treats a missing stack as success" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=missing \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"nothing to tear down"* ]]
+  [[ "${output}" != *"ValidationError"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+}
+
+@test "acg_teardown returns 2 on a throttled lookup without deleting" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=throttled \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 2 ]
+  [[ "${output}" != *"Throttling"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 2 on an access-denied lookup" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=denied \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 2 ]
+  [[ "${output}" != *"AccessDenied"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 3 and returns to the shell when delete fails" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=delete-fails \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; rc=0; acg_teardown --confirm || rc=$?; echo FUNCTION_RETURNED; exit "$rc"' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 3 ]
+  [[ "${output}" == *"FUNCTION_RETURNED"* ]]
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 3 and returns to the shell when delete wait fails" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=wait-fails \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; rc=0; acg_teardown --confirm || rc=$?; echo FUNCTION_RETURNED; exit "$rc"' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 3 ]
+  [[ "${output}" == *"FUNCTION_RETURNED"* ]]
+  run ! grep -F 'kubectl config delete-context' "${calls}"
 }

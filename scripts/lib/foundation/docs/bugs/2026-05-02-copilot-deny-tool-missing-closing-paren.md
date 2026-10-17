@@ -1,5 +1,8 @@
 # Bug: _copilot_review --deny-tool patterns missing closing paren — copilot exits 1
 
+**Status:** SUPERSEDED — by `2026-05-02-copilot-review-noninteractive-combined-fix.md`, fixed in v0.3.19 (`09f42b1`)
+**Priority:** P2 — `_copilot_review` exited 1, so no Copilot review ran; workaround: review by hand
+
 **Date:** 2026-05-02
 **Branch:** `fix/copilot-deny-tool-patterns`
 **File:** `scripts/lib/system.sh`
