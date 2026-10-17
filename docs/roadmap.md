@@ -277,8 +277,13 @@ and no test deletes a real resource.
 
 ### Candidate milestone — v1.43.5 (patch)
 
-**Bug-fix-only: Slack/ChatOps reliability** (operator, 2026-10-15). Branch `k3d-manager-v1.43.5`, cut
-from `main` after v1.43.4 merges. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
+**Slack/ChatOps reliability, plus release-plan tracking** (operator, 2026-10-15; plan added
+2026-10-17). Branch `k3d-manager-v1.43.5`, cut from `main` after v1.43.4 merges. No longer
+bug-fix-only: plan 1 of 5 is
+[`release-plan-tracking`](plans/v1.43.5-release-plan-tracking.md). It adds per-release plan rows to
+the Bug Tracking dashboard, with execution, verification and dispatch kept as separate columns. It
+touches the metrics producers and the dashboard, not `bin/k3dm-webhook`, so it can run in parallel
+with the Slack fixes. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
 first:
 
 - P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
