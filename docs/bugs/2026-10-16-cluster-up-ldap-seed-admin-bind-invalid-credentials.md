@@ -1,6 +1,6 @@
 # Bug: cluster-up Step 10d.5 fails — the hub LDAP rejects the `openldap-admin` Secret's password
 
-**Status:** FIXED (`244701bf`) — live proof pending (hub rebuild drill 2026-10-29)
+**Status:** FIXED (`244701bf`) — live proof half 1 done 2026-10-17: the operator's `make e2e-sandbox-provision` ran `make up` on the fixed tree and Step 10d.5 logged `LDAP password set and verified` for admin, developer and operator. Half 2 (the recovery path, F1) pending: hub rebuild drill 2026-10-29
 **Priority:** P2 — degraded with a workaround (restart `statefulset/openldap`, rerun `make up`); downgraded from P1 2026-10-17 by the operator
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make up` before `make e2e-sandbox`, diagnosed by Claude, read-only)
@@ -275,6 +275,11 @@ fails; drop F3's call → the new B4-R3 test fails.
 
 The hub rebuild drill on 2026-10-29 (`project_hub_rebuild_drill_2026_10_29`): recover step 8 passes with
 the admin-bind check, and `make up` Step 10d.5 logs `LDAP password set and verified` for all three users.
+
+- 2026-10-17: Step 10d.5 part proven live. During run A (`make e2e-sandbox-provision`, `make up` on
+  `k3d-manager-v1.43.4` after `244701bf`) it logged `LDAP password set and verified` for `admin`,
+  `developer` and `operator`. That run did not restore hub data, so F1 (OpenLDAP restart after a
+  restore) still waits for the drill.
 
 ## Landed (2026-10-17)
 
