@@ -88,3 +88,8 @@ The next `make e2e-sandbox` exits within seconds of `Summary written`.
 Claude checked it independently: the diff matches F1/F2 (two files); `shellcheck -S warning` is clean;
 `bats scripts/tests/plugins/e2e.bats` passes 79/79; on a temporary copy, dropping `--wait=false` fails the
 new test.
+
+**First live run (2026-10-17, run `1792239012-26194`, commit `6b4ca6b1`).** `make e2e-sandbox` exited at
+05:12:04; the log's last write (the cleanup's `deleted` line) was 05:11:58, so it exited within one 5s poll
+of the cleanup. No hang. The original hang was a lost watch, which is intermittent, so this shows the fix
+working rather than proving every case.

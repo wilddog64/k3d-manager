@@ -248,3 +248,7 @@ Claude checked it independently: the diff matches F3–F5 exactly (three files);
 clean; `bats scripts/tests/plugins/e2e.bats` passes 78/78; the new test runs in about 0.3s. Mutations, on a
 temporary copy: a default of `180` fails `after 420s`; an interval default of `0` fails `rechecking in 10s`
 (after spinning the real 420s, since the stub then never advances `SECONDS`). Live proof still pending.
+
+**First live run with 420s (2026-10-17, run `1792239012-26194`, commit `6b4ca6b1`).** On a settled hub the
+gate passed on its first poll ("15 Synced and Healthy"): no regression. The longer window itself waits for
+a run started straight after a fresh `make up`.
