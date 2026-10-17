@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** VERIFIED — 2026-10-17: part A lib-foundation v0.5.4 (subtree `cb573b61`); part B `bin/cluster-down` `d0117dbf` (cluster_down.bats 28/28); independent acceptance suite `cluster_down_acceptance.bats` 11/11 on HEAD, 11/11 red on pre-fix. E3 live (`make down` on a live sandbox and after expiry) pending
+**Status:** VERIFIED — 2026-10-17: part A lib-foundation v0.5.4 (subtree `cb573b61`); part B `bin/cluster-down` `d0117dbf` (cluster_down.bats 28/28); independent acceptance suite `cluster_down_acceptance.bats` 11/11 on HEAD, 11/11 red on pre-fix. E3 live half 1 done 2026-10-17: operator `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` on a live sandbox printed `cloud teardown: verified (stack k3d-manager-cluster deleted or absent in us-west-2)`, exit 0; Claude confirmed hub readyz ok, 26 apps Synced/Healthy, no `ubuntu-k3s` Applications or registration, context removed. E3 half 2 (down after expiry) pending
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium
 **Approval:** operator explicitly requested filing P2 on 2026-10-15; fix approved 2026-10-16 "go for that green + warning" (operator) — credential-invalid stays exit 0 with an `UNVERIFIED` warning
