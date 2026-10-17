@@ -1,10 +1,10 @@
 # Bug: Hostinger pod IP pool is exhausted by leaked CNI reservations; new pods cannot start
 
 **Filed:** 2026-10-17 (Claude, read-only investigation of the Hostinger node)
-**Status:** OPEN — evidence gathered; cleanup and prevention not specified
+**Status:** OPEN — fix approved; step 1 done (read-only), step 2 cleanup awaiting operator; prevention not yet specified
 **Priority:** P1 — every new pod on the node fails intermittently, including the Vault unseal watchdog CronJob that `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md` depends on, so that fix cannot work while this is open
 **Severity:** high
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-17: "go ahead"
 **Affected:** `ubuntu-hostinger` (single node `srv1754834`, flannel host-local IPAM, pod CIDR `10.42.0.0/24`)
 
 ## Evidence (2026-10-17 ~23:10 UTC)
@@ -44,4 +44,13 @@ power-offs, k3s/containerd restarts, kills under memory pressure — see
    `crictl pods`), an alert on `no IP addresses available` / reservation count near 254, and a
    larger node pod CIDR is NOT the fix (it only delays the leak).
 
-**Implementation:** not started.
+## Step 1 result — 2026-10-17 (read-only)
+
+- 252 reservation files: 45 belong to a live sandbox, **207 to no sandbox at all**.
+- Running pods: 47, of which 2 are hostNetwork, so 45 use pod IPs — matching the 45 live
+  reservations exactly. No running pod's IP is among the 207.
+- Sweep script (dry-run by default, `--apply` deletes): takes the host-local `lock` with `flock`,
+  re-checks each file against `crictl pods` **and** every pod's reported IP at deletion time. Dry
+  run on the node: `kept=45 stale=207`.
+
+**Implementation:** cleanup pending operator; prevention not started.
