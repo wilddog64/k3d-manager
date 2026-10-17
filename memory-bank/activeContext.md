@@ -1,3 +1,4 @@
+- 2026-10-17: spec docs/plans/v1.43.4-bug-live-evidence-record.md (plan 5/5 — v1.43.4 at cap) approved + dispatched to Codex: **Live evidence:** line (env/scenario/run/commit), live_evidence label ok/stale/missing, lint on LIVE-VERIFIED flips.
 - 2026-10-17: keep-hub sandbox PF bug VERIFIED — Codex c99c8b3a on origin; Claude reran BATS 34/34 + acceptance 11/11, shellcheck clean, N1 red pre-fix, N2 red under mutation. E3 live at next sandbox make down.
 - 2026-10-17: LDAP 10d.5 bug live half 1 (Step 10d.5 verified x3 in run A's make up); F1 restore path waits for drill 10-29. Teardown bug half 2: plain make down after today's ACG sandbox expires (stack already gone) should print UNVERIFIED (AWS credentials invalid), exit 0.
 - 2026-10-17: P3 keep-hub sandbox pushgateway PF bug approved + dispatched to Codex (operator cleaned the live agent by hand).
