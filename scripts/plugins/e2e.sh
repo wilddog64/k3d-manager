@@ -390,11 +390,11 @@ function e2e_verify_sandbox() {
   acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
   _E2E_ACTIVE_PHASE="checking-nodes"
   _e2e_sandbox_kc get nodes -o wide
-  _E2E_ACTIVE_PHASE="provisioning-secrets"
-  _e2e_sandbox_provision_secrets
-
   _E2E_ACTIVE_PHASE="checking-hub-apps"
   _e2e_sandbox_hub_apps_ready
+
+  _E2E_ACTIVE_PHASE="provisioning-secrets"
+  _e2e_sandbox_provision_secrets
 
   _E2E_ACTIVE_PHASE="enabling-stripe"
   _e2e_sandbox_enable_stripe

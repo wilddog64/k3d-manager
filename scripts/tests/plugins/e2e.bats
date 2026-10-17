@@ -120,6 +120,28 @@ FAKE
   [ "$status" -eq 1 ]
 }
 
+@test "sandbox checks hub Applications before provisioning secrets" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-order-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  _e2e_sandbox_preflight_hub() { :; }
+  acg_extend_playwright() { :; }
+  _e2e_sandbox_hub_apps_ready() { printf 'hub-apps\n' >> "$calls"; }
+  _e2e_sandbox_provision_secrets() { printf 'provision\n' >> "$calls"; }
+  _e2e_sandbox_enable_stripe() { :; }
+  _e2e_sandbox_wait_job() { :; }
+  _e2e_sandbox_job_manifest() { :; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  _run_command() { :; }
+  run e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  run cat "$calls"
+  [ "${lines[0]}" = "hub-apps" ]
+  [ "${lines[1]}" = "provision" ]
+}
+
 @test "sandbox phase checks hub before extending it" {
   local calls="$BATS_TEST_TMPDIR/hub-preflight-calls"
   : > "$calls"
