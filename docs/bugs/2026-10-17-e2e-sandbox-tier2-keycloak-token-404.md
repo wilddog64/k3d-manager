@@ -1,6 +1,6 @@
 # e2e-sandbox Tier 2 cannot mint a Keycloak token (doubled realm path, no e2e client on the hub realm)
 
-**Status:** FIXED in `bc6b2df6` (BATS + mutation verified 2026-10-17); awaiting live proof (`make up` then `make e2e-sandbox`)
+**Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap below still open.
 **Priority:** P1
 **Approval:** operator, 2026-10-17 — "go with your recommendation (A)"
 **Severity:** High — every Tier 2 Stripe test fails 401 before reaching payment-service
@@ -276,3 +276,17 @@ On the next `make up` (or on the running hub via a one-off Step 10d rerun), then
 the Playwright `stripe` project passes 4/4, the summary shows `result=pass`, and after the run
 `kubectl --context ubuntu-k3s -n shopping-cart-apps get externalsecret,secret e2e-keycloak-credentials`
 returns NotFound.
+
+## Live result (2026-10-17)
+
+- `make up` Step 10d: `[keycloak] e2e identity ensured in realm 'shopping-cart' (client e2e-tests, user e2e-user)`.
+- `make e2e-sandbox`, three runs: 4/4 failing on 401 became 3/4 passing. Both authenticated
+  checks and the declined-card check passed, so the token is issued and accepted.
+
+## Open gap: the success path never deletes the ExternalSecret
+
+`e2e_verify_sandbox` disarms its EXIT trap (`trap - EXIT`) on the normal path. The
+`delete externalsecret e2e-keycloak-credentials` exists only inside `_e2e_sandbox_exit_trap`, so every
+run that reaches its summary leaves the ExternalSecret and its Secret (age 19m after three runs).
+Fix: delete it on the normal path too, before `trap - EXIT` (one shared cleanup function). Add a BATS
+test for the non-trap path. The existing test covers only the trap.

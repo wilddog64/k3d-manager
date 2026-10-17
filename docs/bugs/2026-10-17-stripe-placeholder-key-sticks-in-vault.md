@@ -68,3 +68,22 @@ Then rerun `make e2e-sandbox`, which restarts payment on its own.
 
 `make e2e-sandbox` Tier 2 reports 4/4, and `payment-gateway-secrets` `stripe-api-key` is no longer
 19 bytes.
+
+## Repair applied, and a second cause (2026-10-17 01:51Z)
+
+- **Repair.** The operator's Mac has no `vault` CLI, so the first `vault kv patch` silently did
+  nothing. The repair that worked used `curl` to POST to `localhost:18200/v1/secret/data/payment/stripe`:
+  the token went in a temporary header file, the key came from the Keychain through stdin into `jq`,
+  then the ExternalSecret was force-synced. `stripe-api-key` became 107 bytes. Future repair steps
+  must use `curl`, not `vault`.
+- **Still failing.** Run `1792201944-27199` still got 402 on the success checkout. The placeholder
+  was a real cause, but it is not the only one.
+- **Never passed.** Tier 2 Stripe has not passed in any recorded run since 2026-09-25, so the success
+  path has never been proven live.
+- **Prime suspect.** `StripeGateway.processPayment` (shopping-cart-payment) creates the PaymentIntent
+  with `payment_method=pm_card_visa` and `confirm=true`, but sets neither `return_url` nor
+  `automatic_payment_methods[allow_redirects]=never`. Recent Stripe API versions reject that
+  combination, because automatic payment methods are on by default. This is unconfirmed: the cleanup
+  restart erased the exception message again. To confirm, read the failed `POST /v1/payment_intents`
+  in the Stripe dashboard (Developers → Logs, test mode, about 01:53Z), or capture the logs during
+  a rerun.
