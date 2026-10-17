@@ -161,26 +161,26 @@ e2e-sandbox-provision:
   `make e2e-sandbox-provision` and the reuse-if-healthy rule.
 - `CHANGELOG.md` `[Unreleased]` → `### Added`.
 
-### Files
+## Files
 
 `scripts/plugins/e2e.sh`, `Makefile`, `scripts/lib/webhook/make_targets.py`,
 `scripts/tests/plugins/e2e_sandbox_preflight.bats`, `scripts/tests/bin/webhook_make_targets.py`,
 `scripts/tests/bin/test_cloud_bridge.py`, `docs/howto/slack-slash-commands.md`,
 `docs/guides/vcluster-e2e-harness.md`, `CHANGELOG.md`.
 
-### Rules
+## Rules
 
 shellcheck clean on `scripts/plugins/e2e.sh`; `bats scripts/tests/plugins/e2e_sandbox_preflight.bats`
 and `bats scripts/tests/plugins/e2e.bats` green; `pytest scripts/tests/bin/test_cloud_bridge.py
 scripts/tests/bin/webhook_make_targets.py` green. No test runs a real `make up`, `kubectl` or AWS call.
 
-### Definition of Done
+## Definition of Done
 
 Commit message: `feat(e2e): make e2e-sandbox-provision brings up a missing ACG sandbox first`.
 Live proof (operator, later): with no `ubuntu-k3s`, `make e2e-sandbox-provision` provisions and reaches
 `running-playwright`; a second run reuses the sandbox without calling `make up`.
 
-### What NOT to Do
+## What NOT to Do
 
 - Do not change `make e2e-sandbox` behaviour or its `operator` role.
 - Do not add the new target to the cloud-runner capability set or to the cloud-bridge.
