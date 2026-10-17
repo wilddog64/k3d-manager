@@ -189,3 +189,12 @@ Run from `go/` and paste the output of each:
 After the merge: CI publishes a new `sha-*` image; `make image-pin-drift` shows order `DRIFT` to it; a fresh
 `trivy image` on it shows none of the 7 Go findings. Bumping the order pin then needs the operator's go
 (it deploys to both clusters).
+
+## Landed (2026-10-17)
+
+shopping-cart-order PR #99 (`fix/go-x-deps-cves`, `e01ddc2`), from Codex, checked independently by Claude. The
+versions differ from F1's minimums: `x/net` v0.60.0's own `go.mod` requires `x/crypto` v0.57.0 and `x/text`
+v0.42.0, so `go get` resolved them higher (both are past their fixes). The CHANGELOG entry was corrected to
+match. Gates: gofmt clean, `go vet` clean, `go test -race` passes, `docker build -f go/Dockerfile go` succeeds.
+`trivy` on the locally built image: `app/order-service` 0 HIGH/CRITICAL (was 7). The only remaining findings are
+the 2 `musl` ones, which #90 fixes.
