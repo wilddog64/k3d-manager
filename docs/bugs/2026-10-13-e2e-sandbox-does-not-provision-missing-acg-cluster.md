@@ -1,6 +1,6 @@
 # Bug: e2e-sandbox stops at missing kubecontext instead of provisioning disposable ACG cluster
 
-**Status:** OPEN — fix spec written 2026-10-17 (below), queued for Codex
+**Status:** FIXED (offline) — landed `b264e1cc` + acceptance tests `a09701f7` on k3d-manager-v1.43.4, 2026-10-17; E3 live evidence (operator run of `make e2e-sandbox-provision` with no sandbox) still pending
 **Approval:** explicit 2026-10-17 "let also those to codex's queue and execute one at a time" (operator)
 **Priority:** P2
 **Filed:** 2026-10-13
