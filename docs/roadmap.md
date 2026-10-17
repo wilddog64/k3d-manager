@@ -286,7 +286,9 @@ touches the metrics producers and the dashboard, not `bin/k3dm-webhook`, so it c
 with the Slack fixes. Plan 2 of 5 is
 [`release-forecast`](plans/v1.43.5-release-forecast.md). It forecasts the remaining releases to
 v1.50.0 as date ranges, read from a new `docs/release-milestones.json`. A blocked release, and every
-release after it, shows no date. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
+release after it, shows no date. Plan 3 of 5 is
+[`dispatch-release-scope`](plans/v1.43.5-dispatch-release-scope.md). It lets the dispatch dashboard's
+Window selector also pick a release, from v1.43.0 (the first ledger release) onward. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
 first:
 
 - P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
