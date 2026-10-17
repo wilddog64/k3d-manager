@@ -34,13 +34,15 @@ _run_command() {
 }
 
 @test "cni ipam install: rejects an unexpected staging directory" {
-  _run_command() {
-    shift
-    if [[ "$1" == ssh ]]; then printf '/tmp/not-k3dm\n'; fi
+  ssh() {
+    printf 'ssh %s\n' "$*" >> "${INSTALL_LOG}"
+    if [[ "$*" == *"mktemp -d"* ]]; then printf '/tmp/not-k3dm; touch /pwned\n'; fi
   }
   run _hostinger_ensure_cni_ipam_sweep
   [ "$status" -eq 1 ]
-  ! grep -q 'enable --now' "${INSTALL_LOG}"
+  [ "$(grep -c '' "${INSTALL_LOG}")" -eq 1 ]
+  run grep -E 'install|scp|systemctl' "${INSTALL_LOG}"
+  [ "$status" -ne 0 ]
 }
 
 @test "cni ipam install: dry run sends no remote command" {

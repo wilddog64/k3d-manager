@@ -52,7 +52,7 @@ make_reservation() {
   make_reservation 10.42.0.10 stale-id
   make_reservation 10.42.0.11 live-sandbox
   make_reservation 10.42.0.2 reported-id
-  make_reservation 10.42.0.12 young-id "$(date -u +%Y%m%d%H%M)"
+  make_reservation 10.42.0.12 young-id "$(date +%Y%m%d%H%M)"
   : > "${ipam_dir}/lock"
   : > "${ipam_dir}/last_reserved_ip.0"
   run "${SWEEP}" --apply
@@ -107,7 +107,7 @@ make_reservation() {
 
 @test "N2: pre-fix sweep must fail the young-file safety case" {
   [ "${SWEEP}" = "${SCRIPT_DIR}/tests/fixtures/cni-ipam/pre-fix-sweep.sh" ] || skip
-  make_reservation 10.42.0.10 young-id "$(date -u +%Y%m%d%H%M)"
+  make_reservation 10.42.0.10 young-id "$(date +%Y%m%d%H%M)"
   run "${SWEEP}" --apply
   [ "$status" -eq 0 ]
   [ -e "${ipam_dir}/10.42.0.10" ]
