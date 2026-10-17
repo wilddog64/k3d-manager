@@ -1,3 +1,4 @@
+- 2026-10-17: order is the Go rewrite (CI builds go/Dockerfile); 9 HIGH = musl (fix: dependabot #90/#89 alpine 3.24), stdlib (#92 golang 1.27), x/crypto+net+text indirect (needs go get spec). Awaiting operator.
 - 2026-10-17: order DRIFT checked: 4 CI/Dependabot-only commits (61568ccc..fc3fae5a), rebuild on floating temurin base; trivy HIGH/CRITICAL identical (0C/9H). Recommend NOT bumping; awaiting operator.
 - 2026-10-17: image-pin drift check LANDED dcf8f58a (make image-pin-drift; Claude fixed 12-char compare, ! grep no-op, missing prefix test; BATS 8/8, 3 mutations caught; live = order DRIFT 6412b131 vs 590832de). Open: operator decides on the order pin bump.
 - 2026-10-17: services digest-pin: option 4 approved ("go for that"); spec F1-F4 (bin/k3dm-image-pin-drift + make image-pin-drift + BATS + howto) in docs/bugs/2026-10-17-services-digest-pin-not-bumped-by-app-ci.md; prototype found order DRIFT (6412b131 vs latest 590832de). Dispatching to Codex.

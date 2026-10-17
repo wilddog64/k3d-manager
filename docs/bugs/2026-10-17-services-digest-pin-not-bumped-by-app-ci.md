@@ -187,11 +187,23 @@ The operator asked for a check before any bump. Findings:
   (built 2026-10-06).
 - `61568ccc...fc3fae5a` is 4 commits, all CI or Dependabot (`dependabot.yml`, `ci.yml`, a coverage
   workflow and script, a CHANGELOG line, the CI tag bump). No application code, Dockerfile or build file changed.
-- The images differ because the Dockerfile's base, `eclipse-temurin:21-jre-alpine`, is a floating tag, so a
+- The images differ because the base images in `go/Dockerfile` (`golang:1.25-alpine`, `alpine:3.19`) are floating tags, so a
   rebuild picks up a newer base.
 - `trivy image --severity HIGH,CRITICAL` on both images: identical, 0 CRITICAL and the same 9 HIGH (musl
-  CVE-2026-40200, and Go `stdlib`/`golang.org/x/*` findings from a Go binary inside the image).
+  CVE-2026-40200, and Go `stdlib`/`golang.org/x/*` findings in `/app/order-service`).
 
 Bumping would redeploy order on both clusters for no change in behaviour or vulnerabilities, so it was not
 bumped. The check will keep reporting this drift until order's next real release is pinned. Base-image-only
 rebuilds therefore show up as `DRIFT` too, and a `DRIFT` line is a prompt to look, not a defect on its own.
+
+**Correction (same day).** Order is the Go rewrite, not Java: CI builds `go/Dockerfile` with context `go`
+(`ci.yml` → `build-push-deploy.yml`, `dockerfile: go/Dockerfile`). The root `Dockerfile` (Java/temurin) is
+legacy and not built by CI. `/app/order-service` is the service itself. Where the 9 HIGH findings get fixed:
+
+| Findings | Fixed by |
+|---|---|
+| musl CVE-2026-40200 (2) | `alpine:3.19` → `3.24`: Dependabot PR #90 (`go/Dockerfile`), #89 (`go/Dockerfile.local`) |
+| Go `stdlib` (3) | Go 1.25.14 → 1.27-alpine builder: Dependabot PR #92 |
+| `golang.org/x/crypto`, `x/net` (2), `x/text` | indirect deps in `go/go.mod`; no Dependabot PR, needs a `go get` bump |
+
+All three PRs are green but `BEHIND` main. #95 (golang `1.21` → `1.25` in `go/Dockerfile.local`) duplicates #92's purpose.
