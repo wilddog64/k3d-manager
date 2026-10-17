@@ -1,6 +1,6 @@
 # App CI bumps the image in shopping-cart-infra, never the digest k3d-manager deploys
 
-**Status:** OPEN — option 4 chosen; fix spec below (F1–F4)
+**Status:** FIXED (`dcf8f58a`) — drift is now reported by `make image-pin-drift`; pins stay manual
 **Priority:** P2
 **Severity:** Medium — a merged, published service fix silently never reaches the sandbox or Hostinger;
 the e2e run then reports the old defect as if it were still unfixed
@@ -161,3 +161,20 @@ fully green; `make check-doc-links` clean. No network calls in tests.
 - Do NOT create a PR, commit to `main`, or skip hooks. Do NOT touch files outside `## Files`.
 - Do NOT change any `services/*/kustomization.yaml` pin.
 - Do NOT call GHCR or any network endpoint, and do NOT run `gh auth token` for real.
+
+## Landed (2026-10-17)
+
+`dcf8f58a` on `k3d-manager-v1.43.4`, via `bin/k3dm-codex-dispatch` (task `image-pin-drift`). Claude's review
+found three defects in Codex's version and fixed them before landing:
+
+1. It compared only the first 12 hex characters of each digest. It now compares the full digest.
+2. The token-leak test ended in `! grep`, which never fails a BATS test. It now uses `run grep` and asserts
+   status 1.
+3. Nothing covered digests that share the displayed prefix. Test 3 now does.
+
+Gates: `shellcheck -S warning` clean; `bats scripts/tests/bin/image_pin_drift.bats` passes 8/8;
+`make check-doc-links` clean. Mutations, on temporary copies: always `current` fails tests 2 and 3; a
+12-character compare fails test 3; the gh token in `curl` argv fails test 7.
+
+Live (read-only, against GHCR): the output matches the prototype table above, with `shopping-cart-order`
+reported as `DRIFT`, exit 1. The order pin is the operator's call.
