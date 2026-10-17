@@ -328,6 +328,7 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
+Open for counts from filed until the bug is LIVE-VERIFIED.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 

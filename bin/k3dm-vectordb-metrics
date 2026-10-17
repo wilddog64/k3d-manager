@@ -256,7 +256,12 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             if not _release_at_least(release, (1, 43, 2)):
                 verified = "n/a"
                 live_verified = "n/a"
-            value = -2
+            if not _release_at_least(release, (1, 43, 2)) or verification == "live":
+                value = -2
+            elif filed:
+                value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
+            else:
+                value = -1
         elif filed:
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
         else:

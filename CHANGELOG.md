@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- Bug Tracking now keeps Open for counting fixed bugs until they are LIVE-VERIFIED; see
+  `docs/bugs/2026-10-17-bug-table-open-for-stops-at-fix-not-live-verify.md`.
+
 - Tier 2 now uses the hub's sandbox deployment and switches Stripe on with a per-cluster profile
   label, resetting the registration to mock mode when the run exits.
 - `make down` / `bin/cluster-down` on AWS now prints a cloud-teardown summary and exits 1 when the

@@ -241,9 +241,11 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     }
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
-    assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -2") for line in info)
+    # agent-audit: allow assert-removed because fixed-not-live rows now count from filed date
+    assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -1") for line in info)
     assert any('bug="implemented"' in line and 'live_verified="false"' in line for line in info)
-    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and 'live_verified="false"' in line and line.endswith(" -2") for line in info)
+    # agent-audit: allow assert-removed because offline VERIFIED rows now count from filed date
+    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and 'live_verified="false"' in line and line.endswith(" -1") for line in info)
     assert any('bug="live-verified"' in line and 'verified="true"' in line and 'live_verified="true"' in line for line in info)
     assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line and line.endswith(" -2") for line in info)
     # agent-audit: allow assert-removed verified assertions rewritten to also check live_verified
@@ -256,6 +258,51 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     statuses = [line.split('status="', 1)[1].split('"', 1)[0]
                 for line in info if 'release="v1.43.2"' in line]
     assert statuses == sorted(statuses, key={"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}.get)
+
+
+def test_acceptance_M1_M2_M3_M4_N1_N2_N3_open_for_until_live_verified(metrics, tmp_path):
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    docs = {
+        "m1-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-10\n**Status:** FIXED\n",
+        "m2-verified.md": "**Priority:** P1\n**Filed:** 2026-10-09\n**Status:** VERIFIED — offline\n",
+        "m3-live.md": "**Priority:** P1\n**Filed:** 2026-10-08\n**Status:** LIVE-VERIFIED — live\n",
+        "m4-open.md": "**Priority:** P1\n**Filed:** 2026-10-11\n**Status:** OPEN\n",
+        "m4-unknown.md": "**Priority:** P1\n**Status:** OPEN\n",
+        "n2-old-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-01\n**Status:** FIXED\n",
+    }
+    for name, text in docs.items():
+        (bugs / name).write_text(text)
+    tally = {
+        "v1.43.4": {"open_paths": [
+            {"path": f"docs/bugs/{name}"}
+            for name in ("m1-fixed.md", "m2-verified.md", "m3-live.md", "m4-open.md", "m4-unknown.md")
+        ]},
+        "v1.43.1": {"closed_paths": [{"path": "docs/bugs/n2-old-fixed.md"}]},
+    }
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("metric publishing is outside this acceptance test")
+
+    metrics.publish_bug_metrics = fail_if_called
+    metrics._push_bug_group = fail_if_called
+    output = metrics._bug_status_metrics(tmp_path, now=now, tally=tally)
+    values = {
+        line.split('bug="', 1)[1].split('"', 1)[0]: int(line.rsplit(" ", 1)[1])
+        for line in output.splitlines() if line.startswith("k3dm_bug_info{")
+    }
+    assert values["m1-fixed"] == 7
+    assert values["m2-verified"] == 8
+    assert values["m3-live"] == -2
+    assert values["m4-open"] == 6
+    assert values["m4-unknown"] == -1
+    assert values["n2-old-fixed"] == -2
+
+
+def test_acceptance_M5_grafana_guide_defines_open_for_until_live_verified():
+    guide = (ROOT / "docs/guides/grafana-dashboards.md").read_text(encoding="utf-8")
+    assert "Open for counts from filed until the bug is LIVE-VERIFIED." in guide
 
 
 def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
