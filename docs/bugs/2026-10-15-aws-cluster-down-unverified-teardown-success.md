@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — part A landed in lib-foundation `c2fd0a5` (PR #70, CI pending); part B waits for v0.5.4 + subtree pull
+**Status:** OPEN — part A released in lib-foundation v0.5.4 (PR #70 `856041a`, release #71 `c8e1822`), subtree-pulled into k3d-manager-v1.43.4 `cb573b61`; part B dispatched
 **Priority:** P2 — false-positive teardown success risks billable stale cloud resources
 **Severity:** medium
 **Approval:** operator explicitly requested filing P2 on 2026-10-15; fix approved 2026-10-16 "go for that green + warning" (operator) — credential-invalid stays exit 0 with an `UNVERIFIED` warning
@@ -209,9 +209,49 @@ Tests (`scripts/tests/bin/cluster_down.bats`, existing stub harness): for each o
 rc 0/2/3 and an `sts` failure, assert the summary line text, that the hub deregister and Vault
 port-forward clean-up still ran, and the exit code (0, 1, 1, 0). Show the rc-2/rc-3 cases red
 against the pre-fix script on a temp copy. Docs: the teardown section of the ACG guide gains the
-summary-line meanings; `CHANGELOG.md` `### Fixed`.
+summary-line meanings; `CHANGELOG.md` `### Fixed`. There is no ACG guide yet: document the summary
+line and exit codes next to `make down` in `docs/howto/makefile.md`.
 
 Out of scope here: an account-level AWS orphan inventory (criteria 3 and 6) and Slack log
 excerpts (`2026-10-15-cluster-down-short-job-no-slack-output.md`).
 
-**Implementation:** not started. No AWS resources were queried or changed as part of filing.
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: With CLUSTER_PROVIDER=k3s-aws, valid credentials and acg_teardown rc 0, bin/cluster-down --confirm exits 0 and prints "cloud teardown: verified" naming the stack and region.
+  - id: M2
+    text: When acg_teardown returns 2 (lookup failed) or 3 (delete failed), cluster-down still runs the hub deregister and Vault port-forward clean-up, prints "cloud teardown: UNVERIFIED" with the cause, and exits 1.
+  - id: M3
+    text: When `aws sts get-caller-identity` fails, acg_teardown is not called, a warning says the teardown was skipped and NOT verified, the summary line says UNVERIFIED (credentials invalid), and the exit code is 0.
+  - id: M4
+    text: A dry run prints the summary "cloud teardown: dry-run", calls no acg_teardown, and exits 0; a non-AWS provider prints "not applicable (<provider>)".
+must_not:
+  - id: N1
+    text: An acg_teardown rc 2 or 3 never ends in exit 0 (red against the pre-fix script).
+  - id: N2
+    text: The word "verified" without the UN prefix never appears in the summary when acg_teardown was not called or returned non-zero.
+  - id: N3
+    text: No real aws or kubectl call is made by the tests (stubs only; no AWS resource touched).
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, M4, N1, N2]
+    kind: offline
+    text: scripts/tests/bin/cluster_down.bats cases for rc 0/2/3, sts failure, dry-run; rc 2/3 cases shown red on a temp copy of the pre-fix script.
+  - id: E2
+    proves: [N3]
+    kind: offline
+    text: Stubs on PATH log every aws/kubectl invocation; the log contains only stubbed calls.
+  - id: E3
+    proves: [M1, M3]
+    kind: live
+    text: Operator or Claude runs make down against a live ACG sandbox (and once after expiry); job output shows the summary line and the matching exit status.
+interface:
+  - bin/cluster-down [--confirm] [provider] [dry-run]  (env CLUSTER_PROVIDER, ACG_REGION, K3DM_DEPLOY_DRY_RUN, KEEP_LOCAL)
+  - acg_teardown --confirm return codes 0/1/2/3 (lib-foundation v0.5.4)
+  - aws sts get-caller-identity (credential probe)
+  - stdout/stderr summary line "[acg-down] cloud teardown: ..."
+```
+
+**Implementation:** part B not started. No AWS resources were queried or changed as part of filing.
