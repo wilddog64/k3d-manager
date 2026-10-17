@@ -138,3 +138,9 @@ Claude checked it independently:
     without waiting".
 
 Live proof is still pending (see above).
+
+**First live run (2026-10-17, run `1792204737-19253`, commit `56b7add7`).** The gate passed on its
+first poll ("15 Synced and Healthy"), so the new code causes no regression on a settled hub. The
+retry path was not exercised, because nothing was converging. Live proof of the retry still waits
+for a run started straight after `make up`. The run was 3/4; the one failure is the deferred Stripe
+402 (`docs/bugs/2026-10-17-stripe-placeholder-key-sticks-in-vault.md`).
