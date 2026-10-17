@@ -1,3 +1,4 @@
+- 2026-10-17: LDAP 10d.5 bug downgraded P1→P2 (operator); spec F1-F4 (hub_data refresh restarts statefulset/openldap; 10d.5 binds with openldap-admin Secret via -y file; verify_ldap admin-bind check; BATS) in docs/bugs/2026-10-16-cluster-up-ldap-seed-admin-bind-invalid-credentials.md (58f7d6e6). Dispatching Codex.
 - 2026-10-17: operator go → order pin bumped 6412b131→c6e96845 (sha-d1238c5, trivy HIGH/CRIT 0) in services/shopping-cart-order; both order apps (hostinger + ubuntu-k3s) track k3d-manager-v1.43.4.
 - 2026-10-17: order image sha-d1238c5 (c6e96845…) built; trivy HIGH/CRIT = 0 (OS alpine 3.24.2 + app). image-pin-drift: order DRIFT 6412b131→c6e96845. Pin bump awaiting operator go.
 - 2026-10-17: order PR #99 MERGED d1238c5 (operator, via temporary ruleset admin bypass, restored to DeployKey-only — verified). Branch deleted local+remote. Push CI on main running (Go CI + Java CI build-push). No tag ([Unreleased]).
