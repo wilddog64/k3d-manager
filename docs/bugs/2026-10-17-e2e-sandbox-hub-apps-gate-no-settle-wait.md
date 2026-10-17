@@ -1,6 +1,6 @@
 # e2e-sandbox hub-apps gate fails on a single poll while an Application is still converging
 
-**Status:** REOPENED (recurrence, 2026-10-17) — the retry path is live-proven, but the 180s default is shorter than one ArgoCD reconcile; fix F3–F5 below, dispatched to Codex. The first fix `45412d26` stays.
+**Status:** FIXED (`2de544dc`, 420s default) — no regression on a settled hub (run `1792239012-26194`); live proof of the longer window waits for an e2e run started straight after a fresh `make up`. The first fix `45412d26` stays.
 **Priority:** P2
 **Severity:** Medium — a `make e2e-sandbox` run started right after `make up` fails before Playwright; rerunning a few minutes later passes
 **Found by:** Claude, live run `1792200825-26862` (2026-10-17), branch `k3d-manager-v1.43.4`
