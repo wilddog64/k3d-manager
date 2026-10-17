@@ -178,3 +178,20 @@ Gates: `shellcheck -S warning` clean; `bats scripts/tests/bin/image_pin_drift.ba
 
 Live (read-only, against GHCR): the output matches the prototype table above, with `shopping-cart-order`
 reported as `DRIFT`, exit 1. The order pin is the operator's call.
+
+## Order drift — checked, not bumped (2026-10-17)
+
+The operator asked for a check before any bump. Findings:
+
+- Pinned `6412b131…` = `sha-61568ccc` (built 2026-09-22). `:latest` `590832de…` = `sha-fc3fae5a`
+  (built 2026-10-06).
+- `61568ccc...fc3fae5a` is 4 commits, all CI or Dependabot (`dependabot.yml`, `ci.yml`, a coverage
+  workflow and script, a CHANGELOG line, the CI tag bump). No application code, Dockerfile or build file changed.
+- The images differ because the Dockerfile's base, `eclipse-temurin:21-jre-alpine`, is a floating tag, so a
+  rebuild picks up a newer base.
+- `trivy image --severity HIGH,CRITICAL` on both images: identical, 0 CRITICAL and the same 9 HIGH (musl
+  CVE-2026-40200, and Go `stdlib`/`golang.org/x/*` findings from a Go binary inside the image).
+
+Bumping would redeploy order on both clusters for no change in behaviour or vulnerabilities, so it was not
+bumped. The check will keep reporting this drift until order's next real release is pinned. Base-image-only
+rebuilds therefore show up as `DRIFT` too, and a `DRIFT` line is a prompt to look, not a defect on its own.
