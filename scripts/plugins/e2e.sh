@@ -478,7 +478,7 @@ function e2e_verify_sandbox() {
 
 function _e2e_sandbox_cleanup() {
   _e2e_sandbox_clear_profile
-  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found || true
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found --wait=false --request-timeout=30s || true
 }
 
 function _e2e_sandbox_exit_trap() {

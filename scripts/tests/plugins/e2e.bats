@@ -317,6 +317,18 @@ FAKE
   [ "$status" -eq 0 ]
 }
 
+@test "cleanup delete does not wait on a lost watch" {
+  local calls="$BATS_TEST_TMPDIR/cleanup-delete-flags"
+  : > "$calls"
+  _e2e_sandbox_clear_profile() { :; }
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_cleanup
+  run grep -w -- '--wait=false' "$calls"
+  [ "$status" -eq 0 ]
+  run grep -w -- '--request-timeout=30s' "$calls"
+  [ "$status" -eq 0 ]
+}
+
 # agent-audit: allow assert-removed sandbox registration and override assertions; replaced by hub profile and overlay assertions
 @test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {
   run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
