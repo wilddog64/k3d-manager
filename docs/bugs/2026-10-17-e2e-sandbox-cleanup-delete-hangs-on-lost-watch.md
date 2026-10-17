@@ -1,6 +1,6 @@
 # e2e-sandbox exit cleanup hangs forever when kubectl delete loses its watch
 
-**Status:** OPEN — fix spec below
+**Status:** FIXED (`d9585858`) — live proof pending
 **Priority:** P3
 **Severity:** Low — the run's verdict and summary are already written; but `make e2e-sandbox` never
 exits, holds the operator's pane, and blocks anything waiting for the run to end
@@ -81,3 +81,10 @@ the recorded delete carries the tokens `--wait=false` and `--request-timeout=30s
 ## Live proof
 
 The next `make e2e-sandbox` exits within seconds of `Summary written`.
+
+## Landed (2026-10-17)
+
+`d9585858` on `k3d-manager-v1.43.4`, via `bin/k3dm-codex-dispatch` (task `e2e-cleanup-delete-no-wait`).
+Claude checked it independently: the diff matches F1/F2 (two files); `shellcheck -S warning` is clean;
+`bats scripts/tests/plugins/e2e.bats` passes 79/79; on a temporary copy, dropping `--wait=false` fails the
+new test.
