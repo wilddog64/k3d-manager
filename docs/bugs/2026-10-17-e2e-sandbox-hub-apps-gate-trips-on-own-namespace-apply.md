@@ -1,6 +1,7 @@
 # e2e-sandbox hub-apps gate trips on the harness's own namespace apply
 
 **Status:** LIVE-VERIFIED — 2026-10-17 run `1792198836-11122` (gate: 15 Synced and Healthy), branch `k3d-manager-v1.43.4`
+**Live evidence:** 2026-10-17 · run 1792198836-11122 · env sandbox/local-m4 · scenario stripe/product-catalog · commit 1e554a42 · proves fix
 **Priority:** P1
 **Severity:** High — every `make e2e-sandbox` run fails before Stripe or Playwright
 **Found by:** Claude, live run `1792198645-28764` (2026-10-17T00:57:28Z)

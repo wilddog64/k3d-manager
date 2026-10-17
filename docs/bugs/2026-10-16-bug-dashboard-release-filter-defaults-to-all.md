@@ -1,6 +1,8 @@
 # Bug: Bug Tracking opens on All releases, and its table is not ordered by priority
 
 **Status:** LIVE-VERIFIED — 2026-10-16: operator opened /d/k3dm-bugs with no URL parameters; Release = v1.43.4, rows P1 → P2 → P3, Verified fixes = Show all (fixed in df9c8e4c, spec `docs/plans/v1.43.4-bug-dashboard-defaults.md`)
+**Fix commit:** `df9c8e4c`
+**Live evidence:** 2026-10-16 · run operator-browser-k3dm-bugs · env hub/k3d · scenario dashboard-default-load · commit df9c8e4c · proves fix
 **Priority:** P3
 **Filed:** 2026-10-16
 **Detected by:** human (operator)

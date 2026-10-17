@@ -1,6 +1,8 @@
 # e2e-sandbox Tier 2 cannot mint a Keycloak token (doubled realm path, no e2e client on the hub realm)
 
 **Status:** LIVE-VERIFIED — 2026-10-17 runs `1792200904-21736`, `1792201944-27199` (Step 10d ensured the identity; Tier 2 token issued, 3/4 pass — the remaining failure is Stripe, `2026-10-17-stripe-placeholder-key-sticks-in-vault.md`). Cleanup gap fixed `ff5f5d99`, live-proven in run `1792203807-7042`.
+**Live evidence:** 2026-10-17 · run 1792201944-27199 · env sandbox/local-m4 · scenario stripe/product-catalog · commit 33e1f83c · proves fix
+**Live evidence:** 2026-10-17 · run 1792203807-7042 · env sandbox/local-m4 · scenario stripe/product-catalog · commit 7313b3f9 · proves fix
 **Priority:** P1
 **Approval:** operator, 2026-10-17 — "go with your recommendation (A)"
 **Severity:** High — every Tier 2 Stripe test fails 401 before reaching payment-service

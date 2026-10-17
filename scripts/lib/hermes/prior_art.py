@@ -125,7 +125,7 @@ _LIVE_EVIDENCE_RE = re.compile(
     r"\s+(?:·|\|)\s+env\s+(\S+)"
     r"\s+(?:·|\|)\s+scenario\s+(\S+)"
     r"\s+(?:·|\|)\s+commit\s+([0-9a-f]{7,40})"
-    r"\s+(?:·|\|)\s+proves\s+((?:E\d+)(?:,(?:E\d+))*)\s*$"
+    r"\s+(?:·|\|)\s+proves\s+((?:E\d+)(?:,(?:E\d+))*|fix)\s*$"
 )
 
 
@@ -175,6 +175,15 @@ def doc_verification(text):
     if _VERIFIED_RE.search(value):
         return "verified"
     return ""
+
+
+_FIX_COMMIT_RE = re.compile(r"^\*\*Fix commit:\*\*\s*`?([0-9a-f]{7,40})`?\s*$", re.MULTILINE)
+
+
+def doc_fix_commit(text):
+    """Return the code fix commit named by a ``**Fix commit:**`` header, else None."""
+    match = _FIX_COMMIT_RE.search(text)
+    return match.group(1) if match else None
 
 
 def doc_live_evidence(text):

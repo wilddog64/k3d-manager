@@ -315,7 +315,7 @@ def test_acceptance_M1_M2_M3_M4_N1_N2_N3_open_for_until_live_verified(metrics, t
     docs = {
         "m1-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-10\n**Status:** FIXED\n",
         "m2-verified.md": "**Priority:** P1\n**Filed:** 2026-10-09\n**Status:** VERIFIED — offline\n",
-        "m3-live.md": "**Priority:** P1\n**Filed:** 2026-10-08\n**Status:** LIVE-VERIFIED — live\n",
+        "m3-live.md": "**Priority:** P1\n**Filed:** 2026-10-08\n**Status:** LIVE-VERIFIED — live\n**Live evidence:** 2026-10-15 · run r1 · env sandbox/m4 · scenario s/x · commit abcdef12 · proves E3\n",
         "m4-open.md": "**Priority:** P1\n**Filed:** 2026-10-11\n**Status:** OPEN\n",
         "m4-unknown.md": "**Priority:** P1\n**Status:** OPEN\n",
         "n2-old-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-01\n**Status:** FIXED\n",

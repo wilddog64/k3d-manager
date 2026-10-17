@@ -389,8 +389,12 @@ planned drill or a `Was:` history note, is ignored. Without one, it is the UTC c
 earliest commit that set that Status. A verified doc with neither is `true`; unverified values stay
 `false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
 
-The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. It
-also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
+The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
+contain the first eight characters of the commit that marked the doc fixed (the commit used for
+**Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
+otherwise they are `-` and render as `—`.
+
+It also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
 fix commit:
 
 | Live evidence | Meaning |
@@ -404,14 +408,15 @@ fix commit:
 
 Each live proof uses one line in this form (multiple lines are allowed):
 `**Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>`.
-The separators may also be written as ` | `, and `proves` contains comma-separated Acceptance
-IDs such as `E1,E3`. Open for keeps counting from Filed for `missing` and `stale`; `ok`,
-`unchecked`, and historic `n/a` rows keep the live-verified value of `-2`.
-
-They
-contain the first eight characters of the commit that marked the doc fixed (the commit used for
-**Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
-otherwise they are `-` and render as `—`.
+The separators may also be written as ` | `. `proves` contains comma-separated Acceptance IDs such
+as `E1,E3`, or `fix` for a doc with no Acceptance block. `commit` is the k3d-manager commit checked
+out when the proof ran (an e2e run records it in `~/.k3dm/e2e/<run>.json`); `run` is the e2e run ID,
+or a short name or log path for a proof that is not an e2e run. The check compares against the commit that first closed the doc's Status. When the doc was closed
+after the proof ran (for example straight to LIVE-VERIFIED), add `**Fix commit:** <sha>` naming the
+code fix; it overrides that proxy for this check only. Open for keeps counting from Filed
+for `missing` and `stale`; `ok`, `unchecked`, and historic `n/a` rows keep the live-verified value
+of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED without a
+well-formed line (`make check-bug-evidence` sweeps every doc).
 
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row

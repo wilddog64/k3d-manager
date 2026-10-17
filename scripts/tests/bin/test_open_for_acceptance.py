@@ -69,7 +69,8 @@ def test_m2_offline_verified_counts_days(repo):
 
 
 def test_m3_live_verified_is_minus_two(repo):
-    assert _value(repo, "v1.43.4", "LIVE-VERIFIED — 2026-10-15") == -2
+    # agent-audit: allow assert-removed live-evidence spec supersedes: LIVE-VERIFIED stops counting only with recorded evidence
+    assert _value(repo, "v1.43.4", "LIVE-VERIFIED — 2026-10-15\n**Live evidence:** 2026-10-15 · run r1 · env sandbox/m4 · scenario s/x · commit abcdef12 · proves E3") == -2
 
 
 def test_m4_open_bug_days(repo):

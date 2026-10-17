@@ -13,8 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import (doc_live_evidence, _status_value, doc_meta, doc_status,
-                              doc_verification)  # noqa: E402
+from hermes.prior_art import (doc_fix_commit, doc_live_evidence, _status_value, doc_meta,
+                              doc_status, doc_verification)  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -264,9 +264,8 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         live_evidence = "-"
         evidence = doc_live_evidence(text)
         fixed_item = (fixed_in or {}).get(path) or {}
-        fix_commit = fixed_item.get("commit")
-        evidence_tracking = isinstance(fixed_in, dict) and path in fixed_in
-        if status == "fixed" and verification == "live" and evidence_tracking:
+        fix_commit = doc_fix_commit(text) or fixed_item.get("commit")
+        if status == "fixed" and verification == "live":
             if not _release_at_least(release, (1, 43, 4)):
                 live_evidence = "n/a"
             elif not evidence:
@@ -341,6 +340,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             timestamp_labels.append(timestamp)
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
+        fixed_item = (fixed_in or {}).get(path) or {}
         fix_sha = fixed_item.get("commit", "")[:8] if status == "fixed" and isinstance(fixed_item.get("commit", ""), str) else "-"
         verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"
         if not re.fullmatch(r"[0-9a-f]{8}|-", fix_sha):
