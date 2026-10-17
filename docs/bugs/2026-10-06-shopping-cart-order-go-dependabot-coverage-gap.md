@@ -219,3 +219,11 @@ New:
 
 Add `.github/workflows/go-ci.yml` to `## Files` for this fix only. Commit message:
 `ci(go): golangci-lint v2.14.0 (built with Go 1.27) for the go 1.26 module`.
+
+## Merged and built (2026-10-17)
+
+PR #99 merged as `d1238c5` (operator; the ruleset admin bypass was added for the merge, then removed again and
+checked). The `main` push built `sha-d1238c5a…` = `sha256:c6e96845647c…` (`:latest`). `trivy image --severity
+HIGH,CRITICAL` on it: OS `alpine 3.24.2` **0**, `app/order-service` **0** (was 9 in total: 7 Go + 2 `musl`).
+Acceptance boxes 2 and 4 are met for the image. The pin bump (`services/shopping-cart-order`) is pending the
+operator's go, because it deploys to both clusters.
