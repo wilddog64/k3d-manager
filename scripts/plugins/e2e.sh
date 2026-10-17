@@ -172,17 +172,24 @@ function _e2e_sandbox_preflight_hub() {
 
 function _e2e_sandbox_hub_apps_ready() {
   local ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" listing bad
-  listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \
-    -o 'jsonpath={range .items[?(@.spec.destination.name=="ubuntu-k3s")]}{.metadata.name}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}')"
-  if [[ -z "$listing" ]]; then
-    _err "[e2e] hub Applications: none target ubuntu-k3s in ${ns}; cluster-up registers the sandbox with the hub — rerun make up with the k3s-aws provider"
-    return 1
-  fi
-  bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
-  if [[ -n "$bad" ]]; then
-    _err "[e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy: $(tr '\n' ';' <<< "$bad")"
-    return 1
-  fi
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-180}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+  deadline=$(( SECONDS + timeout ))
+  while :; do
+    listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \
+      -o 'jsonpath={range .items[?(@.spec.destination.name=="ubuntu-k3s")]}{.metadata.name}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}')"
+    if [[ -z "$listing" ]]; then
+      _err "[e2e] hub Applications: none target ubuntu-k3s in ${ns}; cluster-up registers the sandbox with the hub — rerun make up with the k3s-aws provider"
+      return 1
+    fi
+    bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
+    [[ -z "$bad" ]] && break
+    if (( SECONDS >= deadline )); then
+      _err "[e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy after ${timeout}s: $(tr '\n' ';' <<< "$bad")"
+      return 1
+    fi
+    _info "[e2e] hub Applications for ubuntu-k3s still converging: $(tr '\n' ';' <<< "$bad") — rechecking in ${interval}s"
+    sleep "$interval"
+  done
   _info "[e2e] hub Applications for ubuntu-k3s: $(wc -l <<< "$listing" | tr -d ' ') Synced and Healthy"
 }
 

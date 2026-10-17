@@ -202,12 +202,59 @@ FAKE
 
 @test "hub Applications require Synced and Healthy" {
   _e2e_hub_kc() { printf '%s\n' "${HUB_APPS:-}"; }
-  HUB_APPS="" run _e2e_sandbox_hub_apps_ready
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="" run _e2e_sandbox_hub_apps_ready
   [ "$status" -ne 0 ]
-  HUB_APPS="ubuntu-k3s-shopping-cart-order OutOfSync Healthy" run _e2e_sandbox_hub_apps_ready
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="ubuntu-k3s-shopping-cart-order OutOfSync Healthy" run _e2e_sandbox_hub_apps_ready
   [ "$status" -ne 0 ]
-  HUB_APPS="ubuntu-k3s-shopping-cart-order Synced Healthy" run _e2e_sandbox_hub_apps_ready
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="ubuntu-k3s-shopping-cart-order Synced Healthy" run _e2e_sandbox_hub_apps_ready
   [ "$status" -eq 0 ]
+}
+
+@test "hub Applications re-poll until they converge" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-converge-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    local count
+    count="$(wc -l < "$calls")"
+    printf '%s\n' call >> "$calls"
+    if (( count < 2 )); then
+      printf '%s\n' "app OutOfSync Healthy"
+    else
+      printf '%s\n' "app Synced Healthy"
+    fi
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=180 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$calls")" -eq 3 ]
+  [[ "$output" == *"still converging"* ]]
+}
+
+@test "hub Applications fail after a persistent unhealthy poll" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-persist-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+    printf '%s\n' "app OutOfSync Healthy"
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=0 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 0s"* ]]
+  [[ "$output" == *"app OutOfSync Healthy"* ]]
+}
+
+@test "empty hub Applications fail without waiting" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-empty-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=180 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$calls")" -eq 1 ]
+  [[ "$output" == *"none target ubuntu-k3s"* ]]
 }
 
 @test "stripe profile is set before rollout and reset after the run" {
