@@ -1,6 +1,6 @@
 # Bug: e2e-sandbox stops at missing kubecontext instead of provisioning disposable ACG cluster
 
-**Status:** VERIFIED — 2026-10-17: landed `b264e1cc`; independent acceptance tests `a09701f7` green, must_nots red on pre-fix. E3 live (operator `make e2e-sandbox-provision` with no sandbox) pending
+**Status:** LIVE-VERIFIED — 2026-10-17: fixes `b264e1cc`, `a09701f7`. Operator `make e2e-sandbox-provision` with no sandbox: CloudFormation stack created, `make up` finished, Tier 2 run `1792267442-14483` 4/4. Second run: preflight `readyz=ok`, no provisioning, Tier 2 run `1792268856-27928` 4/4
 **Approval:** explicit 2026-10-17 "let also those to codex's queue and execute one at a time" (operator)
 **Priority:** P2
 **Filed:** 2026-10-13

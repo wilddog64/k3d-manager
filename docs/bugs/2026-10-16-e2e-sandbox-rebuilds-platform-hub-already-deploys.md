@@ -1,6 +1,6 @@
 # Bug: e2e-sandbox rebuilds a platform the hub already deploys to the sandbox
 
-**Status:** VERIFIED — 2026-10-17: fix `4b510350` (spec `docs/plans/v1.43.4-e2e-sandbox-hub-stripe-profile.md`), e2e BATS green. Live proof pending `make appsets-reapply` + `make e2e-sandbox`
+**Status:** LIVE-VERIFIED — 2026-10-17: fix `4b510350`, after `make appsets-reapply` on k3d-manager-v1.43.4. Tier 2 runs `1792267442-14483` (fresh sandbox) and `1792268856-27928` (reused) both 4/4; no Vault token-review setup step, 15 hub `ubuntu-k3s` Applications Synced and Healthy
 **Priority:** P2
 **Filed:** 2026-10-16
 **Detected by:** live run (operator's `make e2e-sandbox`, verified by Claude)
