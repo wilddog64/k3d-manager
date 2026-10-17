@@ -283,7 +283,10 @@ bug-fix-only: plan 1 of 5 is
 [`release-plan-tracking`](plans/v1.43.5-release-plan-tracking.md). It adds per-release plan rows to
 the Bug Tracking dashboard, with execution, verification and dispatch kept as separate columns. It
 touches the metrics producers and the dashboard, not `bin/k3dm-webhook`, so it can run in parallel
-with the Slack fixes. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
+with the Slack fixes. Plan 2 of 5 is
+[`release-forecast`](plans/v1.43.5-release-forecast.md). It forecasts the remaining releases to
+v1.50.0 as date ranges, read from a new `docs/release-milestones.json`. A blocked release, and every
+release after it, shows no date. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
 first:
 
 - P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
