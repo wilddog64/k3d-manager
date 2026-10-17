@@ -173,3 +173,24 @@ missing), `### Fixed`:
 3. Proof: the next Dependabot merge shows `mergedBy` = the App (`app/<slug>`), not
    `app/github-actions`, and a `push` run of the build workflow exists for its merge commit, ending
    in a published image (`Build, Scan & Push` = success, not skipped).
+
+## Landed on branches (2026-10-17)
+
+Codex made the change in each repo (`codex exec`, launched from each repo). Claude checked it:
+
+- Each diff touches only the two spec files.
+- The workflow change is byte-identical in all five repos.
+- `actionlint` is clean in all five.
+- Each CHANGELOG entry sits under `## [Unreleased]`.
+
+Claude then committed and pushed `fix/automerge-app-token`; origin matches local in every repo.
+
+| Repo | Commit |
+|---|---|
+| shopping-cart-order | `433d0ce` |
+| shopping-cart-payment | `d561af8` |
+| shopping-cart-frontend | `493e862` |
+| shopping-cart-basket | `de68838` |
+| shopping-cart-product-catalog | `a6d60fe` |
+
+PRs wait for the operator's App setup (secrets present in all five repos).
