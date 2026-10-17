@@ -1,7 +1,7 @@
 # A placeholder Stripe key in Vault is reused forever, so Tier 2's success checkout gets 402
 
-**Status:** OPEN — root cause confirmed 2026-10-17; fix spec pending
-**Priority:** P1
+**Status:** DEFERRED — both causes confirmed; the fix is proven by a direct Stripe call (`pi_3URNAGGSVhtK1dwe1heJ9ZK2` succeeded). Not dispatched: shopping-cart retires at v2.0.0, and e2e moves to TwinkleAI at v1.50.0 (operator, 2026-10-17). Reopen only if Tier 2 gates a release before then.
+**Priority:** P3 (was P1; lowered because shopping-cart is being retired)
 **Severity:** High — Tier 2 `make e2e-sandbox` cannot pass; every real Stripe charge fails
 **Found by:** Claude, live runs `1792200904-21736` and the 01:44Z rerun (2026-10-17), branch `k3d-manager-v1.43.4`
 **Related:** `docs/bugs/2026-09-20-seed-clobbers-real-payment-secrets.md` (fixed the clobber, not this),
@@ -178,3 +178,9 @@ The operator can only log into `acct_1Tzo4YKH1dHRwQRM`, so nobody can read the S
 account the platform actually uses. Moving to it means updating the Keychain `k3dm-stripe-sk-test`,
 Vault `payment/stripe`, `VITE_STRIPE_PUBLISHABLE_KEY` and a frontend rebuild. That is operator
 credential work, to be scheduled separately.
+
+## Fix proven against Stripe (2026-10-17 02:20Z)
+
+The same replay with `automatic_payment_methods[enabled]=true` and `[allow_redirects]=never` returned
+`status: succeeded` (`pi_3URNAGGSVhtK1dwe1heJ9ZK2`). The F1/F2 spec above is correct as written; it is
+parked, not dispatched.
