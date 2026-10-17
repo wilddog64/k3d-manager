@@ -198,3 +198,24 @@ v0.42.0, so `go get` resolved them higher (both are past their fixes). The CHANG
 match. Gates: gofmt clean, `go vet` clean, `go test -race` passes, `docker build -f go/Dockerfile go` succeeds.
 `trivy` on the locally built image: `app/order-service` 0 HIGH/CRITICAL (was 7). The only remaining findings are
 the 2 `musl` ones, which #90 fixes.
+
+### F4 — CI lint pin (found on PR #99's first CI run)
+
+`go-ci` failed at `golangci-lint`: `can't load config: the Go language version (go1.25) used to build
+golangci-lint is lower than the targeted Go version (1.26.0)`. The pinned v2.5.0 was built with Go 1.25 and
+refuses a module that declares `go 1.26.0`. v2.14.0 (2026-09-24) is built with go1.27.0. Claude ran it locally
+against the branch (checksum-verified binary): `0 issues`.
+
+On branch `fix/go-x-deps-cves`, in `.github/workflows/go-ci.yml`, in the `golangci-lint` step:
+
+Old:
+```yaml
+          version: v2.5.0
+```
+New:
+```yaml
+          version: v2.14.0
+```
+
+Add `.github/workflows/go-ci.yml` to `## Files` for this fix only. Commit message:
+`ci(go): golangci-lint v2.14.0 (built with Go 1.27) for the go 1.26 module`.
