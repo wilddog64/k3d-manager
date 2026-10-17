@@ -1054,7 +1054,11 @@ function vault_install_unseal_watchdog() {
    rendered="$(mktemp -t vault-unseal-watchdog.XXXXXX.yaml)"
    trap '$(_cleanup_trap_command "$rendered")' EXIT TERM
    local _live_vault_image
-   _live_vault_image="$(_kubectl -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   if [[ -n "$app_context" ]]; then
+      _live_vault_image="$(kubectl --context "$app_context" -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   else
+      _live_vault_image="$(_kubectl -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   fi
    VAULT_NS="$ns" \
    VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-${_live_vault_image:-hashicorp/vault:1.18.3}}" \
    VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \

@@ -1944,9 +1944,19 @@ function argocd_check_values_branch() {
       return 0
    fi
 
-   _warn "[argocd] Applications on a stale values branch:"
-   printf '%s\n' "${_drift}" >&2
-   _warn "[argocd] Fix: reapply the ApplicationSets with K3D_MANAGER_BRANCH=${_expected}"
+   local _stale _degraded
+   _stale="$(printf '%s\n' "${_drift}" | grep -v ' health Degraded$' || true)"
+   _degraded="$(printf '%s\n' "${_drift}" | grep ' health Degraded$' || true)"
+   if [[ -n "${_stale}" ]]; then
+      _warn "[argocd] Applications on a stale values branch:"
+      printf '%s\n' "${_stale}" >&2
+      _warn "[argocd] Fix: reapply the ApplicationSets with K3D_MANAGER_BRANCH=${_expected}"
+   fi
+   if [[ -n "${_degraded}" ]]; then
+      _warn "[argocd] Applications Degraded on the expected branch (health, not a values-branch problem):"
+      printf '%s\n' "${_degraded}" >&2
+      _warn "[argocd] Fix: inspect the Application's resources (often an ExternalSecret behind a sealed Vault); reapplying will not fix these"
+   fi
    return 1
 }
 

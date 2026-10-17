@@ -904,6 +904,23 @@ function _hostinger_reapply_gitops_applicationsets() {
   return 0
 }
 
+function _hostinger_ensure_vault_unseal_watchdog() {
+  local ns="${HOSTINGER_VAULT_NS:-secrets}"
+  local release="${VAULT_RELEASE:-vault}"
+  if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${ns}" get statefulset "${release}" >/dev/null 2>&1; then
+    _info "[k3s-hostinger] No Vault StatefulSet ${ns}/${release} on ${_HOSTINGER_KUBE_CONTEXT} — skipping unseal watchdog"
+    return 0
+  fi
+  if ! declare -f vault_install_unseal_watchdog >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/plugins/vault.sh"
+  fi
+  _info "[k3s-hostinger] Ensuring Vault unseal watchdog on ${_HOSTINGER_KUBE_CONTEXT}..."
+  if ! ( vault_install_unseal_watchdog "${ns}" "${_HOSTINGER_KUBE_CONTEXT}" ); then
+    printf 'ERROR: %s\n' "[k3s-hostinger] Vault unseal watchdog install failed on ${_HOSTINGER_KUBE_CONTEXT} — a reboot will leave Vault sealed" >&2
+    return 1
+  fi
+}
+
 function _hostinger_reconcile_vault_cluster_store() {
   local host ssh_target
   host="$(_hostinger_require_host)" || return 1
@@ -1106,6 +1123,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_frontend_dns || return 1
   _hostinger_refresh_access_layer || return 1
+  _hostinger_ensure_vault_unseal_watchdog || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"
     _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"
