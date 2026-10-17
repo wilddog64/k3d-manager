@@ -341,6 +341,17 @@ cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
 v1.43.0 and is superseded. v1.44.0 is at its five-plan cap.
 
+### Candidate milestone — v1.44.1 (patch)
+
+**Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.44.1`, cut from
+`main` after v1.44.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.44.0 are at
+their five-plan caps, and this plan depends on v1.44.0's submitter authentication. Plan 1 of 5 is
+[`cloud-bridge-e2e-sandbox`](plans/v1.44.1-cloud-bridge-e2e-sandbox.md): a cloud session may run
+`make-e2e-sandbox` (Tier 2 against an existing sandbox; `e2e-sandbox-provision` stays refused)
+under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, no lifecycle
+overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
+explicit exclusion of `e2e-sandbox`.
+
 ### Candidate milestone — v1.45.0
 
 **Docs drift detection.** Facts that can be derived from code (module tables, route tables,
