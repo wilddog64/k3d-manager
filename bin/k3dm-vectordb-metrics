@@ -190,8 +190,10 @@ def _evidence_contains_fix(root, fix_commit, evidence_commit):
             ["git", "-C", str(root), "merge-base", "--is-ancestor", fix_commit, evidence_commit],
             capture_output=True, text=True, timeout=10, check=False)
     except Exception:
-        return False
-    return result.returncode == 0
+        return None
+    if result.returncode in (0, 1):
+        return result.returncode == 0
+    return None
 
 
 def _verification_times(root, ref, texts):
@@ -277,11 +279,14 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
                 live_evidence = "stale"
                 for item in evidence:
                     try:
-                        if checker(fix_commit, item["commit"]):
-                            live_evidence = "ok"
-                            break
+                        contained = checker(fix_commit, item["commit"])
                     except Exception:
-                        continue
+                        contained = None
+                    if contained:
+                        live_evidence = "ok"
+                        break
+                    if contained is None:
+                        live_evidence = "unchecked"
         if status == "fixed":
             verified = "true" if verification in ("verified", "live") else "false"
             live_verified = "true" if verification == "live" else "false"

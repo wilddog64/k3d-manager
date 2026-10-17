@@ -124,3 +124,16 @@ def test_N4_fix_sha_label_is_per_row(repo):
     rows = {l.split('bug="')[1].split('"')[0]: l for l in out.splitlines() if l.startswith("k3dm_bug_info{")}
     assert f'fix_sha="{old[:8]}"' in rows["2026-10-10-a"]
     assert f'fix_sha="{later[:8]}"' in rows["2026-10-10-b"]
+
+def test_N5_unresolvable_commit_is_unchecked_not_stale(repo):
+    r, old, fix, later = repo
+    gone = "0123456789abcdef0123456789abcdef01234567"
+    row = _row(r, _doc([_ev(gone)]), {"docs/bugs/2026-10-10-x.md": {"commit": fix}})
+    assert 'live_evidence="unchecked"' in row
+    row = _row(r, _doc([_ev(later)]), {"docs/bugs/2026-10-10-x.md": {"commit": gone}})
+    assert 'live_evidence="unchecked"' in row
+
+def test_N5_resolvable_non_ancestor_stays_stale(repo):
+    r, old, fix, later = repo
+    row = _row(r, _doc([_ev(old)]), {"docs/bugs/2026-10-10-x.md": {"commit": fix}})
+    assert 'live_evidence="stale"' in row

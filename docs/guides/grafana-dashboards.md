@@ -400,9 +400,9 @@ fix commit:
 | Live evidence | Meaning |
 |---|---|
 | `ok` | `✓ current`: at least one evidence commit contains the fix |
-| `stale` | `stale proof`: no evidence commit contains the fix |
+| `stale` | `stale proof`: git confirms no evidence commit contains the fix |
 | `missing` | no well-formed evidence line is recorded |
-| `unchecked` | evidence exists, but the fix commit is unknown |
+| `unchecked` | evidence exists, but the fix commit is unknown, or git cannot resolve the fix or evidence commit (for example a squash-merged release branch that was deleted without an archive tag) |
 | `n/a` | LIVE-VERIFIED release predates v1.43.4 |
 | `-` | not fixed or not LIVE-VERIFIED |
 

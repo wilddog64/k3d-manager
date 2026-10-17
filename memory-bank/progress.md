@@ -1,3 +1,4 @@
+- 2026-10-17: live-evidence squash-merge hardening — unresolvable commits → unchecked (not stale); /post-merge Step 8 tags archive/<branch> before deleting release branches.
 - 2026-10-17: live-evidence spec IMPLEMENTED — Codex 1a965ff8 + Claude corrections (fixed_in gate removed, **Fix commit:** override, proves fix, guide split fixed), independent tests, 6 v1.43.4 LIVE-VERIFIED docs backfilled (all ok). E4 dashboard check pending.
 - 2026-10-17: spec docs/plans/v1.43.4-bug-live-evidence-record.md (plan 5/5 — v1.43.4 at cap) approved + dispatched to Codex: **Live evidence:** line (env/scenario/run/commit), live_evidence label ok/stale/missing, lint on LIVE-VERIFIED flips.
 - 2026-10-17: keep-hub sandbox PF bug VERIFIED — Codex c99c8b3a on origin; Claude reran BATS 34/34 + acceptance 11/11, shellcheck clean, N1 red pre-fix, N2 red under mutation. E3 live at next sandbox make down.
