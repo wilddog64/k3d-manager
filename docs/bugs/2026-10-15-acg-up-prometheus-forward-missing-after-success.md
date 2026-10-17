@@ -45,4 +45,18 @@ Other observed checks included ArgoCD 43/43 apps healthy, frontend and Keycloak 
 - A working listener on expected provider-specific port survives the intended lifecycle or has an observable, bounded self-healing mechanism.
 - No port-conflict claim or automatic resource mutation without evidence; no unrelated cluster shutdown or destructive action.
 
+## Findings — 2026-10-17 (Claude, read-only)
+
+- Job `5f5cff23` Step 14b **did** start the forward (`PID 20171`); it was not the missing-service skip.
+- Step 14b launches a bare background `kubectl port-forward` (`bin/cluster-up` ~1966). Every other
+  sandbox forward (Vault 4.1, ArgoCD 4b, frontend 10g.10, Pushgateway 14c) is a launchd agent with
+  auto-restart. `kubectl port-forward` exits when its target pod goes away, and nothing restarts it.
+- `~/.local/share/k3d-manager/k3s-aws/logs/acg-prom-pf.log` (across runs): 5× `error: lost connection
+  to pod`, 2× `unable to forward port because pod is not running. Current status=Pending` — the
+  Prometheus pod is rescheduled after Step 14 starts the forward (Step 14 itself deploys/updates it).
+- `_acg_up_cleanup` kills the PID only on a non-zero exit, so cleanup is not the cause.
+- Likely root cause: an unmanaged forward that dies on the first Prometheus pod restart. Fix shape:
+  install it as a launchd agent like Step 14c. Not yet proven for this job (log lines carry no
+  timestamps); live proof needs a sandbox.
+
 **Implementation:** not started.

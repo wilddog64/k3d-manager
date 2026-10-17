@@ -2655,3 +2655,4 @@ Operator requested that existing cloud-bridge `make-e2e` and `make-e2e-remote` e
 ## 2026-10-13 — Hermes alert_delivery UNKNOWN triage
 
 Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `alert delivery probe unavailable`. Read-only branch review found `scripts/lib/hermes/sensors.py` suppresses all probe errors with broad `except Exception`; actual live cause remains unverified and no Alertmanager outage is established. Filed P2 bug `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (`2c2225b8`) for safe diagnostic reasons and probe verification; no executable changes.
+- 2026-10-17: Dependabot bug — frontend #123 merged; basket #53 + product-catalog #60 in progress. Prometheus PF bug: root cause likely bare kubectl port-forward (no launchd) dying on Prometheus pod restart; findings added to bug doc. Hostinger host key matches known_hosts (ed25519/ecdsa/rsa); SSH ok; prev-boot journal needs operator sudo.
