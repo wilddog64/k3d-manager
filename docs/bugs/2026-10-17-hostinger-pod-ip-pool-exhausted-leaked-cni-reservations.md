@@ -1,7 +1,7 @@
 # Bug: Hostinger pod IP pool is exhausted by leaked CNI reservations; new pods cannot start
 
 **Filed:** 2026-10-17 (Claude, read-only investigation of the Hostinger node)
-**Status:** OPEN — fix approved; step 1 done (read-only), step 2 cleanup awaiting operator; prevention not yet specified
+**Status:** OPEN — cleanup done 2026-10-17T23:14:58Z (operator ran the sweep; Claude confirmed); prevention not yet specified
 **Priority:** P1 — every new pod on the node fails intermittently, including the Vault unseal watchdog CronJob that `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md` depends on, so that fix cannot work while this is open
 **Severity:** high
 **Approval:** approved — operator, 2026-10-17: "go ahead"
@@ -53,4 +53,13 @@ power-offs, k3s/containerd restarts, kills under memory pressure — see
   re-checks each file against `crictl pods` **and** every pod's reported IP at deletion time. Dry
   run on the node: `kept=45 stale=207`.
 
-**Implementation:** cleanup pending operator; prevention not started.
+## Step 2 result — 2026-10-17 (operator ran, Claude verified)
+
+- Sweep `--apply` at 23:14:58Z: `kept=45 stale=207`, `reservations now: 45`.
+- `journalctl -u k3s` "no IP addresses available": 184 from 18:12Z to the sweep, **0** after.
+- The next watchdog run (`vault-unseal-watchdog-29871315`) got `10.42.0.65` and completed; Vault
+  reports `sealed: false`.
+- Count only `-u k3s` lines: the node's own sudo log records each command line, so a plain grep of
+  the journal counts the investigator's own commands.
+
+**Implementation:** cleanup done; prevention not started.

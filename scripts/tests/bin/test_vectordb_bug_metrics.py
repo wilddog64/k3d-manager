@@ -128,6 +128,17 @@ def test_verification_times_copy_status_date_for_direct_live_verification(metric
     assert times == {"docs/bugs/bug.md": ("2026-10-15", "2026-10-15", verified_sha)}
 
 
+def test_verification_times_add_commit_time_to_same_day_status_date(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** VERIFIED — 2026-10-17: tests green\n")
+    _commit(tmp_path, "verified", "2026-10-17T19:41:10+00:00")
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-17: live proof\n")
+    _commit(tmp_path, "live", "2026-10-17T21:05:00+00:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times["docs/bugs/bug.md"][:2] == ("2026-10-17 19:41Z", "2026-10-17 21:05Z")
+
+
 def test_verification_times_git_failure_is_non_fatal_and_metrics_fall_back(metrics, tmp_path):
     texts = {"docs/bugs/verified.md": "**Priority:** P1\n**Status:** VERIFIED\n"}
     times = metrics._verification_times(tmp_path / "not-a-repo", "HEAD", texts)

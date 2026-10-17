@@ -184,6 +184,12 @@ def _verification_commit(root, ref, path, pattern):
     return sha, timestamp.strftime("%Y-%m-%d %H:%MZ")
 
 
+def _with_commit_time(day, commit):
+    if day and commit and len(day) == 10 and commit[1].startswith(day):
+        return commit[1]
+    return day
+
+
 def _evidence_contains_fix(root, fix_commit, evidence_commit):
     try:
         result = subprocess.run(
@@ -210,11 +216,13 @@ def _verification_times(root, ref, texts):
                 root, ref, path, r"^\*\*Status:\*\* LIVE-VERIFIED")
             if live_at is None and live_commit:
                 live_at = live_commit[1]
+            live_at = _with_commit_time(live_at, live_commit)
         verified_at = _status_date(text) if verification == "verified" else None
         verified_commit = _verification_commit(
             root, ref, path, r"^\*\*Status:\*\* (LIVE-)?VERIFIED")
         if verified_at is None and verified_commit:
             verified_at = verified_commit[1]
+        verified_at = _with_commit_time(verified_at, verified_commit)
         if verification == "live" and verified_commit and live_commit and verified_commit[0] == live_commit[0]:
             verified_at = live_at
         times[path] = (verified_at or "true", live_at, verified_commit[0] if verified_commit else None)

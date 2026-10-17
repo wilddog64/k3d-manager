@@ -386,7 +386,11 @@ live-verified document gets `YYYY-MM-DD HH:MMZ` (UTC) or `YYYY-MM-DD`. The time 
 written directly after the keyword (`VERIFIED — <ISO date or time>: <evidence>` /
 `LIVE-VERIFIED — <ISO date or time>: <evidence>`); a date later in the Status text, such as a
 planned drill or a `Was:` history note, is ignored. Without one, it is the UTC committer time of the
-earliest commit that set that Status. A verified doc with neither is `true`; unverified values stay
+earliest commit that set that Status. A date-only Status date takes that commit's time when the
+commit is from the same UTC day; otherwise it stays `YYYY-MM-DD` — usually because the only commit
+that carries the Status is a release squash merge, whose time is the merge, not the verification.
+Write the time in the Status (`VERIFIED — 2026-10-17T19:41Z: …`) to always get one. A verified doc
+with neither is `true`; unverified values stay
 `false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
 
 The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
