@@ -251,6 +251,25 @@ local user `e2e-user`, roles, Vault `secret/keycloak/e2e`, run-scoped ExternalSe
 - Hostinger runs the same realm; the identity exists there too but grants nothing beyond payment roles,
   and no credential is deployed to Hostinger.
 
+### Files
+
+- `scripts/plugins/shopping_cart.sh`
+- `scripts/plugins/keycloak.sh`
+- `bin/cluster-up`
+- `scripts/plugins/e2e.sh`
+- `scripts/tests/plugins/e2e.bats`
+- `scripts/tests/plugins/keycloak.bats`
+- `docs/guides/vcluster-e2e-harness.md`
+
+### Rules
+
+- Implement F1–F4 exactly; touch only the files above. No PR, no merge, no `--no-verify`, never `main`.
+- Never print, echo or log a secret value; no secret in argv (stdin / env only).
+- Do not run anything against a live cluster, Vault, Keycloak or the ACG sandbox — BATS stubs only.
+- Gates (paste the output): `shellcheck scripts/plugins/keycloak.sh scripts/plugins/e2e.sh scripts/plugins/shopping_cart.sh bin/cluster-up`
+  (zero new warnings); `bats scripts/tests/plugins/e2e.bats scripts/tests/plugins/keycloak.bats` (all pass).
+- Commit message: `fix(e2e): give Tier 2 a hub Keycloak e2e identity and fix the doubled realm path`
+
 ### Live proof
 
 On the next `make up` (or on the running hub via a one-off Step 10d rerun), then `make e2e-sandbox`:
