@@ -73,6 +73,8 @@ step 1 merges and the workflow runs.
 - After the first publish, confirm the package `minio-image-uploader` is pullable with `ghcr-pull-secret`
   (link it to the repo or grant the token's account read access).
 
+**Step 1 landed 2026-10-18:** shopping-cart-infra PR #113, squash `1be75f5f` (Codex `fb572b8`, Claude `387cabf` guard-before-build, `0c7e630` CHANGELOG). Workflow run `39167798042` succeeded: `minio-image-uploader:1.0.0` = `sha256:f152ceb0e3293888372fc43fe0e8a87bbcea3d1fb1e1dba7bcc599596b72657d`, cosign `.sig` published. The package is **public** and linked to the repo, so the pull-access prerequisite needs no action.
+
 ### Step 2 — after the first signed publish
 
 - **F5.** In `image-upload-job.yaml`: uploader image
@@ -118,7 +120,7 @@ interface:
 
 ## Definition of Done
 
-- [ ] Step 1 (F1–F4) on `fix/minio-uploader-image` in `shopping-cart-infra`; only
+- [x] Step 1 (F1–F4) on `fix/minio-uploader-image` in `shopping-cart-infra`; only
       `data-layer/minio/uploader/Dockerfile`, `.github/workflows/minio-uploader-image.yml`,
       `data-layer/minio/image-upload-job.yaml` and a test file changed.
 - [ ] Step 1 tests: M3, M4 and N2 green, N2 red on the pre-fix manifest; the workflow passes `actionlint`
