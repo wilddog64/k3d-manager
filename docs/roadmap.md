@@ -304,6 +304,10 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
   [`cluster-down-short-job-no-slack-output`](bugs/2026-10-15-cluster-down-short-job-no-slack-output.md),
   [`e2e-slack-runner-interface-inconsistent`](bugs/2026-10-15-e2e-slack-runner-interface-inconsistent.md),
   [`slack-find-similar-docs-free-text-q-parsing`](bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md).
+- Moved from v1.43.4 (operator, 2026-10-17): P2 [`hostinger-node-unresponsive-then-rebooted`](bugs/2026-10-17-hostinger-node-unresponsive-then-rebooted.md)
+  (no code fix; needs the hPanel activity log to say who powered the VM off) and P3
+  [`frontend-cart-badge-stale-across-logout`](bugs/2026-10-17-frontend-cart-badge-stale-across-logout.md)
+  (shopping-cart-frontend; approval pending).
 - The 2026-10-06 Slack bugs with no Priority line go to the v1.50.1 status cleanup unless one of these
   fixes covers them.
 

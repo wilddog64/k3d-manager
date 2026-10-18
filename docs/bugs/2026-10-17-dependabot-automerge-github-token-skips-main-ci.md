@@ -1,6 +1,6 @@
 # Dependabot auto-merges never build an image: the merge push is made with GITHUB_TOKEN
 
-**Status:** OPEN — option 1 chosen 2026-10-17; fix specified below (needs operator App setup)
+**Status:** OPEN — fixed and merged in 4 of 5 repos (order #100, payment #90, frontend #123, product-catalog #60); basket #53 is green with no unresolved threads and waits for the operator's merge. Working in production: see "Observed working" below
 **Priority:** P2 — dependency and base-image fixes merge but are not built or deployed until an unrelated
 human merge; the workaround is a manual merge or a manual `workflow_dispatch`
 **Severity:** Medium — silent: the PR shows MERGED and green, and nothing says the image was never built
@@ -243,3 +243,13 @@ new:
 No CHANGELOG change: the existing `[Unreleased]` entry still describes the fix. Gate: `actionlint`
 on the file in each repo, and the mint/enable block hashes the same in all 5. Commit message (all
 repos): `ci(dependabot): gate auto-merge on the minted App token, one policy condition`.
+
+## Observed working — 2026-10-17 (Claude, read-only `gh`)
+
+shopping-cart-payment #90 merged at 18:36Z. A later Dependabot auto-merge, `824a6c21` (author
+`dependabot[bot]`, "build(deps): bump the maven-minor-patch group…"), started a `push` run on `main`
+at 19:31Z, and that run's `Build, Scan & Push / build-push` job **succeeded**. Before the fix, a
+Dependabot merge started no `push` run at all. shopping-cart-order shows the same: Dependabot merges at
+19:20Z, 19:29Z and 19:50Z (after #100 merged at 18:44Z) each started `push` CI on `main`.
+
+Remaining: merge basket #53, then close this bug once a basket Dependabot merge starts a `push` run.

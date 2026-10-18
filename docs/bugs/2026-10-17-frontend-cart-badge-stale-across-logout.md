@@ -2,6 +2,7 @@
 
 **Status:** OPEN — cause confirmed by code read + live check; not yet fixed
 **Priority:** P3
+**Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
 **Found:** 2026-10-17, operator (logged out `developer`, logged in as `admin`, badge showed 3)
 **Affected:** `shopping-cart-frontend` (`src/stores/cartStore.ts`, `src/components/layout/Header.tsx`, `src/hooks/useCart.ts`)

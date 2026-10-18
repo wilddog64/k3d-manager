@@ -2,7 +2,8 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — root cause found 2026-10-17 (unmanaged forward dies on Prometheus pod restart); fix specified, not dispatched
+**Status:** FIXED — 2026-10-17: `3b3efd9f` (Codex) + behavioural N1/N3/N4 tests `11392935` (Claude); Claude-verified (scope = spec, 8 files; BATS 71/71; N1 red on pre-fix 1707318b, N3/N4 mutation-tested red). Doc status was left at OPEN by mistake until 2026-10-17 20:30 PDT. Awaiting independent verifier and live E2/E3
+**Fix commit:** 3b3efd9f
 **Priority:** P2 — misleading successful provisioning/observability verification, degraded telemetry; reclassify if the sandbox intentionally supports a partial-success state
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-17: "go ahead to do that" (fix as a launchd agent like Step 14c, kept in v1.43.4)
@@ -59,7 +60,15 @@ Other observed checks included ArgoCD 43/43 apps healthy, frontend and Keycloak 
   install it as a launchd agent like Step 14c. Not yet proven for this job (log lines carry no
   timestamps); live proof needs a sandbox.
 
-**Implementation:** not started.
+**Implementation:** `3b3efd9f` (see Status).
+
+**Live observation — 2026-10-17 19:53–20:08 PDT (not E2/E3):** on `make up CLUSTER_PROVIDER=k3s-aws`
+at `a05061c9`, Step 14b logged "ACG Prometheus port-forward agent loaded (launchd:
+com.k3d-manager.sandbox.prometheus-port-forward…)", and `acg-prom-pf.log` shows `Forwarding from
+0.0.0.0:19190` followed by 58 forwarded connections. After the sandbox went away during the keep-hub
+`make down`, launchd kept relaunching kubectl (dial timeouts to the sandbox API) until cluster-down
+unloaded the agent and removed it at 20:08:31. No `/-/ready` probe and no pod-delete recovery were
+run, so E2 and E3 remain open.
 
 ## Fix
 

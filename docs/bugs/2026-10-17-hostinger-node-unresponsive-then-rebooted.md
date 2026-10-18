@@ -2,6 +2,7 @@
 
 **Status:** OPEN — previous-boot journal read 2026-10-17: the outage was a hypervisor-initiated power-off, not a hang; who triggered it is unconfirmed
 **Priority:** P2
+**Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
 **Found:** 2026-10-17, operator paged by `PublicEndpointDown` for `https://frontend.3ai-talk.org/`
 **Affected:** `ubuntu-hostinger` (single node `srv1754834`, 7.9 GiB RAM, no swap) — every app on it
