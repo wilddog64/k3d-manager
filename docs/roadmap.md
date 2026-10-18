@@ -325,6 +325,11 @@ Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verifi
 counts Codex tokens through verification, including live evidence when the spec's Acceptance block
 requires it. It also adds a `review` cause to the v1.43.4 rework rate.
 
+Plan 3 of 5 is [`dispatch-codex-solo-activity`](plans/v1.43.6-dispatch-codex-solo-activity.md)
+(operator, 2026-10-18). The dispatch dashboard sees only dispatcher-launched Codex runs; this adds a row for
+every Codex session (headless or interactive, by repo), and Codex's own 5-hour and weekly quota, read
+from the session files. Depends on v1.43.5 plan 4's session scan.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
