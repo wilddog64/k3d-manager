@@ -2766,3 +2766,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: P2 ArgoCD password LIVE-VERIFIED (operator logged in with show-service-passwords output). Vault secret/argocd/admin still stale until written or next hub recovery.
 - 2026-10-18: shopping-cart-infra PR #115 merged 542bb011 (22:49Z); enforce_admins restored; local main synced; fix/* branch so no tag. Next: operator syncs ubuntu-hostinger-data-layer, screenshot for E2.
 - 2026-10-18: operator synced ubuntu-hostinger-data-layer after #115; minio-image-upload PostSync Succeeded with the updated script ConfigMap. Awaiting storefront screenshot (slug-tag E2).
+- 2026-10-18: slug-tag fix is in MinIO (22:51Z, marker 2); Cloudflare edge serves July copies (max-age 4h). Operator: purge or wait, then E2 screenshot.

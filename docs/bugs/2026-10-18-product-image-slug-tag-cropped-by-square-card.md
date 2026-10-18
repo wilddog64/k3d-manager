@@ -83,3 +83,8 @@ interface:
 - 2026-10-18: Codex `d81199d6`; Claude verified the diff matches F1–F3 (only the ConfigMap, the new
   `scripts/tests/bin/minio-image-art.bats` and CHANGELOG changed), 16/16 green across the art, upload-job
   and keycloak suites, and both art tests red against the `origin/main` ConfigMap.
+- 2026-10-18 ~16:25 PDT, after the operator's data-layer sync: MinIO holds the new art (cache-busted fetches
+  of `/minio/product-images/*.jpg` show `last-modified` 22:51:30Z, `.art-version` = `2`). The storefront
+  still showed slug tags on most cards because Cloudflare served the July copies of the plain URLs
+  (`cf-cache-status: HIT`, `cache-control: max-age=14400`). Purge `/minio/product-images/*` or wait up to 4h,
+  then take the E2 screenshot. A future ART_VERSION bump hits the same edge cache.
