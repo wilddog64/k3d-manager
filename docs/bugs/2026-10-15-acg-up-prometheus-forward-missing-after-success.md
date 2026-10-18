@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.4` (triage 2026-10-15, operator-approved placement)
-**Status:** FIXED — 2026-10-17: `3b3efd9f` (Codex) + behavioural N1/N3/N4 tests `11392935` (Claude); Claude-verified (scope = spec, 8 files; BATS 71/71; N1 red on pre-fix 1707318b, N3/N4 mutation-tested red). Doc status was left at OPEN by mistake until 2026-10-17 20:30 PDT. Awaiting independent verifier and live E2/E3
+**Status:** FIXED — 2026-10-17: `3b3efd9f` (Codex) + behavioural N1/N3/N4 tests `11392935` (Claude); Claude-verified (scope = spec, 8 files; BATS 71/71; N1 red on pre-fix 1707318b, N3/N4 mutation-tested red). Doc status was left at OPEN by mistake until 2026-10-17 20:30 PDT. Independent verifier (Sonnet, Acceptance-only, stubbed launchctl/kubectl, temp HOME) PASSED: 18/18 post-fix covering M1–M6 and N1–N4; N1 red on pre-fix 1707318b (8 pre-fix failures in all); re-run by Claude. Verifier note, not a defect: the missing-service branch's printed recovery hint still suggests a bare `nohup kubectl port-forward` (out of scope here). Awaiting live E2/E3
 **Fix commit:** 3b3efd9f
 **Priority:** P2 — misleading successful provisioning/observability verification, degraded telemetry; reclassify if the sandbox intentionally supports a partial-success state
 **Severity:** medium
