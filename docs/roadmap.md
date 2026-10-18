@@ -330,6 +330,18 @@ Plan 3 of 5 is [`dispatch-codex-solo-activity`](plans/v1.43.6-dispatch-codex-sol
 every Codex session (headless or interactive, by repo), and Codex's own 5-hour and weekly quota, read
 from the session files. Depends on v1.43.5 plan 4's session scan.
 
+Plan 4 of 5 is [`claude-context-compaction-metrics`](plans/v1.43.6-claude-context-compaction-metrics.md)
+(operator, 2026-10-18). It measures what context compaction costs: compactions, files re-read after a
+compaction, and Claude cost per verified spec, plus a hand tally of resumption failures and
+missing-context corrections. It sets up a two-week 200K versus larger-window experiment. Depends on
+v1.43.5 plan 5's Claude scan.
+
+Plan 5 of 5 is [`hub-argocd-pinned-upgrade`](plans/v1.43.6-hub-argocd-pinned-upgrade.md) (operator,
+2026-10-18). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`) and has never had a
+planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry run,
+before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
+2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the

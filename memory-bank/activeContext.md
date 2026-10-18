@@ -2163,3 +2163,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18 — v1.43.4 release PR #145 opened (CHANGELOG promoted).
 - 2026-10-18: PR #145 CI red on f60c598f (5 rotted suites: watchdog CNI stub + bare-! lint, acg stub vs lib-foundation v0.5.4 flags, dr freshness fixed date, bugs table Live evidence column). Fixed in `8d8dca19`; CI rerunning. v1.43.6 plan 4 (Claude context/compaction metrics) drafted in scratchpad; commit pending.
 - 2026-10-18: Dependabot auto-merge bug Status OPEN → FIXED (`46b8632b`), live proof pending (next weekly Dependabot auto-merge must run Go CI + publish).
+- 2026-10-18: v1.43.6 plans 4 (claude-context-compaction-metrics) and 5 (hub-argocd-pinned-upgrade) written; v1.43.6 at 5/5 cap. Hub ArgoCD = argo-cd-10.10.5/v3.5.5 (latest), chart unpinned. Upgrade windows 2026-11-03 (fallback 11-10); 10-29 drill confirms the pin.
