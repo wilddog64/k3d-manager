@@ -1,13 +1,14 @@
 # Bug: a Hostinger re-registration made `data-git` delete the data-layer Application with a cascade finalizer
 
 **Filed:** 2026-10-18 (Claude, found while syncing the MinIO hook fix)
-**Status:** OPEN
+**Status:** FIXED — awaiting `make appsets-reapply` + E3 live check
 **Priority:** P1 — the stuck cascade deletion retries every ~16s against 43 data-layer objects (Postgres, MinIO, RabbitMQ, Redis); the only reason Hostinger's data layer still exists is that the deletes have not landed
 **Severity:** high
 **Approval:** approved — operator, 2026-10-18: "can you dispath those two to codex?"
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Component:** `scripts/etc/argocd/applicationsets/data-git.yaml`, `scripts/plugins/argocd.sh` (`register_app_cluster`)
+**Fix commit:** `781494e6`
 
 ## Symptom
 
@@ -116,3 +117,14 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT run kubectl against any cluster; do NOT patch or sync the live Application.
 - Do NOT edit `scripts/lib/foundation/`.
+
+## Recovery and verification log
+
+- 2026-10-18 15:14 PDT: operator removed the stuck finalizer. `data-git` recreated the Application
+  at 22:14:27Z; it synced `83e8880d` and is Synced/Healthy. All 7 data pods kept running (no
+  restarts) and all 7 PVCs stayed Bound (88d). The recreated Application carries
+  `resources-finalizer.argocd.argoproj.io` again (not from the `data-git` template), so the exposure
+  stays open until F1 is reapplied to the hub.
+- 2026-10-18: Codex `781494e6`; Claude verified the diff, `argocd_register_role_label.bats` 3/3 and the
+  suite set 55/55 green, and the new tests red against `bb53fd99`. The jsonpath
+  `{.metadata.labels.k3d-manager/role}` reads `app-cluster` from the live hub secret.

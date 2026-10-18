@@ -1,13 +1,14 @@
 # Bug: `bin/argocd-app-sync` uses a stale Vault admin password after a hub rebuild and fails with a Python traceback
 
 **Filed:** 2026-10-18 (Claude, from the operator's tmux pane)
-**Status:** OPEN
+**Status:** FIXED — awaiting operator E2 run
 **Priority:** P3 — a workaround exists (pass `ARGOCD_ADMIN_PASSWORD`, or use the UI)
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "can you dispath those two to codex?"
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Component:** `bin/argocd-app-sync`
+**Fix commit:** `9ab8368b`
 
 ## Symptom
 
@@ -81,3 +82,9 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT contact a real ArgoCD, Vault or cluster.
 - Do NOT write a password to a file outside a `mktemp` path that is removed on exit.
+
+## Verification log
+
+- 2026-10-18: Codex `9ab8368b`; Claude verified the diff and `argocd_app_sync.bats` 11/11 green. Against
+  the pre-fix script (`bb53fd99`, in a temporary worktree) tests 8–10 (env→Vault fallback,
+  Vault→initial-secret fallback, single safe error) fail, the other 8 pass.

@@ -134,3 +134,11 @@ interface:
 - Do NOT skip pre-commit hooks (`--no-verify`).
 - Do NOT sync or delete anything on the cluster; the operator runs the recovery sync.
 - Do NOT change the bucket contents layout or the MinIO credentials wiring.
+
+**Live sync 2026-10-18 15:14 PDT** (after the data-layer Application was recovered, see
+`2026-10-18-data-layer-app-cascade-deleted-by-registration-label-window.md`): synced `83e8880d`;
+PostSync `minio-bucket-init` and `minio-image-upload` both Succeeded. Events: pod
+`minio-image-upload-76g6t` pulled `minio-image-uploader:1.0.0@sha256:f152ceb0…` (Kyverno admitted it),
+container ran ~6s; the 10-16 Failed Job was replaced. The pod log was not captured
+(HookSucceeded deleted the pod within seconds). Remaining for E2: product images load on the storefront
+and KubeJobFailed resolved.
