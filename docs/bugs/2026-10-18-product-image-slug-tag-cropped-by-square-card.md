@@ -88,3 +88,6 @@ interface:
   still showed slug tags on most cards because Cloudflare served the July copies of the plain URLs
   (`cf-cache-status: HIT`, `cache-control: max-age=14400`). Purge `/minio/product-images/*` or wait up to 4h,
   then take the E2 screenshot. A future ART_VERSION bump hits the same edge cache.
+- 2026-10-18 ~16:50 PDT: operator purged Cloudflare by prefix `frontend.3ai-talk.org/minio/product-images/`
+  (`success: True`). Plain URLs now return the 22:51Z objects (`cf-cache-status: MISS`). Remaining for E2:
+  the storefront screenshot.

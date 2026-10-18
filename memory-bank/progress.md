@@ -2773,3 +2773,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: shopping-cart-frontend PR #127 opened (cache TTL fix); Copilot requested; CI pending.
 - 2026-10-18: shopping-cart-frontend #127 CI green (866a225), Copilot no issues. enforce_admins DELETE was blocked by the auto-mode classifier; still enabled. Cloudflare purge script handed to operator (my session cannot read the keychain).
 - 2026-10-18: operator disabled enforce_admins on shopping-cart-frontend for #127 merge; restore after merge.
+- 2026-10-18: Cloudflare prefix purge done by operator (success); plain image URLs serve 22:51Z art. Awaiting storefront screenshot for slug-tag E2.
