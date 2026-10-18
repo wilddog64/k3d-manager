@@ -142,3 +142,6 @@ PostSync `minio-bucket-init` and `minio-image-upload` both Succeeded. Events: po
 container ran ~6s; the 10-16 Failed Job was replaced. The pod log was not captured
 (HookSucceeded deleted the pod within seconds). Remaining for E2: product images load on the storefront
 and KubeJobFailed resolved.
+- 2026-10-18 (operator screenshot): the storefront Products page shows the generated product images
+  (coloured tiles with the product name) for all 8 visible products. Remaining for E2: the
+  KubeJobFailed RESOLVED email.
