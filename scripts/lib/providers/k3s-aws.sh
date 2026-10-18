@@ -347,10 +347,35 @@ function _k3s_aws_deregister_cluster() {
   _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"
 }
 
+function _k3s_aws_retire_shell_watcher() {
+  [[ -f "${_ACG_WATCH_PID_FILE}" ]] || return 0
+  local _old_pid _cmd _i
+  _old_pid=$(cat "${_ACG_WATCH_PID_FILE}")
+  if [[ "${_old_pid}" =~ ^[0-9]+$ ]] && kill -0 "${_old_pid}" 2>/dev/null; then
+    _cmd=$(ps -o command= -p "${_old_pid}" 2>/dev/null || true)
+    if [[ "${_cmd}" == *cluster-up* || "${_cmd}" == *k3d-manager* ]]; then
+      kill "${_old_pid}" 2>/dev/null || true
+      for _i in 1 2 3 4 5 6 7 8 9 10; do
+        kill -0 "${_old_pid}" 2>/dev/null || break
+        sleep 0.5
+      done
+      if kill -0 "${_old_pid}" 2>/dev/null; then
+        _warn "[k3s-aws] stale in-shell watcher PID ${_old_pid} did not exit — leaving ${_ACG_WATCH_PID_FILE}"
+        return 0
+      fi
+      _info "[k3s-aws] stopped stale in-shell watcher PID ${_old_pid} (launchd owns the watcher)"
+    else
+      _warn "[k3s-aws] ${_ACG_WATCH_PID_FILE} names PID ${_old_pid}, which is not a k3d-manager watcher — not killing it"
+    fi
+  fi
+  rm -f "${_ACG_WATCH_PID_FILE}"
+}
+
 function _k3s_aws_start_watcher() {
   _info "[k3s-aws] Starting sandbox watcher..."
   if launchctl list "${_ACG_WATCH_LAUNCHD_LABEL}" >/dev/null 2>&1; then
     _info "[k3s-aws] launchd watcher ${_ACG_WATCH_LAUNCHD_LABEL} is loaded — skipping in-shell watcher"
+    _k3s_aws_retire_shell_watcher
     return 0
   fi
   local _existing_pid
