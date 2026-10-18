@@ -243,6 +243,7 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_refresh_index", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_health_metrics", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None, raising=False)
+    monkeypatch.setattr(k3dm_hermes, "_publish_cni_ipam_metrics", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_publish_pr_checks", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
