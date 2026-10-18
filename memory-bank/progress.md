@@ -2720,3 +2720,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18 — basket #54 (lint pin) and #53 (App-token automerge, 46b8632b) merged; #52 merged pre-fix by github-actions[bot] with no Go CI (last red sample). Dependabot bug awaits the first post-#53 Dependabot merge. Next: /create-pr v1.43.4.
 - 2026-10-18 — v1.43.4 release PR #145 opened (CHANGELOG promoted).
 - 2026-10-18: PR #145 CI red on f60c598f (5 rotted suites: watchdog CNI stub + bare-! lint, acg stub vs lib-foundation v0.5.4 flags, dr freshness fixed date, bugs table Live evidence column). Fixed in `8d8dca19`; CI rerunning. v1.43.6 plan 4 (Claude context/compaction metrics) drafted in scratchpad; commit pending.
+- 2026-10-18: Dependabot auto-merge bug Status OPEN → FIXED (`46b8632b`), live proof pending (next weekly Dependabot auto-merge must run Go CI + publish).
