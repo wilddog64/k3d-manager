@@ -1581,7 +1581,7 @@ Requires a service account token from the ubuntu-k3s cluster:
 Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_SECRET_NAME   Secret name   (default: cluster-ubuntu-k3s)
   ARGOCD_APP_CLUSTER_NAME          Cluster name  (default: ubuntu-k3s)
-  ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:6443)
+  ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:16443, the sandbox tunnel)
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
   ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
   ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required unless SERVER=https://kubernetes.default.svc)

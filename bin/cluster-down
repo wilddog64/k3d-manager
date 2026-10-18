@@ -108,12 +108,13 @@ case "${_cluster_provider}" in
         lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
       fi
 
-      _info "[acg-down] Stopping tunnel..."
-      if _dry_run_active; then
-        _info "DRY_RUN: would stop autossh tunnel"
-      else
-        tunnel_stop 2>/dev/null || true
-      fi
+    fi
+    _info "[acg-down] Stopping sandbox tunnel agents..."
+    if _dry_run_active; then
+      _info "DRY_RUN: would stop the com.k3d-manager.sandbox.ssh-tunnel agents"
+    else
+      TUNNEL_SCOPE=sandbox tunnel_stop 2>/dev/null || true
+      TUNNEL_SCOPE=sandbox _tunnel_remove_agent_files
     fi
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if _dry_run_active; then
@@ -201,6 +202,9 @@ if _is_mac; then
     fi
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
+  if ! _dry_run_active && [[ -e "${_frontend_browser_plist}" ]]; then
+    _warn "[acg-down] com.k3d-manager.sandbox.frontend-browser-http is still installed (see ${_frontend_browser_launchctl_log}); remove it with: sudo launchctl bootout system ${_frontend_browser_plist}; sudo rm -f ${_frontend_browser_plist}"
+  fi
 
   _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
   _pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
@@ -249,6 +253,19 @@ if [[ -f "${_frontend_pf_pid_file}" ]]; then
     rm -f "${_frontend_pf_pid_file}"
   fi
   _info "[acg-down] Frontend port-forward stopped"
+fi
+
+_frontend_pf_agent_plist="${FRONTEND_PF_PLIST:-${HOME}/Library/LaunchAgents/com.k3d-manager.frontend-port-forward.plist}"
+if [[ -f "${_frontend_pf_agent_plist}" ]] && grep -Fq -- '<string>ubuntu-k3s</string>' "${_frontend_pf_agent_plist}"; then
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload frontend port-forward LaunchAgent"
+  else
+    launchctl unload "${_frontend_pf_agent_plist}" 2>/dev/null || true
+    _info "[acg-down] Frontend port-forward LaunchAgent unloaded"
+  fi
+  _dry_guard "remove frontend port-forward plist" rm -f "${_frontend_pf_agent_plist}"
+elif [[ -f "${_frontend_pf_agent_plist}" ]]; then
+  _info "[acg-down] com.k3d-manager.frontend-port-forward targets another cluster — left in place"
 fi
 
 _info "[acg-down] Stopping ACG Prometheus port-forward..."

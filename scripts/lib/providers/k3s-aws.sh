@@ -156,7 +156,7 @@ _provider_k3s_aws_start_tunnel() {
   fi
 
   _info "[k3s-aws] Starting autossh tunnel..."
-  _dry_guard "start autossh tunnel" tunnel_start
+  TUNNEL_SCOPE=sandbox _dry_guard "start autossh tunnel" tunnel_start
 }
 
 function _provider_k3s_aws_deploy_app_cluster() {
@@ -450,7 +450,7 @@ HELP
     if _dry_run_active; then
       _info "DRY_RUN: would stop autossh tunnel"
     else
-      tunnel_stop || true
+      TUNNEL_SCOPE=sandbox tunnel_stop || true
     fi
   fi
 

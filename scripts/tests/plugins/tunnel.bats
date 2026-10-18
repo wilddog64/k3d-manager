@@ -129,3 +129,68 @@ setup() {
   run grep -F 'su""do' "${PLUGINS_DIR}/tunnel.sh"
   [ "$status" -ne 0 ]
 }
+
+@test "exact destination matching excludes Hostinger and accepts sandbox" {
+  pgrep() {
+    local _pattern="${2:-}"
+    printf '%s\n' \
+      '/opt/homebrew/bin/autossh -M 0 -o ExitOnForwardFailure=yes -L 0.0.0.0:6443:localhost:6443 -N ubuntu@srv1754834.hstgr.cloud' \
+      | grep -E -- "${_pattern}" >/dev/null
+  }
+  export -f pgrep
+  run _tunnel_is_running
+  [ "$status" -ne 0 ]
+
+  pgrep() {
+    local _pattern="${2:-}"
+    printf '%s\n' '/opt/homebrew/bin/autossh -M 0 -o ExitOnForwardFailure=yes -L 0.0.0.0:16443:localhost:6443 -N ubuntu' \
+      | grep -E -- "${_pattern}" >/dev/null
+  }
+  export -f pgrep
+  run _tunnel_is_running
+  [ "$status" -eq 0 ]
+}
+
+@test "sandbox tunnel_start uses sandbox agents and does not accept Hostinger autossh" {
+  unset TUNNEL_LOCAL_PORT TUNNEL_LAUNCHD_LABEL TUNNEL_PLIST_PATH
+  unset TUNNEL_VAULT_LAUNCHD_LABEL TUNNEL_VAULT_PLIST_PATH TUNNEL_VAULT_WRAPPER_PATH
+  export HOME="${BATS_TEST_TMPDIR}/sandbox-home"
+  pgrep() {
+    local _pattern="${2:-}"
+    printf '%s\n' '/opt/homebrew/bin/autossh -M 0 -o ExitOnForwardFailure=yes -L 0.0.0.0:6443:localhost:6443 -N ubuntu@srv1754834.hstgr.cloud' \
+      | grep -E -- "${_pattern}" >/dev/null
+  }
+  launchctl() { return 0; }
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  uname() { echo Darwin; }
+  export -f pgrep launchctl _tunnel_autossh_path uname
+  export TUNNEL_SCOPE=sandbox
+  run tunnel_start
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"already running"* ]]
+  grep -q '0.0.0.0:16443:localhost:6443' "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.ssh-tunnel.plist"
+  grep -q -- '-R 8200:127.0.0.1:18200' "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.ssh-tunnel-vault.sh"
+  [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel.plist" ]
+  [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel-vault.plist" ]
+}
+
+@test "tunnel scope resolves fresh values on every call" {
+  TUNNEL_SCOPE=sandbox _tunnel_resolve_scope
+  TUNNEL_SCOPE= _tunnel_resolve_scope
+  [ "${_TUNNEL_LAUNCHD_LABEL}" = "com.k3d-manager.ssh-tunnel" ]
+  [ "${_TUNNEL_LOCAL_PORT}" = "6443" ]
+}
+
+@test "sandbox tunnel_stop uses destination-bounded kill patterns" {
+  _tunnel_launchd_loaded() { return 1; }
+  _tunnel_is_running() { return 0; }
+  _tunnel_vault_launchd_loaded() { return 1; }
+  _tunnel_vault_is_running() { return 0; }
+  pkill() { printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/pkill-patterns.log"; }
+  export -f _tunnel_launchd_loaded _tunnel_is_running _tunnel_vault_launchd_loaded _tunnel_vault_is_running pkill
+  export TUNNEL_SCOPE=sandbox
+  run tunnel_stop
+  [ "$status" -eq 0 ]
+  grep -Fq -- 'autossh .* -N ubuntu$' "${BATS_TEST_TMPDIR}/pkill-patterns.log"
+  grep -Fq -- 'ssh -N .*-R 8200:127\.0\.0\.1:18200 ubuntu$' "${BATS_TEST_TMPDIR}/pkill-patterns.log"
+}

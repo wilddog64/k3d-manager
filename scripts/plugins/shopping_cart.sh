@@ -40,6 +40,12 @@ function add_ubuntu_k3s_cluster() {
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local ssh_target="${ssh_user}@${ssh_host}"
+  local _tunnel_port="${TUNNEL_SANDBOX_LOCAL_PORT:-16443}"
+
+  if [[ ! "${_tunnel_port}" =~ ^[0-9]+$ ]]; then
+    _err "[shopping_cart] TUNNEL_SANDBOX_LOCAL_PORT must be numeric: ${_tunnel_port}"
+    return 1
+  fi
 
   case "${remote_kubeconfig}" in
     (*[!A-Za-z0-9_./-]*)
@@ -53,16 +59,16 @@ function add_ubuntu_k3s_cluster() {
 
 # shellcheck disable=SC2029
   if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
-      | sed -e 's|https://localhost:|https://127.0.0.1:|g' > "${local_kubeconfig}"; then
+      | sed -e 's|https://localhost:|https://127.0.0.1:|g' -e "s|https://127.0.0.1:6443|https://127.0.0.1:${_tunnel_port}|g" > "${local_kubeconfig}"; then
     _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
   fi
   chmod 600 "${local_kubeconfig}"
 
-  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s through local tunnel at 127.0.0.1:6443"
+  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s through local tunnel at 127.0.0.1:${_tunnel_port}"
   if ! KUBECONFIG="${local_kubeconfig}" _run_command -- kubectl get nodes; then
-    _err "[shopping_cart] Cannot reach Ubuntu k3s API through local tunnel at 127.0.0.1:6443"
+    _err "[shopping_cart] Cannot reach Ubuntu k3s API through local tunnel at 127.0.0.1:${_tunnel_port}"
     return 1
   fi
 

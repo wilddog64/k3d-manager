@@ -449,7 +449,7 @@ fi
 
 if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
-  _dry_guard "start autossh tunnel" tunnel_start
+  TUNNEL_SCOPE=sandbox _dry_guard "start autossh tunnel" tunnel_start
 fi
 
 if _dry_run_active; then
@@ -924,7 +924,7 @@ kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
-_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:${TUNNEL_SANDBOX_LOCAL_PORT:-16443}}"
 _info "[acg-up] Reconciling other app-cluster registrations (additive)..."
 argocd_reconcile_app_cluster_registrations || true
 

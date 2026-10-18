@@ -20,6 +20,15 @@ bats_require_minimum_version 1.5.0
   [ "$status" -eq 0 ]
 }
 
+@test "cluster-down scopes tunnel cleanup and frontend agent ownership" {
+  run grep -nF 'TUNNEL_SCOPE=sandbox _tunnel_remove_agent_files' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'grep -Fq -- '\''<string>ubuntu-k3s</string>'\''' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'com.k3d-manager.sandbox.frontend-browser-http is still installed' bin/cluster-down
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-down k3s-aws deregister block has real and dry-run paths" {
   run grep -nF '_k3s_aws_deregister_cluster || _warn' bin/cluster-down
   [ "$status" -eq 0 ]
