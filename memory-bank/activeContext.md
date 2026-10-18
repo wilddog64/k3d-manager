@@ -2221,3 +2221,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: slug-tag P3 LIVE-VERIFIED (operator Chrome screenshot). Cloudflare TTL P3: main CI cad5079 green; waiting for max-age=300 on the live image (E2).
 - 2026-10-18: Filed docs/plans/v1.43.7-codex-dispatch-cross-repo.md (opens v1.43.7; v1.43.6 at cap). Operator rule: never bypass bin/k3dm-codex-dispatch; k3d-manager specs go through make codex-dispatch; other repos wait for this plan.
 - 2026-10-18: v1.43.7 cross-repo dispatch plan: added target-movement check on land (operator suggestion): M7, N5.
+- 2026-10-18: v1.43.6 solo-activity plan: added k3dm_codex_untracked_sessions (detected − associated by session id) + Untracked stat/bar gauge, M6/N6 (operator suggestion).
