@@ -2,6 +2,7 @@
 
 **Status:** LIVE-VERIFIED — 2026-10-18: after `make refresh CLUSTER_PROVIDER=k3s-hostinger` installed the fixed sweep (2790 bytes, pre-fix 2770) at about 19:10Z, its first run at about 19:22Z left the host pod IP pool unchanged (45/254 used, 0 stale removed, 0 allocation errors, probe up). Offline: fixed `0fc16826`, 104/104 sites, guard BATS 2/2, N1/M3 red on pre-fix, touched suites 420/420. The first close as "no live surface" was wrong (see Live verification)
 **Priority:** P3
+**Fix commit:** `0fc16826`
 **Approval:** approved — operator, 2026-10-18: "others please dispatch to codex" (v1.43.4 bug)
 **Found:** 2026-10-17, by the independent acceptance verifier for e2e-sandbox-provision
 

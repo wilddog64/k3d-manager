@@ -2,6 +2,7 @@
 
 **Status:** LIVE-VERIFIED — 2026-10-18: E3 passed on ubuntu-hostinger. After `make refresh CLUSTER_PROVIDER=k3s-hostinger`, the operator deleted `secrets/vault-0` at 19:12:54Z; it came back sealed and the next watchdog run (`vault-unseal-watchdog-29872515`, 19:15:00Z) logged `vault sealed — replaying shard` / `unseal succeeded`; `vault-sealed=false` and ready at 19:15:04Z, 2m10s after the restart (limit 10 min). Fixed by Codex `a1c2f800`; offline: Codex BATS 24/24, independent verifier 9/9, N1/N3 red on pre-fix
 **Priority:** P1
+**Fix commit:** `a1c2f800`
 **Approval:** approved — operator, 2026-10-17: "apporve the fix"
 **Found:** 2026-10-17, Claude, while `make appsets-reapply` failed its final check
 **Branch:** `k3d-manager-v1.43.4`

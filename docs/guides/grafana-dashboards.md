@@ -433,7 +433,8 @@ after the proof ran (for example straight to LIVE-VERIFIED), add `**Fix commit:*
 code fix; it overrides that proxy for this check only. Open for keeps counting from Filed
 for `missing` and `stale`; `ok`, `unchecked`, and historic `n/a` rows keep the live-verified value
 of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED without a
-well-formed line (`make check-bug-evidence` sweeps every doc).
+well-formed line and now requires a **Fix commit:** header for a new LIVE-VERIFIED doc, checking
+that an evidence commit contains it (`make check-bug-evidence` sweeps every doc).
 
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
