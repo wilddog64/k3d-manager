@@ -2189,3 +2189,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: LIVE-VERIFIED deployment-dashboard (47b4903a) + stat-tiles (36a00e12) bugs from operator screenshot after make platform-ops. down/somethingelse still on hub Pushgateway — operator DELETE needed.
 - 2026-10-18: Operator DELETEd down/somethingelse; deployment tiles now show only up/aws + down/aws (clean). Leak cleanup complete.
 - 2026-10-18: Dispatched stale-proof P3 (docs/bugs/2026-10-18-live-evidence-stale-when-fix-commit-defaults-to-squash-merge.md) to Codex via codex exec.
+- 2026-10-18: Verified Codex stale-proof fix 6d8bd118 (5 Component files, pytest 7/7, check-bug-evidence rc 0); fixed legacy M6 acceptance test 9be4f2e3 (23/23). Operator added COSIGN_KEY/COSIGN_PASSWORD to shopping-cart-infra. MinIO spec updated; dispatching Step 1 to Codex.

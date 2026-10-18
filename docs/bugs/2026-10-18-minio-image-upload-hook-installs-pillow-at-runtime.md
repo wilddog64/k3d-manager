@@ -7,7 +7,7 @@
 **Approval:** approved — operator, 2026-10-18: "you can open a P3 bug base on what you discovered"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-infra` on a feature branch
 **Release:** v1.43.5
-**Component:** `shopping-cart-infra`: `data-layer/minio/image-upload-job.yaml`, `data-layer/minio/image-upload-configmap.yaml`
+**Component:** `shopping-cart-infra`: `data-layer/minio/image-upload-job.yaml`, `data-layer/minio/uploader/Dockerfile` (new), `.github/workflows/minio-uploader-image.yml` (new)
 
 ## Symptom
 
@@ -39,18 +39,48 @@ That is a timing match, not log evidence. Also unexplained: the TTL controller d
 
 ## Fix
 
-In `shopping-cart-infra`, on a feature branch, never `main`:
+Decision (operator, 2026-10-18): a pinned uploader image built in `shopping-cart-infra`.
 
-- **F1.** Remove the runtime `pip install`. Either build a small pinned uploader image with Pillow
-  (published to GHCR with the repo's existing image pipeline), or generate the images without Pillow.
-  The hook must make no PyPI or other package-index call at run time.
-- **F2.** Pin the uploader image by tag and digest.
-- **F3.** Add `activeDeadlineSeconds: 600` to the Job spec.
-- **F4.** Keep `hook-delete-policy: HookSucceeded`, so a failed Job stays for diagnosis. Add
-  `BeforeHookCreation` so the next sync replaces it rather than colliding with the leftover.
+Hostinger facts that shape it (read-only, 2026-10-18):
+- Kyverno `verify-first-party-images` **enforces** a cosign signature on `ghcr.io/wilddog64/*`, so the image
+  must be signed. `shopping-cart-infra` has only `PACKAGES_TOKEN`; no `COSIGN_KEY` / `COSIGN_PASSWORD`.
+- Nodes are `amd64`; namespace `shopping-cart-data`'s default ServiceAccount already uses `ghcr-pull-secret`.
+- The shared `build-push-deploy.yml` promotes into `k8s/base/kustomization.yaml`, which this repo lacks,
+  so the uploader gets its own workflow.
 
-Recovery for the current state is an operator-run sync of `ubuntu-hostinger-data-layer` after F1–F4 land.
-Claude reads the new pod's log before the TTL removes it.
+### Step 1 — Codex, branch `fix/minio-uploader-image` in `shopping-cart-infra`
+
+- **F1.** `data-layer/minio/uploader/Dockerfile`:
+  `FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1`,
+  `pip install --no-cache-dir Pillow==13.0.0`, a non-root `USER`. The upload script stays in the
+  ConfigMap (unchanged), so script edits need no rebuild.
+- **F2.** `.github/workflows/minio-uploader-image.yml`: on push to `main` with paths
+  `data-layer/minio/uploader/**` and on `workflow_dispatch`; `permissions: contents: read, packages: write`;
+  actions pinned to version tags (`@v3`, `@v5`, as in `build-push-deploy.yml`); build `linux/amd64`, push
+  `ghcr.io/wilddog64/minio-image-uploader:sha-<sha>` and `:1.0.0`; cosign sign by digest with
+  `secrets.COSIGN_KEY` / `COSIGN_PASSWORD`. The job **fails** when `COSIGN_KEY` is empty (an unsigned
+  image is rejected by Kyverno, so a silent skip would publish an unusable image). No `latest` tag.
+- **F3.** In `image-upload-job.yaml`: `activeDeadlineSeconds: 600`.
+- **F4.** `hook-delete-policy: BeforeHookCreation,HookSucceeded`.
+
+Step 1 does not change the uploader image or the `pip install` line yet; the image does not exist until
+step 1 merges and the workflow runs.
+
+### Operator prerequisites (before step 1 merges)
+
+- **DONE 2026-10-18** (operator; verified with `gh secret list`). Add `COSIGN_KEY` and `COSIGN_PASSWORD` to `wilddog64/shopping-cart-infra` (same key the app repos sign
+  with; Kyverno trusts its public key).
+- After the first publish, confirm the package `minio-image-uploader` is pullable with `ghcr-pull-secret`
+  (link it to the repo or grant the token's account read access).
+
+### Step 2 — after the first signed publish
+
+- **F5.** In `image-upload-job.yaml`: uploader image
+  `ghcr.io/wilddog64/minio-image-uploader:1.0.0@sha256:<published digest>`, command
+  `python3 /scripts/generate-and-upload.py` (no `pip install`). Pin the `copy-mc` init image by digest too.
+
+Recovery: the operator syncs `ubuntu-hostinger-data-layer` after step 2 lands. Claude reads the new pod's
+log before the TTL removes it.
 
 ## Acceptance
 
@@ -88,10 +118,13 @@ interface:
 
 ## Definition of Done
 
-- [ ] F1–F4 on a `shopping-cart-infra` feature branch; only the Component files (plus an uploader image
-      definition if F1 builds one) changed.
-- [ ] E1 passes; N1 and N2 shown red on the pre-fix manifest.
-- [ ] Pushed; report the SHA.
+- [ ] Step 1 (F1–F4) on `fix/minio-uploader-image` in `shopping-cart-infra`; only
+      `data-layer/minio/uploader/Dockerfile`, `.github/workflows/minio-uploader-image.yml`,
+      `data-layer/minio/image-upload-job.yaml` and a test file changed.
+- [ ] Step 1 tests: M3, M4 and N2 green, N2 red on the pre-fix manifest; the workflow passes `actionlint`
+      if available, otherwise a YAML parse plus the assertions in F2.
+- [ ] Step 2 (F5) after the first signed publish: M1, M2, N1 green, N1 red on the pre-fix manifest.
+- [ ] Each step pushed; report the SHA.
 
 ## What NOT to Do
 
