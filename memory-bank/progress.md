@@ -2728,3 +2728,5 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: PR #145 pytest tripwire red: hermes poll tests never stubbed _publish_cni_ipam_metrics (added v1.43.4), so each poll ran bin/k3dm-cni-ipam-metrics (ssh to Hostinger + hub push on a laptop). Stubbed in both fixtures + K3DM_CNI_IPAM_PUSHGATEWAY_URL in conftest guard; make test-pytest 983 passed, tripwire clean.
 - 2026-10-18: PR #145 CI green on e15969cc (lint, alertmanager-behaviour, detect, CodeQL); 0 unresolved threads; MERGEABLE but BLOCKED by enforce_admins. Claude DELETE was denied by the auto-mode permission check, so the operator disables it (or merges as admin) and /post-merge re-enables it.
 - 2026-10-18: enforce_admins DISABLED at operator request for the PR #145 merge — /post-merge must re-enable (bodyless POST).
+- 2026-10-18: PR #145 MERGED — v1.43.4 squash `a8909477` on main; enforce_admins restored to true.
+- 2026-10-18: v1.43.4 tagged + GitHub release published; branch k3d-manager-v1.43.5 cut from `a8909477`; retro written (docs/retro/2026-10-18-v1.43.4-retrospective.md).
