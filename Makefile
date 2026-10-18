@@ -857,7 +857,7 @@ show-service-passwords:
 	for _argocd_candidate in vault initial; do \
 	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_file="$$_argocd_vault_file"; else _argocd_candidate_file="$$_argocd_initial_file"; fi; \
 	  if [ -s "$$_argocd_candidate_file" ]; then \
-	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$username,password:($password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
+	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$$username,password:($$password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
 	    _argocd_code=$$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @"$$_argocd_payload" "$$_argocd_url/api/v1/session" || true); \
 	    if [ "$$_argocd_candidate" = vault ]; then _argocd_vault_code="$$_argocd_code"; else _argocd_initial_code="$$_argocd_code"; fi; \
 	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$(cat "$$_argocd_candidate_file")"; break; fi; \

@@ -25,6 +25,16 @@ case "$url" in
   *lookup-self) printf '200' ;;
   *secret/data/argocd/admin) printf '%s' '{"data":{"data":{"password":"vault-pass"}}}' ;;
   *api/v1/session)
+    payload=""
+    prev=""
+    for arg in "$@"; do
+      [ "$prev" = "--data" ] && payload="${arg#@}"
+      prev="$arg"
+    done
+    if ! jq -e '.username == "admin" and (.password | type == "string" and length > 0)' "$payload" >/dev/null 2>&1; then
+      printf '400'
+      exit 0
+    fi
     count_file="${BATS_TEST_TMPDIR}/show-passwords-session-count"
     count=0
     [ -f "$count_file" ] && count="$(cat "$count_file")"
