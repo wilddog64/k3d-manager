@@ -2208,3 +2208,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: show-service-passwords jq/make escaping bug (operator live run) fixed 07298804; stub now validates payload. Operator to rerun make show-service-passwords (E3).
 - 2026-10-18: P2 ArgoCD password LIVE-VERIFIED (operator logged in with show-service-passwords output). Vault secret/argocd/admin still stale until written or next hub recovery.
 - 2026-10-18: shopping-cart-infra PR #115 merged 542bb011 (22:49Z); enforce_admins restored; local main synced; fix/* branch so no tag. Next: operator syncs ubuntu-hostinger-data-layer, screenshot for E2.
+- 2026-10-18: operator synced ubuntu-hostinger-data-layer after #115; minio-image-upload PostSync Succeeded with the updated script ConfigMap. Awaiting storefront screenshot (slug-tag E2).
