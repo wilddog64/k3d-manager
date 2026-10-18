@@ -5,6 +5,8 @@ A hub app-cluster registration is the ArgoCD cluster Secret in the `cicd` namesp
 load-bearing state, not bookkeeping: removing it can remove the Applications that manage the
 cluster's workloads.
 
+The `data-git` ApplicationSet preserves its data-layer resources if its generated Application is deleted during re-registration.
+
 ## Inventory and creation paths
 
 The single declaration of remotely registered app clusters is

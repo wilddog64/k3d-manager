@@ -3,7 +3,7 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
-  source "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  source "${ARGOCD_PLUGIN_SOURCE:-${BATS_TEST_DIRNAME}/../../plugins/argocd.sh}"
 }
 
 @test "browser TLS defaults to the k3s-aws provider-scoped state dir" {

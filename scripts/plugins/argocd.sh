@@ -1630,6 +1630,13 @@ HELP
     _err "[argocd] ARGOCD_APP_CLUSTER_SHOPPING_CART must be 'true' or 'false'"
     return 1
   fi
+  local _role_label=""
+  local _existing_role
+  _existing_role="$(_kubectl get secret "${ARGOCD_APP_CLUSTER_SECRET_NAME}" -n "${ARGOCD_NAMESPACE}" \
+    -o jsonpath='{.metadata.labels.k3d-manager/role}' 2>/dev/null || true)"
+  case "${_existing_role}" in
+    app-cluster) _role_label='    k3d-manager/role: "app-cluster"' ;;
+  esac
   local _managed="${ARGOCD_APP_CLUSTER_MANAGED:-false}"
   if [[ "${_managed}" == "true" ]] && {
     [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" || -z "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}" ||
@@ -1662,7 +1669,8 @@ metadata:
   labels:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
-${_platform_labels}    k3d-manager/managed: "${_managed}"
+${_platform_labels}${_role_label:+${_role_label}
+}    k3d-manager/managed: "${_managed}"
     k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
