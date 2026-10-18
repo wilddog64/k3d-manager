@@ -21,7 +21,7 @@ data:
           "type": "stat",
           "title": "Last acg-up Duration",
           "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background" },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -34,8 +34,10 @@ data:
           },
           "targets": [{
             "datasource": { "type": "prometheus", "uid": "prometheus" },
-            "expr": "max by (provider, status) (k3dm_deployment_duration_seconds{action=\"up\"})",
-            "legendFormat": "{{provider}} ({{status}})"
+            "expr": "max by (provider) (k3dm_deployment_duration_seconds{action=\"up\"})",
+            "legendFormat": "{{provider}}",
+            "instant": true,
+            "range": false
           }]
         },
         {
@@ -43,7 +45,7 @@ data:
           "type": "stat",
           "title": "Last acg-down Duration",
           "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background" },
           "fieldConfig": {
             "defaults": {
               "unit": "s",
@@ -56,8 +58,10 @@ data:
           },
           "targets": [{
             "datasource": { "type": "prometheus", "uid": "prometheus" },
-            "expr": "max by (provider, status) (k3dm_deployment_duration_seconds{action=\"down\"})",
-            "legendFormat": "{{provider}} ({{status}})"
+            "expr": "max by (provider) (k3dm_deployment_duration_seconds{action=\"down\"})",
+            "legendFormat": "{{provider}}",
+            "instant": true,
+            "range": false
           }]
         },
         {
@@ -65,7 +69,7 @@ data:
           "type": "stat",
           "title": "Last Deployment Success",
           "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "value_and_name", "colorMode": "background" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "background" },
           "fieldConfig": {
             "defaults": {
               "mappings": [
@@ -80,7 +84,9 @@ data:
           "targets": [{
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (action, provider) (k3dm_deployment_success)",
-            "legendFormat": "{{action}}/{{provider}}"
+            "legendFormat": "{{action}}/{{provider}}",
+            "instant": true,
+            "range": false
           }]
         },
         {
@@ -88,7 +94,7 @@ data:
           "type": "stat",
           "title": "Last Deployment Time",
           "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "value" },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "textMode": "value_and_name", "colorMode": "value" },
           "fieldConfig": {
             "defaults": {
               "unit": "dateTimeFromNow",
@@ -98,7 +104,9 @@ data:
           "targets": [{
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (action, provider) (k3dm_deployment_last_timestamp_seconds) * 1000",
-            "legendFormat": "{{action}}/{{provider}}"
+            "legendFormat": "{{action}}/{{provider}}",
+            "instant": true,
+            "range": false
           }]
         },
         {
