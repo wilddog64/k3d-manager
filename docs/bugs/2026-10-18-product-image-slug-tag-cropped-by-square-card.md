@@ -1,13 +1,14 @@
 # Bug: product images show a cut-off slug label in the bottom-left corner of each storefront card
 
 **Filed:** 2026-10-18 (Claude, from the operator's storefront screenshot)
-**Status:** DISPATCHED — Codex, 2026-10-18
+**Status:** FIXED on branch — awaiting PR, merge and sync
 **Priority:** P3 — cosmetic; images load and products are usable
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "file a P3 for that cosmetic issue"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-infra` on a feature branch
 **Release:** v1.43.5
 **Component:** `shopping-cart-infra`: `data-layer/minio/image-upload-configmap.yaml` (`generate_image`)
+**Fix commit:** shopping-cart-infra `d81199d6` (branch `fix/product-image-slug-tag`)
 
 ## Symptom
 
@@ -76,3 +77,9 @@ interface:
 
 - Do NOT change the frontend's `object-cover` or `aspect-square`; the product grid layout is correct.
 - Do NOT create a PR or commit to `main`; no `--no-verify`.
+
+## Verification log
+
+- 2026-10-18: Codex `d81199d6`; Claude verified the diff matches F1–F3 (only the ConfigMap, the new
+  `scripts/tests/bin/minio-image-art.bats` and CHANGELOG changed), 16/16 green across the art, upload-job
+  and keycloak suites, and both art tests red against the `origin/main` ConfigMap.

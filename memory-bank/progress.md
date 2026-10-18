@@ -2759,3 +2759,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: MinIO E2 storefront images confirmed by operator screenshot; only KubeJobFailed RESOLVED email left.
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-product-image-slug-tag-cropped-by-square-card.md (slug tag at x=50 cropped by aspect-square object-cover; fix in shopping-cart-infra generate_image). Not dispatched.
 - 2026-10-18: P3 product-image slug tag: operator chose drop tag + ART_VERSION marker; spec updated, dispatched to Codex (shopping-cart-infra branch fix/product-image-slug-tag).
+- 2026-10-18: slug-tag fix Codex d81199d6 on shopping-cart-infra fix/product-image-slug-tag verified (16/16, both new tests red pre-fix). Next: PR + operator merge, sync data-layer, screenshot (E2).
