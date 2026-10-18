@@ -1,6 +1,6 @@
 # Dependabot auto-merges never build an image: the merge push is made with GITHUB_TOKEN
 
-**Status:** OPEN — fixed and merged in 4 of 5 repos (order #100, payment #90, frontend #123, product-catalog #60); basket #53 is green with no unresolved threads and waits for the operator's merge. Working in production: see "Observed working" below
+**Status:** OPEN — fixed and merged in all 5 repos (order #100, payment #90, frontend #123, product-catalog #60, basket #53 at `46b8632b`, 2026-10-18 12:54Z); live proof waits for basket's first Dependabot merge after #53. Last pre-fix sample: basket #52 merged 12:51Z by github-actions[bot] as `1f5aef80`, and only Dependency Graph ran on it (no Go CI, no image). Working in production: see "Observed working" below
 **Priority:** P2 — dependency and base-image fixes merge but are not built or deployed until an unrelated
 human merge; the workaround is a manual merge or a manual `workflow_dispatch`
 **Severity:** Medium — silent: the PR shows MERGED and green, and nothing says the image was never built
