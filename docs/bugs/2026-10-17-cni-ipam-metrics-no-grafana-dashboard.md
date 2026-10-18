@@ -1,13 +1,14 @@
 # Bug: Hostinger pod IP pool metrics have no Grafana dashboard; the triage guide cites panels that do not exist
 
 **Filed:** 2026-10-17 (Claude, after the CNI IPAM fix went live)
-**Status:** FIX COMMITTED — `21f48c28` (Codex); verified offline 2026-10-17; E2 live pending
+**Status:** LIVE-VERIFIED — `21f48c28` (Codex) + `28b8ebe5` (deploy-path doc fix) + stat thresholds follow-up; E1 offline green; E2 2026-10-18 operator screenshot: 17.7%, 45/254, 0 errors, probe up, sweep 20.7m, push 8.03m
 **Priority:** P3 — the alerts work; only the at-a-glance view and the guide row are missing or wrong
 **Severity:** low
 **Approval:** approved — operator, 2026-10-17: "go ahead" (to a Pod IP pool dashboard plus the triage-row fix)
 **Release:** v1.43.4 (bug; v1.43.4 and v1.43.5 are both at the 5-plan cap)
 **Component:** `scripts/etc/argocd/platform-ops/` (new dashboard ConfigMap), `docs/guides/grafana-dashboards.md`
 **Related:** `docs/bugs/2026-10-17-hostinger-pod-ip-pool-exhausted-leaked-cni-reservations.md`
+**Live evidence:** 2026-10-18 · run hub-grafana-host-cni-ipam-screenshot · env hub/k3d-k3d-cluster · scenario cni-ipam/dashboard · commit 13d88491 · proves E2
 
 ## Problem
 

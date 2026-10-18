@@ -97,3 +97,12 @@ def test_n1_guide_does_not_reference_missing_dashboard():
     assert "Pod IP pool panels" not in guide or any(
         "k3dm_cni_ipam_reservations" in path.read_text() for path in dashboard_files
     )
+
+
+def test_every_stat_panel_sets_its_own_thresholds_or_mappings():
+    _, dashboard_json = dashboard()
+    for panel in dashboard_json["panels"]:
+        if panel["type"] != "stat":
+            continue
+        defaults = panel["fieldConfig"]["defaults"]
+        assert "thresholds" in defaults or "mappings" in defaults, panel["title"]
