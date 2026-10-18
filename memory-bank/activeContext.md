@@ -2224,3 +2224,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: v1.43.6 solo-activity plan: added k3dm_codex_untracked_sessions (detected − associated by session id) + Untracked stat/bar gauge, M6/N6 (operator suggestion).
 - 2026-10-18: Cloudflare cache-TTL P3: fix not deployed; frontend digest pin still sha256:1c589d0d (pre-fix). Bump to sha256:c6557ecb awaits operator go.
 - 2026-10-18: frontend digest pin bumped to sha256:c6557ecb (operator go); awaiting Hostinger rollout + E2 header check.
+- 2026-10-18: filed P3 docs/bugs/2026-10-18-pr-checks-dashboard-misses-shopping-cart-repos.md (v1.43.7; Hermes PR Checks REPOS lacks the 7 shopping-cart repos). Dispatch not yet approved.
