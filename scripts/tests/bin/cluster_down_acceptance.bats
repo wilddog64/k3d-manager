@@ -10,7 +10,6 @@ setup() {
   T="$(mktemp -d)"
   export HOME="${T}/home"
   mkdir -p "${HOME}" "${T}/bin" "${T}/log"
-  ln -s "${REAL_BASH}" "${T}/bin/bash"
   export STUB_LOG="${T}/log"
   : > "${STUB_LOG}/aws.log"; : > "${STUB_LOG}/kubectl.log"; : > "${STUB_LOG}/other.log"
 
@@ -45,6 +44,7 @@ STUB
     printf '#!/bin/bash\necho "%s $*" >> "${STUB_LOG}/other.log"\nexit 0\n' "$c" > "${T}/bin/$c"
   done
   chmod +x "${T}"/bin/*
+  ln -s "${REAL_BASH}" "${T}/bin/bash"
   export PATH="${T}/bin:/usr/bin:/bin"
   export ACG_REGION="us-west-2"
   export CLUSTER_PROVIDER="k3s-aws"
