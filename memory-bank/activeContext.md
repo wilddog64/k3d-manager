@@ -2176,3 +2176,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: operator ran appsets-reapply (hub 5 then app-cluster 8, all Applications on values branch k3d-manager-v1.43.5 = v1.43.4 merge), appsets-check green, platform-ops deployed; exporter rollout confirmed by Claude (read-only).
 - 2026-10-18: corrected grep-q SIGPIPE bug (P3): not "no live surface" — fix changed the Hostinger CNI sweep script; live pending operator make refresh CLUSTER_PROVIDER=k3s-hostinger + checksum/state evidence.
 - 2026-10-18: Hostinger Vault watchdog P1 LIVE-VERIFIED — vault-0 deleted 19:12:54Z, watchdog job 29872515 unsealed it, ready 19:15:04Z (2m10s).
+- 2026-10-18: grep-q SIGPIPE P3 LIVE-VERIFIED — first post-install CNI sweep (~19:22Z) left the pool unchanged (45/254, 0 stale removed, 0 alloc errors).

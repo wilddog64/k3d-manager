@@ -1,6 +1,6 @@
 # Bug: `producer | grep -q` under pipefail reports a present match as absent
 
-**Status:** VERIFIED — offline (2026-10-18); live pending: the sweep changed two lines of `scripts/etc/hostinger/k3dm-cni-ipam-sweep.sh`, which runs on Hostinger as `/usr/local/sbin/k3dm-cni-ipam-sweep`, so the 2026-10-18 "no live surface" call was wrong (see Live verification); fixed `0fc16826` (Codex sweep, committed by Claude after the pre-commit if-count audit blocked Codex on the deprecated `_jenkins_run_smoke_test`, now allowlisted); 104/104 sites, per-line equivalence checked; guard BATS 2/2 and N1/M3 red on pre-fix; touched suites 420/420
+**Status:** LIVE-VERIFIED — 2026-10-18: after `make refresh CLUSTER_PROVIDER=k3s-hostinger` installed the fixed sweep (2790 bytes, pre-fix 2770) at about 19:10Z, its first run at about 19:22Z left the host pod IP pool unchanged (45/254 used, 0 stale removed, 0 allocation errors, probe up). Offline: fixed `0fc16826`, 104/104 sites, guard BATS 2/2, N1/M3 red on pre-fix, touched suites 420/420. The first close as "no live surface" was wrong (see Live verification)
 **Priority:** P3
 **Approval:** approved — operator, 2026-10-18: "others please dispatch to codex" (v1.43.4 bug)
 **Found:** 2026-10-17, by the independent acceptance verifier for e2e-sandbox-provision
@@ -131,3 +131,15 @@ pre-fix `grep -q` lines until the operator reinstalls it.
    a reservation that belongs to a running pod. The Hermes CNI IPAM publisher already reads that
    state file, so the CNI panels show the run.
 3. Then set Status to `LIVE-VERIFIED` with the date and the evidence.
+
+## Live evidence
+
+**Live evidence:** 2026-10-18 · run cni-ipam-sweep-20261018T1922Z · env ubuntu-hostinger · scenario post-install-sweep · commit 0fc16826 · proves fix
+
+- `make refresh CLUSTER_PROVIDER=k3s-hostinger` copied `k3dm-cni-ipam-sweep.sh` at 2790 bytes,
+  the fixed size; the pre-fix file is 2770.
+- Grafana "k3dm Host Pod IP Pool" at 19:28:54Z: "Since last sweep" 6.62 min, so the sweep ran at
+  about 19:22Z. The previous run, at about 19:08Z, came before the install.
+- Reservations 45 used of 254 (17.7%), unchanged across the run. "Stale reservations removed per
+  sweep" stayed at 0, so no live pod's reservation was released. Allocation errors (1h): 0. Probe:
+  up.
