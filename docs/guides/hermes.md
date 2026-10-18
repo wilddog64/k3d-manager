@@ -350,9 +350,9 @@ Three behaviours of the target are deliberate:
   result means the sensor will work, not merely that an item exists.
 
 The admin password resolves from `ARGOCD_ADMIN_PASSWORD`, else the `argocd-initial-admin-secret`
-Secret in `cicd`. Prefer that Secret over `make show-service-passwords`, which reads the Vault copy
-at `secret/data/argocd/admin` first — after a rebuild the Vault copy can predate the new install and
-hand you a password that no longer works. Override the endpoint with `ARGOCD_HOST`.
+Secret in `cicd`. `make show-service-passwords` checks the Vault and initial-secret candidates against
+ArgoCD, preferring Vault; it prints a stale-Vault note when the initial secret is accepted instead.
+Override the endpoint with `ARGOCD_HOST`.
 
 Old tokens signed by a retired key remain listed on the account. `argocd account get --account
 hermes` shows the token IDs and `argocd account delete-token --account hermes <id>` clears the

@@ -6,7 +6,7 @@ setup() {
   HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$HOME"
   export HOME
-  source "${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh"
+  source "${HUB_RECOVERY_SCRIPT:-${BATS_TEST_DIRNAME}/../../plugins/hub_recovery.sh}"
   keycloak_smoke_vault_preseed() { :; }
   HOSTNET_DRIFT_BIN="$BATS_TEST_TMPDIR/hostnet-drift-default"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$HOSTNET_DRIFT_BIN"
@@ -704,10 +704,11 @@ function _stub_argocd_admin_mirror_dependencies() {
   MIRROR_ROOT_TOKEN_B64="cm9vdC10b2tlbg=="
   MIRROR_PASSWORD="stub-argocd-password"
   MIRROR_PASSWORD_B64="c3R1Yi1hcmdvY2QtcGFzc3dvcmQ="
+  MIRROR_VAULT_PASSWORD="vault-argocd-password"
   MIRROR_KV_GET_STATUS=1
   MIRROR_CURL_CODE=200
   : > "$MIRROR_CALLS"
-  export MIRROR_CALLS MIRROR_ROOT_TOKEN_B64 MIRROR_PASSWORD MIRROR_PASSWORD_B64 MIRROR_KV_GET_STATUS MIRROR_CURL_CODE
+  export MIRROR_CALLS MIRROR_ROOT_TOKEN_B64 MIRROR_PASSWORD MIRROR_PASSWORD_B64 MIRROR_VAULT_PASSWORD MIRROR_KV_GET_STATUS MIRROR_CURL_CODE
   _kubectl() {
     case "$*" in
       *"get secret vault-root"*) printf '%s' "$MIRROR_ROOT_TOKEN_B64" ;;
@@ -720,33 +721,78 @@ function _stub_argocd_admin_mirror_dependencies() {
         fi
         printf '%s' "$MIRROR_PASSWORD_B64"
         ;;
-      *"vault kv get"*) cat >/dev/null; printf 'kv get\n' >> "$MIRROR_CALLS"; return "$MIRROR_KV_GET_STATUS" ;;
+      *"vault kv get"*) cat >/dev/null; printf '%s' "$MIRROR_VAULT_PASSWORD"; printf 'kv get\n' >> "$MIRROR_CALLS"; return "$MIRROR_KV_GET_STATUS" ;;
       *"vault kv put"*)
         local stdin
         stdin=$(cat)
-        printf '%s' "$stdin" | jq -e 'select(.username == "admin")' >/dev/null
+        printf '%s\n' "$stdin" | tail -n 1 | jq -e 'select(.username == "admin")' >/dev/null
         printf 'kv put argocd/admin username\n' >> "$MIRROR_CALLS"
         ;;
     esac
   }
-  curl() { printf 'curl\n' >> "$MIRROR_CALLS"; printf '%s' "$MIRROR_CURL_CODE"; }
+  curl() {
+    local curl_count
+    curl_count=$(grep -c '^curl$' "$MIRROR_CALLS" || true)
+    printf 'curl\n' >> "$MIRROR_CALLS"
+    if [[ "$curl_count" -eq 0 ]]; then
+      printf '%s' "${MIRROR_VAULT_CURL_CODE:-$MIRROR_CURL_CODE}"
+    else
+      printf '%s' "$MIRROR_CURL_CODE"
+    fi
+  }
   _no_trace() { "$@"; }
-  _info() { printf 'info\n' >> "$MIRROR_CALLS"; }
-  _warn() { printf 'warn\n' >> "$MIRROR_CALLS"; }
+  _info() { printf 'info %s\n' "$*" >> "$MIRROR_CALLS"; }
+  _warn() { printf 'warn %s\n' "$*" >> "$MIRROR_CALLS"; }
   _err() { printf 'err\n' >> "$MIRROR_CALLS"; }
 }
 
-@test "_hub_recovery_mirror_argocd_admin: skips a Vault entry that already has a password" {
+@test "_hub_recovery_mirror_argocd_admin: keeps an ArgoCD-accepted Vault password" {
   _stub_argocd_admin_mirror_dependencies
   MIRROR_KV_GET_STATUS=0
+  export MIRROR_KV_GET_STATUS
   run _hub_recovery_mirror_argocd_admin hub-context
   [ "$status" -eq 0 ]
-  run grep -Fq curl "$MIRROR_CALLS"
-  [ "$status" -ne 0 ]
+  grep -Fq curl "$MIRROR_CALLS"
   run grep -Fq 'kv put' "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
   run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
+}
+
+@test "_hub_recovery_mirror_argocd_admin: replaces rejected Vault password with accepted initial secret" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_KV_GET_STATUS=0
+  MIRROR_VAULT_CURL_CODE=401
+  export MIRROR_KV_GET_STATUS MIRROR_VAULT_CURL_CODE
+  run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  grep -Fq 'kv put' "$MIRROR_CALLS"
+  grep -Fq 'replacing it from argocd-initial-admin-secret' "$MIRROR_CALLS"
+}
+
+@test "_hub_recovery_mirror_argocd_admin: keeps rejected Vault password when ArgoCD is unreachable" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_KV_GET_STATUS=0
+  MIRROR_VAULT_CURL_CODE=503
+  export MIRROR_KV_GET_STATUS MIRROR_VAULT_CURL_CODE
+  run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  run grep -Fq 'kv put' "$MIRROR_CALLS"
+  [ "$status" -ne 0 ]
+  grep -Fq 'keeping Vault value' "$MIRROR_CALLS"
+}
+
+@test "_hub_recovery_mirror_argocd_admin: does not expose passwords in mirror logs" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_KV_GET_STATUS=0
+  MIRROR_VAULT_CURL_CODE=401
+  export MIRROR_KV_GET_STATUS MIRROR_VAULT_CURL_CODE
+  run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"$MIRROR_PASSWORD"* ]]
+  [[ "$output" != *"$MIRROR_VAULT_PASSWORD"* ]]
+  [[ "$(cat "$MIRROR_CALLS")" != *"$MIRROR_PASSWORD"* ]]
+  [[ "$(cat "$MIRROR_CALLS")" != *"$MIRROR_VAULT_PASSWORD"* ]]
 }
 
 @test "_hub_recovery_mirror_argocd_admin: stores an ArgoCD-verified initial password" {
@@ -812,7 +858,7 @@ function _stub_argocd_admin_mirror_dependencies() {
   run grep -Fq 'kv put' "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
   [ "$(grep -c '^get secret argocd-initial-admin-secret' "$MIRROR_CALLS")" -eq 10 ]
-  [ "$(grep -c '^warn$' "$MIRROR_CALLS")" -eq 1 ]
+  [ "$(grep -c '^warn ' "$MIRROR_CALLS")" -eq 1 ]
   run grep -Fq "$MIRROR_PASSWORD" "$MIRROR_CALLS"
   [ "$status" -ne 0 ]
 }

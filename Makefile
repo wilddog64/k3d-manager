@@ -847,15 +847,29 @@ show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_argocd=$$(curl -sf -H "@$$_vault_hdr" \
+	_argocd_vault_file=$$(mktemp); _argocd_initial_file=$$(mktemp); _argocd_payload=$$(mktemp); \
+	curl -sf -H "@$$_vault_hdr" \
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
-	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
-	[ -n "$$_argocd" ] || _argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null >"$$_argocd_vault_file" || true; \
+	kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null >"$$_argocd_initial_file" || true; \
+	_argocd_url="$${SHOW_SERVICE_PASSWORDS_ARGOCD_URL:-https://argocd.3ai-talk.org}"; _argocd_vault_code=000; _argocd_initial_code=000; _argocd_vault_rejected=0; \
+	for _argocd_candidate in vault initial; do \
+	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_file="$$_argocd_vault_file"; else _argocd_candidate_file="$$_argocd_initial_file"; fi; \
+	  if [ -s "$$_argocd_candidate_file" ]; then \
+	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$username,password:($password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
+	    _argocd_code=$$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @"$$_argocd_payload" "$$_argocd_url/api/v1/session" || true); \
+	    if [ "$$_argocd_candidate" = vault ]; then _argocd_vault_code="$$_argocd_code"; else _argocd_initial_code="$$_argocd_code"; fi; \
+	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$(cat "$$_argocd_candidate_file")"; break; fi; \
+	    if [ "$$_argocd_candidate" = vault ] && [ "$$_argocd_code" != 000 ] && [ "$${_argocd_code#5}" = "$$_argocd_code" ]; then _argocd_vault_rejected=1; fi; \
+	  fi; \
+	done; \
+	if [ -z "$$_argocd" ]; then _argocd="$$(cat "$$_argocd_vault_file" 2>/dev/null || true)"; [ -n "$$_argocd" ] || _argocd="$$(cat "$$_argocd_initial_file" 2>/dev/null || true)"; fi; \
+	rm -f "$$_vault_hdr" "$$_argocd_vault_file" "$$_argocd_initial_file" "$$_argocd_payload"; \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
+	if [ "$$_argocd_vault_rejected" -eq 1 ] && [ "$$_argocd_initial_code" = 200 ]; then echo "    note:     Vault secret/argocd/admin is stale (rejected by ArgoCD)"; elif [ "$$_argocd_vault_code" != 200 ] && [ "$$_argocd_initial_code" != 200 ]; then echo "    note:     not verified against ArgoCD"; fi;\
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
