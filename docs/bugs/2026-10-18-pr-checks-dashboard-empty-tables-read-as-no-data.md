@@ -1,11 +1,13 @@
 # Bug: PR Checks dashboard tables show `No data` when no PR is open, which reads as a fault
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** FIXED — 2026-10-18 by Claude (operator: "if it is small enough then you go work on it"); BATS 3/3, N1 red on pre-fix; E2 live pending
+**Status:** LIVE-VERIFIED — 2026-10-18: fix `248558d7`; BATS 3/3, N1 red on pre-fix; E2 operator screenshot after sync with 0 open PRs: Open PRs reads "No open PRs" and Checks per PR reads "No open PRs — no checks to show"; Last scrape 3.25 mins, GitHub read ok
 **Priority:** P3 — cosmetic; the collector and dashboard are healthy
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "yes, file that bug" / "go ahead file a P3 tweak" (dispatch not yet approved)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
+**Fix commit:** 248558d7
+**Live evidence:** 2026-10-18 · run hub-grafana-pr-checks-empty-tables-screenshot · env hub/k3d-k3d-cluster · scenario pr-checks/no-open-prs · commit 248558d7 · proves E2
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`, `docs/guides/grafana-dashboards.md`
 **Related:** `docs/plans/v1.43.3-pr-checks-dashboard.md`
 
