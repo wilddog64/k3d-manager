@@ -2758,3 +2758,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: P1 data-layer cascade + P3 argocd-app-sync both LIVE-VERIFIED (appsets-reapply: data-git preserve=true, app finalizer gone, Synced/Healthy; app-sync logged in without override). MinIO E2 still needs storefront images + KubeJobFailed resolved.
 - 2026-10-18: MinIO E2 storefront images confirmed by operator screenshot; only KubeJobFailed RESOLVED email left.
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-product-image-slug-tag-cropped-by-square-card.md (slug tag at x=50 cropped by aspect-square object-cover; fix in shopping-cart-infra generate_image). Not dispatched.
+- 2026-10-18: P3 product-image slug tag: operator chose drop tag + ART_VERSION marker; spec updated, dispatched to Codex (shopping-cart-infra branch fix/product-image-slug-tag).

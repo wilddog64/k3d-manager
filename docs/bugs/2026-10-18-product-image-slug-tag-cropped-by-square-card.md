@@ -1,7 +1,7 @@
 # Bug: product images show a cut-off slug label in the bottom-left corner of each storefront card
 
 **Filed:** 2026-10-18 (Claude, from the operator's storefront screenshot)
-**Status:** OPEN
+**Status:** DISPATCHED — Codex, 2026-10-18
 **Priority:** P3 — cosmetic; images load and products are usable
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "file a P3 for that cosmetic issue"
@@ -26,20 +26,20 @@ of the product slug.
 
 ## Fix
 
-In `generate_image`, drop the slug bottom tag. It is a debugging aid, and the product name is already
-in the centred label and the card. Keep `WIDTH`, `HEIGHT`, the colours, the label and the object keys
-unchanged.
+Decision (operator, 2026-10-18: "just do wha proposed fix"): drop the tag, add a version marker.
 
-The images are uploaded only when missing (`image_exists`), so the fix only reaches existing images if
-it also changes that. Either:
-- delete the bucket objects once (an operator step), or
-- add a version marker to the upload script so changed art is uploaded again.
-
-The spec writer picks one before dispatch.
-
-Alternatives considered:
-- Square images: these would also need the detail page checked.
-- Moving the tag to the centre-bottom: this keeps a label nobody needs.
+- **F1.** In `generate_image`, delete the "Subtle bottom tag" block (the `tag_font` line and the
+  `draw.text(... slug ...)` line). Keep `WIDTH`, `HEIGHT`, the colours, the inner rectangle, the centred
+  label and the object keys unchanged.
+- **F2.** Version marker, so changed art reaches images that already exist:
+  - add `ART_VERSION = "2"` next to `WIDTH, HEIGHT`;
+  - add `stored_art_version()`, which returns the stripped output of `mc cat <ALIAS>/<BUCKET>/.art-version`,
+    or `""` when that fails;
+  - in `main()`, after `wait_for_minio()`, set `refresh = stored_art_version() != ART_VERSION`. Skip an
+    existing image only when `not refresh`. After the loop, when `refresh` is true, write `ART_VERSION`
+    to a temp file and `mc cp` it to `<ALIAS>/<BUCKET>/.art-version`.
+  - Later art changes bump `ART_VERSION`.
+- **F3.** A comment above `ART_VERSION`: bump it whenever `generate_image` output changes.
 
 ## Acceptance
 
@@ -54,11 +54,15 @@ must_not:
     text: generate_image must not draw text left of x=100 or right of x=700 (red on pre-fix, which draws the slug at x=50).
   - id: N2
     text: The fix must not change object keys (<slug>.jpg), the bucket, or the MinIO endpoint.
+  - id: N3
+    text: When the stored marker equals ART_VERSION, existing images must not be regenerated or re-uploaded.
+  - id: N4
+    text: When the marker is missing or older, existing images must not be skipped (red on pre-fix, which skips every existing image).
 evidence:
   - id: E1
-    proves: [M1, N1, N2]
+    proves: [M1, N1, N2, N3, N4]
     kind: offline
-    text: render each image locally with the ConfigMap script and assert no non-background pixels of the text colour outside x 100..700; red on pre-fix.
+    text: render each image locally with the ConfigMap script and assert no non-background pixels of the text colour outside x 100..700; with a stubbed mc on PATH, assert refresh/skip behaviour for a missing, older and current marker; N1 and N4 red on pre-fix.
   - id: E2
     proves: [M2]
     kind: live
