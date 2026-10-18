@@ -1,7 +1,7 @@
 # Bug: sandbox `make up` Step 4 kills Hostinger's Vault reverse tunnel while freeing port 18200
 
 **Filed:** 2026-10-18 (Claude, during live E2 of `2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`)
-**Status:** FIXED — 2026-10-18: `3499d201` (Claude); cleanup moved to `_acg_free_vault_local_port` with `lsof -ti -sTCP:LISTEN`; `cluster_up.bats` 60/60; the new client-survives test is red against the pre-fix selection (`client_alive` assertion), 5/5 stable; shellcheck 18 warnings before and after. Awaiting the independent verifier and live E2
+**Status:** FIXED — 2026-10-18: `3499d201` (Claude); cleanup moved to `_acg_free_vault_local_port` with `lsof -ti -sTCP:LISTEN`; `cluster_up.bats` 60/60; the new client-survives test is red against the pre-fix selection (`client_alive` assertion), 5/5 stable; shellcheck 18 warnings before and after. Independent verifier (Sonnet, Acceptance-only, real listener/client fixtures) PASSED: 4/4 post-fix incl. an IPv6 ::1 listener probe; N1 red on pre-fix (754c9ee5); re-run by Claude. Awaiting live E2
 **Fix commit:** 3499d201
 **Priority:** P3 — Hostinger's Vault path drops for under a second and launchd restarts it; no workaround needed
 **Severity:** low
