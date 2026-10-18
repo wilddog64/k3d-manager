@@ -1,7 +1,7 @@
 # Bug: `bin/argocd-app-sync` uses a stale Vault admin password after a hub rebuild and fails with a Python traceback
 
 **Filed:** 2026-10-18 (Claude, from the operator's tmux pane)
-**Status:** FIXED — awaiting operator E2 run
+**Status:** LIVE-VERIFIED — 2026-10-18
 **Priority:** P3 — a workaround exists (pass `ARGOCD_ADMIN_PASSWORD`, or use the UI)
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "can you dispath those two to codex?"
@@ -9,6 +9,7 @@
 **Release:** v1.43.5
 **Component:** `bin/argocd-app-sync`
 **Fix commit:** `9ab8368b`
+**Live evidence:** 2026-10-18 · run argocd-app-sync-20261018 · env hub/k3d-k3d-cluster · scenario no-password-override-after-rebuild · commit 51f51600 · proves E2
 
 ## Symptom
 
@@ -88,3 +89,6 @@ interface:
 - 2026-10-18: Codex `9ab8368b`; Claude verified the diff and `argocd_app_sync.bats` 11/11 green. Against
   the pre-fix script (`bb53fd99`, in a temporary worktree) tests 8–10 (env→Vault fallback,
   Vault→initial-secret fallback, single safe error) fail, the other 8 pass.
+- 2026-10-18 15:21 PDT: the operator ran `bin/argocd-app-sync ubuntu-hostinger-data-layer` in tmux
+  `work:4.0` with no password override; it logged in and the sync reported `Phase: Succeeded`, no
+  traceback.

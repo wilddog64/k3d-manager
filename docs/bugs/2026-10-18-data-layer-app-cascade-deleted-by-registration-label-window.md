@@ -1,7 +1,7 @@
 # Bug: a Hostinger re-registration made `data-git` delete the data-layer Application with a cascade finalizer
 
 **Filed:** 2026-10-18 (Claude, found while syncing the MinIO hook fix)
-**Status:** FIXED — awaiting `make appsets-reapply` + E3 live check
+**Status:** LIVE-VERIFIED — 2026-10-18
 **Priority:** P1 — the stuck cascade deletion retries every ~16s against 43 data-layer objects (Postgres, MinIO, RabbitMQ, Redis); the only reason Hostinger's data layer still exists is that the deletes have not landed
 **Severity:** high
 **Approval:** approved — operator, 2026-10-18: "can you dispath those two to codex?"
@@ -9,6 +9,7 @@
 **Release:** v1.43.5
 **Component:** `scripts/etc/argocd/applicationsets/data-git.yaml`, `scripts/plugins/argocd.sh` (`register_app_cluster`)
 **Fix commit:** `781494e6`
+**Live evidence:** 2026-10-18 · run appsets-reapply-20261018 · env hub/k3d-k3d-cluster · scenario data-git-preserve-on-delete · commit 51f51600 · proves E3
 
 ## Symptom
 
@@ -128,3 +129,7 @@ interface:
 - 2026-10-18: Codex `781494e6`; Claude verified the diff, `argocd_register_role_label.bats` 3/3 and the
   suite set 55/55 green, and the new tests red against `bb53fd99`. The jsonpath
   `{.metadata.labels.k3d-manager/role}` reads `app-cluster` from the live hub secret.
+- 2026-10-18 15:2x PDT, after the operator's `make appsets-reapply` (read-only): hub `data-git` has
+  `spec.syncPolicy.preserveResourcesOnDeletion=true`; `ubuntu-hostinger-data-layer` has no
+  deletionTimestamp and **no finalizers** (the ApplicationSet now strips the cascade finalizer), and is
+  Synced/Healthy with its last sync Succeeded at 22:21:18Z.
