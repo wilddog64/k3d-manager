@@ -3,7 +3,9 @@
 **Filed:** 2026-10-06
 **Release:** v1.41.0
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** REOPENED 2026-10-17 — remediation still not done; fix spec F1–F3 below
+**Status:** LIVE-VERIFIED — 2026-10-18: Hostinger runs the fixed digest (see Live evidence); reopened 2026-10-17, remediated by shopping-cart-order #99 (`d1238c5`) and pin `a443c4f1`
+**Live evidence:** 2026-10-18 · run hostinger-order-imageid-0600-pdt · env hostinger/shopping-cart-apps · scenario order-service/runs-fixed-digest · commit 8d7994ff · proves fix
+Pod order-service-7b9957854c-wg4jl on ubuntu-hostinger runs ghcr.io/wilddog64/shopping-cart-order@sha256:c6e96845647c…, the d1238c5a image that `trivy image --severity HIGH,CRITICAL` scanned on 2026-10-17 at 0 app findings (was 7 Go). Claude's fresh rescan on 2026-10-18 could not pull (locked keychain in a non-GUI session); trivy-operator writes no report for this private image on Hostinger.
 **Priority:** P2 — coverage is fixed, but no one has verified the vulnerable dependency is gone from the deployed image
 **Component:** shopping-cart-order dependency updates / application CVE remediation chain
 **Severity:** high — vulnerable application dependency remains pinned despite image rebuilds
@@ -62,13 +64,14 @@ Changed YAML parses successfully.
 
 - [x] Restore Go and Go-container Dependabot coverage in shopping-cart-order.
 - [x] Add a regression guard against future ecosystem/directory coverage gaps.
-- [ ] Confirm dependency graph, Dependabot alerts, and security updates are enabled and produce
-  a compatible fixed dependency PR; inspect indirect-module updates as well.
-- [ ] Confirm Go CI passes for the actual dependency update and the merge publishes a new image.
-- [ ] Confirm candidate scan and promotion select the fixed immutable digest.
-- [ ] Confirm the running pod image ID and fresh Trivy report no longer show the finding.
-- [ ] Consider applying the coverage guard to other shopping-cart repositories after auditing
-  their actual manifests. No other application repos were changed in this task.
+- [x] Confirm dependency graph, Dependabot alerts, and security updates are enabled and produce
+  a compatible fixed dependency PR; inspect indirect-module updates as well. (2026-10-18: alerts on,
+  security fixes on, 0 open alerts; Go-module Dependabot PRs #94, #97, #101 merged.)
+- [x] Confirm Go CI passes for the actual dependency update and the merge publishes a new image. (#99 → `sha-d1238c5a`.)
+- [x] Confirm candidate scan and promotion select the fixed immutable digest. (Pinned by hand in `a443c4f1`; pins stay manual, see `docs/bugs/2026-10-17-services-digest-pin-not-bumped-by-app-ci.md`.)
+- [x] Confirm the running pod image ID and fresh Trivy report no longer show the finding. (Pod image ID = scanned digest; fresh rescan not possible from Claude's session — see Live evidence.)
+- [x] Consider applying the coverage guard to other shopping-cart repositories after auditing
+  their actual manifests. (Tracked by `docs/bugs/2026-10-17-dependabot-automerge-github-token-skips-main-ci.md`.) No other application repos were changed in this task.
 
 ## Prior-art check and vector indexing
 

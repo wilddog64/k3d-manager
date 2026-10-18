@@ -1,6 +1,8 @@
 # App CI bumps the image in shopping-cart-infra, never the digest k3d-manager deploys
 
-**Status:** FIXED (`dcf8f58a`) — drift is now reported by `make image-pin-drift`; pins stay manual
+**Status:** LIVE-VERIFIED — 2026-10-18; FIXED (`dcf8f58a`) — drift is now reported by `make image-pin-drift`; pins stay manual
+**Live evidence:** 2026-10-18 · run image-pin-drift-0600-pdt · env ghcr.io · scenario image-pin-drift/reports-real-drift · commit 8d7994ff · proves fix
+Claude ran make image-pin-drift against GHCR: frontend, order, payment and product-catalog reported DRIFT (pinned digest differs from :latest), basket and namespace unpinned, exit 1 as specified. No token appeared in the output.
 **Priority:** P2
 **Severity:** Medium — a merged, published service fix silently never reaches the sandbox or Hostinger;
 the e2e run then reports the old defect as if it were still unfixed
