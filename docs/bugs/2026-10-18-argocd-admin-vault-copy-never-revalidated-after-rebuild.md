@@ -1,14 +1,16 @@
 # Bug: the Vault copy of the ArgoCD admin password is never revalidated, so `make show-service-passwords` shows a dead password after a hub rebuild
 
 **Filed:** 2026-10-18 (Claude, from the operator's failed ArgoCD UI login)
-**Status:** FIXED — awaiting operator E3 run
+**Status:** LIVE-VERIFIED — 2026-10-18
 **Priority:** P2 — the ArgoCD UI login is broken with the documented credential; a workaround exists (read `argocd-initial-admin-secret` directly)
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-18: "we should fix this issue so file it and send to codex"
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Component:** `Makefile` (`show-service-passwords`), `scripts/plugins/hub_recovery.sh` (`_hub_recovery_mirror_argocd_admin`)
-**Fix commit:** `b1a0b575` (Codex), `3aee39e6` (Claude: temp-file cleanup), `07298804` (Claude: make-escaped jq variables)
+**Fix commit:** `07298804`
+**Also part of the fix:** `b1a0b575` (Codex), `3aee39e6` (Claude: temp-file cleanup)
+**Live evidence:** 2026-10-18 · run show-service-passwords-20261018 · env hub/k3d-k3d-cluster · scenario stale-vault-after-rebuild · commit 01297023 · proves E3
 **Related:** `2026-10-18-argocd-app-sync-stale-vault-admin-password.md` (same stale value, fixed in `bin/argocd-app-sync` only); `2026-09-13-hub-restore-argocd-admin-vault-mirror-missing.md` (introduced the mirror)
 
 ## Symptom
@@ -125,3 +127,5 @@ interface:
   `$username`/`$password` in the recipe's jq filter. The curl stub accepted any payload, so the tests
   missed it. Fixed in `07298804` (`$$username`, `$$password`); the stub now rejects a payload that lacks
   `username: admin` and a password, and tests 5–6 are red against the broken Makefile.
+- 2026-10-18: operator reran `make show-service-passwords` on `07298804`; it printed the ArgoCD-accepted
+  password, and the operator logged in to the ArgoCD UI as `admin` with it (E3).

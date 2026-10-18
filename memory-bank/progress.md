@@ -2763,3 +2763,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: filed P2 docs/bugs/2026-10-18-argocd-admin-vault-copy-never-revalidated-after-rebuild.md (show-service-passwords + hub-recovery mirror trust a stale Vault ArgoCD password); dispatched to Codex.
 - 2026-10-18: shopping-cart-infra PR #115 (slug tag) open, CI green, Copilot finding fixed 2ba6108. P2 ArgoCD password: Codex b1a0b575 + Claude 3aee39e6 (trap leak), verified 71/71, N1/N2 red pre-fix. Next: operator make show-service-passwords (E3); merge #115 after enforce_admins off.
 - 2026-10-18: show-service-passwords jq/make escaping bug (operator live run) fixed 07298804; stub now validates payload. Operator to rerun make show-service-passwords (E3).
+- 2026-10-18: P2 ArgoCD password LIVE-VERIFIED (operator logged in with show-service-passwords output). Vault secret/argocd/admin still stale until written or next hub recovery.
