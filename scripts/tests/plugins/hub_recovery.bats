@@ -770,6 +770,19 @@ function _stub_argocd_admin_mirror_dependencies() {
   grep -Fq 'replacing it from argocd-initial-admin-secret' "$MIRROR_CALLS"
 }
 
+@test "_hub_recovery_mirror_argocd_admin: removes its password temp files" {
+  _stub_argocd_admin_mirror_dependencies
+  MIRROR_KV_GET_STATUS=0
+  MIRROR_VAULT_CURL_CODE=401
+  export MIRROR_KV_GET_STATUS MIRROR_VAULT_CURL_CODE
+  mirror_tmp="$(mktemp -d)"
+  TMPDIR="$mirror_tmp" run _hub_recovery_mirror_argocd_admin hub-context
+  [ "$status" -eq 0 ]
+  leftover="$(find "$mirror_tmp" -type f | wc -l | tr -d ' ')"
+  rm -rf "$mirror_tmp"
+  [ "$leftover" -eq 0 ]
+}
+
 @test "_hub_recovery_mirror_argocd_admin: keeps rejected Vault password when ArgoCD is unreachable" {
   _stub_argocd_admin_mirror_dependencies
   MIRROR_KV_GET_STATUS=0

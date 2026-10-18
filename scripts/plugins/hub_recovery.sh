@@ -184,9 +184,9 @@ function _hub_recovery_mirror_argocd_admin() {
   root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for ArgoCD admin mirror"; return 1; }
   password_file=$(mktemp)
-  trap 'trap - RETURN; rm -f "'"${password_file}"'" "'"${payload_file:-}"'" 2>/dev/null || true' RETURN
+  payload_file=$(mktemp)
+  trap 'trap - RETURN; rm -f "'"${password_file}"'" "'"${payload_file}"'" 2>/dev/null || true' RETURN
   if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin' > "$password_file" 2>/dev/null && [[ -s "$password_file" ]]; then
-    payload_file=$(mktemp)
     jq -n --arg username admin --rawfile password "$password_file" '{username:$username,password:($password|rtrimstr("\n"))}' > "$payload_file"
     code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-hub-recovery/1' -H 'Content-Type: application/json' --data @"$payload_file" "${argocd_url}/api/v1/session" || true)
     if [[ "$code" == "200" ]]; then
@@ -207,7 +207,6 @@ function _hub_recovery_mirror_argocd_admin() {
     _warn "[hub-recovery] argocd-initial-admin-secret unavailable; cannot mirror ArgoCD admin password into Vault"
     return 0
   fi
-  payload_file=$(mktemp)
   jq -n --arg username admin --rawfile password "$password_file" '{username:$username,password:($password|rtrimstr("\n"))}' > "$payload_file"
   code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-hub-recovery/1' -H 'Content-Type: application/json' --data @"$payload_file" "${argocd_url}/api/v1/session" || true)
   if [[ "$code" != "200" ]]; then
