@@ -94,10 +94,11 @@ case "${CLUSTER_PROVIDER}" in
   k3s-aws|k3s-gcp|k3s-az)
     echo ""
     echo "=== Tunnel ==="
-    if curl -sf --max-time 3 http://localhost:6443 >/dev/null 2>&1; then
-      echo "SSH tunnel: UP (port 6443 reachable)"
+    _tunnel_port="${TUNNEL_SANDBOX_LOCAL_PORT:-16443}"
+    if curl -sf --max-time 3 "http://localhost:${_tunnel_port}" >/dev/null 2>&1; then
+      echo "SSH tunnel: UP (port ${_tunnel_port} reachable)"
     else
-      echo "SSH tunnel: DOWN (port 6443 not reachable)"
+      echo "SSH tunnel: DOWN (port ${_tunnel_port} not reachable)"
     fi
     ;;
 esac
