@@ -253,3 +253,12 @@ Dependabot merge started no `push` run at all. shopping-cart-order shows the sam
 19:20Z, 19:29Z and 19:50Z (after #100 merged at 18:44Z) each started `push` CI on `main`.
 
 Remaining: merge basket #53, then close this bug once a basket Dependabot merge starts a `push` run.
+
+## Last reproduction before the fix — 2026-10-18 (Claude, read-only `gh`)
+
+In `shopping-cart-basket`, Dependabot PR #52 (go-minor-patch group) auto-merged at 12:51:32Z as
+`1f5aef80`. The merge was made by `app/github-actions`. The only run on that commit was Dependency Graph:
+no Go CI, no Test Actions, no image publish. Three minutes later the fix `46b8632b` landed on `main`
+(Go CI `39129258172` green at 12:54:37Z). So #52 is pre-fix and is not the live proof. It confirms the
+defect reproduced right up to the fix. As of 2026-10-18, no Dependabot PR has merged in any of the five
+repos since the fix.
