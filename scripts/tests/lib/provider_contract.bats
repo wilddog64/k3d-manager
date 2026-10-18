@@ -417,6 +417,7 @@ setup() {
   _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_frontend_dns() { printf '%s\n' "frontend-dns" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_ensure_cni_ipam_sweep() { printf '%s\n' "cni-ipam-sweep" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _acg_record_provider() { printf 'provider %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _info() { :; }
 
