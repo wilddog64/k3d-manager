@@ -1,11 +1,13 @@
 # Bug: Agent Dispatch dashboard has two "window" controls and the one that matters defaults to 7d
 
 **Filed:** 2026-10-18 (Claude, from an operator session)
-**Status:** VERIFIED — 2026-10-18: Claude fix; BATS 6/6, N1 red on pre-fix dashboard, no expr lines changed, make validate-manifests 81/81; E2 live pending (ArgoCD sync + screenshot)
+**Status:** LIVE-VERIFIED — 2026-10-18: fix `3ee4cd9d`; BATS 6/6, N1 red on pre-fix; E2 operator screenshot after sync: control reads "Spec window 30d" and hub-dr-drill (1.60 Mil) is the first Per spec row
 **Priority:** P3 — cosmetic; the data is correct, the controls mislead
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go for it" (option 1: default 30d + rename, fixed by Claude)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
+**Fix commit:** 3ee4cd9d
+**Live evidence:** 2026-10-18 · run hub-grafana-dispatch-spec-window-screenshot · env hub/k3d-k3d-cluster · scenario agent-dispatch/spec-window-default · commit 3ee4cd9d · proves E2
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`, `docs/guides/grafana-dashboards.md`
 
 ## Problem
