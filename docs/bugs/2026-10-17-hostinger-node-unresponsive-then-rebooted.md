@@ -61,3 +61,13 @@ It added about a minute here; it did not cause the outage.
   (maintenance)? hPanel's VPS activity log shows which.
 - Unrelated finding during this read: pod IP pool exhausted for days — filed as
   `docs/bugs/2026-10-17-hostinger-pod-ip-pool-exhausted-leaked-cni-reservations.md`.
+
+## Observation — 2026-10-17 20:28 PDT (Vault tunnel keepalive timeout)
+
+During the operator's chained sandbox `make up` / `make down`, `com.k3d-manager.ssh-tunnel-vault`
+logged `Timeout, server srv1754834.hstgr.cloud not responding.` and exited 255 (runs 3 → 5; new
+ssh PID 98519 started 20:28:44). The relaunch first got `remote port forwarding failed for listen
+port 8200` (Hostinger still held the old session's port), then reconnected. The main tunnel
+(PID 93261) stayed up. `kubectl --context ubuntu-hostinger get nodes` showed the node Ready
+afterwards. Not the Step 4 port-kill bug: that one exits 0 or SIGTERM; this is a keepalive timeout.
+
