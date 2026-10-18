@@ -1,6 +1,6 @@
 # Dependabot auto-merges never build an image: the merge push is made with GITHUB_TOKEN
 
-**Status:** FIXED (`46b8632b`) — live proof pending. Merged in all 5 repos (order #100, payment #90, frontend #123, product-catalog #60, basket #53 at `46b8632b`, 2026-10-18 12:54Z); live proof is the first Dependabot auto-merge after the fix in any of the five repos running Go CI and publishing an image (weekly schedule). Last pre-fix sample: basket #52 merged 12:51Z by github-actions[bot] as `1f5aef80`, and only Dependency Graph ran on it (no Go CI, no image). Working in production: see "Observed working" below
+**Status:** LIVE-VERIFIED — 2026-10-18: the first Dependabot auto-merge after the fix, shopping-cart-frontend #125 (operator-triggered "Check for updates"), was merged by `app/k3dm-dependabot-merger` at 19:46:54Z as `bf119607`, and the push CI run 39160325671 on that commit ran every job to success, including Build, Scan, Push & Deploy. Before the fix, basket #52 got only a Dependency Graph run. Fixed (`46b8632b`), merged in all 5 repos
 **Priority:** P2 — dependency and base-image fixes merge but are not built or deployed until an unrelated
 human merge; the workaround is a manual merge or a manual `workflow_dispatch`
 **Severity:** Medium — silent: the PR shows MERGED and green, and nothing says the image was never built
@@ -262,3 +262,19 @@ no Go CI, no Test Actions, no image publish. Three minutes later the fix `46b863
 (Go CI `39129258172` green at 12:54:37Z). So #52 is pre-fix and is not the live proof. It confirms the
 defect reproduced right up to the fix. As of 2026-10-18, no Dependabot PR has merged in any of the five
 repos since the fix.
+
+## Live evidence
+
+**Live evidence:** 2026-10-18 · run 39160325671 · env shopping-cart-frontend · scenario dependabot-automerge · commit bf119607 · proves fix
+
+Claude, read-only `gh`:
+
+- The operator ran "Check for updates" on frontend at 19:40Z. Dependabot opened #125
+  (`chore(deps): bump the npm-minor-patch group with 7 updates`) at 19:42Z, and the
+  `Dependabot auto-merge` workflow succeeded on it.
+- #125 was merged at 19:46:54Z by `app/k3dm-dependabot-merger`, the GitHub App, not
+  `app/github-actions`. Merge commit: `bf11960709df8e4fa358166fc4a91402805b44d2`.
+- Workflow `CI`, run 39160325671, ran on that commit 2 seconds later, with event `push`. It
+  succeeded on every job: Lint, Type Check, Test, E2E Tests, Build, Security Scan, Docker Build,
+  Nginx Cache Headers, and Build, Scan, Push & Deploy. So a Dependabot merge now builds and
+  publishes an image without waiting for an unrelated push.

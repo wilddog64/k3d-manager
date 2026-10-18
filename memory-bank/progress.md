@@ -2734,3 +2734,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: corrected grep-q SIGPIPE bug (P3): not "no live surface" — fix changed the Hostinger CNI sweep script; live pending operator make refresh CLUSTER_PROVIDER=k3s-hostinger + checksum/state evidence.
 - 2026-10-18: Hostinger Vault watchdog P1 LIVE-VERIFIED — vault-0 deleted 19:12:54Z, watchdog job 29872515 unsealed it, ready 19:15:04Z (2m10s).
 - 2026-10-18: grep-q SIGPIPE P3 LIVE-VERIFIED — first post-install CNI sweep (~19:22Z) left the pool unchanged (45/254, 0 stale removed, 0 alloc errors).
+- 2026-10-18: Dependabot automerge P2 LIVE-VERIFIED — frontend #125 merged by app/k3dm-dependabot-merger (bf119607), push CI 39160325671 all green incl Build, Scan, Push & Deploy.
