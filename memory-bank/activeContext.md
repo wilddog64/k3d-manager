@@ -2180,3 +2180,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: Dependabot automerge P2 LIVE-VERIFIED — frontend #125 merged by app/k3dm-dependabot-merger (bf119607), push CI 39160325671 all green incl Build, Scan, Push & Deploy.
 - 2026-10-18: CLAUDE.md compaction line updated on v1.43.5 (auto-compaction at 200K; manual /compact at a natural break before it; threshold under measurement per v1.43.6 plan 4).
 - 2026-10-18: deployment-dashboard P2 (docs/bugs/2026-10-18-deployment-dashboard-empty-for-cli-lifecycle-runs.md) dispatched to Codex (codex exec) on k3d-manager-v1.43.5; operator make up/down held until Codex done + verified.
+- 2026-10-18: deployment-dashboard P2 FIXED by Codex 47b4903a; Claude verified offline (bats 5/5, cluster_up 66/66, cluster_down 11/11, scope = 6 Component files, POST matches webhook). E3 live pending next make up/down. Tree free for operator.

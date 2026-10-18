@@ -1,7 +1,8 @@
 # Bug: k3dm Deployment Metrics dashboard is empty: hub datasource uid missing, CLI runs never publish
 
 **Filed:** 2026-10-18 (Claude, from the operator's screenshot after four `make up` / `make down` runs)
-**Status:** OPEN — dispatched to Codex 2026-10-18 on `k3d-manager-v1.43.5`
+**Status:** FIXED — `47b4903a` (Codex), verified offline by Claude 2026-10-18; E3 (live `make up` → `make down`) pending
+**Fix commit:** `47b4903a`
 **Priority:** P2 — lifecycle runs are invisible on the dashboard; the workaround is to read the run logs
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-18: "go ahead" (to "file it as a bug for v1.43.5 and dispatch it to Codex")
@@ -148,3 +149,13 @@ interface:
 - Do NOT modify files outside the Component list, including `bin/k3dm-webhook` and `scripts/lib/foundation/`.
 - Do NOT commit to `main`.
 - Do NOT push to the live hub Pushgateway from tests.
+
+## Verification (Claude, 2026-10-18)
+
+- `bats scripts/tests/bin/deployment_metrics.bats`: 5/5. `cluster_down_acceptance.bats` 11/11, `cluster_up.bats` 66/66.
+- N1 red on pre-fix `bin/cluster-up` / `bin/cluster-down` (copied from `HEAD^`): no curl call recorded.
+- Scope: only the six Component files changed; `bin/k3dm-webhook` untouched.
+- Deviation, accepted: the push uses POST, not the PUT the Fix text names. `_push_metrics` in
+  `bin/k3dm-webhook` also POSTs, and the spec asks for parity with it. POST replaces only the pushed
+  series within the `k3dm-cli/<action>-<provider>` group, which is all the dashboard reads.
+- Remaining: E3 live, on the operator's next `make up` then `make down KEEP_LOCAL=1`.
