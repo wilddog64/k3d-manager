@@ -141,7 +141,7 @@ function _provider_k3d_create_cluster() {
 
    trap 'trap - RETURN; $(_cleanup_trap_command "$yamlfile")' RETURN
 
-   if _provider_k3d_list_clusters | grep -q -- "$cluster_name"; then
+   if _provider_k3d_list_clusters | grep -- "$cluster_name" >/dev/null; then
       echo "Cluster $cluster_name already exists, skip"
       return 0
    fi

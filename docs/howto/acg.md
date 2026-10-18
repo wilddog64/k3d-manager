@@ -73,6 +73,15 @@ The browser helper opens the sandbox page and clicks the extend button automatic
 
 Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (useful for CI or troubleshooting Playwright issues).
 
+`cluster-up` checks the remaining TTL before provisioning. `ACG_MIN_REMAINING_MINUTES` sets the
+extension threshold (default `120` minutes), and `ACG_MIN_PROVISION_MINUTES` sets the minimum TTL
+needed to safely start provisioning if an extension fails (default `60` minutes). When the sandbox
+is below the extension threshold, `cluster-up` tries the one available extension, which takes the
+sandbox from 4 hours to 8 hours. If that fails and the re-read TTL is below the provisioning floor,
+it restarts the sandbox for fresh credentials before provisioning. A failed restart aborts
+`cluster-up`; if the TTL cannot be read or is already at least the provisioning floor, it keeps the
+existing warn-and-proceed behavior.
+
 You rarely need to extend by hand. `make up` installs a TTL watcher (Step 12), the
 `com.k3d-manager.acg-watch` launchd agent, which checks the sandbox every 30 minutes and clicks
 Extend once 65 minutes or less remain:

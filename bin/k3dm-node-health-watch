@@ -46,12 +46,12 @@ _healthy() {
 _ready() {
   kubectl --context "$context" get node "$node" \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' \
-    --request-timeout=5s 2>/dev/null | grep -qx 'True'
+    --request-timeout=5s 2>/dev/null | grep -x 'True' >/dev/null
 }
 
 _api_reachable() {
   kubectl --context "$context" get --raw /readyz \
-    --request-timeout=5s 2>/dev/null | grep -qx 'ok'
+    --request-timeout=5s 2>/dev/null | grep -x 'ok' >/dev/null
 }
 
 _recover() {

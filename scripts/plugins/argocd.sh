@@ -1581,7 +1581,7 @@ Requires a service account token from the ubuntu-k3s cluster:
 Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_SECRET_NAME   Secret name   (default: cluster-ubuntu-k3s)
   ARGOCD_APP_CLUSTER_NAME          Cluster name  (default: ubuntu-k3s)
-  ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:6443)
+  ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:16443, the sandbox tunnel)
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
   ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
   ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required unless SERVER=https://kubernetes.default.svc)
@@ -1666,6 +1666,7 @@ ${_platform_labels}    k3d-manager/managed: "${_managed}"
     k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
+    k3dm.k3d.io/e2e-profile: "none"
   annotations:
     k3d-manager/sandbox-id: "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}"
     k3d-manager/registered-at: "${_registered_at}"
@@ -1943,9 +1944,19 @@ function argocd_check_values_branch() {
       return 0
    fi
 
-   _warn "[argocd] Applications on a stale values branch:"
-   printf '%s\n' "${_drift}" >&2
-   _warn "[argocd] Fix: reapply the ApplicationSets with K3D_MANAGER_BRANCH=${_expected}"
+   local _stale _degraded
+   _stale="$(printf '%s\n' "${_drift}" | grep -v ' health Degraded$' || true)"
+   _degraded="$(printf '%s\n' "${_drift}" | grep ' health Degraded$' || true)"
+   if [[ -n "${_stale}" ]]; then
+      _warn "[argocd] Applications on a stale values branch:"
+      printf '%s\n' "${_stale}" >&2
+      _warn "[argocd] Fix: reapply the ApplicationSets with K3D_MANAGER_BRANCH=${_expected}"
+   fi
+   if [[ -n "${_degraded}" ]]; then
+      _warn "[argocd] Applications Degraded on the expected branch (health, not a values-branch problem):"
+      printf '%s\n' "${_degraded}" >&2
+      _warn "[argocd] Fix: inspect the Application's resources (often an ExternalSecret behind a sealed Vault); reapplying will not fix these"
+   fi
    return 1
 }
 

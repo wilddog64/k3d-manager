@@ -113,3 +113,41 @@ def test_task_cap():
     assert 'slug="task-0"' not in output
     assert 'k3dm_dispatch_task_truncated{window="1d"} 1' in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 1.6666666666666667' in output
+
+
+def _rework(output, window, cause):
+    prefix = f'k3dm_dispatch_rework_landed{{window="{window}",cause="{cause}"}} '
+    return int(next(line for line in output.splitlines() if line.startswith(prefix))[len(prefix):])
+
+
+def test_rework_counts_each_cause_and_ratio():
+    output = dispatch_metrics.render([
+        event(0, "start", "rerun"), event(10, "codex_exit", "rerun"),
+        event(20, "resume", "rerun"), event(30, "codex_exit", "rerun"), event(40, "land", "rerun", verifier_lines=0),
+        event(0, "start", "tests"), event(10, "codex_exit", "tests"),
+        event(20, "land_refused", "tests", reason="tests"), event(40, "land", "tests", verifier_lines=0),
+        event(0, "start", "edited"), event(10, "codex_exit", "edited"), event(40, "land", "edited", verifier_lines=7),
+        event(0, "start", "clean"), event(10, "codex_exit", "clean"), event(40, "land", "clean", verifier_lines=0),
+    ], 0, 100)
+    assert _rework(output, "1d", "rerun") == 1
+    assert _rework(output, "1d", "tests") == 1
+    assert _rework(output, "1d", "claude_edit") == 1
+    assert _rework(output, "1d", "any") == 3
+    assert 'k3dm_dispatch_rework_ratio{window="1d"} 0.75\n' in output
+
+
+def test_rebase_and_scope_refusals_are_not_rework():
+    output = dispatch_metrics.render([
+        event(0, "start"), event(10, "codex_exit"),
+        event(20, "land_refused", reason="rebase"), event(25, "land_refused", reason="scope"),
+        event(40, "land", verifier_lines=0),
+    ], 0, 100)
+    for cause in ("rerun", "tests", "claude_edit", "any"):
+        assert _rework(output, "30d", cause) == 0
+    assert 'k3dm_dispatch_rework_ratio{window="30d"} 0.0\n' in output
+
+
+def test_rework_ratio_absent_without_landed_spec():
+    output = dispatch_metrics.render([event(0, "start"), event(10, "codex_exit")], 0, 100)
+    assert "k3dm_dispatch_rework_ratio" not in output
+    assert _rework(output, "7d", "any") == 0

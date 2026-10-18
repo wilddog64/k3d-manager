@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [1.43.4] - 2026-10-18
+
+### Added
+
+- **Bug Tracking records live-verification evidence.** Bug docs can record the date, run,
+  environment, scenario, proving commit, and Acceptance IDs for each live proof. Metrics expose
+  whether that proof is current, stale, missing, unchecked, historic, or not applicable; the
+  pre-commit guard and `make check-bug-evidence` flag newly LIVE-VERIFIED docs without evidence.
+  See `docs/plans/v1.43.4-bug-live-evidence-record.md`.
+
+- Added admin-confirmed `e2e-sandbox-provision`, which provisions a missing or dead disposable
+  ACG sandbox through the `k3s-aws` lifecycle before running Tier 2, while reusing healthy sandboxes.
+
+- **Bug Tracking table shows the fix and verification commits.** `k3dm_bug_info` gains `fix_sha`
+  and `verified_sha`, shown as Fix commit and Verified commit after Fixed in.
+
+- **Bug Tracking table shows when a bug was verified and live-verified.** `k3dm_bug_info` gains
+  `verified_at` and `live_verified_at`: a date written right after the `VERIFIED` / `LIVE-VERIFIED`
+  keyword in the Status line, otherwise the UTC time of the first commit that set that Status. The
+  table shows each one in its own column next to its status: Verified, Verified at, Live-verified,
+  Live-verified at (`2026-10-16 21:35Z`, or `—` when not verified). The
+  existing `verified` / `live_verified` labels, the summary tiles and the Hide live-verified filter
+  are unchanged, and a git failure falls back to `true` rather than dropping the series.
+
+### Fixed
+
+- `make down` on `k3s-aws` now removes sandbox Pushgateway and frontend browser launchd agents
+  even when the Hub is kept; see `docs/bugs/2026-10-17-make-down-keep-hub-leaves-sandbox-pushgateway-forward.md`.
+
+- Bug Tracking now keeps Open for counting fixed bugs until they are LIVE-VERIFIED; see
+  `docs/bugs/2026-10-17-bug-table-open-for-stops-at-fix-not-live-verify.md`.
+
+- Tier 2 now uses the hub's sandbox deployment and switches Stripe on with a per-cluster profile
+  label, resetting the registration to mock mode when the run exits.
+- `make down` / `bin/cluster-down` on AWS now prints a cloud-teardown summary and exits 1 when the
+  CloudFormation stack lookup or delete fails, instead of reporting success; invalid credentials
+  stay exit 0 but are reported as UNVERIFIED, not "sandbox already removed". See
+  `docs/bugs/2026-10-15-aws-cluster-down-unverified-teardown-success.md`.
+
+### Changed
+
+- Bug Tracking now opens on the current release, sorts rows by release then priority before status,
+  and defaults Verified fixes to Show all.
+
 ## [1.43.3] - 2026-10-16
 
 - Added: Hermes now publishes per-check CI status for open k3d-manager and lib-foundation PRs,

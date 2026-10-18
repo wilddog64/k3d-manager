@@ -124,7 +124,7 @@ function _signing_grant_eso_read() {
     return 1
   fi
   policies=$(printf '%s' "${role_json}" | jq -r '.data.token_policies // [] | join(",")')
-  if printf '%s' "${policies}" | tr ',' '\n' | grep -qx "${SIGNING_VAULT_POLICY}"; then
+  if printf '%s' "${policies}" | tr ',' '\n' | grep -x "${SIGNING_VAULT_POLICY}" >/dev/null; then
     _info "[signing] ESO role ${role} already grants ${SIGNING_VAULT_POLICY}"
     return 0
   fi
@@ -249,7 +249,7 @@ function _signing_wait_pub_secret() {
   while (( _i < _tries )); do
     if _kubectl --no-exit -n "${SIGNING_ADMISSION_NAMESPACE}" \
       get secret "${SIGNING_PUB_SECRET_NAME}" \
-      -o 'jsonpath={.data.cosign\.pub}' 2>/dev/null | grep -q .; then
+      -o 'jsonpath={.data.cosign\.pub}' 2>/dev/null | grep . >/dev/null; then
       return 0
     fi
     _i=$(( _i + 1 ))

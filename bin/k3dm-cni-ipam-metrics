@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Publish Hostinger CNI IPAM sweep state to the hub Pushgateway."""
+
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+PUSH_RETRIES = 3
+PUSH_SLEEP_SECONDS = 2
+STATE_PATH = "/var/lib/k3dm/cni-ipam-sweep.state"
+INTEGER_KEYS = ("last_run", "kept", "stale", "young", "reservations", "range_size", "alloc_errors_1h")
+
+
+def _ssh_destination():
+    user = os.environ.get("HOSTINGER_SSH_USER", "ubuntu")
+    host = os.environ.get("HOSTINGER_HOST", "srv1754834.hstgr.cloud")
+    key = os.environ.get("HOSTINGER_SSH_KEY", str(Path.home() / ".ssh" / "hostinger"))
+    return ["-i", key, "-o", "IdentitiesOnly=yes", f"{user}@{host}"]
+
+
+def _read_state():
+    command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", *_ssh_destination(), "--",
+               "cat", STATE_PATH]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"ssh exited {result.returncode}")
+    values = {}
+    for line in result.stdout.splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            values[key] = value
+    if values.get("mode") not in {"dry-run", "apply"}:
+        raise ValueError("invalid mode")
+    for key in INTEGER_KEYS:
+        if key not in values or not values[key].isdigit():
+            raise ValueError(f"invalid {key}")
+    return values
+
+
+def _metrics(values):
+    labels = 'host="hostinger"'
+    if values is None:
+        return f"k3dm_cni_ipam_probe_success{{{labels}}} 0\n"
+    return "\n".join((
+        f"k3dm_cni_ipam_reservations{{{labels}}} {values['reservations']}",
+        f"k3dm_cni_ipam_range_size{{{labels}}} {values['range_size']}",
+        f"k3dm_cni_ipam_stale_last_run{{{labels}}} {values['stale']}",
+        f"k3dm_cni_ipam_alloc_errors_1h{{{labels}}} {values['alloc_errors_1h']}",
+        f"k3dm_cni_ipam_sweep_last_run_timestamp_seconds{{{labels}}} {values['last_run']}",
+        f"k3dm_cni_ipam_probe_success{{{labels}}} 1",
+    )) + "\n"
+
+
+def _collect():
+    try:
+        return _read_state()
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        return None
+
+
+def publish(body):
+    base = os.environ.get("K3DM_CNI_IPAM_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    request = urllib.request.Request(f"{base}/metrics/job/k3dm-cni-ipam", data=body.encode(), method="PUT",
+                                     headers={"Content-Type": "text/plain; charset=utf-8"})
+    for attempt in range(1, PUSH_RETRIES + 1):
+        try:
+            urllib.request.urlopen(request, timeout=5).close()
+            return True
+        except Exception as exc:
+            if attempt < PUSH_RETRIES:
+                print(f"cni ipam metrics push attempt {attempt}/{PUSH_RETRIES} failed: {exc}", file=sys.stderr)
+                time.sleep(PUSH_SLEEP_SECONDS)
+            else:
+                print(f"cni ipam metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+    return False
+
+
+def main():
+    body = _metrics(_collect())
+    if "--dry-run" in sys.argv[1:]:
+        print(body, end="")
+        return 0
+    publish(body)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

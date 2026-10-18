@@ -1,0 +1,8 @@
+[Unit]
+Description=k3d-manager: remove leaked flannel host-local IP reservations
+After=k3s.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/local/sbin/k3dm-cni-ipam-sweep --apply

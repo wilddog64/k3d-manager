@@ -187,7 +187,7 @@ EOF
 
     # Verify that the Istio proxy has been injected
     _info "Checking for Istio sidecar..."
-    if _kubectl --no-exit get pod -n "$test_ns" -o yaml | grep -q istio-proxy; then
+    if _kubectl --no-exit get pod -n "$test_ns" -o yaml | grep istio-proxy >/dev/null; then
         _info "Istio sidecar injection is working!"
     else
         _err "Istio sidecar was not injected! Check your Istio installation."
@@ -198,7 +198,7 @@ EOF
     _kubectl port-forward -n "$test_ns" svc/nginx-test 8888:80 &
     PF_PIDS+=($!)
     sleep 3
-    if _curl -s localhost:8888 | grep -q "Welcome to nginx"; then
+    if _curl -s localhost:8888 | grep "Welcome to nginx" >/dev/null; then
         echo "Direct access to the pod is working!"
     else
         echo "Failed to access the pod directly"
@@ -262,7 +262,7 @@ EOF
     sleep 15
 
     _info "Making request through Istio Gateway..."
-    if _curl -s localhost:8085 | grep -q "Welcome to nginx"; then
+    if _curl -s localhost:8085 | grep "Welcome to nginx" >/dev/null; then
         _info "Request through Istio Gateway successful!"
         _info "ISTIO IS WORKING CORRECTLY!"
     else
@@ -485,22 +485,22 @@ function test_jenkins() {
     # Confirm TLS termination and fetch the Jenkins landing page
     if ! CURL_MAX_TIME="$curl_max_time" \
        _curl --insecure -v --resolve "${tls_host}:8443:127.0.0.1" \
-        "https://${tls_host}:8443/" 2>&1 | grep -q "subject: CN=${tls_host}"; then
+        "https://${tls_host}:8443/" 2>&1 | grep "subject: CN=${tls_host}" >/dev/null; then
         _err "TLS certificate not issued by Vault" >&2
     fi
 
     if ! CURL_MAX_TIME="$curl_max_time" \
        _curl --insecure --resolve "${tls_host}:8443:127.0.0.1" \
-        "https://${tls_host}:8443/login" | grep -q Jenkins; then
+        "https://${tls_host}:8443/login" | grep Jenkins >/dev/null; then
         _err "Unable to reach Jenkins landing page" >&2
     fi
 
     # Verify required Vault policies are installed
     local policies
     policies=$(_kubectl -n "$VAULT_NS" exec "$vault_pod" -- vault policy list)
-    if ! echo "$policies" | grep -q jenkins-admin || \
-       ! echo "$policies" | grep -q jenkins-jcasc-read || \
-       ! echo "$policies" | grep -q jenkins-jcasc-write; then
+    if ! echo "$policies" | grep jenkins-admin >/dev/null || \
+       ! echo "$policies" | grep jenkins-jcasc-read >/dev/null || \
+       ! echo "$policies" | grep jenkins-jcasc-write >/dev/null; then
         _err "Required Vault policies missing" >&2
     fi
 
@@ -1014,7 +1014,7 @@ function test_cert_rotation() {
     normalized_serial=$(echo "$initial_serial" | tr -d ':' | tr '[:lower:]' '[:upper:]')
 
     if _kubectl exec -n "${vault_ns_default}" "$vault_pod" -- \
-      vault list pki/certs/revoked 2>/dev/null | grep -qi "$normalized_serial"; then
+      vault list pki/certs/revoked 2>/dev/null | grep -i "$normalized_serial" >/dev/null; then
       _info "✅ Old certificate was revoked in Vault"
     else
       _info "⚠️  Old certificate revocation not confirmed (may not be critical)"
@@ -1034,7 +1034,7 @@ function test_cert_rotation() {
     return 1
   fi
 
-  if _kubectl get pod -n "${jenkins_ns}" "$jenkins_pod" -o jsonpath='{.status.phase}' | grep -q "Running"; then
+  if _kubectl get pod -n "${jenkins_ns}" "$jenkins_pod" -o jsonpath='{.status.phase}' | grep "Running" >/dev/null; then
     _info "✅ Jenkins is running"
   else
     _err "Jenkins pod is not in Running state"

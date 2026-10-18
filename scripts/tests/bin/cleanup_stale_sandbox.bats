@@ -56,6 +56,18 @@ EOF
   [ "${status}" -ne 0 ]
 }
 
+@test "cleanup-stale-sandbox removes the sandbox Prometheus agent" {
+  touch "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.prometheus-port-forward.plist"
+  touch "${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
+  run "${REPO_ROOT}/bin/cleanup-stale-sandbox" --apply
+  [ "${status}" -eq 0 ]
+  [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.prometheus-port-forward.plist" ]
+  [ -e "${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist" ]
+  [[ "$(<"${BATS_TEST_TMPDIR}/launchctl.log")" == *"com.k3d-manager.sandbox.prometheus-port-forward"* ]]
+  run grep -F "com.k3d-manager.prometheus-port-forward" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "${status}" -ne 0 ]
+}
+
 @test "cleanup-stale-sandbox returns failure for an agent operation" {
   touch "${HOME}/Library/LaunchAgents/com.k3d-manager.frontend-port-forward.plist"
   run env FAIL_AGENT=1 "${REPO_ROOT}/bin/cleanup-stale-sandbox" --confirm

@@ -46,6 +46,32 @@ EOF
   [[ "${output}" != *"  trivy-operator k3d-manager-v1.18.0"* ]]
 }
 
+@test "argocd values branch: separates stale and degraded applications" {
+  _kubectl() {
+    cat <<'EOF'
+{"items":[
+ {"metadata":{"name":"stale-app","ownerReferences":[{"kind":"ApplicationSet","name":"set"}]},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"old-branch"}]}},
+ {"metadata":{"name":"degraded-app","ownerReferences":[{"kind":"ApplicationSet","name":"set"}]},"spec":{"sources":[{"repoURL":"https://github.com/wilddog64/k3d-manager","targetRevision":"k3d-manager-v1.18.0"}]},"status":{"health":{"status":"Degraded"}}}
+]}
+EOF
+  }
+
+  run argocd_check_values_branch k3d-manager-v1.18.0 k3d-k3d-cluster set
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Applications on a stale values branch"* ]]
+  [[ "$output" == *"Applications Degraded on the expected branch"* ]]
+  [[ "$output" == *"stale-app old-branch"* ]]
+  [[ "$output" == *"degraded-app health Degraded"* ]]
+  run awk '
+    /Applications on a stale values branch/ { stale = NR }
+    /Applications Degraded on the expected branch/ { degraded = NR }
+    /stale-app old-branch/ { stale_app = NR }
+    /degraded-app health Degraded/ { degraded_app = NR }
+    END { exit !(stale < stale_app && stale_app < degraded && degraded < degraded_app) }
+  ' <<<"$output"
+  [ "$status" -eq 0 ]
+}
+
 @test "argocd values branch: returns 0 when every Application matches" {
   _kubectl() { _clean_fixture; }
 

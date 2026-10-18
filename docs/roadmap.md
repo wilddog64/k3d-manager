@@ -277,9 +277,24 @@ and no test deletes a real resource.
 
 ### Candidate milestone — v1.43.5 (patch)
 
-**Bug-fix-only: Slack/ChatOps reliability** (operator, 2026-10-15). Branch `k3d-manager-v1.43.5`, cut
-from `main` after v1.43.4 merges. Most fixes edit `bin/k3dm-webhook`, so one agent in sequence, P2s
-first:
+**Slack/ChatOps reliability, plus release-plan tracking** (operator, 2026-10-15; plan added
+2026-10-17). Branch `k3d-manager-v1.43.5`, cut from `main` after v1.43.4 merges. No longer
+bug-fix-only: plan 1 of 5 is
+[`release-plan-tracking`](plans/v1.43.5-release-plan-tracking.md). It adds per-release plan rows to
+the Bug Tracking dashboard, with execution, verification and dispatch kept as separate columns. It
+touches the metrics producers and the dashboard, not `bin/k3dm-webhook`, so it can run in parallel
+with the Slack fixes. Plan 2 of 5 is
+[`release-forecast`](plans/v1.43.5-release-forecast.md). It forecasts the remaining releases to
+v1.50.0 as date ranges, read from a new `docs/release-milestones.json`. A blocked release, and every
+release after it, shows no date. Plan 3 of 5 is
+[`dispatch-release-scope`](plans/v1.43.5-dispatch-release-scope.md). It lets the dispatch dashboard's
+Window selector also pick a release, from v1.43.0 (the first ledger release) onward. Plan 4 of 5 is
+[`dispatch-api-cost`](plans/v1.43.5-dispatch-api-cost.md). It prices Codex's tokens at API rates by
+spec, model and landed spec, alongside the flat subscriptions. Plan 5 of 5 is
+[`dispatch-claude-cost`](plans/v1.43.5-dispatch-claude-cost.md). It prices Claude's own sessions at
+API-equivalent rates on the same dashboard, reusing plan 4's price file, so it dispatches after plan 4.
+The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fixes edit
+`bin/k3dm-webhook`, so one agent in sequence, P2s first:
 
 - P2: [`slack-k3dm-help-no-response-during-cluster-up`](bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md),
   [`slack-thread-e2e-replay-no-ack`](bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md),
@@ -289,8 +304,43 @@ first:
   [`cluster-down-short-job-no-slack-output`](bugs/2026-10-15-cluster-down-short-job-no-slack-output.md),
   [`e2e-slack-runner-interface-inconsistent`](bugs/2026-10-15-e2e-slack-runner-interface-inconsistent.md),
   [`slack-find-similar-docs-free-text-q-parsing`](bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md).
+- Moved from v1.43.4 (operator, 2026-10-17): P2 [`hostinger-node-unresponsive-then-rebooted`](bugs/2026-10-17-hostinger-node-unresponsive-then-rebooted.md)
+  (no code fix; needs the hPanel activity log to say who powered the VM off) and P3
+  [`frontend-cart-badge-stale-across-logout`](bugs/2026-10-17-frontend-cart-badge-stale-across-logout.md)
+  (shopping-cart-frontend; approval pending).
 - The 2026-10-06 Slack bugs with no Priority line go to the v1.50.1 status cleanup unless one of these
   fixes covers them.
+
+### Candidate milestone — v1.43.6 (patch)
+
+**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.6`, cut from
+`main` after v1.43.5 merges. Opened because v1.43.4 is bug-fix-only and v1.43.5 is at its five-plan
+cap. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.6-cni-ipam-reclaim-visibility.md).
+It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod
+sandbox. It adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live
+needs `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+
+Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verified-delivery-cost.md)
+(operator, 2026-10-18). It records the independent verifier's verdict in the dispatch ledger and
+counts Codex tokens through verification, including live evidence when the spec's Acceptance block
+requires it. It also adds a `review` cause to the v1.43.4 rework rate.
+
+Plan 3 of 5 is [`dispatch-codex-solo-activity`](plans/v1.43.6-dispatch-codex-solo-activity.md)
+(operator, 2026-10-18). The dispatch dashboard sees only dispatcher-launched Codex runs; this adds a row for
+every Codex session (headless or interactive, by repo), and Codex's own 5-hour and weekly quota, read
+from the session files. Depends on v1.43.5 plan 4's session scan.
+
+Plan 4 of 5 is [`claude-context-compaction-metrics`](plans/v1.43.6-claude-context-compaction-metrics.md)
+(operator, 2026-10-18). It measures what context compaction costs: compactions, files re-read after a
+compaction, and Claude cost per verified spec, plus a hand tally of resumption failures and
+missing-context corrections. It sets up a two-week 200K versus larger-window experiment. Depends on
+v1.43.5 plan 5's Claude scan.
+
+Plan 5 of 5 is [`hub-argocd-pinned-upgrade`](plans/v1.43.6-hub-argocd-pinned-upgrade.md) (operator,
+2026-10-18). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`) and has never had a
+planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry run,
+before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
+2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
 
 ### Candidate milestone — v1.44.0
 
@@ -325,6 +375,17 @@ cloud bridge, Hermes, CLI, local agents) and how each is authorized today (see
 [Engineering-contract gaps](#engineering-contract-gaps-assessed-2026-10-10)).
 [`v1.44.0-bug-lifecycle-dashboard.md`](plans/v1.44.0-bug-lifecycle-dashboard.md) was folded into
 v1.43.0 and is superseded. v1.44.0 is at its five-plan cap.
+
+### Candidate milestone — v1.44.1 (patch)
+
+**Cloud-bridge Tier 2 dispatch** (operator, 2026-10-17). Branch `k3d-manager-v1.44.1`, cut from
+`main` after v1.44.0 merges. Split out because v1.43.4 is bug-fix-only, v1.43.5 and v1.44.0 are at
+their five-plan caps, and this plan depends on v1.44.0's submitter authentication. Plan 1 of 5 is
+[`cloud-bridge-e2e-sandbox`](plans/v1.44.1-cloud-bridge-e2e-sandbox.md): a cloud session may run
+`make-e2e-sandbox` (Tier 2 against an existing sandbox; `e2e-sandbox-provision` stays refused)
+under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, no lifecycle
+overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
+explicit exclusion of `e2e-sandbox`.
 
 ### Candidate milestone — v1.45.0
 
@@ -410,6 +471,43 @@ refuses on a locked keychain, never widens an ACL, and writes a failed result on
 repo key. Scope: [`v1.46.0-scheduled-dr-drill.md`](plans/v1.46.0-scheduled-dr-drill.md). v1.46.0 is
 **full at 5 of 5 plans** (also `v1.46.0-dr-drill-dashboard.md`,
 `v1.46.0-hub-data-backup-integrity.md`); the next v1.46.0 item goes to v1.46.1.
+
+### Candidate milestone — v1.46.1 (patch)
+
+Both items are from the operator, 2026-10-17. No specs have been written yet. Branch
+`k3d-manager-v1.46.1`, cut from `main` after v1.46.0 merges.
+
+**Monthly in-place hub rebuild.** The weekly drill restores into a separate drill cluster, so it
+never exercises the in-place path. That path is the restarts of hub dependents after the restore
+(Keycloak, Grafana, argocd-server, OpenLDAP) and the `make up` steps that read restored data. It is
+where the 2026-10-16 LDAP admin-bind bug lived
+(`docs/bugs/2026-10-16-cluster-up-ldap-seed-admin-bind-invalid-credentials.md`).
+
+The first rebuild is the 2026-10-29 drill. After that, the hub is rebuilt in place once a month,
+attended, from the operator's tmux shell (the Keychain must be readable). The scope:
+
+- A runbook, with a fresh export taken immediately before the rebuild.
+- An ArgoCD API token reissue step, because a rebuild invalidates every token.
+- The result is published to the Pushgateway: a success flag, the step that failed, and the RTO
+  from `_hub_data_record_rto`.
+- A "Last in-place rebuild" row on the v1.46.0 DR drill dashboard.
+- A `HubRebuildStale` alert after 35 days with no successful rebuild (email, `platform-warning`).
+
+Tests stub the publisher; they never push to the live hub's Pushgateway.
+
+**Maintenance page instead of the Cloudflare error page.** While the hub is down, the public hub
+hostnames show Cloudflare's tunnel error (530 / 1033). This applies to a planned rebuild and to an
+outage. Instead, a Worker on those routes passes requests to the origin. When the origin is
+unreachable, the Worker returns a small static maintenance page.
+
+- The page must carry HTTP **503 with `Retry-After`**, never 200. The v1.46.0 offsite hub watch
+  probes `argocd.3ai-talk.org/healthz`; a 200 from the Worker would hide a real outage from it.
+- A planned window is switched on explicitly, and pairs with `make hub-watch-silence`.
+- The page shows the window's expected end time.
+- The Worker is deployed with `make`, like the slack-relay Worker.
+
+Check whether Cloudflare's own custom error pages are available on this plan before choosing the
+Worker.
 
 ### Candidate milestone — v1.47.0
 

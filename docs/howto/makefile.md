@@ -24,6 +24,8 @@ make up URL=https://...      # provision with explicit sandbox URL
 | `make status` | `bin/cluster-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
 | `make smoke` | `scripts/k3d-manager smoke_run` | Run the offline webhook check and the cluster health check when the configured context is reachable; the cluster check finds shopping-cart Applications in ArgoCD and exits 2 when the target is missing or ambiguous (`ARGOCD_APP_PREFIX` / `APP_CONTEXT` pick one) |
 
+For `make down` on AWS, `bin/cluster-down` prints `[acg-down] cloud teardown: ...` after local cleanup. The value is `verified` when the CloudFormation stack was deleted or verified absent, `UNVERIFIED (stack lookup failed ...)` when the stack lookup failed, `UNVERIFIED (stack delete failed ...)` when deletion or its wait failed, `UNVERIFIED (AWS credentials invalid ...)` when credentials could not be checked, `dry-run` for a dry run, and `not applicable (<provider>)` for non-AWS providers. Lookup and delete failures exit 1 after local cleanup; invalid credentials exit 0 with a warning because the cloud teardown remains unverified.
+
 `make smoke SMOKE_ONLY=offline` runs only the webhook check. Use
 `SMOKE_ONLY=cluster` to run only the cluster check. An unreachable cluster is
 reported as `SKIP`, while a failed check makes the target exit non-zero. Each

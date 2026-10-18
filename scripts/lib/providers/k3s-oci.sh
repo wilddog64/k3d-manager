@@ -479,7 +479,7 @@ function _oci_install_k3s_server() {
 
   # Wait for k3s API server ready
   local _attempts=0
-  until ${_ssh} "kubectl get nodes --no-headers 2>/dev/null | grep -q ' Ready'" 2>/dev/null; do
+  until ${_ssh} "kubectl get nodes --no-headers 2>/dev/null | grep ' Ready'" >/dev/null 2>/dev/null; do
     (( _attempts++ ))
     if (( _attempts >= 24 )); then
       _err "[k3s-oci] k3s node not Ready after 2 min"
@@ -619,7 +619,7 @@ function _oci_register_cluster() {
   # Check if already registered
   if _kubectl get secret -n "${_argocd_ns}" \
     -l "argocd.argoproj.io/secret-type=cluster,environment=prod" \
-    --no-headers 2>/dev/null | grep -q .; then
+    --no-headers 2>/dev/null | grep . >/dev/null; then
     _info "[k3s-oci] Cluster already registered with ArgoCD — skipping"
     return 0
   fi
@@ -663,7 +663,7 @@ function _oci_wait_argocd() {
   _info "[k3s-oci] Waiting for ArgoCD pods on OCI (up to 10 min)..."
   until KUBECONFIG="${_OCI_KUBECONFIG}" kubectl get pods -n "${_ns}" \
     -l "app.kubernetes.io/name=argocd-server" \
-    --no-headers 2>/dev/null | grep -q "Running"; do
+    --no-headers 2>/dev/null | grep "Running" >/dev/null; do
     (( _attempts++ ))
     if (( _attempts >= 120 )); then
       _err "[k3s-oci] ArgoCD not Running on OCI after 10 min — check platform-helm sync"
@@ -698,7 +698,7 @@ function _oci_smoke_test() {
 
   for _ns in "${_expected_ns[@]}"; do
     if ! KUBECONFIG="${_OCI_KUBECONFIG}" kubectl get namespace "${_ns}" \
-      --no-headers 2>/dev/null | grep -q "Active"; then
+      --no-headers 2>/dev/null | grep "Active" >/dev/null; then
       _failed+=("namespace/${_ns} missing")
     fi
   done
@@ -706,7 +706,7 @@ function _oci_smoke_test() {
   # ArgoCD server pod
   if ! KUBECONFIG="${_OCI_KUBECONFIG}" kubectl get pods -n cicd \
     -l "app.kubernetes.io/name=argocd-server" \
-    --no-headers 2>/dev/null | grep -q "Running"; then
+    --no-headers 2>/dev/null | grep "Running" >/dev/null; then
     _failed+=("argocd-server not Running")
   fi
 

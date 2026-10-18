@@ -10,37 +10,68 @@ if [[ -r "$_TUNNEL_VARS" ]]; then
 fi
 
 : "${TUNNEL_SSH_HOST:=ubuntu}"
-: "${TUNNEL_LOCAL_PORT:=6443}"
 : "${TUNNEL_REMOTE_PORT:=6443}"
 : "${TUNNEL_BIND_ADDR:=0.0.0.0}"
 : "${TUNNEL_VAULT_REMOTE_PORT:=${TUNNEL_VAULT_PORT:-8200}}"
 : "${TUNNEL_VAULT_LOCAL_PORT:=18200}"
-: "${TUNNEL_LAUNCHD_LABEL:=com.k3d-manager.ssh-tunnel}"
-: "${TUNNEL_PLIST_PATH:=${HOME}/Library/LaunchAgents/${TUNNEL_LAUNCHD_LABEL}.plist}"
-: "${TUNNEL_VAULT_LAUNCHD_LABEL:=com.k3d-manager.ssh-tunnel-vault}"
-: "${TUNNEL_VAULT_PLIST_PATH:=${HOME}/Library/LaunchAgents/${TUNNEL_VAULT_LAUNCHD_LABEL}.plist}"
-: "${TUNNEL_VAULT_WRAPPER_PATH:=${HOME}/Library/LaunchAgents/${TUNNEL_VAULT_LAUNCHD_LABEL}.sh}"
+
+_tunnel_resolve_scope() {
+  local prefix="com.k3d-manager" log_base="/tmp/k3d-manager-tunnel" port="6443"
+  if [[ "${TUNNEL_SCOPE:-}" == "sandbox" ]]; then
+    prefix="com.k3d-manager.sandbox"
+    log_base="/tmp/k3d-manager-sandbox-tunnel"
+    port="${TUNNEL_SANDBOX_LOCAL_PORT:-16443}"
+  fi
+  _TUNNEL_LAUNCHD_LABEL="${TUNNEL_LAUNCHD_LABEL:-${prefix}.ssh-tunnel}"
+  _TUNNEL_PLIST_PATH="${TUNNEL_PLIST_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_LAUNCHD_LABEL}.plist}"
+  _TUNNEL_VAULT_LAUNCHD_LABEL="${TUNNEL_VAULT_LAUNCHD_LABEL:-${prefix}.ssh-tunnel-vault}"
+  _TUNNEL_VAULT_PLIST_PATH="${TUNNEL_VAULT_PLIST_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_VAULT_LAUNCHD_LABEL}.plist}"
+  _TUNNEL_VAULT_WRAPPER_PATH="${TUNNEL_VAULT_WRAPPER_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_VAULT_LAUNCHD_LABEL}.sh}"
+  _TUNNEL_LOCAL_PORT="${TUNNEL_LOCAL_PORT:-${port}}"
+  _TUNNEL_LOG_BASE="${log_base}"
+}
+
+_tunnel_regex_escape() {
+  printf '%s' "$1" | sed 's/[][\.*^$+?(){}|]/\\&/g'
+}
+
+_tunnel_forward_pattern() {
+  printf 'autossh .* -N %s$' "$(_tunnel_regex_escape "${TUNNEL_SSH_HOST}")"
+}
+
+_tunnel_vault_pattern() {
+  printf 'ssh -N .*-R %s:127\\.0\\.0\\.1:%s %s$' "${TUNNEL_VAULT_REMOTE_PORT}" "${TUNNEL_VAULT_LOCAL_PORT}" \
+    "$(_tunnel_regex_escape "${TUNNEL_SSH_HOST}")"
+}
 
 _tunnel_is_running() {
-  pgrep -f "autossh.*${TUNNEL_SSH_HOST}" >/dev/null 2>&1
+  pgrep -f "$(_tunnel_forward_pattern)" >/dev/null 2>&1
 }
 
 _tunnel_launchd_loaded() {
+  _tunnel_resolve_scope
   [[ "$(uname)" == "Darwin" ]] || return 1
-  launchctl list "${TUNNEL_LAUNCHD_LABEL}" >/dev/null 2>&1
+  launchctl list "${_TUNNEL_LAUNCHD_LABEL}" >/dev/null 2>&1
 }
 
 _tunnel_vault_is_running() {
-  pgrep -f "ssh -N .*-R ${TUNNEL_VAULT_REMOTE_PORT}:127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT}" >/dev/null 2>&1
+  pgrep -f "$(_tunnel_vault_pattern)" >/dev/null 2>&1
 }
 
 _tunnel_vault_launchd_loaded() {
+  _tunnel_resolve_scope
   [[ "$(uname)" == "Darwin" ]] || return 1
-  launchctl list "${TUNNEL_VAULT_LAUNCHD_LABEL}" >/dev/null 2>&1
+  launchctl list "${_TUNNEL_VAULT_LAUNCHD_LABEL}" >/dev/null 2>&1
 }
 
 _tunnel_plist_has_reverse() {
-  [[ -f "${TUNNEL_PLIST_PATH}" ]] && grep -q '<string>-R</string>' "${TUNNEL_PLIST_PATH}"
+  _tunnel_resolve_scope
+  [[ -f "${_TUNNEL_PLIST_PATH}" ]] && grep -q '<string>-R</string>' "${_TUNNEL_PLIST_PATH}"
+}
+
+_tunnel_remove_agent_files() {
+  _tunnel_resolve_scope
+  rm -f -- "${_TUNNEL_PLIST_PATH}" "${_TUNNEL_VAULT_PLIST_PATH}" "${_TUNNEL_VAULT_WRAPPER_PATH}"
 }
 
 _tunnel_autossh_path() {
@@ -48,16 +79,17 @@ _tunnel_autossh_path() {
 }
 
 _tunnel_write_plist() {
+  _tunnel_resolve_scope
   local autossh_bin
   autossh_bin="$(_tunnel_autossh_path)"
-  mkdir -p "$(dirname "${TUNNEL_PLIST_PATH}")"
-  cat > "${TUNNEL_PLIST_PATH}" <<PLIST
+  mkdir -p "$(dirname "${_TUNNEL_PLIST_PATH}")"
+  cat > "${_TUNNEL_PLIST_PATH}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${TUNNEL_LAUNCHD_LABEL}</string>
+  <string>${_TUNNEL_LAUNCHD_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
     <string>${autossh_bin}</string>
@@ -70,7 +102,7 @@ _tunnel_write_plist() {
     <string>-o</string>
     <string>ExitOnForwardFailure=yes</string>
     <string>-L</string>
-    <string>${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT}:localhost:${TUNNEL_REMOTE_PORT}</string>
+    <string>${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT}:localhost:${TUNNEL_REMOTE_PORT}</string>
     <string>-N</string>
     <string>${TUNNEL_SSH_HOST}</string>
   </array>
@@ -79,19 +111,20 @@ _tunnel_write_plist() {
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/k3d-manager-tunnel.out</string>
+  <string>${_TUNNEL_LOG_BASE}.out</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/k3d-manager-tunnel.err</string>
+  <string>${_TUNNEL_LOG_BASE}.err</string>
 </dict>
 </plist>
 PLIST
 }
 
 _tunnel_write_vault_agent() {
+  _tunnel_resolve_scope
   local ssh_bin
   ssh_bin="$(command -v ssh)"
-  mkdir -p "$(dirname "${TUNNEL_VAULT_WRAPPER_PATH}")" "$(dirname "${TUNNEL_VAULT_PLIST_PATH}")"
-  cat > "${TUNNEL_VAULT_WRAPPER_PATH}" <<WRAPPER
+  mkdir -p "$(dirname "${_TUNNEL_VAULT_WRAPPER_PATH}")" "$(dirname "${_TUNNEL_VAULT_PLIST_PATH}")"
+  cat > "${_TUNNEL_VAULT_WRAPPER_PATH}" <<WRAPPER
 #!/bin/bash
 "${ssh_bin}" -o BatchMode=yes -o ConnectTimeout=10 "${TUNNEL_SSH_HOST}" \
   "sudo fuser -k -n tcp ${TUNNEL_VAULT_REMOTE_PORT} >/dev/null 2>&1 || true" >/dev/null 2>&1 || true # agent-audit: remote-sudo
@@ -99,18 +132,18 @@ exec "${ssh_bin}" -N -o BatchMode=yes -o ExitOnForwardFailure=yes \
   -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
   -R ${TUNNEL_VAULT_REMOTE_PORT}:127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} "${TUNNEL_SSH_HOST}"
 WRAPPER
-  chmod 0755 "${TUNNEL_VAULT_WRAPPER_PATH}"
-  cat > "${TUNNEL_VAULT_PLIST_PATH}" <<PLIST
+  chmod 0755 "${_TUNNEL_VAULT_WRAPPER_PATH}"
+  cat > "${_TUNNEL_VAULT_PLIST_PATH}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${TUNNEL_VAULT_LAUNCHD_LABEL}</string>
+  <string>${_TUNNEL_VAULT_LAUNCHD_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>${TUNNEL_VAULT_WRAPPER_PATH}</string>
+    <string>${_TUNNEL_VAULT_WRAPPER_PATH}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -119,27 +152,29 @@ WRAPPER
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/tmp/k3d-manager-tunnel-vault.out</string>
+  <string>${_TUNNEL_LOG_BASE}-vault.out</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/k3d-manager-tunnel-vault.err</string>
+  <string>${_TUNNEL_LOG_BASE}-vault.err</string>
 </dict>
 </plist>
 PLIST
 }
 
 function tunnel_start() {
+  _tunnel_resolve_scope
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<EOF
 Usage: tunnel_start
 
 Start the SSH tunnel:
-  Forward: ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)
+  Forward: ${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)
   Reverse: ${TUNNEL_SSH_HOST}:${TUNNEL_VAULT_REMOTE_PORT} -> 127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} (Vault)
 Installs a launchd plist for boot persistence (macOS only).
 
 Config (override via env or scripts/etc/tunnel/vars.sh):
   TUNNEL_SSH_HOST    SSH host alias    (default: ubuntu)
-  TUNNEL_LOCAL_PORT  Local port        (default: 6443)
+  TUNNEL_LOCAL_PORT  Local port        (default: 6443; 16443 with TUNNEL_SCOPE=sandbox)
+  TUNNEL_SCOPE       sandbox → com.k3d-manager.sandbox.* agents (default: unscoped)
   TUNNEL_REMOTE_PORT Remote port       (default: 6443)
   TUNNEL_BIND_ADDR   Bind address      (default: 0.0.0.0)
   TUNNEL_VAULT_REMOTE_PORT  Remote Vault reverse port (default: 8200)
@@ -161,15 +196,16 @@ EOF
   _tunnel_write_plist
   _tunnel_write_vault_agent
   if [[ "$(uname)" == "Darwin" ]]; then
-    launchctl unload -w "${TUNNEL_PLIST_PATH}" 2>/dev/null || true
-    launchctl load -w "${TUNNEL_PLIST_PATH}"
-    launchctl unload -w "${TUNNEL_VAULT_PLIST_PATH}" 2>/dev/null || true
-    launchctl load -w "${TUNNEL_VAULT_PLIST_PATH}"
+    launchctl unload -w "${_TUNNEL_PLIST_PATH}" 2>/dev/null || true
+    launchctl load -w "${_TUNNEL_PLIST_PATH}"
+    launchctl unload -w "${_TUNNEL_VAULT_PLIST_PATH}" 2>/dev/null || true
+    launchctl load -w "${_TUNNEL_VAULT_PLIST_PATH}"
   fi
-  echo "[tunnel] started — ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT}"
+  echo "[tunnel] started — ${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT}"
 }
 
 function tunnel_stop() {
+  _tunnel_resolve_scope
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "Usage: tunnel_stop"
     echo "Stop the SSH tunnel and unload the launchd plist."
@@ -178,25 +214,26 @@ function tunnel_stop() {
 
   if _tunnel_launchd_loaded; then
     if [[ "$(uname)" == "Darwin" ]]; then
-      launchctl unload -w "${TUNNEL_PLIST_PATH}"
+      launchctl unload -w "${_TUNNEL_PLIST_PATH}"
     fi
   fi
 
   if _tunnel_is_running; then
-    pkill -f "autossh.*${TUNNEL_SSH_HOST}" || true
+    pkill -f "$(_tunnel_forward_pattern)" || true
   fi
 
   if _tunnel_vault_launchd_loaded; then
-    launchctl unload -w "${TUNNEL_VAULT_PLIST_PATH}"
+    launchctl unload -w "${_TUNNEL_VAULT_PLIST_PATH}"
   fi
   if _tunnel_vault_is_running; then
-    pkill -f "ssh -N .*-R ${TUNNEL_VAULT_REMOTE_PORT}:127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT}" || true
+    pkill -f "$(_tunnel_vault_pattern)" || true
   fi
 
   echo "[tunnel] stopped"
 }
 
 function tunnel_status() {
+  _tunnel_resolve_scope
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "Usage: tunnel_status"
     echo "Show whether the SSH tunnel is running and the launchd plist is loaded."
@@ -223,8 +260,8 @@ function tunnel_status() {
   fi
 
   echo "[tunnel] launchd: ${launchd_state} | process: ${process_state}"
-  echo "[tunnel] forward: ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)"
-  echo "[tunnel] reverse: ${TUNNEL_SSH_HOST}:${TUNNEL_VAULT_REMOTE_PORT} -> 127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} (Vault, agent ${TUNNEL_VAULT_LAUNCHD_LABEL}: ${vault_state})"
+  echo "[tunnel] forward: ${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)"
+  echo "[tunnel] reverse: ${TUNNEL_SSH_HOST}:${TUNNEL_VAULT_REMOTE_PORT} -> 127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} (Vault, agent ${_TUNNEL_VAULT_LAUNCHD_LABEL}: ${vault_state})"
 
   if [[ "$process_state" == "not running" ]]; then
     return 1

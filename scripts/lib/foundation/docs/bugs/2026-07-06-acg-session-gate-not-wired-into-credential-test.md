@@ -1,5 +1,8 @@
 # Bugfix: v0.4.2 (follow-up) — ACG headless session gate not wired into `acg-credential-test`
 
+**Status:** FIXED — v0.4.2 (#34 `ae9fc73`)
+**Priority:** P2 — only the standalone credential test missed the gate; `make up` had it
+
 **Branch:** `feat/v0.4.2`
 **Files:** `scripts/lib/acg/bin/acg-credential-test`, `scripts/lib/acg/playwright/lib/browser.js`
 

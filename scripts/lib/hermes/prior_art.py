@@ -119,6 +119,14 @@ _BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTI
 _DEFERRED_RE = re.compile(r"^DEFERRED\b", re.IGNORECASE)
 _IMPLEMENTED_RE = re.compile(r"^IMPLEMENTED\b", re.IGNORECASE)
 _VERIFIED_RE = re.compile(r"^(?:VERIFIED|LIVE-VERIFIED)\b", re.IGNORECASE)
+_LIVE_EVIDENCE_RE = re.compile(
+    r"^\*\*Live evidence:\*\*\s*(\d{4}-\d{2}-\d{2})"
+    r"\s+(?:·|\|)\s+run\s+(\S+)"
+    r"\s+(?:·|\|)\s+env\s+(\S+)"
+    r"\s+(?:·|\|)\s+scenario\s+(\S+)"
+    r"\s+(?:·|\|)\s+commit\s+([0-9a-f]{7,40})"
+    r"\s+(?:·|\|)\s+proves\s+((?:E\d+)(?:,(?:E\d+))*|fix)\s*$"
+)
 
 
 def _status_value(text):
@@ -167,6 +175,34 @@ def doc_verification(text):
     if _VERIFIED_RE.search(value):
         return "verified"
     return ""
+
+
+_FIX_COMMIT_RE = re.compile(r"^\*\*Fix commit:\*\*\s*`?([0-9a-f]{7,40})`?\s*$", re.MULTILINE)
+
+
+def doc_fix_commit(text):
+    """Return the code fix commit named by a ``**Fix commit:**`` header, else None."""
+    match = _FIX_COMMIT_RE.search(text)
+    return match.group(1) if match else None
+
+
+def doc_live_evidence(text):
+    """Return the well-formed live-verification evidence lines in a bug document."""
+    evidence = []
+    for line in text.splitlines():
+        match = _LIVE_EVIDENCE_RE.match(line)
+        if not match:
+            continue
+        date, run, env, scenario, commit, proves = match.groups()
+        evidence.append({
+            "date": date,
+            "run": run,
+            "env": env,
+            "scenario": scenario,
+            "commit": commit,
+            "proves": proves,
+        })
+    return evidence
 
 
 def doc_release(text, added_release=None):

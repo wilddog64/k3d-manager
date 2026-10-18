@@ -13,7 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import doc_meta, doc_status, doc_verification  # noqa: E402
+from hermes.prior_art import (doc_fix_commit, doc_live_evidence, _status_value, doc_meta,
+                              doc_status, doc_verification)  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -25,6 +26,8 @@ _SCAN_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 _BUG_STEM_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _FILED_RE = re.compile(r"^\*\*Filed:\*\*\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 _HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
+_STATUS_DATE_RE = re.compile(r"^(?:LIVE-)?VERIFIED\b[\s:,\u2013\u2014-]*"
+                             r"(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2})?Z?)?", re.IGNORECASE)
 STATUS_RANK = {"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}
 
 
@@ -153,8 +156,81 @@ def _release_at_least(release, minimum):
     return version is not None and version >= minimum
 
 
+def _status_date(text):
+    value = _status_value(text)
+    if value is None and re.match(r"^(?:LIVE-)?VERIFIED\b", text.strip(), re.IGNORECASE):
+        value = text.strip()
+    match = _STATUS_DATE_RE.match(value or "")
+    if not match:
+        return None
+    return f"{match.group(1)} {match.group(2)}Z" if match.group(2) else match.group(1)
+
+
+def _verification_commit(root, ref, path, pattern):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "log", ref or "HEAD", "--reverse",
+             "--format=%H %cI", "-E", "-i", "-G", pattern, "--", path],
+            capture_output=True, text=True, timeout=10, check=False)
+    except Exception:
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        sha, committed = result.stdout.splitlines()[0].strip().split(maxsplit=1)
+        timestamp = datetime.fromisoformat(committed).astimezone(timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return sha, timestamp.strftime("%Y-%m-%d %H:%MZ"), committed[:10]
+
+
+def _with_commit_time(day, commit):
+    if day and commit and len(day) == 10 and (commit[1].startswith(day) or commit[2:3] == (day,)):
+        return commit[1]
+    return day
+
+
+def _evidence_contains_fix(root, fix_commit, evidence_commit):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", fix_commit, evidence_commit],
+            capture_output=True, text=True, timeout=10, check=False)
+    except Exception:
+        return None
+    if result.returncode in (0, 1):
+        return result.returncode == 0
+    return None
+
+
+def _verification_times(root, ref, texts):
+    times = {}
+    for path, text in texts.items():
+        verification = doc_verification(text)
+        if verification not in ("verified", "live"):
+            continue
+        live_commit = None
+        live_at = None
+        if verification == "live":
+            live_at = _status_date(text)
+            live_commit = _verification_commit(
+                root, ref, path, r"^\*\*Status:\*\* LIVE-VERIFIED")
+            if live_at is None and live_commit:
+                live_at = live_commit[1]
+            live_at = _with_commit_time(live_at, live_commit)
+        verified_at = _status_date(text) if verification == "verified" else None
+        verified_commit = _verification_commit(
+            root, ref, path, r"^\*\*Status:\*\* (LIVE-)?VERIFIED")
+        if verified_at is None and verified_commit:
+            verified_at = verified_commit[1]
+        verified_at = _with_commit_time(verified_at, verified_commit)
+        if verification == "live" and verified_commit and live_commit and verified_commit[0] == live_commit[0]:
+            verified_at = live_at
+        times[path] = (verified_at or "true", live_at, verified_commit[0] if verified_commit else None)
+    return times
+
+
 def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_in=None,
-                        repo="k3d-manager"):
+                        repo="k3d-manager", verification_times=None, evidence_check=None):
     root = Path(root)
     branch = _scan_branch(root, ref)
     now = now or datetime.now(timezone.utc)
@@ -167,6 +243,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
     rows = []
     skipped = 0
     texts = _bug_texts(root, ref) if texts is None else texts
+    verification_times = verification_times or {}
     for path, text in texts.items():
         priority, status, _live_verified = doc_status(text)
         verification = doc_verification(text)
@@ -194,28 +271,59 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             title = title[:119] + "…"
         verified = None
         live_verified = None
+        live_evidence = "-"
+        evidence = doc_live_evidence(text)
+        fixed_item = (fixed_in or {}).get(path) or {}
+        fix_commit = doc_fix_commit(text) or fixed_item.get("commit")
+        if status == "fixed" and verification == "live":
+            if not _release_at_least(release, (1, 43, 4)):
+                live_evidence = "n/a"
+            elif not evidence:
+                live_evidence = "missing"
+            elif not isinstance(fix_commit, str) or not re.fullmatch(r"[0-9a-f]{7,40}", fix_commit):
+                live_evidence = "unchecked"
+            else:
+                checker = evidence_check or (lambda fix, commit: _evidence_contains_fix(root, fix, commit))
+                live_evidence = "stale"
+                for item in evidence:
+                    try:
+                        contained = checker(fix_commit, item["commit"])
+                    except Exception:
+                        contained = None
+                    if contained:
+                        live_evidence = "ok"
+                        break
+                    if contained is None:
+                        live_evidence = "unchecked"
         if status == "fixed":
             verified = "true" if verification in ("verified", "live") else "false"
             live_verified = "true" if verification == "live" else "false"
             if not _release_at_least(release, (1, 43, 2)):
                 verified = "n/a"
                 live_verified = "n/a"
-            value = -2
+            if verification == "live" and live_evidence in ("missing", "stale"):
+                value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days if filed else -1
+            elif not _release_at_least(release, (1, 43, 2)) or verification == "live":
+                value = -2
+            elif filed:
+                value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
+            else:
+                value = -1
         elif filed:
             value = (now.date() - datetime.strptime(filed, "%Y-%m-%d").date()).days
         else:
             value = -1
-        sort_key = f"{_release_order(release)} {STATUS_RANK[status]} {priority} {filed or '9999-99-99'} {stem}"
+        sort_key = f"{_release_order(release)} {priority} {STATUS_RANK[status]} {filed or '9999-99-99'} {stem}"
         rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified,
-                     live_verified, path))
+                     live_verified, live_evidence, path))
     rows.sort(key=lambda row: row[0])
     truncated = int(len(rows) > 1000)
     aggregates = {}
-    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _path in rows:
+    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _live_evidence, _path in rows:
         key = (release, priority, status, verified, live_verified)
         aggregates[key] = aggregates.get(key, 0) + 1
     lines = []
-    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, path in rows[:1000]:
+    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, live_evidence, path in rows[:1000]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
                   f'status="{status}",release_order="{_release_order(release)}"')
@@ -231,6 +339,29 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
                                     f',fixed_in="-",release_order="{_release_order(release)}"')
         labels += f',verified="{verified if verified is not None else "-"}"'
         labels += f',live_verified="{live_verified if live_verified is not None else "-"}"'
+        values = verification_times.get(path) or (None, None, None)
+        verified_value = verified if verified is not None else "-"
+        live_verified_value = live_verified if live_verified is not None else "-"
+        timestamp_values = (
+            verified_value if verified_value != "true" else values[0] or "true",
+            live_verified_value if live_verified_value != "true" else values[1] or "true",
+        )
+        timestamp_labels = []
+        for timestamp in timestamp_values:
+            if not re.fullmatch(r"[0-9: Z-]+|true|false|n/a|-", timestamp):
+                timestamp = "true"
+            timestamp_labels.append(timestamp)
+        labels += f',verified_at="{timestamp_labels[0]}"'
+        labels += f',live_verified_at="{timestamp_labels[1]}"'
+        fixed_item = (fixed_in or {}).get(path) or {}
+        fix_sha = fixed_item.get("commit", "")[:8] if status == "fixed" and isinstance(fixed_item.get("commit", ""), str) else "-"
+        verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"
+        if not re.fullmatch(r"[0-9a-f]{8}|-", fix_sha):
+            fix_sha = "-"
+        if not re.fullmatch(r"[0-9a-f]{8}|-", verified_sha):
+            verified_sha = "-"
+        labels += f',fix_sha="{fix_sha}",verified_sha="{verified_sha}"'
+        labels += f',live_evidence="{live_evidence}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
         release, priority, status, verified, live_verified = item[0]
@@ -338,7 +469,9 @@ def publish_bug_metrics(root, ref=None):
         tally = None
         fixed_in = None
     try:
-        open_bugs = _bug_status_metrics(root, ref, tally=tally, texts=texts, fixed_in=fixed_in)
+        verification_times = _verification_times(root, ref, texts)
+        open_bugs = _bug_status_metrics(root, ref, tally=tally, texts=texts, fixed_in=fixed_in,
+                                        verification_times=verification_times)
         _push_bug_group("k3dm-bug-open", open_bugs, method="PUT")
     except Exception as exc:
         print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)

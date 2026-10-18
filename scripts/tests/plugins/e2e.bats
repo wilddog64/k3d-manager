@@ -98,70 +98,40 @@ FAKE
   [[ "$BATS_TEST_DESCRIPTION" != _* ]]
 }
 
-@test "sandbox verification never invokes register_app_cluster" {
-  local marker="$BATS_TEST_TMPDIR/register-app-cluster-called"
+# agent-audit: allow assert-removed sandbox-owned Argo CD/Vault/ApplicationSet assertions; Tier 2 now delegates deployment to the hub
+@test "sandbox verification uses hub profile flow without vault, helm, envsubst or appset apply" {
+  local calls="$BATS_TEST_TMPDIR/hub-flow-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  _e2e_sandbox_preflight_hub() { :; }
+  _e2e_sandbox_hub_apps_ready() { :; }
+  _e2e_sandbox_enable_stripe() { :; }
   acg_extend_playwright() { :; }
-  shopping_cart_create_vault_bridge() { :; }
-  _e2e_sandbox_kc() { :; }
-  _e2e_sandbox_argocd_ready() { :; }
+  _e2e_sandbox_provision_secrets() { :; }
+  _e2e_sandbox_provision_keycloak_credentials() { :; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
   _e2e_write_summary() { :; }
   _e2e_write_result_event() { :; }
-  register_app_cluster() { : > "$marker"; return 1; }
-  local rc=0
-  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ]
-  [ ! -e "$marker" ]
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  run e2e_verify_sandbox
+  [ "$status" -eq 0 ]
+  run grep -E 'vault|helm|envsubst|ClusterSecretStore|ApplicationSet|argocd.argoproj.io/secret-type|-n cicd' "$calls"
+  [ "$status" -eq 1 ]
 }
 
-@test "sandbox Argo CD readiness reuses the single cicd installation without helm" {
-  local calls="$BATS_TEST_TMPDIR/argocd-calls"
+@test "sandbox checks hub Applications before provisioning secrets" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-order-calls"
   : > "$calls"
-  _run_command() {
-    while [[ "$1" != "--" ]]; do shift; done
-    shift
-    printf '%s\n' "$*" >> "$calls"
-    if [[ "$*" == *"get deployment"* ]]; then
-      printf '%s\n' "argocd-ubuntu-k3s-server"
-    elif [[ "$*" == *"get statefulset"* ]]; then
-      printf '%s\n' "argocd-ubuntu-k3s-application-controller"
-    fi
-  }
-  run _e2e_sandbox_argocd_ready
-  [ "$status" -eq 0 ]
-  run grep -F -- "-n cicd wait --for=condition=available deployment/argocd-ubuntu-k3s-server" "$calls"
-  [ "$status" -eq 0 ]
-  run grep -F -- "-n cicd rollout status statefulset/argocd-ubuntu-k3s-application-controller" "$calls"
-  [ "$status" -eq 0 ]
-  run grep -F -- "helm" "$calls"
-  [ "$status" -ne 0 ]
-}
-
-@test "sandbox Argo CD registration manifest follows the namespace override" {
-  run _e2e_sandbox_argocd_cluster_manifest
-  [ "$status" -eq 0 ]
-  [[ "$output" == *$'  namespace: cicd'* ]]
-  export E2E_SANDBOX_ARGOCD_NAMESPACE=other
-  run _e2e_sandbox_argocd_cluster_manifest
-  [ "$status" -eq 0 ]
-  [[ "$output" == *$'  namespace: other'* ]]
-}
-
-@test "sandbox ApplicationSet rendering passes the Argo CD namespace to envsubst" {
-  local env_log="$BATS_TEST_TMPDIR/envsubst-argocd-namespace"
-  : > "$env_log"
-  envsubst() {
-    printf '%s\n' "$ARGOCD_NAMESPACE" >> "$env_log"
-    cat
-  }
   _e2e_sandbox_preflight_auth() { :; }
   _e2e_sandbox_preflight_cluster() { :; }
+  _e2e_sandbox_preflight_hub() { :; }
   acg_extend_playwright() { :; }
-  _e2e_sandbox_provision_secrets() { :; }
-  _e2e_sandbox_argocd_ready() { :; }
-  _e2e_sandbox_configure_vault_token_review() { :; }
-  _e2e_sandbox_kc() { :; }
+  _e2e_sandbox_hub_apps_ready() { printf 'hub-apps\n' >> "$calls"; }
+  _e2e_sandbox_provision_secrets() { printf 'provision\n' >> "$calls"; }
+  _e2e_sandbox_provision_keycloak_credentials() { printf 'keycloak-credentials\n' >> "$calls"; }
+  _e2e_sandbox_enable_stripe() { :; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
   _e2e_write_summary() { :; }
@@ -169,111 +139,206 @@ FAKE
   _run_command() { :; }
   run e2e_verify_sandbox
   [ "$status" -eq 0 ]
-  run grep -Fx -- "cicd" "$env_log"
-  [ "$status" -eq 0 ]
+  run cat "$calls"
+  [ "${lines[0]}" = "hub-apps" ]
+  [ "${lines[1]}" = "provision" ]
+  [ "${lines[2]}" = "keycloak-credentials" ]
 }
 
-@test "sandbox Argo CD readiness rejects an absent installation without waiting" {
-  local calls="$BATS_TEST_TMPDIR/argocd-absent-calls"
-  : > "$calls"
-  _run_command() {
-    while [[ "$1" != "--" ]]; do shift; done
-    shift
-    printf '%s\n' "$*" >> "$calls"
-  }
-  run _e2e_sandbox_argocd_ready
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"cicd"* ]]
-  [[ "$output" == *"make up"* ]]
-  run grep -E -- 'wait|apply|helm' "$calls"
-  [ "$status" -ne 0 ]
-}
-
-@test "sandbox Argo CD readiness rejects multiple server resources" {
-  local calls="$BATS_TEST_TMPDIR/argocd-ambiguous-calls"
-  : > "$calls"
-  _run_command() {
-    while [[ "$1" != "--" ]]; do shift; done
-    shift
-    printf '%s\n' "$*" >> "$calls"
-    if [[ "$*" == *"get deployment"* ]]; then
-      printf '%s\n' "argocd-server-a argocd-server-b"
-    elif [[ "$*" == *"get statefulset"* ]]; then
-      printf '%s\n' "argocd-application-controller"
-    fi
-  }
-  run _e2e_sandbox_argocd_ready
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"expected exactly one"* ]]
-  run grep -E -- 'wait|rollout' "$calls"
-  [ "$status" -ne 0 ]
-}
-
-@test "sandbox verification reports checking-argocd when Argo CD is absent" {
-  local phase="$BATS_TEST_TMPDIR/argocd-phase"
-  local calls="$BATS_TEST_TMPDIR/argocd-phase-calls"
+@test "sandbox provisions Keycloak credentials before enabling Stripe" {
+  local calls="$BATS_TEST_TMPDIR/keycloak-phase-calls"
   : > "$calls"
   _e2e_sandbox_preflight_auth() { :; }
   _e2e_sandbox_preflight_cluster() { :; }
+  _e2e_sandbox_preflight_hub() { :; }
+  _e2e_sandbox_hub_apps_ready() { :; }
   acg_extend_playwright() { :; }
-  _e2e_sandbox_provision_secrets() { :; }
-  _run_command() {
-    while [[ "$1" != "--" ]]; do shift; done
-    shift
-    printf '%s\n' "$*" >> "$calls"
-  }
-  _e2e_write_summary() { printf '%s\n' "$4" > "$phase"; }
-  _e2e_write_result_event() { :; }
-  local rc=0
-  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" -ne 0 ]
-  run cat "$phase"
-  [ "$output" = "checking-argocd" ]
-  run grep -E -- 'wait|apply|helm' "$calls"
-  [ "$status" -ne 0 ]
-}
-
-@test "sandbox verification registers the cluster in cicd and never runs helm" {
-  local calls="$BATS_TEST_TMPDIR/argocd-flow-calls"
-  : > "$calls"
-  _e2e_sandbox_preflight_auth() { :; }
-  _e2e_sandbox_preflight_cluster() { :; }
-  acg_extend_playwright() { :; }
-  _e2e_sandbox_provision_secrets() { :; }
-  shopping_cart_create_vault_bridge() { :; }
-  _e2e_sandbox_configure_vault_token_review() { :; }
+  _e2e_sandbox_provision_secrets() { printf 'provisioning-secrets\n' >> "$calls"; }
+  _e2e_sandbox_provision_keycloak_credentials() { printf 'provisioning-keycloak-credentials\n' >> "$calls"; }
+  _e2e_sandbox_enable_stripe() { printf 'enabling-stripe\n' >> "$calls"; }
   _e2e_sandbox_wait_job() { :; }
   _e2e_sandbox_job_manifest() { :; }
   _e2e_write_summary() { :; }
   _e2e_write_result_event() { :; }
-  helm() { printf 'helm %s\n' "$*" >> "$calls"; }
-  _run_command() {
-    while [[ "$1" != "--" ]]; do shift; done
-    shift
-    printf '%s\n' "$*" >> "$calls"
-    if [[ "$*" == *"get deployment"* ]]; then
-      printf '%s\n' "argocd-ubuntu-k3s-server"
-    elif [[ "$*" == *"get statefulset"* ]]; then
-      printf '%s\n' "argocd-ubuntu-k3s-application-controller"
-    fi
-  }
-  local rc=0
-  ( e2e_verify_sandbox ) >/dev/null 2>&1 || rc=$?
-  [ "$rc" -eq 0 ]
-  run grep -E -- '(^| )helm ' "$calls"
-  [ "$status" -ne 0 ]
-  run grep -E -- '-n cicd apply -f -' "$calls"
+  _run_command() { :; }
+  run e2e_verify_sandbox
   [ "$status" -eq 0 ]
-  run grep -E -- '-n argocd' "$calls"
-  [ "$status" -ne 0 ]
+  run cat "$calls"
+  [ "${lines[0]}" = "provisioning-secrets" ]
+  [ "${lines[1]}" = "provisioning-keycloak-credentials" ]
+  [ "${lines[2]}" = "enabling-stripe" ]
 }
 
+@test "sandbox phase checks hub before extending it" {
+  local calls="$BATS_TEST_TMPDIR/hub-preflight-calls"
+  : > "$calls"
+  _e2e_sandbox_preflight_auth() { :; }
+  _e2e_sandbox_preflight_cluster() { :; }
+  kubectl() {
+    printf 'kubectl %s\n' "$*" >> "$calls"
+    [[ "$*" == *"--context k3d-k3d-cluster get --raw=/readyz"* ]] && return 1
+    return 0
+  }
+  acg_extend_playwright() { printf 'extend\n' >> "$calls"; }
+  _e2e_write_summary() { printf 'summary phase=%s\n' "$4" >> "$calls"; }
+  _e2e_write_result_event() { :; }
+  _run_command() { printf 'run %s\n' "$*" >> "$calls"; }
+  run e2e_verify_sandbox
+  [ "$status" -ne 0 ]
+  grep -q -- '--context k3d-k3d-cluster get --raw=/readyz' "$calls"
+  grep -q '^summary phase=preflight-hub$' "$calls"
+  run grep -c '^extend$' "$calls"
+  [ "$output" = "0" ]
+}
+
+@test "hub preflight names E2E_HUB_CONTEXT when it is set" {
+  local calls="$BATS_TEST_TMPDIR/hub-context-calls"
+  : > "$calls"
+  kubectl() { printf '%s\n' "$*" >> "$calls"; return 0; }
+  E2E_HUB_CONTEXT=my-hub run _e2e_sandbox_preflight_hub
+  [ "$status" -eq 0 ]
+  grep -q -- '--context my-hub get --raw=/readyz' "$calls"
+}
+
+@test "hub Applications require Synced and Healthy" {
+  _e2e_hub_kc() { printf '%s\n' "${HUB_APPS:-}"; }
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="" run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="ubuntu-k3s-shopping-cart-order OutOfSync Healthy" run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  E2E_HUB_APPS_TIMEOUT=0 HUB_APPS="ubuntu-k3s-shopping-cart-order Synced Healthy" run _e2e_sandbox_hub_apps_ready
+  [ "$status" -eq 0 ]
+}
+
+@test "hub Applications re-poll until they converge" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-converge-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    local count
+    count="$(wc -l < "$calls")"
+    printf '%s\n' call >> "$calls"
+    if (( count < 2 )); then
+      printf '%s\n' "app OutOfSync Healthy"
+    else
+      printf '%s\n' "app Synced Healthy"
+    fi
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=180 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$calls")" -eq 3 ]
+  [[ "$output" == *"still converging"* ]]
+}
+
+@test "hub Applications fail after a persistent unhealthy poll" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-persist-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+    printf '%s\n' "app OutOfSync Healthy"
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=0 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 0s"* ]]
+  [[ "$output" == *"app OutOfSync Healthy"* ]]
+}
+
+@test "empty hub Applications fail without waiting" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-empty-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+  }
+  sleep() { :; }
+  E2E_HUB_APPS_INTERVAL=0 E2E_HUB_APPS_TIMEOUT=180 run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [ "$(wc -l < "$calls")" -eq 1 ]
+  [[ "$output" == *"none target ubuntu-k3s"* ]]
+}
+
+@test "hub Applications default window outlasts two ArgoCD reconciles" {
+  local calls="$BATS_TEST_TMPDIR/hub-apps-default-calls"
+  : > "$calls"
+  _e2e_hub_kc() {
+    printf '%s\n' call >> "$calls"
+    printf '%s\n' "app OutOfSync Healthy"
+  }
+  sleep() { SECONDS=$(( SECONDS + $1 )); }
+  unset E2E_HUB_APPS_TIMEOUT E2E_HUB_APPS_INTERVAL
+  run _e2e_sandbox_hub_apps_ready
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 420s"* ]]
+  [[ "$output" == *"rechecking in 10s"* ]]
+  [ "$(wc -l < "$calls")" -ge 40 ]
+}
+
+@test "stripe profile is set before rollout and reset after the run" {
+  local calls="$BATS_TEST_TMPDIR/profile-calls"
+  : > "$calls"
+  _e2e_hub_kc() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_kc() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_wait_gateway() { printf 'gateway %s\n' "$1" >> "$calls"; }
+  _e2e_sandbox_set_profile() { printf 'profile %s\n' "$1" >> "$calls"; }
+  _e2e_sandbox_enable_stripe
+  _e2e_sandbox_clear_profile
+  run awk '/profile stripe/{stripe=NR} /gateway stripe/{gateway=NR} /rollout restart/ && !restart{restart=NR} /profile none/{none=NR} END{exit !(stripe && gateway && restart && none && stripe < gateway && gateway < restart && restart < none)}' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "profile cleanup runs after Playwright failure" {
+  local calls="$BATS_TEST_TMPDIR/cleanup-calls"
+  : > "$calls"
+  _E2E_PROFILE_SET=1
+  _e2e_sandbox_set_profile() { printf 'profile %s\n' "$1" >> "$calls"; }
+  _e2e_sandbox_wait_gateway() { :; }
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_write_summary() { :; }
+  _e2e_write_result_event() { :; }
+  _E2E_SUMMARY_WRITTEN=1
+  invoke_trap() { false; _e2e_sandbox_exit_trap; }
+  run invoke_trap
+  [ "$status" -ne 0 ]
+  run grep -F 'profile none' "$calls"
+  [ "$status" -eq 0 ]
+  run grep -F 'delete externalsecret e2e-keycloak-credentials' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "keycloak credentials are deleted on the normal (non-trap) path" {
+  run awk '/^function e2e_verify_sandbox\(\)/{f=1} f && /_e2e_sandbox_cleanup/{c=NR} f && /trap - EXIT/{t=NR} f && /^}/{exit !(c && t && c < t)}' "${BATS_TEST_DIRNAME}/../../plugins/e2e.sh"
+  [ "$status" -eq 0 ]
+  local calls="$BATS_TEST_TMPDIR/normal-cleanup-calls"
+  : > "$calls"
+  _E2E_PROFILE_SET=0
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_cleanup
+  run grep -F 'delete externalsecret e2e-keycloak-credentials' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+@test "cleanup delete does not wait on a lost watch" {
+  local calls="$BATS_TEST_TMPDIR/cleanup-delete-flags"
+  : > "$calls"
+  _e2e_sandbox_clear_profile() { :; }
+  _run_command() { printf '%s\n' "$*" >> "$calls"; }
+  _e2e_sandbox_cleanup
+  run grep -w -- '--wait=false' "$calls"
+  [ "$status" -eq 0 ]
+  run grep -w -- '--request-timeout=30s' "$calls"
+  [ "$status" -eq 0 ]
+}
+
+# agent-audit: allow assert-removed sandbox registration and override assertions; replaced by hub profile and overlay assertions
 @test "sandbox job manifest exports OAuth2 and Stripe mode before Job creation" {
   run _e2e_sandbox_job_manifest "sandbox-run-123" "ghcr.io/wilddog64/shopping-cart-e2e-tests:latest"
   [ "$status" -eq 0 ]
   [[ "$output" == *$'name: OAUTH2_ENABLED\n              value: "true"'* ]]
   [[ "$output" == *$'name: STRIPE_E2E\n              value: "true"'* ]]
-  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org/realms/shopping-cart"* ]]
+  [[ "$output" == *"KEYCLOAK_URL"*"https://keycloak.3ai-talk.org"* ]]
+  [[ "$output" != *"https://keycloak.3ai-talk.org/realms"* ]]
+  [[ "$output" == *"KEYCLOAK_CLIENT_SECRET"*"e2e-keycloak-credentials"*"client-secret"* ]]
+  [[ "$output" == *"TEST_PASSWORD"*"e2e-keycloak-credentials"*"user-password"* ]]
   [[ "$output" == *"stripe-checkout-orchestrator.spec.ts"* ]]
 }
 
@@ -386,15 +451,6 @@ PY
   [ "$status" -eq 0 ]
   run grep -F -- "test-stripe-key" "$calls"
   [ "$status" -ne 0 ]
-}
-
-@test "sandbox rendered overrides contain the three substrate changes" {
-  run _e2e_sandbox_render_overrides
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"name: order-service-config"*"BASKET_URL: http://basket-service.shopping-cart-apps:8083"* ]]
-  [[ "$output" == *"PAYMENT_URL: http://payment-service.shopping-cart-payment:8084"* ]]
-  [[ "$output" == *"payment.gateway.default: stripe"*"mock.gateway.enabled: \"false\""* ]]
-  [[ "$output" == *"oauth2.jwk-set-uri: https://keycloak.3ai-talk.org/realms/shopping-cart/protocol/openid-connect/certs"* ]]
 }
 
 @test "sandbox summary carries the sandbox tier and Stripe project" {

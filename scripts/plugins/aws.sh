@@ -60,8 +60,8 @@ HELP
   local input access_key secret_key session_token
   input=$(cat)
 
-  if printf '%s' "$input" | head -n1 | grep -q ',' && \
-     printf '%s' "$input" | head -n1 | grep -qi 'access key id'; then
+  if printf '%s' "$input" | head -n1 | grep ',' >/dev/null && \
+     printf '%s' "$input" | head -n1 | grep -i 'access key id' >/dev/null; then
     local header key_col secret_col
     header=$(printf '%s' "$input" | head -n1)
     key_col=$(printf '%s' "$header" | awk -F',' '{for(i=1;i<=NF;i++){v=$i; gsub(/^[[:space:]"]+|[[:space:]"]+$/,"",v); if(v=="Access key ID"){print i; exit}}}')

@@ -1,5 +1,8 @@
 # Bugfix: v0.4.2 (follow-up) — CDP browser must be Playwright-managed Chrome, not system Chrome
 
+**Status:** FIXED — v0.4.2 (#34 `ae9fc73`)
+**Priority:** P2 — the gate drove the wrong browser; workaround: launch the managed browser by hand
+
 **Branch:** `feat/v0.4.2`
 **Files:** `scripts/lib/acg/cdp.sh`, `scripts/lib/acg/playwright/lib/output.js`
 

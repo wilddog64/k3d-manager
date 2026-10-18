@@ -1257,12 +1257,13 @@ def _collect_cluster_state():
     import socket as _socket
     sections = []
 
+    tunnel_port = os.environ.get("TUNNEL_SANDBOX_LOCAL_PORT", "16443")
     try:
-        with _socket.create_connection(("localhost", 6443), timeout=3):
+        with _socket.create_connection(("localhost", int(tunnel_port)), timeout=3):
             tunnel_ok = True
-    except OSError:
+    except (OSError, ValueError):
         tunnel_ok = False
-    sections.append(f"SSH tunnel (localhost:6443): {'UP' if tunnel_ok else 'DOWN — remote kubectl calls will be unreachable'}")
+    sections.append(f"SSH tunnel (localhost:{tunnel_port}): {'UP' if tunnel_ok else 'DOWN — remote kubectl calls will be unreachable'}")
 
     if not tunnel_ok:
         return "\n\n".join(sections)

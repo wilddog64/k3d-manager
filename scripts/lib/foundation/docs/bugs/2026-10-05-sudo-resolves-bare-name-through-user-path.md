@@ -1,6 +1,7 @@
 # Bug: `_run_command` sudo runs the first matching name in the user's PATH, so NOPASSWD rules for `/usr/bin/*` never match
 
-**Status:** FIXED
+**Status:** FIXED — v0.5.1 (#63 `8b97c0b`). Was: FIXED
+**Priority:** P1 — automated runs stopped at a password prompt, and root ran a binary from a user-writable directory
 **Filed:** 2026-10-05
 **Branch:** `fix/sudo-system-path-resolution`
 **Severity:** Medium. Automated runs stop at a `Password:` prompt, and root runs a binary from a

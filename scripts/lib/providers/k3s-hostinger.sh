@@ -904,6 +904,23 @@ function _hostinger_reapply_gitops_applicationsets() {
   return 0
 }
 
+function _hostinger_ensure_vault_unseal_watchdog() {
+  local ns="${HOSTINGER_VAULT_NS:-secrets}"
+  local release="${VAULT_RELEASE:-vault}"
+  if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${ns}" get statefulset "${release}" >/dev/null 2>&1; then
+    _info "[k3s-hostinger] No Vault StatefulSet ${ns}/${release} on ${_HOSTINGER_KUBE_CONTEXT} — skipping unseal watchdog"
+    return 0
+  fi
+  if ! declare -f vault_install_unseal_watchdog >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/plugins/vault.sh"
+  fi
+  _info "[k3s-hostinger] Ensuring Vault unseal watchdog on ${_HOSTINGER_KUBE_CONTEXT}..."
+  if ! ( vault_install_unseal_watchdog "${ns}" "${_HOSTINGER_KUBE_CONTEXT}" ); then
+    printf 'ERROR: %s\n' "[k3s-hostinger] Vault unseal watchdog install failed on ${_HOSTINGER_KUBE_CONTEXT} — a reboot will leave Vault sealed" >&2
+    return 1
+  fi
+}
+
 function _hostinger_reconcile_vault_cluster_store() {
   local host ssh_target
   host="$(_hostinger_require_host)" || return 1
@@ -920,6 +937,8 @@ function _hostinger_reconcile_vault_cluster_store() {
   if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "1" ]]; then
     if declare -f tunnel_start >/dev/null 2>&1; then
       local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
+      # shellcheck disable=SC2034
+      local TUNNEL_SCOPE=""
       TUNNEL_SSH_HOST="${ssh_target}"
       _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
       if declare -f tunnel_stop >/dev/null 2>&1; then
@@ -950,6 +969,36 @@ function _hostinger_reconcile_vault_cluster_store() {
   if ! APP_CONTEXT="${_HOSTINGER_KUBE_CONTEXT}" shopping_cart_provision_ghcr_pull_secret; then
     _warn "[k3s-hostinger] ghcr-pull-secret not provisioned on ${_HOSTINGER_KUBE_CONTEXT} (no valid GHCR PAT?) — shopping-cart pods may stay in ImagePullBackOff; set GHCR_PAT or store a PAT in Vault and re-run"
   fi
+}
+
+function _hostinger_ensure_cni_ipam_sweep() {
+  local host ssh_user ssh_key src_dir remote_dir
+  host="$(_hostinger_require_host)" || return 1
+  ssh_user="${_HOSTINGER_SSH_USER}"
+  ssh_key="${_HOSTINGER_SSH_KEY}"
+  src_dir="${SCRIPT_DIR}/etc/hostinger"
+  local -a ssh_opts=(-i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+  if _dry_run_active; then
+    _info "DRY_RUN: would install the k3dm-cni-ipam-sweep timer on ${ssh_user}@${host}"
+    return 0
+  fi
+  _info "[k3s-hostinger] Ensuring CNI IP reservation sweep timer on ${host}..."
+  remote_dir="$(_run_command -- ssh "${ssh_opts[@]}" "${ssh_user}@${host}" 'mktemp -d /tmp/k3dm-cni-ipam.XXXXXX')" || return 1
+  if [[ ! "${remote_dir}" =~ ^/tmp/k3dm-cni-ipam\.[A-Za-z0-9]+$ ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] unexpected staging directory from ${host}: ${remote_dir}" >&2
+    return 1
+  fi
+  _run_command -- scp "${ssh_opts[@]}" \
+    "${src_dir}/k3dm-cni-ipam-sweep.sh" \
+    "${src_dir}/k3dm-cni-ipam-sweep.service" \
+    "${src_dir}/k3dm-cni-ipam-sweep.timer" \
+    "${ssh_user}@${host}:${remote_dir}/" || return 1
+  if ! _run_command -- ssh "${ssh_opts[@]}" "${ssh_user}@${host}" \
+      "sudo -n install -m 0755 ${remote_dir}/k3dm-cni-ipam-sweep.sh /usr/local/sbin/k3dm-cni-ipam-sweep && sudo -n install -m 0644 ${remote_dir}/k3dm-cni-ipam-sweep.service ${remote_dir}/k3dm-cni-ipam-sweep.timer /etc/systemd/system/ && rm -rf -- ${remote_dir} && sudo -n systemctl daemon-reload && sudo -n systemctl enable --now k3dm-cni-ipam-sweep.timer"; then # agent-audit: remote-sudo
+    printf 'ERROR: %s\n' "[k3s-hostinger] CNI IP reservation sweep install failed on ${host} — leaked reservations will refill the pod IP pool" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] CNI IP reservation sweep timer enabled on ${host}"
 }
 
 function _provider_k3s_hostinger_deploy_cluster() {
@@ -989,7 +1038,7 @@ HELP
 
   _info "[k3s-hostinger] Waiting for node to be Ready..."
   local attempts=0
-  until KUBECONFIG="${_HOSTINGER_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+  until KUBECONFIG="${_HOSTINGER_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep " Ready" >/dev/null; do
     (( ++attempts ))
     if (( attempts >= 60 )); then
       printf 'ERROR: %s\n' "[k3s-hostinger] Node did not become Ready after 300s" >&2
@@ -1009,6 +1058,7 @@ HELP
   _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
   _dry_guard "register Hostinger cluster with hub" _hostinger_register_cluster || return 1
   _dry_guard "record Hostinger active provider" _acg_record_provider "k3s-hostinger"
+  _hostinger_ensure_cni_ipam_sweep || return 1
 
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
@@ -1106,6 +1156,8 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_frontend_dns || return 1
   _hostinger_refresh_access_layer || return 1
+  _hostinger_ensure_vault_unseal_watchdog || return 1
+  _hostinger_ensure_cni_ipam_sweep || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"
     _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"

@@ -89,3 +89,16 @@ setup() {
   run grep -E 'k3d-manager/shopping-cart: "false"' "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
   [ "$status" -eq 0 ]
 }
+
+@test "registration defaults the e2e profile to none" {
+  ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-test"
+  ARGOCD_APP_CLUSTER_NAME="test"
+  ARGOCD_APP_CLUSTER_SERVER="https://test.example:6443"
+  ARGOCD_APP_CLUSTER_TOKEN="token"
+  ARGOCD_APP_CLUSTER_INSECURE="true"
+  _kubectl() { cp "$rendered" "${BATS_TEST_TMPDIR}/rendered-secret.yaml"; }
+  run register_app_cluster
+  [ "$status" -eq 0 ]
+  run grep -F 'k3dm.k3d.io/e2e-profile: "none"' "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+  [ "$status" -eq 0 ]
+}

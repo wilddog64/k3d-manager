@@ -1,5 +1,88 @@
 #!/usr/bin/env bats
 
+function _run_sandbox_ttl_helper() {
+  local first_ttl="$1" reread_ttl="$2" extend_rc="$3" restart_rc="$4" provision_floor="${5:-}"
+  local helper="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.sh"
+  local calls="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.calls"
+  local ttl_index="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.index"
+  sed -n '/^function _acg_ensure_sandbox_ttl()/,/^}$/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  : > "${calls}"
+  printf '0\n' > "${ttl_index}"
+  run env FIRST_TTL="${first_ttl}" REREAD_TTL="${reread_ttl}" EXTEND_RC="${extend_rc}" \
+    RESTART_RC="${restart_rc}" CALLS="${calls}" TTL_INDEX="${ttl_index}" \
+    ${provision_floor:+ACG_MIN_PROVISION_MINUTES="${provision_floor}"} bash -c '
+      acg_check_ttl() {
+        local index
+        index=$(cat "${TTL_INDEX}")
+        printf "%s\n" "$((index + 1))" > "${TTL_INDEX}"
+        if [[ "${index}" -eq 0 ]]; then printf "%s\n" "${FIRST_TTL}"; else printf "%s\n" "${REREAD_TTL}"; fi
+      }
+      acg_extend_playwright() { printf "extend %s\n" "$1" >> "${CALLS}"; return "${EXTEND_RC}"; }
+      acg_restart() { printf "restart %s %s\n" "$1" "$2" >> "${CALLS}"; return "${RESTART_RC}"; }
+      _info() { printf "info %s\n" "$*" >> "${CALLS}"; }
+      _warn() { printf "warn %s\n" "$*" >> "${CALLS}"; }
+      _err() { printf "err %s\n" "$*" >> "${CALLS}"; }
+      source "$1"
+      _acg_ensure_sandbox_ttl "https://sandbox.example"
+    ' bash "${helper}"
+  SANDBOX_TTL_CALLS="${calls}"
+}
+
+@test "acg-up TTL M1 restarts an expiring sandbox with aws" {
+  _run_sandbox_ttl_helper 30 20 1 0
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL M2 fails when the sandbox restart fails" {
+  _run_sandbox_ttl_helper 30 20 1 1
+  [ "${status}" -ne 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL M3 proceeds without restart for safe or unreadable TTL" {
+  _run_sandbox_ttl_helper 30 60 1 1
+  [ "${status}" -eq 0 ]
+  _run_sandbox_ttl_helper 30 -1 1 1
+  [ "${status}" -eq 0 ]
+  _run_sandbox_ttl_helper 30 "" 1 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up TTL M4 honors the provisioning floor override" {
+  _run_sandbox_ttl_helper 30 50 1 0 51
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL N2 does not restart after a successful or unnecessary extension" {
+  _run_sandbox_ttl_helper 30 20 0 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+  _run_sandbox_ttl_helper 120 20 1 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^extend ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Step 1 delegates TTL safety and does not inline warn-and-continue" {
+  run grep -nF '_acg_ensure_sandbox_ttl "${_acg_sandbox_ref}" || exit 1' bin/cluster-up
+  [ "${status}" -eq 0 ]
+  run bash -c 'block=$(sed -n "/Step 1\/12/,/k3s-gcp)/p" bin/cluster-up); grep -qF "Sandbox extension failed — proceeding anyway" <<<"${block}"'
+  [ "${status}" -ne 0 ]
+}
+
 @test "acg-up identity Application uses server-side apply with server-side diff" {
   local manifest="scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 
@@ -355,6 +438,26 @@ STUB
   [ "$status" -eq 0 ]
 }
 
+@test "acg-up seeds LDAP users with the openldap-admin Secret, not the pod env" {
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q "_acg_ldap_bind_pass"
+  '
+  [ "$status" -eq 0 ]
+
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q -- "-y \\\"\${_ldap_admin_password_file}\\\""
+  '
+  [ "$status" -eq 0 ]
+
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\\/14/,/Step 10d.6\\/14/p" bin/cluster-up)
+    printf "%s" "$seed_block" | grep -q "LDAP_ADMIN_PASSWORD"
+  '
+  [ "$status" -ne 0 ]
+}
+
 @test "acg-up keeps LDAP user passwords out of command arguments" {
   run grep -nF 'ldappasswd -x -H ldap://localhost:1389' bin/cluster-up
   [ "$status" -eq 0 ]
@@ -687,12 +790,10 @@ _load_acg_up_cleanup() {
   [[ "$output" == *"KILL_CALLED 93911"* ]]
 }
 
-@test "acg-up records Vault and Prometheus port-forward ownership" {
-  local vault_line prom_line
+@test "acg-up records Vault port-forward ownership" {
+  local vault_line
   vault_line="$(grep -n '_vault_pf_pid=\$!' bin/cluster-up | cut -d: -f1)"
-  prom_line="$(grep -n '_acg_prom_pf_pid=\$!' bin/cluster-up | cut -d: -f1)"
   [ "$(sed -n "$((vault_line + 1))p" bin/cluster-up | grep -c '_ACG_UP_OWNED_PIDS+=')" -eq 1 ]
-  [ "$(sed -n "$((prom_line + 1))p" bin/cluster-up | grep -c '_ACG_UP_OWNED_PIDS+=')" -eq 1 ]
 }
 
 _load_acg_up_marker_clear() {
@@ -930,4 +1031,54 @@ STUB
   [ "${status}" -eq 2 ]
   [[ "${output}" == *"root-owned state folders found"* ]]
   [[ "${output}" == *"sudo chown -R"* ]]
+}
+
+_start_vault_port_fixture() {
+  command -v lsof >/dev/null 2>&1 || skip "lsof not installed"
+  local dir="${BATS_TEST_TMPDIR}"
+  python3 -c 'import socket,time,sys
+s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("127.0.0.1",0)); s.listen(4)
+open(sys.argv[1],"w").write(str(s.getsockname()[1]))
+conns=[]
+while True:
+    c,_=s.accept(); conns.append(c)' "${dir}/port" &
+  LISTENER_PID=$!
+  local i
+  for i in $(seq 1 50); do [[ -s "${dir}/port" ]] && break; sleep 0.1; done
+  FIXTURE_PORT="$(cat "${dir}/port")"
+  python3 -c 'import socket,time,sys
+c=socket.create_connection(("127.0.0.1",int(sys.argv[1])))
+open(sys.argv[2],"w").write("up")
+time.sleep(120)' "${FIXTURE_PORT}" "${dir}/client" &
+  CLIENT_PID=$!
+  for i in $(seq 1 50); do [[ -s "${dir}/client" ]] && break; sleep 0.1; done
+  [[ -s "${dir}/client" ]]
+}
+
+_stop_vault_port_fixture() {
+  kill "${LISTENER_PID:-}" "${CLIENT_PID:-}" 2>/dev/null || true
+}
+
+@test "acg-up Vault port cleanup kills the listener but not a connected client such as an ssh -R tunnel" {
+  _start_vault_port_fixture
+  sed -n '/^function _acg_free_vault_local_port()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/free.sh"
+  [ -s "${BATS_TEST_TMPDIR}/free.sh" ]
+  run bash -c '_info() { printf "%s\n" "$*"; }; sleep() { :; }; source "$1"; _acg_free_vault_local_port "$2"' _ "${BATS_TEST_TMPDIR}/free.sh" "${FIXTURE_PORT}"
+  local i listener_alive=1
+  for i in $(seq 1 30); do kill -0 "${LISTENER_PID}" 2>/dev/null || { listener_alive=0; break; }; command sleep 0.1; done
+  local client_alive=0
+  kill -0 "${CLIENT_PID}" 2>/dev/null && client_alive=1
+  _stop_vault_port_fixture
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"in use"* ]]
+  [ "${listener_alive}" -eq 0 ]
+  [ "${client_alive}" -eq 1 ]
+}
+
+@test "acg-up Step 4 frees the Vault port through the listener-only cleanup" {
+  run grep -c '^_acg_free_vault_local_port "${_vault_local_port}"$' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run grep -cE 'lsof -ti:"\$\{_vault_local_port\}" 2>' bin/cluster-up
+  [ "$output" -eq 0 ]
 }

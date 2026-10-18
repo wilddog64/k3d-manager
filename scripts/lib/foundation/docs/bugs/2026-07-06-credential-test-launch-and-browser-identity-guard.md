@@ -1,5 +1,8 @@
 # Bugfix: v0.4.2 (follow-up) — credential-test must launch the managed browser, and `_browser_launch` must reject a foreign CDP browser
 
+**Status:** FIXED — v0.4.2 (#34 `ae9fc73`)
+**Priority:** P2 — a foreign CDP browser was accepted; workaround: close it and rerun
+
 **Branch:** `feat/v0.4.2`
 **Files:** `scripts/lib/acg/cdp.sh`, `scripts/lib/acg/bin/acg-credential-test`
 

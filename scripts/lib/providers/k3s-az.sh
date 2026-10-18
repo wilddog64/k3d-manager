@@ -224,7 +224,7 @@ HELP
 
   _info "[k3s-az] Waiting for node to be Ready..."
   local attempts=0
-  until KUBECONFIG="${_AZ_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+  until KUBECONFIG="${_AZ_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep " Ready" >/dev/null; do
     (( ++attempts ))
     if (( attempts >= 60 )); then
       printf 'ERROR: %s\n' "[k3s-az] Node did not become Ready after 300s" >&2

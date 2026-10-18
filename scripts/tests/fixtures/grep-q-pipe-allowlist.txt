@@ -1,0 +1,2 @@
+scripts/etc/e2e/redis.yaml
+scripts/etc/ldap/ldap-password-rotator.yaml.tmpl

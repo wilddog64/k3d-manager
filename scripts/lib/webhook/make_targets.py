@@ -37,6 +37,7 @@ MAKE_TARGETS = {
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
     "e2e": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e in a disposable vCluster"},
     "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
+    "e2e-sandbox-provision": {"min_role": "admin", "confirm": True, "optional": ("DIGEST",), "timeout": 7200, "summary": "Tier 2 e2e; provisions the ACG sandbox first if it is missing"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},
     "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY",), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},

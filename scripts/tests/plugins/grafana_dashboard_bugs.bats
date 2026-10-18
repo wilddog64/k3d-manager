@@ -49,9 +49,30 @@ import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "verified")
 assert variable["type"] == "custom"
-assert variable["current"]["value"] == "^(false|-)?$"
-assert variable["current"]["text"] == "Hide live-verified"
+assert variable["current"]["value"] == ".*"
+assert variable["current"]["text"] == "Show all"
 assert variable["query"] == "Hide live-verified : ^(false|-)?$,Show all : .*"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard opens on the release branch's version" {
+  branch="${GITHUB_HEAD_REF:-$(git -C "${BATS_TEST_DIRNAME}" branch --show-current)}"
+  if [[ ! "${branch}" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    skip "branch ${branch} is not a release branch"
+  fi
+  run env EXPECTED_BRANCH="${branch}" python3 - "${dashboard}" <<'PY'
+import json, os, re, sys
+path = sys.argv[1]
+branch = os.environ["EXPECTED_BRANCH"]
+data = json.loads(open(path).read().split("  k3dm-bugs.json: |\n", 1)[1])
+variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
+assert variable["includeAll"] is True and variable["allValue"] == ".*"
+match = re.fullmatch(r"k3d-manager-v([0-9]+\.[0-9]+\.[0-9]+)", branch)
+assert match, branch
+expected = f"v{match.group(1)}"
+assert variable["current"]["value"] == [expected]
+assert variable["current"]["text"] == [expected]
 PY
   [ "${status}" -eq 0 ]
 }
@@ -103,7 +124,7 @@ assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["fixed_in"] == 6
 assert organize["renameByName"]["fixed_in"] == "Fixed in"
-assert organize["indexByName"]["verified"] == 7 and organize["indexByName"]["live_verified"] == 8
+assert [organize["indexByName"][k] for k in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at")] == [7, 8, 9, 10, 11, 12]
 PY
   [ "${status}" -eq 0 ]
 }
@@ -239,11 +260,15 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Verified", "Live-verified"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
     assert organize["indexByName"]["fixed_in"] == 6
-    assert organize["indexByName"]["verified"] == 7
-    assert organize["indexByName"]["live_verified"] == 8
-    assert organize["renameByName"]["live_verified"] == "Live-verified"
+    assert organize["indexByName"]["fix_sha"] == 7
+    assert organize["indexByName"]["verified_sha"] == 8
+    assert organize["indexByName"]["verified"] == 9
+    assert organize["indexByName"]["verified_at"] == 10
+    assert organize["indexByName"]["live_verified"] == 11
+    assert organize["indexByName"]["live_verified_at"] == 12
+    assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -302,7 +327,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bugs table shows Release, Bug, Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified" {
+@test "bugs table shows Release, Bug, Priority, Filed, Open for, Status, Fixed in, Verified (at), Live-verified (at)" {
   run _open_bugs_table_check columns
   [ "${status}" -eq 0 ]
 }
@@ -326,11 +351,42 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
-for column in ("Fixed in", "Verified", "Live-verified"):
+for column in ("Fixed in", "Fix commit", "Verified commit", "Verified", "Live-verified"):
     override = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == column)
     mappings = next(p["value"] for p in override["properties"] if p["id"] == "mappings")
     values = next(m["options"] for m in mappings if m["type"] == "value")
     assert values["-"]["text"] == "—", column
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bugs table pairs each verification column with its timestamp" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
+organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+order = sorted(organize["indexByName"], key=organize["indexByName"].get)
+assert order[-7:-1] == ["fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"], order
+assert organize["renameByName"]["verified"] == "Verified"
+assert organize["renameByName"]["fix_sha"] == "Fix commit"
+assert organize["renameByName"]["verified_sha"] == "Verified commit"
+assert organize["renameByName"]["verified_at"] == "Verified at"
+assert organize["renameByName"]["live_verified"] == "Live-verified"
+assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
+for label in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"):
+    assert not organize["excludeByName"].get(label), label
+overrides = {o["matcher"].get("options"): o for o in table["fieldConfig"]["overrides"]}
+for column in ("Fix commit", "Verified commit", "Verified at", "Live-verified at"):
+    values = next(m["options"] for p in overrides[column]["properties"] if p["id"] == "mappings"
+                  for m in p["value"] if m["type"] == "value")
+    assert values["-"]["text"] == "—", column
+    if column.endswith("at"):
+        assert {values[k]["text"] for k in ("false", "n/a")} == {"—"}, column
+        assert values["true"]["text"] == "unknown", column
+for column in ("Verified", "Live-verified"):
+    mappings = next(p["value"] for p in overrides[column]["properties"] if p["id"] == "mappings")
+    assert not any(m["type"] == "regex" for m in mappings), column
 PY
   [ "${status}" -eq 0 ]
 }

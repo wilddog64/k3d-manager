@@ -55,7 +55,7 @@ function _provider_k3s_create_cluster() {
 
 function _provider_k3s_destroy_cluster() {
    # Clean up ingress forwarding service if it exists
-   if [[ -f "${K3S_INGRESS_SERVICE_FILE}" ]] || systemctl list-unit-files 2>/dev/null | grep -q "${K3S_INGRESS_SERVICE_NAME}"; then
+   if [[ -f "${K3S_INGRESS_SERVICE_FILE}" ]] || systemctl list-unit-files 2>/dev/null | grep "${K3S_INGRESS_SERVICE_NAME}" >/dev/null; then
       _info "Cleaning up ingress forwarding service..."
       _k3s_remove_ingress_forward 2>/dev/null || true
    fi
@@ -228,7 +228,7 @@ function _k3s_setup_ingress_forward() {
    _info ""
 
    # Detect WSL and provide specific instructions
-   if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
+   if grep -i microsoft /proc/version >/dev/null 2>/dev/null || grep -i wsl /proc/version >/dev/null 2>/dev/null; then
       _warn "WSL detected - additional configuration may be needed for Windows access"
       _info ""
       _info "To access from within WSL:"

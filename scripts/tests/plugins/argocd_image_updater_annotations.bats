@@ -18,12 +18,9 @@ YAML="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/services-git.yaml"
 }
 
 @test "image-updater: shopping-cart apps are no longer hard enrolled" {
-  run grep -F -- 'shopping-cart-basket' "${YAML}"
+  run grep -F -- 'ghcr.io/wilddog64/shopping-cart-' "${YAML}"
   [ "${status}" -ne 0 ]
 
-  run grep -F -- 'shopping-cart-order' "${YAML}"
-  [ "${status}" -ne 0 ]
-
-  run grep -F -- 'shopping-cart-product-catalog' "${YAML}"
+  run grep -E -- 'if eq \.path\.basename "shopping-cart-(basket|order|product-catalog)"' "${YAML}"
   [ "${status}" -ne 0 ]
 }

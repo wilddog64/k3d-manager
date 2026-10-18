@@ -74,6 +74,8 @@ source "${REPO_ROOT}/scripts/plugins/hub_recovery.sh"
 : "${_order_client_secret:=}"
 : "${_product_client_secret:=}"
 : "${_grafana_client_secret:=}"
+: "${_e2e_kc_client_secret:=}"
+: "${_e2e_kc_user_password:=}"
 : "${_ldap_admin_pass:=}"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
@@ -138,6 +140,39 @@ function _acg_fail() {
   _err "$1"
   # shellcheck disable=SC2317
   exit 1
+}
+
+function _acg_ensure_sandbox_ttl() {
+  local _sandbox_ref="$1"
+  local _ttl_mins _min_mins _provision_mins
+
+  if [[ -n "${_sandbox_ref}" ]]; then
+    _ttl_mins=$(acg_check_ttl "${_sandbox_ref}" 2>/dev/null || true)
+    _min_mins="${ACG_MIN_REMAINING_MINUTES:-120}"
+    if [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]] && \
+        (( _ttl_mins < _min_mins )); then
+      _info "[acg-up] Sandbox TTL: ${_ttl_mins}m remaining (< ${_min_mins}m threshold) — extending..."
+      if acg_extend_playwright "${_sandbox_ref}"; then
+        return 0
+      fi
+      _ttl_mins=$(acg_check_ttl "${_sandbox_ref}" 2>/dev/null || true)
+      _provision_mins="${ACG_MIN_PROVISION_MINUTES:-60}"
+      if [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]] && \
+          (( _ttl_mins < _provision_mins )); then
+        _warn "[acg-up] Sandbox cannot be extended and will expire before provisioning finishes — restarting sandbox..."
+        if acg_restart "${_sandbox_ref}" aws; then
+          return 0
+        fi
+        _err "[acg-up] Sandbox restart failed — cannot safely provision on an expiring sandbox"
+        return 1
+      fi
+      _warn "[acg-up] Sandbox extension failed — proceeding anyway"
+    elif [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]]; then
+      _info "[acg-up] Sandbox TTL: ${_ttl_mins}m remaining — OK"
+    else
+      _warn "[acg-up] Could not read sandbox TTL — proceeding without TTL check"
+    fi
+  fi
 }
 
 function _acg_keycloak_reverse_tunnel_up() {
@@ -225,7 +260,7 @@ function _acg_repair_hub_host_alias() {
 
   _current_node_hosts=$(kubectl get configmap coredns -n kube-system \
     --context k3d-k3d-cluster -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
-  if printf '%s\n' "${_current_node_hosts}" | grep -qxF "${_host_ip} host.k3d.internal"; then
+  if printf '%s\n' "${_current_node_hosts}" | grep -xF "${_host_ip} host.k3d.internal" >/dev/null; then
     _info "[acg-up] CoreDNS host.k3d.internal alias already present — no change"
     return 0
   fi
@@ -389,20 +424,7 @@ case "${_cluster_provider}" in
     if _acg_check_credentials 2>/dev/null; then
       _info "[acg-up] AWS credentials are valid — skipping Playwright extraction"
       _acg_sandbox_ref="${sandbox_url:-${_ACG_SANDBOX_URL:-}}"
-      if [[ -n "${_acg_sandbox_ref}" ]]; then
-        _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
-        _acg_min_mins="${ACG_MIN_REMAINING_MINUTES:-120}"
-        if [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]] && \
-            (( _acg_ttl_mins < _acg_min_mins )); then
-          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining (< ${_acg_min_mins}m threshold) — extending..."
-          acg_extend_playwright "${_acg_sandbox_ref}" || \
-            _warn "[acg-up] Sandbox extension failed — proceeding anyway"
-        elif [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]]; then
-          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining — OK"
-        else
-          _warn "[acg-up] Could not read sandbox TTL — proceeding without TTL check"
-        fi
-      fi
+      _acg_ensure_sandbox_ttl "${_acg_sandbox_ref}" || exit 1
     else
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
@@ -447,7 +469,7 @@ fi
 
 if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
-  _dry_guard "start autossh tunnel" tunnel_start
+  TUNNEL_SCOPE=sandbox _dry_guard "start autossh tunnel" tunnel_start
 fi
 
 if _dry_run_active; then
@@ -491,7 +513,7 @@ if ! _command_exist k3d; then
   _err "[acg-up] k3d binary not found in PATH — cannot manage Hub cluster. Check PATH includes ~/.local/bin."
   exit 1
 fi
-if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
+if ! k3d cluster list 2>/dev/null | grep "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]" >/dev/null; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
   _dry_guard "create local Hub cluster" deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _hub_newly_created=1
@@ -539,6 +561,16 @@ if _dry_run_active; then
   _info "[acg-up] DRY_RUN: no changes were made."
   exit 0
 fi
+function _acg_free_vault_local_port() {
+  local port="$1" listeners
+  listeners=$(lsof -ti:"${port}" -sTCP:LISTEN 2>/dev/null || true)
+  if [[ -n "${listeners}" ]]; then
+    _info "[acg-up] Port ${port} in use — killing stale vault port-forward listeners..."
+    echo "${listeners}" | xargs kill 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:${_vault_local_port})..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 mkdir -p "$(dirname "${_vault_pf_pid_file}")"
@@ -546,12 +578,7 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
 fi
-_stale_vault_pf=$(lsof -ti:"${_vault_local_port}" 2>/dev/null || true)
-if [[ -n "${_stale_vault_pf}" ]]; then
-  _info "[acg-up] Port ${_vault_local_port} in use — killing stale vault port-forward holders..."
-  echo "${_stale_vault_pf}" | xargs kill 2>/dev/null || true
-  sleep 1
-fi
+_acg_free_vault_local_port "${_vault_local_port}"
 kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${_ACG_STATE_DIR}/logs/vault-pf.log" 2>&1 &
 _vault_pf_pid=$!
@@ -922,7 +949,7 @@ kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
-_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:${TUNNEL_SANDBOX_LOCAL_PORT:-16443}}"
 _info "[acg-up] Reconciling other app-cluster registrations (additive)..."
 argocd_reconcile_app_cluster_registrations || true
 
@@ -934,7 +961,7 @@ until argocd cluster list -o json \
     | python3 -c "import sys,json; clusters=json.load(sys.stdin); \
       print(next((c['connectionState']['status'] for c in clusters \
         if 'ubuntu-k3s' in c.get('name','') or 'host.k3d.internal' in c.get('server','')), \
-        'Unknown'))" 2>/dev/null | grep -q "Successful"; do
+        'Unknown'))" 2>/dev/null | grep "Successful" >/dev/null; do
   if [[ $(date +%s) -ge ${_argocd_conn_deadline} ]]; then
     _warn "[acg-up] ArgoCD controller did not reconnect to ubuntu-k3s within 120s — proceeding anyway"
     _argocd_connected=0
@@ -976,7 +1003,7 @@ else
     _info "[acg-up] data-layer is delivered by the data-git ApplicationSet — waiting for ${_dl_app_name} (max 300s)..."
     _dl_sync_deadline=$(( $(date +%s) + 300 ))
     until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
-        -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+        -o jsonpath='{.status.sync.status}' 2>/dev/null | grep "Synced" >/dev/null; do
       if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
         _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
         _acg_data_layer_explain "${_dl_app_name}"
@@ -988,7 +1015,7 @@ else
           || true
         _dl_retry_deadline=$(( $(date +%s) + 180 ))
         until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
-            -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+            -o jsonpath='{.status.sync.status}' 2>/dev/null | grep "Synced" >/dev/null; do
           if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
             _dl_pods_ready=0
             for _ss in postgresql-orders postgresql-payment postgresql-products minio; do
@@ -1129,6 +1156,14 @@ else
       _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
       if _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method"; then
         _info "[acg-up] Keycloak client 'argocd' PKCE attribute removed"
+        if E2E_KC_CLIENT_SECRET="${_e2e_kc_client_secret}" E2E_KC_USER_PASSWORD="${_e2e_kc_user_password}" \
+            _keycloak_ensure_e2e_identity "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart"; then
+          _info "[acg-up] Keycloak e2e identity ensured"
+        else
+          kill "${_kc_pf_pid}" 2>/dev/null || true
+          rm -f "${_realm_json_file}"
+          _acg_fail "[acg-up] Failed to ensure the Keycloak e2e identity"
+        fi
       else
         kill "${_kc_pf_pid}" 2>/dev/null || true
         rm -f "${_realm_json_file}"
@@ -1167,6 +1202,11 @@ else
     _err "[acg-up] LDAP pod not found in identity namespace — cannot seed user passwords"
     exit 1
   else
+    _ldap_admin_pass="$(_acg_ldap_bind_pass)"
+    if [[ -z "${_ldap_admin_pass}" ]]; then
+      _err "[acg-up] LDAP admin password not readable from identity/openldap-admin — cannot seed user passwords"
+      exit 1
+    fi
     _ldap_seed_failed=0
     for _ldap_user in admin developer operator; do
       _ldap_user_vault_path="keycloak/users/${_ldap_user}"
@@ -1176,12 +1216,16 @@ else
         _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
         _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
       fi
-      if printf '%s\n%s\n' "${_ldap_user_pass}" "${_ldap_user_pass}" | \
+      if printf '%s\n%s\n%s\n' "${_ldap_admin_pass}" "${_ldap_user_pass}" "${_ldap_user_pass}" | \
           kubectl exec -i -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
             sh -ceu '
+              _ldap_admin_password_file=$(mktemp)
+              trap "rm -f \"${_ldap_admin_password_file}\"" EXIT
+              IFS= read -r _ldap_admin_password
+              printf "%s" "${_ldap_admin_password}" > "${_ldap_admin_password_file}"
               ldappasswd -x -H ldap://localhost:1389 \
                 -D "cn=ldap-admin,dc=home,dc=org" \
-                -w "$LDAP_ADMIN_PASSWORD" \
+                -y "${_ldap_admin_password_file}" \
                 -S "uid=$1,ou=users,dc=home,dc=org"
             ' sh "${_ldap_user}" >/dev/null 2>&1; then
         if printf '%s' "${_ldap_user_pass}" | \
@@ -1355,7 +1399,7 @@ else
 
   _coredns_nodehosts=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
     -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
-  if echo "${_coredns_nodehosts}" | grep -q "keycloak.shopping-cart.local"; then
+  if echo "${_coredns_nodehosts}" | grep "keycloak.shopping-cart.local" >/dev/null; then
     _info "[acg-up] CoreDNS keycloak hosts entry already present — skipping"
   else
     _new_nodehosts=$(NODE_IP="${_node_ip}" python3 -c "
@@ -1489,7 +1533,7 @@ KEYCLOAK_SERVICE_PORT=80 \
 # Using 'rewrite' plugin because 'hosts' can only be used once per server block (conflicts with NodeHosts).
 _current_corefile=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
   -o jsonpath='{.data.Corefile}')
-if ! printf '%s' "${_current_corefile}" | grep -qF 'keycloak.shopping-cart.local'; then
+if ! printf '%s' "${_current_corefile}" | grep -F 'keycloak.shopping-cart.local' >/dev/null; then
   _new_corefile=$(python3 - "${_current_corefile}" <<'PYEOF'
 import sys, re
 text = sys.argv[1]
@@ -1568,7 +1612,7 @@ if _is_mac; then
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.3 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.3'; then
+  if ! /sbin/ifconfig lo0 | grep '127\.0\.0\.3' >/dev/null; then
     _run_command --interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
       _warn "[acg-up] failed to add 127.0.0.3 loopback alias — frontend port-forward will fail to bind"
   fi
@@ -1945,14 +1989,53 @@ else
     kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
     rm -f "${_acg_prom_pf_pid_file}"
   fi
-  kubectl port-forward svc/prometheus-operated "${_acg_prom_local_port}:9090" \
-    -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
-    >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
-  _acg_prom_pf_pid=$!
-  _ACG_UP_OWNED_PIDS+=" ${_acg_prom_pf_pid}"
-  echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
-  disown "${_acg_prom_pf_pid}"
-  _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+  _acg_prom_pf_label="com.k3d-manager.sandbox.prometheus-port-forward"
+  _acg_prom_pf_plist="${HOME}/Library/LaunchAgents/${_acg_prom_pf_label}.plist"
+  _acg_prom_pf_log="${_ACG_STATE_DIR}/logs/acg-prom-pf.log"
+  _acg_prom_kubectl_bin="$(command -v kubectl)"
+  _acg_prom_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_acg_prom_pf_log}")" "$(dirname "${_acg_prom_pf_plist}")"
+  cat > "${_acg_prom_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_acg_prom_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_acg_prom_kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>svc/prometheus-operated</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>${_acg_observability_context}</string>
+    <string>--address</string>
+    <string>0.0.0.0</string>
+    <string>${_acg_prom_local_port}:9090</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_acg_prom_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_acg_prom_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_acg_prom_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_acg_prom_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_acg_prom_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_acg_prom_pf_plist}"
+  _info "[acg-up] ACG Prometheus port-forward agent loaded (launchd: ${_acg_prom_pf_label}, localhost:${_acg_prom_local_port} → ${_acg_observability_context}, log: ${_acg_prom_pf_log})"
 fi
 
 _info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9092 → ${_acg_observability_context})..."

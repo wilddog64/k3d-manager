@@ -169,8 +169,9 @@ def _scan(ref):
         if doc_status(texts[path])[1] != "fixed":
             continue
         commit_info = fixed_releases.get(path)
-        fixed_in[path] = ({"release": commit_info[0], "source": commit_info[1]}
-                          if commit_info else {"release": "unknown", "source": "no_transition"})
+        commit = fixed_commits.get(path, (None,))[0] if commit_info else None
+        fixed_in[path] = ({"release": commit_info[0], "source": commit_info[1], "commit": commit}
+                          if commit_info else {"release": "unknown", "source": "no_transition", "commit": None})
     return result, fixed_in
 
 

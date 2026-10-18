@@ -26,6 +26,13 @@
   [ "$status" -ne 0 ]
 }
 
+@test "local k3s kubeconfig uses the sandbox tunnel port" {
+  run grep -nF 's|https://127.0.0.1:6443|https://127.0.0.1:${_tunnel_port}|g' scripts/plugins/shopping_cart.sh
+  [ "$status" -eq 0 ]
+  run grep -nF 'TUNNEL_SANDBOX_LOCAL_PORT must be numeric' scripts/plugins/shopping_cart.sh
+  [ "$status" -eq 0 ]
+}
+
 @test "keeps default when a context still references it" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

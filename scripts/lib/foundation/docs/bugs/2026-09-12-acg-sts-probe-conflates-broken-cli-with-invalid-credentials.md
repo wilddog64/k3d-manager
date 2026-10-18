@@ -1,7 +1,8 @@
 # `acg-credential-test` treats a broken `aws` CLI as invalid credentials and destroys a working sandbox
 
 **Date:** 2026-09-12
-**Status:** OPEN — measured on a live run, fix not yet written.
+**Status:** FIXED — v0.4.17 (#50 `c87196d`). Was: OPEN — measured on a live run, fix not yet written.
+**Priority:** P1 — a broken local `aws` CLI deleted and restarted a working sandbox
 **Branch (all work):** `fix/acg-prism-monogram-selector`
 **Severity:** high — a local toolchain fault triggers an unnecessary **destructive** action
 (sandbox delete + restart) against a sandbox whose credentials were in fact valid.

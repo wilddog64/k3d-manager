@@ -976,7 +976,7 @@ function e2e_runner_republish() {
     _warn "[e2e-remote] nothing to republish"
     return 0
   fi
-  if ! find "$tmp" -type f -name '*.json' -print -quit | grep -q .; then
+  if ! find "$tmp" -type f -name '*.json' -print -quit | grep . >/dev/null; then
     _warn "[e2e-remote] nothing to republish"
     return 0
   fi

@@ -143,11 +143,15 @@ function _e2e_sandbox_kc() {
   _run_command -- kubectl --context ubuntu-k3s "$@"
 }
 
+function _e2e_hub_kc() {
+  _run_command -- kubectl --context "${E2E_HUB_CONTEXT:-k3d-k3d-cluster}" "$@"
+}
+
 function _e2e_sandbox_preflight_cluster() {
   local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
 
-  if ! kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
-    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up) and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
+  if ! kubectl config get-contexts -o name 2>/dev/null | grep -x -- "$ctx" >/dev/null; then
+    _err "[e2e] sandbox preflight: kubecontext ${ctx} is absent, so every later phase would fail on 'context was not found'; the sandbox k3s cluster is not provisioned in this kubeconfig — bring it up with the k3s-aws provider (make up), or run make e2e-sandbox-provision to provision it as part of the run, and confirm with 'kubectl --context ${ctx} get nodes' before rerunning Tier 2"
     return 1
   fi
   if ! kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1; then
@@ -157,94 +161,99 @@ function _e2e_sandbox_preflight_cluster() {
   _info "[e2e] sandbox preflight: context=${ctx} readyz=ok"
 }
 
-function _e2e_sandbox_argocd_ready() {
-  local ns="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" server controller
-  server="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get deployment \
-    -l app.kubernetes.io/name=argocd-server -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
-  controller="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n "$ns" get statefulset \
-    -l app.kubernetes.io/name=argocd-application-controller -o 'jsonpath={.items[*].metadata.name}' 2>/dev/null || true)"
-  if [[ -z "$server" || -z "$controller" || "$server" == *" "* || "$controller" == *" "* ]]; then
-    _err "[e2e] sandbox Argo CD: expected exactly one argocd-server Deployment and one argocd-application-controller StatefulSet in namespace ${ns} on ubuntu-k3s (found server='${server}' controller='${controller}'); cluster-up installs Argo CD there and e2e-sandbox never installs it — run make up with the k3s-aws provider, then rerun Tier 2"
+function _e2e_sandbox_cluster_ready() {
+  local ctx="ubuntu-k3s" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
+  kubectl config get-contexts -o name 2>/dev/null | grep -x -- "$ctx" >/dev/null || return 1
+  kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1
+}
+
+function _e2e_sandbox_provision_cluster() {
+  local provider="${CLUSTER_PROVIDER:-k3s-aws}"
+  if [[ "$provider" != "k3s-aws" ]]; then
+    _err "[e2e] sandbox provisioning: refusing CLUSTER_PROVIDER=${provider}; only k3s-aws provisions the disposable ACG sandbox"
+  fi
+  _info "[e2e] sandbox provisioning: ubuntu-k3s is absent or not answering /readyz; running make up CLUSTER_PROVIDER=k3s-aws"
+  if ! _run_command --soft -- make -C "${SCRIPT_DIR}/.." --no-print-directory up CLUSTER_PROVIDER=k3s-aws; then
+    _err "[e2e] sandbox provisioning: make up CLUSTER_PROVIDER=k3s-aws failed; see its output above"
+  fi
+  _info "[e2e] sandbox provisioning: make up finished; rechecking ubuntu-k3s"
+}
+
+function _e2e_sandbox_preflight_hub() {
+  local ctx="${E2E_HUB_CONTEXT:-k3d-k3d-cluster}" timeout="${E2E_SANDBOX_PROBE_TIMEOUT:-15}"
+  if ! kubectl --context "$ctx" get --raw=/readyz --request-timeout="${timeout}s" >/dev/null 2>&1; then
+    _err "[e2e] hub preflight: kubecontext ${ctx} did not answer /readyz within ${timeout}s; Tier 2 switches the sandbox to Stripe through the hub's ubuntu-k3s registration, so the hub must be up — start it (make up) and rerun Tier 2"
     return 1
   fi
-  _info "[e2e] sandbox Argo CD: reusing ${ns}/${server}"
-  _e2e_sandbox_kc -n "$ns" wait --for=condition=available "deployment/${server}" --timeout=600s
-  _e2e_sandbox_kc -n "$ns" rollout status "statefulset/${controller}" --timeout=600s
+  _info "[e2e] hub preflight: context=${ctx} readyz=ok"
 }
 
-function _e2e_sandbox_argocd_cluster_manifest() {
-  cat <<YAML
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ubuntu-k3s
-  namespace: ${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}
-  labels:
-    argocd.argoproj.io/secret-type: cluster
-    k3d-manager/role: app-cluster
-type: Opaque
-stringData:
-  name: ubuntu-k3s
-  server: https://kubernetes.default.svc
-  config: '{"tlsClientConfig":{"insecure":true}}'
-YAML
+function _e2e_sandbox_hub_apps_ready() {
+  local ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" listing bad
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+  deadline=$(( SECONDS + timeout ))
+  while :; do
+    listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \
+      -o 'jsonpath={range .items[?(@.spec.destination.name=="ubuntu-k3s")]}{.metadata.name}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}')"
+    if [[ -z "$listing" ]]; then
+      _err "[e2e] hub Applications: none target ubuntu-k3s in ${ns}; cluster-up registers the sandbox with the hub — rerun make up with the k3s-aws provider"
+      return 1
+    fi
+    bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
+    [[ -z "$bad" ]] && break
+    if (( SECONDS >= deadline )); then
+      _err "[e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy after ${timeout}s: $(tr '\n' ';' <<< "$bad")"
+      return 1
+    fi
+    _info "[e2e] hub Applications for ubuntu-k3s still converging: $(tr '\n' ';' <<< "$bad") — rechecking in ${interval}s"
+    sleep "$interval"
+  done
+  _info "[e2e] hub Applications for ubuntu-k3s: $(wc -l <<< "$listing" | tr -d ' ') Synced and Healthy"
 }
 
-function _e2e_sandbox_render_overrides() {
-  cat <<'YAML'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: order-service-config
-  namespace: shopping-cart-apps
-data:
-  BASKET_URL: http://basket-service.shopping-cart-apps:8083
-  PAYMENT_URL: http://payment-service.shopping-cart-payment:8084
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: payment-service-config
-  namespace: shopping-cart-payment
-data:
-  payment.gateway.default: stripe
-  mock.gateway.enabled: "false"
-  oauth2.jwk-set-uri: https://keycloak.3ai-talk.org/realms/shopping-cart/protocol/openid-connect/certs
-YAML
+function _e2e_sandbox_set_profile() {
+  local profile="${1:?profile required}" ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" app
+  _e2e_hub_kc -n "$ns" label secret -l argocd.argoproj.io/cluster-name=ubuntu-k3s \
+    "k3dm.k3d.io/e2e-profile=${profile}" --overwrite
+  for app in ubuntu-k3s-shopping-cart-order ubuntu-k3s-shopping-cart-payment; do
+    _run_command --soft -- kubectl --context "${E2E_HUB_CONTEXT:-k3d-k3d-cluster}" -n "$ns" \
+      annotate "application.argoproj.io/${app}" argocd.argoproj.io/refresh=normal --overwrite || true
+  done
 }
 
-function _e2e_sandbox_vault_store_manifest() {
-  cat <<'YAML'
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: vault-backend
-spec:
-  provider:
-    vault:
-      server: http://vault-bridge.secrets.svc.cluster.local:8201
-      path: secret
-      version: v2
-      auth:
-        tokenSecretRef:
-          name: vault-token
-          namespace: secrets
-          key: token
-YAML
+function _e2e_sandbox_wait_gateway() {
+  local want="${1:?gateway required}" timeout="${E2E_PROFILE_SYNC_TIMEOUT:-300}" deadline got
+  deadline=$(( $(date +%s) + timeout ))
+  while :; do
+    got="$(_run_command --soft --quiet -- kubectl --context ubuntu-k3s -n shopping-cart-payment \
+      get configmap payment-service-config -o 'jsonpath={.data.payment\.gateway\.default}' 2>/dev/null || true)"
+    [[ "$got" == "$want" ]] && return 0
+    (( $(date +%s) < deadline )) || {
+      _warn "[e2e] payment.gateway.default is '${got}', not '${want}', after ${timeout}s"
+      return 1
+    }
+    sleep 5
+  done
 }
 
-function _e2e_sandbox_configure_vault_token_review() {
-  local token_file=""
-  token_file="$(mktemp -t e2e-sandbox-token.XXXXXX)"
-  _e2e_sandbox_kc -n secrets create token external-secrets > "$token_file"
-  _run_command -- env \
-    VAULT_ADDR="${HUB_VAULT_ADDR:-http://127.0.0.1:18200}" \
-    VAULT_TOKEN="${HUB_VAULT_TOKEN:-}" \
-    vault write "auth/kubernetes-ubuntu-k3s/config" \
-    disable_local_ca_jwt=true \
-    token_reviewer_jwt="@${token_file}" \
-    kubernetes_host="${E2E_SANDBOX_KUBERNETES_HOST:-https://kubernetes.default.svc:443}"
-  _run_command -- rm -f "$token_file"
+function _e2e_sandbox_enable_stripe() {
+  _E2E_PROFILE_SET=1
+  _e2e_sandbox_set_profile stripe
+  _e2e_sandbox_wait_gateway stripe
+  _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/order-service
+  _e2e_sandbox_kc -n shopping-cart-payment rollout restart deployment/payment-service
+  _e2e_sandbox_kc -n shopping-cart-apps rollout status deployment/order-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
+  _e2e_sandbox_kc -n shopping-cart-payment rollout status deployment/payment-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
+}
+
+function _e2e_sandbox_clear_profile() {
+  [[ "${_E2E_PROFILE_SET:-0}" == "1" ]] || return 0
+  _E2E_PROFILE_SET=0
+  _e2e_sandbox_set_profile none || _warn "[e2e] could not reset k3dm.k3d.io/e2e-profile to none on the hub"
+  _e2e_sandbox_wait_gateway mock || true
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps rollout restart deployment/order-service || true
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-payment rollout restart deployment/payment-service || true
+  _info "[e2e] sandbox profile reset to none"
 }
 
 function _e2e_sandbox_job_manifest() {
@@ -289,7 +298,23 @@ spec:
             - name: STRIPE_E2E
               value: "true"
             - name: KEYCLOAK_URL
-              value: https://keycloak.3ai-talk.org/realms/shopping-cart
+              value: https://keycloak.3ai-talk.org
+            - name: KEYCLOAK_REALM
+              value: shopping-cart
+            - name: KEYCLOAK_CLIENT_ID
+              value: e2e-tests
+            - name: TEST_USERNAME
+              value: e2e-user
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: e2e-keycloak-credentials
+                  key: client-secret
+            - name: TEST_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: e2e-keycloak-credentials
+                  key: user-password
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -346,6 +371,39 @@ function _e2e_sandbox_provision_secrets() {
     --dry-run=client -o yaml | _e2e_sandbox_kc apply -f -
 }
 
+function _e2e_sandbox_provision_keycloak_credentials() {
+  cat <<'YAML' | _e2e_sandbox_kc apply -f -
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: e2e-keycloak-credentials
+  namespace: shopping-cart-apps
+  labels:
+    app.kubernetes.io/part-of: k3dm-e2e
+spec:
+  refreshInterval: 0s
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: e2e-keycloak-credentials
+    creationPolicy: Owner
+  data:
+    - secretKey: client-secret
+      remoteRef:
+        key: secret/data/keycloak/e2e
+        property: client_secret
+    - secretKey: user-password
+      remoteRef:
+        key: secret/data/keycloak/e2e
+        property: user_password
+YAML
+  if ! _e2e_sandbox_kc -n "$E2E_NAMESPACE" wait --for=condition=Ready externalsecret/e2e-keycloak-credentials --timeout="${E2E_ESO_TIMEOUT:-90}s"; then
+    _err "[e2e] ExternalSecret e2e-keycloak-credentials did not become Ready — check Vault secret/keycloak/e2e and the sandbox ESO log"
+    return 1
+  fi
+}
+
 function _e2e_sandbox_preflight_auth() {
   local service="k3dm-acg-pluralsight" credentials_loadable=1 profile_dir
   local account unreadable=""
@@ -393,47 +451,35 @@ function e2e_verify_sandbox() {
   _E2E_REPORT_DIR="$E2E_REPORT_DIR"
   _E2E_ACTIVE_PHASE="preflight"
   _E2E_SUMMARY_WRITTEN=0
+  _E2E_PROFILE_SET=0
   mkdir -p "$E2E_REPORT_DIR"
   trap '_e2e_sandbox_exit_trap' EXIT
 
   _e2e_sandbox_preflight_auth
+  if [[ "${E2E_SANDBOX_PROVISION:-0}" == "1" ]] && ! _e2e_sandbox_cluster_ready; then
+    _E2E_ACTIVE_PHASE="preflight-hub"
+    _e2e_sandbox_preflight_hub
+    _E2E_ACTIVE_PHASE="provisioning-sandbox"
+    _e2e_sandbox_provision_cluster
+  fi
   _E2E_ACTIVE_PHASE="preflight-cluster"
   _e2e_sandbox_preflight_cluster
+  _E2E_ACTIVE_PHASE="preflight-hub"
+  _e2e_sandbox_preflight_hub
   _E2E_ACTIVE_PHASE="extending-sandbox"
   acg_extend_playwright "${_ACG_SANDBOX_URL:-}"
   _E2E_ACTIVE_PHASE="checking-nodes"
   _e2e_sandbox_kc get nodes -o wide
+  _E2E_ACTIVE_PHASE="checking-hub-apps"
+  _e2e_sandbox_hub_apps_ready
+
   _E2E_ACTIVE_PHASE="provisioning-secrets"
   _e2e_sandbox_provision_secrets
+  _E2E_ACTIVE_PHASE="provisioning-keycloak-credentials"
+  _e2e_sandbox_provision_keycloak_credentials
 
-  _E2E_ACTIVE_PHASE="checking-argocd"
-  _e2e_sandbox_argocd_ready
-  _e2e_sandbox_kc -n "${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" apply -f - <<< "$(_e2e_sandbox_argocd_cluster_manifest)"
-
-  _E2E_ACTIVE_PHASE="configuring-vault"
-  shopping_cart_create_vault_bridge
-  _e2e_sandbox_configure_vault_token_review
-  _e2e_sandbox_kc apply -f - <<< "$(_e2e_sandbox_vault_store_manifest)"
-  _e2e_sandbox_kc wait --for=condition=Ready clustersecretstore/vault-backend --timeout=300s
-
-  _E2E_ACTIVE_PHASE="applying-appsets"
-  local appset_file rendered_file
-  for appset_file in "${SCRIPT_DIR}/etc/argocd/applicationsets"/*.yaml; do
-    rendered_file="$(mktemp -t e2e-sandbox-appset.XXXXXX)"
-    ARGOCD_NAMESPACE="${E2E_SANDBOX_ARGOCD_NAMESPACE:-cicd}" APP_CLUSTER_NAME=ubuntu-k3s \
-      K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)}" \
-      AMBIENT_CNI_CONF_DIR="${AMBIENT_CNI_CONF_DIR:-/opt/cni/bin}" \
-      AMBIENT_CNI_BIN_DIR="${AMBIENT_CNI_BIN_DIR:-/opt/cni/bin}" \
-      AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.27.1}" \
-      envsubst < "$appset_file" > "$rendered_file"
-    _e2e_sandbox_kc apply -f "$rendered_file"
-    _run_command -- rm -f "$rendered_file"
-  done
-  _e2e_sandbox_kc apply -f - <<< "$(_e2e_sandbox_render_overrides)"
-  _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/order-service
-  _e2e_sandbox_kc -n shopping-cart-payment rollout restart deployment/payment-service
-  _e2e_sandbox_kc -n shopping-cart-apps rollout status deployment/order-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
-  _e2e_sandbox_kc -n shopping-cart-payment rollout status deployment/payment-service --timeout="${E2E_ROLLOUT_TIMEOUT}s"
+  _E2E_ACTIVE_PHASE="enabling-stripe"
+  _e2e_sandbox_enable_stripe
 
   _E2E_ACTIVE_PHASE="running-playwright"
   manifest_file="$(mktemp -t e2e-sandbox-job.XXXXXX)"
@@ -448,14 +494,21 @@ function e2e_verify_sandbox() {
   _e2e_write_summary "$run_id" "$candidate_digest" "$rc" "${_E2E_ACTIVE_PHASE}"
   _E2E_SUMMARY_WRITTEN=1
   _e2e_write_result_event "$run_id"
+  _e2e_sandbox_cleanup
   E2E_TIER="$old_tier" E2E_PROJECT="$old_project" export E2E_TIER E2E_PROJECT
   trap - EXIT
   return "$rc"
 }
 
+function _e2e_sandbox_cleanup() {
+  _e2e_sandbox_clear_profile
+  _run_command --soft -- kubectl --context ubuntu-k3s -n shopping-cart-apps delete externalsecret e2e-keycloak-credentials --ignore-not-found --wait=false --request-timeout=30s || true
+}
+
 function _e2e_sandbox_exit_trap() {
   local rc=$?
   set +e
+  _e2e_sandbox_cleanup
   if [[ -n "${_E2E_RUN_ID:-}" ]] && [[ "${_E2E_SUMMARY_WRITTEN:-0}" -eq 0 ]]; then
     _e2e_write_summary "${_E2E_RUN_ID}" "${_E2E_CANDIDATE_DIGEST:-}" "$rc" "${_E2E_ACTIVE_PHASE:-unknown}" || true
     _e2e_write_result_event "${_E2E_RUN_ID}" || true

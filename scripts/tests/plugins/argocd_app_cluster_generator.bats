@@ -58,3 +58,28 @@ setup() {
   run grep -F -- "k3d-manager/role: app-cluster" "${_appsets}/grafana-dashboards-acg.yaml"
   [ "$status" -eq 0 ]
 }
+
+@test "services-git selects the exact e2e Stripe overlays" {
+  run python3 - "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/services-git.yaml" <<'PY'
+import os, sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+root = os.path.abspath(os.path.join(os.path.dirname(sys.argv[1]), '..', '..', '..', '..'))
+path = doc['spec']['template']['spec']['source']['path']
+expected = '{{ if and (eq (index .metadata.labels "k3dm.k3d.io/e2e-profile") "stripe") (has .path.basename (list "shopping-cart-order" "shopping-cart-payment")) }}services-e2e-stripe/{{.path.basename}}{{ else }}{{.path.path}}{{ end }}'
+assert path == expected, path
+for directory, name, keys in [
+    ('shopping-cart-order', 'order-service-config', {'BASKET_URL', 'PAYMENT_URL'}),
+    ('shopping-cart-payment', 'payment-service-config', {'payment.gateway.default', 'mock.gateway.enabled', 'oauth2.jwk-set-uri'}),
+]:
+    overlay = yaml.safe_load(open(os.path.join(root, 'services-e2e-stripe', directory, 'kustomization.yaml')))
+    assert overlay['resources'] == [f'../../services/{directory}']
+    assert os.path.isfile(os.path.join(root, 'services', directory, 'kustomization.yaml'))
+    assert not os.path.exists(os.path.join(root, 'services', directory, 'e2e-stripe'))
+    patch = yaml.safe_load(overlay['patches'][0]['patch'])
+    assert patch['metadata']['name'] == name
+    assert set(patch['data']) == keys
+print('overlay assertions ok')
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"overlay assertions ok"* ]]
+}

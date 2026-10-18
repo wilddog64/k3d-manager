@@ -366,6 +366,7 @@ bin/k3dm-webhook-setup --uninstall
 | `e2e-runner-health` | reader | | `RUNNER` | | 300 |
 | `e2e-remote` | operator | `RUNNER` | `DIGEST` | | 3600 |
 | `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
+| `e2e-sandbox-provision` | admin | | `DIGEST` | yes | 7200 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
 | `smoke` | operator | | `SMOKE_ONLY` | | 900 |
@@ -400,6 +401,9 @@ preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path
 TTY, which Slack jobs do not have. If the stored session has expired the job fails closed
 with `ACG_SESSION_EXPIRED` — sign in once from a real terminal (or run `make e2e-sandbox`
 there) and retry.
+
+Use `e2e-sandbox-provision` with `confirm` when the disposable ACG sandbox may be missing or
+dead; it provisions only through the approved `k3s-aws` lifecycle and reuses a healthy sandbox.
 
 ### `/cluster-diagnose` usage
 

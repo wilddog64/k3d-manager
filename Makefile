@@ -4,6 +4,8 @@
 .DEFAULT_GOAL := help
 
 .PHONY: lint-python
+.PHONY: image-pin-drift
+.PHONY: check-bug-evidence
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -31,7 +33,7 @@ K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -1278,6 +1280,9 @@ check-doc-links:
 	@python3 scripts/check-doc-links.py
 	@./scripts/check-repo-root-debris.sh
 
+check-bug-evidence:
+	@python3 scripts/check-bug-evidence.py docs/bugs/*.md
+
 ## Validate Kubernetes manifests, CRDs included, with kubeconform (installed if missing; needs network):
 ## make validate-manifests [FILES="path/a.yaml path/b.yaml"]
 KUBECONFORM_CRD_CATALOG := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
@@ -1318,6 +1323,10 @@ embed-cache-restore:
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
 	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
+
+## Compare services/*/kustomization.yaml image digests with :latest in GHCR (read-only; needs gh read:packages)
+image-pin-drift:
+	@./bin/k3dm-image-pin-drift
 
 ## Fail if test/job debris (empty-mktemp derived paths) exists at the repo root
 check-repo-root:
@@ -1396,6 +1405,10 @@ e2e:
 ## Run the Tier 2 e2e verification harness (live ACG sandbox + Stripe project). DIGEST=<candidate image digest> optional. Needs a real TTY for the one-time interactive login.
 e2e-sandbox:
 	@$(call _e2e_recorded,e2e-sandbox,./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
+
+## Tier 2 e2e that first provisions the ACG sandbox (make up CLUSTER_PROVIDER=k3s-aws) if ubuntu-k3s is absent or dead. DIGEST optional.
+e2e-sandbox-provision:
+	@$(call _e2e_recorded,e2e-sandbox-provision,env E2E_SANDBOX_PROVISION=1 ./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
 
 ## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
 smoke:

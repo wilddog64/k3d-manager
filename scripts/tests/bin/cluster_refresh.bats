@@ -27,6 +27,13 @@
   [ "$status" -ne 0 ]
 }
 
+@test "cluster-refresh scopes sandbox tunnel and ArgoCD endpoint" {
+  run grep -nF 'export TUNNEL_SCOPE=sandbox' bin/cluster-refresh
+  [ "$status" -eq 0 ]
+  run grep -nF 'https://host.k3d.internal:${TUNNEL_SANDBOX_LOCAL_PORT:-16443}' bin/cluster-refresh
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-refresh retains the ACG Grafana plist when the hub wrapper is absent" {
   local home_dir="${BATS_TEST_TMPDIR}/home"
   local state_dir="${BATS_TEST_TMPDIR}/state"

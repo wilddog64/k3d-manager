@@ -23,7 +23,8 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | CVE Auto-Patch | `cve-autopatch` | `platform-ops/grafana-dashboard-cve-autopatch.yaml` | `make platform-ops` | hub |
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
-| k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
+| k3dm Host Pod IP Pool | `k3dm-host-cni-ipam` | `platform-ops/grafana-dashboard-host-cni-ipam.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
@@ -274,7 +275,9 @@ do not: apply them with `make prometheus-rules`, which applies only
 Shows every open pull request's GitHub check-run state, overall verdict, and check duration for
 k3d-manager and lib-foundation. Hermes publishes it every five minutes through Pushgateway job
 `k3dm-pr-checks`, using one group per repo; the Repo filter is at the top. A Copilot review is not
-a check. Merged or closed PRs disappear on the next good poll. `GitHub read = failed` keeps the
+a check. Merged or closed PRs disappear on the next good poll. With no open PRs the two tables read
+`No open PRs`; that is normal, and **Last scrape** and **GitHub read** are the panels that show whether
+the collector is healthy. `GitHub read = failed` keeps the
 last good rows and usually means the Hermes GitHub token expired or was rejected.
 
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
@@ -309,7 +312,8 @@ Trivy findings, plus one actionable `TargetDown` and one deliberate `HostDiskSpa
 
 ### k3dm Agent Dispatch (`k3dm-agent-dispatch`) — hub
 
-The dispatch dashboard reads the shared Codex ledger export and selects 1d, 7d, or 30d. It shows
+The dispatch dashboard reads the shared Codex ledger export; the **Spec window** control (top left,
+default `30d`) selects 1d, 7d, or 30d. The Grafana time picker does not change these panels. It shows
 accepted specs, integration-test landing success, verifier lines changed, wait minutes, Codex
 tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
 minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens
@@ -321,6 +325,15 @@ lists Codex tokens, Codex time, time to land, and Codex runs for the newest 50 l
 selected window. Tokens are the session total from the spec's last run; only dispatcher-launched
 specs appear, because a bare `codex exec` writes no ledger event.
 
+**Rework rate** is the share of landed specs in the window that needed a second pass, for any of
+three causes: Codex ran more than once, the integration gate refused the land for failing tests,
+or Claude changed lines between Codex's finished tree and what landed. Rebase and scope refusals
+are not rework: a rebase refusal means `main` moved, and a scope refusal is the dispatcher's own
+guard. `k3dm_dispatch_rework_landed{cause=...}` gives the count per cause (`rerun`, `tests`,
+`claude_edit`, `any`); a spec can count under several. The independent verifier's verdict is not
+recorded in the ledger, so a correction it asks for shows up only through the re-run or Claude edit
+that follows.
+
 ### k3dm Bug Tracking (`k3dm-bugs`) — hub
 
 Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb-metrics`.
@@ -328,6 +341,7 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
+Open for counts from filed until the bug is LIVE-VERIFIED.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
@@ -378,16 +392,65 @@ Fixed documents also have a Verified and Live-verified label:
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
+The table shows `verified_at` and `live_verified_at` from `k3dm_bug_info` as **Verified at** and
+**Live-verified at**, each next to its status column (`—` when not verified, `unknown` when no time
+was found). A verified or
+live-verified document gets `YYYY-MM-DD HH:MMZ` (UTC) or `YYYY-MM-DD`. The time comes from a date
+written directly after the keyword (`VERIFIED — <ISO date or time>: <evidence>` /
+`LIVE-VERIFIED — <ISO date or time>: <evidence>`); a date later in the Status text, such as a
+planned drill or a `Was:` history note, is ignored. Without one, it is the UTC committer time of the
+earliest commit that set that Status. A date-only Status date takes that commit's time when the
+commit is from the same UTC day; otherwise it stays `YYYY-MM-DD` — usually because the only commit
+that carries the Status is a release squash merge, whose time is the merge, not the verification.
+Write the time in the Status (`VERIFIED — 2026-10-17T19:41Z: …`) to always get one. A verified doc
+with neither is `true`; unverified values stay
+`false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
+
+The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
+contain the first eight characters of the commit that marked the doc fixed (the commit used for
+**Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
+otherwise they are `-` and render as `—`.
+
+It also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
+fix commit:
+
+| Live evidence | Meaning |
+|---|---|
+| `ok` | `✓ current`: at least one evidence commit contains the fix |
+| `stale` | `stale proof`: git confirms no evidence commit contains the fix |
+| `missing` | no well-formed evidence line is recorded |
+| `unchecked` | evidence exists, but the fix commit is unknown, or git cannot resolve the fix or evidence commit (for example a squash-merged release branch that was deleted without an archive tag) |
+| `n/a` | LIVE-VERIFIED release predates v1.43.4 |
+| `-` | not fixed or not LIVE-VERIFIED |
+
+Each live proof uses one line in this form (multiple lines are allowed):
+`**Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>`.
+The separators may also be written as ` | `. `proves` contains comma-separated Acceptance IDs such
+as `E1,E3`, or `fix` for a doc with no Acceptance block. `commit` is the k3d-manager commit checked
+out when the proof ran (an e2e run records it in `~/.k3dm/e2e/<run>.json`); `run` is the e2e run ID,
+or a short name or log path for a proof that is not an e2e run. The check compares against the commit that first closed the doc's Status. When the doc was closed
+after the proof ran (for example straight to LIVE-VERIFIED), add `**Fix commit:** <sha>` naming the
+code fix; it overrides that proxy for this check only. Open for keeps counting from Filed
+for `missing` and `stale`; `ok`, `unchecked`, and historic `n/a` rows keep the live-verified value
+of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED without a
+well-formed line (`make check-bug-evidence` sweeps every doc).
+
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
 The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Filed, Open for, Status, Fixed in, Verified, and Live-verified, and clicking a title opens that
-document on the scanned branch. The **Hide live-verified** toggle is the default: it keeps open,
-unknown, deferred, and not-yet-live-verified rows visible while hiding live-verified and historic
-`n/a` fixes. To mark a fix live-proven, change its Status to `LIVE-VERIFIED — <evidence>`.
+Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
+document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
+other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
+live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to
+`LIVE-VERIFIED — <evidence>`.
+
+The dashboard opens on the release branch's own version, which is the saved Release value. When a
+new release branch is cut, bump that value; the BATS test fails until it matches. lib-foundation has
+no release branch value and falls back to All. Rows sort by release, then priority (P0 first and
+unset last), then status.
 
 The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
 group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.
@@ -557,9 +620,11 @@ Work down this table before editing a query. Every row is a real past incident.
 | E2E detail panels blank, summary panels fine | result event carries aggregates only | inspect the newest `e2e-result` ConfigMap payload |
 | E2E entirely blank after a real remote run | `E2E_M2_PUBLISH_BACK_HOST` unset under launchd; result stuck `publication_pending` | count `k3dm.k3d.io/e2e-result` ConfigMaps on the hub |
 | k3dm Deployment panels blank | `k3dm Deployment Metrics` is empty: the Pushgateway release must be installed on the app cluster, the local `:9091` port-forward agent must be loaded, and the `job="pushgateway"` target must be up | `curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/-/healthy` |
+| sandbox Prometheus panels blank / `federate-acg` TargetDown | the `com.k3d-manager.sandbox.prometheus-port-forward` agent is not loaded | `launchctl list com.k3d-manager.sandbox.prometheus-port-forward` and `curl -s -o /dev/null -w '%{http_code}' http://localhost:19190/-/ready` |
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
 | k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
 | Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
+| **k3dm Host Pod IP Pool** shows `No data`, `Probe status` down, or a high `Pool used %` | `No data`: Hermes or the hub Pushgateway port-forward is down. `Probe status` down: the collector cannot read `/var/lib/k3dm/cni-ipam-sweep.state` over SSH. High usage with `Stale reservations removed` at 0: real pod load, not a leak | `systemctl list-timers k3dm-cni-ipam-sweep.timer` and the state file on the host; `bin/k3dm-cni-ipam-metrics --dry-run` on the hub |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub's own

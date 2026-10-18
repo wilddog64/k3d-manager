@@ -512,7 +512,7 @@ function _ensure_jenkins_cert() {
    fi
 
    # Check if PKI secrets engine is enabled using authenticated vault_exec
-   if ! _vault_exec --no-exit "$vault_namespace" "vault secrets list" "$vault_release" 2>/dev/null | grep -q "^pki/"; then
+   if ! _vault_exec --no-exit "$vault_namespace" "vault secrets list" "$vault_release" 2>/dev/null | grep "^pki/" >/dev/null; then
       _vault_exec "$vault_namespace" "vault secrets enable pki" "$vault_release"
       _vault_exec "$vault_namespace" "vault secrets tune -max-lease-ttl=87600h pki" "$vault_release"
       _vault_exec "$vault_namespace" "vault write pki/root/generate/internal common_name=dev.local.me ttl=87600h" "$vault_release"
@@ -1816,7 +1816,7 @@ function _deploy_jenkins() {
    trap '$return_trap_cmd' RETURN
 
    if (( ! skip_repo_ops )); then
-      _helm repo list 2>/dev/null | grep -q jenkins >/dev/null 2>&1 || _helm repo add jenkins "$helm_repo_url"
+      _helm repo list 2>/dev/null | grep jenkins >/dev/null 2>&1 || _helm repo add jenkins "$helm_repo_url"
       _helm repo update
    fi
 

@@ -164,7 +164,7 @@ test_ssl_connectivity() {
   local connected=0
   for (( attempt=1; attempt<=max_attempts; attempt++ )); do
     if openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
-         </dev/null 2>/dev/null | grep -q "CONNECTED"; then
+         </dev/null 2>/dev/null | grep "CONNECTED" >/dev/null; then
       connected=1
       break
     fi
@@ -461,7 +461,7 @@ test_login_ldap() {
          -D "cn=$ldap_user,dc=home,dc=org" \
          -w "$ldap_pass" \
          -b "dc=home,dc=org" \
-         "(cn=$user)" dn 2>/dev/null | grep -q "^dn:"; then
+         "(cn=$user)" dn 2>/dev/null | grep "^dn:" >/dev/null; then
       test_user="$user"
       directory_type="basic LDAP"
       verbose "Found basic LDAP test user: $test_user"
@@ -478,7 +478,7 @@ test_login_ldap() {
            -D "cn=$ldap_user,dc=home,dc=org" \
            -w "$ldap_pass" \
            -b "dc=home,dc=org" \
-           "(sAMAccountName=$user)" dn 2>/dev/null | grep -q "^dn:"; then
+           "(sAMAccountName=$user)" dn 2>/dev/null | grep "^dn:" >/dev/null; then
         test_user="$user"
         directory_type="Active Directory"
         verbose "Found AD test user: $test_user"

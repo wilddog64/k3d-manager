@@ -1,7 +1,7 @@
 # Bug: Suspected regression: shopping-cart items disappear after logout and login
 
 **Filed:** 2026-10-13
-**Status:** CLOSED — NOT REPRODUCED 2026-10-15: operator added 3 items, logged out and back in; cart intact (see "Verification 2026-10-15")
+**Status:** LIVE-VERIFIED — NOT REPRODUCED, operator live browser test 2026-10-15: operator added 3 items, logged out and back in; cart intact (see "Verification 2026-10-15")
 **Branch:** `k3d-manager-v1.43.3` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2
 **Date:** 2026-10-13

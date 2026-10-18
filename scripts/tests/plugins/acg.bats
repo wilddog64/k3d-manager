@@ -116,7 +116,7 @@ setup() {
   _acg_check_credentials() { return 0; }
   kubectl() { return 0; }
   _run_command() {
-    local mode="$1"; shift
+    while [[ "${1:-}" == --* && "$1" != "--" ]]; do shift; done
     [[ "${1:-}" == "--" ]] && shift
     if [[ "$*" == aws\ cloudformation\ describe-stacks* ]]; then
       printf 'CREATE_COMPLETE'

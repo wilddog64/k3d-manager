@@ -1,7 +1,8 @@
 # ACG sign-in recovery waits 300s on `id.pluralsight.com`, a host that no longer exists
 
 **Date:** 2026-09-12
-**Status:** OPEN — root cause measured, fix not yet written.
+**Status:** FIXED — v0.4.17 (#50 `c87196d`). Was: OPEN — root cause measured, fix not yet written.
+**Priority:** P1 — every sign-in hung 5 minutes and the live gate failed; no workaround
 **Branch (all work):** `fix/acg-prism-monogram-selector`
 **Severity:** high — deterministic 5-minute hang, then a 5-minute repeat in the restart
 path, on every run that needs to sign in. This is the real cause of the failed

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-host-cni-ipam
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    release: kube-prometheus-stack
+data:
+  host-cni-ipam.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "graphTooltip": 1,
+      "title": "k3dm Host Pod IP Pool",
+      "uid": "k3dm-host-cni-ipam",
+      "tags": ["k3dm", "cni", "ipam"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "1m",
+      "time": {"from": "now-24h", "to": "now"},
+      "panels": [
+        {"id": 1, "type": "stat", "title": "Pool used %", "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0}, "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * k3dm_cni_ipam_reservations / k3dm_cni_ipam_range_size", "legendFormat": "{{host}}"}]},
+        {"id": 2, "type": "stat", "title": "Reservations", "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0}, "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "targets": [{"expr": "k3dm_cni_ipam_reservations", "legendFormat": "used"}, {"expr": "k3dm_cni_ipam_range_size", "legendFormat": "range"}]},
+        {"id": 3, "type": "stat", "title": "Allocation errors (1h)", "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0}, "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}, "targets": [{"expr": "k3dm_cni_ipam_alloc_errors_1h", "legendFormat": "{{host}}"}]},
+        {"id": 4, "type": "stat", "title": "Probe status", "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0}, "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "down", "color": "red"}, "1": {"text": "up", "color": "green"}}}]}, "overrides": []}, "targets": [{"expr": "k3dm_cni_ipam_probe_success", "legendFormat": "{{host}}"}]},
+        {"id": 5, "type": "timeseries", "title": "Pool used % over time", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6}, "fieldConfig": {"defaults": {"unit": "percent", "custom": {"showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * k3dm_cni_ipam_reservations / k3dm_cni_ipam_range_size", "legendFormat": "{{host}}"}]},
+        {"id": 6, "type": "timeseries", "title": "Stale reservations removed per sweep", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6}, "fieldConfig": {"defaults": {"unit": "none", "custom": {"showPoints": "never"}}, "overrides": []}, "targets": [{"expr": "k3dm_cni_ipam_stale_last_run", "legendFormat": "{{host}}"}]},
+        {"id": 7, "type": "stat", "title": "Since last sweep", "gridPos": {"h": 6, "w": 12, "x": 0, "y": 14}, "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1800}, {"color": "red", "value": 3600}]}}, "overrides": []}, "targets": [{"expr": "time() - k3dm_cni_ipam_sweep_last_run_timestamp_seconds", "legendFormat": "{{host}}"}]},
+        {"id": 8, "type": "stat", "title": "Last push age", "gridPos": {"h": 6, "w": 12, "x": 12, "y": 14}, "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1800}, {"color": "red", "value": 3600}]}}, "overrides": []}, "targets": [{"expr": "time() - max(push_time_seconds{job=\"k3dm-cni-ipam\"})"}]}
+      ]
+    }

@@ -717,6 +717,19 @@ STUB
   [[ "${calls[3]}" == *"rollout restart deployment/keycloak"* ]]
   [[ "${calls[4]}" == *"rollout restart deployment/kube-prometheus-stack-grafana"* ]]
   [[ "${calls[5]}" == *"rollout restart deployment/argocd-server"* ]]
+  [[ "${calls[6]}" == *"rollout restart statefulset/openldap"* ]]
+  [[ "${calls[7]}" == *"rollout status statefulset/openldap"* ]]
+}
+
+@test "recover D2: an OpenLDAP restart failure fails the refresh" {
+  source_plugin
+  _kubectl() {
+    [[ "$*" == *"get deployment/keycloak"* ]] && return 0
+    [[ "$*" == *"statefulset/openldap"* ]] && return 1
+    return 0
+  }
+  K3DM_HUB_DATA_KEYCLOAK_POLL_S=0 run _hub_data_refresh_dependents ctx
+  [ "$status" -eq 1 ]
 }
 
 @test "recover D2: waits for ArgoCD to create Keycloak before restarting it" {
@@ -1126,11 +1139,22 @@ STUB
   printf '%s\n' '{"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$TEST_ROOT/inventory.json"
   _hub_data_keycloak_user_count() { printf '%s\n' "$*" >> "$CALL_LOG"; printf 3; }
   _hub_data_ldap_entry_count() { printf '%s\n' "$*" >> "$CALL_LOG"; printf 2; }
+  _hub_data_ldap_admin_bind() { printf '%s\n' "$*" >> "$CALL_LOG"; }
   run hub_data_verify_keycloak "$TEST_ROOT/inventory.json" target-context
   [ "$status" -eq 0 ]
   run hub_data_verify_ldap "$TEST_ROOT/inventory.json" target-context
   [ "$status" -eq 0 ]
   grep -q -- '--context target-context' "$CALL_LOG"
+}
+
+@test "recover B4-R3: a failed LDAP admin bind fails LDAP verification" {
+  source_plugin
+  printf '%s\n' '{"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$TEST_ROOT/inventory.json"
+  _hub_data_ldap_entry_count() { printf 2; }
+  _hub_data_ldap_admin_bind() { return 1; }
+  run --separate-stderr hub_data_verify_ldap "$TEST_ROOT/inventory.json" target-context
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"LDAP admin bind failed"* ]]
 }
 
 @test "recover B4-R4: resume failure is logged and report records false" {

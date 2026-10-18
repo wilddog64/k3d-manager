@@ -103,14 +103,81 @@ setup() {
     source scripts/lib/provider.sh
     source scripts/lib/providers/k3s-aws.sh
     _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
-    printf "%s\n" "$$" > "${_ACG_WATCH_PID_FILE}"
+    sleep 2 &
+    watcher_pid=$!
+    printf "%s\n" "${watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
     launchctl() { return 1; }
     acg_watch() { printf "WATCHER_SHOULD_NOT_RUN\n"; }
     _k3s_aws_start_watcher
+    kill "${watcher_pid}"
   '
   [ "$status" -eq 0 ]
   [[ "$output" == *"Watcher already running (PID"* ]]
   [[ "$output" != *"WATCHER_SHOULD_NOT_RUN"* ]]
+}
+
+@test "N1: launchd retires a stale cluster-up watcher" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    provider_source="${K3S_AWS_PROVIDER_FILE:-scripts/lib/providers/k3s-aws.sh}"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source "${provider_source}"
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    launchctl() { return 0; }
+    ps() { printf "bash bin/cluster-up\n"; }
+    acg_watch() { printf "WATCHER_SHOULD_NOT_RUN\n"; }
+    sleep 2 &
+    watcher_pid=$!
+    trap "kill \"\$watcher_pid\" 2>/dev/null || true" EXIT
+    printf "%s\n" "${watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
+    _k3s_aws_start_watcher
+    if kill -0 "${watcher_pid}" 2>/dev/null; then exit 11; fi
+    [[ ! -e "${_ACG_WATCH_PID_FILE}" ]]
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stopped stale in-shell watcher"* ]]
+}
+
+@test "k3s-aws removes a dead launchd watcher PID" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    launchctl() { return 0; }
+    acg_watch() { printf "WATCHER_SHOULD_NOT_RUN\n"; }
+    printf "999999\n" > "${_ACG_WATCH_PID_FILE}"
+    _k3s_aws_start_watcher
+    [[ ! -e "${_ACG_WATCH_PID_FILE}" ]]
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"WATCHER_SHOULD_NOT_RUN"* ]]
+}
+
+@test "k3s-aws does not kill an unrelated launchd PID" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _ACG_WATCH_PID_FILE="${BATS_TEST_TMPDIR}/watch.pid"
+    launchctl() { return 0; }
+    ps() { printf "sleep 300\n"; }
+    sleep 30 &
+    unrelated_pid=$!
+    printf "%s\n" "${unrelated_pid}" > "${_ACG_WATCH_PID_FILE}"
+    _k3s_aws_start_watcher
+    kill -0 "${unrelated_pid}" 2>/dev/null || exit 21
+    [[ ! -e "${_ACG_WATCH_PID_FILE}" ]]
+    kill "${unrelated_pid}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"not a k3d-manager watcher — not killing it"* ]]
 }
 
 @test "cluster-up stops the shell watcher only after launchd succeeds" {

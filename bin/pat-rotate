@@ -29,7 +29,7 @@ if [[ -z "$NEW_TOKEN" ]]; then
 fi
 
 # Basic format check — GitHub PATs start with ghp_, gho_, ghu_, ghs_, or ghr_
-if ! printf '%s' "$NEW_TOKEN" | grep -qE '^gh[pousr]_[A-Za-z0-9_]{36,}$'; then
+if ! printf '%s' "$NEW_TOKEN" | grep -E '^gh[pousr]_[A-Za-z0-9_]{36,}$' >/dev/null; then
   printf 'WARNING: token does not match expected GitHub PAT format (ghp_/gho_/ghu_/ghs_/ghr_)\n' >&2
 fi
 
@@ -43,7 +43,7 @@ fi
 
 # --- verify ---------------------------------------------------------------
 
-if gh auth status 2>&1 | grep -q 'Logged in to github.com'; then
+if gh auth status 2>&1 | grep 'Logged in to github.com' >/dev/null; then
   printf 'SUCCESS: gh auth verified — token updated\n' >&2
 else
   printf 'ERROR: gh auth status check failed after update\n' >&2

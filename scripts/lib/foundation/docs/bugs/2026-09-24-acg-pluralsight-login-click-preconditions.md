@@ -4,9 +4,8 @@
 **Branch:** `feat/v0.4.18-credential-test-observability`
 **File:** `scripts/lib/acg/playwright/lib/pluralsight_login.js`
 **Severity:** high — headless auto-login had never succeeded; every failure was mis-reported as an expired session.
-**Status:** **RESOLVED & OPERATOR-CONFIRMED 2026-09-24.** `make credential-test` now reaches
-`ACG_SESSION_OK path=auto-login` and completes the full chain: sandbox start, credential
-extraction, and `sts:GetCallerIdentity` validation.
+**Status:** FIXED — v0.4.18 (#55 `2f244ee`). Was: **RESOLVED & OPERATOR-CONFIRMED 2026-09-24.** `make credential-test` now reaches `ACG_SESSION_OK path=auto-login` and completes the full chain: sandbox start, credential extraction, and `sts:GetCallerIdentity` validation.
+**Priority:** P2 — headless auto-login never succeeded; workaround: manual login
 
 ---
 

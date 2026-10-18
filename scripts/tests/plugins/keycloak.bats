@@ -40,6 +40,108 @@ setup() {
   declare -F _keycloak_reconcile_realm_client >/dev/null
 }
 
+@test "_keycloak_ensure_e2e_identity creates missing client and user without leaking secrets" {
+  local argv_log="$BATS_TEST_TMPDIR/e2e-argv.log" stdin_log="$BATS_TEST_TMPDIR/e2e-stdin.log"
+  : > "$argv_log"
+  : > "$stdin_log"
+  export E2E_KC_CLIENT_SECRET='client-sentinel' E2E_KC_USER_PASSWORD='password-sentinel'
+  local user_state="$BATS_TEST_TMPDIR/user-created"
+  printf '0\n' > "$user_state"
+  _curl() {
+    local args="$*" body=""
+    printf '%s\n' "$args" >> "$argv_log"
+    if [[ "$args" == *"--data-binary @-"* ]]; then
+      body=$(cat)
+      printf '%s\n' "$body" >> "$stdin_log"
+    fi
+    case "$args" in
+      *"/roles/PAYMENT_USER"*) printf '{"id":"role-user","name":"PAYMENT_USER"}';;
+      *"/roles/PAYMENT_WRITE"*) printf '{"id":"role-write","name":"PAYMENT_WRITE"}';;
+      *"/roles"*) printf '201';;
+      *"clients?clientId=e2e-tests"*) printf '[]';;
+      *"/clients"*) printf '201';;
+      *"users?username=e2e-user"*)
+        local user_gets
+        user_gets=$(<"$user_state")
+        printf '%s\n' "$((user_gets + 1))" > "$user_state"
+        if (( user_gets >= 1 )); then printf '[{"id":"user-id"}]'; else printf '[]'; fi
+        ;;
+      *"/users"*"role-mappings"*) printf '204';;
+      *"/users"*"reset-password"*) printf '204';;
+      *"/users"*) printf '201';;
+      *) printf '201';;
+    esac
+  }
+  run _keycloak_ensure_e2e_identity "http://localhost:18080" "admin-token" "shopping-cart"
+  [ "$status" -eq 0 ]
+  run grep -F 'client-sentinel' "$argv_log"
+  [ "$status" -eq 1 ]
+  run grep -F 'password-sentinel' "$argv_log"
+  [ "$status" -eq 1 ]
+  grep -q 'client-sentinel' "$stdin_log"
+  grep -q 'password-sentinel' "$stdin_log"
+  run jq -sr 'map(select(type == "array")) | .[0] | map(.name) | sort | join(",")' "$stdin_log"
+  [ "$output" = "PAYMENT_USER,PAYMENT_WRITE" ]
+}
+
+@test "_keycloak_ensure_e2e_identity refuses a partial role mapping" {
+  local calls="$BATS_TEST_TMPDIR/e2e-partial-calls"
+  : > "$calls"
+  export E2E_KC_CLIENT_SECRET=client-secret E2E_KC_USER_PASSWORD=user-password
+  _curl() {
+    printf '%s\n' "$*" >> "$calls"
+    [[ "$*" == *"--data-binary @-"* ]] && cat >/dev/null
+    case "$*" in
+      *"clients?clientId=e2e-tests"*) printf '[{"id":"client-id"}]';;
+      *"users?username=e2e-user"*) printf '[{"id":"user-id"}]';;
+      *"/roles/PAYMENT_USER"*) printf '{"id":"role-user","name":"PAYMENT_USER"}';;
+      *"/roles/PAYMENT_WRITE"*) return 22;;
+      *"role-mappings/realm"*|*"reset-password"*|*"/clients/client-id"*) printf '204';;
+      *"/roles"*) printf '409';;
+      *) printf '204';;
+    esac
+  }
+  run _keycloak_ensure_e2e_identity "http://localhost:18080" "admin-token" "shopping-cart"
+  [ "$status" -eq 1 ]
+  run grep -q 'role-mappings/realm' "$calls"
+  [ "$status" -eq 1 ]
+}
+
+@test "_keycloak_ensure_e2e_identity updates existing client and user" {
+  local calls="$BATS_TEST_TMPDIR/e2e-existing-calls"
+  : > "$calls"
+  export E2E_KC_CLIENT_SECRET=client-secret E2E_KC_USER_PASSWORD=user-password
+  _curl() {
+    printf '%s\n' "$*" >> "$calls"
+    [[ "$*" == *"--data-binary @-"* ]] && cat >/dev/null
+    case "$*" in
+      *"clients?clientId=e2e-tests"*) printf '[{"id":"client-id"}]';;
+      *"/clients/client-id"*) printf '204';;
+      *"users?username=e2e-user"*) printf '[{"id":"user-id"}]';;
+      *"/roles/PAYMENT_USER"*) printf '{"id":"role-user","name":"PAYMENT_USER"}';;
+      *"/roles/PAYMENT_WRITE"*) printf '{"id":"role-write","name":"PAYMENT_WRITE"}';;
+      *"role-mappings/realm"*|*"reset-password"*) printf '204';;
+      *"/roles"*) printf '409';;
+      *) printf '204';;
+    esac
+  }
+  run _keycloak_ensure_e2e_identity "http://localhost:18080" "admin-token" "shopping-cart"
+  [ "$status" -eq 0 ]
+  grep -q '/clients/client-id' "$calls"
+  run grep -q '/users$' "$calls"
+  [ "$status" -eq 1 ]
+  grep -q '/users/user-id/reset-password' "$calls"
+}
+
+@test "_keycloak_ensure_e2e_identity rejects empty secrets before curl" {
+  local calls="$BATS_TEST_TMPDIR/e2e-empty-calls"
+  : > "$calls"
+  _curl() { printf 'called\n' >> "$calls"; }
+  E2E_KC_CLIENT_SECRET= E2E_KC_USER_PASSWORD=password run _keycloak_ensure_e2e_identity base token realm
+  [ "$status" -eq 1 ]
+  [ ! -s "$calls" ]
+}
+
 @test "smoke admin Secret falls back to keycloak-secrets" {
   _kubectl() {
     case "$*" in

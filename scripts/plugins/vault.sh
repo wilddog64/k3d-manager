@@ -481,12 +481,12 @@ function _vault_parse_sealed_from_status() {
       return 0
    fi
 
-   if printf '%s\n' "$status" | grep -Eq 'Sealed[[:space:]]+false'; then
+   if printf '%s\n' "$status" | grep -E 'Sealed[[:space:]]+false' >/dev/null; then
       printf 'false'
       return 0
    fi
 
-   if printf '%s\n' "$status" | grep -Eq 'Sealed[[:space:]]+true'; then
+   if printf '%s\n' "$status" | grep -E 'Sealed[[:space:]]+true' >/dev/null; then
       printf 'true'
       return 0
    fi
@@ -1054,7 +1054,11 @@ function vault_install_unseal_watchdog() {
    rendered="$(mktemp -t vault-unseal-watchdog.XXXXXX.yaml)"
    trap '$(_cleanup_trap_command "$rendered")' EXIT TERM
    local _live_vault_image
-   _live_vault_image="$(_kubectl -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   if [[ -n "$app_context" ]]; then
+      _live_vault_image="$(kubectl --context "$app_context" -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   else
+      _live_vault_image="$(_kubectl -n "$ns" get statefulset "${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+   fi
    VAULT_NS="$ns" \
    VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-${_live_vault_image:-hashicorp/vault:1.18.3}}" \
    VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \
@@ -1151,7 +1155,7 @@ function vault_seed_hub_into_context() {
     _err "[vault] vault_seed_hub_into_context requires an app cluster kube-context"
     return 1
   fi
-  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -x "${_app_ctx}" >/dev/null; then
     _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
     return 1
   fi
@@ -1288,7 +1292,7 @@ function _vault_probe_hub_endpoint() {
     _err "[vault] _vault_probe_hub_endpoint: hostinger profile requires an app kube-context"
     return 1
   fi
-  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_probe_ctx}"; then
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -x "${_probe_ctx}" >/dev/null; then
     return 1
   fi
   local _port=18260 _pid="" _code
@@ -1319,7 +1323,7 @@ function vault_failover_hub_into_context() {
     _err "[vault] vault_failover_hub_into_context requires an app cluster kube-context"
     return 1
   fi
-  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -x "${_app_ctx}" >/dev/null; then
     _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
     return 1
   fi
@@ -1859,7 +1863,7 @@ function _vault_login() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" name="${3:-eso-reader}"
 
-  if _vault_exec --no-exit "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
+  if _vault_exec --no-exit "$ns" "vault policy list" "$release" | grep "^${name}\$" >/dev/null; then
      return 0
   fi
 

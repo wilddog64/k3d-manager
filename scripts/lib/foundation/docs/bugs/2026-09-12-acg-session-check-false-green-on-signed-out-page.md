@@ -1,7 +1,8 @@
 # ACG session check reports `ACG_SESSION_OK` on a signed-out page
 
 **Date:** 2026-09-12
-**Status:** OPEN — assigned to Codex.
+**Status:** FIXED — v0.4.17 (#50 `c87196d`). Was: OPEN — assigned to Codex.
+**Priority:** P2 — the live gate reported success on a signed-out page; workaround: check the page by hand
 **Branch (all work):** `fix/acg-prism-monogram-selector`
 **Severity:** high — makes the `make credential-test` live gate untrustworthy and burns
 ~10 minutes of Playwright timeouts per run before failing.

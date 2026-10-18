@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-10
 **Branch:** k3d-manager `k3d-manager-v1.43.3` (this spec; moved from v1.43.2 2026-10-12); work repo `shopping-cart-frontend`, branch `fix/index-html-no-cache`, cut from `origin/main`
-**Status:** IMPLEMENTED — shopping-cart-frontend PR #121 (`636514d2`), awaiting CI/Copilot and merge; live check after the image deploys
+**Status:** LIVE-VERIFIED — 2026-10-17: Hostinger `frontend` on `sha-b874b3d8` (`sha256:1c589d0d…`, k3d-manager `ae5fc114`); `/` and `/cart` return `Cache-Control: no-cache`, hashed assets keep `max-age=31536000` + `public, immutable` (shopping-cart-frontend PR #121 `636514d2`)
 **Priority:** P2 — after a deploy, a returning browser can keep running the previous build; the workaround is a hard refresh
 **Severity:** medium
 
@@ -72,7 +72,18 @@ Mutation checks:
 ## Live check (operator, after the image deploys)
 
 `curl -sI https://<frontend host>/ | grep -i -e cache-control -e content-security-policy` shows both
-headers.
+headers. Without a public host, port-forward the Hostinger Deployment and check `/` and an SPA route:
+
+```bash
+kubectl --context ubuntu-hostinger -n shopping-cart-apps port-forward deploy/frontend 18091:<containerPort> &
+curl -sI http://127.0.0.1:18091/ | grep -i -e cache-control -e content-security-policy
+curl -sI http://127.0.0.1:18091/some/spa/route | grep -i cache-control
+```
+
+State 2026-10-16 ~21:50Z: PR #121 merged (`b874b3d8`) but the image publish job "Build, Scan, Push &
+Deploy" hung for ~5h in its build-and-push step; the Hostinger pod still runs the 2026-10-09 image
+(CSP present, no Cache-Control). Next: operator cancels and re-runs the job, merges the manifest PR it
+opens, then the check above.
 
 ## Files (shopping-cart-frontend)
 

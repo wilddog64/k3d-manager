@@ -12,7 +12,9 @@ Install via `make <target>` or via the plugin function noted below.
 |-------|--------------|-----------|----------------|-----|
 | `com.k3d-manager.webhook` | HTTP server :9000 | ✅ | `make install-webhook` | `~/Library/Logs/k3dm-webhook.log` |
 | `com.k3d-manager.webhook-token-rotate` | Rotates Slack webhook token | ❌ (timer: 6h) | `make install-token-rotator` | `~/Library/Logs/k3dm-webhook-token-rotate.log` |
-| `com.k3d-manager.ssh-tunnel` | Reverse SSH tunnel → ACG EC2 `:6443` | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel.out` |
+| `com.k3d-manager.ssh-tunnel` | Hostinger SSH tunnel → `:6443` | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel.out` |
+| `com.k3d-manager.sandbox.ssh-tunnel` | Sandbox SSH forward → `:16443` | ✅ | `TUNNEL_SCOPE=sandbox tunnel_start` | `/tmp/k3d-manager-sandbox-tunnel.out` |
+| `com.k3d-manager.sandbox.ssh-tunnel-vault` | Sandbox Vault reverse tunnel | ✅ | `TUNNEL_SCOPE=sandbox tunnel_start` | `/tmp/k3d-manager-sandbox-tunnel-vault.out` |
 | `com.k3d-manager.cloudflare-tunnel` | Cloudflare tunnel → `3ai-talk.org` | ✅ | manual / homebrew | `~/.local/share/k3d-manager/logs/cloudflare-tunnel.log` |
 | `com.k3d-manager.argocd-port-forward` | ArgoCD UI → `localhost:18080` (ubuntu-k3s) | ✅ | `argocd_install` | `~/.local/share/k3d-manager/logs/argocd-pf.log` |
 | `com.k3d-manager.frontend-port-forward` | Frontend → `frontend.shopping-cart.local:80` (ubuntu-k3s) | ✅ | manual | `~/.local/share/k3d-manager/logs/frontend-pf.log` |
@@ -103,10 +105,16 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 ### `com.k3d-manager.ssh-tunnel`
 - **Tool:** `autossh` (auto-reconnecting SSH)
 - **Tunnels:**
-  - `-L 0.0.0.0:6443:localhost:6443` — forward local 6443 → k3s API on EC2
-  - `-R 8200:127.0.0.1:18200` — reverse-forward EC2:8200 → local Vault (for ESO)
+  - `-L 0.0.0.0:6443:localhost:6443` — forward local 6443 → Hostinger k3s API
+  - `-R 8200:127.0.0.1:18200` — reverse-forward Hostinger:8200 → local Vault (for ESO)
 - **Install:** `tunnel_start` (writes and bootstraps the plist dynamically with current EC2 IP)
-- **Target host:** `ubuntu` user on ACG EC2 IP (updated on each `cluster-up`)
+- **Target host:** `ubuntu` user on the Hostinger server
+
+### `com.k3d-manager.sandbox.ssh-tunnel` and `com.k3d-manager.sandbox.ssh-tunnel-vault`
+- **Tool:** `autossh` and `ssh` (auto-reconnecting SSH)
+- **Tunnels:** local `0.0.0.0:16443 → ubuntu:6443` and reverse `ubuntu:8200 → 127.0.0.1:18200`
+- **Install:** `TUNNEL_SCOPE=sandbox tunnel_start`
+- **Logs:** `/tmp/k3d-manager-sandbox-tunnel.out`, `.err`, `-vault.out`, and `-vault.err`
 
 ### `com.k3d-manager.cloudflare-tunnel`
 - **Tool:** `cloudflared`

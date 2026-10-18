@@ -842,6 +842,12 @@ remove the ubuntu-k3s context from ~/.kube/config. The imported key pair
 persists and is reused by subsequent acg_provision calls.
 
 Requires --confirm to prevent accidental teardown.
+
+Return codes:
+  0  Stack deleted, or no stack found (including a missing stack).
+  1  Confirmation or AWS credential check failed.
+  2  CloudFormation stack lookup failed or was unverified.
+  3  Stack deletion request or delete wait failed.
 HELP
     return 0
   fi
@@ -853,19 +859,34 @@ HELP
 
   _acg_check_credentials || return 1
 
-  local stack_status
-  stack_status=$(_run_command --soft -- aws cloudformation describe-stacks \
+  local stack_status lookup_rc=0
+  stack_status=$(_run_command --soft --quiet -- aws cloudformation describe-stacks \
     --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" \
-    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)
+    --query 'Stacks[0].StackStatus' --output text 2>&1) || lookup_rc=$?
+
+  if (( lookup_rc != 0 )); then
+    if [[ "$stack_status" == *"does not exist"* ]]; then
+      stack_status=""
+    else
+      _warn "[acg] Could not read CloudFormation stack ${_ACG_CF_STACK_NAME} in ${ACG_REGION} (rc=${lookup_rc}) — teardown UNVERIFIED"
+      return 2
+    fi
+  fi
 
   if [[ -z "$stack_status" || "$stack_status" == "None" ]]; then
     _info "[acg] No CloudFormation stack found — nothing to tear down"
   else
     _info "[acg] Deleting CloudFormation stack ${_ACG_CF_STACK_NAME}..."
-    _run_command -- aws cloudformation delete-stack \
-      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"
-    _run_command -- aws cloudformation wait stack-delete-complete \
-      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"
+    if ! _run_command --soft -- aws cloudformation delete-stack \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"; then
+      _warn "[acg] delete-stack request failed for ${_ACG_CF_STACK_NAME} — teardown UNVERIFIED"
+      return 3
+    fi
+    if ! _run_command --soft -- aws cloudformation wait stack-delete-complete \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"; then
+      _warn "[acg] ${_ACG_CF_STACK_NAME} did not reach DELETE_COMPLETE — teardown UNVERIFIED"
+      return 3
+    fi
     _info "[acg] Stack deleted"
   fi
 

@@ -1,3 +1,4 @@
+import os
 import runpy
 import subprocess
 import sys
@@ -14,7 +15,8 @@ sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 @pytest.fixture
 def metrics(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(tmp_path / "missing-lib-foundation"))
-    return SimpleNamespace(**runpy.run_path(ROOT / "bin/k3dm-vectordb-metrics"))
+    module = Path(os.environ.get("METRICS_MODULE", ROOT / "bin/k3dm-vectordb-metrics"))
+    return SimpleNamespace(**runpy.run_path(module))
 
 
 def _repo(tmp_path):
@@ -40,6 +42,129 @@ def _git_repo(root, docs):
     subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
     subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
     subprocess.run(["git", "commit", "-qm", "seed"], cwd=root, check=True)
+
+
+def _commit(root, message, date):
+    subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
+    env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
+    subprocess.run(["git", "commit", "-qm", message], cwd=root, env=env, check=True)
+
+
+def test_status_date_formats_status_dates(metrics):
+    assert metrics._status_date("LIVE-VERIFIED — 2026-10-16T21:35:33Z: x") == "2026-10-16 21:35Z"
+    assert metrics._status_date("LIVE-VERIFIED 2026-10-15 — x") == "2026-10-15"
+    assert metrics._status_date("LIVE-VERIFIED — not reproduced, test 2026-10-15: x") is None
+    assert metrics._status_date("VERIFIED — offline. Drill 2026-10-29. Was: IMPLEMENTED 14:41Z") is None
+    assert metrics._status_date("VERIFIED — tests green") is None
+
+
+def test_M1_doc_live_evidence_accepts_both_separators_and_skips_malformed(metrics):
+    text = "\n".join([
+        "**Live evidence:** 2026-10-17 · run 123 · env sandbox/local-m4 · scenario stripe/product-catalog · commit abcdef1 · proves E1,E3",
+        "**Live evidence:** 2026-10-18 | run logs/proof.log | env hostinger | scenario make-down | commit 0123456789abcdef | proves E4",
+        "**Live evidence:** 2026-10-19 · run 123 · env missing-commit · scenario bad · commit nope · proves E1",
+    ])
+    assert metrics.doc_live_evidence(text) == [
+        {"date": "2026-10-17", "run": "123", "env": "sandbox/local-m4",
+         "scenario": "stripe/product-catalog", "commit": "abcdef1", "proves": "E1,E3"},
+        {"date": "2026-10-18", "run": "logs/proof.log", "env": "hostinger",
+         "scenario": "make-down", "commit": "0123456789abcdef", "proves": "E4"},
+    ]
+
+
+def test_M2_M3_M4_live_evidence_states_and_open_for(metrics, tmp_path):
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    texts = {
+        "docs/bugs/current.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit abcdef1 · proves E3\n",
+        "docs/bugs/missing.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n",
+        "docs/bugs/stale.md": "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit deadbee · proves E3\n",
+    }
+    tally = {"v1.43.4": {"closed_paths": [{"path": path} for path in texts]}}
+    fixed = {path: {"release": "v1.43.4", "commit": "abc1234"} for path in texts}
+    output = metrics._bug_status_metrics(
+        tmp_path, now=now, tally=tally, texts=texts, fixed_in=fixed,
+        evidence_check=lambda fix, evidence: fix == "abc1234" and evidence == "abcdef1",
+    )
+    rows = {line.split('bug="', 1)[1].split('"', 1)[0]: line
+            for line in output.splitlines() if line.startswith("k3dm_bug_info{")}
+    assert 'live_evidence="ok"' in rows["current"] and rows["current"].endswith(" -2")
+    assert 'live_evidence="missing"' in rows["missing"] and rows["missing"].endswith(" 7")
+    assert 'live_evidence="stale"' in rows["stale"] and rows["stale"].endswith(" 7")
+
+
+def test_N1_stale_evidence_never_counts_as_current(metrics, tmp_path):
+    path = "docs/bugs/stale.md"
+    text = "**Filed:** 2026-10-10\n**Status:** LIVE-VERIFIED\n**Live evidence:** 2026-10-17 · run 1 · env hub/k3d · scenario test · commit deadbee · proves E3\n"
+    output = metrics._bug_status_metrics(
+        tmp_path, now=datetime(2026, 10, 17, tzinfo=timezone.utc),
+        tally={"v1.43.4": {"closed_paths": [{"path": path}]}}, texts={path: text},
+        fixed_in={path: {"release": "v1.43.4", "commit": "abc1234"}},
+        evidence_check=lambda *_args: False,
+    )
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_bug_info{"))
+    assert 'live_evidence="stale"' in line and not line.endswith(" -2")
+
+
+def test_verification_times_use_earliest_git_state_commits_and_utc(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** VERIFIED — tests green\n")
+    _commit(tmp_path, "verified", "2026-10-16T21:35:33-07:00")
+    verified_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — hub proof\n")
+    _commit(tmp_path, "live", "2026-10-16T22:35:33+02:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    # agent-audit: allow assert-removed verification tuples gained the verified commit SHA as a third element
+    assert times == {"docs/bugs/bug.md": ("2026-10-17 04:35Z", "2026-10-16 20:35Z", verified_sha)}
+
+
+def test_verification_times_copy_status_date_for_direct_live_verification(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-15: not reproduced\n")
+    _commit(tmp_path, "live", "2026-10-16T22:35:33+02:00")
+    verified_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True).stdout.strip()
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times == {"docs/bugs/bug.md": ("2026-10-15", "2026-10-15", verified_sha)}
+
+
+def test_verification_times_add_commit_time_to_same_day_status_date(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** VERIFIED — 2026-10-17: tests green\n")
+    _commit(tmp_path, "verified", "2026-10-17T19:41:10+00:00")
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-17: live proof\n")
+    _commit(tmp_path, "live", "2026-10-17T21:05:00+00:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times["docs/bugs/bug.md"][:2] == ("2026-10-17 19:41Z", "2026-10-17 21:05Z")
+
+
+def test_verification_times_add_commit_time_when_status_date_is_commit_local_date(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-17: live proof\n")
+    _commit(tmp_path, "live", "2026-10-17T17:09:09-07:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times["docs/bugs/bug.md"][:2] == ("2026-10-18 00:09Z", "2026-10-18 00:09Z")
+
+
+def test_verification_times_keep_bare_date_when_neither_commit_date_matches(metrics, tmp_path):
+    _git_repo(tmp_path, {"bug.md": "**Priority:** P1\n**Status:** IMPLEMENTED\n"})
+    bug = tmp_path / "docs/bugs/bug.md"
+    bug.write_text("**Priority:** P1\n**Status:** LIVE-VERIFIED — 2026-10-16: live proof\n")
+    _commit(tmp_path, "live", "2026-10-17T17:09:09-07:00")
+    times = metrics._verification_times(tmp_path, "HEAD", {"docs/bugs/bug.md": bug.read_text()})
+    assert times["docs/bugs/bug.md"][:2] == ("2026-10-16", "2026-10-16")
+
+
+def test_verification_times_git_failure_is_non_fatal_and_metrics_fall_back(metrics, tmp_path):
+    texts = {"docs/bugs/verified.md": "**Priority:** P1\n**Status:** VERIFIED\n"}
+    times = metrics._verification_times(tmp_path / "not-a-repo", "HEAD", texts)
+    assert times == {"docs/bugs/verified.md": ("true", None, None)}
+    output = metrics._bug_status_metrics(tmp_path, tally={
+        "v1.43.2": {"closed_paths": [{"path": "docs/bugs/verified.md"}]},
+    }, texts=texts, verification_times=times)
+    assert 'verified_at="true"' in output
 
 
 def test_bug_metrics_has_exact_counts_all_15_series_and_scan_timestamp(metrics, tmp_path):
@@ -193,19 +318,68 @@ def test_bug_status_metrics_verified_values_and_status_order(metrics, tmp_path):
     }
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
-    assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -2") for line in info)
+    # agent-audit: allow assert-removed because fixed-not-live rows now count from filed date
+    assert any('bug="implemented"' in line and 'status="fixed"' in line and 'verified="false"' in line and line.endswith(" -1") for line in info)
     assert any('bug="implemented"' in line and 'live_verified="false"' in line for line in info)
-    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and 'live_verified="false"' in line and line.endswith(" -2") for line in info)
+    # agent-audit: allow assert-removed because offline VERIFIED rows now count from filed date
+    assert any('bug="verified"' in line and 'status="fixed"' in line and 'verified="true"' in line and 'live_verified="false"' in line and line.endswith(" -1") for line in info)
     assert any('bug="live-verified"' in line and 'verified="true"' in line and 'live_verified="true"' in line for line in info)
     assert any('bug="old-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line and line.endswith(" -2") for line in info)
     # agent-audit: allow assert-removed verified assertions rewritten to also check live_verified
     assert any('bug="unassigned-fixed"' in line and 'status="fixed"' in line and 'verified="n/a"' in line and 'live_verified="n/a"' in line for line in info)
     assert any('bug="open"' in line and 'status="open"' in line and ',verified="-"' in line for line in info)
     assert any('bug="open"' in line and 'live_verified="-"' in line and 'fixed_in="-"' in line for line in info)
+    assert any('bug="implemented"' in line and 'verified_at="false"' in line and 'live_verified_at="false"' in line for line in info)
+    assert any('bug="old-fixed"' in line and 'verified_at="n/a"' in line and 'live_verified_at="n/a"' in line for line in info)
     assert any('bug="deferred"' in line and 'status="deferred"' in line and ',verified="-"' in line for line in info)
     statuses = [line.split('status="', 1)[1].split('"', 1)[0]
                 for line in info if 'release="v1.43.2"' in line]
     assert statuses == sorted(statuses, key={"open": 0, "unknown": 1, "deferred": 2, "fixed": 3}.get)
+
+
+def test_acceptance_M1_M2_M3_M4_N1_N2_N3_open_for_until_live_verified(metrics, tmp_path):
+    now = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    docs = {
+        "m1-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-10\n**Status:** FIXED\n",
+        "m2-verified.md": "**Priority:** P1\n**Filed:** 2026-10-09\n**Status:** VERIFIED — offline\n",
+        "m3-live.md": "**Priority:** P1\n**Filed:** 2026-10-08\n**Status:** LIVE-VERIFIED — live\n**Live evidence:** 2026-10-15 · run r1 · env sandbox/m4 · scenario s/x · commit abcdef12 · proves E3\n",
+        "m4-open.md": "**Priority:** P1\n**Filed:** 2026-10-11\n**Status:** OPEN\n",
+        "m4-unknown.md": "**Priority:** P1\n**Status:** OPEN\n",
+        "n2-old-fixed.md": "**Priority:** P1\n**Filed:** 2026-10-01\n**Status:** FIXED\n",
+    }
+    for name, text in docs.items():
+        (bugs / name).write_text(text)
+    tally = {
+        "v1.43.4": {"open_paths": [
+            {"path": f"docs/bugs/{name}"}
+            for name in ("m1-fixed.md", "m2-verified.md", "m3-live.md", "m4-open.md", "m4-unknown.md")
+        ]},
+        "v1.43.1": {"closed_paths": [{"path": "docs/bugs/n2-old-fixed.md"}]},
+    }
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("metric publishing is outside this acceptance test")
+
+    metrics.publish_bug_metrics = fail_if_called
+    metrics._push_bug_group = fail_if_called
+    output = metrics._bug_status_metrics(tmp_path, now=now, tally=tally)
+    values = {
+        line.split('bug="', 1)[1].split('"', 1)[0]: int(line.rsplit(" ", 1)[1])
+        for line in output.splitlines() if line.startswith("k3dm_bug_info{")
+    }
+    assert values["m1-fixed"] == 7
+    assert values["m2-verified"] == 8
+    assert values["m3-live"] == -2
+    assert values["m4-open"] == 6
+    assert values["m4-unknown"] == -1
+    assert values["n2-old-fixed"] == -2
+
+
+def test_acceptance_M5_grafana_guide_defines_open_for_until_live_verified():
+    guide = (ROOT / "docs/guides/grafana-dashboards.md").read_text(encoding="utf-8")
+    assert "Open for counts from filed until the bug is LIVE-VERIFIED." in guide
 
 
 def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
@@ -223,6 +397,29 @@ def test_bug_status_metrics_sort_by_release_then_priority(metrics, tmp_path):
     lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert [line.split('bug="', 1)[1].split('"', 1)[0] for line in lines] == [
         "new-p0", "new-p2", "old-p0", "unassigned"]
+
+
+def test_bug_status_metrics_sort_priority_before_status(metrics, tmp_path):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    docs = {
+        "p3-open.md": "**Priority:** P3\n**Status:** Open\n",
+        "p1-fixed.md": "**Priority:** P1\n**Status:** FIXED\n",
+        "p2-open.md": "**Priority:** P2\n**Status:** Open\n",
+        "unset-open.md": "**Status:** Open\n",
+    }
+    for name, text in docs.items():
+        (bugs / name).write_text(text)
+    tally = {"v1.43.4": {
+        "open_paths": [{"path": f"docs/bugs/{name}"} for name in ("p3-open.md", "p2-open.md", "unset-open.md")],
+        "closed_paths": [{"path": "docs/bugs/p1-fixed.md"}],
+    }}
+    output = metrics._bug_status_metrics(tmp_path, tally=tally)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
+    sort_keys = [line.split('sort_key="', 1)[1].split('"', 1)[0] for line in lines]
+    assert [line.split('priority="', 1)[1].split('"', 1)[0] for line in lines] == [
+        "P1", "P2", "P3", "unset"]
+    assert sort_keys == sorted(sort_keys)
 
 
 def test_bug_status_metrics_puts_live_verified_last_on_fixed_metrics(metrics, tmp_path):
@@ -252,8 +449,10 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     assert len(info) == 201
     # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-"')
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-"')
         for line in info)
+    assert all("_at=" not in line for line in output.splitlines()
+               if line.startswith("k3dm_bug_status_docs{"))
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P1",status="open"} 2' in output
     assert 'k3dm_bug_status_docs{repo="k3d-manager",release="v1.43.1",priority="P2",status="open"} 199' in output
     assert sum(int(line.rsplit(" ", 1)[1]) for line in output.splitlines()
@@ -457,6 +656,22 @@ def test_bug_status_metrics_adds_fixed_in_only_to_fixed_info(metrics, tmp_path):
     assert any('bug="fixed"' in line and 'fixed_in="v1.43.0"' in line for line in fixed_lines)
     assert any('bug="unknown-fixed"' in line and 'fixed_in="unknown"' in line for line in fixed_lines)
     assert all('fixed_in="-"' in line for line in fixed_lines if 'bug="open"' in line)
+
+
+def test_bug_status_metrics_adds_commit_labels_with_guard(metrics, tmp_path):
+    texts = {"docs/bugs/fixed.md": "**Priority:** P1\n**Status:** VERIFIED\n"}
+    output = metrics._bug_status_metrics(tmp_path, tally={
+        "v1.43.3": {"closed_paths": [{"path": "docs/bugs/fixed.md"}]},
+    }, texts=texts, fixed_in={"docs/bugs/fixed.md": {
+        "release": "v1.43.3", "source": "status_change", "commit": "0123456789abcdef0123456789abcdef01234567"}},
+        verification_times={"docs/bugs/fixed.md": ("true", None, "abcdef0123456789")})
+    assert 'fix_sha="01234567",verified_sha="abcdef01"' in output
+    bad = metrics._bug_status_metrics(tmp_path, tally={
+        "v1.43.3": {"closed_paths": [{"path": "docs/bugs/fixed.md"}]},
+    }, texts=texts, fixed_in={"docs/bugs/fixed.md": {"release": "v1.43.3", "commit": "zz"}},
+        verification_times={"docs/bugs/fixed.md": ("true", None, "zz")})
+    assert 'fix_sha="-",verified_sha="-"' in bad
+    assert all("_sha=" not in line for line in output.splitlines() if line.startswith("k3dm_bug_status_docs{"))
 
 
 def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metrics, monkeypatch, tmp_path):

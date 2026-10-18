@@ -20,14 +20,14 @@ function _shopping_cart_prune_orphan_default_entries() {
   local _refs
   _refs=$(kubectl config view \
     -o jsonpath='{range .contexts[*]}{.context.cluster}{"\n"}{end}' 2>/dev/null || true)
-  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+  if printf '%s\n' "${_refs}" | grep -x "default" >/dev/null; then
     _info "[shopping_cart] Keeping kubeconfig cluster 'default' — still referenced by a context"
   else
     kubectl config delete-cluster default &>/dev/null || true
   fi
   _refs=$(kubectl config view \
     -o jsonpath='{range .contexts[*]}{.context.user}{"\n"}{end}' 2>/dev/null || true)
-  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+  if printf '%s\n' "${_refs}" | grep -x "default" >/dev/null; then
     _info "[shopping_cart] Keeping kubeconfig user 'default' — still referenced by a context"
   else
     kubectl config delete-user default &>/dev/null || true
@@ -40,6 +40,12 @@ function add_ubuntu_k3s_cluster() {
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local ssh_target="${ssh_user}@${ssh_host}"
+  local _tunnel_port="${TUNNEL_SANDBOX_LOCAL_PORT:-16443}"
+
+  if [[ ! "${_tunnel_port}" =~ ^[0-9]+$ ]]; then
+    _err "[shopping_cart] TUNNEL_SANDBOX_LOCAL_PORT must be numeric: ${_tunnel_port}"
+    return 1
+  fi
 
   case "${remote_kubeconfig}" in
     (*[!A-Za-z0-9_./-]*)
@@ -53,16 +59,16 @@ function add_ubuntu_k3s_cluster() {
 
 # shellcheck disable=SC2029
   if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
-      | sed -e 's|https://localhost:|https://127.0.0.1:|g' > "${local_kubeconfig}"; then
+      | sed -e 's|https://localhost:|https://127.0.0.1:|g' -e "s|https://127.0.0.1:6443|https://127.0.0.1:${_tunnel_port}|g" > "${local_kubeconfig}"; then
     _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
   fi
   chmod 600 "${local_kubeconfig}"
 
-  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s through local tunnel at 127.0.0.1:6443"
+  _info "[shopping_cart] Verifying connectivity to Ubuntu k3s through local tunnel at 127.0.0.1:${_tunnel_port}"
   if ! KUBECONFIG="${local_kubeconfig}" _run_command -- kubectl get nodes; then
-    _err "[shopping_cart] Cannot reach Ubuntu k3s API through local tunnel at 127.0.0.1:6443"
+    _err "[shopping_cart] Cannot reach Ubuntu k3s API through local tunnel at 127.0.0.1:${_tunnel_port}"
     return 1
   fi
 
@@ -941,6 +947,24 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
     fi
   fi
+
+  if _vault_kv_exists "keycloak/e2e"; then
+    _info "[acg-up] Reusing existing Vault secret keycloak/e2e"
+    _e2e_kc_client_secret=$(_vault_kv_get_field "keycloak/e2e" "client_secret")
+    _e2e_kc_user_password=$(_vault_kv_get_field "keycloak/e2e" "user_password")
+  else
+    _src_json=$(_seed_source_data "keycloak/e2e")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/e2e from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/e2e
+      _e2e_kc_client_secret=$(printf '%s' "${_src_json}" | jq -r '.client_secret // empty')
+      _e2e_kc_user_password=$(printf '%s' "${_src_json}" | jq -r '.user_password // empty')
+    else
+      _e2e_kc_client_secret=$(openssl rand -base64 36 | tr -d '=+/')
+      _e2e_kc_user_password=$(openssl rand -base64 36 | tr -d '=+/')
+      _vault_kv_put "{\"client_secret\":\"${_e2e_kc_client_secret}\",\"user_password\":\"${_e2e_kc_user_password}\"}" keycloak/e2e
+    fi
+  fi
   _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, minio, ldap, keycloak sandbox secrets)"
 }
 
@@ -1410,7 +1434,7 @@ HELP
   local kubeconfig_dir="${local_kubeconfig%/*}"
 
   local _server_ready=0
-  if KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
+  if KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep " Ready" >/dev/null; then
     _server_ready=1
     _info "[shopping_cart] k3s server already Ready — skipping server install"
   fi
@@ -1462,7 +1486,7 @@ REMOTE
 
   _info "[shopping_cart] Waiting for node to be Ready..."
   local attempts=0
-  until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+  until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep " Ready" >/dev/null; do
     (( attempts++ ))
     if (( attempts >= 30 )); then
       _err "[shopping_cart] Node did not become Ready after 150s"
@@ -1579,7 +1603,7 @@ function _ssm_bootstrap_k3s() {
   _info "[shopping_cart] Waiting for k3s node to be Ready..."
   local attempts=0
   until ssm_exec "${server_id}" \
-      "kubectl get nodes --no-headers 2>/dev/null | grep -q ' Ready'" 2>/dev/null; do
+      "kubectl get nodes --no-headers 2>/dev/null | grep ' Ready'" >/dev/null 2>/dev/null; do
     (( attempts++ ))
     if (( attempts >= 30 )); then
       _err "[shopping_cart] k3s node did not become Ready after 150s"
@@ -1667,7 +1691,7 @@ function _shopping_cart_cred_check() {
       # shellcheck disable=SC2016
       _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
         | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -- \
-            sh -c 'REDISCLI_AUTH="$(base64 -d)" redis-cli --no-auth-warning ping 2>/dev/null | grep -qx PONG'
+            sh -c 'REDISCLI_AUTH="$(base64 -d)" redis-cli --no-auth-warning ping 2>/dev/null | grep -x PONG >/dev/null'
       ;;
   esac
 }

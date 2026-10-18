@@ -345,6 +345,97 @@ function _keycloak_reconcile_realm_client() {
    _info "[keycloak] Reconciled client '$client_id' in realm '$realm_name'"
 }
 
+function _keycloak_ensure_e2e_client() {
+   local base_url="$1" admin_token="$2" realm_name="$3" client_secret="$4"
+   local client_payload client_uuid
+
+   client_payload=$(jq -cn --arg secret "$client_secret" \
+      '{clientId:"e2e-tests",name:"e2e-tests",enabled:true,protocol:"openid-connect",publicClient:false,clientAuthenticatorType:"client-secret",secret:$secret,directAccessGrantsEnabled:true,standardFlowEnabled:false,implicitFlowEnabled:false,serviceAccountsEnabled:false,redirectUris:[],webOrigins:[]}')
+   client_uuid=$(_curl -sf -H "Authorization: Bearer ${admin_token}" \
+      "${base_url}/admin/realms/${realm_name}/clients?clientId=e2e-tests" | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$client_uuid" ]]; then
+      if ! printf '%s' "$client_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
+         -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients" | grep -x '201' >/dev/null; then
+         _err "[keycloak] Failed to create e2e-tests client"
+         return 1
+      fi
+   else
+      client_payload=$(printf '%s' "$client_payload" | jq --arg id "$client_uuid" '.id = $id')
+      if ! printf '%s' "$client_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
+         -X PUT -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients/${client_uuid}" | grep -x '204' >/dev/null; then
+         _err "[keycloak] Failed to update e2e-tests client"
+         return 1
+      fi
+   fi
+}
+
+function _keycloak_ensure_e2e_identity() {
+   local base_url="${1:-}" admin_token="${2:-}" realm_name="${3:-}"
+   local client_secret="${E2E_KC_CLIENT_SECRET:-}" user_password="${E2E_KC_USER_PASSWORD:-}"
+   local role role_status user_payload user_id role_payload
+
+   if [[ -z "$base_url" || -z "$admin_token" || -z "$realm_name" || -z "$client_secret" || -z "$user_password" ]]; then
+      _err "[keycloak] e2e identity requires base URL, admin token, realm, client secret and user password"
+      return 1
+   fi
+
+   for role in PAYMENT_USER PAYMENT_WRITE; do
+      role_status=$(printf '{"name":"%s"}' "$role" | _curl -sS -o /dev/null -w '%{http_code}' \
+         -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/roles" || true)
+      if [[ "$role_status" != 201 && "$role_status" != 409 ]]; then
+         _err "[keycloak] Failed to ensure realm role '$role' (HTTP ${role_status:-000})"
+         return 1
+      fi
+   done
+
+   if ! _keycloak_ensure_e2e_client "$base_url" "$admin_token" "$realm_name" "$client_secret"; then
+      return 1
+   fi
+
+   user_id=$(_curl -sf -H "Authorization: Bearer ${admin_token}" \
+      "${base_url}/admin/realms/${realm_name}/users?username=e2e-user&exact=true" | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$user_id" ]]; then
+      user_payload='{"username":"e2e-user","enabled":true,"emailVerified":true,"email":"e2e-user@example.invalid","firstName":"E2E","lastName":"User","requiredActions":[]}'
+      if ! printf '%s' "$user_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
+         -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/users" | grep -x '201' >/dev/null; then
+         _err "[keycloak] Failed to create e2e-user"
+         return 1
+      fi
+      user_id=$(_curl -sf -H "Authorization: Bearer ${admin_token}" \
+         "${base_url}/admin/realms/${realm_name}/users?username=e2e-user&exact=true" | jq -r '.[0].id // empty' 2>/dev/null || true)
+   fi
+   if [[ -z "$user_id" ]]; then
+      _err "[keycloak] Could not resolve e2e-user id"
+      return 1
+   fi
+
+   user_payload=$(jq -cn --arg password "$user_password" \
+      '{type:"password",value:$password,temporary:false}')
+   if ! printf '%s' "$user_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
+      -X PUT -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/reset-password" | grep -x '204' >/dev/null; then
+      _err "[keycloak] Failed to reset e2e-user password"
+      return 1
+   fi
+
+   role_payload=$(for role in PAYMENT_USER PAYMENT_WRITE; do
+      _curl -sf -H "Authorization: Bearer ${admin_token}" \
+         "${base_url}/admin/realms/${realm_name}/roles/${role}" || exit 1
+   done | jq -s '.')
+   if [[ "$(printf '%s' "$role_payload" | jq -r 'length' 2>/dev/null)" != 2 ]] || ! printf '%s' "$role_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
+      -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
+      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/role-mappings/realm" | grep -x '204' >/dev/null; then
+      _err "[keycloak] Failed to map e2e-user payment roles"
+      return 1
+   fi
+
+   _info "[keycloak] e2e identity ensured in realm '${realm_name}' (client e2e-tests, user e2e-user)"
+}
+
 function _keycloak_remove_client_attribute() {
    local realm_name="${1:-}"
    local client_id="${2:-}"

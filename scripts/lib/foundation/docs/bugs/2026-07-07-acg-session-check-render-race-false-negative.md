@@ -1,5 +1,8 @@
 # Bugfix: v0.4.3 — ACG session check false-negatives on a slow-rendering sandbox page
 
+**Status:** FIXED — v0.4.3 (#35 `b7d08b3`)
+**Priority:** P2 — a slow page read as signed out; workaround: rerun
+
 **Branch:** `feat/v0.4.3`
 **Repo:** `lib-foundation` (standalone — NOT the k3d-manager subtree copy)
 **Files:**

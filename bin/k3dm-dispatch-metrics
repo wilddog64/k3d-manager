@@ -12,6 +12,7 @@ from pathlib import Path
 
 WINDOWS = {"1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
 RESULTS = ("landed", "tests", "scope", "rebase")
+REWORK_CAUSES = ("rerun", "tests", "claude_edit", "any")
 TASK_CAP = 50
 VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
@@ -111,9 +112,20 @@ def _window_metrics(events, now, seconds):
     wait_values = []
     elapsed_values = []
     codex_values = []
+    rework = {cause: 0 for cause in REWORK_CAUSES}
     tasks = []
     for key, event in landed.items():
         task = _task_metrics(states[key], event)
+        causes = {
+            "rerun": task["runs"] > 1,
+            "tests": any(item.get("event") == "land_refused" and item.get("reason") == "tests"
+                         and item["ts"] <= event["ts"] for item in states[key]),
+            "claude_edit": isinstance(event.get("verifier_lines"), (int, float))
+            and event["verifier_lines"] > 0,
+        }
+        causes["any"] = any(causes.values())
+        for cause, hit in causes.items():
+            rework[cause] += int(hit)
         if task["tokens"] is not None:
             token_values.append(task["tokens"])
         if isinstance(event.get("verifier_lines"), (int, float)):
@@ -135,6 +147,8 @@ def _window_metrics(events, now, seconds):
         "wait": sum(wait_values) / len(wait_values) if wait_values else None,
         "elapsed": sum(elapsed_values) / len(elapsed_values) if elapsed_values else None,
         "codex_minutes": sum(codex_values) / len(codex_values) if codex_values else None,
+        "rework": rework,
+        "rework_ratio": rework["any"] / len(landed) if landed else None,
         "tasks": tasks,
     }
 
@@ -161,6 +175,12 @@ def render(events, bad_lines, now=None):
         if metrics["codex_minutes"] is not None:
             lines.append(f'k3dm_dispatch_codex_minutes_per_landed{{window="{window}"}} '
                          f'{metrics["codex_minutes"]}')
+        for cause in REWORK_CAUSES:
+            lines.append(f'k3dm_dispatch_rework_landed{{window="{window}",cause="{cause}"}} '
+                         f'{metrics["rework"][cause]}')
+        if metrics["rework_ratio"] is not None:
+            lines.append(f'k3dm_dispatch_rework_ratio{{window="{window}"}} '
+                         f'{metrics["rework_ratio"]}')
         valid_tasks = []
         skipped = 0
         for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):

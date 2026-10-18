@@ -41,3 +41,18 @@ assert state["failure"]["color"] == "red" and state["in_progress"]["color"] == "
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "PR checks tables say No open PRs instead of No data when nothing is open" {
+  run python3 - "${PR_CHECKS_DASHBOARD:-${dashboard}}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+for panel_id in (5, 6):
+    assert panels[panel_id]["type"] == "table"
+    assert "No open PRs" in panels[panel_id]["fieldConfig"]["defaults"].get("noValue", ""), panel_id
+for panel_id in (1, 2, 3):
+    assert panels[panel_id]["targets"][0]["expr"].endswith("or vector(0)"), panel_id
+PY
+  [ "${status}" -eq 0 ]
+}

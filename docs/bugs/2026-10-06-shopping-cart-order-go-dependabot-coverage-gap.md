@@ -3,7 +3,9 @@
 **Filed:** 2026-10-06
 **Release:** v1.41.0
 **Branch:** `k3d-manager-v1.41.0`
-**Status:** Application coverage FIXED; live dependency/image remediation NOT VERIFIED
+**Status:** LIVE-VERIFIED — 2026-10-18: Hostinger runs the fixed digest (see Live evidence); reopened 2026-10-17, remediated by shopping-cart-order #99 (`d1238c5`) and pin `a443c4f1`
+**Live evidence:** 2026-10-18 · run hostinger-order-imageid-0600-pdt · env hostinger/shopping-cart-apps · scenario order-service/runs-fixed-digest · commit 8d7994ff · proves fix
+Pod order-service-7b9957854c-wg4jl on ubuntu-hostinger runs ghcr.io/wilddog64/shopping-cart-order@sha256:c6e96845647c…, the d1238c5a image that `trivy image --severity HIGH,CRITICAL` scanned on 2026-10-17 at 0 app findings (was 7 Go). Claude's fresh rescan on 2026-10-18 could not pull (locked keychain in a non-GUI session); trivy-operator writes no report for this private image on Hostinger.
 **Priority:** P2 — coverage is fixed, but no one has verified the vulnerable dependency is gone from the deployed image
 **Component:** shopping-cart-order dependency updates / application CVE remediation chain
 **Severity:** high — vulnerable application dependency remains pinned despite image rebuilds
@@ -62,13 +64,14 @@ Changed YAML parses successfully.
 
 - [x] Restore Go and Go-container Dependabot coverage in shopping-cart-order.
 - [x] Add a regression guard against future ecosystem/directory coverage gaps.
-- [ ] Confirm dependency graph, Dependabot alerts, and security updates are enabled and produce
-  a compatible fixed dependency PR; inspect indirect-module updates as well.
-- [ ] Confirm Go CI passes for the actual dependency update and the merge publishes a new image.
-- [ ] Confirm candidate scan and promotion select the fixed immutable digest.
-- [ ] Confirm the running pod image ID and fresh Trivy report no longer show the finding.
-- [ ] Consider applying the coverage guard to other shopping-cart repositories after auditing
-  their actual manifests. No other application repos were changed in this task.
+- [x] Confirm dependency graph, Dependabot alerts, and security updates are enabled and produce
+  a compatible fixed dependency PR; inspect indirect-module updates as well. (2026-10-18: alerts on,
+  security fixes on, 0 open alerts; Go-module Dependabot PRs #94, #97, #101 merged.)
+- [x] Confirm Go CI passes for the actual dependency update and the merge publishes a new image. (#99 → `sha-d1238c5a`.)
+- [x] Confirm candidate scan and promotion select the fixed immutable digest. (Pinned by hand in `a443c4f1`; pins stay manual, see `docs/bugs/2026-10-17-services-digest-pin-not-bumped-by-app-ci.md`.)
+- [x] Confirm the running pod image ID and fresh Trivy report no longer show the finding. (Pod image ID = scanned digest; fresh rescan not possible from Claude's session — see Live evidence.)
+- [x] Consider applying the coverage guard to other shopping-cart repositories after auditing
+  their actual manifests. (Tracked by `docs/bugs/2026-10-17-dependabot-automerge-github-token-skips-main-ci.md`.) No other application repos were changed in this task.
 
 ## Prior-art check and vector indexing
 
@@ -87,3 +90,143 @@ not attempted or verified here.
 
 **Operational lesson:** language migrations must update dependency ecosystem and directory
 coverage. A successful rebuild alone is not evidence that a source dependency CVE is fixed.
+
+## Recurrence — 2026-10-17: the deployed order image still carries 7 Go HIGH CVEs
+
+**Approval:** explicit 2026-10-17 "go ahead" (operator), on Claude's proposed `go get` PR.
+
+Found while checking `make image-pin-drift`'s order `DRIFT` (see
+`docs/bugs/2026-10-17-services-digest-pin-not-bumped-by-app-ci.md`). `trivy image --severity HIGH,CRITICAL`
+on both the pinned order image (`sha-61568ccc`) and `:latest` (`sha-fc3fae5a`): 0 CRITICAL, the same 9 HIGH.
+7 are in `/app/order-service`:
+
+| Module | Installed | Fixed | CVE |
+|---|---|---|---|
+| `stdlib` | 1.25.14 | 1.26.9 / 1.27.2 | CVE-2026-78667, -78669, -97031 |
+| `golang.org/x/crypto` | v0.52.0 | v0.55.0 | CVE-2026-56854 |
+| `golang.org/x/net` | v0.55.0 | v0.60.0 | CVE-2026-46600, -78669 |
+| `golang.org/x/text` | v0.37.0 | v0.39.0 | CVE-2026-56852 |
+
+The other 2 are `musl` CVE-2026-40200 in `alpine:3.19`, covered by Dependabot PRs #90/#89 (`alpine:3.24`).
+
+**Why the coverage fix did not close it.** `x/crypto`, `x/net` and `x/text` are `// indirect` in
+`go/go.mod`, and Dependabot's `gomod` ecosystem opened no PR for them, so the second acceptance box above
+never ticked. `stdlib` has Dependabot PR #92 (`golang:1.27-alpine`), unmerged.
+
+**Ordering trap (same as `docs/plans/shopping-cart-go-builder-image-adoption.md`).** `x/net` v0.60.0
+declares `go 1.26.0`. `go get` raises `go/go.mod` to `go 1.26.0`, and the builder `golang:1.25-alpine` runs
+with `GOTOOLCHAIN=local`, so `docker build` would fail. The builder bump therefore lands in the **same** PR.
+CI's `setup-go` reads `go-version-file: go/go.mod`, so it follows automatically. Dependabot then closes #92
+as superseded.
+
+## Fix — shopping-cart-order (separate repo; spec for Codex)
+
+**Branch:** `fix/go-x-deps-cves`, from `origin/main` (`385c60b8`).
+
+**F1.** In `go/`, run exactly:
+
+```bash
+go get golang.org/x/crypto@v0.55.0 golang.org/x/net@v0.60.0 golang.org/x/text@v0.39.0
+go mod tidy
+```
+
+Expect `go.mod` to show those three versions and `go 1.26.0`, plus whatever transitive bumps `go get`
+requires (e.g. `x/sys`). Do not hand-edit `go.mod` or `go.sum`, and do not bump any other module.
+
+**F2.** In `go/Dockerfile`, line 2:
+
+Old:
+```dockerfile
+FROM docker.io/library/golang:1.25-alpine AS builder
+```
+New:
+```dockerfile
+FROM docker.io/library/golang:1.27-alpine AS builder
+```
+
+Leave the runtime `alpine:3.19` line alone (that is PR #90's).
+
+**F3.** In `CHANGELOG.md`, under `## [Unreleased]`, add a `### Security` entry (append to the existing
+heading):
+
+```markdown
+- Bump the order service's indirect Go modules past their HIGH CVEs: `golang.org/x/crypto` v0.55.0
+  (CVE-2026-56854), `golang.org/x/net` v0.60.0 (CVE-2026-46600, CVE-2026-78669) and `golang.org/x/text`
+  v0.39.0 (CVE-2026-56852). They are `// indirect`, so Dependabot never proposed them. `x/net` v0.60.0
+  needs Go 1.26, so the builder image moves to `golang:1.27-alpine` in the same change, which also clears
+  three Go `stdlib` CVEs (CVE-2026-78667, -78669, -97031). Spec:
+  `docs/bugs/2026-10-06-shopping-cart-order-go-dependabot-coverage-gap.md` (k3d-manager).
+```
+
+## Files
+
+- `go/go.mod`, `go/go.sum`
+- `go/Dockerfile`
+- `CHANGELOG.md`
+
+## Rules
+
+Run from `go/` and paste the output of each:
+
+- `test -z "$(gofmt -l .)"`
+- `go vet ./...`
+- `go test ./... -race -cover`
+- From the repo root: `docker build -f go/Dockerfile go` (it must succeed; this is the check that catches
+  the ordering trap). If Docker is not reachable from the sandbox, say so; do not skip silently.
+
+## Definition of Done
+
+- [ ] F1–F3 applied; the gates above pass (paste the output).
+- [ ] `go list -m golang.org/x/crypto golang.org/x/net golang.org/x/text` shows v0.55.0, v0.60.0, v0.39.0.
+- [ ] Commit message: `fix(deps): bump indirect x/crypto, x/net, x/text past HIGH CVEs; Go 1.27 builder`.
+
+## What NOT to Do
+
+- Do NOT create a PR, push, or commit to `main`. Claude commits, pushes and opens the PR; the operator merges.
+- Do NOT skip hooks (`--no-verify`). Do NOT modify files outside `## Files`, including the Java tree
+  (`pom.xml`, root `Dockerfile`), `go/Dockerfile.local`, and the runtime base image.
+- Do NOT run the integration tests (`-tags integration`) or call any live service.
+
+## Live proof
+
+After the merge: CI publishes a new `sha-*` image; `make image-pin-drift` shows order `DRIFT` to it; a fresh
+`trivy image` on it shows none of the 7 Go findings. Bumping the order pin then needs the operator's go
+(it deploys to both clusters).
+
+## Landed (2026-10-17)
+
+shopping-cart-order PR #99 (`fix/go-x-deps-cves`, `e01ddc2`), from Codex, checked independently by Claude. The
+versions differ from F1's minimums: `x/net` v0.60.0's own `go.mod` requires `x/crypto` v0.57.0 and `x/text`
+v0.42.0, so `go get` resolved them higher (both are past their fixes). The CHANGELOG entry was corrected to
+match. Gates: gofmt clean, `go vet` clean, `go test -race` passes, `docker build -f go/Dockerfile go` succeeds.
+`trivy` on the locally built image: `app/order-service` 0 HIGH/CRITICAL (was 7). The only remaining findings are
+the 2 `musl` ones, which #90 fixes.
+
+### F4 — CI lint pin (found on PR #99's first CI run)
+
+`go-ci` failed at `golangci-lint`: `can't load config: the Go language version (go1.25) used to build
+golangci-lint is lower than the targeted Go version (1.26.0)`. The pinned v2.5.0 was built with Go 1.25 and
+refuses a module that declares `go 1.26.0`. v2.14.0 (2026-09-24) is built with go1.27.0. Claude ran it locally
+against the branch (checksum-verified binary): `0 issues`.
+
+On branch `fix/go-x-deps-cves`, in `.github/workflows/go-ci.yml`, in the `golangci-lint` step:
+
+Old:
+```yaml
+          version: v2.5.0
+```
+New:
+```yaml
+          version: v2.14.0
+```
+
+Add `.github/workflows/go-ci.yml` to `## Files` for this fix only. Commit message:
+`ci(go): golangci-lint v2.14.0 (built with Go 1.27) for the go 1.26 module`.
+
+## Merged and built (2026-10-17)
+
+PR #99 merged as `d1238c5` (operator; the ruleset admin bypass was added for the merge, then removed again and
+checked). The `main` push built `sha-d1238c5a…` = `sha256:c6e96845647c…` (`:latest`). `trivy image --severity
+HIGH,CRITICAL` on it: OS `alpine 3.24.2` **0**, `app/order-service` **0** (was 9 in total: 7 Go + 2 `musl`).
+Acceptance boxes 2 and 4 are met for the image. The pin bump (`services/shopping-cart-order`) is pending the
+operator's go, because it deploys to both clusters.
