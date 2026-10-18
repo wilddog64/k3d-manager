@@ -1,8 +1,9 @@
 # Bug: a keep-hub sandbox `make down` leaves the sandbox frontend port-forward crash-looping and its browser listener daemon running
 
 **Filed:** 2026-10-18 (Claude, while checking E3 of `docs/bugs/2026-10-17-make-down-keep-hub-leaves-sandbox-pushgateway-forward.md`)
-**Status:** FIXED — 2026-10-18: Part B of `17c7cda5` (cluster-down tests red on pre-fix). Independent verifier (Sonnet, Acceptance-only, offline evidence) PASSED: tunnel 16/16 + frontend 7/7 on 7791b17f; every red-on-pre-fix must_not red on ccf5dbfc (re-run by Claude). Awaiting live E2.
+**Status:** LIVE-VERIFIED — 2026-10-18: Part B of `17c7cda5`; independent verifier PASSED (frontend 7/7 post-fix, pre-fix must_not reds confirmed); E2 live after the operator's `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` at 19:32 PDT 2026-10-17: `Frontend port-forward LaunchAgent unloaded`, no `com.k3d-manager.frontend-port-forward` in `launchctl list`, `sandbox.frontend-browser-http` unloaded with its plist gone (no warning needed), and the hub and Hostinger agents still loaded
 **Fix commit:** 17c7cda5
+**Live evidence:** 2026-10-18 · run sandbox-down-keep-local-1932-pdt · env acg/ubuntu-k3s+hostinger · scenario cluster-down/keep-hub-frontend-agents · commit f35353cd · proves E2
 **Priority:** P3 — leftover laptop processes; the hub and Hostinger are not affected
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "1. go ahead 2. yes" (fixed in the same Codex run as Part B of `2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`, which holds the exact code)
