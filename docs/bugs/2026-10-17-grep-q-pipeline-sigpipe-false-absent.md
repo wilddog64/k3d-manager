@@ -1,6 +1,6 @@
 # Bug: `producer | grep -q` under pipefail reports a present match as absent
 
-**Status:** VERIFIED — no live surface (2026-10-18): a source sweep of `grep -q` sites with nothing deployed to observe, so offline proof is the whole proof; fixed `0fc16826` (Codex sweep, committed by Claude after the pre-commit if-count audit blocked Codex on the deprecated `_jenkins_run_smoke_test`, now allowlisted); 104/104 sites, per-line equivalence checked; guard BATS 2/2 and N1/M3 red on pre-fix; touched suites 420/420
+**Status:** VERIFIED — offline (2026-10-18); live pending: the sweep changed two lines of `scripts/etc/hostinger/k3dm-cni-ipam-sweep.sh`, which runs on Hostinger as `/usr/local/sbin/k3dm-cni-ipam-sweep`, so the 2026-10-18 "no live surface" call was wrong (see Live verification); fixed `0fc16826` (Codex sweep, committed by Claude after the pre-commit if-count audit blocked Codex on the deprecated `_jenkins_run_smoke_test`, now allowlisted); 104/104 sites, per-line equivalence checked; guard BATS 2/2 and N1/M3 red on pre-fix; touched suites 420/420
 **Priority:** P3
 **Approval:** approved — operator, 2026-10-18: "others please dispatch to codex" (v1.43.4 bug)
 **Found:** 2026-10-17, by the independent acceptance verifier for e2e-sandbox-provision
@@ -116,3 +116,18 @@ interface:
 - Do NOT create a PR, merge, or commit to `main`. Do NOT use `--no-verify`.
 - Do NOT change any other part of a line, refactor surrounding code, or "fix" unrelated issues found on the way.
 - Do NOT modify `scripts/lib/foundation/`. Do NOT run anything against a host or cluster.
+
+## Live verification
+
+Correction, 2026-10-18: this was first closed as having no live surface. Two converted sites are
+in `scripts/etc/hostinger/k3dm-cni-ipam-sweep.sh`, the CNI IP-reservation sweep that a systemd
+timer runs on the Hostinger node. That copy is installed by `make refresh
+CLUSTER_PROVIDER=k3s-hostinger` and is not touched by a merge, so the host still runs the
+pre-fix `grep -q` lines until the operator reinstalls it.
+
+1. Operator: `make refresh CLUSTER_PROVIDER=k3s-hostinger` from the v1.43.5 branch.
+2. Evidence: the installed `/usr/local/sbin/k3dm-cni-ipam-sweep` matches the repo file
+   (checksum), and the next timer run records a fresh `cni-ipam-sweep.state` with no release of
+   a reservation that belongs to a running pod. The Hermes CNI IPAM publisher already reads that
+   state file, so the CNI panels show the run.
+3. Then set Status to `LIVE-VERIFIED` with the date and the evidence.

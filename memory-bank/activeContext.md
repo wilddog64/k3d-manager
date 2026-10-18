@@ -2174,3 +2174,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: v1.43.4 tagged (annotated, `a8909477`, pushed) and GitHub release v1.43.4 published (notes from CHANGELOG).
 - 2026-10-18: branch k3d-manager-v1.43.5 cut from `a8909477` on origin; local tracking branch set. Retro: docs/retro/2026-10-18-v1.43.4-retrospective.md.
 - 2026-10-18: operator ran appsets-reapply (hub 5 then app-cluster 8, all Applications on values branch k3d-manager-v1.43.5 = v1.43.4 merge), appsets-check green, platform-ops deployed; exporter rollout confirmed by Claude (read-only).
+- 2026-10-18: corrected grep-q SIGPIPE bug (P3): not "no live surface" — fix changed the Hostinger CNI sweep script; live pending operator make refresh CLUSTER_PROVIDER=k3s-hostinger + checksum/state evidence.
