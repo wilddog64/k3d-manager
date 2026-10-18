@@ -2744,3 +2744,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: Filed + fixed P3 docs/bugs/2026-10-18-deployment-stat-tiles-cramped-and-show-stale-runs.md (stat tiles → instant queries, stacked rows, duration tiles drop status). E2 needs make platform-ops.
 - 2026-10-18: Fixed test leak to hub Pushgateway: BATS guard in scripts/lib/deployment_metrics.sh + N5 test (10 pushes pre-fix → 0). E3 up+down seen on graph; LIVE-VERIFIED waits make platform-ops.
 - 2026-10-18: LIVE-VERIFIED deployment-dashboard (47b4903a) + stat-tiles (36a00e12) bugs from operator screenshot after make platform-ops. down/somethingelse still on hub Pushgateway — operator DELETE needed.
+- 2026-10-18: Operator DELETEd down/somethingelse; deployment tiles now show only up/aws + down/aws (clean). Leak cleanup complete.
