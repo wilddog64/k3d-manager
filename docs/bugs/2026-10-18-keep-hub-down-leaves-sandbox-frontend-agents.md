@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P3 — leftover laptop processes; the hub and Hostinger are not affected
 **Severity:** low
-**Approval:** pending — filed by Claude; fix not yet approved or dispatched
+**Approval:** approved — operator, 2026-10-18: "1. go ahead 2. yes" (fixed in the same Codex run as Part B of `2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`, which holds the exact code)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
 **Component:** `bin/cluster-down` (frontend port-forward and frontend browser listener cleanup), `bin/cluster-up` Step 10g.10
 **Related:** `docs/bugs/2026-10-17-make-down-keep-hub-leaves-sandbox-pushgateway-forward.md`. Its Fix says that agents whose program targets `ubuntu-k3s` are cleaned up too, but its Acceptance only tested `sandbox.pushgateway-port-forward`.
@@ -48,14 +48,14 @@ must:
   - id: M1
     text: A k3s-aws cluster-down (keep-hub and delete-hub) boots out and removes com.k3d-manager.frontend-port-forward when its plist contains --context ubuntu-k3s.
   - id: M2
-    text: When launchctl bootout of com.k3d-manager.sandbox.frontend-browser-http fails, cluster-down prints a warning naming the label and the sudo command that removes it.
+    text: When com.k3d-manager.sandbox.frontend-browser-http's plist is still installed after cluster-down's bootout and removal (for example the bootout fails with Operation not permitted), cluster-down prints a warning naming the label and the sudo commands that remove it.
 must_not:
   - id: N1
     text: A keep-hub teardown must not leave com.k3d-manager.frontend-port-forward loaded when it targets ubuntu-k3s (red on pre-fix bin/cluster-down).
   - id: N2
     text: cluster-down must not boot out or remove com.k3d-manager.frontend-port-forward when its plist targets a context other than ubuntu-k3s.
   - id: N3
-    text: A failed daemon bootout must not be silent (red on pre-fix, which prints no warning).
+    text: A daemon left installed after a failed bootout must not be silent (red on pre-fix, which prints no warning).
 evidence:
   - id: E1
     proves: [M1, M2, N1, N2, N3]
