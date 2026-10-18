@@ -541,6 +541,16 @@ if _dry_run_active; then
   _info "[acg-up] DRY_RUN: no changes were made."
   exit 0
 fi
+function _acg_free_vault_local_port() {
+  local port="$1" listeners
+  listeners=$(lsof -ti:"${port}" -sTCP:LISTEN 2>/dev/null || true)
+  if [[ -n "${listeners}" ]]; then
+    _info "[acg-up] Port ${port} in use — killing stale vault port-forward listeners..."
+    echo "${listeners}" | xargs kill 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:${_vault_local_port})..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 mkdir -p "$(dirname "${_vault_pf_pid_file}")"
@@ -548,12 +558,7 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
 fi
-_stale_vault_pf=$(lsof -ti:"${_vault_local_port}" 2>/dev/null || true)
-if [[ -n "${_stale_vault_pf}" ]]; then
-  _info "[acg-up] Port ${_vault_local_port} in use — killing stale vault port-forward holders..."
-  echo "${_stale_vault_pf}" | xargs kill 2>/dev/null || true
-  sleep 1
-fi
+_acg_free_vault_local_port "${_vault_local_port}"
 kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${_ACG_STATE_DIR}/logs/vault-pf.log" 2>&1 &
 _vault_pf_pid=$!

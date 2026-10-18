@@ -949,3 +949,53 @@ STUB
   [[ "${output}" == *"root-owned state folders found"* ]]
   [[ "${output}" == *"sudo chown -R"* ]]
 }
+
+_start_vault_port_fixture() {
+  command -v lsof >/dev/null 2>&1 || skip "lsof not installed"
+  local dir="${BATS_TEST_TMPDIR}"
+  python3 -c 'import socket,time,sys
+s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("127.0.0.1",0)); s.listen(4)
+open(sys.argv[1],"w").write(str(s.getsockname()[1]))
+conns=[]
+while True:
+    c,_=s.accept(); conns.append(c)' "${dir}/port" &
+  LISTENER_PID=$!
+  local i
+  for i in $(seq 1 50); do [[ -s "${dir}/port" ]] && break; sleep 0.1; done
+  FIXTURE_PORT="$(cat "${dir}/port")"
+  python3 -c 'import socket,time,sys
+c=socket.create_connection(("127.0.0.1",int(sys.argv[1])))
+open(sys.argv[2],"w").write("up")
+time.sleep(120)' "${FIXTURE_PORT}" "${dir}/client" &
+  CLIENT_PID=$!
+  for i in $(seq 1 50); do [[ -s "${dir}/client" ]] && break; sleep 0.1; done
+  [[ -s "${dir}/client" ]]
+}
+
+_stop_vault_port_fixture() {
+  kill "${LISTENER_PID:-}" "${CLIENT_PID:-}" 2>/dev/null || true
+}
+
+@test "acg-up Vault port cleanup kills the listener but not a connected client such as an ssh -R tunnel" {
+  _start_vault_port_fixture
+  sed -n '/^function _acg_free_vault_local_port()/,/^}$/p' bin/cluster-up > "${BATS_TEST_TMPDIR}/free.sh"
+  [ -s "${BATS_TEST_TMPDIR}/free.sh" ]
+  run bash -c '_info() { printf "%s\n" "$*"; }; sleep() { :; }; source "$1"; _acg_free_vault_local_port "$2"' _ "${BATS_TEST_TMPDIR}/free.sh" "${FIXTURE_PORT}"
+  local i listener_alive=1
+  for i in $(seq 1 30); do kill -0 "${LISTENER_PID}" 2>/dev/null || { listener_alive=0; break; }; command sleep 0.1; done
+  local client_alive=0
+  kill -0 "${CLIENT_PID}" 2>/dev/null && client_alive=1
+  _stop_vault_port_fixture
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"in use"* ]]
+  [ "${listener_alive}" -eq 0 ]
+  [ "${client_alive}" -eq 1 ]
+}
+
+@test "acg-up Step 4 frees the Vault port through the listener-only cleanup" {
+  run grep -c '^_acg_free_vault_local_port "${_vault_local_port}"$' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+  run grep -cE 'lsof -ti:"\$\{_vault_local_port\}" 2>' bin/cluster-up
+  [ "$output" -eq 0 ]
+}
