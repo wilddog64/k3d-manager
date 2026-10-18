@@ -31,8 +31,10 @@ setup() { mkdir -p "$BATS_TEST_TMPDIR/results"; }
 }
 
 @test "freshness: chooses newest run timestamp instead of filename order" {
-  printf '%s\n' '{"run_timestamp":"20261008T120000Z","success":false}' > "$BATS_TEST_TMPDIR/results/a.json"
-  printf '%s\n' '{"run_timestamp":"20261009T120000Z","success":true}' > "$BATS_TEST_TMPDIR/results/z.json"
+  older="$(date -u -d '2 days ago' +%Y%m%dT%H%M%SZ 2>/dev/null || date -u -v-2d +%Y%m%dT%H%M%SZ)"
+  newer="$(date -u -d '1 day ago' +%Y%m%dT%H%M%SZ 2>/dev/null || date -u -v-1d +%Y%m%dT%H%M%SZ)"
+  printf '{"run_timestamp":"%s","success":false}\n' "$older" > "$BATS_TEST_TMPDIR/results/a.json"
+  printf '{"run_timestamp":"%s","success":true}\n' "$newer" > "$BATS_TEST_TMPDIR/results/z.json"
   run scripts/etc/dr/drill-freshness.sh "$BATS_TEST_TMPDIR/results"
   [ "$status" -eq 0 ]
 }

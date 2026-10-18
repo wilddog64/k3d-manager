@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 REPO="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
 
 setup() {
@@ -74,6 +76,7 @@ load_hostinger() {
   _hostinger_reconcile_vault_cluster_store() { :; }
   _hostinger_refresh_frontend_dns() { :; }
   _hostinger_refresh_access_layer() { :; }
+  _hostinger_ensure_cni_ipam_sweep() { :; }
   deploy_observability_acg() { :; }
   _acg_record_provider() { :; }
 }
@@ -142,7 +145,7 @@ load_hostinger() {
   load_vault
   run vault_install_unseal_watchdog secrets ubuntu-hostinger
   [ "$status" -eq 0 ]
-  ! grep -q "get secret" "$CALLS" || false
+  run ! grep -q "get secret" "$CALLS"
 }
 
 apps_json() {

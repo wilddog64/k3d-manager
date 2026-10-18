@@ -260,7 +260,7 @@ elif check == "columns":
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
     assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at"]
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
     assert organize["indexByName"]["fixed_in"] == 6
     assert organize["indexByName"]["fix_sha"] == 7
     assert organize["indexByName"]["verified_sha"] == 8
@@ -367,7 +367,7 @@ data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 order = sorted(organize["indexByName"], key=organize["indexByName"].get)
-assert order[-6:] == ["fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"], order
+assert order[-7:-1] == ["fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at"], order
 assert organize["renameByName"]["verified"] == "Verified"
 assert organize["renameByName"]["fix_sha"] == "Fix commit"
 assert organize["renameByName"]["verified_sha"] == "Verified commit"
