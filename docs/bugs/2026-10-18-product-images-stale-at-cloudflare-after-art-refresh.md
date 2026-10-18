@@ -1,14 +1,14 @@
 # Bug: refreshed product images stay stale at Cloudflare for up to 4 hours
 
 **Filed:** 2026-10-18 (Claude, found while verifying the slug-tag fix)
-**Status:** FIXED on branch — awaiting PR, merge and rollout
+**Status:** FIXED — merged, awaiting rollout + E2
 **Priority:** P3 — cosmetic; new art appears on its own once the cache expires, or after a manual purge
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to file a P3"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-frontend` on a feature branch
 **Release:** v1.43.5
 **Component:** `shopping-cart-frontend`: `nginx.conf` (`location ^~ /minio/product-images/`)
-**Fix commit:** shopping-cart-frontend `a6a951f5` (branch `fix/product-image-cache-ttl`, with Codex `8c934788`)
+**Fix commit:** shopping-cart-frontend `cad50792` (PR #127, squash of Codex `8c934788`, Claude `a6a951f5`, `866a225`)
 
 ## Symptom
 
@@ -102,3 +102,4 @@ interface:
   upstream. F1 is now `expires 5m;` (`a6a951f5`). The same container check shows `Cache-Control: max-age=300` plus all
   five headers. The test rejects `add_header` in the block and fails on both the pre-fix conf and
   Codex's conf; vitest 31/31 and lint pass.
+- 2026-10-18: PR #127 merged `cad50792` (23:22Z); `866a225` added a node types reference and Prettier formatting after CI lint/type-check reds. Copilot: no issues.
