@@ -1,7 +1,8 @@
 # Bug: sandbox `make up` provisions on a sandbox about to expire when the extend fails
 
 **Filed:** 2026-10-17 (Claude, during the operator's chained `make up` / `make down`, run started about 20:00 PDT)
-**Status:** OPEN
+**Status:** FIXED — 2026-10-17: `0ece6a8c` (Codex); Claude-verified (scope = spec, 3 files; `cluster_up.bats` 66/66; shellcheck 31 warnings before and after; all 6 new tests red against pre-fix 2c2dd4ba, including N1). Awaiting independent verifier and live E2
+**Fix commit:** 0ece6a8c
 **Priority:** P2 — the run can be cut off mid-provision when the sandbox expires; the workaround is to restart the sandbox by hand before `make up`
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-17: "if you found any issue during run, feel free to debug and file bugs dispatch to codex, and rerun make up/down"
