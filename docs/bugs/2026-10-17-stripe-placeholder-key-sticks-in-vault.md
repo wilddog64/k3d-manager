@@ -1,6 +1,8 @@
 # A placeholder Stripe key in Vault is reused forever, so Tier 2's success checkout gets 402
 
-**Status:** FIXED — live-proven 2026-10-17 by Tier 2 run `1792236389-10503`: checkout returns 200 `paymentStatus: PAID`, order PAID, cart cleared (was 402). Image `sha-19079d5f` (digest `b3fb4b07`) pinned in `services/shopping-cart-payment/kustomization.yaml` by `11a9c0c8`. Before that pin, the sandbox still ran the v1.42.0 digest, because payment CI bumps the tag only in shopping-cart-infra. The run is still 3/4, on a separate e2e-test defect: the payments-by-order lookup reads a single object as a list. Payment fix: wilddog64/shopping-cart-payment#89 (merge `b60c4bf7`).
+**Status:** LIVE-VERIFIED — live-proven 2026-10-17 by Tier 2 run `1792236389-10503`: checkout returns 200 `paymentStatus: PAID`, order PAID, cart cleared (was 402). Image `sha-19079d5f` (digest `b3fb4b07`) pinned in `services/shopping-cart-payment/kustomization.yaml` by `11a9c0c8`. Before that pin, the sandbox still ran the v1.42.0 digest, because payment CI bumps the tag only in shopping-cart-infra. The run is still 3/4, on a separate e2e-test defect: the payments-by-order lookup reads a single object as a list. Payment fix: wilddog64/shopping-cart-payment#89 (merge `b60c4bf7`).
+**Live evidence:** 2026-10-17 · run 1792236389-10503 · env acg/tier2-stripe · scenario e2e-sandbox/checkout-paid · commit 11a9c0c8 · proves fix
+Checkout returned 200 paymentStatus PAID, order PAID and cart cleared (was 402), on payment image sha-19079d5f.
 **Priority:** P3 (was P1; lowered because shopping-cart is being retired)
 **Severity:** High — Tier 2 `make e2e-sandbox` cannot pass; every real Stripe charge fails
 **Found by:** Claude, live runs `1792200904-21736` and the 01:44Z rerun (2026-10-17), branch `k3d-manager-v1.43.4`
