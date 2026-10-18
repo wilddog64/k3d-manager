@@ -1,11 +1,13 @@
 # Bug: Agent Dispatch dashboard shows landing success but not how often a landed spec needed rework
 
 **Filed:** 2026-10-18 (Claude, from an operator request)
-**Status:** VERIFIED — 2026-10-18: Claude fix; pytest 10/10 with all 3 new tests red on the pre-fix exporter (N1 included); BATS 7/7; make validate-manifests 81/81; dry-run on the real ledger differs from pre-fix only by added rework lines (30d: 14 of 22, 64%). E3 live pending (dashboard sync + next metrics push)
+**Status:** LIVE-VERIFIED — 2026-10-18: fix `97169650`; pytest 10/10 (3 new red on pre-fix), BATS 7/7; E3 after operator `make dispatch-metrics` (18:16 PDT): hub Prometheus (Explore) returns k3dm_dispatch_rework_ratio 1d 0.4286, 7d 0.7059, 30d 0.6364 — identical to the local dry-run on the same ledger; the panel reads the same expression for the selected window
 **Priority:** P3 — missing measurement; no workload is affected
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead" (rework rate as a P3 on v1.43.4, built by Claude; verified delivery cost goes to a v1.43.6 plan)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
+**Fix commit:** 97169650
+**Live evidence:** 2026-10-18 · run hub-prometheus-explore-rework-ratio · env hub/k3d-k3d-cluster · scenario agent-dispatch/rework-ratio · commit 97169650 · proves E3
 **Component:** `bin/k3dm-dispatch-metrics`, `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`, `docs/guides/grafana-dashboards.md`
 **Related:** `docs/plans/v1.43.6-dispatch-verified-delivery-cost.md` (the second metric the operator asked for)
 
