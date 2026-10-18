@@ -1,10 +1,11 @@
 # Bug: sandbox `make up` Step 4 kills Hostinger's Vault reverse tunnel while freeing port 18200
 
 **Filed:** 2026-10-18 (Claude, during live E2 of `2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`)
-**Status:** OPEN
+**Status:** FIXED — 2026-10-18: `3499d201` (Claude); cleanup moved to `_acg_free_vault_local_port` with `lsof -ti -sTCP:LISTEN`; `cluster_up.bats` 60/60; the new client-survives test is red against the pre-fix selection (`client_alive` assertion), 5/5 stable; shellcheck 18 warnings before and after. Awaiting the independent verifier and live E2
+**Fix commit:** 3499d201
 **Priority:** P3 — Hostinger's Vault path drops for under a second and launchd restarts it; no workaround needed
 **Severity:** low
-**Approval:** pending — not yet put to the operator
+**Approval:** approved — operator, 2026-10-18: "go ahead to fix it" (Claude fixes it directly, v1.43.4)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
 **Component:** `bin/cluster-up` Step 4 (stale Vault port-forward cleanup)
 **Related:** `docs/bugs/v1.6.5-bugfix-acg-up-vault-pf-stale-port.md` (introduced the `lsof -ti` kill to clear a stale kubectl; did not consider other sockets on the port)
@@ -36,7 +37,8 @@ depends on whether a channel is open at that moment.
 
 ## Fix (direction)
 
-Kill only processes listening on the port: `lsof -ti:"${_vault_local_port}" -sTCP:LISTEN`.
+Kill only processes listening on the port: `lsof -ti:"${_vault_local_port}" -sTCP:LISTEN`, in a new
+`_acg_free_vault_local_port PORT` function that Step 4 calls.
 
 ## Acceptance
 
