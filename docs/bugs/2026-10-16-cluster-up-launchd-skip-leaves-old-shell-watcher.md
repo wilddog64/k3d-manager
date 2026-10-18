@@ -1,6 +1,6 @@
 # Bug: cluster-up leaves an older in-shell ACG watcher running when launchd owns the watcher
 
-**Status:** OPEN — fix specified 2026-10-18, dispatched to Codex
+**Status:** FIXED — `98ee090a` (Codex), verified by Claude 2026-10-18: k3s_aws_provider.bats 0 failures, N1 red on pre-fix `85d2a6b3`, shellcheck clean; E2 live pending (next `make up` with a stale shell watcher)
 **Priority:** P3
 **Filed:** 2026-10-16
 **Detected by:** Claude, live check of `docs/bugs/2026-10-16-cluster-up-shell-acg-watcher-writes-to-terminal.md`

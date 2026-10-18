@@ -307,6 +307,15 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
 - The 2026-10-06 Slack bugs with no Priority line go to the v1.50.1 status cleanup unless one of these
   fixes covers them.
 
+### Candidate milestone — v1.43.6 (patch)
+
+**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.6`, cut from
+`main` after v1.43.5 merges. Opened because v1.43.4 is bug-fix-only and v1.43.5 is at its five-plan
+cap. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.6-cni-ipam-reclaim-visibility.md).
+It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod
+sandbox. It adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live
+needs `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
