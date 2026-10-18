@@ -2730,3 +2730,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: enforce_admins DISABLED at operator request for the PR #145 merge — /post-merge must re-enable (bodyless POST).
 - 2026-10-18: PR #145 MERGED — v1.43.4 squash `a8909477` on main; enforce_admins restored to true.
 - 2026-10-18: v1.43.4 tagged + GitHub release published; branch k3d-manager-v1.43.5 cut from `a8909477`; retro written (docs/retro/2026-10-18-v1.43.4-retrospective.md).
+- 2026-10-18: operator ran appsets-reapply (hub 5 then app-cluster 8, all Applications on values branch k3d-manager-v1.43.5 = v1.43.4 merge), appsets-check green, platform-ops deployed; exporter rollout confirmed by Claude (read-only).
