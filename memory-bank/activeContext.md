@@ -2219,3 +2219,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: Cloudflare prefix purge done by operator (success); plain image URLs serve 22:51Z art. Awaiting storefront screenshot for slug-tag E2.
 - 2026-10-18: shopping-cart-frontend #127 merged cad50792; enforce_admins restored; local main synced; fix/* so no tag. Main CI (image build+deploy) in progress. Then: E2 curl for max-age=300.
 - 2026-10-18: slug-tag P3 LIVE-VERIFIED (operator Chrome screenshot). Cloudflare TTL P3: main CI cad5079 green; waiting for max-age=300 on the live image (E2).
+- 2026-10-18: Filed docs/plans/v1.43.7-codex-dispatch-cross-repo.md (opens v1.43.7; v1.43.6 at cap). Operator rule: never bypass bin/k3dm-codex-dispatch; k3d-manager specs go through make codex-dispatch; other repos wait for this plan.

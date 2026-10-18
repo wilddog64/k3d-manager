@@ -342,6 +342,15 @@ planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`
 before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
 2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
 
+### Candidate milestone — v1.43.7 (patch)
+
+**Cross-repo Codex dispatch** (operator, 2026-10-18). Branch `k3d-manager-v1.43.7`, cut from `main`
+after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap. Plan 1 of 5 is
+[`codex-dispatch-cross-repo`](plans/v1.43.7-codex-dispatch-cross-repo.md). Fixes in `shopping-cart-*`,
+`lib-foundation` and other repos currently go through a bare `codex exec` and never reach the dispatch
+ledger. This adds `--repo`/`--branch` to `bin/k3dm-codex-dispatch`, a `repo` field on every ledger event,
+and a `repo` label on the per-task series. The operator needs that data for research.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
