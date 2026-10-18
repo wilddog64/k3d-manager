@@ -21,12 +21,13 @@ data:
       "refresh": "1m",
       "time": {"from": "now-30d", "to": "now"},
       "templating": {"list": [{
-        "name": "window", "label": "Window", "type": "custom",
+        "name": "window", "label": "Spec window", "type": "custom",
+        "description": "Which ledger window the panels show. The Grafana time picker does not change these panels; only this control does.",
         "query": "1d,7d,30d", "options": [
           {"text": "1d", "value": "1d", "selected": false},
-          {"text": "7d", "value": "7d", "selected": true},
-          {"text": "30d", "value": "30d", "selected": false}
-        ], "current": {"text": "7d", "value": "7d", "selected": true}
+          {"text": "7d", "value": "7d", "selected": false},
+          {"text": "30d", "value": "30d", "selected": true}
+        ], "current": {"text": "30d", "value": "30d", "selected": true}
       }]},
       "panels": [
         {"id": 1, "type": "stat", "title": "Accepted specs", "description": "Landed tasks in the selected window.", "gridPos": {"h": 6, "w": 5, "x": 0, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []}},

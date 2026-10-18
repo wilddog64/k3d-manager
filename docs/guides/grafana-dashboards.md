@@ -312,7 +312,8 @@ Trivy findings, plus one actionable `TargetDown` and one deliberate `HostDiskSpa
 
 ### k3dm Agent Dispatch (`k3dm-agent-dispatch`) — hub
 
-The dispatch dashboard reads the shared Codex ledger export and selects 1d, 7d, or 30d. It shows
+The dispatch dashboard reads the shared Codex ledger export; the **Spec window** control (top left,
+default `30d`) selects 1d, 7d, or 30d. The Grafana time picker does not change these panels. It shows
 accepted specs, integration-test landing success, verifier lines changed, wait minutes, Codex
 tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
 minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens

@@ -87,3 +87,19 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
+
+@test "agent dispatch dashboard: spec window defaults to 30d and says the time picker does not apply" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
+var = next(item for item in dashboard["templating"]["list"] if item["name"] == "window")
+assert var["current"]["value"] == "30d", var["current"]
+assert [o["value"] for o in var["options"] if o["selected"]] == ["30d"]
+assert [o["value"] for o in var["options"]] == ["1d", "7d", "30d"]
+assert var["label"] == "Spec window"
+assert "time picker" in var["description"]
+PY
+  [ "$status" -eq 0 ]
+}
