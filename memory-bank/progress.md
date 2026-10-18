@@ -2736,3 +2736,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: grep-q SIGPIPE P3 LIVE-VERIFIED — first post-install CNI sweep (~19:22Z) left the pool unchanged (45/254, 0 stale removed, 0 alloc errors).
 - 2026-10-18: Dependabot automerge P2 LIVE-VERIFIED — frontend #125 merged by app/k3dm-dependabot-merger (bf119607), push CI 39160325671 all green incl Build, Scan, Push & Deploy.
 - 2026-10-18: CLAUDE.md compaction line updated on v1.43.5 (auto-compaction at 200K; manual /compact at a natural break before it; threshold under measurement per v1.43.6 plan 4).
+- 2026-10-18: deployment-dashboard P2 (docs/bugs/2026-10-18-deployment-dashboard-empty-for-cli-lifecycle-runs.md) dispatched to Codex (codex exec) on k3d-manager-v1.43.5; operator make up/down held until Codex done + verified.

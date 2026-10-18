@@ -1,7 +1,7 @@
 # Bug: k3dm Deployment Metrics dashboard is empty: hub datasource uid missing, CLI runs never publish
 
 **Filed:** 2026-10-18 (Claude, from the operator's screenshot after four `make up` / `make down` runs)
-**Status:** OPEN — spec written; dispatch on `k3d-manager-v1.43.5` once that branch is cut
+**Status:** OPEN — dispatched to Codex 2026-10-18 on `k3d-manager-v1.43.5`
 **Priority:** P2 — lifecycle runs are invisible on the dashboard; the workaround is to read the run logs
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-18: "go ahead" (to "file it as a bug for v1.43.5 and dispatch it to Codex")
