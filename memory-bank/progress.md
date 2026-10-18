@@ -2779,3 +2779,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: Filed docs/plans/v1.43.7-codex-dispatch-cross-repo.md (opens v1.43.7; v1.43.6 at cap). Operator rule: never bypass bin/k3dm-codex-dispatch; k3d-manager specs go through make codex-dispatch; other repos wait for this plan.
 - 2026-10-18: v1.43.7 cross-repo dispatch plan: added target-movement check on land (operator suggestion): M7, N5.
 - 2026-10-18: v1.43.6 solo-activity plan: added k3dm_codex_untracked_sessions (detected − associated by session id) + Untracked stat/bar gauge, M6/N6 (operator suggestion).
+- 2026-10-18: Cloudflare cache-TTL P3: fix not deployed; frontend digest pin still sha256:1c589d0d (pre-fix). Bump to sha256:c6557ecb awaits operator go.
