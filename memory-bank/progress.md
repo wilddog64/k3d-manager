@@ -2775,3 +2775,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: operator disabled enforce_admins on shopping-cart-frontend for #127 merge; restore after merge.
 - 2026-10-18: Cloudflare prefix purge done by operator (success); plain image URLs serve 22:51Z art. Awaiting storefront screenshot for slug-tag E2.
 - 2026-10-18: shopping-cart-frontend #127 merged cad50792; enforce_admins restored; local main synced; fix/* so no tag. Main CI (image build+deploy) in progress. Then: E2 curl for max-age=300.
+- 2026-10-18: slug-tag P3 LIVE-VERIFIED (operator Chrome screenshot). Cloudflare TTL P3: main CI cad5079 green; waiting for max-age=300 on the live image (E2).

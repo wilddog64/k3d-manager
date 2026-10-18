@@ -1,14 +1,16 @@
 # Bug: product images show a cut-off slug label in the bottom-left corner of each storefront card
 
 **Filed:** 2026-10-18 (Claude, from the operator's storefront screenshot)
-**Status:** FIXED — merged, awaiting sync + screenshot (E2)
+**Status:** LIVE-VERIFIED — 2026-10-18
 **Priority:** P3 — cosmetic; images load and products are usable
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "file a P3 for that cosmetic issue"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-infra` on a feature branch
 **Release:** v1.43.5
 **Component:** `shopping-cart-infra`: `data-layer/minio/image-upload-configmap.yaml` (`generate_image`)
-**Fix commit:** shopping-cart-infra `542bb011` (PR #115, squash of `d81199d6` + `2ba6108`)
+**Fix commit:** `542bb011`
+**Also part of the fix:** shopping-cart-infra PR #115 (the Fix commit above, in that repo) squash of `d81199d6`, `2ba6108`
+**Live evidence:** 2026-10-18 · run storefront-screenshot-20261018 · env ubuntu-hostinger/shopping-cart-data · scenario art-refresh-after-cf-purge · commit 542bb011 · proves E2
 
 ## Symptom
 
@@ -91,3 +93,4 @@ interface:
 - 2026-10-18 ~16:50 PDT: operator purged Cloudflare by prefix `frontend.3ai-talk.org/minio/product-images/`
   (`success: True`). Plain URLs now return the 22:51Z objects (`cf-cache-status: MISS`). Remaining for E2:
   the storefront screenshot.
+- 2026-10-18 (operator Chrome screenshot, fresh cache): USB Hub, Webcam, Desk Mat and Monitor 24" cards show the label centred and no slug in the corner. The earlier Safari screenshot still showed tags from browser-cached copies; the live objects (checked by download) carry no tag.
