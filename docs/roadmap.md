@@ -316,6 +316,11 @@ It publishes the sweep's per-outcome counts and the age of the oldest IP still h
 sandbox. It adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live
 needs `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
 
+Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verified-delivery-cost.md)
+(operator, 2026-10-18). It records the independent verifier's verdict in the dispatch ledger and
+counts Codex tokens through verification, including live evidence when the spec's Acceptance block
+requires it. It also adds a `review` cause to the v1.43.4 rework rate.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
