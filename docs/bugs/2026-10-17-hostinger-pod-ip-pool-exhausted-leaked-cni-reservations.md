@@ -1,7 +1,7 @@
 # Bug: Hostinger pod IP pool is exhausted by leaked CNI reservations; new pods cannot start
 
 **Filed:** 2026-10-17 (Claude, read-only investigation of the Hostinger node)
-**Status:** FIXED — 2026-10-17: Codex `cf7b2882` + Claude `1707318b` (tests) + `93d6bfbf` (collector ran the state file instead of `cat`ting it — caught live, probe_success 0); offline E1–E3 green, N1/N2 red on pre-fix. Live E4 green (timer installed by `make refresh CLUSTER_PROVIDER=k3s-hostinger`; first sweep 23:51:17Z Result=success, 45/254 kept, 0 stale). Live E5: series in hub Prometheus (probe_success 1), `host.cni-ipam` group loaded with 3 rules; rule health `unknown` pending first evaluation
+**Status:** LIVE-VERIFIED — 2026-10-17: Codex `cf7b2882` + Claude `1707318b` (tests) + `93d6bfbf` (collector ran the state file instead of `cat`ting it — caught live, probe_success 0); offline E1–E3 green, N1/N2 red on pre-fix. Live E4 green (timer installed by `make refresh CLUSTER_PROVIDER=k3s-hostinger`; first sweep 23:51:17Z Result=success, 45/254 kept, 0 stale). Live E5: series in hub Prometheus (probe_success 1), `host.cni-ipam` group loaded with 3 rules; all 3 rules health `ok` on 2026-10-17 (operator rule listing, work:4.0)
 **Fix commit:** 93d6bfbf
 **Live evidence:** 2026-10-17 · run hostinger-refresh-cni-ipam-timer · env hostinger/srv1754834 · scenario cni-ipam/sweep-timer · commit 11392935 · proves E4
 **Live evidence:** 2026-10-17 · run hub-prometheus-cni-ipam-query · env hub/k3d-k3d-cluster · scenario cni-ipam/metrics-and-rules · commit a4675cb4 · proves E5
