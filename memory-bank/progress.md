@@ -2732,3 +2732,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: v1.43.4 tagged + GitHub release published; branch k3d-manager-v1.43.5 cut from `a8909477`; retro written (docs/retro/2026-10-18-v1.43.4-retrospective.md).
 - 2026-10-18: operator ran appsets-reapply (hub 5 then app-cluster 8, all Applications on values branch k3d-manager-v1.43.5 = v1.43.4 merge), appsets-check green, platform-ops deployed; exporter rollout confirmed by Claude (read-only).
 - 2026-10-18: corrected grep-q SIGPIPE bug (P3): not "no live surface" — fix changed the Hostinger CNI sweep script; live pending operator make refresh CLUSTER_PROVIDER=k3s-hostinger + checksum/state evidence.
+- 2026-10-18: Hostinger Vault watchdog P1 LIVE-VERIFIED — vault-0 deleted 19:12:54Z, watchdog job 29872515 unsealed it, ready 19:15:04Z (2m10s).
