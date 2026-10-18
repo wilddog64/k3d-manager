@@ -2188,3 +2188,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: Fixed test leak to hub Pushgateway: BATS guard in scripts/lib/deployment_metrics.sh + N5 test (10 pushes pre-fix → 0). E3 up+down seen on graph; LIVE-VERIFIED waits make platform-ops.
 - 2026-10-18: LIVE-VERIFIED deployment-dashboard (47b4903a) + stat-tiles (36a00e12) bugs from operator screenshot after make platform-ops. down/somethingelse still on hub Pushgateway — operator DELETE needed.
 - 2026-10-18: Operator DELETEd down/somethingelse; deployment tiles now show only up/aws + down/aws (clean). Leak cleanup complete.
+- 2026-10-18: Dispatched stale-proof P3 (docs/bugs/2026-10-18-live-evidence-stale-when-fix-commit-defaults-to-squash-merge.md) to Codex via codex exec.
