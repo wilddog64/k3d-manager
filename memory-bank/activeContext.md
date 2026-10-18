@@ -2204,3 +2204,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: P3 product-image slug tag: operator chose drop tag + ART_VERSION marker; spec updated, dispatched to Codex (shopping-cart-infra branch fix/product-image-slug-tag).
 - 2026-10-18: slug-tag fix Codex d81199d6 on shopping-cart-infra fix/product-image-slug-tag verified (16/16, both new tests red pre-fix). Next: PR + operator merge, sync data-layer, screenshot (E2).
 - 2026-10-18: filed P2 docs/bugs/2026-10-18-argocd-admin-vault-copy-never-revalidated-after-rebuild.md (show-service-passwords + hub-recovery mirror trust a stale Vault ArgoCD password); dispatched to Codex.
+- 2026-10-18: shopping-cart-infra PR #115 (slug tag) open, CI green, Copilot finding fixed 2ba6108. P2 ArgoCD password: Codex b1a0b575 + Claude 3aee39e6 (trap leak), verified 71/71, N1/N2 red pre-fix. Next: operator make show-service-passwords (E3); merge #115 after enforce_admins off.

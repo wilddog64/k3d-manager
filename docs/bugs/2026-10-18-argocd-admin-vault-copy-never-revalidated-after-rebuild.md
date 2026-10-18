@@ -1,13 +1,14 @@
 # Bug: the Vault copy of the ArgoCD admin password is never revalidated, so `make show-service-passwords` shows a dead password after a hub rebuild
 
 **Filed:** 2026-10-18 (Claude, from the operator's failed ArgoCD UI login)
-**Status:** DISPATCHED — Codex, 2026-10-18
+**Status:** FIXED — awaiting operator E3 run
 **Priority:** P2 — the ArgoCD UI login is broken with the documented credential; a workaround exists (read `argocd-initial-admin-secret` directly)
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-18: "we should fix this issue so file it and send to codex"
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Component:** `Makefile` (`show-service-passwords`), `scripts/plugins/hub_recovery.sh` (`_hub_recovery_mirror_argocd_admin`)
+**Fix commit:** `b1a0b575` (Codex), `3aee39e6` (Claude: temp-file cleanup)
 **Related:** `2026-10-18-argocd-app-sync-stale-vault-admin-password.md` (same stale value, fixed in `bin/argocd-app-sync` only); `2026-09-13-hub-restore-argocd-admin-vault-mirror-missing.md` (introduced the mirror)
 
 ## Symptom
@@ -112,3 +113,11 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT contact a real ArgoCD, Vault or cluster in tests.
 - Do NOT edit `scripts/lib/foundation/`, or the Grafana/Keycloak blocks of `show-service-passwords`.
+
+## Verification log
+
+- 2026-10-18: Codex `b1a0b575`; Claude reviewed the diff against F1/F2. One defect found and fixed in
+  `3aee39e6`: the mirror's RETURN trap captured `${payload_file:-}` while it was still empty, so the two
+  JSON payloads holding the admin password were never removed from `TMPDIR`. A new test ("removes its
+  password temp files") is red on `b1a0b575` and green after. Both suites 71/71; against `9577850c`
+  N1 (test 62) and N2 (test 47) fail. shellcheck clean at warning level.
