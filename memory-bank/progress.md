@@ -2723,3 +2723,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: Dependabot auto-merge bug Status OPEN → FIXED (`46b8632b`), live proof pending (next weekly Dependabot auto-merge must run Go CI + publish).
 - 2026-10-18: v1.43.6 plans 4 (claude-context-compaction-metrics) and 5 (hub-argocd-pinned-upgrade) written; v1.43.6 at 5/5 cap. Hub ArgoCD = argo-cd-10.10.5/v3.5.5 (latest), chart unpinned. Upgrade windows 2026-11-03 (fallback 11-10); 10-29 drill confirms the pin.
 - 2026-10-18: Dependabot bug — basket #52 (1f5aef80, 12:51Z) merged 3 min before fix 46b8632b with no Go CI: last pre-fix repro, recorded in the doc; live proof still pending.
+- 2026-10-18: PR #145 CI cancel (3x after cluster_down test 65): cluster_down_acceptance teardown `kill "${SLEEP_PID:-0}"` = kill 0 (whole process group) if setup fails; guarded so a setup failure surfaces as a red test.

@@ -57,7 +57,7 @@ STUB
 }
 
 teardown() {
-  kill "${SLEEP_PID:-0}" 2>/dev/null || true
+  [[ -n "${SLEEP_PID:-}" ]] && kill "${SLEEP_PID}" 2>/dev/null || true
   # N3: only stubs were ever on PATH for aws/kubectl
   [[ "$(command -v aws)" == "${T}/bin/aws" ]]
   [[ "$(command -v kubectl)" == "${T}/bin/kubectl" ]]
