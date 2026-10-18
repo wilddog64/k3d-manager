@@ -153,7 +153,7 @@ interface:
 ## Verification (Claude, 2026-10-18)
 
 - `bats scripts/tests/bin/deployment_metrics.bats`: 5/5. `cluster_down_acceptance.bats` 11/11, `cluster_up.bats` 66/66.
-- N1 red on pre-fix `bin/cluster-up` / `bin/cluster-down` (copied from `HEAD^`): no curl call recorded.
+- N1 red: Codex ran the N1 case against the pre-fix scripts and recorded no curl call. Claude confirmed independently: `git show 47b4903a^:bin/cluster-{up,down}` contains no push code (0 matches for `deployment_metrics`, `metrics/job` or `k3dm_deployment`).
 - Scope: only the six Component files changed; `bin/k3dm-webhook` untouched.
 - Deviation, accepted: the push uses POST, not the PUT the Fix text names. `_push_metrics` in
   `bin/k3dm-webhook` also POSTs, and the spec asks for parity with it. POST replaces only the pushed
