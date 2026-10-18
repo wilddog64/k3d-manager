@@ -8,6 +8,7 @@ function _k3dm_push_deployment_metrics() {
 
   [[ "${K3DM_DEPLOYMENT_METRICS:-1}" == "0" ]] && return 0
   [[ "${DRY_RUN:-0}" == "1" ]] && return 0
+  [[ -n "${BATS_TEST_FILENAME:-}" && -z "${K3DM_DEPLOYMENT_PUSHGATEWAY_URL:-}" ]] && return 0
 
   case "${provider}" in
     k3s-aws) provider_short="aws" ;;

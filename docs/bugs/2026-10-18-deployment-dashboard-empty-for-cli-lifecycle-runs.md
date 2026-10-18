@@ -159,3 +159,31 @@ interface:
   `bin/k3dm-webhook` also POSTs, and the spec asks for parity with it. POST replaces only the pushed
   series within the `k3dm-cli/<action>-<provider>` group, which is all the dashboard reads.
 - Remaining: E3 live, on the operator's next `make up` then `make down KEEP_LOCAL=1`.
+
+## N5 gap and fix (Claude, 2026-10-18)
+
+N5 held only inside `deployment_metrics.bats`. Other suites run the real `bin/cluster-down` or
+`bin/cluster-up` with no URL override, and when `curl` resolves to the real binary
+(`cluster_down_acceptance.bats` puts `/usr/bin` on PATH) the push reached the live hub. Claude's run
+of that suite pushed `down/aws (failed)` and `down/somethingelse (success)`; the operator deleted both
+groups.
+
+Fix: `_k3dm_push_deployment_metrics` returns before pushing when `BATS_TEST_FILENAME` is set and
+`K3DM_DEPLOYMENT_PUSHGATEWAY_URL` is not, so every suite is covered, including future ones. Suites that
+test the push set the URL explicitly and still reach their curl stub.
+
+- New test `N5: under BATS with no explicit URL the publisher never calls curl`: green on the fix, red
+  on a pre-fix copy of the library.
+- `cluster_down_acceptance.bats` with a recording `curl` stub: 10 `k3dm-cli` push attempts on the
+  pre-fix tree, 0 on the fix.
+- `cluster_down_acceptance`, `cluster_down`, `cluster_up`, `deployment_metrics`, `hub_pushgateway`:
+  123 ok, 0 failures.
+
+## E3 progress (2026-10-18)
+
+The operator's `make up` and `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` (`cloud teardown:
+verified`) both reached the hub: the "Deployment Duration Over Time" graph shows `up/aws (success)`
+at 12.3 min and `down/aws (success)` at about 2.1 min, with no datasource error. The stat tiles also
+showed the leaked test series; that display is fixed separately in
+`docs/bugs/2026-10-18-deployment-stat-tiles-cramped-and-show-stale-runs.md`. Marking LIVE-VERIFIED
+waits for the tiles after `make platform-ops`.

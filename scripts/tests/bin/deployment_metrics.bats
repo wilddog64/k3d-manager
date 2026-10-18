@@ -80,3 +80,10 @@ run_publisher() {
   run grep -F '"datasource": { "type": "prometheus", "uid": "prometheus" }' "${dashboard}"
   [ "${status}" -eq 0 ]
 }
+
+@test "N5: under BATS with no explicit URL the publisher never calls curl" {
+  unset K3DM_DEPLOYMENT_PUSHGATEWAY_URL
+  run_publisher down k3s-aws failed 0 test-run
+  [ "${status}" -eq 0 ]
+  [ ! -s "${CURL_LOG}" ]
+}
