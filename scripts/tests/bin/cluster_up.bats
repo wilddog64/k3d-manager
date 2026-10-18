@@ -1,5 +1,88 @@
 #!/usr/bin/env bats
 
+function _run_sandbox_ttl_helper() {
+  local first_ttl="$1" reread_ttl="$2" extend_rc="$3" restart_rc="$4" provision_floor="${5:-}"
+  local helper="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.sh"
+  local calls="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.calls"
+  local ttl_index="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.index"
+  sed -n '/^function _acg_ensure_sandbox_ttl()/,/^}$/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  : > "${calls}"
+  printf '0\n' > "${ttl_index}"
+  run env FIRST_TTL="${first_ttl}" REREAD_TTL="${reread_ttl}" EXTEND_RC="${extend_rc}" \
+    RESTART_RC="${restart_rc}" CALLS="${calls}" TTL_INDEX="${ttl_index}" \
+    ${provision_floor:+ACG_MIN_PROVISION_MINUTES="${provision_floor}"} bash -c '
+      acg_check_ttl() {
+        local index
+        index=$(cat "${TTL_INDEX}")
+        printf "%s\n" "$((index + 1))" > "${TTL_INDEX}"
+        if [[ "${index}" -eq 0 ]]; then printf "%s\n" "${FIRST_TTL}"; else printf "%s\n" "${REREAD_TTL}"; fi
+      }
+      acg_extend_playwright() { printf "extend %s\n" "$1" >> "${CALLS}"; return "${EXTEND_RC}"; }
+      acg_restart() { printf "restart %s %s\n" "$1" "$2" >> "${CALLS}"; return "${RESTART_RC}"; }
+      _info() { printf "info %s\n" "$*" >> "${CALLS}"; }
+      _warn() { printf "warn %s\n" "$*" >> "${CALLS}"; }
+      _err() { printf "err %s\n" "$*" >> "${CALLS}"; }
+      source "$1"
+      _acg_ensure_sandbox_ttl "https://sandbox.example"
+    ' bash "${helper}"
+  SANDBOX_TTL_CALLS="${calls}"
+}
+
+@test "acg-up TTL M1 restarts an expiring sandbox with aws" {
+  _run_sandbox_ttl_helper 30 20 1 0
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL M2 fails when the sandbox restart fails" {
+  _run_sandbox_ttl_helper 30 20 1 1
+  [ "${status}" -ne 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL M3 proceeds without restart for safe or unreadable TTL" {
+  _run_sandbox_ttl_helper 30 60 1 1
+  [ "${status}" -eq 0 ]
+  _run_sandbox_ttl_helper 30 -1 1 1
+  [ "${status}" -eq 0 ]
+  _run_sandbox_ttl_helper 30 "" 1 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up TTL M4 honors the provisioning floor override" {
+  _run_sandbox_ttl_helper 30 50 1 0 51
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart https://sandbox.example aws$' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+}
+
+@test "acg-up TTL N2 does not restart after a successful or unnecessary extension" {
+  _run_sandbox_ttl_helper 30 20 0 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+  _run_sandbox_ttl_helper 120 20 1 1
+  [ "${status}" -eq 0 ]
+  run grep -c '^extend ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+  run grep -c '^restart ' "${SANDBOX_TTL_CALLS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Step 1 delegates TTL safety and does not inline warn-and-continue" {
+  run grep -nF '_acg_ensure_sandbox_ttl "${_acg_sandbox_ref}" || exit 1' bin/cluster-up
+  [ "${status}" -eq 0 ]
+  run bash -c 'block=$(sed -n "/Step 1\/12/,/k3s-gcp)/p" bin/cluster-up); grep -qF "Sandbox extension failed — proceeding anyway" <<<"${block}"'
+  [ "${status}" -ne 0 ]
+}
+
 @test "acg-up identity Application uses server-side apply with server-side diff" {
   local manifest="scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 

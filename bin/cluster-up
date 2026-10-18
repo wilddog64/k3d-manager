@@ -142,6 +142,39 @@ function _acg_fail() {
   exit 1
 }
 
+function _acg_ensure_sandbox_ttl() {
+  local _sandbox_ref="$1"
+  local _ttl_mins _min_mins _provision_mins
+
+  if [[ -n "${_sandbox_ref}" ]]; then
+    _ttl_mins=$(acg_check_ttl "${_sandbox_ref}" 2>/dev/null || true)
+    _min_mins="${ACG_MIN_REMAINING_MINUTES:-120}"
+    if [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]] && \
+        (( _ttl_mins < _min_mins )); then
+      _info "[acg-up] Sandbox TTL: ${_ttl_mins}m remaining (< ${_min_mins}m threshold) — extending..."
+      if acg_extend_playwright "${_sandbox_ref}"; then
+        return 0
+      fi
+      _ttl_mins=$(acg_check_ttl "${_sandbox_ref}" 2>/dev/null || true)
+      _provision_mins="${ACG_MIN_PROVISION_MINUTES:-60}"
+      if [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]] && \
+          (( _ttl_mins < _provision_mins )); then
+        _warn "[acg-up] Sandbox cannot be extended and will expire before provisioning finishes — restarting sandbox..."
+        if acg_restart "${_sandbox_ref}" aws; then
+          return 0
+        fi
+        _err "[acg-up] Sandbox restart failed — cannot safely provision on an expiring sandbox"
+        return 1
+      fi
+      _warn "[acg-up] Sandbox extension failed — proceeding anyway"
+    elif [[ -n "${_ttl_mins}" ]] && [[ "${_ttl_mins}" != "-1" ]]; then
+      _info "[acg-up] Sandbox TTL: ${_ttl_mins}m remaining — OK"
+    else
+      _warn "[acg-up] Could not read sandbox TTL — proceeding without TTL check"
+    fi
+  fi
+}
+
 function _acg_keycloak_reverse_tunnel_up() {
   local code
   code=$(ssh -o ConnectTimeout=10 ubuntu "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18080/" 2>/dev/null || true)
@@ -391,20 +424,7 @@ case "${_cluster_provider}" in
     if _acg_check_credentials 2>/dev/null; then
       _info "[acg-up] AWS credentials are valid — skipping Playwright extraction"
       _acg_sandbox_ref="${sandbox_url:-${_ACG_SANDBOX_URL:-}}"
-      if [[ -n "${_acg_sandbox_ref}" ]]; then
-        _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
-        _acg_min_mins="${ACG_MIN_REMAINING_MINUTES:-120}"
-        if [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]] && \
-            (( _acg_ttl_mins < _acg_min_mins )); then
-          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining (< ${_acg_min_mins}m threshold) — extending..."
-          acg_extend_playwright "${_acg_sandbox_ref}" || \
-            _warn "[acg-up] Sandbox extension failed — proceeding anyway"
-        elif [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]]; then
-          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining — OK"
-        else
-          _warn "[acg-up] Could not read sandbox TTL — proceeding without TTL check"
-        fi
-      fi
+      _acg_ensure_sandbox_ttl "${_acg_sandbox_ref}" || exit 1
     else
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
