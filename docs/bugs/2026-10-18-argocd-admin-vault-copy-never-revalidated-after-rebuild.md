@@ -8,7 +8,7 @@
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Component:** `Makefile` (`show-service-passwords`), `scripts/plugins/hub_recovery.sh` (`_hub_recovery_mirror_argocd_admin`)
-**Fix commit:** `b1a0b575` (Codex), `3aee39e6` (Claude: temp-file cleanup)
+**Fix commit:** `b1a0b575` (Codex), `3aee39e6` (Claude: temp-file cleanup), `07298804` (Claude: make-escaped jq variables)
 **Related:** `2026-10-18-argocd-app-sync-stale-vault-admin-password.md` (same stale value, fixed in `bin/argocd-app-sync` only); `2026-09-13-hub-restore-argocd-admin-vault-mirror-missing.md` (introduced the mirror)
 
 ## Symptom
@@ -121,3 +121,7 @@ interface:
   JSON payloads holding the admin password were never removed from `TMPDIR`. A new test ("removes its
   password temp files") is red on `b1a0b575` and green after. Both suites 71/71; against `9577850c`
   N1 (test 62) and N2 (test 47) fail. shellcheck clean at warning level.
+- 2026-10-18: operator's first live run failed with `jq: error: sername/0 is not defined`. Make expanded
+  `$username`/`$password` in the recipe's jq filter. The curl stub accepted any payload, so the tests
+  missed it. Fixed in `07298804` (`$$username`, `$$password`); the stub now rejects a payload that lacks
+  `username: admin` and a password, and tests 5–6 are red against the broken Makefile.
