@@ -1,7 +1,8 @@
 # e2e-sandbox hub-apps gate fails on a single poll while an Application is still converging
 
-**Status:** FIXED (`2de544dc`, 420s default) — no regression on a settled hub (run `1792239012-26194`); live proof of the longer window waits for an e2e run started straight after a fresh `make up`. The first fix `45412d26` stays.
+**Status:** LIVE-VERIFIED 2026-10-18 — run `1792355973-27075` started straight after a fresh `make up` waited through six not-converged polls, then passed ("11 Synced and Healthy"); fixed in `2de544dc` (420s default)
 **Priority:** P2
+**Fix commit:** `a8909477` (v1.43.4 squash; contains branch fix `2de544dc`)
 **Severity:** Medium — a `make e2e-sandbox` run started right after `make up` fails before Playwright; rerunning a few minutes later passes
 **Found by:** Claude, live run `1792200825-26862` (2026-10-17), branch `k3d-manager-v1.43.4`
 **Approval:** explicit 2026-10-17 "can you write a spec for hub-apps check and dispatch to codex?" (operator)
@@ -252,3 +253,13 @@ temporary copy: a default of `180` fails `after 420s`; an interval default of `0
 **First live run with 420s (2026-10-17, run `1792239012-26194`, commit `6b4ca6b1`).** On a settled hub the
 gate passed on its first poll ("15 Synced and Healthy"): no regression. The longer window itself waits for
 a run started straight after a fresh `make up`.
+
+## Live verification (Claude, 2026-10-18)
+
+The operator ran `make up CLUSTER_PROVIDER=k3s-aws; make e2e-sandbox` from `k3d-manager-v1.43.5` at
+`6d2f8c37`. The e2e run `1792355973-27075` started at 13:39 PDT, right after `make up` finished. The hub-apps
+gate printed `hub Applications for ubuntu-k3s still converging: acg-trivy-operator OutOfSync Progressing`
+and then `OutOfSync Healthy`, rechecking every 10s, and then passed with `11 Synced and Healthy`. Before
+the fix, the first of those polls failed the run. The run finished `exit_code=0`.
+
+**Live evidence:** 2026-10-18 · run 1792355973-27075 · env ubuntu-k3s · scenario e2e-after-fresh-make-up · commit 6d2f8c37 · proves fix
