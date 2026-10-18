@@ -104,3 +104,4 @@ interface:
   Codex's conf; vitest 31/31 and lint pass.
 - 2026-10-18: PR #127 merged `cad50792` (23:22Z); `866a225` added a node types reference and Prettier formatting after CI lint/type-check reds. Copilot: no issues.
 - 2026-10-18: E2 not yet runnable. The image header still reads `max-age=14400` (`cf-cache-status: HIT`), but Hostinger still runs the pre-fix image: `services/shopping-cart-frontend/kustomization.yaml` pins `sha256:1c589d0d…` (deploy last rolled 19:10Z), while the fix image `sha-cad5079…` is `sha256:c6557ecb…` (GHCR, 23:28Z). Same pin-not-bumped class as `2026-10-17-services-digest-pin-not-bumped-by-app-ci.md`. Bumping the pin needs the operator's go.
+- 2026-10-18: operator approved the pin bump ("yes, you can"); frontend pin -> `sha256:c6557ecb…` (fix image `sha-cad5079…`).

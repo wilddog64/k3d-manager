@@ -2223,3 +2223,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: v1.43.7 cross-repo dispatch plan: added target-movement check on land (operator suggestion): M7, N5.
 - 2026-10-18: v1.43.6 solo-activity plan: added k3dm_codex_untracked_sessions (detected − associated by session id) + Untracked stat/bar gauge, M6/N6 (operator suggestion).
 - 2026-10-18: Cloudflare cache-TTL P3: fix not deployed; frontend digest pin still sha256:1c589d0d (pre-fix). Bump to sha256:c6557ecb awaits operator go.
+- 2026-10-18: frontend digest pin bumped to sha256:c6557ecb (operator go); awaiting Hostinger rollout + E2 header check.
