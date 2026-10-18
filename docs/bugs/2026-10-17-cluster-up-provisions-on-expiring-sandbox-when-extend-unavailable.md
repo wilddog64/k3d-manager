@@ -1,8 +1,10 @@
 # Bug: sandbox `make up` provisions on a sandbox about to expire when the extend fails
 
 **Filed:** 2026-10-17 (Claude, during the operator's chained `make up` / `make down`, run started about 20:00 PDT)
-**Status:** FIXED — 2026-10-17: `0ece6a8c` (Codex); Claude-verified (scope = spec, 3 files; `cluster_up.bats` 66/66; shellcheck 31 warnings before and after; all 6 new tests red against pre-fix 2c2dd4ba, including N1). Independent verifier (Sonnet, Acceptance-only, stubbed lib functions) PASSED: 19/19 post-fix incl. 59/60 floor boundaries, -1/empty TTL and both override directions; N1 red on pre-fix (7 pre-fix failures); re-run by Claude. Verifier notes: the N2 invalid-credentials case is only a source check; after a restart the TTL is not re-read (not required). Awaiting live E2
+**Status:** LIVE-VERIFIED — 2026-10-17: `0ece6a8c` (Codex); Claude-verified (scope = spec, 3 files; `cluster_up.bats` 66/66; shellcheck 31 warnings before and after; all 6 new tests red against pre-fix 2c2dd4ba, including N1). Independent verifier (Sonnet, Acceptance-only, stubbed lib functions) PASSED: 19/19 post-fix incl. 59/60 floor boundaries, -1/empty TTL and both override directions; N1 red on pre-fix (7 pre-fix failures); re-run by Claude. Verifier notes: the N2 invalid-credentials case is only a source check; after a restart the TTL is not re-read (not required). Live E2 passed (below)
 **Fix commit:** 0ece6a8c
+**Live evidence:** 2026-10-17 · run sandbox-up-2044-pdt · env acg/ubuntu-k3s · scenario cluster-up/extend-unavailable-restarts-sandbox · commit f65626a8 · proves E2
+Claude's make up CLUSTER_PROVIDER=k3s-aws at 20:44:13 PDT logged "Sandbox TTL: 14m remaining", the extend failed (Extend button absent; the one extension was already used), then "Sandbox cannot be extended and will expire before provisioning finishes — restarting sandbox...", "Sandbox restarted. Ready for credential extraction." and Step 2 provisioning on the new sandbox; make up exited 0.
 **Priority:** P2 — the run can be cut off mid-provision when the sandbox expires; the workaround is to restart the sandbox by hand before `make up`
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-17: "if you found any issue during run, feel free to debug and file bugs dispatch to codex, and rerun make up/down"
