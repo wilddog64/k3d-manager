@@ -2211,3 +2211,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: operator synced ubuntu-hostinger-data-layer after #115; minio-image-upload PostSync Succeeded with the updated script ConfigMap. Awaiting storefront screenshot (slug-tag E2).
 - 2026-10-18: slug-tag fix is in MinIO (22:51Z, marker 2); Cloudflare edge serves July copies (max-age 4h). Operator: purge or wait, then E2 screenshot.
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-product-images-stale-at-cloudflare-after-art-refresh.md (nginx short TTL on /minio/product-images/; URL versioning rejected: seed is ON CONFLICT DO NOTHING). Not yet dispatched.
+- 2026-10-18: Cloudflare-stale P3 dispatched to Codex (shopping-cart-frontend fix/product-image-cache-ttl).
