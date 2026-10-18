@@ -24,6 +24,7 @@ producer feeds it**, and why a panel is empty when it is. Grounded in
 | E2E Verification | `e2e-verification` | `platform-ops/grafana-dashboard-e2e.yaml` | `make platform-ops` | hub |
 | Hermes Status | `hermes-status` | `platform-ops/grafana-dashboard-hermes.yaml` | `make platform-ops` | hub |
 | k3dm Host Disk | `k3dm-host-disk` | `platform-ops/grafana-dashboard-host-disk.yaml` | `make platform-ops` | hub |
+| k3dm Host Pod IP Pool | `k3dm-host-cni-ipam` | `platform-ops/grafana-dashboard-host-cni-ipam.yaml` | `make platform-ops` | hub |
 | k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
@@ -611,7 +612,7 @@ Work down this table before editing a query. Every row is a real past incident.
 | Checkout Load Test blank except CPU | no producer — expected | nothing to fix |
 | k3dm Tests panels blank | nobody has run `make test-all`/`make test-metrics` yet, or the Pushgateway forward is unavailable | check the *Suite freshness* panel: `No data` means never pushed, a large age means the push stopped |
 | Host disk panels show `No data` | Hermes is not running or the hub Pushgateway port-forward is down | check Hermes and the *Last push age* panel |
-| Pod IP pool panels show `No data` or a high reservation ratio | Hermes, the Hostinger sweep timer, or the hub Pushgateway port-forward is unavailable | check `k3dm_cni_ipam_reservations`, `k3dm_cni_ipam_range_size`, and the sweep timer/state file |
+| **k3dm Host Pod IP Pool** shows `No data`, `Probe status` down, or a high `Pool used %` | `No data`: Hermes or the hub Pushgateway port-forward is down. `Probe status` down: the collector cannot read `/var/lib/k3dm/cni-ipam-sweep.state` over SSH. High usage with `Stale reservations removed` at 0: real pod load, not a leak | `systemctl list-timers k3dm-cni-ipam-sweep.timer` and the state file on the host; `bin/k3dm-cni-ipam-metrics --dry-run` on the hub |
 | Replica stat shows several `1`s | kube-state-metrics pod-IP churn | cosmetic; wrap in `max()` |
 
 The deployment metrics live in the **app-cluster** Prometheus, not the hub's. The hub's own
