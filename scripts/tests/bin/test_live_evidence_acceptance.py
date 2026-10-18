@@ -90,8 +90,8 @@ def test_M6_flip_without_evidence_fails(repo):
     assert res.returncode == 1 and "2026-10-10-x.md" in res.stderr
 
 def test_M6_flip_with_evidence_passes(repo):
-    r, _, _, later = repo
-    res = _lint(r, "docs/bugs/2026-10-10-x.md", _doc([_ev(later)]), head_text=_doc([]).replace("LIVE-VERIFIED — 2026-10-17", "FIXED"))
+    r, _, fix, later = repo
+    res = _lint(r, "docs/bugs/2026-10-10-x.md", _doc([f"**Fix commit:** `{fix}`", _ev(later)]), head_text=_doc([]).replace("LIVE-VERIFIED — 2026-10-17", "FIXED"))
     assert res.returncode == 0, res.stderr
 
 def test_M6_new_file_live_without_evidence_fails(repo):
