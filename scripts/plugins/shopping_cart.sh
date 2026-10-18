@@ -20,14 +20,14 @@ function _shopping_cart_prune_orphan_default_entries() {
   local _refs
   _refs=$(kubectl config view \
     -o jsonpath='{range .contexts[*]}{.context.cluster}{"\n"}{end}' 2>/dev/null || true)
-  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+  if printf '%s\n' "${_refs}" | grep -x "default" >/dev/null; then
     _info "[shopping_cart] Keeping kubeconfig cluster 'default' — still referenced by a context"
   else
     kubectl config delete-cluster default &>/dev/null || true
   fi
   _refs=$(kubectl config view \
     -o jsonpath='{range .contexts[*]}{.context.user}{"\n"}{end}' 2>/dev/null || true)
-  if printf '%s\n' "${_refs}" | grep -qx "default"; then
+  if printf '%s\n' "${_refs}" | grep -x "default" >/dev/null; then
     _info "[shopping_cart] Keeping kubeconfig user 'default' — still referenced by a context"
   else
     kubectl config delete-user default &>/dev/null || true
@@ -1428,7 +1428,7 @@ HELP
   local kubeconfig_dir="${local_kubeconfig%/*}"
 
   local _server_ready=0
-  if KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready"; then
+  if KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep " Ready" >/dev/null; then
     _server_ready=1
     _info "[shopping_cart] k3s server already Ready — skipping server install"
   fi
@@ -1480,7 +1480,7 @@ REMOTE
 
   _info "[shopping_cart] Waiting for node to be Ready..."
   local attempts=0
-  until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+  until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep " Ready" >/dev/null; do
     (( attempts++ ))
     if (( attempts >= 30 )); then
       _err "[shopping_cart] Node did not become Ready after 150s"
@@ -1597,7 +1597,7 @@ function _ssm_bootstrap_k3s() {
   _info "[shopping_cart] Waiting for k3s node to be Ready..."
   local attempts=0
   until ssm_exec "${server_id}" \
-      "kubectl get nodes --no-headers 2>/dev/null | grep -q ' Ready'" 2>/dev/null; do
+      "kubectl get nodes --no-headers 2>/dev/null | grep ' Ready'" >/dev/null 2>/dev/null; do
     (( attempts++ ))
     if (( attempts >= 30 )); then
       _err "[shopping_cart] k3s node did not become Ready after 150s"
@@ -1685,7 +1685,7 @@ function _shopping_cart_cred_check() {
       # shellcheck disable=SC2016
       _shopping_cart_cred_secret_b64 "$ctx" "$sref" password \
         | kubectl --context "$ctx" -n shopping-cart-data exec -i "$pod" -- \
-            sh -c 'REDISCLI_AUTH="$(base64 -d)" redis-cli --no-auth-warning ping 2>/dev/null | grep -qx PONG'
+            sh -c 'REDISCLI_AUTH="$(base64 -d)" redis-cli --no-auth-warning ping 2>/dev/null | grep -x PONG >/dev/null'
       ;;
   esac
 }

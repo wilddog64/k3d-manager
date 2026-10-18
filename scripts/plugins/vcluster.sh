@@ -222,7 +222,7 @@ function _vcluster_wait_ready() {
   local interval=2
   local elapsed=0
   until _kubectl --no-exit --quiet -- -n "$VCLUSTER_NAMESPACE" \
-    get pod -l "$selector" --no-headers 2>/dev/null | grep -q .; do
+    get pod -l "$selector" --no-headers 2>/dev/null | grep . >/dev/null; do
     sleep "$interval"
     elapsed=$((elapsed + interval))
     if (( elapsed >= timeout )); then

@@ -156,7 +156,7 @@ _dispatch_start() {
   git -C "$_dispatch_repo_root" fetch origin "$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
   head="$(git -C "$_dispatch_repo_root" rev-parse HEAD)"; remote="$(git -C "$_dispatch_repo_root" rev-parse "origin/$rel")"
   [[ "$head" == "$remote" ]] || _dispatch_error "HEAD is not pushed to origin/$rel"
-  _dispatch_spec_files <"$_dispatch_repo_root/$spec" | grep -q . || _dispatch_error "spec has no backticked path in its ## Files section"
+  _dispatch_spec_files <"$_dispatch_repo_root/$spec" | grep . >/dev/null || _dispatch_error "spec has no backticked path in its ## Files section"
   spec_base="$(basename "$spec" .md)"
   [[ -n "$slug" ]] || slug="${spec_base#"${version}"-}"
   [[ "$slug" != "$spec_base" ]] || slug="$spec_base"

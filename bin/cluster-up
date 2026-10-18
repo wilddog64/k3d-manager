@@ -227,7 +227,7 @@ function _acg_repair_hub_host_alias() {
 
   _current_node_hosts=$(kubectl get configmap coredns -n kube-system \
     --context k3d-k3d-cluster -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
-  if printf '%s\n' "${_current_node_hosts}" | grep -qxF "${_host_ip} host.k3d.internal"; then
+  if printf '%s\n' "${_current_node_hosts}" | grep -xF "${_host_ip} host.k3d.internal" >/dev/null; then
     _info "[acg-up] CoreDNS host.k3d.internal alias already present — no change"
     return 0
   fi
@@ -493,7 +493,7 @@ if ! _command_exist k3d; then
   _err "[acg-up] k3d binary not found in PATH — cannot manage Hub cluster. Check PATH includes ~/.local/bin."
   exit 1
 fi
-if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
+if ! k3d cluster list 2>/dev/null | grep "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]" >/dev/null; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
   _dry_guard "create local Hub cluster" deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _hub_newly_created=1
@@ -936,7 +936,7 @@ until argocd cluster list -o json \
     | python3 -c "import sys,json; clusters=json.load(sys.stdin); \
       print(next((c['connectionState']['status'] for c in clusters \
         if 'ubuntu-k3s' in c.get('name','') or 'host.k3d.internal' in c.get('server','')), \
-        'Unknown'))" 2>/dev/null | grep -q "Successful"; do
+        'Unknown'))" 2>/dev/null | grep "Successful" >/dev/null; do
   if [[ $(date +%s) -ge ${_argocd_conn_deadline} ]]; then
     _warn "[acg-up] ArgoCD controller did not reconnect to ubuntu-k3s within 120s — proceeding anyway"
     _argocd_connected=0
@@ -978,7 +978,7 @@ else
     _info "[acg-up] data-layer is delivered by the data-git ApplicationSet — waiting for ${_dl_app_name} (max 300s)..."
     _dl_sync_deadline=$(( $(date +%s) + 300 ))
     until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
-        -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+        -o jsonpath='{.status.sync.status}' 2>/dev/null | grep "Synced" >/dev/null; do
       if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
         _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
         _acg_data_layer_explain "${_dl_app_name}"
@@ -990,7 +990,7 @@ else
           || true
         _dl_retry_deadline=$(( $(date +%s) + 180 ))
         until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
-            -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+            -o jsonpath='{.status.sync.status}' 2>/dev/null | grep "Synced" >/dev/null; do
           if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
             _dl_pods_ready=0
             for _ss in postgresql-orders postgresql-payment postgresql-products minio; do
@@ -1374,7 +1374,7 @@ else
 
   _coredns_nodehosts=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
     -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
-  if echo "${_coredns_nodehosts}" | grep -q "keycloak.shopping-cart.local"; then
+  if echo "${_coredns_nodehosts}" | grep "keycloak.shopping-cart.local" >/dev/null; then
     _info "[acg-up] CoreDNS keycloak hosts entry already present — skipping"
   else
     _new_nodehosts=$(NODE_IP="${_node_ip}" python3 -c "
@@ -1508,7 +1508,7 @@ KEYCLOAK_SERVICE_PORT=80 \
 # Using 'rewrite' plugin because 'hosts' can only be used once per server block (conflicts with NodeHosts).
 _current_corefile=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
   -o jsonpath='{.data.Corefile}')
-if ! printf '%s' "${_current_corefile}" | grep -qF 'keycloak.shopping-cart.local'; then
+if ! printf '%s' "${_current_corefile}" | grep -F 'keycloak.shopping-cart.local' >/dev/null; then
   _new_corefile=$(python3 - "${_current_corefile}" <<'PYEOF'
 import sys, re
 text = sys.argv[1]
@@ -1587,7 +1587,7 @@ if _is_mac; then
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.3 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.3'; then
+  if ! /sbin/ifconfig lo0 | grep '127\.0\.0\.3' >/dev/null; then
     _run_command --interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
       _warn "[acg-up] failed to add 127.0.0.3 loopback alias — frontend port-forward will fail to bind"
   fi

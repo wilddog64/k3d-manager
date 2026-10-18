@@ -62,7 +62,7 @@ fi
 
 # Test cluster connection
 echo -e "${YELLOW}4. Checking cluster connection...${NC}"
-if argocd cluster list | grep -q "https://kubernetes.default.svc"; then
+if argocd cluster list | grep "https://kubernetes.default.svc" >/dev/null; then
     echo -e "${GREEN}   ✓ Cluster connected${NC}\n"
 else
     echo -e "${RED}   ✗ No cluster found${NC}\n"
@@ -73,7 +73,7 @@ fi
 echo -e "${YELLOW}5. Checking user info...${NC}"
 USER_INFO=$(argocd account get-user-info)
 echo "$USER_INFO" | head -3
-if echo "$USER_INFO" | grep -q "admin"; then
+if echo "$USER_INFO" | grep "admin" >/dev/null; then
     echo -e "${GREEN}   ✓ User info retrieved${NC}\n"
 else
     echo -e "${RED}   ✗ Failed to get user info${NC}\n"
@@ -159,7 +159,7 @@ echo -e "${GREEN}   ✓ RBAC check complete${NC}\n"
 
 # Test readonly user (alice)
 echo -e "${YELLOW}12. Testing readonly user (alice)...${NC}"
-if yes | argocd login "$ARGOCD_SERVER" --insecure --username alice --password "$LDAP_PASS" 2>&1 | grep -qi "logged in successfully"; then
+if yes | argocd login "$ARGOCD_SERVER" --insecure --username alice --password "$LDAP_PASS" 2>&1 | grep -i "logged in successfully" >/dev/null; then
     echo -e "${GREEN}   ✓ Alice logged in successfully${NC}"
 
     # Alice should be able to list apps
@@ -174,7 +174,7 @@ if yes | argocd login "$ARGOCD_SERVER" --insecure --username alice --password "$
       --repo https://github.com/argoproj/argocd-example-apps.git \
       --path helm-guestbook \
       --dest-server https://kubernetes.default.svc \
-      --dest-namespace default 2>&1 | grep -q "PermissionDenied"; then
+      --dest-namespace default 2>&1 | grep "PermissionDenied" >/dev/null; then
         echo -e "${GREEN}   ✓ Alice cannot create applications (correct)${NC}\n"
     else
         echo -e "${YELLOW}   ⚠ Alice may have unexpected permissions${NC}\n"
@@ -193,7 +193,7 @@ echo ""
 
 # Delete test app
 echo -e "${YELLOW}14. Deleting test application...${NC}"
-if argocd app delete guestbook --yes 2>&1 | grep -q "deleted"; then
+if argocd app delete guestbook --yes 2>&1 | grep "deleted" >/dev/null; then
     echo -e "${GREEN}   ✓ Application deleted${NC}\n"
 else
     echo -e "${YELLOW}   ⚠ Application may have already been deleted${NC}\n"

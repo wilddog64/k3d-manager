@@ -41,11 +41,11 @@ for f in "${ipam_dir}"/*; do
   name="$(basename "${f}")"
   [[ "${name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
   id="$(head -n1 "${f}" | tr -d '\r')"
-  if printf '%s\n' "${live}" | grep -qxF -- "${id}"; then
+  if printf '%s\n' "${live}" | grep -xF -- "${id}" >/dev/null; then
     kept=$((kept + 1))
     continue
   fi
-  if printf '%s\n' "${running_ips}" | grep -qxF -- "${name}"; then
+  if printf '%s\n' "${running_ips}" | grep -xF -- "${name}" >/dev/null; then
     printf 'SKIP %s: no sandbox but a pod reports this IP\n' "${name}"
     kept=$((kept + 1))
     continue

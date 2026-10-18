@@ -65,7 +65,7 @@ for user in chengkai.liang test-user; do
     -D "cn=ldap-admin,dc=home,dc=org" \
     -w "$LDAP_PASS" \
     -b "dc=home,dc=org" \
-    "(cn=$user)" dn 2>/dev/null | grep -q "^dn: cn=$user"; then
+    "(cn=$user)" dn 2>/dev/null | grep "^dn: cn=$user" >/dev/null; then
     echo "User found: $user"
   else
     echo "FAILED: User not found: $user"
@@ -83,7 +83,7 @@ for group in it-devops developers; do
     -D "cn=ldap-admin,dc=home,dc=org" \
     -w "$LDAP_PASS" \
     -b "dc=home,dc=org" \
-    "(cn=$group)" dn 2>/dev/null | grep -q "^dn: cn=$group"; then
+    "(cn=$group)" dn 2>/dev/null | grep "^dn: cn=$group" >/dev/null; then
     echo "Group found: $group"
   else
     echo "FAILED: Group not found: $group"

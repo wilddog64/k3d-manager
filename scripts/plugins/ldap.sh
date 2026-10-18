@@ -744,7 +744,7 @@ function _ldap_import_ldif() {
       else
          import_output=${import_output//$'
 '/}
-         if echo "$import_output" | grep -qE "Already exists|no global superior knowledge"; then
+         if echo "$import_output" | grep -E "Already exists|no global superior knowledge" >/dev/null; then
             _info "[ldap] LDIF import completed (some entries skipped - base DN or duplicates)"
          else
             _warn "[ldap] LDIF import encountered errors:"; echo "$import_output" | head -10
@@ -761,7 +761,7 @@ function _ldap_import_ldif() {
    local vault_ns="${VAULT_NS:-vault}"
    for user in "${test_users[@]}"; do
       local user_dn="cn=${user},${user_ou},${base_dn}"
-      _kubectl --no-exit -n "$ns" exec "$pod" --          ldapsearch -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -b "$user_dn" -LLL dn 2>/dev/null | grep -q "^dn:" || continue
+      _kubectl --no-exit -n "$ns" exec "$pod" --          ldapsearch -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -b "$user_dn" -LLL dn 2>/dev/null | grep "^dn:" >/dev/null || continue
       local vault_path="ldap/users/${user}"
       local existing_pass
       existing_pass=$(_no_trace _vault_exec "$vault_ns" "vault kv get -field=password secret/$vault_path" 2>/dev/null) || existing_pass=""

@@ -80,7 +80,7 @@ if [[ -z "${APP_CONTEXT+x}" ]]; then
     if ! _local_contexts="$(kubectl config get-contexts -o name 2>/dev/null)"; then
       _target_error "destination ${_selected_dest} cannot be checked because local kubeconfig contexts are unavailable"
     fi
-    if printf '%s\n' "${_local_contexts}" | grep -qxF -- "${_selected_dest}"; then
+    if printf '%s\n' "${_local_contexts}" | grep -xF -- "${_selected_dest}" >/dev/null; then
       APP_CONTEXT="${_selected_dest}"
     else
       _target_error "destination ${_selected_dest} is not a local kubeconfig context; add that context or set APP_CONTEXT"

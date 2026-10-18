@@ -198,7 +198,7 @@ if ! "${_make}" install-hub-pushgateway-port-forward; then _local_agents_ok=0; f
 for _pf_name in argocd keycloak; do
   _hub_restore_ensure_pf_agent "${_pf_name}" || _local_agents_ok=0
 done
-if launchctl list 2>/dev/null | grep -q 'com.k3d-manager.grafana-port-forward'; then
+if launchctl list 2>/dev/null | grep 'com.k3d-manager.grafana-port-forward' >/dev/null; then
   launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.grafana-port-forward" || _local_agents_ok=0
 fi
 _ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0

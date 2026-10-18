@@ -27,7 +27,7 @@ _keychain_set() {
 
 _github_secret_exists() {
   gh secret list --repo "${_REPO}" --json name -q '.[].name' \
-    | grep -qx "${1}" 2>/dev/null
+    | grep -x "${1}" >/dev/null 2>/dev/null
 }
 
 _ensure_secret() {

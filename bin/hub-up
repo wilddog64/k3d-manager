@@ -34,7 +34,7 @@ _hub_dispatch() {
 }
 
 _info "[hub-up] Step 1/5 — checking local Hub cluster"
-if k3d cluster list 2>/dev/null | grep -q "^${_hub_name}[[:space:]]"; then
+if k3d cluster list 2>/dev/null | grep "^${_hub_name}[[:space:]]" >/dev/null; then
   _info "[hub-up] hub exists — skipping create"
 else
   _hub_dispatch 1 "creating local Hub cluster" deploy_cluster --provider k3d "${_hub_name}"

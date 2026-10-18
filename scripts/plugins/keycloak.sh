@@ -356,7 +356,7 @@ function _keycloak_ensure_e2e_client() {
    if [[ -z "$client_uuid" ]]; then
       if ! printf '%s' "$client_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
          -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
-         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients" | grep -qx '201'; then
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients" | grep -x '201' >/dev/null; then
          _err "[keycloak] Failed to create e2e-tests client"
          return 1
       fi
@@ -364,7 +364,7 @@ function _keycloak_ensure_e2e_client() {
       client_payload=$(printf '%s' "$client_payload" | jq --arg id "$client_uuid" '.id = $id')
       if ! printf '%s' "$client_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
          -X PUT -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
-         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients/${client_uuid}" | grep -qx '204'; then
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/clients/${client_uuid}" | grep -x '204' >/dev/null; then
          _err "[keycloak] Failed to update e2e-tests client"
          return 1
       fi
@@ -401,7 +401,7 @@ function _keycloak_ensure_e2e_identity() {
       user_payload='{"username":"e2e-user","enabled":true,"emailVerified":true,"email":"e2e-user@example.invalid","firstName":"E2E","lastName":"User","requiredActions":[]}'
       if ! printf '%s' "$user_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
          -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
-         --data-binary @- "${base_url}/admin/realms/${realm_name}/users" | grep -qx '201'; then
+         --data-binary @- "${base_url}/admin/realms/${realm_name}/users" | grep -x '201' >/dev/null; then
          _err "[keycloak] Failed to create e2e-user"
          return 1
       fi
@@ -417,7 +417,7 @@ function _keycloak_ensure_e2e_identity() {
       '{type:"password",value:$password,temporary:false}')
    if ! printf '%s' "$user_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
       -X PUT -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
-      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/reset-password" | grep -qx '204'; then
+      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/reset-password" | grep -x '204' >/dev/null; then
       _err "[keycloak] Failed to reset e2e-user password"
       return 1
    fi
@@ -428,7 +428,7 @@ function _keycloak_ensure_e2e_identity() {
    done | jq -s '.')
    if [[ "$(printf '%s' "$role_payload" | jq -r 'length' 2>/dev/null)" != 2 ]] || ! printf '%s' "$role_payload" | _curl -sS -o /dev/null -w '%{http_code}' \
       -X POST -H "Authorization: Bearer ${admin_token}" -H 'Content-Type: application/json' \
-      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/role-mappings/realm" | grep -qx '204'; then
+      --data-binary @- "${base_url}/admin/realms/${realm_name}/users/${user_id}/role-mappings/realm" | grep -x '204' >/dev/null; then
       _err "[keycloak] Failed to map e2e-user payment roles"
       return 1
    fi

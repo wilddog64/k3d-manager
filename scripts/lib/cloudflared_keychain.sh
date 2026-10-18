@@ -2,7 +2,7 @@
 # Helpers for the cloudflared Keychain backup format.
 
 function _cloudflared_base64_decode() {
-  if base64 --help 2>&1 | grep -q -- '--decode'; then
+  if base64 --help 2>&1 | grep -- '--decode' >/dev/null; then
     base64 --decode
   else
     base64 -D
