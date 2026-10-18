@@ -1,11 +1,13 @@
 # Bug: Bugs dashboard `Verified at` shows a bare date when the status was committed in the evening (Pacific)
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** VERIFIED — 2026-10-18: Claude fix; pytest 47/47, N1 red on pre-fix (other 2 reds are copy-location artifacts, same on a fixed copy); real row computes 2026-10-18 00:09Z; E2 live pending
+**Status:** LIVE-VERIFIED — 2026-10-18: fix `54ac5c4d`; pytest 47/47, N1 red on pre-fix; E2 operator screenshot after the next Hermes run: Hostinger pod IP pool row reads Verified at and Live verified at 2026-10-18 00:09Z
 **Priority:** P3 — cosmetic; the date is correct, only the time of day is missing
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead" (file and fix by Claude)
 **Release:** v1.43.4 (bug; exempt from the plan cap)
+**Fix commit:** 54ac5c4d
+**Live evidence:** 2026-10-18 · run hub-grafana-bugs-verified-at-screenshot · env hub/k3d-k3d-cluster · scenario bugs-dashboard/verified-at · commit 54ac5c4d · proves E2
 **Component:** `bin/k3dm-vectordb-metrics` (`_verification_commit`, `_with_commit_time`)
 
 ## Problem
