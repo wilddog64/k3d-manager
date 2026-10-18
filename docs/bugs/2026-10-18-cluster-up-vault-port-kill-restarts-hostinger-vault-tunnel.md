@@ -1,8 +1,10 @@
 # Bug: sandbox `make up` Step 4 kills Hostinger's Vault reverse tunnel while freeing port 18200
 
 **Filed:** 2026-10-18 (Claude, during live E2 of `2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`)
-**Status:** FIXED — 2026-10-18: `3499d201` (Claude); cleanup moved to `_acg_free_vault_local_port` with `lsof -ti -sTCP:LISTEN`; `cluster_up.bats` 60/60; the new client-survives test is red against the pre-fix selection (`client_alive` assertion), 5/5 stable; shellcheck 18 warnings before and after. Independent verifier (Sonnet, Acceptance-only, real listener/client fixtures) PASSED: 4/4 post-fix incl. an IPv6 ::1 listener probe; N1 red on pre-fix (754c9ee5); re-run by Claude. Awaiting live E2
+**Status:** LIVE-VERIFIED — 2026-10-18: `3499d201` (Claude); cleanup moved to `_acg_free_vault_local_port` with `lsof -ti -sTCP:LISTEN`; `cluster_up.bats` 60/60; the new client-survives test is red against the pre-fix selection (`client_alive` assertion), 5/5 stable; shellcheck 18 warnings before and after. Independent verifier (Sonnet, Acceptance-only, real listener/client fixtures) PASSED: 4/4 post-fix incl. an IPv6 ::1 listener probe; N1 red on pre-fix (754c9ee5); re-run by Claude. Live E2 passed (below)
 **Fix commit:** 3499d201
+**Live evidence:** 2026-10-18 · run sandbox-up-1953-pdt · env acg/ubuntu-k3s+hostinger · scenario cluster-up/step4-vault-port-keeps-hostinger-tunnel · commit a05061c9 · proves E2
+Step 4 logged "Port 18200 in use — killing stale vault port-forward listeners..." (the fixed path ran). `com.k3d-manager.ssh-tunnel-vault` was PID 31129 before and after (process start 19:26:40 PDT, before the run); launchd logged no `exited due` for any `com.k3d-manager.ssh-tunnel*` or `vault-port-forward` label from 19:52 to 20:07 PDT; Hostinger's main tunnel stayed PID 93261.
 **Priority:** P3 — Hostinger's Vault path drops for under a second and launchd restarts it; no workaround needed
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to fix it" (Claude fixes it directly, v1.43.4)
