@@ -1,7 +1,7 @@
 # Bug: PR Checks dashboard tables show `No data` when no PR is open, which reads as a fault
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** OPEN — fix specified, not dispatched
+**Status:** FIXED — 2026-10-18 by Claude (operator: "if it is small enough then you go work on it"); BATS 3/3, N1 red on pre-fix; E2 live pending
 **Priority:** P3 — cosmetic; the collector and dashboard are healthy
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "yes, file that bug" / "go ahead file a P3 tweak" (dispatch not yet approved)

@@ -275,7 +275,9 @@ do not: apply them with `make prometheus-rules`, which applies only
 Shows every open pull request's GitHub check-run state, overall verdict, and check duration for
 k3d-manager and lib-foundation. Hermes publishes it every five minutes through Pushgateway job
 `k3dm-pr-checks`, using one group per repo; the Repo filter is at the top. A Copilot review is not
-a check. Merged or closed PRs disappear on the next good poll. `GitHub read = failed` keeps the
+a check. Merged or closed PRs disappear on the next good poll. With no open PRs the two tables read
+`No open PRs`; that is normal, and **Last scrape** and **GitHub read** are the panels that show whether
+the collector is healthy. `GitHub read = failed` keeps the
 last good rows and usually means the Hermes GitHub token expired or was rejected.
 
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
