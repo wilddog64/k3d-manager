@@ -181,11 +181,11 @@ def _verification_commit(root, ref, path, pattern):
         timestamp = datetime.fromisoformat(committed).astimezone(timezone.utc)
     except (ValueError, TypeError, OverflowError):
         return None
-    return sha, timestamp.strftime("%Y-%m-%d %H:%MZ")
+    return sha, timestamp.strftime("%Y-%m-%d %H:%MZ"), committed[:10]
 
 
 def _with_commit_time(day, commit):
-    if day and commit and len(day) == 10 and commit[1].startswith(day):
+    if day and commit and len(day) == 10 and (commit[1].startswith(day) or commit[2:3] == (day,)):
         return commit[1]
     return day
 
