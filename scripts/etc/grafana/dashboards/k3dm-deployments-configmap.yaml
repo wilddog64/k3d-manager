@@ -33,7 +33,7 @@ data:
             }
           },
           "targets": [{
-            "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (provider, status) (k3dm_deployment_duration_seconds{action=\"up\"})",
             "legendFormat": "{{provider}} ({{status}})"
           }]
@@ -55,7 +55,7 @@ data:
             }
           },
           "targets": [{
-            "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (provider, status) (k3dm_deployment_duration_seconds{action=\"down\"})",
             "legendFormat": "{{provider}} ({{status}})"
           }]
@@ -78,7 +78,7 @@ data:
             }
           },
           "targets": [{
-            "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (action, provider) (k3dm_deployment_success)",
             "legendFormat": "{{action}}/{{provider}}"
           }]
@@ -96,7 +96,7 @@ data:
             }
           },
           "targets": [{
-            "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (action, provider) (k3dm_deployment_last_timestamp_seconds) * 1000",
             "legendFormat": "{{action}}/{{provider}}"
           }]
@@ -115,7 +115,7 @@ data:
             }
           },
           "targets": [{
-            "datasource": { "type": "prometheus", "uid": "P5A1115AEDF367D43" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "expr": "max by (action, provider, status) (k3dm_deployment_duration_seconds)",
             "legendFormat": "{{action}}/{{provider}} ({{status}})"
           }]

@@ -17,6 +17,8 @@
 
 set -euo pipefail
 
+_k3dm_deployment_start_epoch="$(date +%s)"
+
 # launchd starts this script with the plist's minimal PATH, which omits
 # ~/.local/bin where k3d and istioctl live. Without this, every Slack-driven
 # run dies at the Step 3.5 hub preflight while the same command succeeds from a
@@ -28,6 +30,7 @@ fi
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 # shellcheck source=scripts/lib/cloudflared_keychain.sh
 source "${REPO_ROOT}/scripts/lib/cloudflared_keychain.sh"
@@ -205,6 +208,12 @@ function _acg_keycloak_ldap_provider_id() {
 
 function _acg_up_cleanup() {
   local _exit_code=$?
+  if declare -f _k3dm_push_deployment_metrics >/dev/null 2>&1; then
+    local _duration_secs=$(( $(date +%s) - _k3dm_deployment_start_epoch ))
+    _k3dm_push_deployment_metrics "up" "${_cluster_provider}" \
+      "$([[ "${_exit_code}" -eq 0 ]] && printf 'success' || printf 'failed')" \
+      "${_duration_secs}" "cli-${_k3dm_deployment_start_epoch}-$$" || true
+  fi
   [[ "${_exit_code}" -eq 0 ]] && return
   _warn "[acg-up] failed (exit ${_exit_code}) — cleaning up local processes..."
   for _pid_file in vault-pf frontend-pf acg-prom-pf; do

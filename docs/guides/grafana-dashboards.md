@@ -471,6 +471,10 @@ because lib-foundation has no release branch.
 
 ### k3dm Deployment Metrics (`k3dm-deployments`) — ACG only
 
+CLI runs publish to the hub Pushgateway under `job="k3dm-cli"`; webhook runs keep
+`job="k3dm-webhook"`. Set `K3DM_DEPLOYMENT_METRICS=0` to disable the CLI push. The panels
+query the `prometheus` datasource uid.
+
 | Panel | Query |
 |---|---|
 | Last acg-up / acg-down Duration | `max by (provider, status) (k3dm_deployment_duration_seconds{action="up"\|"down"})` |
