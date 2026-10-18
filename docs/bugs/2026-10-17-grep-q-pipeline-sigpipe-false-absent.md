@@ -1,8 +1,8 @@
 # Bug: `producer | grep -q` under pipefail reports a present match as absent
 
-**Status:** open — e2e.sh instances fixed in the e2e-sandbox-provision task (v1.43.4); the rest unaudited
+**Status:** OPEN — e2e.sh instances fixed in the e2e-sandbox-provision task (v1.43.4); remaining sweep specified 2026-10-18, dispatched to Codex
 **Priority:** P3
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-18: "others please dispatch to codex" (v1.43.4 bug)
 **Found:** 2026-10-17, by the independent acceptance verifier for e2e-sandbox-provision
 
 ## Symptom
@@ -37,6 +37,82 @@ See the two "more contexts follow it in the listing" tests in
 
 ## Remaining scope
 
-`grep -rE '\| *grep -q'` finds about 50 occurrences across `scripts/` and `bin/` (excluding
-vendored `node_modules`). Audit each: it matters only where the producer can write after the
-matching line AND the shell has pipefail on. Fix those with the pattern above; leave the rest.
+As of 2026-10-18, `grep -rn '| *grep -q' scripts bin` (excluding `scripts/tests/` and
+`node_modules`) finds 105 occurrences in about 30 files. A per-site audit of "can the producer
+write after the match" is slower and riskier than converting every site, and the conversion is
+behaviour-preserving: `grep -q` and `grep … >/dev/null` give the same exit status; the only
+difference is that the second reads its input to EOF. So the fix converts every site except
+the exclusions below.
+
+The highest-stakes site is `scripts/etc/hostinger/k3dm-cni-ipam-sweep.sh` lines 44 and 48 (a
+false "absent" there would delete a live pod's IP reservation). It is safe today only because the
+whole `printf` fits in one pipe-buffer write; convert it like the rest.
+
+## Fix
+
+1. In every file under `scripts/` and `bin/`, except the exclusions, rewrite each pipeline
+   `PRODUCER | grep -q<flags> ARGS` to `PRODUCER | grep -<flags-without-q> ARGS >/dev/null`.
+   Keep every other flag and argument exactly (`-qx` → `-x`, `-qE` → `-E`, `-qxF --` → `-xF --`,
+   bare `-q` → no flag). If the site already redirects stderr (`2>/dev/null`) keep it. Where grep
+   ends a `&&`/`||` chain or sits in `if`, only the grep words change.
+2. **Exclusions — do not edit:**
+   - `scripts/lib/foundation/` (lib-foundation subtree; list its sites in the report for an
+     upstream follow-up).
+   - `scripts/tests/` (test code).
+   - `scripts/etc/ldap/ldap-password-rotator.yaml.tmpl` and `scripts/etc/e2e/redis.yaml`: these run
+     in container `/bin/sh` without `pipefail`, so they cannot misfire.
+   - Any site whose producer streams forever (`-f`, `--follow`, `--watch`, `tail -f`): converting it
+     would hang. The 2026-10-18 scan found none; if Codex finds one, leave it and list it.
+3. Add `scripts/tests/fixtures/grep-q-pipe-allowlist.txt`, one `path` per line, listing the two
+   container files above (and any streaming site from step 2).
+4. Add `scripts/tests/lib/grep_q_pipe_guard.bats`:
+   - Guard: `grep -rnE '\| *grep +-[A-Za-z]*q' scripts bin` (excluding `scripts/tests/`,
+     `scripts/lib/foundation/`, `node_modules`, and allowlisted paths) finds nothing.
+   - Behaviour: the deterministic SIGPIPE shape from the e2e tests (producer prints the match,
+     `sleep 0.3`, prints another line; `set -o pipefail`) — `producer | grep -x match >/dev/null`
+     succeeds every time across 5 iterations.
+   - CNI sweep: run `scripts/etc/hostinger/k3dm-cni-ipam-sweep.sh`'s existing BATS suites unchanged.
+5. If a converted site lives in a file that ships to a host (the CNI sweep script), note in the
+   report that the operator must reinstall it with `make refresh CLUSTER_PROVIDER=k3s-hostinger`.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: Outside scripts/tests/, scripts/lib/foundation/, node_modules and the allowlist, no file under scripts/ or bin/ contains a pipeline into grep with a -q flag.
+  - id: M2
+    text: Every converted grep keeps its other flags, pattern and arguments, and redirects stdout to /dev/null.
+  - id: M3
+    text: grep_q_pipe_guard.bats exists, passes, and fails if a new "| grep -q" is added to a non-allowlisted file.
+  - id: M4
+    text: The full make test suite and make test-pytest pass with no new failures versus the pre-fix branch.
+must_not:
+  - id: N1
+    text: Under pipefail, a pipeline whose producer writes after the matching line must not report the match absent (the guard's behaviour test is red when its pipeline uses grep -q).
+  - id: N2
+    text: No file under scripts/lib/foundation/, scripts/tests/ (other than the new guard and fixture), or the allowlist changes.
+  - id: N3
+    text: No converted site prints grep's matching lines to stdout or the terminal.
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, M4, N1, N2, N3]
+    kind: offline
+    text: bats scripts/tests/lib/grep_q_pipe_guard.bats plus the suites for every touched file (CNI sweep, e2e preflight, k3s providers), shellcheck on every touched shell file, make test and make test-pytest; N1 shown red by pointing the behaviour test at a grep -q pipeline; M3 shown red by a temp copy containing a new grep -q.
+interface:
+  - Shell pipelines of the form PRODUCER | grep -q… under scripts/ and bin/
+  - scripts/tests/fixtures/grep-q-pipe-allowlist.txt
+```
+
+## Definition of Done
+
+- [ ] E1 green; red demonstrations pasted; `git diff --stat` lists only converted files, the allowlist and the guard test.
+- [ ] Report lists: converted-site count per file, the lib-foundation sites left for upstream, and any streaming site skipped.
+- [ ] Commit message verbatim: `fix: read grep matches to EOF so pipefail cannot turn SIGPIPE into a false miss`
+- [ ] Pushed to `origin/k3d-manager-v1.43.4`; memory-bank updated with the SHA.
+
+## What NOT to Do
+
+- Do NOT create a PR, merge, or commit to `main`. Do NOT use `--no-verify`.
+- Do NOT change any other part of a line, refactor surrounding code, or "fix" unrelated issues found on the way.
+- Do NOT modify `scripts/lib/foundation/`. Do NOT run anything against a host or cluster.
