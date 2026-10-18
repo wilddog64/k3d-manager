@@ -1,7 +1,7 @@
 # Bug: a sandbox `make up` mistakes Hostinger's SSH tunnel for its own, so the sandbox never gets a Vault reverse tunnel
 
 **Filed:** 2026-10-18 (Claude, from the operator's `make up CLUSTER_PROVIDER=k3s-aws` at 18:30 PDT 2026-10-17)
-**Status:** FIXED — 2026-10-18: `17c7cda5` (Codex, landed in scope; 199 BATS green; 7 new tests red on pre-fix) + `152f7978` (Claude: `bin/cluster-status` and `bin/k3dm-webhook` tunnel probes moved to the sandbox port, from the Step 0 grep). Awaiting the independent verifier and live E2/E3.
+**Status:** FIXED — 2026-10-18: `17c7cda5` (Codex, landed in scope; 199 BATS green; 7 new tests red on pre-fix) + `152f7978` (Claude: `bin/cluster-status` and `bin/k3dm-webhook` tunnel probes moved to the sandbox port, from the Step 0 grep). Independent verifier (Sonnet, Acceptance-only, offline evidence) PASSED: tunnel 16/16 + frontend 7/7 on 7791b17f; every red-on-pre-fix must_not red on ccf5dbfc (re-run by Claude). Awaiting live E2/E3.
 **Fix commit:** 17c7cda5, 152f7978
 **Priority:** P1 — a sandbox `make up` fails whenever the Hostinger tunnel is up, and the only workaround in `docs/issues/2026-07-07-two-cluster-vault-bridge-css-not-ready-k3s-aws.md` (one remote cluster at a time) means taking down the public Hostinger site
 **Severity:** high

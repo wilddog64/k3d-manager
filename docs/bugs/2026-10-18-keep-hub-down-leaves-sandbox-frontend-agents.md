@@ -1,7 +1,7 @@
 # Bug: a keep-hub sandbox `make down` leaves the sandbox frontend port-forward crash-looping and its browser listener daemon running
 
 **Filed:** 2026-10-18 (Claude, while checking E3 of `docs/bugs/2026-10-17-make-down-keep-hub-leaves-sandbox-pushgateway-forward.md`)
-**Status:** FIXED — 2026-10-18: Part B of `17c7cda5` (cluster-down tests red on pre-fix). Awaiting the independent verifier and live E2.
+**Status:** FIXED — 2026-10-18: Part B of `17c7cda5` (cluster-down tests red on pre-fix). Independent verifier (Sonnet, Acceptance-only, offline evidence) PASSED: tunnel 16/16 + frontend 7/7 on 7791b17f; every red-on-pre-fix must_not red on ccf5dbfc (re-run by Claude). Awaiting live E2.
 **Fix commit:** 17c7cda5
 **Priority:** P3 — leftover laptop processes; the hub and Hostinger are not affected
 **Severity:** low
