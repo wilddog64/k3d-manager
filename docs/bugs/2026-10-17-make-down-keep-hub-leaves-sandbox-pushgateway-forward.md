@@ -1,9 +1,11 @@
 # Bug: `make down` that keeps the hub leaves the sandbox's Pushgateway port-forward crash-looping
 
-**Status:** VERIFIED — 2026-10-17: fix `c99c8b3a` (Codex; Claude re-ran outside the sandbox): cluster_down.bats + provider_marker 34/34, cluster_down_acceptance 11/11, shellcheck clean; N1 red on pre-fix `bin/cluster-down`; N2 red under a mutation that runs hub cleanup on keep-hub. E3 live (next sandbox `make down`) pending
+**Status:** LIVE-VERIFIED — 2026-10-17: fix `c99c8b3a` (Codex; Claude re-ran outside the sandbox): cluster_down.bats + provider_marker 34/34, cluster_down_acceptance 11/11, shellcheck clean; N1 red on pre-fix `bin/cluster-down`; N2 red under a mutation that runs hub cleanup on keep-hub. LIVE-VERIFIED 2026-10-18: E3 after the operator's `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` (18:39 PDT 10-17): `launchctl list` has no `com.k3d-manager.sandbox.*` agent; Hostinger `pushgateway-port-forward`, `hub-pushgateway-port-forward`, `alertmanager-*`, `keycloak-port-forward`, `cloudflare-tunnel` and both `ssh-tunnel*` agents still loaded. Two sandbox leftovers outside this bug's tested scope are filed as `docs/bugs/2026-10-18-keep-hub-down-leaves-sandbox-frontend-agents.md`
 **Priority:** P3
 **Severity:** low
 **Approval:** approved — operator, 2026-10-17: "go ahead to dispatch that P3 bug to codex"
+**Fix commit:** c99c8b3a
+**Live evidence:** 2026-10-18 · run make-down-k3s-aws-keep-local-launchctl-list · env laptop/launchd-gui · scenario cluster-down/keep-hub-sandbox-agents · commit c99c8b3a · proves E3
 **Found:** 2026-10-17, Claude, checking the operator's `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`
 **Affected:** `bin/cluster-down` (sandbox launchd cleanup), macOS laptop launchd state
 
