@@ -103,3 +103,18 @@ assert "time picker" in var["description"]
 PY
   [ "$status" -eq 0 ]
 }
+
+@test "agent dispatch dashboard: rework rate stat reads the selected window" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
+panel = next(p for p in dashboard["panels"] if p["title"] == "Rework rate")
+assert panel["type"] == "stat"
+assert [t["expr"] for t in panel["targets"]] == ['k3dm_dispatch_rework_ratio{window="$window"}']
+assert panel["fieldConfig"]["defaults"]["unit"] == "percentunit"
+assert "independent verifier" in panel["description"]
+PY
+  [ "$status" -eq 0 ]
+}

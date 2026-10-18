@@ -325,6 +325,15 @@ lists Codex tokens, Codex time, time to land, and Codex runs for the newest 50 l
 selected window. Tokens are the session total from the spec's last run; only dispatcher-launched
 specs appear, because a bare `codex exec` writes no ledger event.
 
+**Rework rate** is the share of landed specs in the window that needed a second pass, for any of
+three causes: Codex ran more than once, the integration gate refused the land for failing tests,
+or Claude changed lines between Codex's finished tree and what landed. Rebase and scope refusals
+are not rework: a rebase refusal means `main` moved, and a scope refusal is the dispatcher's own
+guard. `k3dm_dispatch_rework_landed{cause=...}` gives the count per cause (`rerun`, `tests`,
+`claude_edit`, `any`); a spec can count under several. The independent verifier's verdict is not
+recorded in the ledger, so a correction it asks for shows up only through the re-run or Claude edit
+that follows.
+
 ### k3dm Bug Tracking (`k3dm-bugs`) — hub
 
 Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb-metrics`.
