@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.4] - 2026-10-18
+
 ### Added
 
 - **Bug Tracking records live-verification evidence.** Bug docs can record the date, run,
