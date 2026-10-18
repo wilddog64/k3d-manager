@@ -1,7 +1,7 @@
 # Bug: k3dm Deployment Metrics dashboard is empty: hub datasource uid missing, CLI runs never publish
 
 **Filed:** 2026-10-18 (Claude, from the operator's screenshot after four `make up` / `make down` runs)
-**Status:** FIXED — `47b4903a` (Codex), verified offline by Claude 2026-10-18; E3 (live `make up` → `make down`) pending
+**Status:** LIVE-VERIFIED 2026-10-18 — the operator's real `make up` and `make down` (k3s-aws, KEEP_LOCAL=1) show on the hub dashboard as `up/aws` SUCCESS 12.3 min and `down/aws` SUCCESS 2.12 min; fixed in `47b4903a`, test-leak guard `e37bd31a`
 **Fix commit:** `47b4903a`
 **Priority:** P2 — lifecycle runs are invisible on the dashboard; the workaround is to read the run logs
 **Severity:** medium
@@ -187,3 +187,12 @@ at 12.3 min and `down/aws (success)` at about 2.1 min, with no datasource error.
 showed the leaked test series; that display is fixed separately in
 `docs/bugs/2026-10-18-deployment-stat-tiles-cramped-and-show-stale-runs.md`. Marking LIVE-VERIFIED
 waits for the tiles after `make platform-ops`.
+
+## Live verification (Claude, from the operator's screenshot, 2026-10-18 ~14:10 PDT)
+
+After `make platform-ops`, the hub's **k3dm Deployment Metrics** tiles read `up/aws` 12.3 mins and
+SUCCESS, `down/aws` 2.12 mins and SUCCESS, with no datasource error. Both runs came from the
+operator's working tree on `k3d-manager-v1.43.5` after `47b4903a`. The evidence line cites the fix
+commit, because the exact HEAD each run used was not recorded.
+
+**Live evidence:** 2026-10-18 · run operator-make-up-then-make-down · env k3d-k3d-cluster · scenario cli-up-down-k3s-aws-keep-local · commit 47b4903a · proves E3

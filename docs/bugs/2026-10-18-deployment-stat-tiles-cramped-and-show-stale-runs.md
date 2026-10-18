@@ -1,7 +1,8 @@
 # Bug: deployment dashboard stat tiles are cramped and show runs the Pushgateway no longer holds
 
 **Filed:** 2026-10-18 (Claude, from the operator's dashboard screenshots after the E3 `make up` / `make down`)
-**Status:** FIXED — Claude 2026-10-18, verified offline; live check after the next `make platform-ops`
+**Status:** LIVE-VERIFIED 2026-10-18 — after `make platform-ops` the tiles list one series per row, and `aws (failed)` is gone from the tiles while the graph still shows it; fixed in `36a00e12`
+**Fix commit:** `36a00e12`
 **Priority:** P3 — cosmetic and misleading tiles; the underlying series are correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead"
@@ -74,4 +75,11 @@ interface:
 
 - E1: `observability_deployment_dashboard.bats` 3/3 and `deployment_metrics.bats` 8/8 green. The new
   test fails on a copy of the pre-fix dashboard in a scratch tree ("not an instant query").
-- E2: pending the operator's `make platform-ops`.
+- E2 (operator's screenshot after `make platform-ops` from `e37bd31a`, 2026-10-18 ~14:10 PDT): every
+  tile lists one row per series with the name on the left and the value on the right, and nothing is
+  cut off. `aws (failed)` is gone from "Last acg-down Duration" but still in the graph's legend, so the
+  tiles read current Pushgateway state, not history (N2). `down/somethingelse` still shows because the
+  group is still on the Pushgateway (the operator's earlier DELETE did not remove it). That is correct
+  instant-query behaviour, not a regression.
+
+**Live evidence:** 2026-10-18 · run make-platform-ops · env k3d-k3d-cluster · scenario hub-dashboard-after-platform-ops · commit e37bd31a · proves E2
