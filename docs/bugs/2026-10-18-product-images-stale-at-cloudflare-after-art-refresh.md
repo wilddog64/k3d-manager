@@ -1,13 +1,14 @@
 # Bug: refreshed product images stay stale at Cloudflare for up to 4 hours
 
 **Filed:** 2026-10-18 (Claude, found while verifying the slug-tag fix)
-**Status:** OPEN
+**Status:** FIXED on branch — awaiting PR, merge and rollout
 **Priority:** P3 — cosmetic; new art appears on its own once the cache expires, or after a manual purge
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to file a P3"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-frontend` on a feature branch
 **Release:** v1.43.5
 **Component:** `shopping-cart-frontend`: `nginx.conf` (`location ^~ /minio/product-images/`)
+**Fix commit:** shopping-cart-frontend `a6a951f5` (branch `fix/product-image-cache-ttl`, with Codex `8c934788`)
 
 ## Symptom
 
@@ -40,7 +41,7 @@ tells the edge or the browser to fetch again.
 - **F1.** In `nginx.conf`, inside `location ^~ /minio/product-images/`, add:
   ```nginx
           proxy_hide_header Cache-Control;
-          add_header Cache-Control "public, max-age=300" always;
+          expires 5m;
   ```
   Change nothing else in the location (proxy target and headers stay, per N2). The `^~` prefix keeps
   the regex `expires 1y` / `immutable` static-asset block from applying to these URLs. Keep it that
@@ -57,7 +58,7 @@ sets Browser Cache TTL to "Respect Existing Headers" for the zone, or adds a Cac
 ```yaml
 must:
   - id: M1
-    text: Responses under /minio/product-images/ carry Cache-Control "public, max-age=300" from the origin.
+    text: Responses under /minio/product-images/ carry Cache-Control max-age=300 from the origin and keep the server-level security headers.
   - id: M2
     text: After an art refresh, the new image is served at the plain URL within 5 minutes, with no purge.
 must_not:
@@ -91,3 +92,13 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT call the Cloudflare API or change zone settings; that is the operator's.
 - Do NOT touch the catalog seed or the MinIO uploader.
+
+## Verification log
+
+- 2026-10-18: Codex `8c934788` implemented F1 as first written (`add_header Cache-Control ... always`).
+  Claude found that an `add_header` inside a location stops nginx inheriting the server-level
+  `add_header` set, so image responses lost `X-Content-Type-Options`, CSP, `X-Frame-Options`,
+  `Referrer-Policy` and `Permissions-Policy`. Confirmed in `nginx:1.31-alpine` with a stub MinIO
+  upstream. F1 is now `expires 5m;` (`a6a951f5`). The same container check shows `Cache-Control: max-age=300` plus all
+  five headers. The test rejects `add_header` in the block and fails on both the pre-fix conf and
+  Codex's conf; vitest 31/31 and lint pass.

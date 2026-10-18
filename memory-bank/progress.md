@@ -2769,3 +2769,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: slug-tag fix is in MinIO (22:51Z, marker 2); Cloudflare edge serves July copies (max-age 4h). Operator: purge or wait, then E2 screenshot.
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-product-images-stale-at-cloudflare-after-art-refresh.md (nginx short TTL on /minio/product-images/; URL versioning rejected: seed is ON CONFLICT DO NOTHING). Not yet dispatched.
 - 2026-10-18: Cloudflare-stale P3 dispatched to Codex (shopping-cart-frontend fix/product-image-cache-ttl).
+- 2026-10-18: Cloudflare-stale P3 fixed on shopping-cart-frontend fix/product-image-cache-ttl (Codex 8c934788 + Claude a6a951f5: expires 5m instead of add_header, which dropped the security headers). Next: PR.
