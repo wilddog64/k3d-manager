@@ -1,6 +1,6 @@
 # Bug: `producer | grep -q` under pipefail reports a present match as absent
 
-**Status:** OPEN — e2e.sh instances fixed in the e2e-sandbox-provision task (v1.43.4); remaining sweep specified 2026-10-18; first Codex run aborted by Claude (it edited excluded paths, `scripts/lib/foundation/` and tests, with a line-number `perl -pi` that kept `-q`); Codex reverted its own edits, nothing committed; re-dispatch pending
+**Status:** FIXED — `0fc16826` (Codex sweep, committed by Claude after the pre-commit if-count audit blocked Codex on the deprecated `_jenkins_run_smoke_test`, now allowlisted); 104/104 sites, per-line equivalence checked; guard BATS 2/2 and N1/M3 red on pre-fix; touched suites 420/420
 **Priority:** P3
 **Approval:** approved — operator, 2026-10-18: "others please dispatch to codex" (v1.43.4 bug)
 **Found:** 2026-10-17, by the independent acceptance verifier for e2e-sandbox-provision
