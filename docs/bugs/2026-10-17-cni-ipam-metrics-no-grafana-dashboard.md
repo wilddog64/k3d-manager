@@ -1,7 +1,7 @@
 # Bug: Hostinger pod IP pool metrics have no Grafana dashboard; the triage guide cites panels that do not exist
 
 **Filed:** 2026-10-17 (Claude, after the CNI IPAM fix went live)
-**Status:** OPEN — fix specified, not dispatched
+**Status:** FIX COMMITTED — `21f48c28` (Codex); verified offline 2026-10-17; E2 live pending
 **Priority:** P3 — the alerts work; only the at-a-glance view and the guide row are missing or wrong
 **Severity:** low
 **Approval:** approved — operator, 2026-10-17: "go ahead" (to a Pod IP pool dashboard plus the triage-row fix)
@@ -79,7 +79,7 @@ Replace the triage row at line 614 (old → new):
 Add one row to the dashboard inventory table (line 26 area), directly after `k3dm Host Disk`:
 
 ```
-| k3dm Host Pod IP Pool | `k3dm-host-cni-ipam` | `platform-ops/grafana-dashboard-host-cni-ipam.yaml` | `make platform-ops` | hub |
+| k3dm Host Pod IP Pool | `k3dm-host-cni-ipam` | `platform-ops/grafana-dashboard-host-cni-ipam.yaml` | ArgoCD app `hub-grafana-dashboards` | hub |
 ```
 
 ### 3. Test `scripts/tests/bin/test_cni_ipam_dashboard.py`
@@ -115,7 +115,7 @@ evidence:
   - id: E2
     proves: [M1, M2]
     kind: live
-    text: After push, the operator runs make platform-ops from k3d-manager-v1.43.4 (the inventory's deploy path for Host Disk; the hub-grafana-dashboards ApplicationSet also includes grafana-dashboard-*.yaml once reapplied); Claude or the operator opens "k3dm Host Pod IP Pool" and every stat shows a value (Pool used % about 18, Probe status up).
+    text: After push, ArgoCD app hub-grafana-dashboards (tracking k3d-manager-v1.43.4, include grafana-dashboard-*.yaml) syncs the ConfigMap — make platform-ops applies only a fixed list of five dashboards and does not deploy this one; Claude or the operator opens "k3dm Host Pod IP Pool" and every stat shows a value (Pool used % about 18, Probe status up).
 interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-host-cni-ipam.yaml (ConfigMap, data key host-cni-ipam.json)
   - docs/guides/grafana-dashboards.md triage table
