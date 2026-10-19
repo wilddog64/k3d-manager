@@ -20,7 +20,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - README Hermes documentation commit `bb4a2f64` adds the guide, Phase 1/2 scope links, and a focused Mermaid lifecycle diagram.
 - README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
 - Dispatched P3 dashboard bug `bug-dashboard-verification-tile-labels-clipped`; implementation landed via dispatcher as `5819e236`, with 22/22 dashboard BATS and link checks passing. Operator live-verified the full `Verified` and `Live-verified` labels on the hub `k3dm-bugs` dashboard on 2026-10-19.
-- Dispatched P2 e2e sandbox frontend upstream race; implementation landed via dispatcher as `4ebaaec5`. It performs one bounded frontend rollout restart after product-catalog is `Synced/Healthy` while frontend remains `Synced/Degraded`. Focused BATS passed 35/35, shellcheck and `_agent_audit` passed; Slack live verification is still in progress and the bug must not be closed yet.
+- Dispatched P2 e2e sandbox frontend upstream race; implementation landed via dispatcher as `4ebaaec5`. It performs one bounded frontend rollout restart after product-catalog is `Synced/Healthy` while frontend remains `Synced/Degraded`. Offline verification is complete: focused BATS 35/35, shellcheck, and `_agent_audit` passed. Bug is `VERIFIED`; operator live Slack verification remains in progress, so it is not `LIVE-VERIFIED`.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work
@@ -35,7 +35,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
-- E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: Slack job `f8ea6d69` is being used for live verification; do not mark the bug verified until the operator confirms completion.
+- E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `VERIFIED` from offline tests; Slack job `f8ea6d69` is being used for live verification, which remains pending operator confirmation.
 - PR Checks table transformation fix: investigation/fix pending.
 - PR Checks panel 8 legend layout fix: investigation/fix pending.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.

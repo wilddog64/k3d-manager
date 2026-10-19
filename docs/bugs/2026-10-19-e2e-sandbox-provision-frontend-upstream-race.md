@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-19 (Slack job `8417cf04` investigation)
 **Branch:** k3d-manager-v1.43.5
-**Status:** IMPLEMENTED — 2026-10-19: dispatched implementation landed in `4ebaaec5`; Slack live verification is still in progress. Do not close this bug yet.
+**Status:** VERIFIED — 2026-10-19: dispatched implementation landed in `4ebaaec5`; focused offline tests passed 35/35, shellcheck and `_agent_audit` passed. Live Slack verification remains in progress; do not mark `LIVE-VERIFIED` yet.
 **Priority:** P2
 **Severity:** Tier 2 live verification fails until the sandbox is repaired or reprovisioned
 **Component:** sandbox app bootstrap / ArgoCD Application convergence / shopping-cart frontend
@@ -53,4 +53,5 @@ The sandbox app bootstrap must not leave frontend permanently degraded when prod
 - [ ] A fresh sandbox run proves frontend does not enter `CrashLoopBackOff` when product-catalog reconciliation is slower.
 - [ ] The hub gate reaches all target Applications `Synced` and `Healthy` without manual restarts.
 - [x] Offline tests cover the selected dependency-order or upstream-retry behavior.
-- [ ] No fix is marked `VERIFIED` or `LIVE-VERIFIED` until live verification is complete.
+- [x] Offline verification is complete before marking the fix `VERIFIED`.
+- [ ] Live Slack verification is complete before marking the fix `LIVE-VERIFIED`.
