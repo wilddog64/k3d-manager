@@ -72,6 +72,10 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 `/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
 
+### Confirming a mutating command
+
+`confirm` is the only confirmation keyword on Slack. The HTTP API uses `"confirm": true`, and Make uses `CONFIRM=1`. `/cluster-up` and `/cluster-down` are out of scope: they run by default and take `dry-run`.
+
 Every relayed command is capped at the caller's mapped Slack role; unmapped users receive the `reader` role.
 
 The relay forwards these metadata headers to the webhook:

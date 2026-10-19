@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Slack `cleanup-stale-sandbox` now accepts only `confirm` for mutating runs and labels queued
+  cleanup work as `confirm` or `preview`.
+
 - Hermes PR Checks now cover the seven shopping-cart repositories in addition to k3d-manager and
   lib-foundation.
 

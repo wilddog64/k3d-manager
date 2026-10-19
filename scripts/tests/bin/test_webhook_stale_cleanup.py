@@ -105,9 +105,34 @@ def test_notify_job_uses_bot_for_a_new_thread(monkeypatch, tmp_path):
     assert calls == [(('cleanup complete',), {'thread_ts': '1700000000.000001', 'channel_id': 'C123'})]
 
 
-def test_thread_cleanup_passes_channel_to_worker(monkeypatch, tmp_path):
+def test_thread_cleanup_confirm_passes_channel_to_worker(monkeypatch, tmp_path):
     monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
     monkeypatch.setattr(webhook, "_notify_job", lambda *_args: None)
+    started = []
+
+    class _Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(webhook.threading, "Thread", _Thread)
+    (tmp_path / "parent").mkdir()
+    (tmp_path / "parent" / "thread_ts").write_text("1700000000.000001")
+
+    webhook._handle_thread_command(
+        "parent", "cleanup-stale-sandbox confirm", role="admin", channel_id="C123"
+    )
+
+    assert started[0][0] is webhook._run_stale_sandbox_cleanup
+    assert started[0][1] == ("parent", True, "C123")
+
+
+def test_thread_cleanup_apply_is_rejected_without_starting_worker(monkeypatch, tmp_path):
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    notifications = []
+    monkeypatch.setattr(webhook, "_notify_job", lambda job, text: notifications.append((job, text)))
     started = []
 
     class _Thread:
@@ -125,5 +150,43 @@ def test_thread_cleanup_passes_channel_to_worker(monkeypatch, tmp_path):
         "parent", "cleanup-stale-sandbox apply", role="admin", channel_id="C123"
     )
 
-    assert started[0][0] is webhook._run_stale_sandbox_cleanup
-    assert started[0][1] == ("parent", True, "C123")
+    assert started == []
+    assert notifications == [
+        ("parent", "❌ `apply` is no longer accepted — use `cleanup-stale-sandbox confirm`.")
+    ]
+
+
+def test_thread_cleanup_labels_are_preview_and_confirm(monkeypatch, tmp_path):
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    notifications = []
+    monkeypatch.setattr(webhook, "_notify_job", lambda job, text: notifications.append(text))
+    started = []
+
+    class _Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append(args)
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(webhook.threading, "Thread", _Thread)
+    (tmp_path / "parent").mkdir()
+    for command in ("cleanup-stale-sandbox", "cleanup-stale-sandbox preview", "cleanup-stale-sandbox confirm"):
+        webhook._handle_thread_command("parent", command, role="admin", channel_id="C123")
+
+    assert [args[1] for args in started] == [False, False, True]
+    assert notifications == [
+        "🧹 *cleanup-stale-sandbox* (preview) queued",
+        "🧹 *cleanup-stale-sandbox* (preview) queued",
+        "🧹 *cleanup-stale-sandbox* (confirm) queued",
+    ]
+
+
+def test_cleanup_thread_header_uses_confirm_label(monkeypatch, tmp_path):
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    headers = []
+    monkeypatch.setattr(webhook, "_start_bot_thread", lambda text, channel_id="": headers.append(text) or None)
+    monkeypatch.setattr(webhook, "_spawn_capture_text", lambda cmd, timeout=None: (0, "", False))
+    monkeypatch.setattr(webhook, "_notify_job", lambda *_args: None)
+    webhook._run_stale_sandbox_cleanup("job1", confirm=True, channel_id="C123")
+    assert headers == ["🧹 *cleanup-stale-sandbox* (confirm) queued"]

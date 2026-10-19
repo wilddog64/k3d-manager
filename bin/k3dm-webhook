@@ -504,7 +504,7 @@ def _run_stale_sandbox_cleanup(job_id, confirm=False, channel_id=""):
     (job_dir / "status").write_text("running")
     thread_ts_file = job_dir / "thread_ts"
     if not thread_ts_file.exists() and channel_id:
-        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'apply' if confirm else 'preview'}) queued"
+        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'confirm' if confirm else 'preview'}) queued"
         _thread_ts = _start_bot_thread(_thread_header, channel_id=channel_id)
         if _thread_ts:
             thread_ts_file.write_text(_thread_ts)
@@ -958,13 +958,16 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     elif cmd == "cleanup-stale-sandbox":
         _parts = command.strip().split()
         _cleanup_action = _parts[1].lower() if len(_parts) > 1 else "preview"
-        if _cleanup_action not in ("preview", "confirm", "apply"):
-            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm|apply]`")
+        if _cleanup_action == "apply":
+            _notify_job(job_id, "❌ `apply` is no longer accepted — use `cleanup-stale-sandbox confirm`.")
             return
-        _confirm = _cleanup_action in ("confirm", "apply")
+        if _cleanup_action not in ("preview", "confirm"):
+            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm]`")
+            return
+        _confirm = _cleanup_action == "confirm"
         threading.Thread(target=_run_stale_sandbox_cleanup,
                          args=(job_id, _confirm, channel_id), daemon=True).start()
-        _tag = "apply" if _confirm else "dry-run"
+        _tag = "confirm" if _confirm else "preview"
         _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 
     elif cmd in ("cluster-up", "up"):
