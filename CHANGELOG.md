@@ -7,6 +7,10 @@
 - Hermes PR Checks now cover the seven shopping-cart repositories in addition to k3d-manager and
   lib-foundation.
 
+- **Bug Tracking now requires live proof to name its fix commit.** Newly LIVE-VERIFIED bug
+  documents must include a **Fix commit:** header, and at least one evidence commit must contain
+  that fix; this prevents valid pre-squash release-branch proof from being reported as stale.
+
 ## [1.43.4] - 2026-10-18
 
 ### Added
