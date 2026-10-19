@@ -1,7 +1,8 @@
 # Bug: PR Checks dashboard never shows shopping-cart pull requests
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting hub Hermes rollout + E3
+**Fix commit:** `10b49424`
 **Priority:** P3 — observability gap; the PRs and their checks are still visible on GitHub
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to do that" (filing); "go ahead to dispatch those three P3 to codex" (dispatch, 2026-10-18)
@@ -118,3 +119,4 @@ interface:
 - 2026-10-18: filed. GitHub shows k3d-manager #145 open 05:56–12:01 PDT, matching the dashboard; the
   shopping-cart-frontend #127/#128 activity the same day is absent.
 - 2026-10-18: live risk cleared. Operator screenshot: `k3dm-hermes-gh-token` already covers all seven shopping-cart repos plus k3d-manager and lib-foundation, with Actions, Checks, Commit statuses and Contents read-only. It has no Pull requests permission, but all nine repos are public, the same way k3d-manager PR listing already works.
+- 2026-10-18: Codex (dispatcher) fix landed `10b49424`. Claude verified: `pytest scripts/tests/hermes` 272 passed; pre-fix `REPOS` turns 3 PR-checks publish tests red (N1). The test for a fetch failure on one repo still PUTs the other eight (N2). Tests use fakes only (N3). E3 waits for hub Hermes to run the new code.

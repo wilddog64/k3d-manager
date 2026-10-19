@@ -2786,3 +2786,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: operator: rotate expiring tokens at the 10-29 hub rebuild (after the rebuild verifies), then monthly. Credential-expiry inventory + dr-drill preflight plan deferred to after 10-22.
 - 2026-10-19: frontend cache fix deployed; origin sends 5m, Cloudflare overrides browser TTL to 14400 -> operator to set Browser Cache TTL "Respect Existing Headers", then recheck E2.
 - 2026-10-18: operator approved dispatching 3 P3s. Added ## Files to live-evidence + pr-checks bugs; pr-checks moved to v1.43.5. MinIO pillow (shopping-cart-infra) held: dispatcher is k3d-manager-only until v1.43.7.
+- 2026-10-18: Landed via dispatcher: pr-checks fix 10b49424 (272 hermes tests; 3 red pre-fix) and live-evidence CHANGELOG a4c9b426. Correction: live-evidence fix was already 6d8bd118, MinIO Step 1 already fb572b8 (shopping-cart-infra). Both bugs FIXED; pr-checks E3 awaits hub Hermes.

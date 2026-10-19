@@ -1,7 +1,8 @@
 # Bug: a LIVE-VERIFIED doc reads "stale proof" when its fix commit defaults to the release's squash merge
 
 **Filed:** 2026-10-18 (Claude, from the operator's question about the Bugs dashboard's Open for column)
-**Status:** OPEN
+**Status:** FIXED
+**Fix commit:** `6d8bd118`
 **Priority:** P3 — a dashboard row reports correct proof as stale; no runtime impact
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to open P3 bug"
@@ -144,3 +145,4 @@ interface:
 - An evidence commit from another repo (the Dependabot bug cites `shopping-cart-frontend`'s
   `bf119607`) scans `unchecked` and shows `—`, the same as `ok`. That is the documented v1.43.4 rule
   and is out of scope here.
+- 2026-10-18: fix `6d8bd118` (Codex) and test fix `9be4f2e3` had landed earlier; the dispatcher re-run added only the missing CHANGELOG entry (`a4c9b426`). `test_check_bug_evidence.py` passes on landing.
