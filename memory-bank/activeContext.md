@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD: `4ebaaec5` (`e2e-sandbox-provision` frontend upstream recovery fix is landed; live verification is pending).
+- Current remote HEAD: `ecf99276` (`e2e-sandbox-provision` frontend upstream recovery fix is live-verified through Slack).
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -20,7 +20,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - README Hermes documentation commit `bb4a2f64` adds the guide, Phase 1/2 scope links, and a focused Mermaid lifecycle diagram.
 - README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
 - Dispatched P3 dashboard bug `bug-dashboard-verification-tile-labels-clipped`; implementation landed via dispatcher as `5819e236`, with 22/22 dashboard BATS and link checks passing. Operator live-verified the full `Verified` and `Live-verified` labels on the hub `k3dm-bugs` dashboard on 2026-10-19.
-- Dispatched P2 e2e sandbox frontend upstream race; implementation landed via dispatcher as `4ebaaec5`. It performs one bounded frontend rollout restart after product-catalog is `Synced/Healthy` while frontend remains `Synced/Degraded`. Focused BATS passed 35/35, shellcheck and `_agent_audit` passed; fresh live `e2e-sandbox-provision` verification remains pending.
+- Dispatched P2 e2e sandbox frontend upstream race; implementation landed via dispatcher as `4ebaaec5`. It performs one bounded frontend rollout restart after product-catalog is `Synced/Healthy` while frontend remains `Synced/Degraded`. Focused BATS passed 35/35, shellcheck and `_agent_audit` passed; Slack job `f8ea6d69` live-verified E2E run `1792450928-16408` with four expected tests and zero unexpected/flaky results.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work
