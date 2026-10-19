@@ -8,6 +8,16 @@
 **Component:** sandbox app bootstrap / ArgoCD Application convergence / shopping-cart frontend
 **Related:** `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`, `docs/issues/2026-05-26-acg-sandbox-expiry-remote-cluster-rebuild-shopping-cart-bootstrap-gap.md`
 
+## Files
+
+| File | Scope |
+|---|---|
+| `scripts/plugins/e2e.sh` | Add the bounded sandbox convergence/recovery behavior needed to prevent the frontend upstream race from leaving the gate degraded. |
+| `scripts/tests/plugins/e2e_sandbox_preflight.bats` | Add focused offline coverage for the selected behavior. |
+
+Do not modify shopping-cart application manifests or unrelated providers. Do not mark this
+bug verified from offline tests; a fresh `e2e-sandbox-provision` run is required.
+
 ## Symptom / evidence
 
 Slack job `8417cf04` ran `make e2e-sandbox-provision` and failed at the 420-second hub-Application gate. The preflight passed, but the gate repeatedly reported:
