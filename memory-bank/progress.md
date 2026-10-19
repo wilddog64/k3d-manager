@@ -8,6 +8,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Read-only cluster diagnosis: frontend pod `frontend-bfb7667c-698wr` was `CrashLoopBackOff`; Nginx logged `host not found in upstream "product-catalog.shopping-cart-apps.svc.cluster.local"`. Product-catalog synced/healthy later, leaving frontend degraded. No live mutation performed.
 - Filed detailed evidence issue plus canonical P2 dashboard bug record; pushed through `dc906243`.
 - Operator reported PR Checks panel 8 “Check duration” legend clipping. Filed P3 `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md`, linked it to the populated-table bug, and made no dashboard change.
+- Reviewed non-archive `docs/` architecture and flow diagrams against the current tree. Converted boxed/ASCII diagrams to Mermaid, corrected Cloudflare relay `/ask-docs` and 31-target claims, and marked the Istio ingress page as a legacy path. Commit: `ef058487`; review record: `docs/issues/2026-10-19-docs-architecture-diagram-review.md`.
 
 ## 2026-10-18
 
@@ -31,3 +32,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 2. Investigate the PR Checks table transformation issue using actual Grafana frames before modifying JSON.
 3. Investigate panel 8 legend sizing/layout and verify with a live screenshot after any approved fix.
 4. Re-run the relevant acceptance tests and update bug statuses only after evidence exists.
+5. Push and verify documentation review commit `ef058487`; Mermaid rendering was unavailable locally because `mmdc` is not installed.

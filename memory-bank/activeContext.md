@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD after the latest documentation work: `dc906243`.
+- Current remote HEAD before the current push: `dc906243`; documentation review commit is `ef058487` locally and pending push.
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -16,6 +16,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Slack job `8417cf04`, E2E run `1792410757-29778`: preflight passed, but the 420-second hub-app gate failed with frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`. Read-only diagnosis found frontend Nginx exiting because `product-catalog.shopping-cart-apps.svc.cluster.local` did not exist when frontend started. Product-catalog later became healthy, but frontend remained `CrashLoopBackOff`. Detailed evidence: `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; dashboard-facing bug: `docs/bugs/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md` (P2 OPEN).
 - PR Checks dashboard: panel 5/6 populated-table transformation issue is recorded in `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md` (P3 OPEN).
 - PR Checks dashboard: panel 8 Check duration legend clipping is recorded in `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (P3 OPEN). No dashboard implementation change has been authorized.
+- Documentation review commit `ef058487` converted current non-archive flow/architecture diagrams to Mermaid, corrected Cloudflare relay drift, and labeled the legacy ingress path. Review record: `docs/issues/2026-10-19-docs-architecture-diagram-review.md`.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work
@@ -43,5 +44,6 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - `shellcheck scripts/plugins/e2e.sh`: clean.
 - `_agent_audit`: passed.
 - PR Checks/bug dashboard tests: 66 passed.
+- Documentation checks: `make check-doc-links` passed (`2218 file(s) OK`); targeted `bats scripts/tests/lib/bats_negation_lint.bats` failed on its existing assertion at line 6; no shell files were changed.
 
 Use the bug docs for acceptance criteria and the archive for historical context; do not re-derive old decisions silently.
