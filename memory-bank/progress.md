@@ -2791,3 +2791,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: operator approved dispatch of Slack confirm-keyword P3; /cluster-down confirm requirement deferred for later discussion.
 - 2026-10-18: filed + dispatched P3 docs/bugs/2026-10-18-e2e-sandbox-provision-has-no-preview.md (preview without confirm; operator approved both).
 - 2026-10-18: landed Slack confirm-keyword fix aef07289 (N1/N2 red pre-fix, bin 718 pass). E3 after operator make restart-webhook. Preview P3 dispatched, running.
+- 2026-10-18: landed e2e-sandbox-provision preview 2c065963 (M1 red pre-fix, N1 mutation red). One make restart-webhook covers E3 for both Slack fixes.

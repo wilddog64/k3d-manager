@@ -1,7 +1,8 @@
 # Bug: e2e-sandbox-provision has no read-only preview
 
 **Filed:** 2026-10-18 (Claude, from the operator's request)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting webhook restart + E3
+**Fix commit:** `2c065963`
 **Priority:** P3 — no wrong action today; the operator just cannot see what a 2-hour job will do
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "we should do that, and please file it and may dispatch to codex" (filing + dispatch)
@@ -129,3 +130,7 @@ interface:
 - Do NOT contact ACG, the hub, AWS or Slack from tests; stub them.
 - Do NOT change the confirm path of `e2e_verify_sandbox` or any other `/k3dm` target.
 - Do NOT add a preview to `fix-delete-pod`, `fix-force-sync` or `e2e-runner-unlock`.
+
+## Verification log
+
+- 2026-10-18: Codex (dispatcher) fix landed `2c065963`. Claude verified: `webhook_make_targets.py` 35 passed; `e2e_sandbox_preflight.bats` 0 failures; shellcheck clean. Pre-fix `make_targets.py` turns the M1 test red; a mutation calling `_e2e_sandbox_provision_cluster` from the preview turns 2 preview tests red (N1). E3 waits for `make restart-webhook`.
