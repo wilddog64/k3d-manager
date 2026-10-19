@@ -709,9 +709,10 @@ def _run_upgrade_thread_job(job_id, chart_version, stage):
         text += f"\n```{output}```"
     _notify_job(job_id, text)
 
-def _handle_thread_command(job_id, command, role="admin", channel_id=""):
+def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id=""):
     """Dispatch a thread command for job_id. Runs in a background thread."""
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
+    actor = f"slack-thread:{user_id}" if user_id else f"slack-thread:{role}"
     if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
         return
     if channel_id:
@@ -719,7 +720,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     required = _thread_command_min_role(command)
     if not _role_allows(role, required):
         _audit_remote_action(
-            "/slack/events", f"thread-{cmd or 'unknown'}", "slack", role, False,
+            "/slack/events", f"thread-{cmd or 'unknown'}", actor, role, False,
             reason=f"requires {required}",
         )
         _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_actor_role(role)}*.")
@@ -789,7 +790,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
             (new_job_dir / "channel_id").write_text(channel_id)
         threading.Thread(
             target=_run_make_target,
-            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), f"slack-thread:{role}"),
+            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), actor),
             daemon=True,
         ).start()
         _notify_job(job_id, f"🛠️ *k3dm {target}* queued — job `{new_job_id}`")
@@ -2071,6 +2072,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         threading.Thread(
                             target=_handle_thread_command,
                             args=(job_id, text, slack_role, ev_channel_id),
+                            kwargs={"user_id": ev_user},
                             daemon=True,
                         ).start()
                     elif cmd in _STANDALONE_CMDS:
@@ -2085,6 +2087,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         threading.Thread(
                             target=_handle_thread_command,
                             args=(anchor_id, text, slack_role, ev_channel_id),
+                            kwargs={"user_id": ev_user},
                             daemon=True,
                         ).start()
                 elif cmd in _STANDALONE_CMDS:
@@ -2100,6 +2103,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     threading.Thread(
                         target=_handle_thread_command,
                         args=(anchor_id, text, slack_role, ev_channel_id),
+                        kwargs={"user_id": ev_user},
                         daemon=True,
                     ).start()
             self._json(200, {"ok": True})

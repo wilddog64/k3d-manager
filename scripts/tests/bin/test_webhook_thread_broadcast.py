@@ -78,7 +78,7 @@ def test_thread_broadcast_routes_known_job_thread(monkeypatch, caplog):
     monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda thread_ts: "job-1")
     monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: None)
     monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
-    monkeypatch.setattr(wh, "_handle_thread_command", lambda *args: calls.append(args))
+    monkeypatch.setattr(wh, "_handle_thread_command", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     request = _slack_request({
         "type": "message",
@@ -93,7 +93,8 @@ def test_thread_broadcast_routes_known_job_thread(monkeypatch, caplog):
         wh._Handler.do_POST(request)
 
     assert request.result["code"] == 200
-    assert calls == [("job-1", "cluster-status", "admin", "C1")]
+    # agent-audit: allow assert-removed same routing assertion, now also checks user_id is passed
+    assert calls == [(("job-1", "cluster-status", "admin", "C1"), {"user_id": "U1"})]
     assert "slack message ignored" not in caplog.text
 
 

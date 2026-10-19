@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Slack thread-started jobs now record the Slack user ID in the actor field instead of only the
+  user's role.
+
 - Slack thread replies sent with **Also send to channel** are now routed to the webhook
   instead of being silently ignored.
 
