@@ -447,3 +447,39 @@ _stub_kubectl_slow_context_list() {
   run _e2e_sandbox_cluster_ready
   [ "$status" -eq 0 ]
 }
+
+@test "hub app convergence recovers frontend after product-catalog becomes healthy" {
+  local listing_state="$BATS_TEST_TMPDIR/hub-listing.calls"
+  printf '0\n' > "$listing_state"
+  _e2e_hub_kc() {
+    local listing_calls
+    listing_calls=$(( $(<"$listing_state") + 1 ))
+    printf '%s\n' "$listing_calls" > "$listing_state"
+    case "$listing_calls" in
+      1)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Degraded' \
+          'ubuntu-k3s-shopping-cart-product-catalog OutOfSync Healthy'
+        ;;
+      2)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Degraded' \
+          'ubuntu-k3s-shopping-cart-product-catalog Synced Healthy'
+        ;;
+      *)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Healthy' \
+          'ubuntu-k3s-shopping-cart-product-catalog Synced Healthy'
+        ;;
+    esac
+  }
+  _e2e_sandbox_kc() {
+    printf 'sandbox kubectl %s\n' "$*" >> "$CALL_LOG"
+  }
+  export E2E_HUB_APPS_TIMEOUT=5 E2E_HUB_APPS_INTERVAL=0
+
+  run _e2e_sandbox_hub_apps_ready
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"frontend upstream recovery"* ]]
+  [ "$(grep -c -- 'rollout restart deployment/frontend' "$CALL_LOG")" -eq 1 ]
+}

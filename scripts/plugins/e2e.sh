@@ -190,7 +190,7 @@ function _e2e_sandbox_preflight_hub() {
 
 function _e2e_sandbox_hub_apps_ready() {
   local ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" listing bad
-  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline frontend_recovery_attempted=0
   deadline=$(( SECONDS + timeout ))
   while :; do
     listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \
@@ -201,6 +201,14 @@ function _e2e_sandbox_hub_apps_ready() {
     fi
     bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
     [[ -z "$bad" ]] && break
+    if (( frontend_recovery_attempted == 0 )) \
+      && awk '$1 == "ubuntu-k3s-shopping-cart-frontend" && $2 == "Synced" && $3 == "Degraded"' <<< "$listing" | grep -q . \
+      && awk '$1 == "ubuntu-k3s-shopping-cart-product-catalog" && $2 == "Synced" && $3 == "Healthy"' <<< "$listing" | grep -q .; then
+      frontend_recovery_attempted=1
+      _warn "[e2e] frontend upstream recovery: product-catalog is healthy but frontend is degraded; restarting deployment/frontend once"
+      _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/frontend || \
+        _warn "[e2e] frontend upstream recovery: rollout restart deployment/frontend failed; continuing to wait for hub Applications"
+    fi
     if (( SECONDS >= deadline )); then
       _err "[e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy after ${timeout}s: $(tr '\n' ';' <<< "$bad")"
       return 1
