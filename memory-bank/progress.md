@@ -2801,3 +2801,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-19: thread-actor fix landed bc1399eb (Claude fixed broadcast test stub; landed --allow-out-of-scope). P1 role-lookup bug awaiting operator dispatch approval.
 - 2026-10-19: P1 role-lookup bug approved; dispatched to Codex.
 - 2026-10-19: P1 role-lookup fix landed a70e52a4 (Claude fixed N2 assertion). Live E2 = rerun /k3dm e2e-sandbox-provision confirm.
+- 2026-10-19: Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. Preflight passed; the 420s hub-app gate failed while frontend was `Synced/Degraded` and product-catalog was `OutOfSync/Healthy`. Live read-only inspection found frontend Nginx exited because the product-catalog Service DNS name did not exist at startup; product-catalog later became healthy but frontend stayed CrashLoopBackOff. Filed `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; implementation not authorized/applied.

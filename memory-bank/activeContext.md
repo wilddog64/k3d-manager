@@ -2244,3 +2244,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-19: thread-actor fix landed bc1399eb (Claude fixed broadcast test stub; landed --allow-out-of-scope). P1 role-lookup bug awaiting operator dispatch approval.
 - 2026-10-19: P1 role-lookup bug approved; dispatched to Codex.
 - 2026-10-19: P1 role-lookup fix landed a70e52a4 (Claude fixed N2 assertion). Live E2 = rerun /k3dm e2e-sandbox-provision confirm.
+- 2026-10-19: Slack live verification job `8417cf04` investigated. E2E run `1792410757-29778` failed at the 420s hub-app gate: frontend `Synced/Degraded`, product-catalog `OutOfSync/Healthy`. Read-only live diagnosis found frontend Nginx `host not found in upstream product-catalog.shopping-cart-apps.svc.cluster.local`; product-catalog synced/healthy later, leaving frontend CrashLoopBackOff. Filed `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; no fix or live mutation applied.
