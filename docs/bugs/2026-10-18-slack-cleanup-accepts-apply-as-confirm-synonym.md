@@ -111,3 +111,4 @@ interface:
 ## Verification log
 
 - 2026-10-18: Codex (dispatcher) fix landed `aef07289`; Claude added the label/header tests (N2, M2). `test_webhook_stale_cleanup.py` 10 passed; pre-fix webhook turns 3 red (apply refusal N1, labels N2, header M2). `pytest scripts/tests/bin` 718 passed, 1 skipped. E3 waits for `make restart-webhook`.
+- 2026-10-18: E3 partial (operator screenshots). `/cleanup-stale-sandbox` showed `(preview) queued`, and a thread reply `cleanup-stale-sandbox confirm` showed `(confirm) queued` and removed the stale ubuntu-k3s local state (M1, M2 live). The `apply` refusal (N1) is not yet live-checked. Found on the way: a reply with "Also send to channel" is dropped, filed as `docs/bugs/2026-10-18-slack-thread-broadcast-reply-silently-ignored.md`.
