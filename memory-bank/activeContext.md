@@ -35,7 +35,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
-- E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: fresh live `e2e-sandbox-provision` verification pending.
+- E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: Slack job `f8ea6d69` live-verified via E2E run `1792450928-16408` (pass, exit 0, 11 hub Applications `Synced/Healthy`).
 - PR Checks table transformation fix: investigation/fix pending.
 - PR Checks panel 8 legend layout fix: investigation/fix pending.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.

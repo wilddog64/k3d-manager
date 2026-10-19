@@ -2,12 +2,13 @@
 
 **Filed:** 2026-10-19 (Slack job `8417cf04` investigation)
 **Branch:** k3d-manager-v1.43.5
-**Status:** IMPLEMENTED — 2026-10-19: dispatched implementation landed in `4ebaaec5`; live `e2e-sandbox-provision` verification is pending.
+**Status:** LIVE-VERIFIED — 2026-10-19: Slack job `f8ea6d69` completed successfully; E2E run `1792450928-16408` passed with exit code 0 and all 11 hub Applications `Synced/Healthy` after implementation `4ebaaec5`.
 **Priority:** P2
 **Severity:** Tier 2 live verification fails until the sandbox is repaired or reprovisioned
 **Component:** sandbox app bootstrap / ArgoCD Application convergence / shopping-cart frontend
 **Related:** `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`, `docs/issues/2026-05-26-acg-sandbox-expiry-remote-cluster-rebuild-shopping-cart-bootstrap-gap.md`
 **Fix commit:** `4ebaaec5`
+**Live evidence:** 2026-10-19 · run 1792450928-16408 · env hub/k3d · scenario slack-e2e-sandbox-provision · commit 81f89f16 · proves fix
 
 ## Files
 
@@ -50,7 +51,7 @@ The sandbox app bootstrap must not leave frontend permanently degraded when prod
 
 ## Acceptance
 
-- [ ] A fresh sandbox run proves frontend does not enter `CrashLoopBackOff` when product-catalog reconciliation is slower.
-- [ ] The hub gate reaches all target Applications `Synced` and `Healthy` without manual restarts.
+- [x] A fresh sandbox run proves frontend does not enter `CrashLoopBackOff` when product-catalog reconciliation is slower.
+- [x] The hub gate reaches all target Applications `Synced` and `Healthy` without manual restarts.
 - [x] Offline tests cover the selected dependency-order or upstream-retry behavior.
-- [ ] No fix is marked `VERIFIED` or `LIVE-VERIFIED` until the live run succeeds.
+- [x] No fix was marked `VERIFIED` or `LIVE-VERIFIED` until the live run succeeded.
