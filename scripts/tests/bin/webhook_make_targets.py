@@ -210,12 +210,34 @@ class MakeTargetTests(unittest.TestCase):
         self.assertTrue(spec["confirm"])
         self.assertNotIn("e2e-sandbox-provision", wh.make_target_help("operator", wh._role_allows))
         self.assertIn("e2e-sandbox-provision", wh.make_target_help("admin", wh._role_allows))
-        _, error = wh.parse_make_request("e2e-sandbox-provision", {}, None)
-        self.assertIn("rerun with `confirm`", error)
+        self.assertIn("e2e-sandbox-provision [DIGEST=…] [confirm]", wh.make_target_help("admin", wh._role_allows))
+        self.assertNotIn("e2e-sandbox-provision-preview", wh.make_target_help("operator", wh._role_allows))
+        self.assertIn("e2e-sandbox-provision-preview", wh.make_target_help("admin", wh._role_allows))
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox-provision", {}, None),
+            (["e2e-sandbox-provision-preview"], None),
+        )
+        digest = "sha256:" + "a" * 64
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox-provision", {"DIGEST": digest}, None),
+            (["e2e-sandbox-provision-preview", f"DIGEST={digest}"], None),
+        )
         self.assertEqual(
             wh.parse_make_request("e2e-sandbox-provision", {}, True),
             (["e2e-sandbox-provision"], None),
         )
+
+    def test_confirm_targets_without_preview_still_require_confirmation(self):
+        for target, args in (
+            ("fix-delete-pod", {"APP": "frontend", "NS": "shopping-cart-apps"}),
+            ("fix-force-sync", {"APP": "shopping-cart"}),
+            ("e2e-runner-unlock", {"RUNNER": "m2"}),
+        ):
+            with self.subTest(target=target):
+                argv, error = wh.parse_make_request(target, args, None)
+                self.assertIsNone(argv)
+                # agent-audit: allow assert-removed refusal now asserted for confirm targets without a preview
+                self.assertIn("rerun with `confirm`", error)
 
     def test_smoke_is_operator_tier_and_hidden_from_readers(self):
         """The cluster half performs real Vault reads and live logins."""

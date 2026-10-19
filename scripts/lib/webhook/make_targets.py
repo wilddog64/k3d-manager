@@ -37,7 +37,8 @@ MAKE_TARGETS = {
     "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
     "e2e": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e in a disposable vCluster"},
     "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
-    "e2e-sandbox-provision": {"min_role": "admin", "confirm": True, "optional": ("DIGEST",), "timeout": 7200, "summary": "Tier 2 e2e; provisions the ACG sandbox first if it is missing"},
+    "e2e-sandbox-provision": {"min_role": "admin", "confirm": True, "preview": "e2e-sandbox-provision-preview", "optional": ("DIGEST",), "timeout": 7200, "summary": "Tier 2 e2e; provisions the ACG sandbox first if it is missing"},
+    "e2e-sandbox-provision-preview": {"min_role": "admin", "optional": ("DIGEST",), "timeout": 300, "summary": "read-only preview of e2e-sandbox-provision"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},
     "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY",), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},
@@ -92,6 +93,8 @@ def parse_make_request(target, args, confirm):
             return None, f"invalid value for {key}"
         assignments.append(f"{key}={value}")
     if spec.get("confirm") and confirm is not True:
+        if spec.get("preview"):
+            return [spec["preview"], *assignments], None
         return None, f"`{target}` is destructive — rerun with `confirm`"
     return [target, *assignments], None
 
@@ -106,7 +109,7 @@ def make_target_help(role, role_allows):
         parts += [f"{key}=…" for key in spec.get("required", ())]
         parts += [f"[{key}=…]" for key in spec.get("optional", ())]
         if spec.get("confirm"):
-            parts.append("confirm")
+            parts.append("[confirm]" if spec.get("preview") else "confirm")
         lines.append(f"• `{' '.join(parts)}` — {spec['summary']} ({spec['min_role']})")
     cluster_lines = [
         f"• `{name}` — {summary} ({min_role})"

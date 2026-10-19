@@ -434,6 +434,46 @@ function _e2e_sandbox_preflight_auth() {
   return 1
 }
 
+function e2e_sandbox_preview() {
+  local candidate_digest="${1:-}" output line
+
+  _e2e_load_deps
+  if output="$(_e2e_sandbox_preflight_auth 2>&1)"; then
+    printf '%s\n' '[e2e-preview] acg login: ok'
+  else
+    if [[ -n "$output" ]]; then
+      while IFS= read -r line; do
+        printf '[e2e-preview] %s\n' "$line"
+      done <<< "$output"
+    fi
+    return 1
+  fi
+
+  if _e2e_sandbox_cluster_ready; then
+    printf '%s\n' '[e2e-preview] ubuntu-k3s: ready — would reuse it'
+  else
+    printf '%s\n' '[e2e-preview] ubuntu-k3s: absent or not ready — would run make up CLUSTER_PROVIDER=k3s-aws'
+  fi
+
+  if output="$(_e2e_sandbox_preflight_hub 2>&1)"; then
+    printf '%s\n' '[e2e-preview] hub: ok'
+  else
+    if [[ -n "$output" ]]; then
+      while IFS= read -r line; do
+        printf '[e2e-preview] %s\n' "$line"
+      done <<< "$output"
+    fi
+    return 1
+  fi
+
+  if [[ -n "$candidate_digest" ]]; then
+    printf '[e2e-preview] digest: %s\n' "$candidate_digest"
+  else
+    printf '%s\n' '[e2e-preview] digest: default (none given)'
+  fi
+  printf '%s\n' '[e2e-preview] no changes made; rerun with confirm to run Tier 2'
+}
+
 function e2e_verify_sandbox() {
   local run_id candidate_digest="${1:-}" job_name image manifest_file rc=1
   local old_tier="${E2E_TIER}" old_project="${E2E_PROJECT}"

@@ -6,6 +6,8 @@
 
 - Slack `cleanup-stale-sandbox` now accepts only `confirm` for mutating runs and labels queued
   cleanup work as `confirm` or `preview`.
+- Added a read-only preview for `e2e-sandbox-provision`; without `confirm`, the Slack target now
+  reports ACG auth, hub readiness, and whether `ubuntu-k3s` would be reused or provisioned.
 
 - Hermes PR Checks now cover the seven shopping-cart repositories in addition to k3d-manager and
   lib-foundation.

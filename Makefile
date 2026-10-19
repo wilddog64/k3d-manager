@@ -32,6 +32,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: e2e-sandbox-provision-preview
 
 .PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
@@ -1423,6 +1424,10 @@ e2e-sandbox:
 ## Tier 2 e2e that first provisions the ACG sandbox (make up CLUSTER_PROVIDER=k3s-aws) if ubuntu-k3s is absent or dead. DIGEST optional.
 e2e-sandbox-provision:
 	@$(call _e2e_recorded,e2e-sandbox-provision,env E2E_SANDBOX_PROVISION=1 ./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
+
+## Preview the Tier 2 sandbox provisioning checks without making changes. DIGEST optional.
+e2e-sandbox-provision-preview:
+	./scripts/k3d-manager e2e_sandbox_preview $(DIGEST)
 
 ## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
 smoke:
