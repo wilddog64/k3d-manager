@@ -1,8 +1,9 @@
 # Bug: e2e-sandbox-provision has no read-only preview
 
 **Filed:** 2026-10-18 (Claude, from the operator's request)
-**Status:** FIXED — landed, awaiting webhook restart + E3
+**Status:** LIVE-VERIFIED — 2026-10-18: `/k3dm e2e-sandbox-provision` without `confirm` ran `make e2e-sandbox-provision-preview` and printed acg login ok, ubuntu-k3s absent (would run make up), hub ok, default digest, no changes made (operator screenshot)
 **Fix commit:** `2c065963`
+**Live evidence:** 2026-10-18 · run slack-k3dm-preview · env hub-webhook/ubuntu-k3s-absent · scenario e2e-sandbox-provision-no-confirm · commit 8de20c0b · proves E3
 **Priority:** P3 — no wrong action today; the operator just cannot see what a 2-hour job will do
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "we should do that, and please file it and may dispatch to codex" (filing + dispatch)
@@ -135,3 +136,4 @@ interface:
 
 - 2026-10-18: Codex (dispatcher) fix landed `2c065963`. Claude verified: `webhook_make_targets.py` 35 passed; `e2e_sandbox_preflight.bats` 0 failures; shellcheck clean. Pre-fix `make_targets.py` turns the M1 test red; a mutation calling `_e2e_sandbox_provision_cluster` from the preview turns 2 preview tests red (N1). E3 waits for `make restart-webhook`.
 - 2026-10-18: E3 first attempt failed. The operator's Slack reply was `[e2e-preview] ERROR: [e2e] _ACG_SANDBOX_URL is empty` (rc 2). The preview never sourced `plugins/acg.sh`, which `e2e_verify_sandbox` does and which sets the URL. The bats setup exported the URL, so the tests could not see this. Claude added the same source block and a test with the URL unset and a fake `acg.sh` (red on `2c065963`). E3 to be retried after `make restart-webhook`.
+- 2026-10-18: E3 passed on `8de20c0b` (operator screenshot): the Slack reply shows the five `[e2e-preview]` lines and `succeeded`. Nothing was provisioned.
