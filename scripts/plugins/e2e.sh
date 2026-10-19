@@ -438,6 +438,10 @@ function e2e_sandbox_preview() {
   local candidate_digest="${1:-}" output line
 
   _e2e_load_deps
+  if ! declare -f acg_extend_playwright >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/acg.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${PLUGINS_DIR}/acg.sh"
+  fi
   if output="$(_e2e_sandbox_preflight_auth 2>&1)"; then
     printf '%s\n' '[e2e-preview] acg login: ok'
   else

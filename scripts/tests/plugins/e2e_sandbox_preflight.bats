@@ -256,6 +256,23 @@ _stub_preview_mutations() {
   [ ! -s "$CALL_LOG" ] || ! grep -Eq '(^| )make |acg_extend_playwright|_e2e_sandbox_provision|_e2e_sandbox_enable_stripe| kubectl .* (apply|patch|delete)( |$)' "$CALL_LOG"
 }
 
+@test "sandbox preview loads the ACG plugin for the sandbox URL" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=0
+  unset _ACG_SANDBOX_URL
+  unset -f acg_extend_playwright
+  PLUGINS_DIR="$BATS_TEST_TMPDIR/plugins"
+  mkdir -p "$PLUGINS_DIR"
+  printf '%s\n' '_ACG_SANDBOX_URL="https://example.test/from-plugin"' 'acg_extend_playwright() { :; }' > "$PLUGINS_DIR/acg.sh"
+  run e2e_sandbox_preview
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[e2e-preview] acg login: ok"* ]]
+  [[ "$output" != *"_ACG_SANDBOX_URL is empty"* ]]
+}
+
 @test "sandbox preview stops on ACG auth failure" {
   install_security
   _stub_kubectl

@@ -134,3 +134,4 @@ interface:
 ## Verification log
 
 - 2026-10-18: Codex (dispatcher) fix landed `2c065963`. Claude verified: `webhook_make_targets.py` 35 passed; `e2e_sandbox_preflight.bats` 0 failures; shellcheck clean. Pre-fix `make_targets.py` turns the M1 test red; a mutation calling `_e2e_sandbox_provision_cluster` from the preview turns 2 preview tests red (N1). E3 waits for `make restart-webhook`.
+- 2026-10-18: E3 first attempt failed. The operator's Slack reply was `[e2e-preview] ERROR: [e2e] _ACG_SANDBOX_URL is empty` (rc 2). The preview never sourced `plugins/acg.sh`, which `e2e_verify_sandbox` does and which sets the URL. The bats setup exported the URL, so the tests could not see this. Claude added the same source block and a test with the URL unset and a fake `acg.sh` (red on `2c065963`). E3 to be retried after `make restart-webhook`.
