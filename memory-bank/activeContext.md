@@ -2227,3 +2227,4 @@ Operator explicitly requested a **new spec** (not an amendment) to track feature
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-pr-checks-dashboard-misses-shopping-cart-repos.md (v1.43.7; Hermes PR Checks REPOS lacks the 7 shopping-cart repos). Dispatch not yet approved.
 - 2026-10-18: PR-checks shopping-cart P3 deferred to after the weekly quota reset (Thu 2026-10-22), operator request. Operator may widen the Hermes PAT repo selection beforehand.
 - 2026-10-18: operator: rotate expiring tokens at the 10-29 hub rebuild (after the rebuild verifies), then monthly. Credential-expiry inventory + dr-drill preflight plan deferred to after 10-22.
+- 2026-10-19: frontend cache fix deployed; origin sends 5m, Cloudflare overrides browser TTL to 14400 -> operator to set Browser Cache TTL "Respect Existing Headers", then recheck E2.
