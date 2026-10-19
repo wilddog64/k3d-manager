@@ -4,7 +4,17 @@ import re
 from datetime import datetime
 
 
-REPOS = ("wilddog64/k3d-manager", "wilddog64/lib-foundation")
+REPOS = (
+    "wilddog64/k3d-manager",
+    "wilddog64/lib-foundation",
+    "wilddog64/shopping-cart-basket",
+    "wilddog64/shopping-cart-e2e-tests",
+    "wilddog64/shopping-cart-frontend",
+    "wilddog64/shopping-cart-infra",
+    "wilddog64/shopping-cart-order",
+    "wilddog64/shopping-cart-payment",
+    "wilddog64/shopping-cart-product-catalog",
+)
 MAX_PRS = 20
 FAILED = ("failure", "timed_out", "action_required", "startup_failure", "stale")
 RUNNING = ("queued", "in_progress", "waiting", "requested", "pending")

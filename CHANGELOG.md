@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Hermes PR Checks now cover the seven shopping-cart repositories in addition to k3d-manager and
+  lib-foundation.
+
 ## [1.43.4] - 2026-10-18
 
 ### Added

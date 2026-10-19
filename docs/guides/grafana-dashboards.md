@@ -273,12 +273,17 @@ do not: apply them with `make prometheus-rules`, which applies only
 ### k3dm PR Checks (`k3dm-pr-checks`) — hub
 
 Shows every open pull request's GitHub check-run state, overall verdict, and check duration for
-k3d-manager and lib-foundation. Hermes publishes it every five minutes through Pushgateway job
+the nine selected repos: k3d-manager, lib-foundation, shopping-cart-basket, shopping-cart-e2e-tests,
+shopping-cart-frontend, shopping-cart-infra, shopping-cart-order, shopping-cart-payment, and
+shopping-cart-product-catalog. Hermes publishes it every five minutes through Pushgateway job
 `k3dm-pr-checks`, using one group per repo; the Repo filter is at the top. A Copilot review is not
-a check. Merged or closed PRs disappear on the next good poll. With no open PRs the two tables read
+a check. Merged or closed PRs disappear on the next good poll. With no open PRs the tables read
 `No open PRs`; that is normal, and **Last scrape** and **GitHub read** are the panels that show whether
 the collector is healthy. `GitHub read = failed` keeps the
-last good rows and usually means the Hermes GitHub token expired or was rejected.
+last good rows and usually means the Hermes GitHub token expired or was rejected. **GitHub read** is
+the minimum across the selected repos; use the Repo filter to find which one failed. A repo whose
+reads have always failed is missing from the Repo filter, because the filter is built from
+`k3dm_pr_checks_open_prs`. The Hermes GitHub token needs read access to every listed repo.
 
 ### k3dm Alertmanager Delivery (`k3dm-alertmanager-delivery`) — hub
 
@@ -464,7 +469,7 @@ On `main`, which is
 not a release branch, the current-release row is empty and the charts show the last five shipped
 releases. A tally failure skips only the release group, so the inventory keeps updating.
 
-The Repo selector chooses between `k3d-manager` and `lib-foundation`. lib-foundation is read from
+The Repo selector chooses among the nine PR Checks repos listed above. lib-foundation is read from
 its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
 `~/src/gitrepo/personal/lib-foundation`), and its release labels are its own tags such as
 `v0.5.3`. The "Fixed this release" and "Open in later releases" tiles remain k3d-manager-only
