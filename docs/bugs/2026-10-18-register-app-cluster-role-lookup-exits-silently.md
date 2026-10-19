@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P1 — `make up CLUSTER_PROVIDER=k3s-aws` stops at Step 10 with no error; no workaround on this branch
 **Severity:** high (regression on `k3d-manager-v1.43.5`, unreleased)
-**Approval:** pending — filed while reporting the failed run to the operator
+**Approval:** approved — operator, 2026-10-18: "yes" to dispatching to Codex
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/plugins/argocd.sh` (app-cluster registration, ~1633)
 **Related:** `781494e6` `fix(argocd): keep data-layer resources and the role label across re-registration`
