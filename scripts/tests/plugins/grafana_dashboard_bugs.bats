@@ -290,9 +290,11 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 live = panels[24]
 assert live["title"] == "Live-verified"
 assert 'live_verified="true"' in live["targets"][0]["expr"]
-assert panels[16]["gridPos"] == {"x": 15, "y": 16, "w": 2, "h": 4}
-assert live["gridPos"] == {"x": 17, "y": 16, "w": 2, "h": 4}
-assert panels[17]["gridPos"] == {"x": 19, "y": 16, "w": 2, "h": 4}
+assert panels[13]["gridPos"] == {"x": 12, "y": 16, "w": 2, "h": 4}
+assert panels[16]["gridPos"] == {"x": 14, "y": 16, "w": 3, "h": 4}
+assert live["gridPos"] == {"x": 17, "y": 16, "w": 3, "h": 4}
+assert panels[17]["gridPos"] == {"x": 20, "y": 16, "w": 2, "h": 4}
+assert panels[14]["gridPos"] == {"x": 22, "y": 16, "w": 2, "h": 4}
 table = panels[23]
 assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
 PY
