@@ -2,7 +2,8 @@
 
 **Filed:** 2026-10-19 (Slack job `8417cf04` investigation)
 **Branch:** k3d-manager-v1.43.5
-**Status:** VERIFIED — 2026-10-19: dispatched implementation landed in `4ebaaec5`; focused offline tests passed 35/35, shellcheck and `_agent_audit` passed. Live Slack verification remains in progress; do not mark `LIVE-VERIFIED` yet.
+**Status:** LIVE-VERIFIED — 2026-10-19: operator-confirmed Slack job `f8ea6d69` completed the live sandbox provisioning path and E2E run `1792450928-16408` passed 4/4 tests with exit code 0.
+**Live evidence:** 2026-10-19 · run 1792450928-16408 · env sandbox/ubuntu-k3s · scenario e2e-sandbox-provision-frontend-upstream-race · commit 4ebaaec5 · proves fix
 **Priority:** P2
 **Severity:** Tier 2 live verification fails until the sandbox is repaired or reprovisioned
 **Component:** sandbox app bootstrap / ArgoCD Application convergence / shopping-cart frontend
@@ -50,8 +51,16 @@ The sandbox app bootstrap must not leave frontend permanently degraded when prod
 
 ## Acceptance
 
-- [ ] A fresh sandbox run proves frontend does not enter `CrashLoopBackOff` when product-catalog reconciliation is slower.
-- [ ] The hub gate reaches all target Applications `Synced` and `Healthy` without manual restarts.
+- [x] A fresh sandbox run proves frontend does not enter `CrashLoopBackOff` when product-catalog reconciliation is slower.
+- [x] The hub gate reaches all target Applications `Synced` and `Healthy` without manual restarts.
 - [x] Offline tests cover the selected dependency-order or upstream-retry behavior.
 - [x] Offline verification is complete before marking the fix `VERIFIED`.
-- [ ] Live Slack verification is complete before marking the fix `LIVE-VERIFIED`.
+- [x] Live Slack verification is complete before marking the fix `LIVE-VERIFIED`.
+
+## Live evidence
+
+- Slack job: `f8ea6d69`
+- E2E run: `1792450928-16408`
+- Summary: `/Users/cliang/.k3dm/e2e/1792450928-16408.json`
+- Result: `pass`, exit code `0`, `4/4` passed, `0` failed
+- Provisioning log reached `11 Synced and Healthy`, created the E2E Job, and published the result event.
