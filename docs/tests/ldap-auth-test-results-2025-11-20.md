@@ -119,43 +119,16 @@ curl -sSk -u "chengkai.liang:test1234" https://jenkins.dev.local.me/whoAmI/api/j
 
 ## Architecture Validated
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         End-to-End Flow                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│   User                                                               │
-│     │                                                                │
-│     ▼                                                                │
-│   HTTPS Request (chengkai.liang:test1234)                           │
-│     │                                                                │
-│     ▼                                                                │
-│   ┌─────────────────────────────────────────┐                       │
-│   │  Istio Ingress Gateway                  │                       │
-│   │  (TLS termination with Vault PKI cert)  │                       │
-│   └─────────────────────────────────────────┘                       │
-│     │                                                                │
-│     ▼                                                                │
-│   ┌─────────────────────────────────────────┐                       │
-│   │  Jenkins (jenkins-0)                    │                       │
-│   │  ├── jenkins container                  │                       │
-│   │  ├── istio-proxy sidecar               │                       │
-│   │  └── vault-agent-init (completed)       │                       │
-│   │      └── /vault/secrets/ldap-bind-*     │                       │
-│   └─────────────────────────────────────────┘                       │
-│     │                                                                │
-│     │ LDAP Bind (credentials from Vault sidecar)                    │
-│     ▼                                                                │
-│   ┌─────────────────────────────────────────┐                       │
-│   │  OpenLDAP (directory/openldap)          │                       │
-│   │  └── dc=home,dc=org                     │                       │
-│   │      └── ou=users                       │                       │
-│   │          ├── cn=chengkai.liang ✅       │                       │
-│   │          ├── cn=jenkins-admin ✅        │                       │
-│   │          └── cn=test-user ✅            │                       │
-│   └─────────────────────────────────────────┘                       │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    U[User] --> R[Authenticated HTTPS request]
+    R --> I[Istio Ingress Gateway\nTLS termination with Vault PKI certificate]
+    I --> J[Jenkins jenkins-0\njenkins container\nistio-proxy sidecar\nvault-agent-init]
+    J -->|LDAP bind using Vault-injected credentials| L[OpenLDAP\ndirectory/openldap]
+    L --> D[dc=home,dc=org\nou=users]
+    D --> C1[cn=chengkai.liang]
+    D --> C2[cn=jenkins-admin]
+    D --> C3[cn=test-user]
 ```
 
 ---

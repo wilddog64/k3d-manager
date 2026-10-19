@@ -79,7 +79,7 @@ tunnel:
 
 ```js
 '/cluster-up' '/cluster-down' '/cluster-status' '/cluster-diagnose' '/cluster-refresh'
-'/cluster-resume' '/hostinger-status' '/cleanup-stale-sandbox' '/argocd-upgrade'
+'/cluster-resume' '/hostinger-status' '/cleanup-stale-sandbox' '/argocd-upgrade' '/ask-docs'
 '/hermes-auth' '/k3dm' '/ask' '/claude' '/gemini' '/codex'
 ```
 
@@ -138,6 +138,7 @@ target's own `min_role`). A request below the floor is a 403 **and** an audit re
 | `POST` | `/api/v1/cleanup-stale-sandbox` | `admin` | reap a dead ACG sandbox (requires `confirm`) |
 | `POST` | `/api/v1/argocd-upgrade` | `admin` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
 | `POST` | `/api/v1/ask` | `reader` | AI agent question (claude / gemini / codex) → Slack |
+| `POST` | `/api/v1/ask-docs` | `reader` | Bounded documentation Q&A → Slack |
 | `POST` | `/slack/events` | (Slack-signed) | Slack Events API — thread replies, URL verification |
 | `GET`  | `/api/v1/health` | — | JSON smoke-test report (used by `bin/cluster-status`) — includes Pushgateway |
 | `GET`  | `/api/v1/make` | `reader` | target help for the caller's role |
@@ -149,7 +150,7 @@ every route is behind a per-bucket rate limiter (`429`).
 ### `/k3dm` — the Makefile as the operator interface
 
 Rather than adding a route per operation, `/k3dm <target> [KEY=value …] [confirm]` runs one
-of the **17 allowlisted Makefile targets** declared in `scripts/lib/webhook/make_targets.py`.
+of the **31 allowlisted Makefile targets** declared in `scripts/lib/webhook/make_targets.py`.
 A new operator capability is now a Makefile target plus one table row — the route, the Slack
 surface, the role check and the help text are already there.
 

@@ -1,5 +1,12 @@
 # Ingress Port Forwarding and Multi-Service SNI Routing
 
+> **Legacy runbook:** this page documents the optional k3s-host `socat`/Istio
+> forwarding path. The supported hub exposure path is the macOS Cloudflare
+> tunnel and service port-forwards documented in
+> [`cloudflare-slack-relay.md`](cloudflare-slack-relay.md). The hostnames,
+> addresses, and Jenkins examples below are illustrative for that legacy path,
+> not the current default deployment.
+
 This document explains how k3d-manager enables multiple services (ArgoCD, Grafana, Keycloak, etc.) to share a single external HTTPS port (443) through port forwarding and SNI-based routing.
 
 > **Note:** Jenkins is used throughout this document as the illustrative example, but it is a
@@ -42,12 +49,12 @@ flowchart TD
 
         subgraph virtualservices["VirtualServices"]
             vs_jenkins["jenkins/jenkins\n→ jenkins:8081"]
-            vs_argocd["argocd/argocd\n→ argocd-server:443"]
+            vs_argocd["cicd/argocd\n→ argocd-server:443"]
         end
 
         subgraph pods["Pods"]
             pod_jenkins["Jenkins Pod\n(ns: jenkins)"]
-            pod_argocd["ArgoCD Pod\n(ns: argocd)"]
+            pod_argocd["ArgoCD Pod\n(ns: cicd)"]
         end
 
         subgraph vault["Vault PKI"]

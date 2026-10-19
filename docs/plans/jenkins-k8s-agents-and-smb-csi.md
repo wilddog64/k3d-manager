@@ -36,23 +36,11 @@ Implement dynamic Jenkins agent provisioning using the Kubernetes plugin with su
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Jenkins Controller (jenkins namespace)                  │
-│ - Kubernetes Plugin enabled                             │
-│ - ServiceAccount: jenkins-admin                         │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ├─> Creates agent pods dynamically
-                          │
-        ┌─────────────────┴─────────────────┐
-        │                                     │
-┌───────▼──────────┐              ┌─────────▼──────────┐
-│ Linux Agent Pod  │              │ Windows Agent Pod  │
-│ - Alpine/Ubuntu  │              │ - Nano Server      │
-│ - JNLP container │              │ - JNLP container   │
-│ - Build tools    │              │ - PowerShell       │
-└──────────────────┘              └────────────────────┘
+```mermaid
+flowchart TD
+    C[Jenkins Controller\nKubernetes plugin\nServiceAccount jenkins-admin]
+    C -->|creates dynamically| L[Linux Agent Pod\nAlpine/Ubuntu\nJNLP + build tools]
+    C -->|creates dynamically| W[Windows Agent Pod\nNano Server\nJNLP + PowerShell]
 ```
 
 ### Implementation Plan

@@ -63,25 +63,17 @@ This document outlines a comprehensive plan to enhance Jenkins deployment securi
 - Implementation exists but testing/validation coverage unclear
 
 ### How It Works (from code analysis)
-```
-┌─────────────────────────────────────────────────────────┐
-│ jenkins-cert-rotator CronJob                           │
-│ - Schedule: 0 */12 * * * (every 12 hours)              │
-│ - Image: google/cloud-sdk:slim                         │
-│ - ServiceAccount: jenkins-cert-rotator                 │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ├─> Run cert-rotator.sh
-                          │
-                          ├─> Check cert expiry via Vault API
-                          │
-                          ├─> If expiry < RENEW_BEFORE:
-                          │   ├─> Request new cert from Vault
-                          │   ├─> Update K8s secret (jenkins-tls)
-                          │   ├─> Revoke old cert in Vault
-                          │   └─> Trigger Jenkins pod restart
-                          │
-                          └─> Log results
+```mermaid
+flowchart TD
+    C[Jenkins cert-rotator CronJob\nevery 12 hours\nServiceAccount jenkins-cert-rotator] --> R[Run cert-rotator.sh]
+    R --> E[Check certificate expiry via Vault API]
+    E --> Q{Expiry below RENEW_BEFORE?}
+    Q -- No --> L[Log results]
+    Q -- Yes --> N[Request new certificate from Vault]
+    N --> U[Update Kubernetes secret jenkins-tls]
+    U --> X[Revoke old Vault certificate]
+    X --> P[Restart Jenkins pod]
+    P --> L
 ```
 
 ### Knowledge Gaps
@@ -730,24 +722,17 @@ export JENKINS_PRIMARY_HOST="jenkins-host.tailnet-name.ts.net"
 
 ## Implementation Priority Matrix
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Priority Matrix (Impact vs Effort)                      │
-└─────────────────────────────────────────────────────────┘
-
-High Impact, Low Effort:          High Impact, High Effort:
-├─ 1. SSL Setup Integration       ├─ 5. MFA Integration
-│  (2-3 hrs, immediate benefit)   │  (13-17 hrs, security critical)
-│                                  │
-└─ 3. DNS Configuration Docs      └─ 4. Let's Encrypt Integration
-   (2-4 hrs, enables customization)  (21-27 hrs, production feature)
-
-Low Impact, Low Effort:           Low Impact, High Effort:
-├─ 6. Remote Access Docs          ├─ (none in current plan)
-│  (4-5 hrs, reference material)  │
-│                                  │
-└─ 2. Cert Rotation Testing
-   (3-4 hrs docs, validation)
+```mermaid
+quadrantChart
+    title Priority matrix (impact vs effort)
+    x-axis Low effort --> High effort
+    y-axis Low impact --> High impact
+    1 SSL setup integration: [0.25, 0.85]
+    2 Certificate rotation testing: [0.25, 0.25]
+    3 DNS configuration docs: [0.25, 0.85]
+    4 Let's Encrypt integration: [0.8, 0.85]
+    5 MFA integration: [0.8, 0.85]
+    6 Remote access docs: [0.25, 0.25]
 ```
 
 ### Recommended Implementation Order
