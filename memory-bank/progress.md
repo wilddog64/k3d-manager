@@ -2790,3 +2790,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-slack-cleanup-accepts-apply-as-confirm-synonym.md (confirm = sole Slack keyword; apply refused). Not dispatched.
 - 2026-10-18: operator approved dispatch of Slack confirm-keyword P3; /cluster-down confirm requirement deferred for later discussion.
 - 2026-10-18: filed + dispatched P3 docs/bugs/2026-10-18-e2e-sandbox-provision-has-no-preview.md (preview without confirm; operator approved both).
+- 2026-10-18: landed Slack confirm-keyword fix aef07289 (N1/N2 red pre-fix, bin 718 pass). E3 after operator make restart-webhook. Preview P3 dispatched, running.

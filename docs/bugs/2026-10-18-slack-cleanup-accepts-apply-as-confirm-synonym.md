@@ -1,7 +1,8 @@
 # Bug: Slack confirmation keyword is `confirm` everywhere except cleanup-stale-sandbox, which also takes `apply`
 
 **Filed:** 2026-10-18 (Claude, from the operator's request)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting webhook restart + E3
+**Fix commit:** `aef07289`
 **Priority:** P3 — inconsistent UX; no wrong mutation today
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "some command use apply and some use confirm. we should unify them to be consistent" (filing + fix); "yes ... dispatch bug to codex" (dispatch, 2026-10-18). Requiring `confirm` on `/cluster-down` is deferred for later discussion — out of scope here
@@ -106,3 +107,7 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT run the real cleanup or contact Slack; stub them.
 - Do NOT add `apply` (or any other synonym) to `/k3dm`.
+
+## Verification log
+
+- 2026-10-18: Codex (dispatcher) fix landed `aef07289`; Claude added the label/header tests (N2, M2). `test_webhook_stale_cleanup.py` 10 passed; pre-fix webhook turns 3 red (apply refusal N1, labels N2, header M2). `pytest scripts/tests/bin` 718 passed, 1 skipped. E3 waits for `make restart-webhook`.
