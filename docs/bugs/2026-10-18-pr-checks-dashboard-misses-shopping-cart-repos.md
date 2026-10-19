@@ -4,8 +4,8 @@
 **Status:** OPEN
 **Priority:** P3 — observability gap; the PRs and their checks are still visible on GitHub
 **Severity:** low
-**Approval:** approved — operator, 2026-10-18: "go ahead to do that" (filing; dispatch not yet approved)
-**Release:** v1.43.7 (bug; exempt from the plan cap)
+**Approval:** approved — operator, 2026-10-18: "go ahead to do that" (filing); "go ahead to dispatch those three P3 to codex" (dispatch, 2026-10-18)
+**Release:** v1.43.5 (bug; exempt from the plan cap; moved from v1.43.7 so it can dispatch now)
 **Component:** `scripts/lib/hermes/pr_checks.py` (`REPOS`), `docs/guides/grafana-dashboards.md`
 **Related:** `docs/plans/v1.43.3-pr-checks-dashboard.md` (introduced the dashboard);
 `docs/plans/v1.43.7-codex-dispatch-cross-repo.md` (the same cross-repo research data, for dispatches)
@@ -55,6 +55,14 @@ every panel already filters by `repo`.
 include a shopping-cart repo, that repo pushes `scrape_success 0` and **GitHub read** turns red. If
 that happens, the operator widens the PAT's repository selection; Claude does not handle the token.
 
+## Files
+
+- `scripts/lib/hermes/pr_checks.py`
+- `scripts/tests/hermes/test_pr_checks.py`
+- `scripts/tests/hermes/test_hermes.py`
+- `docs/guides/grafana-dashboards.md`
+- `CHANGELOG.md`
+
 ## Acceptance
 
 ```yaml
@@ -93,7 +101,7 @@ interface:
 
 ## Definition of Done
 
-- [ ] F1–F3 on `k3d-manager-v1.43.7`; only the three listed files plus `CHANGELOG.md` change.
+- [ ] F1–F3 on `k3d-manager-v1.43.5`; only the three listed files plus `CHANGELOG.md` change.
 - [ ] N1 shown red against the pre-fix `REPOS`.
 - [ ] `pytest scripts/tests/hermes` green.
 - [ ] Commit: `fix(hermes): PR checks cover the shopping-cart repos`

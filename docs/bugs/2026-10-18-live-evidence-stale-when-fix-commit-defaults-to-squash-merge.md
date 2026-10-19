@@ -73,6 +73,15 @@ In `docs/guides/grafana-dashboards.md`, in the paragraph on `**Fix commit:**`, s
 pre-commit gate now requires it for a new LIVE-VERIFIED doc and checks that an evidence commit
 contains it.
 
+## Files
+
+- `scripts/check-bug-evidence.py`
+- `scripts/tests/bin/test_check_bug_evidence.py`
+- `docs/guides/grafana-dashboards.md`
+- `docs/bugs/2026-10-17-grep-q-pipeline-sigpipe-false-absent.md`
+- `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md`
+- `CHANGELOG.md`
+
 ## Acceptance
 
 ```yaml
