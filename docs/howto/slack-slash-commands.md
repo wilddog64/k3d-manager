@@ -510,6 +510,8 @@ fetched via `conversations.replies` and prepended to the agent's prompt. This le
 see the full conversation history — error messages, prior agent responses, prior diagnoses —
 without the user having to paste them manually.
 
+Thread replies work whether or not Slack's **Also send to channel** option is selected.
+
 Bot status and ANSI control sequences are stripped before injection.
 
 ### Filing mode

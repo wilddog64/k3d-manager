@@ -103,6 +103,16 @@ _policy._slack_user_role = _slack_user_role
 _LOG = get_logger("webhook")
 
 
+def _slack_message_is_command_candidate(ev):
+    """Return whether a Slack message may contain a webhook command."""
+    return (
+        ev.get("type") == "message"
+        and not ev.get("bot_id")
+        and bool(ev.get("text", "").strip())
+        and ev.get("subtype", "") in ("", "thread_broadcast")
+    )
+
+
 def _provider_supports_pushgateway(provider):
     """The Pushgateway is installed on app-cluster observability stacks only."""
     return provider != "hub"
@@ -2030,9 +2040,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_subtype = ev.get("subtype", "")
             ev_text = ev.get("text", "").strip()
             ev_user = ev.get("user", "")
+            if ev_type == "message" and ev_subtype not in ("", "thread_broadcast"):
+                _LOG.info("slack message ignored subtype=%s", ev_subtype)
             if not _slack_user_is_allowlisted(ev_user):
                 _LOG.warning("slack event ignored type=%r user=%r reason=unallowlisted", ev_type, ev_user)
-                if ev_type == "message" and not ev_bot_id and not ev_subtype and ev_text:
+                if _slack_message_is_command_candidate(ev):
                     _event_command = ev_text.lstrip("/").lower().split()[0]
                     if _event_command in (_THREAD_COMMANDS | _STANDALONE_CMDS):
                         _post_slack_bot(
@@ -2046,12 +2058,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             slack_role = _slack_user_role(ev_user)
             _LOG.debug("slack event type=%r thread_ts=%r ts=%r bot_id=%r subtype=%r user=%r role=%r",
                        ev_type, ev_thread_ts, ev_ts, ev_bot_id, ev_subtype, ev_user, slack_role)
-            if (
-                ev_type == "message"
-                and not ev_bot_id
-                and not ev_subtype
-                and ev_text
-            ):
+            if _slack_message_is_command_candidate(ev):
                 ev_channel_id = ev.get("channel", "")
                 is_thread_reply = bool(ev_thread_ts and ev_thread_ts != ev_ts)
                 thread_ts = ev_thread_ts if is_thread_reply else None

@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Slack thread replies sent with **Also send to channel** are now routed to the webhook
+  instead of being silently ignored.
+
 - Slack `cleanup-stale-sandbox` now accepts only `confirm` for mutating runs and labels queued
   cleanup work as `confirm` or `preview`.
 - Added a read-only preview for `e2e-sandbox-provision`; without `confirm`, the Slack target now
