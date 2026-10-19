@@ -47,6 +47,7 @@ allowlist/role map is already keyed by it.
 
 - `bin/k3dm-webhook`
 - `scripts/tests/bin/test_webhook_thread_actor.py`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py` (added at verification: its `_handle_thread_command` stub must accept the new `user_id` keyword)
 - `CHANGELOG.md`
 
 ## Acceptance
