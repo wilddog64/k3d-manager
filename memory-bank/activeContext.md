@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD: `bb4a2f64` (`README.md` now links and diagrams the Hermes process).
+- Current remote HEAD: `e9d1fddb` (`README.md` now indexes Hermes in both Guides and Architecture sections).
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -18,6 +18,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - PR Checks dashboard: panel 8 Check duration legend clipping is recorded in `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (P3 OPEN). No dashboard implementation change has been authorized.
 - Documentation review commit `ef058487` converted current non-archive flow/architecture diagrams to Mermaid, corrected Cloudflare relay drift, and labeled the legacy ingress path. Review record: `docs/issues/2026-10-19-docs-architecture-diagram-review.md`.
 - README Hermes documentation commit `bb4a2f64` adds the guide, Phase 1/2 scope links, and a focused Mermaid lifecycle diagram.
+- README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work
