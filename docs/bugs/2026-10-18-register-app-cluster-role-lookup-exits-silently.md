@@ -1,7 +1,8 @@
 # Bug: app-cluster registration exits silently when the role-label lookup fails
 
 **Filed:** 2026-10-18 (Claude, from the live `e2e-sandbox-provision` run, job `f5e6229f`)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting live rerun (E2)
+**Fix commit:** `a70e52a4`
 **Priority:** P1 — `make up CLUSTER_PROVIDER=k3s-aws` stops at Step 10 with no error; no workaround on this branch
 **Severity:** high (regression on `k3d-manager-v1.43.5`, unreleased)
 **Approval:** approved — operator, 2026-10-18: "yes" to dispatching to Codex
@@ -97,3 +98,7 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT modify `scripts/lib/foundation/`.
 - Do NOT contact the hub or a cluster from tests.
+
+## Verification log
+
+- 2026-10-19: Codex (dispatcher) fix landed `a70e52a4`, using `_kubectl --no-exit --quiet`. Claude verified: the new real-`_run_command` test is red on `781494e6` (N1). Codex's "no error text printed" assertions read grep's `${output}`, not the registration's; Claude moved them before the `run grep`. A mutation that drops `--quiet` and `2>/dev/null` now turns the test red (N2). `argocd_register_role_label.bats` + `argocd.bats` green; shellcheck clean.

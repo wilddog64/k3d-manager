@@ -2800,3 +2800,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-19: e2e job f5e6229f FAILED at acg-up Step 10 (silent): 781494e6 role lookup exits via _run_command inside $(...||true). Filed P1 register-app-cluster-role-lookup-exits-silently (approval pending). ACG stack left running. Cloudflare image bug LIVE-VERIFIED (max-age=300).
 - 2026-10-19: thread-actor fix landed bc1399eb (Claude fixed broadcast test stub; landed --allow-out-of-scope). P1 role-lookup bug awaiting operator dispatch approval.
 - 2026-10-19: P1 role-lookup bug approved; dispatched to Codex.
+- 2026-10-19: P1 role-lookup fix landed a70e52a4 (Claude fixed N2 assertion). Live E2 = rerun /k3dm e2e-sandbox-provision confirm.
