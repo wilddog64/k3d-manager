@@ -19,6 +19,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Documentation review commit `ef058487` converted current non-archive flow/architecture diagrams to Mermaid, corrected Cloudflare relay drift, and labeled the legacy ingress path. Review record: `docs/issues/2026-10-19-docs-architecture-diagram-review.md`.
 - README Hermes documentation commit `bb4a2f64` adds the guide, Phase 1/2 scope links, and a focused Mermaid lifecycle diagram.
 - README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
+- Dispatched P3 dashboard bug `bug-dashboard-verification-tile-labels-clipped`; implementation landed via dispatcher as `5819e236`, with 22/22 dashboard BATS and link checks passing. Bug is VERIFIED offline; live Grafana proof remains pending.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work

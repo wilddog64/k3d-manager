@@ -1,7 +1,8 @@
 # Bug: Bug Tracking verification tile labels are clipped
 
-**Status:** OPEN
+**Status:** VERIFIED — 2026-10-19: dispatched implementation landed in `5819e236`; dashboard BATS 22/22 and `make check-doc-links` passed. Live Grafana verification is still pending.
 **Priority:** P3
+**Fix commit:** `5819e236`
 **Branch:** `k3d-manager-v1.43.5`
 
 ## Summary
