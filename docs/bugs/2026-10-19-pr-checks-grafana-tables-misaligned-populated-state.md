@@ -7,7 +7,7 @@
 **Approval:** bug filing requested by operator, 2026-10-19; implementation not yet authorized
 **Release:** v1.43.5 (triage; confirm target release before implementation)
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` (table panels 5 and 6)
-**Related:** `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md` (previous no-PR empty-state improvement), `docs/plans/v1.43.3-pr-checks-dashboard.md`
+**Related:** `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md` (previous no-PR empty-state improvement), `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (panel 8 legend layout), `docs/plans/v1.43.3-pr-checks-dashboard.md`
 
 ## Symptom / evidence
 
