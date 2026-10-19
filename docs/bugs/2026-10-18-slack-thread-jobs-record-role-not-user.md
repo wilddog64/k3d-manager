@@ -1,7 +1,8 @@
 # Bug: jobs started from a Slack thread record the role, not the user
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting webhook restart + E2
+**Fix commit:** `bc1399eb`
 **Priority:** P3 — audit-trail gap; the command runs correctly
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "file a P3 bug as you mention above"
@@ -94,3 +95,7 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT call the Slack API or start real jobs in tests.
 - Do NOT change role resolution, the allowlist, or the top-level `/k3dm` actor.
+
+## Verification log
+
+- 2026-10-19: Codex (dispatcher) fix landed `bc1399eb`. Claude verified: on the pre-fix webhook, 4 of the 5 `test_webhook_thread_actor.py` tests are red (N1). The fallback-to-role test passes either way (M3). Codex's change broke the thread-broadcast routing test, whose stub took no kwargs; Claude updated that test to assert `user_id` is passed. It landed with `--allow-out-of-scope`, and the spec Files now list it. `pytest scripts/tests/bin` 734 passed, 1 skipped.
