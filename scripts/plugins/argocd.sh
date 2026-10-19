@@ -1632,7 +1632,7 @@ HELP
   fi
   local _role_label=""
   local _existing_role
-  _existing_role="$(_kubectl get secret "${ARGOCD_APP_CLUSTER_SECRET_NAME}" -n "${ARGOCD_NAMESPACE}" \
+  _existing_role="$(_kubectl --no-exit --quiet get secret "${ARGOCD_APP_CLUSTER_SECRET_NAME}" -n "${ARGOCD_NAMESPACE}" \
     -o jsonpath='{.metadata.labels.k3d-manager/role}' 2>/dev/null || true)"
   case "${_existing_role}" in
     app-cluster) _role_label='    k3d-manager/role: "app-cluster"' ;;

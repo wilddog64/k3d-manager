@@ -7,6 +7,9 @@ setup() {
   RENDERED_FILE="${BATS_TEST_TMPDIR}/cluster-secret.yaml"
   ROLE_LOOKUP=""
   _kubectl() {
+    while [[ "$1" == --* ]]; do
+      shift
+    done
     if [[ "$1" == "get" && "$2" == "secret" ]]; then
       [[ -n "${ROLE_LOOKUP}" ]] && printf '%s\n' "${ROLE_LOOKUP}"
       [[ -n "${ROLE_LOOKUP}" ]] && return 0
@@ -54,8 +57,55 @@ register_for_test() {
   [ "${status}" -eq 0 ]
 }
 
-@test "first-time registration still applies the app-cluster role" {
+@test "first-time registration applies the cluster secret without a role label" {
   register_for_test
   [ "${status}" -eq 0 ]
   [ "$(<"${BATS_TEST_TMPDIR}/active-role")" = "role-set" ]
+  run grep -F -- 'k3d-manager/role:' "${RENDERED_FILE}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "a failed real kubectl role lookup still applies the cluster secret" {
+  local kubectl_bin="${BATS_TEST_TMPDIR}/bin/kubectl"
+  local applied_file="${BATS_TEST_TMPDIR}/real-kubectl-applied.yaml"
+  local runner="${BATS_TEST_TMPDIR}/run-registration.sh"
+  mkdir -p "${kubectl_bin%/*}"
+  cat > "${kubectl_bin}" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == "get" && "$2" == "secret" ]]; then
+  printf 'secret lookup failed\n' >&2
+  exit 1
+fi
+if [[ "$1" == "apply" && "$2" == "-f" ]]; then
+  cat "$3" > "${APPLIED_FILE}"
+  exit 0
+fi
+exit 2
+STUB
+  chmod +x "${kubectl_bin}"
+  export APPLIED_FILE="${applied_file}"
+  export PATH="${kubectl_bin%/*}:${PATH}"
+  export ARGOCD_PLUGIN_SOURCE="${ARGOCD_PLUGIN_SOURCE:-${SCRIPT_DIR}/plugins/argocd.sh}"
+  export ARGOCD_APP_CLUSTER_SERVER=https://kubernetes.default.svc
+  export ARGOCD_APP_CLUSTER_NAME=ubuntu-k3s
+  export ARGOCD_APP_CLUSTER_SECRET_NAME=ubuntu-k3s-app-cluster
+  export ARGOCD_NAMESPACE=cicd
+  cat > "${runner}" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+source "${SCRIPT_DIR}/lib/system.sh"
+source "${ARGOCD_PLUGIN_SOURCE}"
+_argocd_set_active_app_cluster() { :; }
+register_app_cluster
+printf 'registration-survived\n'
+SCRIPT
+  chmod +x "${runner}"
+
+  run bash "${runner}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"registration-survived"* ]]
+  [[ "${output}" != *"secret lookup failed"* ]]
+  [ -s "${APPLIED_FILE}" ]
+  run grep -F -- 'k3d-manager/role:' "${APPLIED_FILE}"
+  [ "${status}" -ne 0 ]
 }

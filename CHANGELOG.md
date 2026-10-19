@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- App-cluster registration now continues when the existing Secret role-label lookup fails,
+  applying the Secret without a role label instead of exiting silently.
+
 - Slack thread-started jobs now record the Slack user ID in the actor field instead of only the
   user's role.
 
