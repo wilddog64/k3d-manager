@@ -1,7 +1,8 @@
 # Bug: a Slack thread reply sent with "Also send to channel" is silently ignored
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** OPEN
+**Status:** FIXED — landed, awaiting webhook restart + E2
+**Fix commit:** `93d8cf77`
 **Priority:** P3 — the command is not run and nothing replies; resending without the checkbox works
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "yes" to filing and dispatching to Codex
@@ -95,3 +96,7 @@ interface:
 - Do NOT contact Slack or start real jobs in tests; stub them.
 - Do NOT route `message_changed` or any other subtype; only `thread_broadcast` is added.
 - Do NOT log message text or user IDs in the new INFO line.
+
+## Verification log
+
+- 2026-10-18: Codex (dispatcher) fix landed `93d8cf77`. Claude found the new INFO line also fired for `thread_broadcast`, which is routed, not dropped. Claude narrowed it to dropped subtypes and made the routing test assert no "ignored" line. `test_webhook_thread_broadcast.py` 11 passed, all 11 red on the pre-fix webhook (routing test = N1); `pytest scripts/tests/bin` 729 passed, 1 skipped. E2 waits for `make restart-webhook`.
