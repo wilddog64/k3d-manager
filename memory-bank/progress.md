@@ -2788,3 +2788,4 @@ Operator screenshot showed Hermes `alert_delivery` status `unknown`, evidence `a
 - 2026-10-18: operator approved dispatching 3 P3s. Added ## Files to live-evidence + pr-checks bugs; pr-checks moved to v1.43.5. MinIO pillow (shopping-cart-infra) held: dispatcher is k3d-manager-only until v1.43.7.
 - 2026-10-18: Landed via dispatcher: pr-checks fix 10b49424 (272 hermes tests; 3 red pre-fix) and live-evidence CHANGELOG a4c9b426. Correction: live-evidence fix was already 6d8bd118, MinIO Step 1 already fb572b8 (shopping-cart-infra). Both bugs FIXED; pr-checks E3 awaits hub Hermes.
 - 2026-10-18: filed P3 docs/bugs/2026-10-18-slack-cleanup-accepts-apply-as-confirm-synonym.md (confirm = sole Slack keyword; apply refused). Not dispatched.
+- 2026-10-18: operator approved dispatch of Slack confirm-keyword P3; /cluster-down confirm requirement deferred for later discussion.

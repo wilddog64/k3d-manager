@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P3 — inconsistent UX; no wrong mutation today
 **Severity:** low
-**Approval:** approved — operator, 2026-10-18: "some command use apply and some use confirm. we should unify them to be consistent" (filing + fix); dispatch not yet requested
+**Approval:** approved — operator, 2026-10-18: "some command use apply and some use confirm. we should unify them to be consistent" (filing + fix); "yes ... dispatch bug to codex" (dispatch, 2026-10-18). Requiring `confirm` on `/cluster-down` is deferred for later discussion — out of scope here
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `bin/k3dm-webhook` (`cleanup-stale-sandbox` Slack parser and labels)
 **Related:** `docs/bugs/2026-10-07-slack-stale-sandbox-cleanup-misleading-reporting.md` (documented
