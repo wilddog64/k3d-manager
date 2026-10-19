@@ -6,6 +6,7 @@
 **Severity:** medium
 **Component:** sandbox app bootstrap / ArgoCD Application convergence / shopping-cart frontend
 **Related:** `docs/issues/2026-05-26-acg-sandbox-expiry-remote-cluster-rebuild-shopping-cart-bootstrap-gap.md`
+**Dashboard bug record:** `docs/bugs/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`
 
 ## Job
 
