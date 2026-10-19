@@ -275,6 +275,7 @@ flowchart LR
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 - **[Cloudflare Tunnel + Slack Relay](docs/architecture/cloudflare-slack-relay.md)** — Ingress routing and Slack slash command dispatch with Mermaid diagrams
 - **[Webhook Server](docs/architecture/webhook-server.md)** — `bin/k3dm-webhook` + `scripts/lib/webhook/` module layout after the v1.13.0 modularization, request flow, and remaining phases
+- **[Hermes Monitoring and Repairs](docs/architecture/hermes-phase1-monitoring-scope.md)** — Read-only sensing, incident correlation, and the approval boundary for repairs; see the [Phase 2 repair scope](docs/architecture/hermes-phase2-repair-scope.md)
 - **[OpenLDAP Directory Service](docs/architecture/openldap-directory-service.md)** — Symas `jp-gouin/openldap-stack-ha` topology, credential model, and consumer wiring after the v1.22.0 `bitnamilegacy` migration
 - **[CVE Detection and Remediation Pipeline](docs/architecture/cve-remediation-pipeline.md)** — Trivy alert → webhook → immutable-image promotion/rebuild, plus Dependabot escalation
 - **[Trivy Operator Observability](docs/architecture/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
