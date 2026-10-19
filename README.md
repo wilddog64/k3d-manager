@@ -231,6 +231,7 @@ docs/
 - **[Alerting](docs/guides/alerting.md)** — Alertmanager receivers, default-deny routing, warning allowlist, and notification triage
 - **[Webhook AI analysis fallback](docs/guides/ai-analysis-fallback.md)** — Candidate ordering, failure classification, and safe sentinel output
 - **[Alert delivery](docs/guides/alert-delivery.md)** — Generated route-tree checks, missing configSecret triage, and Hermes blackout detection
+- **[Hermes operations](docs/guides/hermes.md)** — Off-hub monitoring, multi-signal correlation, Slack reporting, and approval-gated repairs
 - **[App-cluster registration](docs/guides/app-cluster-registration.md)** — Hub registration durability, reconciliation, and registration-gap triage
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
 - **[vCluster E2E Harness](docs/guides/vcluster-e2e-harness.md)** — Both tiers of the e2e verification harness: Tier 1 (`e2e_verify_vcluster`) stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate; Tier 2 (`e2e_verify_sandbox`) is the opt-in ACG sandbox Stripe flow
@@ -239,6 +240,30 @@ docs/
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
 - **[Security & Vulnerability Management](docs/guides/security/)** — Deep-dive set on the security stack: Trivy CVE loop, Vault PKI, ESO, image signing/attestation, grounded in the actual implementation
+
+### Hermes operations
+
+Hermes is the off-hub monitoring and triage agent. It observes read-only health signals,
+correlates sustained multi-signal degradation, reports incidents to Slack, and proposes only
+closed, approval-gated repairs. The poll cycle does not mutate cluster, cloud, Git, or edge
+state by itself.
+
+```mermaid
+flowchart LR
+    S[Read-only sensors\nESO · ArgoCD · reachability\nnode pressure · CI · app health]
+    C[Deterministic correlator\nsustained multi-signal incident]
+    R[Slack report\nevidence + possible prior art]
+    P[Allowlisted repair proposal\nexact command + action ID]
+    A[Human approval\nprecondition re-validated]
+    X[Scoped repair + post-repair sample]
+
+    S --> C --> R --> P --> A --> X
+    X -.-> S
+```
+
+- **[Hermes guide](docs/guides/hermes.md)** — operator process, sensors, Slack approvals, recovery, and commands
+- **[Phase 1 monitoring scope](docs/architecture/hermes-phase1-monitoring-scope.md)** — read-only sensing and correlation boundaries
+- **[Phase 2 repair scope](docs/architecture/hermes-phase2-repair-scope.md)** — closed repair allowlist and human-approval safety boundary
 
 ### Providers
 - **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
