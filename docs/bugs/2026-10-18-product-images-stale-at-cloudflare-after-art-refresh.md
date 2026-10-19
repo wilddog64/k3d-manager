@@ -1,14 +1,16 @@
 # Bug: refreshed product images stay stale at Cloudflare for up to 4 hours
 
 **Filed:** 2026-10-18 (Claude, found while verifying the slug-tag fix)
-**Status:** FIXED — merged, awaiting rollout + E2
+**Status:** LIVE-VERIFIED — 2026-10-19 01:25Z: the plain `webcam.jpg` URL now returns `cache-control: max-age=300` with `cf-cache-status: REVALIDATED`, after the old 4h edge entry expired
 **Priority:** P3 — cosmetic; new art appears on its own once the cache expires, or after a manual purge
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "go ahead to file a P3"
 **Branch:** `k3d-manager-v1.43.5` (doc); fix in `wilddog64/shopping-cart-frontend` on a feature branch
 **Release:** v1.43.5
 **Component:** `shopping-cart-frontend`: `nginx.conf` (`location ^~ /minio/product-images/`)
-**Fix commit:** shopping-cart-frontend `cad50792` (PR #127, squash of Codex `8c934788`, Claude `a6a951f5`, `866a225`)
+**Fix commit:** `cad50792`
+**Fix repo:** shopping-cart-frontend (PR #127, squash of Codex `8c934788`, Claude `a6a951f5`, `866a225`)
+**Live evidence:** 2026-10-19 · run curl-plain-url-poll · env ubuntu-hostinger/shopping-cart-apps · scenario plain-image-url-after-edge-expiry · commit cad50792 · proves E2
 
 ## Symptom
 
@@ -106,3 +108,4 @@ interface:
 - 2026-10-18: E2 not yet runnable. The image header still reads `max-age=14400` (`cf-cache-status: HIT`), but Hostinger still runs the pre-fix image: `services/shopping-cart-frontend/kustomization.yaml` pins `sha256:1c589d0d…` (deploy last rolled 19:10Z), while the fix image `sha-cad5079…` is `sha256:c6557ecb…` (GHCR, 23:28Z). Same pin-not-bumped class as `2026-10-17-services-digest-pin-not-bumped-by-app-ci.md`. Bumping the pin needs the operator's go.
 - 2026-10-18: operator approved the pin bump ("yes, you can"); frontend pin -> `sha256:c6557ecb…` (fix image `sha-cad5079…`).
 - 2026-10-19 00:07Z: the frontend rolled out on `sha256:c6557ecb…`. A cache-busted fetch (`cf-cache-status: MISS`) returns `expires` = now + 5 min, so the origin sends the 5 min TTL. Cloudflare rewrites `Cache-Control` to `max-age=14400`, its zone Browser Cache TTL. The security headers are all present. The edge entry follows the origin TTL; the browser TTL needs the operator to set Browser Cache TTL to "Respect Existing Headers" (the open question above). E2 is pending that setting.
+- 2026-10-19 01:25Z: E2 passed. `curl -A k3dm-verify/1` on https://frontend.3ai-talk.org/minio/product-images/webcam.jpg returned `cache-control: max-age=300` and `cf-cache-status: REVALIDATED` (last-modified 2026-10-18 22:51:30 GMT). No purge was needed.
