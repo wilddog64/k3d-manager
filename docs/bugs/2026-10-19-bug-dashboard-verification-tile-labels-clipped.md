@@ -1,9 +1,10 @@
 # Bug: Bug Tracking verification tile labels are clipped
 
-**Status:** VERIFIED — 2026-10-19: dispatched implementation landed in `5819e236`; dashboard BATS 22/22 and `make check-doc-links` passed. Live Grafana verification is still pending.
+**Status:** LIVE-VERIFIED — 2026-10-19: operator refreshed the hub `k3dm-bugs` dashboard and confirmed the `Verified` and `Live-verified` labels render fully after the dispatched implementation in `5819e236`.
 **Priority:** P3
 **Fix commit:** `5819e236`
 **Branch:** `k3d-manager-v1.43.5`
+**Live evidence:** 2026-10-19 · run operator-browser-k3dm-bugs · env hub/k3d · scenario verification-tile-labels · commit 5819e236 · proves fix
 
 ## Summary
 
