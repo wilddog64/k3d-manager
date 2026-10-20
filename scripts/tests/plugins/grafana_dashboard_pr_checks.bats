@@ -101,3 +101,22 @@ assert {prop["id"]: prop["value"] for prop in duration_override["properties"]}["
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "PR check duration legend uses a readable side layout without changing its query" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panel = next(panel for panel in data["panels"] if panel["id"] == 8)
+assert panel["options"]["legend"] == {
+    "showLegend": True,
+    "displayMode": "list",
+    "placement": "right",
+    "calcs": [],
+}
+assert panel["targets"][0]["expr"] == 'k3dm_pr_check_duration_seconds{repo=~"$repo"}'
+assert panel["targets"][0]["legendFormat"] == "{{repo}}#{{pr}} {{check}}"
+PY
+  [ "${status}" -eq 0 ]
+}
