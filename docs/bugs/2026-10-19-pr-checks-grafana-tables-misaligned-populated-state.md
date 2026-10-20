@@ -12,7 +12,7 @@
 ## Files
 
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
-- `scripts/tests/grafana_dashboard_pr_checks.bats`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
 
 ## Symptom / evidence
 
