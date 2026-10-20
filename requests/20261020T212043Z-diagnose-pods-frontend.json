@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "action": "diagnose-pods",
+  "args": {
+    "provider": "hostinger",
+    "namespace": "frontend"
+  },
+  "requested_by": "chatgpt-cloud",
+  "requested_at": "2026-10-20T21:20:43Z",
+  "expires_at": "2026-10-20T21:50:43Z"
+}
