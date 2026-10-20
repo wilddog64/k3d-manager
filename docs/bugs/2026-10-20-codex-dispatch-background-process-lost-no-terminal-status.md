@@ -2,12 +2,16 @@
 
 **Filed:** 2026-10-20 (ChatGPT; operator-provided CLI screenshots)
 **Status:** OPEN — investigation and implementation deferred until Claude is available
-**Priority:** P2 — unreliable autonomous dispatch and loss of execution evidence
-**Severity:** medium — tasks can appear accepted but never run or report completion
-**Approval:** operator explicitly approved filing a P2 bug, 2026-10-19 PDT; NOT approval to implement
+**Priority:** P1 — critical engineering workflow blocker: autonomous Codex dispatch can silently fail, preventing reliable agent-to-agent implementation and verification
+**Severity:** high — tasks can appear accepted but never run or report completion, blocking dependable automated engineering throughput
+**Approval:** operator approved filing as P2, then explicitly escalated to P1 on 2026-10-19 PDT because unreliable dispatch hinders effective engineering work; NOT approval to implement
 **Release:** v1.43.5 (triage; scheduling to be confirmed)
 **Component:** `bin/k3dm-codex-dispatch`, `scripts/tests/bin/codex_dispatch.bats`
 **Related:** `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md`
+
+## Priority escalation — 2026-10-19 PDT
+
+Operator: "I think that p2 should raise to p1 as this hinder any work effectively". Dispatch is a critical path for k3d-manager's AI-engineering workflow: repeated accepted-but-silent worker failures prevent dependable implementation and verification handoffs, require manual investigation/retries, and make completion evidence untrustworthy. P1 reflects **workflow impact and urgency**, not proof that all invocations fail or that the root cause is known. Prior successful Claude-coordinated runs and r4 demonstrate the failure is intermittent/context-dependent. Investigate before implementing; retain all failed-run evidence and the reverted speculative repair commits (6e8ef83e, bd63a39e, 04d91a6e and respective reversals) as forensic history, not accepted fixes.
 
 ## Problem and observed evidence
 
