@@ -193,6 +193,7 @@ EOF
     "K3DM_PORT_CACHE_DIR=$state_dir/port-cache" "TMPDIR=$state_dir/tmp"
   )
   (
+    trap '' HUP
     set +e
     if (( network )); then
       env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
@@ -346,6 +347,7 @@ _dispatch_resume() {
   )
   (
     cd "$task"
+    trap '' HUP
     set +e
     if [[ -f "$run/network" ]]; then
       env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
