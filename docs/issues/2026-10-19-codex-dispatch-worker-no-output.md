@@ -60,6 +60,19 @@ network: yes
 scope: in-scope
 ```
 
+The detached-worker retry was then implemented and tested, but a live retry still failed in this launcher environment:
+
+```text
+task: pr-checks-table-misalignment-retry3
+pid=17223
+alive=no
+codex.log: not created
+exit=not-recorded
+state: failed (worker exited without exit marker)
+```
+
+The dispatcher fix commits are `6e8ef83e` (terminal failure reporting) and `04d91a6e` (detached worker launch). The retry cannot yet be considered active or complete.
+
 ## Root cause
 
 The worker termination mechanism is still unknown. The dispatcher successfully created the worktree and PID, but the worker exited before writing to `codex.log`, `last-message.md`, or `exit`. The dispatcher previously misclassified this terminal condition as `unknown`.

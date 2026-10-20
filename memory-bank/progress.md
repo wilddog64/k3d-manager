@@ -17,6 +17,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Dispatched the existing explicit Slack job-ID mismatch bug after live reproduction `d5261dfb` (thread anchor) versus `26f2035e` (Make child with `make.log`). Fix `177ba541` honors explicit IDs, rejects cross-thread access, and selects the newest non-anchor for bare `logs`. Focused Python tests passed 25/25; relevant BATS 14/14; syntax validation and `_agent_audit` passed. Operator then ran the Slack-originated E2E flow: job `26f2035e` completed successfully and E2E run `1792455493-30189` returned `exit_code=0` / `result=pass`. Bug is now `LIVE-VERIFIED`.
 - Dispatched P3 `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md` as `pr-checks-table-misalignment`; dispatcher created the isolated worktree and implementation remains pending.
 - Investigated the dispatcher recurrence: task PID `58276` died with empty `codex.log` and no exit marker. Updated dispatcher status to report `failed (worker exited without exit marker)` and added a 34-test regression suite case; worker termination root cause remains open in `docs/issues/2026-10-19-codex-dispatch-worker-no-output.md`.
+- Retried after detached-worker hardening (`04d91a6e`); `pr-checks-table-misalignment-retry3` still lost PID `17223` before creating `codex.log`. The dispatcher now reports the failure, but live worker persistence remains unresolved.
 
 ## 2026-10-18
 
