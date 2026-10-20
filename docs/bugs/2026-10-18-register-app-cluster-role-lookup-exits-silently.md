@@ -1,8 +1,9 @@
 # Bug: app-cluster registration exits silently when the role-label lookup fails
 
 **Filed:** 2026-10-18 (Claude, from the live `e2e-sandbox-provision` run, job `f5e6229f`)
-**Status:** VERIFIED — 2026-10-20: focused BATS 41/41 passed and ShellCheck clean; awaiting operator live rerun (E2)
+**Status:** LIVE-VERIFIED — 2026-10-20: Slack-originated job `05f2be6c` completed E2E run `1792538358-29202` with 4/4 passed and `exit_code=0`; registration log confirms the cluster Secret was applied and the live hub Secret has the `app-cluster` role label with creation time `2026-10-20T23:26:40Z`.
 **Fix commit:** `a70e52a4`
+**Live evidence:** 2026-10-20 · run 1792538358-29202 · env sandbox/local-m4 · scenario slack-e2e-sandbox-provision-app-cluster-registration · commit a70e52a4 · proves E2
 **Priority:** P1 — `make up CLUSTER_PROVIDER=k3s-aws` stops at Step 10 with no error; no workaround on this branch
 **Severity:** high (regression on `k3d-manager-v1.43.5`, unreleased)
 **Approval:** approved — operator, 2026-10-18: "yes" to dispatching to Codex
@@ -102,4 +103,5 @@ interface:
 ## Verification log
 
 - 2026-10-19: Codex (dispatcher) fix landed `a70e52a4`, using `_kubectl --no-exit --quiet`. Claude verified: the new real-`_run_command` test is red on `781494e6` (N1). Codex's "no error text printed" assertions read grep's `${output}`, not the registration's; Claude moved them before the `run grep`. A mutation that drops `--quiet` and `2>/dev/null` now turns the test red (N2). `argocd_register_role_label.bats` + `argocd.bats` green; shellcheck clean.
-- 2026-10-20: independent rerun `bats scripts/tests/plugins/argocd_register_role_label.bats scripts/tests/plugins/argocd.bats` passed 41/41. `shellcheck -x scripts/plugins/argocd.sh` exited 0 with no findings. Live E2 remains pending; the operator must run the Slack-originated `/k3dm e2e-sandbox-provision confirm` flow and confirm the hub Secret refreshes as specified above. This is **not** LIVE-VERIFIED.
+- 2026-10-20: independent rerun `bats scripts/tests/plugins/argocd_register_role_label.bats scripts/tests/plugins/argocd.bats` passed 41/41. `shellcheck -x scripts/plugins/argocd.sh` exited 0 with no findings. At that point live E2 was pending; it was completed by the operator's later Slack-originated run recorded below.
+- 2026-10-20: operator ran Slack-originated job `05f2be6c`; `make.log` records `[argocd] registering app cluster 'ubuntu-k3s'`, `cluster secret applied`, and the `app-cluster` role label being set. E2E summary `~/.k3dm/e2e/1792538358-29202.json` reports `result=pass`, `passed=4`, `failed=0`, `total=4`, `exit_code=0`. Read-only hub check (`kubectl` context `k3d-k3d-cluster`) reports Secret `cluster-ubuntu-k3s` creation timestamp `2026-10-20T23:26:40Z` and role `app-cluster`, confirming refresh during the run. E2 passed; status is LIVE-VERIFIED.

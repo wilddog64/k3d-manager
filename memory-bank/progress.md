@@ -41,6 +41,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Slack confirm-keyword fix landed at `aef07289`; thread broadcast fix landed at `93d8cf77`; thread actor fix at `bc1399eb`.
 - P1 register-app-cluster role-lookup defect was found in live e2e job `f5e6229f`, approved, and fixed at `a70e52a4`; live E2 rerun remains pending.
 - 2026-10-20: independently reran `argocd_register_role_label.bats` and `argocd.bats` (41/41) plus `shellcheck -x scripts/plugins/argocd.sh` (clean). Updated the canonical bug to VERIFIED; Slack-originated operator live E2 remains pending, so it is not LIVE-VERIFIED.
+- 2026-10-20: operator Slack job `05f2be6c` completed E2E run `1792538358-29202`; saved summary reports pass, 4/4, exit code 0. Job log confirms app-cluster registration applied the Secret and set its role label. Read-only hub check shows Secret creation timestamp `2026-10-20T23:26:40Z` and role `app-cluster`. Updated `docs/bugs/2026-10-18-register-app-cluster-role-lookup-exits-silently.md` to LIVE-VERIFIED.
 - Frontend cache TTL fix was deployed; operator still needs Cloudflare “Respect Existing Headers” and an E2 check.
 
 ## 2026-10-17 and earlier active decisions
