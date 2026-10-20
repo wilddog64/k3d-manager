@@ -1,10 +1,11 @@
 # Cloud-bridge Make job-status returns empty output, hiding test failure diagnostics
 
 **Filed:** 2026-10-06
-**Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** FIXED in branch; live cloud/Slack verification pending — canonical bug: [September 28 report](2026-09-28-make-jobs-never-write-output-file.md)
+**Release / branch:** v1.43.5 / `k3d-manager-v1.43.5` (original report: v1.42.0)
+**Status:** VERIFIED — 2026-10-19: dispatched fix landed in `d5e7b7f5`; relevant BATS passed 14/14, focused Python tests passed 17/17, Python compile and `_agent_audit` passed. Live Slack verification remains pending operator confirmation.
 **Severity:** Medium — cloud agents see terminal failure but cannot diagnose it
 **Component:** webhook job-status log selection / cloud-bridge response
+**Fix commit:** `d5e7b7f5`
 
 ## Files
 

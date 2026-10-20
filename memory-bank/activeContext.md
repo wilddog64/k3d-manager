@@ -21,6 +21,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
 - Dispatched P3 dashboard bug `bug-dashboard-verification-tile-labels-clipped`; implementation landed via dispatcher as `5819e236`, with 22/22 dashboard BATS and link checks passing. Operator live-verified the full `Verified` and `Live-verified` labels on the hub `k3dm-bugs` dashboard on 2026-10-19.
 - Dispatched P2 e2e sandbox frontend upstream race; implementation landed via dispatcher as `4ebaaec5`. It performs one bounded frontend rollout restart after product-catalog is `Synced/Healthy` while frontend remains `Synced/Degraded`. Offline verification passed: focused BATS 35/35, shellcheck, and `_agent_audit`. Operator-confirmed Slack job `f8ea6d69` completed E2E run `1792450928-16408` with 4/4 passed and exit code 0; bug is now `LIVE-VERIFIED`.
+- Dispatched Slack Make-log lookup fix from the canonical empty-output bug; implementation `d5e7b7f5` writes the Make target marker for thread-created jobs so shared retrieval selects `make.log`. Relevant BATS passed 14/14, focused Python tests 17/17, compile and `_agent_audit` passed. Bug is `VERIFIED`; operator Slack live verification remains pending.
 - Remote pull verified: `fa472803` added the PR Checks bug doc; `09dff92e` changed the product-catalog image pin. They were not two Markdown docs.
 
 ## Recent completed work
@@ -36,6 +37,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Open / pending
 
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
+- Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.
 - PR Checks table transformation fix: investigation/fix pending.
 - PR Checks panel 8 legend layout fix: investigation/fix pending.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
