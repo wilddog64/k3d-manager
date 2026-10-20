@@ -23,11 +23,41 @@ Operator screenshot on 2026-10-19, dashboard **k3dm PR Checks**, repo filter **A
 - **Checks per PR** table has **PR = 1.03 mins** (a duration displayed where the PR number belongs); the **Duration** column contains `No open PRs — no checks to show` rather than a numeric duration. **Value #A** and extra placeholder-like values appear, while check names and statuses are otherwise present.
 - Screenshot contains real check rows, including GitGuardian, lint, integration, and security checks; therefore the no-PR/no-check placeholders are incorrect in the populated state.
 
-## Investigation notes (not yet root-cause confirmed)
+## Investigation notes (not yet root-cause confirmed — superseded by "Root cause and fix direction — 2026-10-20" below)
 
 Current dashboard config on `k3d-manager-v1.43.5` uses two instant Prometheus table targets per panel followed by a Grafana `merge` and `organize` transformation. Both queries carry numeric `Value` fields that Grafana may name `Value #A` and `Value #B`. The `organize` exclusion removes `Value` but does not explicitly exclude or correctly map all resulting suffixed fields. The previous fix set `fieldConfig.defaults.noValue` on each table, which may turn missing fields in otherwise populated rows into misleading `No open PRs` text.
 
 Investigate actual Grafana frame schemas, transformation/join keys, duplicate rows, time-series label/value handling, field overrides and duration unit formatting. Confirm independently rather than assuming one particular Grafana behavior. Do not modify the Hermes collector unless evidence shows source metrics are invalid.
+
+## Root cause and fix direction — 2026-10-20 (Antigravity agent; evidence-based)
+
+Root cause is now confirmed by simulation; the investigation notes above predate it. Method: the hub Grafana (11.4.0, `kube-prometheus-stack-grafana`, default datasource uid `prometheus`) was queried through `/api/ds/query` with the dashboard's exact targets, and the returned frames were run through Grafana 11.4.0's own `@grafana/data` code (`joinByField`, `organize`) with a copy of `@grafana/prometheus` `transformDFToTable`. Live data: one open PR (`wilddog64/shopping-cart-product-catalog` #62) with 7 checks. The simulation harness is not in the repo.
+
+| Variant | Panel 5 (Open PRs) | Panel 6 (Checks per PR) |
+|---|---|---|
+| Original (`merge` + `organize`) | 2 rows; `Value #A` / `Value #B` leak; `Overall` null on the info row and `Draft/Head/Title` null on the overall row | 14 rows; `Value #A` leaks; `Duration` null on every state row and `State` null on every duration row |
+| `label_join` + `joinByField` (outer, key `__join`) with `organize` — the first Codex attempt (task `pr-checks-table-misalignment-r4`) | 1 row but columns `Draft, Head, pr 1, repo 1, Title, pr 2, repo 2, Overall` | 7 rows but columns `check 1, pr 1, repo 1, State, check 2, pr 2, repo 2, Duration` |
+| Same, with the **second** query aggregated (below) | 1 row: `Draft, Head, PR, Repo, Title, Overall` | 7 rows: `Check, PR, Repo, State, Duration` |
+
+**Why the original misaligns:** `merge` concatenates the two queries' frames instead of joining them, so each metric's value stays in its own `Value #A` / `Value #B` column on its own row.
+
+**Why the first join attempt is still wrong:** both queries return the same label set (`repo`, `pr`, and for panel 6 `check`). `joinByField` keeps both copies and renames them `repo 1` / `repo 2` (and `pr`, `check`), so `organize.renameByName` for `repo`, `pr` and `check` never matches and the table shows duplicate columns.
+
+**Fix (verified in simulation, not yet in the dashboard YAML):**
+
+1. Keep the `label_join` on every target that creates `__join` (Prometheus and Grafana both preserve a label named `__join`; confirmed against the live API).
+2. Aggregate the **second** query so it keeps only the join key (plus the one label it must contribute), which removes the duplicate labels:
+   - Panel 5, query B: `max by (__join, state) (label_join(k3dm_pr_overall{repo=~"$repo"},"__join",":","repo","pr"))`
+   - Panel 6, query B: `max by (__join) (label_join(k3dm_pr_check_duration_seconds{repo=~"$repo"},"__join",":","repo","pr","check"))`
+   - Query A of each panel stays as `label_join(...)` without aggregation (panel 5 A = `k3dm_pr_info`, panel 6 A = `k3dm_pr_check_state`), so it supplies `repo`, `pr`, `check`, `title`, `head`, `draft`, `state`.
+3. Keep `transformations` as `joinByField` (`{"byField":"__join","mode":"outer"}`) followed by `organize`. In `organize.excludeByName` hide `Time`, `Value`, `Value #A`, `__name__`, `__join`, `job`, `instance`; additionally hide `Value #B` for panel 5 only. Panel 6 must **keep** `Value #B` so `renameByName` can turn it into `Duration`.
+4. Keep `fieldConfig.defaults.noValue` and all existing mappings, units and `sortBy` unchanged; the empty state must still read "No open PRs" / "No open PRs — no checks to show".
+
+**Simulation results with the fix (live data):** repo `.*` gives panel 5 = 1 row and panel 6 = 7 rows with exactly the columns above and `Duration` populated (2, 32, 5, 0, 51, 27, 24 s); a single-repo filter gives the same; a non-matching repo returns no rows, so `noValue` still applies. The pre-fix queries reproduce the operator screenshot's symptoms (leaked `Value #A/#B`, `Duration` null).
+
+**Regression test requirement (existing test is insufficient):** the first Codex attempt added a BATS test that joins plain Python dictionaries; it passes against the broken duplicate-label variant, so it cannot detect this defect. The test must assert on the dashboard JSON that (a) query B of panels 5 and 6 aggregates with `max by (__join` and does not carry `repo`, `pr` or `check` outside the join key, (b) query A is not aggregated, (c) `joinByField` precedes `organize`, (d) panel 5 hides `Value #B` and panel 6 does not, and (e) `Value #B` is renamed to `Duration` in panel 6. Keep the existing empty-state test intact.
+
+**Not verified:** real browser rendering of the panels (simulation ran Grafana's transformation code in Node, not the UI); `repo=All` with several repos at once (live data has one repo and one PR); mixed states beyond `success` and `skipped`. These belong to the live check (E2).
 
 ## Expected behavior
 
