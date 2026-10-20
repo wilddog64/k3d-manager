@@ -2,6 +2,13 @@
 
 Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memory-bank/archive/2026-10-07-to-2026-10-16-compressed.md`; the prior full file remains recoverable from git history.
 
+## 2026-10-20 Hostinger multi-service P1 investigation
+
+- Read-only diagnosis found repeated M4 frontend/Pushgateway port-forward TCP/6443 timeouts around the outage, followed by forwarding recovery. This supports a transient M4-to-Hostinger Kubernetes API path interruption but does not establish the responsible network segment.
+- VPS boot time remained 2026-10-17; k3s was active and no incident-window OOM, link, disk, or I/O kernel journal matches were found. Current API readiness, node/app/data workloads, Vault/ESO readiness, frontend public endpoint, and product API were healthy.
+- Fresh Hostinger status job `dc9e4089` completed with 20 OK / 1 fail. The sole failure was ArgoCD direct password login; ArgoCD SSO passed. Operator `make status` screenshot was overall HEALTHY; its Hub snapshot was 270 minutes old and is separate from live service status.
+- No runtime recovery action was taken. Canonical P1 remains OPEN pending confirmation of the API-path fault domain and separate ArgoCD direct-login triage. Evidence and exact timeline are recorded in `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.
