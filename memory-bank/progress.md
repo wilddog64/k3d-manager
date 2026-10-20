@@ -47,4 +47,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-20 dispatcher investigation
 
 - Confirmed the process-group cleanup root cause of silent dispatch worker loss and recorded the evidence in the P1 bug doc; Codex dispatch of the fix is the next step. Grafana table fix is on hold behind it.
-- Dispatcher P1 is `LIVE-VERIFIED` from the real Codex CLI smoke run (`2de716d8`; run `live-smoke-codex-cli`, E2 recorded in the bug doc). PR Checks Grafana fix remains separately OPEN after the operator's live screenshot showed the table still misaligned.
+- Dispatcher P1 is `LIVE-VERIFIED` from the real Codex CLI smoke run (`2de716d8`; run `live-smoke-codex-cli`, E2 recorded in the bug doc). PR Checks table correction is tracked below as `VERIFIED` pending live dashboard confirmation.
+
+## 2026-10-20 PR Checks table unit correction
+
+- Dispatched `pr-checks-table-unit-fix` for the remaining populated Checks per PR display defect. Panel 6 applied seconds formatting to every numeric field, so PR numbers such as 62 and 56 rendered as `1.03 mins` and `56 s`. Commit `9787ce98` moves the seconds unit to a `Duration` field override.
+- Independent verification: `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats` passed 4/4; `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats` exited 0; dispatcher land gate reran the BATS suite and passed. Pushed to `origin/k3d-manager-v1.43.5`. Bug status is `VERIFIED`; live Grafana check remains pending.

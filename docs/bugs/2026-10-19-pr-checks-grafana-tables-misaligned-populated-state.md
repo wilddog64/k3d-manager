@@ -1,13 +1,13 @@
 # Bug: PR Checks Grafana tables misalign query fields and leak empty-state placeholders when PRs exist
 
 **Filed:** 2026-10-19 (operator screenshot)
-**Status:** OPEN — REOPENED 2026-10-20: operator live screenshot still shows the populated Checks per PR table misaligned after fix `1a1c33d8`; investigation/fix follow-up required.
+**Status:** VERIFIED — 2026-10-20: panel 6 seconds unit is now scoped to `Duration`; focused BATS passed. Live Grafana verification remains pending.
 **Priority:** P3 — dashboard presentation/data interpretation defect; GitHub scraping appears healthy
 **Severity:** low (potentially misleading CI/PR status)
-**Approval:** bug filing requested by operator, 2026-10-19; implementation not yet authorized
+**Approval:** bug filing requested by operator, 2026-10-19; implementation authorized by operator on 2026-10-20 after read-only diagnosis
 **Release:** v1.43.5 (triage; confirm target release before implementation)
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` (table panels 5 and 6)
-**Fix commit:** `1a1c33d8`
+**Fix commit:** `9787ce98` (builds on table join fix `1a1c33d8`)
 **Related:** `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md` (previous no-PR empty-state improvement), `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (panel 8 legend layout), `docs/plans/v1.43.3-pr-checks-dashboard.md`
 
 ## Files
@@ -147,4 +147,12 @@ Visible evidence:
 
 **Additional P3 acceptance emphasis:** Render the actual numeric PR number in the `PR` column for every check row, without elapsed-time units; retain elapsed-time formatting only for `Duration`. Verify the populated live panel against a real open PR and record the deployed commit SHA, timestamp, and screenshot after the correction. Ensure offline regression exercises Grafana's effective transformed frame rather than only the declarative dashboard JSON.
 
-**Triage:** Keep the existing bug `OPEN` / P3, not `VERIFIED` or `LIVE-VERIFIED`. This entry documents evidence only; implementation and live dashboard modifications remain pending authorization.
+**Triage at recurrence:** Keep the bug `OPEN` / P3 until the remaining populated-table symptom is fixed and checked. The operator authorized implementation after the subsequent read-only diagnosis; the current status is recorded above.
+
+## Field unit correction — 2026-10-20
+
+The latest populated-table screenshot showed correct headers and numeric duration values, but PR identifiers were rendered as elapsed time (`62` as `1.03 mins`, `56` as `56 s`). Panel 6's default `unit: "s"` applied to every numeric field, including the PR label. Commit `9787ce98` removes that panel default and sets seconds only on the transformed `Duration` field. The regression test checks that the default has no unit and the `Duration` override uses seconds.
+
+Independent verification: `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats` passed 4/4; `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats` exited 0. The dispatcher landing gate reran the BATS suite successfully after rebasing and landed the fix on `k3d-manager-v1.43.5`.
+
+**Current status:** offline verified; operator live Grafana verification is still required before `LIVE-VERIFIED`. The prior screenshot's `Value #A` and empty-state placeholder symptoms were not present in the latest screenshot and are not claimed as newly verified here.
