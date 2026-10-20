@@ -6,6 +6,17 @@
 **Severity:** Medium — cloud agents see terminal failure but cannot diagnose it
 **Component:** webhook job-status log selection / cloud-bridge response
 
+## Files
+
+| File | Scope |
+|---|---|
+| `bin/k3dm-webhook` | Ensure Slack-thread Make jobs record their target metadata so shared log selection recognizes `make.log`. |
+| `scripts/lib/webhook/job_output.py` | Keep bounded, redacted Make-log selection deterministic for Slack and HTTP consumers. |
+| `scripts/tests/bin/test_job_output.py` | Add regression coverage for Make-log selection when the job metadata is present or absent. |
+| `scripts/tests/bin/test_webhook_thread_dispatch.py` | Verify Slack-thread Make job creation records the target marker used by log retrieval. |
+
+Do not broaden Slack authorization, expose raw logs, or modify unrelated job producers.
+
 ## Reproduction and observed result
 
 Operator requested `make-test-all` via cloud-bridge.
