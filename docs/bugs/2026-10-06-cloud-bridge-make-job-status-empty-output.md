@@ -170,3 +170,17 @@ reader still expected `output`. The same commit changed producer tests to assert
 `make.log` exists and `output` does not, leaving external retrieval uncovered. Full
 history and fix direction are recorded in the reopened September canonical bug.
 The repository cause is established; the deployed host revision is not independently verified.
+
+## Live evidence — 2026-10-20 (partial; terminal check pending)
+
+The operator authorized a read-only cloud-bridge investigation while away from the M4. Through the `cloud-requests` orphan branch:
+
+- `20261020T205644Z-hostinger-status` queued webhook job `5a80b6ca` (HTTP 202). A subsequent `job-status` response at `20261020T205950Z-job-status-hostinger` reported `status=success` with a **nonempty, redacted** Hostinger status report, including the failed ArgoCD login probe. This proves live HTTP retrieval for a completed status job.
+- `20261020T205644Z-make-test-all` queued webhook job `a3ec539d` (HTTP 202). The `job-status` response `20261020T205950Z-job-status-test-all` returned `status=running`, `result_classification=in_progress`, and a **nonempty, redacted** tail of Make BATS test output (through case 582), confirming the previously empty Make-log selection now works for an actively running Make job.
+- The `make-test-all` terminal response and live Slack `logs` thread retrieval had **not** been observed at this point. The screenshot showing a Slack start notification does not establish thread completion or successful `logs` retrieval.
+
+**Verification classification:** `VERIFIED` remains appropriate for the complete cross-interface bug, with **partial LIVE evidence** for bridge HTTP retrieval. Do not set `LIVE-VERIFIED` until a terminal Make job returns meaningful bounded diagnostics and Slack thread `logs` is exercised successfully, or split the independently verified HTTP behavior from outstanding Slack-specific acceptance into separately scoped records. The user requested consideration of live verification; this conservative status avoids a false success in the bug dashboard.
+
+Evidence URLs:
+- https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-hostinger.json
+- https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
