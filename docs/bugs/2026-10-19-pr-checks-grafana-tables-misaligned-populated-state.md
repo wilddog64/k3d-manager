@@ -1,7 +1,7 @@
 # Bug: PR Checks Grafana tables misalign query fields and leak empty-state placeholders when PRs exist
 
 **Filed:** 2026-10-19 (operator screenshot)
-**Status:** VERIFIED — 2026-10-20: fix `1a1c33d8` landed; focused dashboard BATS passed 4/4, ShellCheck passed, and `_agent_audit` passed. Live Grafana verification remains pending operator confirmation.
+**Status:** OPEN — REOPENED 2026-10-20: operator live screenshot still shows the populated Checks per PR table misaligned after fix `1a1c33d8`; investigation/fix follow-up required.
 **Priority:** P3 — dashboard presentation/data interpretation defect; GitHub scraping appears healthy
 **Severity:** low (potentially misleading CI/PR status)
 **Approval:** bug filing requested by operator, 2026-10-19; implementation not yet authorized
@@ -121,3 +121,14 @@ interface:
 - `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats`: passed.
 - `_agent_audit`: passed in the dispatched task.
 - Live Grafana verification is intentionally pending; this bug is not `LIVE-VERIFIED`.
+
+## Recurrence — 2026-10-20
+
+After `1a1c33d8` was deployed, the operator reported a populated **Checks per PR** table still showing the original defect:
+
+- `PR` contains durations such as `1.03 mins` and `56 s` instead of PR numbers.
+- `State` contains `No open PRs — no checks to show` despite real check rows being present.
+- `Value #A` remains visible as a table column.
+- `Duration` contains numeric values, but the row fields are still misaligned.
+
+This recurrence reopens the bug. The screenshot is live evidence that the offline JSON regression did not fully model the deployed Grafana frame/transformation behavior. Do not mark this bug `VERIFIED` or `LIVE-VERIFIED` again until the exact populated dashboard path is corrected and rechecked.
