@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD: `250118b7` (`docs: record Slack job ID task dispatch`).
+- Current remote HEAD: `945ab727` (`docs: mark app-cluster registration live verified`).
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -46,7 +46,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - PR Checks panel 8 legend clipping bug: dispatcher task `pr-checks-legend-clipped` landed as `a5edc7ac`; focused BATS 5/5 and ShellCheck passed. Operator screenshot confirms the side legend is readable after sync; bug is LIVE-VERIFIED.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
 - P1 register-app-cluster role-lookup fix `a70e52a4`: LIVE-VERIFIED 2026-10-20 from Slack job `05f2be6c`, E2E run `1792538358-29202` (4/4, exit 0); log confirms cluster Secret applied and read-only hub check confirms fresh creation timestamp plus `app-cluster` role. Offline BATS 41/41 and ShellCheck clean.
-- New P2 Slack Make job-ID notice inconsistency: live thread for job `05f2be6c` showed queued/started/progress notices without the ID; bare `logs` found it. Dispatcher task `slack-make-job-id-notices` exited successfully in-scope; independent focused tests and audit pass. Awaiting operator/Claude review and land, then a live Slack check. Spec: `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`.
+- New P2 Slack Make job-ID notice inconsistency: live thread for job `05f2be6c` showed queued/started/progress notices without the ID; bare `logs` found it. Dispatched implementation independently reverified: pytest 24/24, focused BATS 10/10, Python syntax compile (no bytecode writes), and `git diff --check` pass; task's `_agent_audit` passed. Candidate remains isolated and unlanded; awaiting operator/Claude review and land, then live Slack check. Spec: `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
 
 ## Verification from latest work
