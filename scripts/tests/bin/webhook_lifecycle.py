@@ -4,6 +4,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
@@ -78,6 +79,45 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
         self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "fix-list"])
         self.assertEqual(self.published_metrics, [])
+
+    def test_make_target_progress_notice_includes_job_id(self):
+        job_id = "a1b2c3da"
+        (lifecycle.JOB_DIR / job_id).mkdir()
+
+        class ImmediateTimer:
+            def __init__(self, _interval, callback):
+                self.callback = callback
+                self.daemon = False
+
+            def start(self):
+                self.callback()
+
+            def cancel(self):
+                return None
+
+        with patch.object(lifecycle.threading, "Timer", ImmediateTimer):
+            lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
+
+        progress = [text for _, text in self.notifications if "still running" in text]
+        self.assertEqual(len(progress), 1)
+        self.assertIn(f"job `{job_id}`", progress[0])
+
+    def test_make_target_failure_notice_includes_job_id(self):
+        job_id = "a1b2c3db"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_failing_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("failure output\n")
+            return lifecycle.os.posix_spawn("/usr/bin/false", ["false"], dict(env or {}))
+
+        lifecycle._spawn_job = spawn_failing_job
+        lifecycle._run_make_target(job_id, ["fix-list"], 12, "actor")
+
+        self.assertEqual((job_dir / "status").read_text(), "failed")
+        self.assertTrue(any("failed (rc 1)" in text for _, text in self.notifications))
+        self.assertTrue(all(f"job `{job_id}`" in text for _, text in self.notifications))
+
     def test_test_all_publishes_captured_log_once_after_completion(self):
         job_id = "a1b2c3d6"
         (lifecycle.JOB_DIR / job_id).mkdir()
