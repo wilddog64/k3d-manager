@@ -19,11 +19,16 @@ _dispatch_ledger_event() {
   json="$(jq -nc --arg event "$event" --arg version "$version" --arg slug "$slug" \
     --argjson ts "$(date +%s)" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug} | ($filter)" 2>/dev/null)" || {
     echo "[codex-dispatch] WARNING: could not build ledger event ${event} for ${slug}" >&2
-    return 0
+    return 1
   }
   if ! printf '%s\n' "$json" >>"$_dispatch_worktree_root/ledger.jsonl"; then
     echo "[codex-dispatch] WARNING: could not write $_dispatch_worktree_root/ledger.jsonl" >&2
+    return 1
   fi
+}
+
+_dispatch_ledger_event_best_effort() {
+  _dispatch_ledger_event "$@" || true
 }
 
 _dispatch_schedule_metrics() {
@@ -31,25 +36,116 @@ _dispatch_schedule_metrics() {
   "$_dispatch_script_dir/k3dm-dispatch-metrics" >>"$_dispatch_worktree_root/metrics.log" 2>&1 &
 }
 
-_dispatch_codex_exit() {
-  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tokens tree ts
-  tokens="$(awk '/^tokens used$/{getline; gsub(/,/, ""); if ($0 ~ /^[0-9]+$/) value=$0} END{if (value != "") print value}' "$log" 2>/dev/null || true)"
-  git -C "$worktree" add -A
-  tree="$(git -C "$worktree" write-tree)"
-  git -C "$worktree" reset -q
-  printf '%s\n' "$tree" >"$run/codex-tree"
+_dispatch_log() {
+  local run="$1" message="$2"
+  printf '[%s] %s\n' "$(date +%s)" "$message" >>"$run/supervisor.log"
+}
+
+_dispatch_atomic_write() {
+  local path="$1" content="$2" tmp
+  tmp="${path}.tmp.$$"
+  printf '%b' "$content" >"$tmp" && mv -f "$tmp" "$path"
+}
+
+_dispatch_process_start() {
+  ps -p "$1" -o lstart= 2>/dev/null | sed 's/^ *//; s/ *$//'
+}
+
+_dispatch_write_start_marker() {
+  local run="$1" started process_start
+  started="$(date +%s)"
+  process_start="$(_dispatch_process_start $$)"
+  [[ -n "$process_start" ]] || process_start=unavailable
+  _dispatch_atomic_write "$run/start" "pid=$$\nstarted=$started\nprocess_start=$process_start\n"
+  _dispatch_atomic_write "$run/pid" "$$\n"
+}
+
+_dispatch_write_exit_marker() {
+  local run="$1" exit_code="$2" ts
   ts="$(date +%s)"
-  printf '%s\n' "$ts" >"$run/codex-exit-ts"
+  _dispatch_atomic_write "$run/exit" "${exit_code}\n"
+  _dispatch_atomic_write "$run/codex-exit-ts" "${ts}\n"
+}
+
+_dispatch_start_marker_value() {
+  local run="$1" key="$2"
+  awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$run/start" 2>/dev/null
+}
+
+_dispatch_worker_matches_start() {
+  local run="$1" pid marker_start current_start
+  [[ -s "$run/start" ]] || return 1
+  pid="$(_dispatch_start_marker_value "$run" pid)"
+  marker_start="$(_dispatch_start_marker_value "$run" process_start)"
+  [[ "$pid" =~ ^[0-9]+$ && -n "$marker_start" ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  current_start="$(_dispatch_process_start "$pid")"
+  [[ "$marker_start" == unavailable ]] || [[ -n "$current_start" && "$current_start" == "$marker_start" ]]
+}
+
+_dispatch_codex_exit() {
+  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tokens tree
+  tokens="$(awk '/^tokens used$/{getline; gsub(/,/, ""); if ($0 ~ /^[0-9]+$/) value=$0} END{if (value != "") print value}' "$log" 2>/dev/null || true)"
+  git -C "$worktree" add -A || return 1
+  tree="$(git -C "$worktree" write-tree)" || return 1
+  git -C "$worktree" reset -q || return 1
+  printf '%s\n' "$tree" >"$run/codex-tree"
   if [[ -n "$tokens" ]]; then
     _dispatch_ledger_event codex_exit "$version" "$slug" \
       --argjson exit "$exit_code" --argjson tokens "$tokens" --arg tree "$tree" \
-      '.["exit"]=$exit|.["tokens"]=$tokens|.["tree"]=$tree'
+      '.["exit"]=$exit|.["tokens"]=$tokens|.["tree"]=$tree' || return 1
   else
     _dispatch_ledger_event codex_exit "$version" "$slug" \
       --argjson exit "$exit_code" --arg tree "$tree" \
-      '.["exit"]=$exit|.["tokens"]=null|.["tree"]=$tree'
+      '.["exit"]=$exit|.["tokens"]=null|.["tree"]=$tree' || return 1
   fi
   _dispatch_schedule_metrics
+}
+
+_dispatch_worker() {
+  local operation="$1" worktree="$2" run="$3" version="$4" slug="$5" network="$6" n="${7:-}" session_id="${8:-}"
+  local -a state_vars
+  _dispatch_write_start_marker "$run" || { _dispatch_log "$run" "could not write worker start marker"; return 125; }
+  state_vars=(
+    "K3DM_REPO_ROOT=$worktree" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
+    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
+    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
+  )
+  cd "$worktree" || { _dispatch_log "$run" "could not enter worker worktree"; return 125; }
+  set +e
+  if [[ "$operation" == start ]]; then
+    if (( network )); then
+      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
+    else
+      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
+    fi
+  elif (( network )); then
+    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+  else
+    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+  fi
+  local exit_code="$?" log="$run/codex.log"
+  [[ "$operation" == start ]] || log="$run/codex-$n.log"
+  _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write Codex exit marker"
+  if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"; then
+    _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
+  fi
+  return "$exit_code"
+}
+
+_dispatch_detach_worker() {
+  local run="$1"; shift
+  perl -MPOSIX -e 'defined(my $first = fork) or die "fork failed\n"; exit 0 if $first; POSIX::setsid() >= 0 or die "setsid failed\n"; defined(my $second = fork) or die "second fork failed\n"; exit 0 if $second; exec @ARGV or die "exec failed\n"' \
+    "$_dispatch_script_dir/k3dm-codex-dispatch" _worker "$@" >>"$run/supervisor.log" 2>&1 &
+}
+
+_dispatch_wait_for_start() {
+  local run="$1" attempt
+  for ((attempt = 1; attempt <= 40; attempt++)); do
+    [[ -s "$run/start" ]] && return 0
+    sleep 0.05
+  done
+  return 1
 }
 
 _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
@@ -178,7 +274,7 @@ _dispatch_start() {
   fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
-  _dispatch_ledger_event start "$version" "$slug" --argjson network "$network" '.["network"]=$network'
+  _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" '.["network"]=$network'
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
 Run the spec's Rules gates and paste their output.
@@ -187,37 +283,32 @@ Do not touch memory-bank/.
 Do not unset or override the K3DM_* and TMPDIR variables you were given. They keep this task's state away from the live webhook and from other tasks.
 Your last message must list every file you changed.
 EOF
-  local -a _dispatch_state_vars=(
-    "K3DM_REPO_ROOT=$worktree" "K3DM_JOB_DIR=$state_dir/jobs" "K3DM_RUN_DIR=$state_dir/run"
-    "K3DM_STATE_DIR=$state_dir/state" "K3DM_LOG_DIR=$state_dir/logs" "K3DM_TMP_ROOT=$state_dir/tmp"
-    "K3DM_PORT_CACHE_DIR=$state_dir/port-cache" "TMPDIR=$state_dir/tmp"
-  )
-  (
-    set +e
-    if (( network )); then
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
-    else
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
-    fi
-    exit_code="$?"
-    _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$run/codex.log" "$exit_code"
-    printf '%s\n' "$exit_code" >"$run/exit"
-  ) </dev/null >/dev/null 2>&1 &
-  printf '%s\n' "$!" >"$run/pid"
+  _dispatch_detach_worker "$run" start "$worktree" "$run" "$version" "$slug" "$network" </dev/null
+  _dispatch_wait_for_start "$run" || _dispatch_log "$run" "worker did not acknowledge startup"
   echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
 }
 
 _dispatch_status() {
-  local rel version task slug run state spec pid
+  local rel version task slug run state spec pid exit_code
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
   [[ -d "$_dispatch_worktree_root/$version" ]] || return 0
   for task in "$_dispatch_worktree_root/$version"/*; do
     [[ -d "$task" && "$task" != *.run ]] || continue
     slug="$(basename "$task")"; run="$task.run"
-    if [[ -f "$run/landed" ]]; then state=landed
-    elif [[ -f "$run/pid" ]] && kill -0 "$(<"$run/pid")" 2>/dev/null; then state=running
-    elif [[ -f "$run/exit" ]]; then state="exited $(<"$run/exit")"
-    else state=unknown; fi
+    if [[ -f "$run/landed" ]]; then
+      state=landed
+    elif [[ -f "$run/exit" ]]; then
+      exit_code="$(head -n 1 "$run/exit")"
+      if [[ "$exit_code" == 0 ]]; then state="exited successfully"; else state="exited nonzero ($exit_code)"; fi
+    elif _dispatch_worker_matches_start "$run"; then
+      state=running
+    elif [[ -s "$run/start" ]]; then
+      state="terminated unexpectedly (see $run/supervisor.log)"
+    elif [[ -f "$run/pid" ]] && kill -0 "$(<"$run/pid")" 2>/dev/null; then
+      state=starting
+    else
+      state=unknown
+    fi
     [[ -z "${1:-}" || "$1" == "$slug" ]] || continue
     echo "task: $slug"; echo "state: $state"; [[ -f "$run/network" ]] && echo "network: yes" || true
     if compgen -G "$run/prompt-[0-9]*.md" >/dev/null; then
@@ -250,7 +341,7 @@ _dispatch_land() {
   [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   if ! _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow"; then
-    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
     _dispatch_schedule_metrics
     _dispatch_error "task changes are out of scope"
   fi
@@ -272,7 +363,7 @@ _dispatch_land() {
   current="$(git -C "$_dispatch_repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"; [[ "$current" == "$rel" ]] || _dispatch_error "operator checkout is not on $rel"
   [[ -z "$(git -C "$_dispatch_repo_root" status --porcelain)" ]] || _dispatch_error "operator checkout is dirty"
   if ! git -C "$task" rebase "$rel" >/dev/null; then
-    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason rebase '.["reason"]=$reason'
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason rebase '.["reason"]=$reason'
     _dispatch_schedule_metrics
     _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
   fi
@@ -284,7 +375,7 @@ _dispatch_land() {
     "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp" \
     bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
     tail -n 20 "$run/land-test.log"
-    _dispatch_ledger_event land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
     _dispatch_schedule_metrics
     _dispatch_error "tests failed after rebase onto $rel; see $run/land-test.log"
   else
@@ -295,7 +386,7 @@ _dispatch_land() {
   if [[ -s "$run/codex-exit-ts" ]]; then
     codex_ts="$(<"$run/codex-exit-ts")"; wait_seconds=$((land_ts - codex_ts))
   fi
-  _dispatch_ledger_event land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
+  _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
     --argjson wait_seconds "$wait_seconds" '.["verifier_lines"]=$verifier_lines|.["wait_seconds"]=$wait_seconds'
   _dispatch_schedule_metrics
   git -C "$_dispatch_repo_root" worktree remove "$task"
@@ -311,7 +402,7 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run pid session_id n network_slug exit_code
+  local slug="" prompt_file="" rel version task run pid session_id n network_slug
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -337,26 +428,10 @@ _dispatch_resume() {
     _dispatch_error "network task $network_slug is still running; only one networked task at a time"
   fi
   cp "$prompt_file" "$run/prompt-$n.md"
-  rm -f "$run/exit"
-  local -a _dispatch_state_vars=(
-    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
-    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
-    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
-  )
-  (
-    cd "$task"
-    set +e
-    if [[ -f "$run/network" ]]; then
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
-    else
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
-    fi
-    exit_code="$?"
-    _dispatch_codex_exit "$task" "$run" "$version" "$slug" "$run/codex-$n.log" "$exit_code"
-    printf '%s\n' "$exit_code" >"$run/exit"
-  ) </dev/null >/dev/null 2>&1 &
-  printf '%s\n' "$!" >"$run/pid"
-  _dispatch_ledger_event resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
+  rm -f "$run/exit" "$run/start"
+  _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" </dev/null
+  _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }
@@ -374,7 +449,7 @@ _dispatch_abandon() {
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
   if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
   git -C "$_dispatch_repo_root" worktree remove --force "$_dispatch_task_dir"; git -C "$_dispatch_repo_root" branch -D "task/$version/$slug" >/dev/null
-  _dispatch_ledger_event abandon "$version" "$slug"
+  _dispatch_ledger_event_best_effort abandon "$version" "$slug"
   _dispatch_schedule_metrics
   echo "abandoned: $slug"
 }
@@ -382,6 +457,7 @@ _dispatch_abandon() {
 main() {
   (($#)) || { _dispatch_usage; exit 2; }
   case "$1" in
+    _worker) shift; _dispatch_worker "$@" ;;
     start) shift; _dispatch_start "$@" ;;
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
