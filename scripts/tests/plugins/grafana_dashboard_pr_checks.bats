@@ -88,6 +88,16 @@ assert "Value #B" not in organize(6)["excludeByName"]
 assert organize(6)["renameByName"]["Value #B"] == "Duration"
 assert "state)" in panels[5]["targets"][1]["expr"]
 assert "check" in panels[6]["targets"][0]["expr"]
+
+# Seconds formatting belongs only to the transformed duration field. Applying
+# it as a panel default also renders the numeric PR identifier as elapsed time.
+defaults = panels[6]["fieldConfig"]["defaults"]
+assert "unit" not in defaults
+duration_override = next(
+    override for override in panels[6]["fieldConfig"]["overrides"]
+    if override["matcher"] == {"id": "byName", "options": "Duration"}
+)
+assert {prop["id"]: prop["value"] for prop in duration_override["properties"]}["unit"] == "s"
 PY
   [ "${status}" -eq 0 ]
 }
