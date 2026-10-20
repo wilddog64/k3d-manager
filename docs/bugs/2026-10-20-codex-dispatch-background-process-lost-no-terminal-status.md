@@ -4,7 +4,7 @@
 **Status:** OPEN — investigation and implementation deferred until Claude is available
 **Priority:** P1 — critical engineering workflow blocker: autonomous Codex dispatch can silently fail, preventing reliable agent-to-agent implementation and verification
 **Severity:** high — tasks can appear accepted but never run or report completion, blocking dependable automated engineering throughput
-**Approval:** operator approved filing as P2, then explicitly escalated to P1 on 2026-10-19 PDT because unreliable dispatch hinders effective engineering work; NOT approval to implement
+**Approval:** operator approved filing as P2, then explicitly escalated to P1 on 2026-10-19 PDT because unreliable dispatch hinders effective engineering work; NOT approval to implement at filing time; operator then approved implementation and a Codex dispatch on 2026-10-20 PDT (Codex billing is flat-rate, no API token calls)
 **Release:** v1.43.5 (triage; scheduling to be confirmed)
 **Component:** `bin/k3dm-codex-dispatch`, `scripts/tests/bin/codex_dispatch.bats`
 **Related:** `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md`
@@ -51,7 +51,67 @@ printf '%s\n' "$!" >"$run/pid"
 
 The supervisor's stdout/stderr is discarded. The `exit` marker is written *after* `_dispatch_codex_exit` (which performs Git operations and ledger/metrics updates); failures there may prevent recording the original Codex return code. `status` reports `unknown` if PID is not alive and `exit` does not exist. A PID file alone proves an attempt to launch the shell subshell, not that Codex started.
 
-**Root cause is unknown.** Plausible explanations requiring evidence: Codex startup failure; background worker terminated by parent/session/signal; supervisor failure prior to or during completion bookkeeping; filesystem/permission error. The fact that r4 worked rules out a blanket claim that all dispatches fail. No evidence implicates tmux specifically.
+**Root cause was unknown when this section was written; see "Investigation findings — 2026-10-20" below for the confirmed cause.** Plausible explanations that required evidence: Codex startup failure; background worker terminated by parent/session/signal; supervisor failure prior to or during completion bookkeeping; filesystem/permission error. The fact that r4 worked rules out a blanket claim that all dispatches fail. No evidence implicates tmux specifically.
+
+## Investigation findings — 2026-10-20 (Antigravity agent, evidence-based)
+
+Preserved for later review. Commands were run on `m4-air.local`; probe processes were `sleep` only (no Codex calls) and were cleaned up afterwards.
+
+### Root cause (confirmed for the launcher used in that session; inferred for Codex CLI)
+
+`_dispatch_start` launches Codex as a plain background subshell `( ... ) &` that stays in the **same process group and session** as whatever launched `bin/k3dm-codex-dispatch`. Agent harnesses clean up that process group when a tool command returns, so the worker is killed before it writes `codex.log`, `exit`, `codex-exit-ts` or a ledger `codex_exit` event. The surviving artifacts are exactly those seen for r5/r6: a PID file, a 0-byte `codex.log`, no exit marker, no live process.
+
+### Evidence 1 — signal observed (Antigravity shell tool)
+
+A probe subshell with `trap ... HUP TERM INT QUIT PIPE` was backgrounded exactly like the dispatcher's worker. At the instant the launching command returned it logged:
+
+```text
+04:10:06 got SIGHUP
+```
+
+Without the trap the same subshell was gone by the next command. Earlier, a plain `( sleep 120 ) &` was likewise dead within ~3 seconds of its launching command ending.
+
+### Evidence 2 — which launch styles survive
+
+Each variant ran `sleep` and was checked after the launching command ended (SIGHUP case), then separately after the whole process group was sent `SIGKILL` (`os.killpg`):
+
+| Launch method | Survives SIGHUP | Survives `SIGKILL` to the group |
+|---|---|---|
+| Plain `( ... ) &` (current dispatcher) | NO | NO |
+| `nohup` | yes | NO |
+| `trap '' HUP` in the subshell | yes | NO |
+| New session (`perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV'`) | yes | yes |
+| Double-fork + `setsid` (python `os.fork`/`os.setsid`) | yes | yes |
+
+macOS has no `setsid` binary; use perl or python.
+
+### Evidence 3 — why the earlier Codex-authored fixes did not help
+
+`git log` shows three reverted commits: `04d91a6e` (detached `nohup` worker), `bd63a39e` (`trap '' HUP`) and `6e8ef83e` (status label for a dead worker). The first two defend only against SIGHUP. Table above shows they cannot survive a `SIGKILL` of the process group, which is consistent with those fixes appearing to do nothing when the dispatch was launched from Codex CLI. This is an inference: Codex CLI's actual kill mechanism was **not** observed directly.
+
+### Evidence 4 — r4 worked only because the launcher stayed alive
+
+`pr-checks-table-misalignment-r4` was started with the launching command kept running until Codex exited (a wait loop on the worker PID). It produced a 294 KB `codex.log`, `exit=0` and a ledger `codex_exit`. A task started the normal way (launcher returns immediately) died within seconds. This matches the root cause and rules out a Codex startup, auth or sandbox fault: `codex login status` was fine and Codex ran normally once it was kept alive.
+
+### Other observations
+
+- `status` printed `unknown` for `e2e-sandbox-live-verify`, `r5` and `r6`. All three have a ledger `start` event but no `codex_exit`. Only r5/r6 were checked in detail (0-byte `codex.log`); `e2e-sandbox-live-verify` was not.
+- r4's Codex output survived abandonment only because the ledger recorded the Git tree `5e1f59ce05f71d5d8ed78429f12796dcfe059fc4`; `abandon` deletes the worktree. Consider warning or archiving `codex.log`/`last-message.md` before `abandon` removes evidence.
+
+### Implementation direction (operator approved implementation on 2026-10-20 PDT)
+
+1. Start the worker fully detached: new session via a double-fork with `setsid` (perl or python helper; no reliance on a `setsid` binary), stdin from `/dev/null`, stdout/stderr to `supervisor.log`. Apply the same launch path to `resume`.
+2. The worker's first action writes a start marker (its own PID, process start time, timestamp) atomically. A bare shell PID is not proof of a started worker.
+3. Write the `exit` marker (code and timestamp) **before** Git-tree, ledger and metrics bookkeeping, then record bookkeeping failures separately in `supervisor.log`.
+4. `status` reports a dead worker with a start marker but no `exit` marker as `terminated unexpectedly` with the log path; compare process start time to avoid PID-reuse false positives. Keep `unknown` only for runs with no start marker at all.
+5. Offline BATS with a fake Codex binary (`K3DM_CODEX_BIN`) must cover: rc=0, rc=42, missing executable, forced bookkeeping failure, lost worker (SIGKILL of the worker) and PID reuse, plus a regression test proving the worker survives `SIGHUP` and a `SIGKILL` of the launcher's process group. No test may call the real `codex`.
+6. Update `docs/howto/codex-dispatch.md` with the new status values, `supervisor.log`, and a note that agent-launched dispatches no longer need to keep the launching command alive.
+7. Fallback if a detached worker is still killed when launched from Codex CLI (verified live, E2): move to `launchctl submit` / a launchd job. Do not add it speculatively.
+
+### Not verified
+
+- A detached worker surviving Codex CLI's own cleanup (needs E2 live dispatch from Codex CLI).
+- Whether `r5`/`r6` were launched from Codex CLI; their launch environment was not recorded.
 
 ## Expected behavior
 

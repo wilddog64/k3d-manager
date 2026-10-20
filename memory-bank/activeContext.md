@@ -57,3 +57,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Documentation checks: `make check-doc-links` passed (`2218 file(s) OK`); targeted `bats scripts/tests/lib/bats_negation_lint.bats` failed on its existing assertion at line 6; no shell files were changed.
 
 Use the bug docs for acceptance criteria and the archive for historical context; do not re-derive old decisions silently.
+
+## Dispatcher P1 investigation (2026-10-20)
+
+- Root cause of dead dispatch workers confirmed: `_dispatch_start`/`_dispatch_resume` background the worker in the launcher's process group/session; the agent harness's cleanup kills it (SIGHUP observed; `nohup`/`trap '' HUP` do not survive a group SIGKILL; a new session or double-fork does). Full evidence is in `docs/bugs/2026-10-20-codex-dispatch-background-process-lost-no-terminal-status.md` (section "Investigation findings — 2026-10-20").
+- Operator approved implementing the fix via Codex dispatch (flat-rate, no API token calls). PR Checks Grafana fix is deferred until the dispatcher is fixed. Verified-but-unlanded Grafana candidate: `r4` tree `5e1f59ce05f71d5d8ed78429f12796dcfe059fc4` plus `max by (__join[, state])` wrapping the second query of panels 5 and 6 (simulation scripts in the Antigravity scratch dir `gfsim`).

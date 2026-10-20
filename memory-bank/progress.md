@@ -41,3 +41,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 3. Investigate panel 8 legend sizing/layout and verify with a live screenshot after any approved fix.
 4. Re-run the relevant acceptance tests and update bug statuses only after evidence exists.
 5. Push and verify documentation review commit `ef058487`; Mermaid rendering was unavailable locally because `mmdc` is not installed.
+
+## 2026-10-20 dispatcher investigation
+
+- Confirmed the process-group cleanup root cause of silent dispatch worker loss and recorded the evidence in the P1 bug doc; Codex dispatch of the fix is the next step. Grafana table fix is on hold behind it.
