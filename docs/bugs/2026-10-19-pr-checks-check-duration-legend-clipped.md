@@ -2,8 +2,9 @@
 
 **Filed:** 2026-10-19 (operator screenshots)
 **Branch:** k3d-manager-v1.43.5
-**Status:** OPEN — operator authorized implementation and dispatcher work on 2026-10-20
+**Status:** VERIFIED — 2026-10-20: the legend is configured as a right-side list; focused dashboard BATS tests pass. Live Grafana verification after sync remains pending.
 **Priority:** P3
+**Fix commit:** `a5edc7ac`
 **Severity:** low — the chart remains visible, but some series names cannot be read
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` panel 8
 **Related:** `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md`
@@ -37,7 +38,14 @@ Every plotted check-duration series remains identifiable. The legend must be ful
 
 ## Acceptance
 
-- [ ] Panel 8 legend is fully readable with the current multi-series PR/check data.
+- [ ] Panel 8 legend is fully readable with the current multi-series PR/check data (operator live verification pending).
 - [ ] The chart remains usable with zero, one, and many duration series.
-- [ ] The `k3dm_pr_check_duration_seconds` query and `repo` filter remain unchanged unless evidence requires otherwise.
+- [x] The `k3dm_pr_check_duration_seconds` query and `repo` filter remain unchanged.
 - [ ] A live screenshot or rendered panel inspection confirms no legend clipping after sync.
+
+## Offline verification — 2026-10-20
+
+- Dispatched as `pr-checks-legend-clipped`; dispatcher reported `exited successfully`, `scope: in-scope`, and landed commit `a5edc7ac` on `k3d-manager-v1.43.5`.
+- `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats`: 5/5 passed, including the new assertion for a right-side legend and unchanged query/legend format.
+- `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats` and `git diff --check`: clean.
+- The dashboard configuration now places the legend at the right side of panel 8 as a list. This is offline verification only; confirm the rendered panel in Grafana after deployment before closing the live acceptance items.

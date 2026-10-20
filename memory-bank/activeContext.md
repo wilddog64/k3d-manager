@@ -15,7 +15,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 - Slack job `8417cf04`, E2E run `1792410757-29778`: preflight passed, but the 420-second hub-app gate failed with frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`. Read-only diagnosis found frontend Nginx exiting because `product-catalog.shopping-cart-apps.svc.cluster.local` did not exist when frontend started. Product-catalog later became healthy, but frontend remained `CrashLoopBackOff`. Detailed evidence: `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; dashboard-facing bug: `docs/bugs/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md` (P2 OPEN).
 - PR Checks dashboard: panel 5/6 populated-table transformation issue is `LIVE-VERIFIED` after the operator's Safari-private and Chrome screenshots confirmed the fix at deployed revision `f2063dba`.
-- PR Checks dashboard: panel 8 Check duration legend clipping is recorded in `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (P3 OPEN); operator authorized implementation and the issue is being dispatched.
+- PR Checks dashboard: panel 8 Check duration legend layout fix is landed as `a5edc7ac` and offline-verified (focused BATS 5/5); `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` is VERIFIED with operator live Grafana confirmation pending.
 - Documentation review commit `ef058487` converted current non-archive flow/architecture diagrams to Mermaid, corrected Cloudflare relay drift, and labeled the legacy ingress path. Review record: `docs/issues/2026-10-19-docs-architecture-diagram-review.md`.
 - README Hermes documentation commit `bb4a2f64` adds the guide, Phase 1/2 scope links, and a focused Mermaid lifecycle diagram.
 - README architecture-index follow-up `e9d1fddb` adds Hermes to the visible Architecture list shown with the other architecture documents.
@@ -43,7 +43,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - PR Checks table fix `1a1c33d8` had a remaining panel 6 unit-formatting defect: the panel-wide seconds unit rendered PR numbers as durations. Dispatched fix `9787ce98` scopes seconds formatting to the `Duration` field; independent focused BATS passed 4/4, ShellCheck clean, and dispatcher landing gate passed. Operator screenshots in Safari private browsing and Chrome confirmed populated rows now show numeric PR identifiers and durations in their proper columns; canonical bug is `LIVE-VERIFIED` at deployed revision `f2063dba`.
 - Dispatch task `pr-checks-table-unit-fix` completed in scope and was landed/pushed to `origin/k3d-manager-v1.43.5` as `9787ce98`.
 - Dispatched P3 PR Checks table misalignment as `pr-checks-table-misalignment`; isolated worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/pr-checks-table-misalignment` is created and implementation is pending.
-- PR Checks panel 8 legend clipping bug: scope recorded; dispatcher task is being started.
+- PR Checks panel 8 legend clipping bug: dispatcher task `pr-checks-legend-clipped` landed as `a5edc7ac`; focused BATS 5/5 and ShellCheck passed. Operator must confirm the side legend renders fully in Grafana after sync.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
 - P1 register-app-cluster role-lookup fix `a70e52a4`: live E2 rerun pending.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
