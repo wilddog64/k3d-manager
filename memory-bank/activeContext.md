@@ -45,7 +45,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Dispatched P3 PR Checks table misalignment as `pr-checks-table-misalignment`; isolated worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/pr-checks-table-misalignment` is created and implementation is pending.
 - PR Checks panel 8 legend clipping bug: dispatcher task `pr-checks-legend-clipped` landed as `a5edc7ac`; focused BATS 5/5 and ShellCheck passed. Operator screenshot confirms the side legend is readable after sync; bug is LIVE-VERIFIED.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
-- P1 register-app-cluster role-lookup fix `a70e52a4`: live E2 rerun pending.
+- P1 register-app-cluster role-lookup fix `a70e52a4`: independently offline-verified 2026-10-20 (focused BATS 41/41, ShellCheck clean); operator Slack-originated live E2 rerun remains pending. Bug is VERIFIED, not LIVE-VERIFIED.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
 
 ## Verification from latest work

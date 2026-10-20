@@ -1,7 +1,7 @@
 # Bug: app-cluster registration exits silently when the role-label lookup fails
 
 **Filed:** 2026-10-18 (Claude, from the live `e2e-sandbox-provision` run, job `f5e6229f`)
-**Status:** FIXED — landed, awaiting live rerun (E2)
+**Status:** VERIFIED — 2026-10-20: focused BATS 41/41 passed and ShellCheck clean; awaiting operator live rerun (E2)
 **Fix commit:** `a70e52a4`
 **Priority:** P1 — `make up CLUSTER_PROVIDER=k3s-aws` stops at Step 10 with no error; no workaround on this branch
 **Severity:** high (regression on `k3d-manager-v1.43.5`, unreleased)
@@ -102,3 +102,4 @@ interface:
 ## Verification log
 
 - 2026-10-19: Codex (dispatcher) fix landed `a70e52a4`, using `_kubectl --no-exit --quiet`. Claude verified: the new real-`_run_command` test is red on `781494e6` (N1). Codex's "no error text printed" assertions read grep's `${output}`, not the registration's; Claude moved them before the `run grep`. A mutation that drops `--quiet` and `2>/dev/null` now turns the test red (N2). `argocd_register_role_label.bats` + `argocd.bats` green; shellcheck clean.
+- 2026-10-20: independent rerun `bats scripts/tests/plugins/argocd_register_role_label.bats scripts/tests/plugins/argocd.bats` passed 41/41. `shellcheck -x scripts/plugins/argocd.sh` exited 0 with no findings. Live E2 remains pending; the operator must run the Slack-originated `/k3dm e2e-sandbox-provision confirm` flow and confirm the hub Secret refreshes as specified above. This is **not** LIVE-VERIFIED.
