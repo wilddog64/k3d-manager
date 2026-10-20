@@ -783,6 +783,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "target").write_text(target)
         thread_ts = _thread_ts_for_job(job_id)
         if thread_ts:
             (new_job_dir / "thread_ts").write_text(thread_ts)

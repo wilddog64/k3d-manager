@@ -60,6 +60,16 @@ def test_successful_new_commands_ack_once_without_unknown(dispatch_env, command,
     assert not any("Unknown command" in notice for notice in notices)
 
 
+def test_slack_make_job_records_target_for_make_log_selection(dispatch_env):
+    _started, _notices = dispatch_env
+
+    wh._handle_thread_command("job", "k3dm test-all", "admin", "C1")
+
+    queued = [path for path in wh.JOB_DIR.iterdir() if path.name != "job"]
+    assert len(queued) == 1
+    assert (queued[0] / "target").read_text() == "test-all"
+
+
 def test_kill_still_dispatches(dispatch_env, monkeypatch):
     _started, notices = dispatch_env
     monkeypatch.setattr(wh, "_running_procs", {"job": 123})
