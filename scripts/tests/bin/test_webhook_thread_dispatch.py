@@ -1,4 +1,6 @@
 import importlib.util
+import io
+import json
 import threading
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -61,13 +63,61 @@ def test_successful_new_commands_ack_once_without_unknown(dispatch_env, command,
 
 
 def test_slack_make_job_records_target_for_make_log_selection(dispatch_env):
-    _started, _notices = dispatch_env
+    _started, notices = dispatch_env
 
     wh._handle_thread_command("job", "k3dm test-all", "admin", "C1")
 
     queued = [path for path in wh.JOB_DIR.iterdir() if path.name != "job"]
     assert len(queued) == 1
     assert (queued[0] / "target").read_text() == "test-all"
+    assert notices == [f"🛠️ *make test-all* queued — job `{queued[0].name}`"]
+
+
+def test_direct_make_route_uses_job_id_in_thread_notice_and_response(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "test-token")
+    monkeypatch.setattr(wh, "_MAKE_JOB_LOCK", threading.Lock())
+    monkeypatch.setattr(wh, "_rate_limited", lambda _key: False)
+    monkeypatch.setattr(wh, "_request_role", lambda _headers, _token_role: "admin")
+    monkeypatch.setattr(wh, "_request_actor", lambda _headers: "slack:test")
+    monkeypatch.setattr(wh, "_request_source_command", lambda _headers: "make")
+    monkeypatch.setattr(wh, "_audit_remote_action", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda text, channel_id="": notices.append(text) or "THREAD")
+    started = []
+    notices = []
+    response = {}
+
+    class Thread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            started.append((target, args, kwargs))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Thread", Thread)
+    body = json.dumps({"target": "test-all", "channel_id": "C1"}).encode()
+    fake = type("FakeHandler", (), {
+        "path": "/api/v1/make",
+        "headers": {"Content-Length": str(len(body))},
+        "rfile": io.BytesIO(body),
+        "_auth": lambda self: True,
+        "send_response": lambda self, code: None,
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, payload: response.update(code=code, payload=payload),
+    })()
+
+    wh._Handler.do_POST(fake)
+
+    job_id = response["payload"]["job_id"]
+    assert response["code"] == 202
+    assert notices == [f"🛠️ *make test-all* queued — job `{job_id}`"]
+    assert (tmp_path / job_id / "status").read_text() == "queued"
+    assert (tmp_path / job_id / "target").read_text() == "test-all"
+    assert started[0][0] is wh._run_make_target
+    assert started[0][1][0] == job_id
 
 
 def test_kill_still_dispatches(dispatch_env, monkeypatch):

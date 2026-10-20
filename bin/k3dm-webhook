@@ -827,7 +827,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
             args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), actor),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🛠️ *k3dm {target}* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🛠️ *make {target}* queued — job `{new_job_id}`")
 
     elif cmd == "argocd-upgrade":
         parts = command.strip().lstrip("/").split()
@@ -2441,11 +2441,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             thread_ts = str(body.get("thread_ts", "")).strip()
             channel_id = str(body.get("channel_id", "")).strip()
             thread_source = ""
+            job_id = str(uuid.uuid4())[:8]
             if not thread_ts and channel_id and SLACK_BOT_TOKEN:
-                thread_ts = _start_bot_thread(f"🛠️ *make {target}* queued", channel_id=channel_id)
+                thread_ts = _start_bot_thread(
+                    f"🛠️ *make {target}* queued — job `{job_id}`", channel_id=channel_id
+                )
                 if thread_ts:
                     thread_source = "bot"
-            job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             (JOB_DIR / job_id / "target").write_text(target)

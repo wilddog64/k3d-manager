@@ -69,6 +69,8 @@ class WebhookLifecycleTests(unittest.TestCase):
         self.assertEqual(self.spawned[0][0], ["make", "--no-print-directory", "app-cve-scan", "CRONJOB=app-cve-scan"])
         self.assertEqual(self.spawned[0][2], lifecycle.REPO_ROOT)
         self.assertTrue(any("actor-1" in text for _, text in self.notifications))
+        self.assertTrue(self.notifications)
+        self.assertTrue(all(f"job `{job_id}`" in text for _, text in self.notifications))
 
     def test_make_target_never_uses_shell_or_concatenated_command(self):
         job_id = "a1b2c3d5"
@@ -126,6 +128,7 @@ class WebhookLifecycleTests(unittest.TestCase):
 
         self.assertEqual((job_dir / "status").read_text(), "failed")
         self.assertTrue(any("timed out after" in text for _, text in self.notifications))
+        self.assertTrue(all(f"job `{job_id}`" in text for _, text in self.notifications))
         self.assertLess(elapsed, 5)
         with self.assertRaises(ProcessLookupError):
             os.kill(child["pid"], 0)

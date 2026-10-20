@@ -103,7 +103,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     def _post_progress():
         elapsed = int((time.monotonic() - start) / 60)
         tail = "\n".join(_read_job_tail(log_file)) or "—"
-        _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed\n```{tail}```")
+        _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed — job `{job_id}`\n```{tail}```")
 
     def _wait(pid):
         deadline = time.monotonic() + timeout
@@ -122,7 +122,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     try:
         (job_dir / "status").write_text("running")
         log_file.touch()
-        _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
+        _notify_job(job_id, f"🛠️ *make {label}* started by {actor} — job `{job_id}`")
         cmd = ["make", "--no-print-directory", *argv_tail]
         env = {**os.environ, "K3DM_JUNIT_XML": str(job_dir / "junit.xml")}
         _LOG.debug("make job %s argv=%r", job_id, cmd)
@@ -156,7 +156,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         if status == "failed":
             write_failure_note(job_dir, job_id, f"make {label}", timeout if timed_out else rc,
                                timed_out=timed_out, redact=_redact_secrets)
-        _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
+        _notify_job(job_id, f"{icon} *make {label}* {verdict} — job `{job_id}`\n```{tail or '(no output)'}```")
     finally:
         if progress_timer:
             progress_timer.cancel()
