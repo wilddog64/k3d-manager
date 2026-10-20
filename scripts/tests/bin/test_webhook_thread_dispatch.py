@@ -107,3 +107,52 @@ def test_reader_k3dm_is_denied_without_worker(dispatch_env):
     assert started == []
     assert len(notices) == 1
     assert "requires role *admin*" in notices[0]
+
+
+def test_logs_explicit_id_reads_requested_child(dispatch_env):
+    _started, notices = dispatch_env
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
+    child = wh.JOB_DIR / "aabbccdd"
+    child.mkdir()
+    (child / "thread_ts").write_text("THREAD")
+    (child / "target").write_text("test-all")
+    (child / "make.log").write_text("child output")
+
+    wh._handle_thread_command("job", "logs aabbccdd", "reader", "C1")
+
+    assert len(notices) == 1
+    assert "job `aabbccdd`" in notices[0]
+    assert "child output" in notices[0]
+
+
+def test_logs_rejects_cross_thread_explicit_id(dispatch_env):
+    _started, notices = dispatch_env
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD-A")
+    child = wh.JOB_DIR / "aabbccdd"
+    child.mkdir()
+    (child / "thread_ts").write_text("THREAD-B")
+    (child / "make.log").write_text("secret child output")
+
+    wh._handle_thread_command("job", "logs aabbccdd", "reader", "C1")
+
+    assert len(notices) == 1
+    assert "not in this Slack thread" in notices[0]
+    assert "secret child output" not in notices[0]
+
+
+def test_bare_logs_prefers_newest_non_anchor_job(dispatch_env):
+    _started, notices = dispatch_env
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
+    (wh.JOB_DIR / "job" / "status").write_text("thread-anchor")
+    child = wh.JOB_DIR / "aabbccdd"
+    child.mkdir()
+    (child / "thread_ts").write_text("THREAD")
+    (child / "status").write_text("running")
+    (child / "target").write_text("test-all")
+    (child / "make.log").write_text("newest child output")
+
+    wh._handle_thread_command("job", "logs", "reader", "C1")
+
+    assert len(notices) == 1
+    assert "job `aabbccdd`" in notices[0]
+    assert "newest child output" in notices[0]

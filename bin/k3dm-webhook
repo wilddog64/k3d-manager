@@ -635,16 +635,49 @@ def _find_job_by_thread_ts(thread_ts):
     """Return job_id whose thread_ts file matches, or None. Skips ask sub-jobs."""
     if not JOB_DIR.exists():
         return None
+    candidates = []
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
             action_file = ts_file.parent / "action"
             if action_file.exists() and action_file.read_text().strip() in {"ask", "ask-docs"}:
                 continue
             if ts_file.read_text().strip() == thread_ts:
-                return ts_file.parent.name
+                candidates.append(ts_file.parent)
         except OSError:
             pass
-    return None
+    candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    non_anchors = []
+    for path in candidates:
+        status_file = path / "status"
+        status = status_file.read_text(errors="replace").strip() if status_file.exists() else ""
+        if status != "thread-anchor":
+            non_anchors.append(path)
+    return (non_anchors or candidates)[0].name if (non_anchors or candidates) else None
+
+
+def _resolve_thread_log_job(anchor_job_id, command, channel_id):
+    """Resolve an optional explicit log ID without crossing the Slack thread boundary."""
+    parts = command.strip().split()
+    if len(parts) > 2:
+        return None, "Usage: `logs [job-id]`"
+    if len(parts) == 1:
+        thread_ts = _thread_ts_for_job(anchor_job_id)
+        return (_find_job_by_thread_ts(thread_ts) if thread_ts else anchor_job_id), None
+    requested_id = parts[1]
+    if not _JOB_ID_RE.fullmatch(requested_id):
+        return None, "Usage: `logs [job-id]`"
+    requested_dir = JOB_DIR / requested_id
+    if not requested_dir.exists():
+        return requested_id, None
+    anchor_thread = _thread_ts_for_job(anchor_job_id)
+    requested_thread = _thread_ts_for_job(requested_id)
+    if anchor_thread and requested_thread and anchor_thread != requested_thread:
+        return None, f"⚠️ Job `{requested_id}` is not in this Slack thread"
+    requested_channel_file = requested_dir / "channel_id"
+    if channel_id and requested_channel_file.exists():
+        if requested_channel_file.read_text(errors="replace").strip() != channel_id:
+            return None, f"⚠️ Job `{requested_id}` is not in this Slack channel"
+    return requested_id, None
 
 
 _THREAD_COMMANDS = {
@@ -851,12 +884,16 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
 
     elif cmd == "logs":
-        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets)
+        log_job_id, error = _resolve_thread_log_job(job_id, command, channel_id)
+        if error:
+            _notify_job(job_id, error)
+            return
+        output = read_job_output(JOB_DIR / log_job_id, redact=_redact_secrets)
         if output:
             last = [line.rstrip() for line in output.splitlines() if line.strip()][-20:]
-            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{chr(10).join(last)}```")
+            _notify_job(job_id, f"📋 *Last 20 lines* (job `{log_job_id}`)\n```{chr(10).join(last)}```")
         else:
-            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+            _notify_job(job_id, f"⚠️ No log found for job `{log_job_id}`")
 
     elif cmd == "cluster-status":
         new_job_id = str(uuid.uuid4())[:8]
