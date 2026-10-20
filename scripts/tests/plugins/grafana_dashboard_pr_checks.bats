@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC1091
 
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
@@ -34,7 +35,7 @@ for panel in panels.values():
 repo = next(item for item in data["templating"]["list"] if item["name"] == "repo")
 assert repo["includeAll"] and repo["multi"]
 for panel_id in (5, 6):
-    assert any(item["id"] == "merge" for item in panels[panel_id]["transformations"])
+    assert any(item["id"] == "joinByField" for item in panels[panel_id]["transformations"])
     assert "Repo" in next(item for item in panels[panel_id]["transformations"] if item["id"] == "organize")["options"]["renameByName"].values()
 state = panels[6]["fieldConfig"]["defaults"]["mappings"][0]["options"]
 assert state["failure"]["color"] == "red" and state["in_progress"]["color"] == "blue"
@@ -53,6 +54,40 @@ for panel_id in (5, 6):
     assert "No open PRs" in panels[panel_id]["fieldConfig"]["defaults"].get("noValue", ""), panel_id
 for panel_id in (1, 2, 3):
     assert panels[panel_id]["targets"][0]["expr"].endswith("or vector(0)"), panel_id
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "PR checks tables join populated rows without duplicate label fields" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+
+def organize(panel_id):
+    return next(item for item in panels[panel_id]["transformations"] if item["id"] == "organize")["options"]
+
+assert [item["id"] for item in panels[5]["transformations"]] == ["joinByField", "organize"]
+assert [item["id"] for item in panels[6]["transformations"]] == ["joinByField", "organize"]
+for panel_id in (5, 6):
+    join = panels[panel_id]["transformations"][0]
+    assert join["options"] == {"byField": "__join", "mode": "outer"}
+    assert "max by" not in panels[panel_id]["targets"][0]["expr"]
+    assert "label_join" in panels[panel_id]["targets"][0]["expr"]
+    exclude = organize(panel_id)["excludeByName"]
+    assert all(exclude.get(name) for name in ("Time", "Value", "Value #A", "__name__", "__join", "job", "instance"))
+
+assert panels[5]["targets"][1]["expr"].startswith("max by (__join, state) (")
+assert panels[6]["targets"][1]["expr"].startswith("max by (__join) (")
+assert "repo\",\"pr\"))" in panels[5]["targets"][1]["expr"]
+assert "repo\",\"pr\",\"check\"))" in panels[6]["targets"][1]["expr"]
+assert organize(5)["excludeByName"]["Value #B"]
+assert "Value #B" not in organize(6)["excludeByName"]
+assert organize(6)["renameByName"]["Value #B"] == "Duration"
+assert "state)" in panels[5]["targets"][1]["expr"]
+assert "check" in panels[6]["targets"][0]["expr"]
 PY
   [ "${status}" -eq 0 ]
 }
