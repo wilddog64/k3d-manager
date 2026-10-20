@@ -132,3 +132,19 @@ After `1a1c33d8` was deployed, the operator reported a populated **Checks per PR
 - `Duration` contains numeric values, but the row fields are still misaligned.
 
 This recurrence reopens the bug. The screenshot is live evidence that the offline JSON regression did not fully model the deployed Grafana frame/transformation behavior. Do not mark this bug `VERIFIED` or `LIVE-VERIFIED` again until the exact populated dashboard path is corrected and rechecked.
+
+## Operator confirmation — 2026-10-20 (latest screenshot, Checks per PR)
+
+The operator supplied a newer live screenshot of the **Checks per PR** table while GitHub Dependabot auto-merge checks were completing successfully. This confirms that the existing P3 recurrence is still observable, not that the CI automation itself failed.
+
+Visible evidence:
+
+- Column headers are `Check | PR | Repo | State | Duration`.
+- The `PR` cells render elapsed times such as **`1.03 mins`** for `wilddog64/shopping-cart-product-catalog` checks and **`56 s`** for `wilddog64/shopping-cart-basket` rather than numeric PR identifiers.
+- The `Duration` column appears to contain plausible individual check durations (2s, 32s, 5s, 0s, 51s, 27s, 24s, 25s), meaning the defect is **not** a simple universal shift of every column. Investigate Grafana's field selection, organize transformation, display units and joined result frames.
+- `GitGuardian Security Checks`, `Lint & Type Check`, `automerge`, `Integration Test — Schema Self-Heal`, `Lint, Test & Build`, and `Security Scan` show `success`; `Build, Scan & Push` shows `skipped`. Do not infer the PRs merged or a patched image deployed from these rows alone.
+- The screenshot does **not** show the earlier `Value #A` or `No open PRs` placeholders. Preserve this distinction: those prior symptoms are not re-established by the latest image.
+
+**Additional P3 acceptance emphasis:** Render the actual numeric PR number in the `PR` column for every check row, without elapsed-time units; retain elapsed-time formatting only for `Duration`. Verify the populated live panel against a real open PR and record the deployed commit SHA, timestamp, and screenshot after the correction. Ensure offline regression exercises Grafana's effective transformed frame rather than only the declarative dashboard JSON.
+
+**Triage:** Keep the existing bug `OPEN` / P3, not `VERIFIED` or `LIVE-VERIFIED`. This entry documents evidence only; implementation and live dashboard modifications remain pending authorization.
