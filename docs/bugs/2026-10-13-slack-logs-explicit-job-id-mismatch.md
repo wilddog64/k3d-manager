@@ -1,7 +1,7 @@
 # Bug: Slack logs command substitutes unrelated job ID (2026-10-13)
 
 **Filed:** 2026-10-13
-**Status:** VERIFIED — 2026-10-19: dispatched fix landed in `177ba541`; focused Python tests passed 25/25, relevant BATS passed 14/14, syntax validation and `_agent_audit` passed. Live Slack verification remains pending operator confirmation.
+**Status:** LIVE-VERIFIED — 2026-10-20: operator ran `logs 26f2035e` in Slack; the bot returned `Last 20 lines (job 26f2035e)` and the transcript showed E2E run `1792455493-30189` with `exit_code=0` / `result=pass`.
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (ChatOps observability / job correlation)
 **Release:** v1.43.5 (triage 2026-10-15, operator-approved placement)
@@ -10,7 +10,8 @@
 **Component:** Slack /k3dm thread command routing; job-ID resolution; webhook job log lookup
 **Fix commit:** `177ba541`
 **Related:** `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md` (thread association vs arbitrary ID lookup distinction)
-**Evidence:** Operator Slack screenshots, 2026-10-13 and 2026-10-14; source inspection of `bin/k3dm-webhook` on `k3d-manager-v1.43.2`. No access to live job directories or webhook logs.
+**Evidence:** Operator Slack screenshots, 2026-10-13 and 2026-10-14; source inspection of `bin/k3dm-webhook`; live Slack-thread job `26f2035e` with `target=e2e-sandbox`, `status=success`, and `make.log`; E2E result `/Users/cliang/.k3dm/e2e/1792455493-30189.json` with `exit_code=0` and `result=pass`.
+**Live evidence:** 2026-10-20 · run 1792455493-30189 · env Slack/e2e-sandbox · scenario slack-logs-26f2035e · commit 177ba541 · proves fix
 
 ## Files
 
@@ -62,7 +63,7 @@ Both replies were:
 - [x] `logs` with no argument retains documented thread association behavior.
 - [x] Existing job log files / incomplete or running jobs return accurate `running`, `pending`, `not found`, or `unavailable` responses without inventing log content.
 - [x] Regression tests cover two distinct IDs, repeated calls, same-thread and cross-thread access, missing job, and running job; assert that lookup ID and reported ID agree.
-- [ ] Verify on a live Slack test job and capture sanitized evidence before closing.
+- [x] Verify on a live Slack test job and capture sanitized evidence before closing.
 - [ ] Preserve logging redaction, job authorization, retention, and thread security policy.
 
 ## Files
