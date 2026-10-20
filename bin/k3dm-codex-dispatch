@@ -187,25 +187,54 @@ Do not touch memory-bank/.
 Do not unset or override the K3DM_* and TMPDIR variables you were given. They keep this task's state away from the live webhook and from other tasks.
 Your last message must list every file you changed.
 EOF
-  local -a _dispatch_state_vars=(
+  nohup "$_dispatch_script_dir/k3dm-codex-dispatch" worker \
+    --worktree "$worktree" --run "$run" --version "$version" --slug "$slug" \
+    --prompt "$run/prompt.md" --output "$run/last-message.md" </dev/null >/dev/null 2>&1 &
+  printf '%s\n' "$!" >"$run/pid"
+  echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
+}
+
+_dispatch_worker() {
+  local worktree="" run="" version="" slug="" prompt="" log="" output="" session_id="" mode=start exit_code
+  while (($#)); do
+    case "$1" in
+      --worktree) worktree="$2"; shift 2 ;;
+      --run) run="$2"; shift 2 ;;
+      --version) version="$2"; shift 2 ;;
+      --slug) slug="$2"; shift 2 ;;
+      --prompt) prompt="$2"; shift 2 ;;
+      --log) log="$2"; shift 2 ;;
+      --output) output="$2"; shift 2 ;;
+      --session-id) session_id="$2"; mode=resume; shift 2 ;;
+      *) _dispatch_error "unknown worker option: $1" ;;
+    esac
+  done
+  [[ -d "$worktree" && -d "$run" && -n "$version" && -n "$slug" && -s "$prompt" ]] ||
+    _dispatch_error "worker requires a worktree, run directory, version, slug, and prompt"
+  [[ -n "$log" ]] || log="$run/codex.log"
+  [[ -n "$output" ]] || output="$run/last-message.md"
+  local state_dir="$run/state"
+  local -a state_vars=(
     "K3DM_REPO_ROOT=$worktree" "K3DM_JOB_DIR=$state_dir/jobs" "K3DM_RUN_DIR=$state_dir/run"
     "K3DM_STATE_DIR=$state_dir/state" "K3DM_LOG_DIR=$state_dir/logs" "K3DM_TMP_ROOT=$state_dir/tmp"
     "K3DM_PORT_CACHE_DIR=$state_dir/port-cache" "TMPDIR=$state_dir/tmp"
   )
-  (
-    trap '' HUP
-    set +e
-    if (( network )); then
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
+  cd "$worktree"
+  set +e
+  if [[ "$mode" == resume ]]; then
+    if [[ -f "$run/network" ]]; then
+      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$state_dir\"]" -c sandbox_workspace_write.network_access=true -o "$output" "$session_id" - <"$prompt" >"$log" 2>&1
     else
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
+      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$state_dir\"]" -o "$output" "$session_id" - <"$prompt" >"$log" 2>&1
     fi
-    exit_code="$?"
-    _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$run/codex.log" "$exit_code"
-    printf '%s\n' "$exit_code" >"$run/exit"
-  ) </dev/null >/dev/null 2>&1 &
-  printf '%s\n' "$!" >"$run/pid"
-  echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
+  elif [[ -f "$run/network" ]]; then
+    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$prompt" >"$log" 2>&1
+  else
+    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$state_dir" -o "$run/last-message.md" - <"$prompt" >"$log" 2>&1
+  fi
+  exit_code="$?"
+  _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"
+  printf '%s\n' "$exit_code" >"$run/exit"
 }
 
 _dispatch_status() {
@@ -340,24 +369,10 @@ _dispatch_resume() {
   fi
   cp "$prompt_file" "$run/prompt-$n.md"
   rm -f "$run/exit"
-  local -a _dispatch_state_vars=(
-    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
-    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
-    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
-  )
-  (
-    cd "$task"
-    trap '' HUP
-    set +e
-    if [[ -f "$run/network" ]]; then
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
-    else
-      env "${_dispatch_state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
-    fi
-    exit_code="$?"
-    _dispatch_codex_exit "$task" "$run" "$version" "$slug" "$run/codex-$n.log" "$exit_code"
-    printf '%s\n' "$exit_code" >"$run/exit"
-  ) </dev/null >/dev/null 2>&1 &
+  nohup "$_dispatch_script_dir/k3dm-codex-dispatch" worker \
+    --worktree "$task" --run "$run" --version "$version" --slug "$slug" \
+    --prompt "$run/prompt-$n.md" --log "$run/codex-$n.log" --output "$run/last-message-$n.md" --session-id "$session_id" \
+    </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$!" >"$run/pid"
   _dispatch_ledger_event resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
   _dispatch_schedule_metrics
@@ -389,6 +404,7 @@ main() {
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;
+    worker) shift; _dispatch_worker "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;
