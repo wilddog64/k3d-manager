@@ -1,7 +1,7 @@
 # Issue: dispatched documentation worker exited without output
 
 **Date:** 2026-10-19
-**Status:** OPEN
+**Status:** PARTIALLY FIXED — status reporting improved; worker-start failure remains unresolved
 
 ## What was attempted
 
@@ -30,10 +30,57 @@ scope: in-scope
 
 The run directory contained an empty `codex.log`; no `exit` or `last-message.md` file was produced, and the recorded worker PID was no longer running.
 
+## Recurrence — 2026-10-20
+
+The PR Checks table task was dispatched with:
+
+```text
+bin/k3dm-codex-dispatch start --spec docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md --slug pr-checks-table-misalignment --network
+```
+
+The task again created its worktree and PID, then lost the worker before it wrote any Codex output or exit marker:
+
+```text
+task: pr-checks-table-misalignment
+state: unknown
+network: yes
+scope: in-scope
+pid=58276
+alive=no
+exit=not-recorded
+codex.log size=0 bytes
+```
+
+After the dispatcher status fix, the same record reports:
+
+```text
+task: pr-checks-table-misalignment
+state: failed (worker exited without exit marker)
+network: yes
+scope: in-scope
+```
+
 ## Root cause
 
-Unknown. The dispatcher successfully created the worktree but the worker exited before writing its normal completion markers.
+The worker termination mechanism is still unknown. The dispatcher successfully created the worktree and PID, but the worker exited before writing to `codex.log`, `last-message.md`, or `exit`. The dispatcher previously misclassified this terminal condition as `unknown`.
+
+The dispatcher now treats a dead recorded PID without an `exit` marker as `failed (worker exited without exit marker)`, so operators can distinguish a dead worker from an active one.
 
 ## Recommended follow-up
 
-Investigate why a dispatched worker can terminate before `_dispatch_codex_exit` records the exit state, then make the status command report a terminal failure instead of `state: unknown`.
+Investigate why a dispatched worker can terminate before `_dispatch_codex_exit` records the exit state. Preserve the new terminal failure status and add startup diagnostics or a supervised worker mechanism once the termination cause is isolated.
+
+## Verification
+
+```text
+bats scripts/tests/bin/codex_dispatch.bats
+1..34
+ok 1 ...
+...
+ok 34 ...
+
+shellcheck bin/k3dm-codex-dispatch
+clean
+```
+
+The focused BATS suite passed 34/34, including the regression test for a dead worker without an exit marker.
