@@ -1,13 +1,14 @@
 # Bug: Slack logs command substitutes unrelated job ID (2026-10-13)
 
 **Filed:** 2026-10-13
-**Status:** OPEN — reproducible symptom; source confirms explicit argument is ignored; exact selected job requires live log verification
+**Status:** VERIFIED — 2026-10-19: dispatched fix landed in `177ba541`; focused Python tests passed 25/25, relevant BATS passed 14/14, syntax validation and `_agent_audit` passed. Live Slack verification remains pending operator confirmation.
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (ChatOps observability / job correlation)
 **Release:** v1.43.5 (triage 2026-10-15, operator-approved placement)
 **Reported:** 2026-10-13, operator
 **Approval:** standing bug-filing (report only; no runtime changes approved)
 **Component:** Slack /k3dm thread command routing; job-ID resolution; webhook job log lookup
+**Fix commit:** `177ba541`
 **Related:** `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md` (thread association vs arbitrary ID lookup distinction)
 **Evidence:** Operator Slack screenshots, 2026-10-13 and 2026-10-14; source inspection of `bin/k3dm-webhook` on `k3d-manager-v1.43.2`. No access to live job directories or webhook logs.
 
@@ -56,11 +57,11 @@ Both replies were:
 
 ## Acceptance criteria
 
-- [ ] Exact job-ID selection semantics are documented for Slack `logs` (explicit argument versus thread default).
-- [ ] An explicit `logs A` never returns a status message referencing different ID `B`; unauthorized IDs are rejected safely.
-- [ ] `logs` with no argument retains documented thread association behavior.
-- [ ] Existing job log files / incomplete or running jobs return accurate `running`, `pending`, `not found`, or `unavailable` responses without inventing log content.
-- [ ] Regression tests cover two distinct IDs, repeated calls, same-thread and cross-thread access, missing job, and running job; assert that lookup ID and reported ID agree.
+- [x] Exact job-ID selection semantics are documented for Slack `logs` (explicit argument versus thread default).
+- [x] An explicit `logs A` never returns a status message referencing different ID `B`; unauthorized IDs are rejected safely.
+- [x] `logs` with no argument retains documented thread association behavior.
+- [x] Existing job log files / incomplete or running jobs return accurate `running`, `pending`, `not found`, or `unavailable` responses without inventing log content.
+- [x] Regression tests cover two distinct IDs, repeated calls, same-thread and cross-thread access, missing job, and running job; assert that lookup ID and reported ID agree.
 - [ ] Verify on a live Slack test job and capture sanitized evidence before closing.
 - [ ] Preserve logging redaction, job authorization, retention, and thread security policy.
 
@@ -95,3 +96,9 @@ The same thread contained the actual Make child job:
 ```
 
 The target marker and `make.log` were present on the child, proving the preceding Make-log marker fix was active. Slack still looked up the anchor when the operator requested `logs d5261dfb`, confirming the explicit-ID/thread-association defect remains reproducible live.
+
+## Verification evidence
+
+- Focused Python tests: `25/25` passed across thread dispatch, ask-docs thread behavior, and job-output selection.
+- Relevant BATS suites: `14/14` passed.
+- Syntax validation and `_agent_audit`: passed.
