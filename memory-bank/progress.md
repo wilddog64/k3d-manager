@@ -10,6 +10,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - No runtime recovery action was taken. Canonical P1 remains OPEN pending confirmation of the API-path fault domain and separate ArgoCD direct-login triage. Evidence and exact timeline are recorded in `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.
 - After service recovery, downgraded the canonical record from P1 to P2: current degradation has an SSO workaround, but the outage's API-path root cause remains unknown. The original incident severity is retained as historical context in the bug doc.
 
+## 2026-10-20 Slack Make job-ID notices
+
+- Operator reported inconsistent job-ID visibility during Slack E2E run `05f2be6c`. The queued, started, and progress notices omitted the ID; bare `logs` returned the transcript under `05f2be6c`. Source review found the `/k3dm` thread path includes the ID, while the direct Make webhook creates its queued notice before generating the ID; shared worker lifecycle notices also omit it.
+- Filed P2 `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`; implementation dispatch is pending. No implementation or live E2E change made.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.

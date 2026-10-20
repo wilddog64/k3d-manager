@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD: `fa6410b8` (`docs: record Hostinger incident investigation`).
+- Current remote HEAD: `ee1ca2ae` (`docs: verify app-cluster role lookup fix`).
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -46,6 +46,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - PR Checks panel 8 legend clipping bug: dispatcher task `pr-checks-legend-clipped` landed as `a5edc7ac`; focused BATS 5/5 and ShellCheck passed. Operator screenshot confirms the side legend is readable after sync; bug is LIVE-VERIFIED.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
 - P1 register-app-cluster role-lookup fix `a70e52a4`: independently offline-verified 2026-10-20 (focused BATS 41/41, ShellCheck clean); operator Slack-originated live E2 rerun remains pending. Bug is VERIFIED, not LIVE-VERIFIED.
+- New P2 Slack Make job-ID notice inconsistency: live thread for job `05f2be6c` showed queued/started/progress notices without the ID; bare `logs` found it. Bug spec: `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`; dispatch pending.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
 
 ## Verification from latest work
