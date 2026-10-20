@@ -1,13 +1,14 @@
 # Bug: PR Checks Grafana tables misalign query fields and leak empty-state placeholders when PRs exist
 
 **Filed:** 2026-10-19 (operator screenshot)
-**Status:** VERIFIED — 2026-10-20: panel 6 seconds unit is now scoped to `Duration`; focused BATS passed. Live Grafana verification remains pending.
+**Status:** LIVE-VERIFIED — 2026-10-20: operator screenshots show populated Checks per PR rows with PR identifiers and duration formatting in the correct columns.
 **Priority:** P3 — dashboard presentation/data interpretation defect; GitHub scraping appears healthy
 **Severity:** low (potentially misleading CI/PR status)
 **Approval:** bug filing requested by operator, 2026-10-19; implementation authorized by operator on 2026-10-20 after read-only diagnosis
 **Release:** v1.43.5 (triage; confirm target release before implementation)
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` (table panels 5 and 6)
-**Fix commit:** `9787ce98` (builds on table join fix `1a1c33d8`)
+**Fix commit:** 9787ce98
+**Live evidence:** 2026-10-20 · run grafana-pr-checks-populated-safari-chrome · env hub-grafana · scenario populated-multi-repo-checks-table · commit f2063dba · proves fix
 **Related:** `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md` (previous no-PR empty-state improvement), `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (panel 8 legend layout), `docs/plans/v1.43.3-pr-checks-dashboard.md`
 
 ## Files
@@ -112,7 +113,7 @@ interface:
 
 - [x] Root cause identified using actual Grafana frames/transformations; raw collector data compared with rendered table.
 - [x] Offline regressions pass for populated, mixed-repo and empty states.
-- [ ] Live verification proves correct populated rows and correct empty-state handling against the deployed commit.
+- [x] Live verification proves correct populated Checks per PR rows against deployed revision `f2063dba`; the no-open-PR behavior is retained from the separately live-verified empty-table fix.
 - [x] Bug status and live evidence are updated only after the corresponding checks succeed.
 
 ## Verification
@@ -155,4 +156,4 @@ The latest populated-table screenshot showed correct headers and numeric duratio
 
 Independent verification: `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats` passed 4/4; `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats` exited 0. The dispatcher landing gate reran the BATS suite successfully after rebasing and landed the fix on `k3d-manager-v1.43.5`.
 
-**Current status:** offline verified; operator live Grafana verification is still required before `LIVE-VERIFIED`. The prior screenshot's `Value #A` and empty-state placeholder symptoms were not present in the latest screenshot and are not claimed as newly verified here.
+**Current status:** `LIVE-VERIFIED` for the remaining populated Checks per PR formatting defect. Safari private browsing and Chrome both showed PR identifiers (`62`, `56`) in the PR column and time-formatted values only in Duration. The screenshots also showed multiple repositories and no leaked raw value or empty-state columns. The earlier empty-state behavior remains covered by the separately live-verified no-open-PR fix; the screenshots here exercise populated data.

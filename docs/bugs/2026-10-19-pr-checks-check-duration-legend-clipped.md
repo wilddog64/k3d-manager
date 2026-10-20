@@ -2,11 +2,16 @@
 
 **Filed:** 2026-10-19 (operator screenshots)
 **Branch:** k3d-manager-v1.43.5
-**Status:** OPEN — presentation fix not authorized
+**Status:** OPEN — operator authorized implementation and dispatcher work on 2026-10-20
 **Priority:** P3
 **Severity:** low — the chart remains visible, but some series names cannot be read
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` panel 8
 **Related:** `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md`
+
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
 
 ## Symptom / evidence
 
@@ -19,6 +24,8 @@ The current panel definition is:
 ```
 
 It uses the default Grafana legend layout, has no explicit legend configuration, and places a potentially long multi-series legend inside an eight-row panel.
+
+The operator supplied another live screenshot on 2026-10-20 showing the final legend row clipped at the bottom edge of the Check duration panel in Safari private browsing. Chrome also shows the legend crowded at the panel boundary. Keep the query and Repo filter unchanged while investigating the layout.
 
 ## Root cause / investigation status
 
