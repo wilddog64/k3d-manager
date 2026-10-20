@@ -95,3 +95,21 @@ The fallback to `SLACK_WEBHOOK_URL` calls `_slack_post(SLACK_WEBHOOK_URL, text)`
 **Investigation focus:** Obtain the actual Slack message `ts`, `thread_ts`, and `channel` for the initial announcement, the 2/4/6/8/10-minute updates, and later replies. Compare these to job-local `thread_ts`, `thread_source`, `channel_id`, and `response_url` values as persisted over time (redact response URL). Determine whether the bot starts a new thread after an earlier fallback fails, or whether child-job metadata is introduced or overwritten mid-execution. Account for the code's `_notify_job` branch ordering and thread-parent creation behavior. Do not assert a root cause without these timestamps or a deterministic reproduction.
 
 **Additional regression requirement:** Exercise successive 120-second timer callbacks with the same child job, including empty/partial thread metadata and changes in posting backend. Verify that *every* notification uses the **original intended thread parent**, and that a failure to post in-thread never silently switches later notifications to a different parent. The test must fail before fixing this observed behavior.
+
+## Additional incident — 2026-10-20 (cloud-bridge Make job notification)
+
+Operator screenshot at approximately 13:58 PDT shows the `k3d-manager` Slack app announcing a cloud-bridge initiated `make test-all` job. The operator reported that the call **did not return its result within the expected Slack thread**. This resembles the existing asynchronous job lifecycle / thread-correlation failure mode, but is a **different entry path** than the original `cluster-up (aws)` incident.
+
+The same invocation is corroborated by GitHub-backed bridge responses: request `20261020T205644Z-make-test-all` queued job `a3ec539d` at 20:58:08 UTC. A subsequent `job-status` response at 21:00:15 UTC showed `running` and a nonempty redacted Make test tail. **Do not classify absence of a terminal Slack reply as a failure until the job is actually terminal.** Determine whether later completion/failure messages are posted as thread replies, separate top-level messages, or not delivered.
+
+**Status: OPEN — live verification=false.** Reopened/investigation expanded for async Make notifications; no verified fix or confirmed regression yet. Retain P3 initially; consider P2 if a completed job lacks notification or loses important completion status. The `2026-10-18-slack-thread-broadcast-reply-silently-ignored.md` issue is about incoming human `thread_broadcast` commands, so it should **not** be marked regressed solely on the basis of outbound job notifications.
+
+### Additional checks / evidence
+
+- Confirm terminal status for `a3ec539d` via `job-status` / `.final.json` before evaluating missing final Slack notifications.
+- Inspect recorded `channel_id`, parent `thread_ts`, job metadata, and Slack post responses for the cloud-bridge `make-test-all` path (without exposing tokens or private content).
+- Verify that queued, started, progress and terminal notifications attach to the same Slack thread, or surface an explicit, diagnosable fallback.
+- Capture actual Slack `ts` and `thread_ts` for the sent messages; do not infer them from the screenshot alone.
+- Add regression coverage specifically for externally queued Make jobs, distinct from the existing `cluster-up` assertions; do not run another large test suite only to exercise Slack notification formatting.
+
+Evidence: https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
