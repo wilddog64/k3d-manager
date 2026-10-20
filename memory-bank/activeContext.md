@@ -40,8 +40,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
 - Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.
 - Slack explicit job-ID lookup fix `177ba541`: bug is `LIVE-VERIFIED` from operator Slack job `26f2035e` and E2E run `1792455493-30189` (exit code 0 / result pass).
-- PR Checks table transformation fix: investigation/fix pending.
-- Corrected the PR Checks dispatch spec test path to `scripts/tests/plugins/grafana_dashboard_pr_checks.bats` and dispatched non-network task `pr-checks-table-misalignment-r5`; its worker exited before Codex output (`codex.log` 0 bytes, PID 43248 gone), so implementation remains pending.
+- PR Checks table transformation fix `1a1c33d8` is landed and `VERIFIED`: panels 5/6 use repo-scoped composite joins with query-B aggregation; focused dashboard BATS passed 4/4, ShellCheck and `_agent_audit` passed. Operator live Grafana verification remains pending.
+- Corrected the PR Checks dispatch spec test path to `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`; the repaired dispatcher task completed successfully and landed `1a1c33d8`. Live Grafana verification remains pending.
 - Dispatched P3 PR Checks table misalignment as `pr-checks-table-misalignment`; isolated worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/pr-checks-table-misalignment` is created and implementation is pending.
 - PR Checks panel 8 legend layout fix: investigation/fix pending.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.

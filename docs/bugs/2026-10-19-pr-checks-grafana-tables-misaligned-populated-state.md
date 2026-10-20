@@ -1,12 +1,13 @@
 # Bug: PR Checks Grafana tables misalign query fields and leak empty-state placeholders when PRs exist
 
 **Filed:** 2026-10-19 (operator screenshot)
-**Status:** OPEN — investigation and fix pending
+**Status:** VERIFIED — 2026-10-20: fix `1a1c33d8` landed; focused dashboard BATS passed 4/4, ShellCheck passed, and `_agent_audit` passed. Live Grafana verification remains pending operator confirmation.
 **Priority:** P3 — dashboard presentation/data interpretation defect; GitHub scraping appears healthy
 **Severity:** low (potentially misleading CI/PR status)
 **Approval:** bug filing requested by operator, 2026-10-19; implementation not yet authorized
 **Release:** v1.43.5 (triage; confirm target release before implementation)
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` (table panels 5 and 6)
+**Fix commit:** `1a1c33d8`
 **Related:** `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md` (previous no-PR empty-state improvement), `docs/bugs/2026-10-19-pr-checks-check-duration-legend-clipped.md` (panel 8 legend layout), `docs/plans/v1.43.3-pr-checks-dashboard.md`
 
 ## Files
@@ -109,7 +110,14 @@ interface:
 
 ## Definition of Done
 
-- [ ] Root cause identified using actual Grafana frames/transformations; raw collector data compared with rendered table.
-- [ ] Offline regressions pass for populated, mixed-repo and empty states.
+- [x] Root cause identified using actual Grafana frames/transformations; raw collector data compared with rendered table.
+- [x] Offline regressions pass for populated, mixed-repo and empty states.
 - [ ] Live verification proves correct populated rows and correct empty-state handling against the deployed commit.
-- [ ] Bug status and live evidence are updated only after the corresponding checks succeed.
+- [x] Bug status and live evidence are updated only after the corresponding checks succeed.
+
+## Verification
+
+- `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats`: 4/4 passed independently and again during dispatcher landing.
+- `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats`: passed.
+- `_agent_audit`: passed in the dispatched task.
+- Live Grafana verification is intentionally pending; this bug is not `LIVE-VERIFIED`.

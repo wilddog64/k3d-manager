@@ -17,6 +17,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Dispatched the existing explicit Slack job-ID mismatch bug after live reproduction `d5261dfb` (thread anchor) versus `26f2035e` (Make child with `make.log`). Fix `177ba541` honors explicit IDs, rejects cross-thread access, and selects the newest non-anchor for bare `logs`. Focused Python tests passed 25/25; relevant BATS 14/14; syntax validation and `_agent_audit` passed. Operator then ran the Slack-originated E2E flow: job `26f2035e` completed successfully and E2E run `1792455493-30189` returned `exit_code=0` / `result=pass`. Bug is now `LIVE-VERIFIED`.
 - Dispatched P3 `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md` as `pr-checks-table-misalignment`; dispatcher created the isolated worktree and implementation remains pending.
 - Corrected the dispatch spec's test path to `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`; non-network retry `pr-checks-table-misalignment-r5` was created but its worker exited before writing Codex output, leaving implementation pending.
+- Dispatched the corrected PR Checks bug through the repaired dispatcher. Codex changed the two dashboard table panels and regression test; independent focused BATS and the land gate passed 4/4, ShellCheck and `_agent_audit` passed. Commit `1a1c33d8` landed on `k3d-manager-v1.43.5`; bug is `VERIFIED`, with live Grafana verification still pending.
 
 ## 2026-10-18
 
