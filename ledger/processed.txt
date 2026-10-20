@@ -83,3 +83,4 @@
 20261020T205950Z-job-status-hostinger
 20261020T205950Z-job-status-test-all
 20261020T212043Z-diagnose-pods-frontend
+20261020T212043Z-hostinger-status
