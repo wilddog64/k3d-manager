@@ -134,17 +134,6 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ "$status" -eq 0 ]; [[ "$output" == *"out-of-scope: memory-bank/x.md"* ]]
 }
 
-@test "codex dispatch: status reports a dead worker without an exit marker" {
-  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
-  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
-  pid="$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/pid")"
-  kill "$pid" 2>/dev/null || true
-  sleep 1
-  run dispatch status one
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"state: failed (worker exited without exit marker)"* ]]
-}
-
 @test "codex dispatch: land refuses running, out-of-scope, and dirty tasks" {
   export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null

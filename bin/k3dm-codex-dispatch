@@ -217,7 +217,6 @@ _dispatch_status() {
     if [[ -f "$run/landed" ]]; then state=landed
     elif [[ -f "$run/pid" ]] && kill -0 "$(<"$run/pid")" 2>/dev/null; then state=running
     elif [[ -f "$run/exit" ]]; then state="exited $(<"$run/exit")"
-    elif [[ -f "$run/pid" ]]; then state="failed (worker exited without exit marker)"
     else state=unknown; fi
     [[ -z "${1:-}" || "$1" == "$slug" ]] || continue
     echo "task: $slug"; echo "state: $state"; [[ -f "$run/network" ]] && echo "network: yes" || true

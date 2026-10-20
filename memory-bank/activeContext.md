@@ -42,7 +42,6 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Slack explicit job-ID lookup fix `177ba541`: bug is `LIVE-VERIFIED` from operator Slack job `26f2035e` and E2E run `1792455493-30189` (exit code 0 / result pass).
 - PR Checks table transformation fix: investigation/fix pending.
 - Dispatched P3 PR Checks table misalignment as `pr-checks-table-misalignment`; isolated worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/pr-checks-table-misalignment` is created and implementation is pending.
-- Dispatcher follow-up: `pr-checks-table-misalignment` worker PID `58276` died with an empty `codex.log` and no exit marker. `bin/k3dm-codex-dispatch status` now reports `failed (worker exited without exit marker)` instead of `unknown`; underlying worker termination remains unresolved and is documented in `docs/issues/2026-10-19-codex-dispatch-worker-no-output.md`.
 - PR Checks panel 8 legend layout fix: investigation/fix pending.
 - Frontend Cloudflare cache TTL: origin is 5m but Cloudflare browser TTL was 14400; operator must set “Respect Existing Headers” and recheck.
 - P1 register-app-cluster role-lookup fix `a70e52a4`: live E2 rerun pending.
