@@ -1,7 +1,7 @@
 # Bug: Codex dispatch workers disappear without terminal status or diagnostic output
 
 **Filed:** 2026-10-20 (ChatGPT; operator-provided CLI screenshots)
-**Status:** OPEN — investigation and implementation deferred until Claude is available
+**Status:** FIXED — landed `2de716d8`; offline (42/42 BATS) and one live Codex CLI smoke verified; awaiting operator's own Codex CLI dispatch as final confirmation
 **Priority:** P1 — critical engineering workflow blocker: autonomous Codex dispatch can silently fail, preventing reliable agent-to-agent implementation and verification
 **Severity:** high — tasks can appear accepted but never run or report completion, blocking dependable automated engineering throughput
 **Approval:** operator approved filing as P2, then explicitly escalated to P1 on 2026-10-19 PDT because unreliable dispatch hinders effective engineering work; NOT approval to implement at filing time; operator then approved implementation and a Codex dispatch on 2026-10-20 PDT (Codex billing is flat-rate, no API token calls)
@@ -110,8 +110,33 @@ macOS has no `setsid` binary; use perl or python.
 
 ### Not verified
 
-- A detached worker surviving Codex CLI's own cleanup (needs E2 live dispatch from Codex CLI).
+- A detached worker surviving Codex CLI's own cleanup (needs E2 live dispatch from Codex CLI). **Resolved below.**
 - Whether `r5`/`r6` were launched from Codex CLI; their launch environment was not recorded.
+
+## Resolution — 2026-10-20 (Antigravity agent)
+
+**Fix landed:** `2de716d8` ("fix: detach Codex dispatch workers and record terminal status"), implemented by Codex via dispatch task `dispatcher-detached-worker` (Codex `resume` once after review) and landed with `bin/k3dm-codex-dispatch land`. Pushed with the live-smoke spec in `8a8fb450`.
+
+**Review defects found and fixed before landing:**
+1. `_dispatch_ledger_event` was changed to `return 1`, which under `set -e` would have aborted `start`/`resume`/`abandon`/`land` on a ledger write failure (in `land`, after the merge, leaving the worktree and branch behind). Non-worker callers now use `_dispatch_ledger_event_best_effort`; only the worker's `_dispatch_codex_exit` path observes the failure.
+2. The required survival tests were missing. Added tests for SIGHUP to the launcher, SIGKILL of the launcher's process group, and a plain `( ... ) &` negative control that is killed.
+
+**Offline evidence (E1):** `env -i bats scripts/tests/bin/codex_dispatch.bats` 42/42 ok (was 34), `shellcheck bin/k3dm-codex-dispatch` clean, `_agent_audit` rc=0, no trailing whitespace; changed only the three files in `## Files`. `land` re-ran the same BATS after the rebase onto `580269a6`: passed.
+
+**Live evidence (E2):** a real Codex CLI session (`codex exec --sandbox danger-full-access`, prompt `scratch/live-smoke-prompt.md` in the Antigravity artifact dir) ran exactly one command, `bin/k3dm-codex-dispatch start --spec docs/issues/2026-10-20-dispatch-live-smoke-spec.md --slug live-smoke-codex-cli`, and ended its turn at 04:32:51. Observed afterwards:
+
+```text
+04:32:57  status: running        # 6 s after the CLI session exited
+          worker PID 72399, PPID 1, PGID 72398 (own group), codex.log growing (16.9 KB)
+04:34:07  status: exited successfully
+          exit=0, codex-exit-ts=1792495984, start-ts=1792495968, supervisor.log 0 bytes
+ledger:   start (network 0) then codex_exit exit 0 tokens 16815
+result:   scratch/dispatch-smoke.txt = "dispatch smoke ok"
+```
+
+Before the fix, `r5`/`r6` had 0-byte `codex.log` and no markers in the same situation. Evidence directory (kept): `~/.local/share/k3d-manager/worktrees/v1.43.5/live-smoke-codex-cli.run/`; the worktree and branch were abandoned after the check.
+
+**Caveats:** the live check used `--sandbox danger-full-access` so the nested dispatcher could create worktrees; a stricter Codex CLI sandbox profile was not tested. One run is one data point; the operator's own Codex CLI dispatch of the Grafana fix is the next live confirmation. `e2e-sandbox-live-verify`, `r5` and `r6` run directories were left untouched as forensic evidence.
 
 ## Expected behavior
 
