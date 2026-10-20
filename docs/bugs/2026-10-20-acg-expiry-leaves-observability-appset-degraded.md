@@ -19,6 +19,22 @@ application destination spec is invalid: there are no clusters with this name: u
 
 The operator suspects the ACG sandbox expired and ACG purged its AWS resources. This is plausible but **not yet confirmed**. In particular, the error says Argo CD does not recognize the destination cluster name; merely losing the EC2 instance would often leave a registered but unreachable cluster. Determine whether registration was removed, the cluster secret changed, or ApplicationSet generation references an incorrect name.
 
+## Additional evidence: existing Alertmanager detection (2026-10-20)
+
+The operator received an Alertmanager notification reporting **[1] Firing** with:
+
+```yaml
+alertname: TargetDown
+cluster: acg
+job: federate-acg
+prometheus: monitoring/kube-prometheus-stack-prometheus
+severity: warning
+summary: One or more targets are unreachable.
+description: 100% of the federate-acg/ targets in namespace are down.
+```
+
+This confirms that monitoring and alert delivery detect loss of the ACG federation target. **There is no observed automatic cleanup invocation following this alert.** The missing integration is an alert-to-verification-to-remediation workflow, not basic detection. Neither the alert nor Argo CD's missing-cluster error alone proves sandbox expiration; corroborate with authoritative sandbox lifecycle state.
+
 ## Expected
 
 When a disposable ACG environment is confirmed destroyed, only ACG-owned Argo CD resources should be retired or suspended safely. Persistent hub/Hostinger observability must remain intact; the next ACG provision should restore the ACG GitOps applications without manual repair. Transient network failures must not trigger destructive cleanup.
@@ -30,10 +46,13 @@ When a disposable ACG environment is confirmed destroyed, only ACG-owned Argo CD
 3. Identify an authoritative signal that the disposable ACG sandbox is gone; treat API timeouts and temporary unreachability as insufficient evidence.
 4. Check for any other ACG-only ApplicationSets/Applications left degraded, without broad or name-only deletion of resources shared with the hub.
 5. Document whether cleanup should remove an ephemeral generated object, disable an environment-scoped generator, or change the desired-state definition so Argo CD cannot immediately recreate stale resources.
+6. Trace Alertmanager routing for `TargetDown` (`cluster=acg`, `job=federate-acg`), existing Hermes/dispatcher integration, and `cleanup-stale-sandbox` behavior. Identify how to trigger verification without granting a generic cluster mutation endpoint.
 
 ## Fix (direction; validate after investigation)
 
 Make ACG teardown/reconciliation idempotent for both explicit shutdown and unexpected expiry. Gate cleanup on a verified gone/retired sandbox identity and an allowlist of ACG-owned GitOps resources. Respect Argo CD deletion semantics: inspect child Application finalizers and resource-pruning impact before deletion. Re-provisioning should recreate/re-register `ubuntu-k3s` and restore its observability apps. Expose cleanup outcome and reason in existing operational logs/status.
+
+Reuse `bin/cleanup-stale-sandbox` or existing lifecycle logic if it can be safely scoped, rather than duplicating teardown code. Accept a validated, allowlisted ACG-specific alert as a **verification request**, not an authorization to delete. The remediation dispatcher must independently confirm destruction for the same sandbox identity, deduplicate repeated firing alerts, serialize cleanup per identity, record the outcome, and safely retry/recover partial cleanup. If verification is unavailable or inconclusive, leave resources unchanged and record the reason. Do not let an alert from an old sandbox delete resources belonging to a newly provisioned sandbox.
 
 Do not introduce a generic destructive `/k3dm` or cloud-bridge command as a prerequisite; if remote mutation is later needed, design it as a separate explicitly authorized, fixed-scope operation.
 
@@ -51,6 +70,12 @@ must:
     text: On the next ACG provision, cluster registration and ACG observability desired state are recreated successfully without manual Argo CD intervention.
   - id: M5
     text: Cleanup logs the target sandbox identity, decisions, actions and results so an operator can distinguish expiry cleanup from transient errors.
+  - id: M6
+    text: An authenticated and validated Alertmanager TargetDown notification for cluster=acg and job=federate-acg can trigger a sandbox lifecycle verification request via the existing dispatcher/Hermes path (or an equivalently constrained handler).
+  - id: M7
+    text: Only after independent confirmation that the matching ACG sandbox identity was destroyed does the dispatcher invoke allowlisted, scoped, idempotent stale-resource cleanup, preferably reusing existing cleanup-stale-sandbox logic.
+  - id: M8
+    text: Repeated firing alerts for the same expired sandbox identity are deduplicated and cleanup is serialized; partially failed cleanup can be retried safely, and stale notifications cannot affect a replacement sandbox.
 must_not:
   - id: N1
     text: A temporarily unreachable ubuntu-k3s cluster must not cause ApplicationSet deletion or child-resource pruning.
@@ -60,11 +85,19 @@ must_not:
     text: A GitOps reconciler must not immediately recreate degraded ACG-only objects after confirmed teardown.
   - id: N4
     text: The fix must not expose generic arbitrary kubectl or Argo CD deletion through reader-level Slack/cloud-bridge endpoints.
+  - id: N5
+    text: A TargetDown notification, Argo CD Degraded status, or federation scrape failure alone must not authorize cleanup without authoritative expiry/destruction evidence.
+  - id: N6
+    text: Duplicate alerts, malformed/untrusted alerts, and notifications belonging to prior sandbox identities must not cause concurrent, repeated destructive operations or cleanup of a new sandbox.
 evidence:
   - id: E1
-    proves: [M2, M3, M5, N1, N2, N3, N4]
+    proves: [M2, M3, M5, M8, N1, N2, N3, N4, N6]
     kind: offline
     text: Stub Argo CD, sandbox identity/expiry signal, and Kubernetes API calls; cover verified expiry, transient timeout, second cleanup run, non-ACG resources, and a still-active GitOps reconciler. Prove N1/N2 fail against a deliberately unscoped deletion implementation.
+  - id: E3
+    proves: [M6, M7, M8, N5, N6]
+    kind: offline
+    text: Integration test feeds a validated TargetDown alert through notification handling and a stubbed Hermes/dispatcher, authoritative sandbox-state check and cleanup executor; assert alert-to-verification-to-cleanup-to-audit on confirmed expiry. Simulate a transient outage, inconclusive state, duplicate firing alerts, malformed alerts, overlapping execution and a late alert for the previous sandbox; assert no unauthorized cleanup. Demonstrate N5 failure under a naive alert-direct-delete implementation.
   - id: E2
     proves: [M1, M2, M4, M5, N2, N3]
     kind: live
@@ -73,12 +106,14 @@ interface:
   - ACG lifecycle scripts (final owner to be determined)
   - Argo CD ApplicationSet observability-acg and its generated Applications
   - Argo CD destination cluster ubuntu-k3s
+  - Alertmanager TargetDown labels cluster=acg, job=federate-acg
+  - Hermes/dispatcher verification-to-cleanup integration (implementation owner to be determined)
 ```
 
 ## Definition of Done
 
 - [ ] Root cause and owning lifecycle paths identified and documented.
-- [ ] Scoped code/tests satisfy offline acceptance; report failing pre-fix cases.
+- [ ] Scoped code/tests satisfy offline acceptance, including E3 alert integration and negative safety tests; report failing pre-fix cases.
 - [ ] Next operator-approved live expiration/teardown and re-provision verifies E2.
 - [ ] Capture post-fix health, cleanup logs, and release/commit reference.
 
