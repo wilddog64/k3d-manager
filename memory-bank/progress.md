@@ -13,7 +13,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-20 Slack Make job-ID notices
 
 - Operator reported inconsistent job-ID visibility during Slack E2E run `05f2be6c`. The queued, started, and progress notices omitted the ID; bare `logs` returned the transcript under `05f2be6c`. Source review found the `/k3dm` thread path includes the ID, while the direct Make webhook creates its queued notice before generating the ID; shared worker lifecycle notices also omit it.
-- Filed P2 `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`; implementation dispatch is pending. No implementation or live E2E change made.
+- Filed P2 `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md` and dispatched task `slack-make-job-id-notices` without `--network`. After a sandboxed status probe reported a false terminated state (process inspection was permission-limited), an escalated read-only status check confirmed `running`, with four in-scope implementation/test files modified. No live E2E change made.
 
 ## 2026-10-19
 
