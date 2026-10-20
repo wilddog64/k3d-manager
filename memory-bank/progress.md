@@ -47,4 +47,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-20 dispatcher investigation
 
 - Confirmed the process-group cleanup root cause of silent dispatch worker loss and recorded the evidence in the P1 bug doc; Codex dispatch of the fix is the next step. Grafana table fix is on hold behind it.
-- Dispatcher P1 fixed and live-verified from Codex CLI (`2de716d8`, E2 recorded in the bug doc). PR Checks Grafana fix is unblocked; operator will dispatch it and live-verify the dashboard.
+- Dispatcher P1 is `LIVE-VERIFIED` from the real Codex CLI smoke run (`2de716d8`; run `live-smoke-codex-cli`, E2 recorded in the bug doc). PR Checks Grafana fix remains separately OPEN after the operator's live screenshot showed the table still misaligned.

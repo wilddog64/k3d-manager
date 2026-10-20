@@ -1,7 +1,9 @@
 # Bug: Codex dispatch workers disappear without terminal status or diagnostic output
 
 **Filed:** 2026-10-20 (ChatGPT; operator-provided CLI screenshots)
-**Status:** FIXED — landed `2de716d8`; offline (42/42 BATS) and one live Codex CLI smoke verified; awaiting operator's own Codex CLI dispatch as final confirmation
+**Status:** LIVE-VERIFIED — 2026-10-20: real Codex CLI dispatch smoke survived launcher-session cleanup and reached terminal status; fix `2de716d8`
+**Fix commit:** 2de716d8
+**Live evidence:** 2026-10-20 · run live-smoke-codex-cli · env Codex-CLI-danger-full-access · scenario detached-dispatcher-worker · commit 2de716d8 · proves E2
 **Priority:** P1 — critical engineering workflow blocker: autonomous Codex dispatch can silently fail, preventing reliable agent-to-agent implementation and verification
 **Severity:** high — tasks can appear accepted but never run or report completion, blocking dependable automated engineering throughput
 **Approval:** operator approved filing as P2, then explicitly escalated to P1 on 2026-10-19 PDT because unreliable dispatch hinders effective engineering work; NOT approval to implement at filing time; operator then approved implementation and a Codex dispatch on 2026-10-20 PDT (Codex billing is flat-rate, no API token calls)
@@ -195,11 +197,11 @@ interface:
 
 ## Definition of Done
 
-- [ ] Identify the actual termination/failure path using newly captured evidence; keep root cause marked unknown until confirmed.
-- [ ] Regression tests pass in a hermetic offline environment, including the pre-fix negative test.
-- [ ] No loss of original Codex exit status when completion bookkeeping fails.
-- [ ] Dead workers never remain indefinitely as ambiguous `unknown`.
-- [ ] Operator-approved live dispatch validates status and diagnostic artifacts against the implementation commit.
+- [x] Identify the actual termination/failure path using newly captured evidence; keep root cause marked unknown until confirmed.
+- [x] Regression tests pass in a hermetic offline environment, including the pre-fix negative test.
+- [x] No loss of original Codex exit status when completion bookkeeping fails.
+- [x] Dead workers never remain indefinitely as ambiguous `unknown`.
+- [x] Operator-approved live dispatch validates status and diagnostic artifacts against the implementation commit.
 
 ## What NOT to Do
 
