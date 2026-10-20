@@ -11,6 +11,15 @@
 **Related:** `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md` (thread association vs arbitrary ID lookup distinction)
 **Evidence:** Operator Slack screenshots, 2026-10-13 and 2026-10-14; source inspection of `bin/k3dm-webhook` on `k3d-manager-v1.43.2`. No access to live job directories or webhook logs.
 
+## Files
+
+| File | Scope |
+|---|---|
+| `bin/k3dm-webhook` | Parse an explicit Slack `logs <job-id>` argument and resolve that authorized job without substituting a thread anchor. |
+| `scripts/tests/bin/test_webhook_thread_dispatch.py` | Add regression coverage for explicit IDs, thread anchors, repeated lookups, and running/finished jobs. |
+
+Do not change job log retention, authorization policy, or unrelated Make producers.
+
 ## Symptom
 
 After issuing `k3dm e2e-remote RUNNER=m2` through Slack, the bot reported:
@@ -69,3 +78,20 @@ Code inspection confirms a defect:
 - `_find_job_by_thread_ts`, around lines 624–637, returns the **first** matching `*/thread_ts` found by an unsorted glob. The original thread anchor and newly spawned test job share the same `thread_ts`, so selection can be ambiguous. This may cause lookup of an anchor without output, but the exact lookup result is not established without runtime evidence.
 
 **Expected fix:** Parse and validate optional explicit `logs <job-id>` and use that specific authorized job. Define the default for bare `logs` in a multi-job thread deterministically (e.g. most recent relevant child), rather than first arbitrary glob match. Ensure a running job with no output yet is distinct from absent job/log; preserve redaction and per-user authorization. Add regression cases for `k3dm test` followed by immediate `logs <queued-id>`, both while running and after completion. Do not silently replace a supplied ID with any thread ancestor.
+
+## Live reproduction — 2026-10-19
+
+Slack job `d5261dfb` was reported as having no log. The local job directory contained only:
+
+```text
+status=thread-anchor
+thread_ts=1792455452.742509
+```
+
+The same thread contained the actual Make child job:
+
+```text
+26f2035e status=running target=e2e-sandbox make.log=yes
+```
+
+The target marker and `make.log` were present on the child, proving the preceding Make-log marker fix was active. Slack still looked up the anchor when the operator requested `logs d5261dfb`, confirming the explicit-ID/thread-association defect remains reproducible live.
