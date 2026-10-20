@@ -1,0 +1,1 @@
+{"action": "job-status", "body": {"job_id": "8a78c34d", "output": "", "result_classification": "in_progress", "status": "running"}, "completed_at": "2026-10-20T21:22:59.699902Z", "http_status": 200, "id": "20261020T212310Z-job-status-hostinger-recheck", "schema": 1, "status": "ok"}
