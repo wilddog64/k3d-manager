@@ -1,9 +1,10 @@
 # Slack Make job acknowledgements and status notices omit the job ID inconsistently
 
 **Filed:** 2026-10-20 (operator-reported live Slack run)
-**Status:** OPEN — implementation pending
+**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Awaiting operator Slack live verification after webhook rollout.
 **Priority:** P2 — job execution continues, but operators may not be able to correlate or request its logs by ID; bare `logs` is a workaround
 **Branch:** `k3d-manager-v1.43.5`
+**Fix commit:** `abb0a526`
 **Release:** v1.43.5 (bug; no new plan slot)
 **Component:** Slack `/make` and `/k3dm` async Make job acknowledgement/progress notices
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md`, `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`
@@ -26,12 +27,12 @@ Every asynchronous Make job lifecycle notice—queued, started, progress, and te
 
 ## Acceptance criteria
 
-- [ ] The direct `/make` queued message includes the ID returned in its queued response and used for its job directory.
-- [ ] `/k3dm <target>` queued notices and direct `/make` notices use the same visible ID format.
-- [ ] Started, progress, and terminal Make notifications identify the same job ID, including failure and timeout paths.
-- [ ] Tests assert exact ID consistency across both enqueue paths and worker notifications; tests do not launch real Make targets, AWS resources, or clusters.
-- [ ] Regression tests preserve bare `logs` and explicit `logs <job-id>` lookup behavior and do not expose response URLs, credentials, or unredacted job output.
-- [ ] Focused Python/BATS tests, ShellCheck for touched shell, and `_agent_audit` pass.
+- [x] The direct `/make` queued message includes the ID returned in its queued response and used for its job directory.
+- [x] `/k3dm <target>` queued notices and direct `/make` notices use the same visible ID format.
+- [x] Started, progress, and terminal Make notifications identify the same job ID, including failure and timeout paths.
+- [x] Tests assert exact ID consistency across both enqueue paths and worker notifications; tests do not launch real Make targets, AWS resources, or clusters.
+- [x] Regression tests preserve bare `logs` and explicit `logs <job-id>` lookup behavior and do not expose response URLs, credentials, or unredacted job output.
+- [x] Focused Python/BATS tests and `_agent_audit` pass. No shell files changed, so ShellCheck is not applicable.
 
 ## Files
 
@@ -47,3 +48,10 @@ Do not change Make job authorization, log retention, cluster execution, or AWS p
 - `bin/k3dm-webhook` `/k3dm` thread-command branch creates a job ID before sending `queued — job <id>`.
 - `bin/k3dm-webhook` direct Make webhook branch currently calls `_start_bot_thread("… queued")` before generating the Make job ID.
 - `scripts/lib/webhook/lifecycle.py::_run_make_target` sends started, timed progress, and terminal notices without including the ID already passed as `job_id`.
+
+## Verification
+
+- Fix landed on `k3d-manager-v1.43.5` as `abb0a526`; deterministic progress/failure regression coverage follow-up is `cb7f37dc`.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/webhook_lifecycle.py`: 26 passed. Coverage includes direct `/make` queued ID/response/directory consistency, `/k3dm` queued format, explicit and bare logs behavior, and started/progress/success/failure/timeout notices.
+- `bats scripts/tests/bin/makefile_webhook_slack.bats`: 10/10 passed. Python syntax compilation, `git diff --check`, and `_agent_audit` passed.
+- No shell source files changed; ShellCheck is not applicable. Operator Slack live verification remains pending after webhook rollout; this record is not LIVE-VERIFIED.
