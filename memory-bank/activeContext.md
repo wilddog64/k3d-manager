@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD before this investigation update: `0027c322` (`docs: live verify PR checks legend fix`).
+- Current remote HEAD: `fa6410b8` (`docs: record Hostinger incident investigation`).
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -74,4 +74,4 @@ Use the bug docs for acceptance criteria and the archive for historical context;
 - Incident-time M4 frontend and Pushgateway port-forward logs show repeated TCP/6443 timeouts; frontend forwarding resumed around 21:26 UTC. Evidence favors a transient M4-to-Hostinger API path interruption, but does not identify the failing network segment.
 - Hostinger remained up since 2026-10-17, k3s was active, and no incident-window OOM/link/disk journal matches were found. Current read-only checks showed API `/readyz=ok`, node/app/data workloads ready, Vault and `vault-backend` Ready, and public frontend/products HTTP 200.
 - Fresh Hostinger status job `dc9e4089` had 20 OK / 1 fail: only ArgoCD direct password login unavailable; ArgoCD SSO succeeded. Operator `make status` screenshot reported HEALTHY; its hub snapshot was stale, not a live-service failure.
-- Canonical bug remains OPEN: recovered at last check, root cause unconfirmed, ArgoCD direct-login endpoint needs triage. No runtime changes performed. See `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.
+- Canonical Hostinger incident record is OPEN at P2 (downgraded from P1 after recovery); root cause remains unconfirmed and ArgoCD direct-login has an SSO workaround. No runtime changes performed. See `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.

@@ -1,11 +1,11 @@
-# P1: Hostinger multi-service outage — frontend 502, Kubernetes API timeouts, data-layer and ESO degradation
+# Hostinger multi-service outage — frontend 502, Kubernetes API timeouts, data-layer and ESO degradation
 
 **Filed:** 2026-10-20 (operator-approved live incident triage)
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5 (bug; no new plan slot)
 **Status:** OPEN — incident recovered at last check; root cause unconfirmed; ArgoCD direct-login endpoint remains unavailable
-**Priority:** P1 — public frontend unavailable and multiple critical application/data services degraded
-**Severity:** high
+**Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
+**Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
 **Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
 **Component:** `k3s-hostinger` node/control plane, public frontend ingress/port-forward, shopping-cart data layer, Vault/ESO; precise fault domain TBD
 **Affected:** `ubuntu-hostinger`, `https://frontend.3ai-talk.org/`, `shopping-cart-apps`, `shopping-cart-data`, Hostinger `ClusterSecretStore/vault-backend`

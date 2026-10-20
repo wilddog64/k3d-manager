@@ -8,6 +8,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - VPS boot time remained 2026-10-17; k3s was active and no incident-window OOM, link, disk, or I/O kernel journal matches were found. Current API readiness, node/app/data workloads, Vault/ESO readiness, frontend public endpoint, and product API were healthy.
 - Fresh Hostinger status job `dc9e4089` completed with 20 OK / 1 fail. The sole failure was ArgoCD direct password login; ArgoCD SSO passed. Operator `make status` screenshot was overall HEALTHY; its Hub snapshot was 270 minutes old and is separate from live service status.
 - No runtime recovery action was taken. Canonical P1 remains OPEN pending confirmation of the API-path fault domain and separate ArgoCD direct-login triage. Evidence and exact timeline are recorded in `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.
+- After service recovery, downgraded the canonical record from P1 to P2: current degradation has an SSO workaround, but the outage's API-path root cause remains unknown. The original incident severity is retained as historical context in the bug doc.
 
 ## 2026-10-19
 
