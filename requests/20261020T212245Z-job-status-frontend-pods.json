@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "job-status",
+  "args": {
+    "job_id": "88461022"
+  },
+  "requested_by": "chatgpt-cloud",
+  "requested_at": "2026-10-20T21:22:45Z",
+  "expires_at": "2026-10-20T21:52:45Z"
+}
