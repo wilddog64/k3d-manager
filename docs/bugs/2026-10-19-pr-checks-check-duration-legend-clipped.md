@@ -2,9 +2,10 @@
 
 **Filed:** 2026-10-19 (operator screenshots)
 **Branch:** k3d-manager-v1.43.5
-**Status:** VERIFIED — 2026-10-20: the legend is configured as a right-side list; focused dashboard BATS tests pass. Live Grafana verification after sync remains pending.
+**Status:** LIVE-VERIFIED — 2026-10-20: operator screenshot after Argo CD sync shows the multi-series legend fully readable in the right-side list.
 **Priority:** P3
 **Fix commit:** `a5edc7ac`
+**Live evidence:** 2026-10-20 · run operator-screenshot-pr-checks-duration-legend · env hub-grafana · scenario multi-series-check-duration-legend · commit 6385c3c6 · proves fix
 **Severity:** low — the chart remains visible, but some series names cannot be read
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml` panel 8
 **Related:** `docs/bugs/2026-10-19-pr-checks-grafana-tables-misaligned-populated-state.md`
@@ -30,7 +31,7 @@ The operator supplied another live screenshot on 2026-10-20 showing the final le
 
 ## Root cause / investigation status
 
-The likely cause is insufficient panel height for the number of legend rows. The panel has many series and the legend is placed below the plot; the current JSON does not configure a compact or scrollable legend. Confirm the exact Grafana rendering behavior against the deployed panel before choosing the fix.
+The bottom legend exceeded the available panel height for the number of active series. The fix moves the list to the right of the plot. The operator's post-sync screenshot confirms the series names are readable and the chart remains visible.
 
 ## Expected behavior
 
@@ -38,14 +39,14 @@ Every plotted check-duration series remains identifiable. The legend must be ful
 
 ## Acceptance
 
-- [ ] Panel 8 legend is fully readable with the current multi-series PR/check data (operator live verification pending).
+- [x] Panel 8 legend is fully readable with the current multi-series PR/check data.
 - [ ] The chart remains usable with zero, one, and many duration series.
 - [x] The `k3dm_pr_check_duration_seconds` query and `repo` filter remain unchanged.
-- [ ] A live screenshot or rendered panel inspection confirms no legend clipping after sync.
+- [x] The operator's post-sync live screenshot confirms no legend clipping with many series.
 
 ## Offline verification — 2026-10-20
 
 - Dispatched as `pr-checks-legend-clipped`; dispatcher reported `exited successfully`, `scope: in-scope`, and landed commit `a5edc7ac` on `k3d-manager-v1.43.5`.
 - `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats`: 5/5 passed, including the new assertion for a right-side legend and unchanged query/legend format.
 - `shellcheck -x scripts/tests/plugins/grafana_dashboard_pr_checks.bats` and `git diff --check`: clean.
-- The dashboard configuration now places the legend at the right side of panel 8 as a list. This is offline verification only; confirm the rendered panel in Grafana after deployment before closing the live acceptance items.
+- The dashboard configuration places the legend at the right side of panel 8 as a list. Live screenshot evidence confirms the multi-series case; zero- and one-series layouts were not separately exercised.
