@@ -5,6 +5,7 @@
 **Status:** REOPENED — P2 suspected recurrence 2026-10-21 (failure analysis job `aeeeb11f` appears outside parent thread); prior fix `6b324441` was live-verified for a different resume job.
 **Fix commit:** `6b324441`
 **Priority:** P2 — terminal cluster-up failure-analysis thread correlation suspected lost (raised from P3 2026-10-21).
+**Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
 **Evidence:** operator Slack screenshot 2026-10-15 approximately 07:35 PDT, AWS ACG sandbox `cluster-up` job `5f5cff23`
