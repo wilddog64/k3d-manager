@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-21 MinIO and cart-badge bug review/dispatch
+
+- MinIO image-upload bug was already implemented in `shopping-cart-infra` main at `83e8880d6dba22ebe3ffda36f052d7ce870887d7`; no duplicate dispatch was created. Current PostSync uploader manifest has no runtime `pip install`, and `bats scripts/tests/bin/minio-image-upload-job.bats` passed 8/8. Live hook success and product images were recorded earlier; resolved-alert evidence is still outstanding in the bug doc.
+- The cart-badge bug was not already fixed: `Header.handleLogout` only called `signoutRedirect`, and persisted `itemCount` was not keyed to an identity. Dispatched an isolated Codex implementation in `/Users/cliang/.codex/worktrees/bdce/shopping-cart-frontend`, session `01a15e8a-082b-71a1-a06f-d2792259984b`. Candidate changes are limited to Header/useCart and their tests; user-owned untracked documents in the main frontend checkout were left untouched.
+- Independent candidate validation: focused Vitest 11/11, full `npm test` 37/37, `npm run lint` passed, and `git diff --check` passed. `npm run build` failed because the existing dependency installation cannot resolve `@tailwindcss/postcss`; no network install was attempted. Candidate remains uncommitted/unlanded pending full build validation and review. Exact output/follow-up is in `docs/issues/2026-10-21-cart-badge-dispatch-build-dependency-missing.md`.
+
 ## 2026-10-21 Grafana bug dashboard hard refresh
 
 - Applied `kubectl --context k3d-k3d-cluster -n cicd annotate application hub-grafana-dashboards argocd.argoproj.io/refresh=hard --overwrite`; output: `application.argoproj.io/hub-grafana-dashboards annotated`. Verified Argo consumed the annotation; reconciliation at `2026-10-21T12:23:22Z`, `sync=Synced`, `health=Healthy`, `operation=Succeeded`. No sync or manifest change was requested.
