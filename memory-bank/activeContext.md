@@ -113,4 +113,4 @@ Use the bug docs for acceptance criteria and the archive for historical context;
 - Prepared six scoped dispatches from the operator screenshot: hub-data macOS Bats fixture portability, DR freshness diagnostics, Slack multi-job thread targeting, cluster-up thread recurrence triage, expired ACG observability AppSet triage, and Hostinger multi-service incident triage.
 - The last three are explicitly read-only investigations; no Slack API, infrastructure mutation, DR operation, or deployment is authorized. Networked investigations must run one at a time.
 - Older P3 ACG sandbox reaper record is already implemented and is not the P2 `observability-acg` issue in this queue.
-- Dispatch start/verification and commit SHA will be recorded in progress.md.
+- Scope documentation is committed and pushed as `c218ff47`. Five workers were launched, but all report `terminated unexpectedly`; Hostinger triage was blocked by a stale ACG network-task lock. No task was landed. See `docs/issues/2026-10-21-p2-bug-dispatch-worker-exits.md`.
