@@ -2,6 +2,11 @@
 
 Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memory-bank/archive/2026-10-07-to-2026-10-16-compressed.md`; the prior full file remains recoverable from git history.
 
+## 2026-10-21 dispatch vendor/model attribution plan
+
+- Added `docs/plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md` as v1.43.7 plan 2 of 5. It specifies vendor/model provenance per worker attempt and separately for the primary coordinator, backward-compatible unknown handling, bounded dashboard metrics, and regression coverage. It explicitly excludes model routing or automatic selection and establishes this telemetry as a prerequisite to the broader v1.45.1 routing proposal.
+- No runtime code or dashboard was changed. Plan validation: pending.
+
 ## 2026-10-20 Hostinger multi-service P1 investigation
 
 - Read-only diagnosis found repeated M4 frontend/Pushgateway port-forward TCP/6443 timeouts around the outage, followed by forwarding recovery. This supports a transient M4-to-Hostinger Kubernetes API path interruption but does not establish the responsible network segment.

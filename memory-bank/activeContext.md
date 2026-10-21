@@ -55,6 +55,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Verification from latest work
 
+- Drafted v1.43.7 plan `docs/plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md` (plan 2/5): vendor/model provenance per worker attempt plus separate primary coordinator identity; attribution only, no model-routing changes. Depends on the v1.43.7 cross-repo dispatch plan and establishes the identity contract for later routing work.
+
 - `bats scripts/tests/plugins/e2e_sandbox_preflight.bats`: 34/34 passed.
 - `shellcheck scripts/plugins/e2e.sh`: clean.
 - `_agent_audit`: passed.
