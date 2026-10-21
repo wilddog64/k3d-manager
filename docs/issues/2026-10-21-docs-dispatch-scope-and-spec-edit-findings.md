@@ -37,6 +37,16 @@ required elevated filesystem access; no lock or user data was removed.
 [codex-dispatch] ERROR: could not remove stale landing lock
 ```
 
+After pushing commits `2c32ad31` and `802c21c8`, a live GitHub-page fetch was attempted for the
+README, Grafana index, and one standalone dashboard page. The browsing service could not retrieve
+any of the pages, so rendered-page verification remains pending; both bugs remain OPEN.
+
+```text
+Failed to fetch https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.5/README.md: Cache miss
+Failed to fetch https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.5/docs/guides/grafana-dashboards.md: Cache miss
+Failed to fetch https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.5/docs/guides/grafana-dashboards/k3dm-bugs.md: Cache miss
+```
+
 The Grafana status output included:
 
 ```text
