@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — dispatched 2026-10-21; reproduce and trace timestamp propagation; root cause unconfirmed
+**Status:** OPEN — offline lifecycle thread-context fix verified 2026-10-21; live Slack confirmation pending
 **Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
@@ -38,7 +38,15 @@ Trace the **actual async `cluster-up` notification path**, not only `cluster-sta
 - When threading is unavailable, fallback to top-level message is explicit, records a reason, and retains job correlation.
 - No change to cluster provisioning, execution permissions, or AWS resources is required to correct message routing.
 
-**Implementation:** not started.
+## Offline implementation and verification — 2026-10-21
+
+The async lifecycle dispatcher previously copied only `thread_ts` into `cluster-up`, `cluster-down`, and `cluster-resume` child jobs. It did not preserve the parent `channel_id`, `thread_source`, or allowed `response_url`. The shared notifier consequently lacked enough persisted context to reliably address the original channel/thread. The refresh workers also posted directly to `response_url` without passing the saved `thread_ts`.
+
+The implementation now copies the persisted Slack delivery context to lifecycle child jobs and persists request context for direct cluster, refresh, and resume API jobs. Cluster and resume progress and terminal notifications carry the child job ID. Refresh reports use the shared notifier and retain the ID. If a threaded attempt fails, a fallback remains addressed to the saved thread and its delivery record carries a safe reason code; delivery records do not contain response URLs.
+
+Deterministic regression coverage now exercises parent-to-child context for up/down/resume and both refresh variants, actual `chat.postMessage` channel/thread payloads for successive cluster-up start/progress/success and failure notifications, refresh routing when a response URL is present, and redacted fallback diagnostics. The existing status and diagnostics suites remain covered. No AWS or cluster lifecycle operation was run.
+
+Offline source/tests confirm the metadata-loss risk and that the fixed paths retain the intended payload destination. They do not expose raw Slack message metadata, establish the screenshot's exact Slack `thread_ts` placement, verify workspace scopes or channel membership, or prove Slack's rendered response-URL reply behavior. Keep this bug OPEN until the operator confirms a real lifecycle notification remains in the originating Slack thread.
 
 ## Dispatch scope (2026-10-21)
 

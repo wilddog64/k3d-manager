@@ -10,7 +10,6 @@ import traceback
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
-from webhook.render import _slack_post
 from webhook.log import get_logger
 from webhook.failure_notes import write_failure_note
 
@@ -235,7 +234,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
         tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed — job `{job_id}`\n```{tail_text}```")
         try:
             current_count = sum(1 for _ in open(_out_file))
         except OSError:
@@ -273,7 +272,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
         _dry_tag = " — DRY_RUN preview" if dry_run else ""
-        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag}"
+        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag} — job `{job_id}`"
         _notify_job(job_id, summary)
         if not dry_run:
             _push_metrics(action, provider, status, elapsed_secs, job_id)
@@ -374,7 +373,7 @@ def _run_cluster_resume(job_id, provider="aws"):
         elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
         tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed — job `{job_id}`\n```{tail_text}```")
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
@@ -388,7 +387,7 @@ def _run_cluster_resume(job_id, provider="aws"):
         emoji = "✅" if status == "success" else "❌"
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
-        _notify_job(job_id, f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m")
+        _notify_job(job_id, f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m — job `{job_id}`")
         _push_metrics("resume", provider, status, elapsed_secs, job_id)
 
     try:
@@ -429,7 +428,7 @@ def _run_cluster_resume(job_id, provider="aws"):
 def _run_cluster_refresh(job_id, response_url, thread_ts=None):
     """Run bin/cluster-refresh --no-login-prompt; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
-    if thread_ts:
+    if thread_ts and not (job_dir / "thread_ts").exists():
         (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
@@ -443,12 +442,9 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
                       + report[-1800:])
-        output = report
+        output = f"{report.rstrip()}\n\n— job `{job_id}`\n"
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
+        _notify_job(job_id, output)
 
     try:
         _write_log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
@@ -479,7 +475,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
     """Run make refresh for k3s-hostinger (restore kubeconfig + ArgoCD); post result."""
     job_dir = JOB_DIR / job_id
-    if thread_ts:
+    if thread_ts and not (job_dir / "thread_ts").exists():
         (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
@@ -488,12 +484,9 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
+        output = f"{_redact_secrets(''.join(lines)).rstrip()}\n\n— job `{job_id}`\n"
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
+        _notify_job(job_id, output)
 
     try:
         (job_dir / "status").write_text("running")

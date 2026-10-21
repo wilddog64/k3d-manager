@@ -15,6 +15,7 @@ _spec = importlib.util.spec_from_file_location(
 )
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
+_REAL_NOTIFY_JOB = wh._notify_job
 
 
 @pytest.fixture
@@ -153,6 +154,136 @@ def test_direct_make_route_uses_job_id_in_thread_notice_and_response(
     assert started[0][1][0] == job_id
 
 
+@pytest.mark.parametrize(
+    "command",
+    ["cluster-up aws", "cluster-down aws", "cluster-resume aws",
+     "cluster-refresh aws", "cluster-refresh hostinger"],
+)
+def test_lifecycle_children_persist_complete_parent_thread_context(
+    dispatch_env, command
+):
+    _started, _notices = dispatch_env
+    parent = wh.JOB_DIR / "job"
+    (parent / "channel_id").write_text("C-PARENT")
+    (parent / "thread_ts").write_text("1700000000.000001")
+    (parent / "thread_source").write_text("bot")
+    (parent / "response_url").write_text("https://hooks.slack.com/services/test")
+
+    wh._handle_thread_command("job", command, "admin", "C-PARENT")
+
+    child_dirs = [path for path in wh.JOB_DIR.iterdir() if path.name != "job"]
+    assert len(child_dirs) == 1
+    child = child_dirs[0]
+    assert {name: (child / name).read_text() for name in (
+        "channel_id", "thread_ts", "thread_source", "response_url"
+    )} == {
+        "channel_id": "C-PARENT",
+        "thread_ts": "1700000000.000001",
+        "thread_source": "bot",
+        "response_url": "https://hooks.slack.com/services/test",
+    }
+
+
+@pytest.mark.parametrize("exit_status", [0, 256])
+def test_cluster_up_progress_and_terminal_payloads_keep_parent_thread(
+    dispatch_env, monkeypatch, exit_status
+):
+    started, _notices = dispatch_env
+    parent = wh.JOB_DIR / "job"
+    (parent / "channel_id").write_text("C-PARENT")
+    (parent / "thread_ts").write_text("1700000000.000001")
+    (parent / "thread_source").write_text("bot")
+
+    class CaptureThread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            self.target, self.args, self.kwargs = target, args, kwargs or {}
+
+        def start(self):
+            started.append((self.target, self.args, self.kwargs))
+
+    monkeypatch.setattr(wh.threading, "Thread", CaptureThread)
+    wh._handle_thread_command("job", "cluster-up aws", "admin", "C-PARENT")
+    child_id = started[-1][1][0]
+    assert (wh.JOB_DIR / child_id / "channel_id").read_text() == "C-PARENT"
+    assert (wh.JOB_DIR / child_id / "thread_ts").read_text() == "1700000000.000001"
+    payloads = []
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "xoxb-test")
+    monkeypatch.setattr(
+        wh, "_post_slack_bot",
+        lambda text, thread_ts=None, channel_id=None:
+            payloads.append({"text": text, "thread_ts": thread_ts, "channel": channel_id}) or f"{len(payloads)}.0",
+    )
+    wh._notify_job = _REAL_NOTIFY_JOB
+
+    lifecycle_globals = wh._run_cluster.__globals__
+    monkeypatch.setitem(lifecycle_globals, "JOB_DIR", wh.JOB_DIR)
+    monkeypatch.setitem(lifecycle_globals, "_notify_job", _REAL_NOTIFY_JOB)
+    monkeypatch.setitem(lifecycle_globals["_helpers"], "running_cluster_job", lambda: None)
+    monkeypatch.setitem(lifecycle_globals, "_posix_spawn_job", lambda *args, **kwargs: 12345)
+    monkeypatch.setattr(wh.os, "waitpid", lambda pid, options: (pid, exit_status))
+    monkeypatch.setitem(lifecycle_globals, "_run_cleanup", lambda *args: None)
+
+    class OneProgressTimer:
+        count = 0
+
+        def __init__(self, _interval, callback):
+            self.callback = callback
+            self.index = OneProgressTimer.count
+            OneProgressTimer.count += 1
+
+        def start(self):
+            if self.index == 0:
+                self.callback()
+
+        def cancel(self):
+            return None
+
+    monkeypatch.setattr(wh.threading, "Timer", OneProgressTimer)
+    wh._run_cluster(child_id, "up", "aws", dry_run=True)
+
+    assert len(payloads) == (3 if exit_status == 0 else 4)
+    assert all(payload["channel"] == "C-PARENT" for payload in payloads)
+    assert all(payload["thread_ts"] == "1700000000.000001" for payload in payloads)
+    assert all(f"job `{child_id}`" in payload["text"] for payload in payloads)
+    assert "still running" in payloads[1]["text"]
+    terminal = payloads[-1]["text"]
+    assert ("success" if exit_status == 0 else "failed") in terminal
+
+
+@pytest.mark.parametrize("worker_name", ["_run_cluster_refresh", "_run_hostinger_refresh"])
+def test_refresh_worker_prefers_saved_thread_even_with_response_url(
+    monkeypatch, tmp_path, worker_name
+):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "xoxb-test")
+    job_dir = tmp_path / "refresh01"
+    job_dir.mkdir()
+    (job_dir / "channel_id").write_text("C-PARENT")
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "thread_source").write_text("bot")
+    (job_dir / "response_url").write_text("https://hooks.slack.com/services/test")
+    payloads = []
+    monkeypatch.setattr(
+        wh, "_post_slack_bot",
+        lambda text, thread_ts=None, channel_id=None:
+            payloads.append({"text": text, "thread_ts": thread_ts, "channel": channel_id}) or "1710000000.000001",
+    )
+    lifecycle_globals = getattr(wh, worker_name).__globals__
+    monkeypatch.setitem(lifecycle_globals, "JOB_DIR", tmp_path)
+    monkeypatch.setitem(lifecycle_globals, "_notify_job", _REAL_NOTIFY_JOB)
+    monkeypatch.setitem(lifecycle_globals, "_posix_spawn_capture", lambda *args, **kwargs: ("__WEBHOOK_SUCCESS__", False))
+    if worker_name == "_run_cluster_refresh":
+        monkeypatch.setitem(lifecycle_globals, "_acg_stack_probe", lambda _provider: None)
+
+    getattr(wh, worker_name)("refresh01", "https://hooks.slack.com/services/test",
+                             thread_ts="1700000000.000001")
+
+    assert len(payloads) == 1
+    assert payloads[0]["channel"] == "C-PARENT"
+    assert payloads[0]["thread_ts"] == "1700000000.000001"
+    assert "job `refresh01`" in payloads[0]["text"]
+
+
 def test_notification_failure_logs_safe_reason_code(monkeypatch, tmp_path, caplog):
     import logging
 
@@ -168,6 +299,39 @@ def test_notification_failure_logs_safe_reason_code(monkeypatch, tmp_path, caplo
     assert delivered is False
     assert "reason=not_delivered" in caplog.text
     assert "private command payload" not in caplog.text
+
+
+def test_thread_delivery_fallback_records_redacted_reason_and_keeps_parent(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "xoxb-test")
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    (job_dir / "channel_id").write_text("C-PARENT")
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "thread_source").write_text("bot")
+    (job_dir / "response_url").write_text("https://hooks.slack.com/services/private-token")
+    fallback_calls = []
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: "")
+    monkeypatch.setattr(
+        wh, "_slack_post",
+        lambda url, text, thread_ts=None:
+            fallback_calls.append((url, text, thread_ts)) or True,
+    )
+
+    assert wh._notify_job("job", "✅ lifecycle complete — job `job`") is True
+
+    assert fallback_calls == [(
+        "https://hooks.slack.com/services/private-token",
+        "✅ lifecycle complete — job `job`",
+        "1700000000.000001",
+    )]
+    delivery = json.loads((job_dir / "delivery.jsonl").read_text().splitlines()[-1])
+    assert delivery["route"] == "response_url"
+    assert delivery["thread_ts"] == "1700000000.000001"
+    assert delivery["reason"] == "thread_post_rejected"
+    assert "private-token" not in (job_dir / "delivery.jsonl").read_text()
 
 
 def test_kill_still_dispatches(dispatch_env, monkeypatch):

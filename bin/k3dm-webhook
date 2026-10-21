@@ -700,6 +700,27 @@ def _thread_ts_for_job(job_id):
     return path.read_text().strip() if path.exists() else None
 
 
+def _copy_thread_context(parent_job_id, child_job_id, channel_id=""):
+    """Persist the parent's Slack delivery context on an async child job."""
+    child_dir = JOB_DIR / child_job_id
+    for name in ("channel_id", "thread_ts", "thread_source", "response_url"):
+        value = _read_job_value(parent_job_id, name)
+        if name == "channel_id" and not value:
+            value = (channel_id or "").strip()
+        if value:
+            (child_dir / name).write_text(value)
+
+
+def _persist_notification_context(job_id, *, channel_id="", thread_ts="",
+                                 thread_source="", response_url=""):
+    """Save only the Slack delivery fields supplied by a trusted route."""
+    job_dir = JOB_DIR / job_id
+    for name, value in (("channel_id", channel_id), ("thread_ts", thread_ts),
+                        ("thread_source", thread_source), ("response_url", response_url)):
+        if value:
+            (job_dir / name).write_text(str(value).strip())
+
+
 def _parse_thread_diagnose(command):
     """Parse the Slack bare-message form of /cluster-diagnose."""
     parts = command.strip().lstrip("/").split()
@@ -935,6 +956,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         (new_job_dir / "status").write_text("queued")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _copy_thread_context(job_id, new_job_id, channel_id)
         _refresh_parts = command.strip().split()
         _refresh_provider = _refresh_parts[1].lower() if len(_refresh_parts) >= 2 and _refresh_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         threading.Thread(
@@ -952,6 +974,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         (new_job_dir / "status").write_text("queued")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster_refresh,
             args=(new_job_id, ""),
@@ -973,8 +996,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("resume")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster_resume,
             args=(new_job_id, _resume_provider),
@@ -994,8 +1016,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("down")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "down", _down_provider),
@@ -1032,8 +1053,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("up")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
@@ -1236,14 +1256,20 @@ def _notify_job(job_id, text):
         if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
             route = "bot_thread"
             posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+            if not posted:
+                failure = "thread_post_rejected"
         if not posted and response_url:
             route = "response_url"
             posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
+            if not posted:
+                failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
         # A configured default channel cannot safely receive a reply whose
         # originating Slack channel is unknown. Preserve the requested thread.
         if not posted and SLACK_BOT_TOKEN and (channel_id or (not thread_ts and SLACK_CHANNEL_ID)):
             route = "bot_fallback"
             ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id or SLACK_CHANNEL_ID)
+            if not ts:
+                failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
             if ts and not thread_ts:
                 thread_ts_file.write_text(ts)
             posted = bool(ts)
@@ -1252,6 +1278,8 @@ def _notify_job(job_id, text):
         if not posted and SLACK_WEBHOOK_URL and not thread_ts:
             route = "webhook_fallback"
             posted = bool(_slack_post(SLACK_WEBHOOK_URL, text))
+            if not posted:
+                failure = "delivery_rejected"
     except Exception as exc:
         failure = type(exc).__name__
         _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
@@ -1261,7 +1289,10 @@ def _notify_job(job_id, text):
     if not posted:
         _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
                      job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
-    _record_notification_delivery(job_id, route, intended_channel, thread_ts, posted, failure if not posted else "")
+    _record_notification_delivery(
+        job_id, route, intended_channel, thread_ts, posted,
+        failure if failure != "not_delivered" else "",
+    )
     return posted
 
 
@@ -2391,6 +2422,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text(action)
+            _persist_notification_context(
+                job_id, channel_id=body.get("channel_id", ""),
+                thread_ts=body.get("thread_ts", ""), response_url=response_url,
+            )
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(
@@ -2457,9 +2492,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            _persist_notification_context(job_id, channel_id=channel_id,
+                                         thread_ts=thread_ts or "", response_url=response_url)
             threading.Thread(
                 target=_run_hostinger_refresh if provider == "hostinger" else _run_cluster_refresh,
                 args=(job_id, response_url),
@@ -2478,12 +2516,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
+            channel_id = body.get("channel_id", "")
+            thread_ts = body.get("thread_ts", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text("resume")
-            if response_url:
-                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            _persist_notification_context(job_id, channel_id=channel_id,
+                                         thread_ts=thread_ts, response_url=response_url)
             threading.Thread(
                 target=_run_cluster_resume,
                 args=(job_id, provider),
