@@ -1,6 +1,6 @@
 # Bug: Slack smoke command cannot specify an ArgoCD target
 
-**Status:** VERIFIED — explicit Slack target selector is allowlisted and validated; operator live verification pending
+**Status:** LIVE-VERIFIED — Slack smoke accepted the explicit Hostinger target and passed
 **Priority:** P2
 **Filed:** 2026-10-21
 **Detected by:** operator Slack live verification, job `a3d1097b`
@@ -57,7 +57,15 @@ regression tests, and documentation.
 - `python3 -m unittest scripts.tests.bin.webhook_make_targets`: **39 tests passed**.
 - `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_cloud_bridge.py`: **83 passed**.
 - The dispatcher's land gate reran both commands successfully; commit hook `_agent_audit` passed.
-- No live Slack/webhook verification was performed. After deploying/restarting the webhook, run
-  `/k3dm smoke ARGOCD_APP_PREFIX=<chosen-target-prefix>` (for example,
-  `ARGOCD_APP_PREFIX=ubuntu-hostinger-` or `ubuntu-k3s-`) and confirm the intended single target is
-  checked. Without an explicit selector, the existing fail-closed behavior must remain.
+- Before operator live verification, no live Slack/webhook check had been performed.
+
+## Live verification
+
+**Fix commit:** 611bc1f8
+**Live evidence:** 2026-10-20 · run c4a9465f · env ubuntu-hostinger · scenario slack-smoke-explicit-prefix-passed-2-of-2 · commit 4a8aeaae · proves fix
+
+- Operator ran `/k3dm smoke ARGOCD_APP_PREFIX=ubuntu-hostinger-` after the webhook restart.
+- Slack job `c4a9465f` showed queued, started, and succeeded notices with the selector; terminal
+  output reported `webhook offline PASS`, `cluster-health cluster PASS`, and `smoke: 2 passed, 0 failed, 0 skipped`.
+- This verifies the explicit-prefix path for `ubuntu-hostinger-`; it does not separately live-test
+  `ubuntu-k3s-` or the no-prefix ambiguity path (whose fail-closed behavior remains covered offline).

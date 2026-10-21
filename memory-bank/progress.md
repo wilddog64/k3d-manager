@@ -57,7 +57,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-21 Slack smoke target selection
 
 - After webhook restart, operator Slack job `a3d1097b` showed the `[TARGET] expected exactly one shopping-cart target, found 2` diagnostic with both candidate apps and destinations. This live-verifies the reporting fix; the smoke gate correctly remains failed because it must not choose a cluster implicitly.
-- Filed P2 `docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`: Slack currently permits only `SMOKE_ONLY` for smoke, preventing an explicit `ARGOCD_APP_PREFIX` selection. Dispatched as `slack-smoke-target-override`; dispatcher reports `running`, scope `in-scope`. No cluster behavior or target-selection default is being changed. Evidence commit `f39bd0e2` is pushed.
+- Filed P2 `docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`: Slack initially permitted only `SMOKE_ONLY` for smoke, preventing an explicit `ARGOCD_APP_PREFIX` selection. Fix landed as `611bc1f8`, then operator live-verified `/k3dm smoke ARGOCD_APP_PREFIX=ubuntu-hostinger-` with job `c4a9465f`; output reported offline PASS, cluster PASS, and 2 passed / 0 failed / 0 skipped. Bug is LIVE-VERIFIED. Evidence status commit `4a8aeaae` recorded the other dispatch bug; this live evidence is being recorded now. No default target behavior changed.
 
 ## 2026-10-21 Dispatch dashboard historical metrics
 
