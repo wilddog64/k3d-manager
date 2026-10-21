@@ -17,6 +17,10 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Fix landed on `k3d-manager-v1.43.5` as `abb0a526`; test follow-up is `cb7f37dc`. Bug is VERIFIED offline; awaiting operator Slack live verification after webhook rollout. No live E2E or infrastructure action was performed.
 - Operator Slack live attempt `/make test-all`, job `be53f685`, showed queued, started, progress, and terminal failure notices without IDs; `logs` returned the transcript with the job ID. The command ended rc 2: 1,747 tests, 56 failed. Test 1171 reproduced the tracked macOS `sha256sum` fixture failure; the other failures were not triaged. LaunchAgent plist points at the updated checkout, but process state is unconfirmed. Kept the bug VERIFIED (not LIVE-VERIFIED), updated `docs/bugs/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md` and the related macOS fixture bug. The plist diagnostic accidentally emitted stored Slack credentials into tool output; values were not copied into the repo, and rotation is recommended.
 
+## 2026-10-20 Slack Make test-all follow-up
+
+- Slack job `c30366d6` completed. Queued, started, progress, and terminal-failure messages consistently included the ID, confirming live lifecycle-notice propagation. The run ended rc 2 (1,747 cases, 56 failed); the tracked macOS `sha256sum` fixture failure recurred and 55 other failures were not triaged. Explicit `logs c30366d6` lookup was not exercised, so the bug remains VERIFIED, not LIVE-VERIFIED. Evidence is recorded in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.

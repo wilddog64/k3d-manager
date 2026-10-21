@@ -1,7 +1,7 @@
 # Slack Make job acknowledgements and status notices omit the job ID inconsistently
 
 **Filed:** 2026-10-20 (operator-reported live Slack run)
-**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Slack live attempt `be53f685` still showed queued/started notices without IDs; webhook rollout state is unconfirmed, so retest after restart. Not LIVE-VERIFIED.
+**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Follow-up Slack run `c30366d6` showed the same ID in queued, started, progress, and terminal-failure notices. Explicit `logs c30366d6` retrieval is still unverified, so not LIVE-VERIFIED.
 **Priority:** P2 — job execution continues, but operators may not be able to correlate or request its logs by ID; bare `logs` is a workaround
 **Branch:** `k3d-manager-v1.43.5`
 **Fix commit:** `abb0a526`
@@ -50,6 +50,8 @@ Do not change Make job authorization, log retention, cluster execution, or AWS p
 - `scripts/lib/webhook/lifecycle.py::_run_make_target` sends started, timed progress, and terminal notices without including the ID already passed as `job_id`.
 
 ## Verification
+
+- Follow-up live Slack run `c30366d6` (2026-10-20): queued, started, 2-minute progress, and terminal-failure notices all included the same ID. The command exited 2 (1,747 cases, 56 failed); the known macOS `sha256sum` fixture issue recurred. Explicit `logs c30366d6` retrieval has not been tested, so status remains VERIFIED rather than LIVE-VERIFIED. Details are in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
 
 - Fix landed on `k3d-manager-v1.43.5` as `abb0a526`; deterministic progress/failure regression coverage follow-up is `cb7f37dc`.
 - `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/webhook_lifecycle.py`: 26 passed. Coverage includes direct `/make` queued ID/response/directory consistency, `/k3dm` queued format, explicit and bare logs behavior, and started/progress/success/failure/timeout notices.

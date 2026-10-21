@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-20
 **Related bug:** `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`
-**Result:** Live notice check failed; full test command exited nonzero, so no live pass
+**Result:** First live notice check failed; follow-up job `c30366d6` showed IDs in queued, started, progress, and terminal-failure notices. Full test command exited nonzero (1,747 cases, 56 failed); explicit `logs <job-id>` retrieval was not tested on this follow-up, so end-to-end live verification remains partial.
 
 ## What was tested
 
@@ -38,6 +38,45 @@ make: *** [test-all] Error 2
 ````
 
 The `sha256sum` fixture failure is already tracked in `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md`. Other failures remain untriaged; the captured local transcript is `scratch/test-logs/all/20261020-170156.log`.
+
+## Follow-up live run: `c30366d6`
+
+The operator reran `/make test-all` in the same Slack conversation. Read-only inspection confirmed the same job ID in every lifecycle notice emitted by this run:
+
+```text
+:hammer_and_wrench: *make test-all* queued — job `c30366d6`
+:hammer_and_wrench: *make test-all* started by slack-thread:U4C9LDQP2 — job `c30366d6`
+:hourglass_flowing_sand: *make test-all* still running — 2m elapsed — job `c30366d6`
+:x: *make test-all* failed (rc 2) — job `c30366d6`
+```
+
+The local job status became `failed`. Verbatim ending:
+
+````text
+Test log saved to scratch/test-logs/all/20261020-171339.log
+Collected artifacts in scratch/test-logs/all/20261020-171339
+[tripwire] blocked 430 call(s) to host tools; none reached a real binary:
+  84 kubectl --context ubuntu-k3s --request-timeout=5s get --raw=/readyz
+  84 kubectl --context ubuntu-hostinger --request-timeout=5s get --raw=/readyz
+  84 kubectl --context ubuntu-gcp --request-timeout=5s get --raw=/readyz
+  84 kubectl --context ubuntu-azure --request-timeout=5s get --raw=/readyz
+  37 security find-generic-password -s k3dm-webhook-token-reader -a k3dm -w
+  37 security find-generic-password -s k3dm-webhook-token-cloud-runner -a k3dm -w
+  7 gh auth token
+  5 aws cloudformation describe-stacks --region us-west-2 --stack-name k3d-manager-cluster --query Stacks[0].StackStatus --output text
+  4 launchctl list com.k3d-manager.acg-watch
+  1 security find-generic-password -s platform-ops-git-writer -a k3dm -w
+  1 security find-generic-password -s platform-ops-app-rebuild -a k3dm -w
+  1 security find-generic-password -s k3dm-webhook-token -a k3dm -w
+  1 kubectl config get-contexts ubuntu-k3s
+make[1]: *** [test] Error 1
+[k3dm-test-metrics] 1747 cases, 56 failed
+[k3dm-test-metrics] metrics pushed: test-all/local
+[test-all] metrics log: /var/folders/nc/y0_fv7412472dpg2z7y0yq5w0000gn/T//k3dm-test-all-1792541619.log
+make: *** [test-all] Error 2
+````
+
+The known macOS fixture failure recurred (`scripts/tests/plugins/hub_data.bats: line 126: sha256sum: command not found`). The full transcript is `scratch/test-logs/all/20261020-171339.log`; the other 55 failures were not triaged. An explicit `logs c30366d6` lookup was not run, so live verification remains partial despite lifecycle ID propagation working.
 
 ## Diagnostics and actual output
 
