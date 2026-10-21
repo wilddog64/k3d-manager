@@ -72,6 +72,17 @@ EOF
   [[ "$output" != *"abc123"* ]]
 }
 
+@test "smoke: target selection failure includes bounded candidate context" {
+  CLUSTER_OUTPUT=$'[TARGET] expected exactly one shopping-cart target, found 2\n  ubuntu-hostinger-shopping-cart-basket -> ubuntu-hostinger\n  ubuntu-k3s-shopping-cart-basket -> ubuntu-k3s\n/Users/user/bin/smoke-test-cluster-health command failed (2)\nERROR: failed to execute /Users/user/bin/smoke-test-cluster-health: 2\n' CLUSTER_RC=1 run smoke_run cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"smoke_check_failed: 1 cluster-health failure(s)"* ]]
+  [[ "$output" == *"[TARGET] expected exactly one shopping-cart target, found 2"* ]]
+  [[ "$output" == *"ubuntu-hostinger-shopping-cart-basket -> ubuntu-hostinger"* ]]
+  [[ "$output" == *"ubuntu-k3s-shopping-cart-basket -> ubuntu-k3s"* ]]
+  [[ "$output" != *"command failed"* ]]
+  [[ "$output" != *"diagnostics_unavailable"* ]]
+}
+
 @test "smoke: missing failure details are reported as unavailable" {
   CLUSTER_RC=1 run smoke_run cluster
   [ "$status" -ne 0 ]

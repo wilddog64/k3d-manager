@@ -33,19 +33,28 @@ function _smoke_execute() {
 }
 
 function _smoke_failure_excerpt() {
-  local _log="$1" _line _count=0 _shown=0
+  local _log="$1" _line _count=0 _shown=0 _include_context=0
   if [[ ! -f "$_log" || ! -r "$_log" ]]; then
     printf '  diagnostics_unavailable: cluster-health log is missing or unreadable. Check the smoke job transcript with /k3dm logs <job-id>.\n'
     return
   fi
-  _count="$(grep -cE '^[[:space:]]*\[FAIL\]' "$_log" 2>/dev/null || true)"
+  _count="$(grep -cE '^[[:space:]]*\[(FAIL|TARGET)\]' "$_log" 2>/dev/null || true)"
   if [[ "$_count" -eq 0 ]]; then
-    printf '  diagnostics_unavailable: no [FAIL] details found in cluster-health log. Check /k3dm logs <job-id> for the full smoke transcript.\n'
+    printf '  diagnostics_unavailable: no [FAIL] or [TARGET] details found in cluster-health log. Check /k3dm logs <job-id> for the full smoke transcript.\n'
     return
   fi
   printf '  smoke_check_failed: %s cluster-health failure(s)\n' "$_count"
   while IFS= read -r _line; do
-    [[ "$_line" == *'[FAIL]'* ]] || continue
+    if [[ "$_line" =~ ^[[:space:]]*\[TARGET\] ]]; then
+      _include_context=1
+    elif [[ "$_line" =~ ^[[:space:]]+[^[:space:]] ]] && [[ "$_include_context" -eq 1 ]]; then
+      :
+    elif [[ "$_line" =~ ^[[:space:]]*\[FAIL\] ]]; then
+      _include_context=0
+    else
+      _include_context=0
+      continue
+    fi
     _line="$(printf '%s' "$_line" | LC_ALL=C tr -cd '\11\12\15\40-\176' | sed -E 's/(token|password|secret|api[_-]?key|authorization)([[:space:]]*[:=][[:space:]]*|[[:space:]]+)[^[:space:]]+/\1=[REDACTED]/Ig; s/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig')"
     printf '  %s\n' "${_line:0:240}"
     _shown=$((_shown + 1))
