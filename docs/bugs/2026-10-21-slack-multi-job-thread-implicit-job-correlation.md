@@ -4,8 +4,10 @@
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Priority:** P2 — ChatOps job correlation / diagnostics reliability
-**Status:** VERIFIED — follow-up landed in `66a4dcdd`; explicit-target thread delivery context is covered by focused regressions.
-**Verification:** Offline verified 2026-10-21: focused pytest 48/48, Python AST parse, `_agent_audit`, `_agent_lint`, and `git diff --check` passed. LIVE-VERIFICATION PENDING after deployment; the prior operator live check failed before this follow-up.
+**Status:** LIVE-VERIFIED — follow-up landed in `66a4dcdd`; operator confirmed exact-job `logs` and `status` replies in a Slack thread.
+**Verification:** Offline verified 2026-10-21: focused pytest 48/48, Python AST parse, `_agent_audit`, `_agent_lint`, and `git diff --check` passed. Live-verified from the operator's 2026-10-21 screenshot showing `logs fb7db078` returning that job's last 20 lines and `status fb7db078` returning `Job fb7db078 status: failed`, both in the originating thread. The job's failure is its diagnostic result, not a failure of reply routing.
+**Fix commit:** `66a4dcdd`
+**Live evidence:** 2026-10-21 · run fb7db078 · env slack/acg-automation · scenario explicit-logs-and-status-thread-reply · commit 66a4dcdd · proves fix
 **Approval:** operator authorized dispatch of a scoped follow-up fix on 2026-10-21; no additional Slack messages, live job tests, deployment, or PR are authorized without operator approval
 **Component:** Slack Events API thread routing, thread-to-job selection, implicit `logs`/`status`/`diagnosis`/`kill` semantics
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (FIXED / LIVE-VERIFIED 2026-10-20; do not regress); `docs/bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md` (LIVE-VERIFIED 2026-10-21); `docs/bugs/2026-10-02-cluster-status-report-not-threaded.md` (FIXED); `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`.
@@ -16,7 +18,9 @@ Follow-up live check on 2026-10-21: in the thread containing `cluster-status` jo
 
 Source review found that the explicit-target path switches notification delivery from the parent thread anchor to the target job directory. The parent context has the Slack channel ID, while status workers persist the target job's thread timestamp but do not persist its channel ID. `_notify_job()` requires channel/thread context to post a bot-thread reply. Follow-up spec: `docs/issues/2026-10-21-slack-explicit-target-reply-context-spec.md`.
 
-The follow-up copies the validated parent delivery context to the explicit target before responding; commit `66a4dcdd`. Regression tests confirm successful explicit `status`/`logs` replies inherit the thread/channel fields and cross-channel targets are still rejected. Operator should repeat the exact-ID Slack check only after this commit is deployed.
+The follow-up copies the validated parent delivery context to the explicit target before responding; commit `66a4dcdd`. Regression tests confirm successful explicit `status`/`logs` replies inherit the thread/channel fields and cross-channel targets are still rejected.
+
+Operator live verification subsequently succeeded: in the thread, `logs fb7db078` returned the target job's output and `status fb7db078` returned the same job's status. Both replies were visible in-thread. The job itself was `failed` because its `make test-all` run had 53 test failures; this does not invalidate the routing check.
 
 In Slack channel `#acg-automation` on 2026-10-21 (PDT), a `make fix-list` job `cc07714e` created parent thread `1792585073.083669`. Multiple subsequent independent commands intentionally shared this thread:
 
