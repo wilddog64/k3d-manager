@@ -1,7 +1,7 @@
 # Bug: MinIO image-upload PostSync hook installs Pillow from PyPI on every run and can hang for a day
 
 **Filed:** 2026-10-18 (Claude, from the operator's Oct 17 KubeJobFailed alert email on ubuntu-hostinger)
-**Status:** OPEN
+**Status:** VERIFIED — fix landed in `shopping-cart-infra` main as `83e8880d6dba22ebe3ffda36f052d7ce870887d7`; focused offline suite passed 8/8. LIVE-VERIFIED remains pending confirmation that the KubeJobFailed alert resolved.
 **Priority:** P3 — a failed seed hook leaves the data-layer app OutOfSync and a KubeJobFailed alert firing; product images already in MinIO keep serving
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "you can open a P3 bug base on what you discovered"
@@ -123,10 +123,10 @@ interface:
 - [x] Step 1 (F1–F4) on `fix/minio-uploader-image` in `shopping-cart-infra`; only
       `data-layer/minio/uploader/Dockerfile`, `.github/workflows/minio-uploader-image.yml`,
       `data-layer/minio/image-upload-job.yaml` and a test file changed.
-- [ ] Step 1 tests: M3, M4 and N2 green, N2 red on the pre-fix manifest; the workflow passes `actionlint`
+- [x] Step 1 tests: M3, M4 and N2 green, N2 red on the pre-fix manifest; the workflow passes `actionlint`
       if available, otherwise a YAML parse plus the assertions in F2.
-- [ ] Step 2 (F5) after the first signed publish: M1, M2, N1 green, N1 red on the pre-fix manifest.
-- [ ] Each step pushed; report the SHA.
+- [x] Step 2 (F5) after the first signed publish: M1, M2, N1 green, N1 red on the pre-fix manifest.
+- [x] Each step pushed; fix landed on `shopping-cart-infra` main at `83e8880d6dba22ebe3ffda36f052d7ce870887d7`.
 
 ## What NOT to Do
 
@@ -145,3 +145,5 @@ and KubeJobFailed resolved.
 - 2026-10-18 (operator screenshot): the storefront Products page shows the generated product images
   (coloured tiles with the product name) for all 8 visible products. Remaining for E2: the
   KubeJobFailed RESOLVED email.
+
+**Offline verification 2026-10-21:** `bats scripts/tests/bin/minio-image-upload-job.bats` passed 8/8 against the landed `shopping-cart-infra` fix. The manifest pins the uploader and init images by tag and digest, removes runtime package installation, and bounds the Job with `activeDeadlineSeconds: 600`. This verifies the fix offline; it does not satisfy the remaining live alert-resolution criterion.
