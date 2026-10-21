@@ -4,6 +4,7 @@
 
 - Independently verified `slack-multi-job-thread-targeting-p2`: focused dispatch and broadcast tests pass 45/45; AST parse, `git diff --check`, and `_agent_audit` pass. Task commit `612aa63b` was rebased and landed locally as `6c6cbd0b` on `k3d-manager-v1.43.5`. Canonical bug marked VERIFIED offline; do not mark LIVE-VERIFIED until operator tests deployed webhook behavior. A broader related run had 49 passed / 1 failed in the separate `test_webhook_ask_docs_thread.py` notification stub. Push of the release branch remains pending.
 - Dispatcher false “terminated unexpectedly” status was caused by sandbox-denied `ps`; read-only elevated status confirmed task workers were active/completed. Recorded investigation and follow-up in `docs/issues/2026-10-21-p2-bug-dispatch-worker-exits.md`.
+- Operator's live screenshot showed no response to explicit `status 76933b92`; parent bug returned to OPEN and records live verification failure. Follow-up scope `docs/issues/2026-10-21-slack-explicit-target-reply-context-spec.md` was dispatched as `slack-explicit-target-reply-context` after commits `92050837` (bug update/spec) and `fc40d402` (required Files heading). Source suggests target replies may lack persisted channel context; follow-up worker must verify this with regression tests. No Slack messages or deployment performed.
 
 ## 2026-10-21 review of two Slack command bugs
 
