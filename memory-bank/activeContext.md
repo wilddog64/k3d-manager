@@ -13,7 +13,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Latest live investigations and records
 
-- Three P3 documentation bugs were authorized for sequential Codex dispatch on 2026-10-21: README/Hermes duplication, the monolithic Grafana dashboards guide, and GitHub rendering failure for CVE/Trivy architecture guides. The third remains investigation-first; no speculative source edits. Dispatch queue is pending task starts.
+- Three P3 documentation bugs were dispatched sequentially on 2026-10-21. README/Hermes and Grafana guide tasks exited successfully with offline checks passing; their uncommitted isolated-worktree changes await independent review and live GitHub rendering. The networked CVE/Trivy investigation found both pages currently render via GitHub HTTP 200; it made no lasting source changes, and the bug remains OPEN pending the operator's browser check. Dispatch findings: `docs/issues/2026-10-21-docs-dispatch-scope-and-spec-edit-findings.md`.
 
 - Hostinger node outage: operator-provided support response attributes the 2026-10-17 17:46:15 UTC shutdown to emergency security-patch maintenance, consistent with the guest QEMU-agent log. Added a typed investigation-only evidence path to the LIVE-VERIFIED gate, with boundary tests; the bug is now `LIVE-VERIFIED`. Internal actor/job ID remains unavailable.
 

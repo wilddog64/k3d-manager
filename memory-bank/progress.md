@@ -2,7 +2,9 @@
 
 ## 2026-10-21 documentation bug dispatch queue
 
-- Reviewed P3 bugs for the duplicate README Hermes section, monolithic Grafana dashboards guide, and CVE/Trivy GitHub rendering failure. Operator authorized implementation/investigation dispatch. Updated each bug's Approval record; added the affected Trivy guide to the CVE investigation file scope, with source edits contingent on a reproducible document-specific cause. Tasks will be dispatched sequentially.
+- Reviewed P3 bugs for README/Hermes duplication, the monolithic Grafana guide, and CVE/Trivy GitHub rendering failure; pushed the authorization/scope update as `b05ccf6c`.
+- Dispatched sequentially: `readme-hermes-operations-deduplicate` exited successfully; `grafana-dashboard-guide-split` exited successfully; networked `cve-guide-github-render-investigation` exited successfully. First two worktrees contain uncommitted changes and need independent review; no task was landed. Their offline checks and live-rendering caveats are in the dispatch logs.
+- CVE/Trivy and representative pages currently return GitHub HTTP 200 with rendered Markdown; no browser-session reproduction, so its bug remains OPEN. The worker's attempted edit to its own spec was removed. Scope findings recorded in `docs/issues/2026-10-21-docs-dispatch-scope-and-spec-edit-findings.md`.
 
 ## 2026-10-20 Hostinger provider evidence and investigation verification path
 
