@@ -235,7 +235,7 @@ docs/
 - **[App-cluster registration](docs/guides/app-cluster-registration.md)** — Hub registration durability, reconciliation, and registration-gap triage
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
 - **[vCluster E2E Harness](docs/guides/vcluster-e2e-harness.md)** — Both tiers of the e2e verification harness: Tier 1 (`e2e_verify_vcluster`) stands up the shopping-cart stack in a throwaway vCluster, runs Playwright as an in-cluster Job and emits an exit-code-faithful pass/fail for the v1.26.0 promotion gate; Tier 2 (`e2e_verify_sandbox`) is the opt-in ACG sandbox Stripe flow
-- **[Grafana Dashboards](docs/guides/grafana-dashboards.md)** — All seven shipped dashboards: panel-by-panel meaning, which producer feeds each series (exporter / Pushgateway / promtail / trivy-operator), and a `No data`-by-cause triage table
+- **[Grafana Dashboards](docs/guides/grafana-dashboards.md)** — Dashboard inventory, per-dashboard references, producer provenance, and `No data` triage
 - **[Vector Store](docs/guides/vector-store.md)** — The pgvector prior-art store: what is embedded and why it is ~3% of each file, the content-hash keying that makes a re-run free, the two Gemini quotas and why only one can be paced around, the rebuildable-cache stance, and credential resolution across env / keychain / hub Vault
 - **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
 - **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
