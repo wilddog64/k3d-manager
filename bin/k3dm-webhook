@@ -785,6 +785,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         if error:
             _notify_job(delivery_job_id, error)
             return
+        _copy_thread_context(delivery_job_id, target_id, channel_id)
         job_id = target_id
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)

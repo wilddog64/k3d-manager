@@ -381,6 +381,47 @@ def test_status_explicit_id_resolves_once_and_ignores_mtime(dispatch_env):
     assert notices == ["ℹ️ *Job `aabbccdd`* status: `running`"]
 
 
+@pytest.mark.parametrize("command", ["status aabbccdd", "logs aabbccdd"])
+def test_explicit_target_reply_inherits_parent_delivery_context(dispatch_env, command):
+    _started, notices = dispatch_env
+    anchor = wh.JOB_DIR / "job"
+    (anchor / "thread_ts").write_text("THREAD")
+    (anchor / "channel_id").write_text("C1")
+    (anchor / "thread_source").write_text("bot")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "thread_ts").write_text("THREAD")
+    (target / "status").write_text("running")
+    (target / "make.log").write_text("child output")
+
+    wh._handle_thread_command("job", command, "reader", "C1")
+
+    assert (target / "channel_id").read_text() == "C1"
+    assert (target / "thread_ts").read_text() == "THREAD"
+    assert (target / "thread_source").read_text() == "bot"
+    assert len(notices) == 1
+
+
+def test_logs_rejects_cross_channel_explicit_id_through_parent(dispatch_env, monkeypatch):
+    _started, notices = dispatch_env
+    deliveries = []
+    monkeypatch.setattr(wh, "_notify_job", lambda job_id, text: deliveries.append((job_id, text)))
+    anchor = wh.JOB_DIR / "job"
+    (anchor / "thread_ts").write_text("THREAD")
+    (anchor / "channel_id").write_text("C1")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "thread_ts").write_text("THREAD")
+    (target / "channel_id").write_text("C2")
+    (target / "make.log").write_text("secret child output")
+
+    wh._handle_thread_command("job", "logs aabbccdd", "reader", "C1")
+
+    assert deliveries[0][0] == "job"
+    assert "not in this Slack channel" in deliveries[0][1]
+    assert "secret child output" not in deliveries[0][1]
+
+
 def test_unknown_word_still_gets_unknown_reply(dispatch_env):
     _started, notices = dispatch_env
 
