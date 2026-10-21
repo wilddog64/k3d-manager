@@ -57,6 +57,14 @@ bug-dashboard link bug, not the CVE architecture guide rendering issue. Reopened
 record and noted that the offline fix `2036253f` still needs live dashboard deployment/interpolation
 verification.
 
+The first dispatch start attempt could not fetch the release branch in the restricted execution
+context. Retrying with approved network access fetched the branch and started the non-networked
+task `grafana-bug-dashboard-links-live-repro-fix` in-scope.
+
+```text
+[codex-dispatch] ERROR: could not fetch origin/k3d-manager-v1.43.5
+```
+
 The Grafana status output included:
 
 ```text
