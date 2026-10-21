@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-20 dispatch queue and stale PID recovery
+
+- Dashboard Bug Tracking links: dispatched task `2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem` exited successfully. Focused BATS was 21 passed with 1 release-branch skip; dashboard JSON and `git diff --check` passed. Worktree remains unlanded; live row clicks remain required.
+- Slack help: task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` had no terminal marker after its worker PID was reused. Root cause: resume used `kill -0` only, unlike status which checks recorded process-start identity. Fixed resume guard and added regression test; commit `e12b9d87` is pushed. The task resumed and exited successfully. Focused pytest: 29 passed; `scripts/tests/lib/webhook.bats` still has two role-helper failures (tests 66–67), so do not land until reviewed.
+- Hostinger node outage: added an offline-only dispatch scope/report path. Live SSH, Hostinger panel/API, cluster access, and infrastructure changes are explicitly out of scope; the task will identify evidence still needed from the operator.
+
 ## 2026-10-20 queued bug dispatches
 
 - The Grafana Bug Tracking link task exited successfully in its isolated worktree. Focused `grafana_dashboard_bugs.bats` passed 21 tests (one release-branch-only skip); dashboard JSON validation and `git diff --check` passed. The task changes remain unlanded pending independent review; live URL clicks are still needed.

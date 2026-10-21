@@ -37,7 +37,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
-- Dispatch queue (2026-10-20): `2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem` exited successfully in its isolated worktree; focused BATS passed 21 tests with one release-branch skip, dashboard JSON validation and `git diff --check` passed. Changes remain unlanded; live link clicks remain pending. The Slack `k3dm help` bug now has an explicit `## Files` allowlist, pending commit/push before dispatch. Hostinger outage remains a read-only evidence review; no live host/provider action is authorized by this queue.
+- Dispatch queue (2026-10-20): dashboard-link implementation exited successfully (focused BATS 21 tests plus one release-branch skip; JSON and diff checks passed), unlanded pending review and live clicks. Slack help task resumed successfully after fixing stale-PID identity handling (`e12b9d87`); focused pytest passed 29/29, but webhook BATS had failures 66–67 and must be reviewed before landing. Hostinger task is scoped to offline evidence review only; no live host/provider access or infrastructure change.
 
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
 - Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.

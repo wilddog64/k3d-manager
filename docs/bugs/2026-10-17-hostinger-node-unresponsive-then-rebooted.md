@@ -47,6 +47,18 @@ It added about a minute here; it did not cause the outage.
 3. If memory pressure is confirmed: compare summed memory limits against 7.9 GiB, and decide
    between swap, lower limits, or moving workloads.
 
+## Dispatch scope — read-only offline review
+
+Review the evidence already recorded in this bug and the repository for related incident records.
+Do not SSH to the node, access the Hostinger panel or APIs, query live clusters, or change
+infrastructure. Do not claim the cause is confirmed beyond the previous-boot journal evidence.
+Produce a bounded report that distinguishes established facts from hypotheses and lists the exact
+operator-provided evidence still needed to resolve who initiated the power-off.
+
+## Files
+
+- `docs/issues/2026-10-20-hostinger-node-outage-evidence-review.md`
+
 ## Previous-boot journal — 2026-10-17 (Claude, read via SSH; host key matched `known_hosts`)
 
 - The host key was **not** the problem: ED25519, ECDSA and RSA keys served now all match
