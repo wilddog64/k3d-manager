@@ -2,8 +2,8 @@
 
 **Filed:** 2026-10-20 (operator GitHub failure notification; investigated with GitHub Actions logs and results branch)
 **Status:** OPEN
-**Priority:** P3 — failure signal is correct but the logs do not identify stale drill age or corrective action
-**Severity:** low — observability/diagnostic deficiency, not a failed recovery drill
+**Priority:** P2 — repeated scheduled freshness failures lack actionable diagnostics and the DR evidence is past its eight-day assurance window
+**Severity:** moderate — DR readiness evidence is stale and the automated workflow cannot distinguish its failure mode; no evidence that an actual recovery drill failed
 **Approval:** operator requested investigation and bug filing if necessary on 2026-10-20; no authorization for live DR operations
 **Component:** `scripts/etc/dr/drill-freshness.sh`, `scripts/tests/plugins/dr_drill_freshness.bats`, installed copy `wilddog64/k3dm-hub-data:main/drill-freshness.sh`
 **Related:** `docs/plans/v1.46.0-scheduled-dr-drill.md` (weekly unattended drill is already queued; do not duplicate); `docs/howto/hub-dr-drill.md`; `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md`
@@ -15,6 +15,14 @@ GitHub's `Hub DR drill freshness` workflow failed on 2026-10-19 (run [3923166099
 The `results` branch currently contains only `results/20261010T182508Z.json` (plus `.gitkeep`). That result has `success: true`, V0–V7 all true, `rto_seconds: 499`, and `rpo_seconds: 459`. The script enforces `age <= 8 * 86400`: on October 19 and 20 that last result was older than eight days. **This is a legitimate stale-freshness failure, not evidence that an actual restore drill failed.**
 
 The workflow's `actions/checkout@v4.2.2` Node.js deprecation warning is unrelated to the exit 1.
+
+## Follow-up evidence (2026-10-21)
+
+- Scheduled run [39577636232](https://github.com/wilddog64/k3dm-hub-data/actions/runs/39577636232) failed again at 09:31 UTC (02:31 PDT), on data-repo `main` commit `7c88cbf8`.
+- Both checkouts completed successfully, including the `results` branch. The `freshness` job's `bash k3dm-manager/drill-freshness.sh results` step exited 1 immediately with no diagnostic; all other job steps completed.
+- As inspected on October 21, the `results` branch still contains only `results/20261010T182508Z.json` plus `.gitkeep`. The October 10 JSON says `success: true`, V0–V7 true, RTO 499 seconds, RPO 459 seconds. At the October 21 run it is approximately 10 days 15 hours old, exceeding the eight-day gate.
+- This confirms repeated **stale evidence**, not a new failed DR execution. Investigate why subsequent runs were not executed and/or published separately under the existing `docs/plans/v1.46.0-scheduled-dr-drill.md` work; preserve the existing eight-day threshold.
+- The operator requested P2 bug tracking on October 21 and authorized a direct documentation update to `k3d-manager-v1.43.5` without a PR. No DR operation or data-repo update is authorized by that request.
 
 ## Root cause
 
