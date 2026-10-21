@@ -33,6 +33,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Smoke diagnostics task `slack-smoke-health-diagnostics` landed as `30236df8`; independent BATS passed 10/10, ShellCheck was clean, and `_agent_audit` passed in the commit hook. Bug status is VERIFIED pending operator live Slack check.
 - Replay acknowledgment task `slack-thread-e2e-replay-ack` landed as `fd1b40b0`; focused pytest passed 34/34, Python AST syntax validation passed, `_agent_audit` passed, and `scripts/tests/lib/webhook.bats` passed 68/68 with Python 3.14 after obtaining permission for its localhost test-server bind. ShellCheck is not applicable to the Python entrypoint; the environment/tooling details are recorded in `docs/issues/2026-10-20-slack-dispatch-verification-environment.md`. Bug status is VERIFIED pending operator live test; no replay or report publication was triggered.
 
+## 2026-10-21 Slack live verification follow-up
+
+- Operator's Slack `/make smoke` failed (rc 2) and output `diagnostics_unavailable`. The captured cluster-health log shows `[TARGET] expected exactly one shopping-cart target, found 2` with both destinations. The reporter only extracts `[FAIL]` lines, so this live test disproves completion of the diagnostics fix. Reopened the smoke bug; no implementation change made. Full output is in `docs/issues/2026-10-21-slack-live-verification-results.md`.
+- Operator's `/make e2e-replay RUNNER=m2` completed successfully with `published=0 still pending=0`. This does not exercise the thread-command path; replay bug remains offline VERIFIED pending `k3dm e2e-replay RUNNER=m2` as a bare message in an existing E2E thread.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.

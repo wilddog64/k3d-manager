@@ -69,4 +69,9 @@ No live webhook logs or runner replay outcome were provided; the command may hav
 - `_agent_audit`: passed in the commit hook, including the explicitly annotated role-expectation change.
 - No live `e2e-replay` was triggered; live verification remains operator-controlled.
 
+The 2026-10-21 screenshot showed `/make e2e-replay RUNNER=m2` succeeding with no pending reports.
+That exercises the direct Make route, not the bare `k3dm e2e-replay RUNNER=m2` thread-command path
+covered by this bug, so the live verification status remains pending. See
+`docs/issues/2026-10-21-slack-live-verification-results.md`.
+
 Do not dispatch a live replay or publish reports during implementation; live acceptance remains operator-controlled.

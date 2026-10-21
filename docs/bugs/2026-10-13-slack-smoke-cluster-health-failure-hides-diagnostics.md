@@ -1,6 +1,6 @@
 # Bug: Slack make smoke reports cluster-health FAIL without actionable diagnostics
 
-**Status:** VERIFIED — offline tests passed; awaiting operator live verification
+**Status:** OPEN — live Slack test still returned `diagnostics_unavailable`; offline fix is incomplete
 **Priority:** P2
 **Filed:** 2026-10-13
 **Detected by:** human
@@ -70,6 +70,14 @@ This is **reporting/diagnostic visibility**, not a fix for the unknown cluster-h
 - `bats scripts/tests/plugins/smoke.bats`: 10/10 passed.
 - `shellcheck scripts/plugins/smoke.sh`: clean (exit 0).
 - `_agent_audit`: passed in the commit hook.
-- No live Slack smoke command has been run for verification.
+- At initial offline verification, no live Slack smoke command had been run.
+
+## Live verification attempt — 2026-10-21
+
+The operator's Slack `/make smoke` run still returned `diagnostics_unavailable`. The retained
+`cluster-health.log` shows that the health check failed before assertion checks because two
+shopping-cart targets were found. The reporter only extracts `[FAIL]` lines, so it omitted the
+actionable `[TARGET]` explanation. See `docs/issues/2026-10-21-slack-live-verification-results.md`.
+This bug is reopened; do not mark LIVE-VERIFIED.
 
 Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.
