@@ -29,7 +29,7 @@ From the current release branch, run the documented rollout steps for both compo
 
 ## Redispatched investigation task
 
-**Slug:** `slack-find-similar-docs-live-q-failure-followup`
+**Task:** Codex investigation `01a160e6-0c57-7dd1-a894-3d20546d63b1`
 
 Treat the current release branch as the intended deployment source. Inspect the Slack relay and webhook code paths, identify safe read-only ways to establish which release-branch revisions are active (or state if runtime revision cannot be queried), and document the component-specific rollout/restart steps and live acceptance check. Determine whether any remaining parser/validation defect exists in the landed code. Do not deploy, restart services, change deployment triggers, or duplicate an already-correct implementation.
 
