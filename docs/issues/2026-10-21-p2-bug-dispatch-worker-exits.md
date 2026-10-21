@@ -33,7 +33,7 @@ network: yes
 scope: in-scope
 ```
 
-Three non-network implementation workers and the networked ACG worker ultimately report `terminated unexpectedly`; their supervisor logs are empty and their worktrees contain unlanded partial edits. No partial task edits were landed or copied into the main worktree. The cluster-up recurrence triage subsequently **exited successfully** and produced a scoped report, but found no task-local job metadata; it did not establish whether the Slack notification was actually top-level.
+The DR freshness diagnostics worker subsequently **exited successfully**, leaving scoped changes in its isolated worktree; independent review/verification and landing are still pending. The hub-data macOS, Slack multi-job, and networked ACG workers report `terminated unexpectedly`; their supervisor logs are empty and their worktrees contain unlanded edits. No task changes were copied into the main worktree. The cluster-up recurrence triage **exited successfully** and produced a scoped report, but found no task-local job metadata; it did not establish whether the Slack notification was actually top-level.
 
 The sixth task, `hostinger-multi-service-incident-triage`, was not started. Exact dispatcher response:
 
@@ -45,4 +45,4 @@ This conflicts with the ACG task's `terminated unexpectedly` status: the network
 
 ## Root cause / follow-up
 
-Cause is unknown. The dispatcher reports unexpected termination without a supervisor log while task worktrees show partial modifications; the cluster-up metadata-only task did complete and returned an inconclusive finding. Investigate worker lifecycle/supervisor terminal bookkeeping and safely recover or resume the exact unfinished slugs before retrying; preserve all worktrees. Do not land partial changes, dispatch another network task, or claim verification.
+Cause is unknown. Some workers complete successfully while other workers for the same launch batch report unexpected termination without supervisor logs; the ACG task status conflicts with the network lock. The cluster-up metadata-only task returned an inconclusive finding. Review the DR task independently, and investigate worker lifecycle/supervisor terminal bookkeeping before safely recovering or resuming unfinished slugs; preserve all worktrees. Do not land partial changes, start another network task while the lock is held, or claim verification.
