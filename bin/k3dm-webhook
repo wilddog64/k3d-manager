@@ -800,7 +800,8 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
                 _notify_job(job_id, "Usage: `k3dm <target> [KEY=value ...] [confirm]`")
                 return
         if target == "help":
-            _notify_job(job_id, f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}")
+            help_text = f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}"
+            _notify_help(job_id, help_text)
             return
         argv_tail, error = parse_make_request(target, args, confirm)
         if error:
@@ -1129,6 +1130,19 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         )
 
 
+def _run_thread_command_guarded(job_id, command, role, channel_id, user_id=""):
+    """Keep daemon worker exceptions correlated with the acknowledged Slack event."""
+    try:
+        _handle_thread_command(job_id, command, role, channel_id, user_id=user_id)
+    except Exception as exc:
+        thread_ts = _read_job_value(job_id, "thread_ts") or None
+        _LOG.exception("slack command worker failed job=%s channel=%s thread_ts=%s reason=%s",
+                       job_id, _read_job_value(job_id, "channel_id") or channel_id or "missing",
+                       thread_ts or "missing", type(exc).__name__)
+        _record_notification_delivery(job_id, "handler", channel_id, thread_ts, False,
+                                      f"handler_{type(exc).__name__}")
+
+
 def _archive_acg_screenshot(screenshot_path):
     """Copy a failure screenshot into the shared screenshots directory."""
     try:
@@ -1216,6 +1230,8 @@ def _notify_job(job_id, text):
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
     posted = False
     route = "none"
+    intended_channel = channel_id or ""
+    failure = "not_delivered"
     try:
         if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
             route = "bot_thread"
@@ -1223,21 +1239,76 @@ def _notify_job(job_id, text):
         if not posted and response_url:
             route = "response_url"
             posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
-        if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
+        # A configured default channel cannot safely receive a reply whose
+        # originating Slack channel is unknown. Preserve the requested thread.
+        if not posted and SLACK_BOT_TOKEN and (channel_id or (not thread_ts and SLACK_CHANNEL_ID)):
             route = "bot_fallback"
-            ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
+            ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id or SLACK_CHANNEL_ID)
             if ts and not thread_ts:
                 thread_ts_file.write_text(ts)
             posted = bool(ts)
-        if not posted and SLACK_WEBHOOK_URL:
+        # Incoming webhooks cannot preserve a reply thread, so they are only a
+        # fallback for notifications that were not addressed to a thread.
+        if not posted and SLACK_WEBHOOK_URL and not thread_ts:
             route = "webhook_fallback"
             posted = bool(_slack_post(SLACK_WEBHOOK_URL, text))
     except Exception as exc:
-        _LOG.warning("slack notification failed job=%s route=%s reason=%s", job_id, route, type(exc).__name__)
+        failure = type(exc).__name__
+        _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
+                     job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
+        _record_notification_delivery(job_id, route, intended_channel, thread_ts, False, failure)
         return False
     if not posted:
-        _LOG.warning("slack notification failed job=%s route=%s reason=not_delivered", job_id, route)
+        _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
+                     job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
+    _record_notification_delivery(job_id, route, intended_channel, thread_ts, posted, failure if not posted else "")
     return posted
+
+
+def _record_notification_delivery(job_id, route, channel_id, thread_ts, delivered, reason):
+    """Persist redacted delivery metadata so event acknowledgment is not mistaken for delivery."""
+    record = {
+        "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "job_id": job_id,
+        "event_id": _read_job_value(job_id, "event_id") or None,
+        "route": route,
+        "channel_id": channel_id or None,
+        "thread_ts": thread_ts or None,
+        "delivered": delivered,
+        "reason": reason or None,
+    }
+    try:
+        job_dir = JOB_DIR / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        with (job_dir / "delivery.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError as exc:
+        _LOG.error("slack delivery record failed job=%s reason=%s", job_id, type(exc).__name__)
+
+
+def _read_job_value(job_id, name):
+    try:
+        return (JOB_DIR / job_id / name).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _notify_help(job_id, text):
+    """Deliver long help output in bounded chunks and stop after a failed chunk."""
+    limit = 39000
+    remaining = text
+    while remaining:
+        if len(remaining) <= limit:
+            chunk, remaining = remaining, ""
+        else:
+            boundary = remaining.rfind("\n", 0, limit)
+            if boundary <= 0:
+                boundary = limit
+            chunk, remaining = remaining[:boundary], remaining[boundary:].lstrip("\n")
+        if not _notify_job(job_id, chunk):
+            _LOG.error("slack help delivery incomplete job=%s", job_id)
+            return False
+    return True
 
 
 def _analyze_stall(lines):
@@ -2098,12 +2169,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 if _slack_message_is_command_candidate(ev):
                     _event_command = ev_text.lstrip("/").lower().split()[0]
                     if _event_command in (_THREAD_COMMANDS | _STANDALONE_CMDS):
-                        _post_slack_bot(
+                        feedback = _post_slack_bot(
                             "⛔ This Slack account is not authorized for webhook commands. "
                             "Ask an admin to add it to the webhook role map.",
                             thread_ts=ev_thread_ts or None,
                             channel_id=ev.get("channel", ""),
                         )
+                        _LOG.warning("slack authorization feedback delivered=%s channel=%s thread_ts=%s",
+                                     bool(feedback), ev.get("channel") or "missing", ev_thread_ts or "missing")
                 self._json(200, {"ok": True})
                 return
             slack_role = _slack_user_role(ev_user)
@@ -2120,7 +2193,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     _LOG.debug("slack thread reply thread_ts=%r job_id=%r cmd=%r", thread_ts, job_id, cmd)
                     if job_id:
                         threading.Thread(
-                            target=_handle_thread_command,
+                            target=_run_thread_command_guarded,
                             args=(job_id, text, slack_role, ev_channel_id),
                             kwargs={"user_id": ev_user},
                             daemon=True,
@@ -2130,12 +2203,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         anchor_dir = JOB_DIR / anchor_id
                         anchor_dir.mkdir(parents=True, exist_ok=True)
                         (anchor_dir / "status").write_text("thread-anchor")
+                        if event_id:
+                            (anchor_dir / "event_id").write_text(event_id)
                         if ev_channel_id:
                             (anchor_dir / "channel_id").write_text(ev_channel_id)
                         (anchor_dir / "thread_ts").write_text(thread_ts)
                         _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
-                            target=_handle_thread_command,
+                            target=_run_thread_command_guarded,
                             args=(anchor_id, text, slack_role, ev_channel_id),
                             kwargs={"user_id": ev_user},
                             daemon=True,
@@ -2146,12 +2221,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     anchor_dir = JOB_DIR / anchor_id
                     anchor_dir.mkdir(parents=True, exist_ok=True)
                     (anchor_dir / "status").write_text("thread-anchor")
+                    if event_id:
+                        (anchor_dir / "event_id").write_text(event_id)
                     if ev_channel_id:
                         (anchor_dir / "channel_id").write_text(ev_channel_id)
                     if ev_ts:
                         (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
-                        target=_handle_thread_command,
+                        target=_run_thread_command_guarded,
                         args=(anchor_id, text, slack_role, ev_channel_id),
                         kwargs={"user_id": ev_user},
                         daemon=True,

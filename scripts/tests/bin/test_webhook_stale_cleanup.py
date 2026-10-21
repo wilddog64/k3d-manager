@@ -105,6 +105,81 @@ def test_notify_job_uses_bot_for_a_new_thread(monkeypatch, tmp_path):
     assert calls == [(('cleanup complete',), {'thread_ts': '1700000000.000001', 'channel_id': 'C123'})]
 
 
+def test_notify_job_records_correlated_failure_without_secrets(monkeypatch, tmp_path, caplog):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "channel_id").write_text("C123")
+    (job_dir / "event_id").write_text("Ev-help-1")
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "secret-token")
+    monkeypatch.setattr(webhook, "SLACK_CHANNEL_ID", "")
+    monkeypatch.setattr(webhook, "SLACK_WEBHOOK_URL", "")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *_args, **_kwargs: "")
+
+    assert webhook._notify_job("deadbeef", "help") is False
+
+    record = (job_dir / "delivery.jsonl").read_text()
+    assert '"event_id": "Ev-help-1"' in record
+    assert '"delivered": false' in record
+    assert '"channel_id": "C123"' in record
+    assert "secret-token" not in record
+    assert "channel=C123" in caplog.text
+
+
+def test_notify_job_does_not_send_thread_reply_to_default_channel(monkeypatch, tmp_path):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "secret-token")
+    monkeypatch.setattr(webhook, "SLACK_CHANNEL_ID", "configured-channel")
+    monkeypatch.setattr(webhook, "SLACK_WEBHOOK_URL", "")
+    calls = []
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *args, **kwargs: calls.append((args, kwargs)) or "")
+
+    assert webhook._notify_job("deadbeef", "help") is False
+    assert calls == []
+
+
+def test_notify_help_splits_large_output_and_stops_on_delivery_failure(monkeypatch):
+    calls = []
+    monkeypatch.setattr(webhook, "_notify_job", lambda job, text: calls.append((job, text)) or len(calls) == 1)
+
+    assert webhook._notify_help("deadbeef", "x" * 80001) is False
+    assert len(calls) == 2
+    assert all(len(text) <= 39000 for _, text in calls)
+
+
+def test_notify_help_delivers_help_that_fits_one_message(monkeypatch):
+    calls = []
+    monkeypatch.setattr(webhook, "_notify_job", lambda job, text: calls.append((job, text)) or True)
+
+    assert webhook._notify_help("deadbeef", "targets") is True
+    assert calls == [("deadbeef", "targets")]
+
+
+def test_thread_command_exception_is_correlated_and_persisted(monkeypatch, tmp_path, caplog):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "thread_ts").write_text("1700000000.000001")
+    (job_dir / "channel_id").write_text("C123")
+    (job_dir / "event_id").write_text("Ev-help-2")
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(webhook, "_handle_thread_command", fail)
+    webhook._run_thread_command_guarded("deadbeef", "k3dm help", "admin", "C123", "U1")
+
+    record = (job_dir / "delivery.jsonl").read_text()
+    assert '"event_id": "Ev-help-2"' in record
+    assert '"route": "handler"' in record
+    assert '"reason": "handler_RuntimeError"' in record
+    assert "job=deadbeef" in caplog.text
+
+
 def test_thread_cleanup_confirm_passes_channel_to_worker(monkeypatch, tmp_path):
     monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
     monkeypatch.setattr(webhook, "_notify_job", lambda *_args: None)

@@ -145,6 +145,40 @@ def test_duplicate_event_id_dispatches_once(monkeypatch):
     assert len(calls) == 1
 
 
+def test_top_level_help_delivers_promptly_while_make_lock_is_held(monkeypatch, tmp_path):
+    posted = []
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "_seen_event_ids", __import__("collections").OrderedDict())
+    monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
+    monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "admin")
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(wh, "SLACK_CHANNEL_ID", "")
+    monkeypatch.setattr(wh, "SLACK_WEBHOOK_URL", "")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: posted.append((text, kwargs)) or "reply-ts")
+    monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
+    wh._MAKE_JOB_LOCK.acquire()
+    try:
+        request = _slack_request({
+            "type": "message", "subtype": "", "user": "U1", "channel": "C-help",
+            "ts": "1700000000.000030", "text": "k3dm help",
+        }, event_id="Ev-help")
+        wh._Handler.do_POST(request)
+    finally:
+        wh._MAKE_JOB_LOCK.release()
+
+    assert request.result["code"] == 200
+    assert len(posted) == 1
+    assert "targets for role admin" in posted[0][0]
+    assert posted[0][1] == {"thread_ts": "1700000000.000030", "channel_id": "C-help"}
+    anchor = next(tmp_path.iterdir())
+    assert (anchor / "event_id").read_text() == "Ev-help"
+    delivery = json.loads((anchor / "delivery.jsonl").read_text().splitlines()[0])
+    assert delivery["delivered"] is True
+    assert delivery["event_id"] == "Ev-help"
+
+
 def test_subtype_drop_is_logged_without_message_text(monkeypatch, caplog):
     monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
     monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
