@@ -1,6 +1,6 @@
 # Bug: Dispatch dashboard renders missing Codex telemetry as zero
 
-**Status:** VERIFIED — missing Codex exit metrics are omitted; operator live verification pending
+**Status:** LIVE-VERIFIED — Grafana shows missing Codex exit metrics as unavailable, not zero
 **Priority:** P3
 **Filed:** 2026-10-21
 **Detected by:** operator review of the k3dm Agent Dispatch dashboard
@@ -58,4 +58,16 @@ Only correct exporter semantics and add regression tests.
 - `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_dispatch_metrics.py`: **12 passed**.
 - `bats scripts/tests/plugins/agent_dispatch_dashboard.bats`: **7/7 passed**.
 - The dispatcher's land gate reran both commands successfully. Commit hook `_agent_audit` passed; the intentional replacement of the old zero-run expectation is documented with an allow marker.
-- No live Grafana/Pushgateway verification was performed. Operator should confirm the two historical rows show elapsed time while missing Codex duration/run values remain blank after the exporter rollout.
+- At offline verification time, no live Grafana/Pushgateway check had been performed.
+
+## Live verification
+
+**Fix commit:** 63d604dd
+**Live evidence:** 2026-10-20 · run grafana-screenshot-2026-10-20 · env hub-grafana · scenario historical-dispatch-rows-show-elapsed-and-blank-missing-codex-metrics · commit 63d604dd · proves fix
+
+- 2026-10-20: operator screenshot after exporter rollout shows `slack-explicit-job-logs` with
+  `Time to land` = **1.60 mins** and `slack-make-log-selection` = **4.98 mins**. `Codex tokens`,
+  `Codex time`, and `Codex runs` are blank for both historical rows, confirming missing terminal
+  telemetry is represented as unavailable rather than zero. The task rows and elapsed values remain.
+- Evidence: operator-provided Grafana screenshot in the conversation (Checks table, columns Spec,
+  Release, Codex tokens, Codex time, Time to land, Codex runs).

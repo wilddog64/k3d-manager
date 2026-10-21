@@ -9,9 +9,13 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 ## 2026-10-21 dispatched bug verification and landing
 
-- `dispatch-dashboard-missing-codex-telemetry` landed as `63d604dd`; focused pytest passed 12/12 and Agent Dispatch dashboard BATS passed 7/7, including the landing gate. Commit-hook `_agent_audit` passed. Marked its bug VERIFIED; live Grafana/exporter confirmation remains with the operator.
+- `dispatch-dashboard-missing-codex-telemetry` landed as `63d604dd`; focused pytest passed 12/12 and Agent Dispatch dashboard BATS passed 7/7, including the landing gate. Commit-hook `_agent_audit` passed. It was initially marked VERIFIED pending operator confirmation.
 - `slack-smoke-target-override` landed as `611bc1f8`; focused unittest passed 39/39 and cloud-bridge pytest passed 83/83, including the landing gate. Commit-hook `_agent_audit` passed. Marked its bug VERIFIED; webhook rollout and explicit-target Slack smoke confirmation remain with the operator.
 - Neither live verification was claimed or performed.
+
+## 2026-10-20 dispatch telemetry live verification
+
+- Operator's Grafana screenshot shows the two historical rows retaining elapsed-to-land values (**1.60 mins** and **4.98 mins**) while Codex tokens, time, and run counts are blank. Updated `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md` to LIVE-VERIFIED. No Slack selector live test was included in this screenshot; that bug remains VERIFIED offline.
 
 ## 2026-10-20 Hostinger multi-service P1 investigation
 
@@ -59,7 +63,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 - Investigated screenshot rows `slack-explicit-job-logs` and `slack-make-log-selection`. Ledger contains only `start` and `land` for each; no `codex_exit`. Their elapsed values (96 seconds / 1.60 minutes and 299 seconds / 4.98 minutes) are valid, but tokens are unavailable and zero runs/time are exporter defaults for absent terminal events, not evidence of no Codex work.
 - These runs predate `2de716d8`, which added terminal status markers and `codex_exit` events. No telemetry was backfilled and no dashboard changes were made. Findings: `docs/issues/2026-10-21-dispatch-dashboard-legacy-task-metrics-missing.md`.
-- Filed P3 `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md`; scoped to exporter semantics and regression tests only. Dispatched as `dispatch-dashboard-missing-codex-telemetry`; status running, in scope. Spec pushed in `fb4b1bb8`.
+- Filed P3 `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md`; scoped to exporter semantics and regression tests only. Dispatched as `dispatch-dashboard-missing-codex-telemetry`; it landed as `63d604dd` and is now LIVE-VERIFIED. Spec was pushed in `fb4b1bb8`.
 
 ## 2026-10-19
 
