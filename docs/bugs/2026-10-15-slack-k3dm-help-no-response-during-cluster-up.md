@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — missing response observed; delivery root cause not yet established
+**Status:** VERIFIED — 2026-10-21: independent offline verification passed in the isolated dispatch worktree; live Slack verification is pending after the fix is landed and deployed.
 **Priority:** P2 — ChatOps command reliability
 **Reported incident:** AWS `cluster-up` job `f58814c3`, Oct 15 around 10:52–10:54 local time
 
@@ -68,6 +68,47 @@ not ok 66 webhook role helpers preserve token admin and fail closed
 not ok 67 webhook fix mode requires operator+ role, not question phrasing
 ```
 
-The changes remain in the isolated dispatch worktree and are not landed. No live Slack command
-was sent. Diagnose the three suite failures and complete any missing acceptance coverage before
-marking VERIFIED or requesting live verification.
+The changes remained in the isolated dispatch worktree and were not landed at that point. No live
+Slack command was sent. The three failures were later diagnosed and corrected as described below.
+
+## Follow-up offline verification — 2026-10-21
+
+The three BATS failures were caused by the test harness calling
+`SourceFileLoader.load_module()`, which is unavailable in the active Python 3.15.0 runtime. They
+failed before reaching the webhook assertions. The test snippets now use `SourceFileLoader` with
+`importlib.util`'s spec/module/`exec_module` APIs; production behavior was not changed to address
+these interpreter-compatibility failures.
+
+Independent verification in the isolated dispatch worktree:
+
+```text
+bats --filter 'Slack cluster parser accepts tokens in any order and dry-run isolates execution' scripts/tests/lib/webhook.bats
+1..1
+ok 1 Slack cluster parser accepts tokens in any order and dry-run isolates execution
+
+bats --filter 'webhook role helpers preserve token admin and fail closed' scripts/tests/lib/webhook.bats
+1..1
+ok 1 webhook role helpers preserve token admin and fail closed
+
+bats --filter 'fix mode requires operator' scripts/tests/lib/webhook.bats
+1..1
+ok 1 webhook fix mode requires operator+ role, not question phrasing
+
+bats scripts/tests/lib/webhook.bats
+1..68
+68 passed, 5 skipped
+
+python3 -m pytest -p no:cacheprovider -q scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_stale_cleanup.py
+29 passed in 0.32s
+
+shellcheck scripts/tests/lib/webhook.bats
+git diff --check
+_agent_lint exit=0
+_agent_audit exit=0
+```
+
+The dispatcher reports the task exited successfully and in-scope. Its four changed files remain
+uncommitted and unlanded in the isolated worktree. This is offline verification only; no live Slack
+command was sent. After the code is landed and deployed, the operator should run `k3dm help` while a
+`cluster-up` is still running and confirm the help response appears promptly in the originating
+Slack conversation/thread.
