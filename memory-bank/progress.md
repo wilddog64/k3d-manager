@@ -1,5 +1,10 @@
 # Progress — compressed operational log
 
+## 2026-10-20 Hostinger provider evidence and status-gate mismatch
+
+- Operator supplied Hostinger support's control-plane review: no customer stop/reboot was recorded at 2026-10-17 17:46:15 UTC; Hostinger attributed the shutdown to a platform-initiated emergency security-patch maintenance restart. No internal actor or job ID was exposed.
+- This agrees with the guest journal's `qemu-ga: guest-shutdown called` at 17:46:15 UTC and orderly poweroff. Provider evidence was added to the bug, but status remains `VERIFIED`: the pre-commit LIVE-VERIFIED gate requires a software fix commit, which this investigation has none of. Did not bypass the hook. Filed `docs/issues/2026-10-20-live-verification-gate-requires-fix-commit-for-investigation-bugs.md`; memory pressure remains a pre-event observation, not a proven cause.
+
 ## 2026-10-20 dispatch queue and stale PID recovery
 
 - Dashboard Bug Tracking links: dispatched task `2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem` exited successfully. Focused BATS was 21 passed with 1 release-branch skip; dashboard JSON and `git diff --check` passed. Worktree remains unlanded; live row clicks remain required.
