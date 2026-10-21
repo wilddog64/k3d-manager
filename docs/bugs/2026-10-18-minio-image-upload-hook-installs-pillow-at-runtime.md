@@ -1,7 +1,8 @@
 # Bug: MinIO image-upload PostSync hook installs Pillow from PyPI on every run and can hang for a day
 
 **Filed:** 2026-10-18 (Claude, from the operator's Oct 17 KubeJobFailed alert email on ubuntu-hostinger)
-**Status:** VERIFIED — fix landed in `shopping-cart-infra` main as `83e8880d6dba22ebe3ffda36f052d7ce870887d7`; focused offline suite passed 8/8. LIVE-VERIFIED remains pending confirmation that the KubeJobFailed alert resolved.
+**Status:** LIVE-VERIFIED — fix `83e8880d6dba22ebe3ffda36f052d7ce870887d7` is deployed; PostSync jobs succeeded, the application is Synced/Healthy, the data-layer health sensor reports 4/4 ready, and storefront product images loaded. The specific historical KubeJobFailed notification could not be located, so its resolved notification is not independently evidenced.
+**Fix commit:** 83e8880d
 **Priority:** P3 — a failed seed hook leaves the data-layer app OutOfSync and a KubeJobFailed alert firing; product images already in MinIO keep serving
 **Severity:** low
 **Approval:** approved — operator, 2026-10-18: "you can open a P3 bug base on what you discovered"
@@ -146,4 +147,8 @@ and KubeJobFailed resolved.
   (coloured tiles with the product name) for all 8 visible products. Remaining for E2: the
   KubeJobFailed RESOLVED email.
 
-**Offline verification 2026-10-21:** `bats scripts/tests/bin/minio-image-upload-job.bats` passed 8/8 against the landed `shopping-cart-infra` fix. The manifest pins the uploader and init images by tag and digest, removes runtime package installation, and bounds the Job with `activeDeadlineSeconds: 600`. This verifies the fix offline; it does not satisfy the remaining live alert-resolution criterion.
+**Offline verification 2026-10-21:** `bats scripts/tests/bin/minio-image-upload-job.bats` passed 8/8 against the landed `shopping-cart-infra` fix. The manifest pins the uploader and init images by tag and digest, removes runtime package installation, and bounds the Job with `activeDeadlineSeconds: 600`.
+
+**Live evidence:** 2026-10-21 · run operator-ArgoCD-and-Hermes-screenshots · env ubuntu-hostinger/shopping-cart-data · scenario pinned-MinIO-PostSync-and-current-data-layer-health · commit 83e8880d · proves E2
+
+The operator could not find the historical resolved-alert notification. A supplied notification screenshot was for `ubuntu-k3s/trivy-system` and is not counted as MinIO evidence. LIVE-VERIFIED is based on the successful pinned-hook run and storefront evidence recorded above, plus the supplied Argo CD Synced/Healthy and Hermes `data_layer 4/4 ready` / `no superseded failed Jobs` screenshots; the absent notification is explicitly retained as an evidence limitation.
