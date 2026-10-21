@@ -1,6 +1,6 @@
 # Bug: Slack make smoke reports cluster-health FAIL without actionable diagnostics
 
-**Status:** OPEN — live Slack test still returned `diagnostics_unavailable`; offline fix is incomplete
+**Status:** VERIFIED — `[TARGET]` follow-up passed offline tests; awaiting operator live verification
 **Priority:** P2
 **Filed:** 2026-10-13
 **Detected by:** human
@@ -75,11 +75,12 @@ This is **reporting/diagnostic visibility**, not a fix for the unknown cluster-h
 
 ## Live verification attempt — 2026-10-21
 
-The operator's Slack `/make smoke` run still returned `diagnostics_unavailable`. The retained
+The operator's Slack `/make smoke` run returned `diagnostics_unavailable`. The retained
 `cluster-health.log` shows that the health check failed before assertion checks because two
 shopping-cart targets were found. The reporter only extracts `[FAIL]` lines, so it omitted the
 actionable `[TARGET]` explanation. See `docs/issues/2026-10-21-slack-live-verification-results.md`.
-This bug is reopened; do not mark LIVE-VERIFIED.
+This reopened the bug and led to the follow-up below; do not mark LIVE-VERIFIED until the operator
+repeats the Slack check against the restarted webhook.
 
 ### Follow-up dispatch evidence
 
@@ -97,5 +98,14 @@ Follow-up implementation must report the `[TARGET]` reason and bounded candidate
 actionable diagnostics, while preserving redaction and the five-line/240-character bounds. Keep
 the fix in `scripts/plugins/smoke.sh` and `scripts/tests/plugins/smoke.bats`; do not modify
 `bin/smoke-test-cluster-health` or cluster behavior.
+
+### Follow-up offline verification — 2026-10-21
+
+- Follow-up landed as `36dfb1e2`; it recognizes `[TARGET]` diagnostics and includes indented
+  candidate/context lines, while retaining the existing sanitization and output bounds.
+- `bats scripts/tests/plugins/smoke.bats`: 11/11 passed; `shellcheck scripts/plugins/smoke.sh`:
+  clean; `_agent_audit` passed in the commit hook.
+- Status is VERIFIED offline. Operator must restart the webhook and rerun `/make smoke` for
+  live verification.
 
 Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.

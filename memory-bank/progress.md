@@ -37,6 +37,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 - Operator's Slack `/make smoke` failed (rc 2) and output `diagnostics_unavailable`. The captured cluster-health log shows `[TARGET] expected exactly one shopping-cart target, found 2` with both destinations. The reporter only extracts `[FAIL]` lines, so this live test disproves completion of the diagnostics fix. Reopened the smoke bug; no implementation change made. Full output is in `docs/issues/2026-10-21-slack-live-verification-results.md`.
 - Operator's `/make e2e-replay RUNNER=m2` completed successfully with `published=0 still pending=0`. This does not exercise the thread-command path; replay bug remains offline VERIFIED pending `k3dm e2e-replay RUNNER=m2` as a bare message in an existing E2E thread.
+- Dispatched and landed the smoke `[TARGET]` diagnostic follow-up as `36dfb1e2`. It includes `[TARGET]` lines and indented context while keeping output bounded/redacted. Independent BATS passed 11/11, ShellCheck clean, `_agent_audit` passed. Bug is VERIFIED offline; operator must restart the webhook and repeat `/make smoke` for live verification.
 
 ## 2026-10-19
 

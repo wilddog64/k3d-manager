@@ -29,9 +29,10 @@ The readable local log contains:
 ERROR: failed to execute /Users/cliang/src/gitrepo/personal/k3d-manager/scripts/../bin/smoke-test-cluster-health: 2
 ```
 
-Root cause of the reporting gap: `scripts/plugins/smoke.sh` only recognizes log lines beginning
-with `[FAIL]`. Target-selection failures use `[TARGET]`, so useful context is discarded. The smoke
-bug is OPEN again. No code change was made during this verification report.
+Root cause of the reporting gap: `scripts/plugins/smoke.sh` only recognized log lines beginning
+with `[FAIL]`. Target-selection failures use `[TARGET]`, so useful context was discarded. The bug
+was reopened; the follow-up fix later landed as `36dfb1e2`, with BATS 11/11 and ShellCheck clean.
+The bug is offline VERIFIED again; operator live verification is still pending.
 
 ## Replay acknowledgment
 
