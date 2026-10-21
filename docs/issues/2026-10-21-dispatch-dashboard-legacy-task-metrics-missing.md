@@ -35,3 +35,5 @@ metrics; the existing records were not backfilled. No dashboard or ledger mutati
 Consider rendering missing Codex metrics as unavailable rather than zero, to distinguish legacy
 incomplete telemetry from a measured zero. Any historical backfill would need independent
 evidence; the current run directories do not retain Codex output or exit/token counts.
+The implementation task is tracked in
+`docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md`.

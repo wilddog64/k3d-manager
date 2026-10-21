@@ -48,6 +48,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 - Investigated screenshot rows `slack-explicit-job-logs` and `slack-make-log-selection`. Ledger contains only `start` and `land` for each; no `codex_exit`. Their elapsed values (96 seconds / 1.60 minutes and 299 seconds / 4.98 minutes) are valid, but tokens are unavailable and zero runs/time are exporter defaults for absent terminal events, not evidence of no Codex work.
 - These runs predate `2de716d8`, which added terminal status markers and `codex_exit` events. No telemetry was backfilled and no dashboard changes were made. Findings: `docs/issues/2026-10-21-dispatch-dashboard-legacy-task-metrics-missing.md`.
+- Filed P3 `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md`; scoped to exporter semantics and regression tests only. Dispatch pending.
 
 ## 2026-10-19
 
