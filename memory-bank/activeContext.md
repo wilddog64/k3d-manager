@@ -13,7 +13,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Latest live investigations and records
 
-- Hostinger node outage: operator-provided support response attributes the 2026-10-17 17:46:15 UTC shutdown to emergency security-patch maintenance, consistent with the guest QEMU-agent log. Kept the bug `VERIFIED`, not `LIVE-VERIFIED`, because the evidence gate requires a software fix commit; documented the validator gap in `docs/issues/2026-10-20-live-verification-gate-requires-fix-commit-for-investigation-bugs.md`. Internal actor/job ID remains unavailable.
+- Hostinger node outage: operator-provided support response attributes the 2026-10-17 17:46:15 UTC shutdown to emergency security-patch maintenance, consistent with the guest QEMU-agent log. Added a typed investigation-only evidence path to the LIVE-VERIFIED gate, with boundary tests; the bug is now `LIVE-VERIFIED`. Internal actor/job ID remains unavailable.
 
 - Slack job `8417cf04`, E2E run `1792410757-29778`: preflight passed, but the 420-second hub-app gate failed with frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`. Read-only diagnosis found frontend Nginx exiting because `product-catalog.shopping-cart-apps.svc.cluster.local` did not exist when frontend started. Product-catalog later became healthy, but frontend remained `CrashLoopBackOff`. Detailed evidence: `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; dashboard-facing bug: `docs/bugs/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md` (P2 OPEN).
 - PR Checks dashboard: panel 5/6 populated-table transformation issue is `LIVE-VERIFIED` after the operator's Safari-private and Chrome screenshots confirmed the fix at deployed revision `f2063dba`.

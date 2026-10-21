@@ -1,9 +1,9 @@
 # Progress — compressed operational log
 
-## 2026-10-20 Hostinger provider evidence and status-gate mismatch
+## 2026-10-20 Hostinger provider evidence and investigation verification path
 
 - Operator supplied Hostinger support's control-plane review: no customer stop/reboot was recorded at 2026-10-17 17:46:15 UTC; Hostinger attributed the shutdown to a platform-initiated emergency security-patch maintenance restart. No internal actor or job ID was exposed.
-- This agrees with the guest journal's `qemu-ga: guest-shutdown called` at 17:46:15 UTC and orderly poweroff. Provider evidence was added to the bug, but status remains `VERIFIED`: the pre-commit LIVE-VERIFIED gate requires a software fix commit, which this investigation has none of. Did not bypass the hook. Filed `docs/issues/2026-10-20-live-verification-gate-requires-fix-commit-for-investigation-bugs.md`; memory pressure remains a pre-event observation, not a proven cause.
+- This agrees with the guest journal's `qemu-ga: guest-shutdown called` at 17:46:15 UTC and orderly poweroff. Added an explicit typed live-investigation evidence format and tests without weakening fix-commit evidence checks; marked the incident `LIVE-VERIFIED`. Memory pressure remains a pre-event observation, not a proven cause.
 
 ## 2026-10-20 dispatch queue and stale PID recovery
 

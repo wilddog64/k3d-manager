@@ -1,7 +1,9 @@
 # Bug: Hostinger node went unresponsive for ~25 minutes, then rebooted
 
-**Status:** VERIFIED — Hostinger support's control-plane review attributes the shutdown to emergency security-patch maintenance, but the repository's LIVE-VERIFIED gate requires a software fix commit, which this incident investigation does not have. Provider live evidence is recorded below; promotion is pending a supported investigation-only evidence path. Validator mismatch: [issue record](../issues/2026-10-20-live-verification-gate-requires-fix-commit-for-investigation-bugs.md).
+**Status:** LIVE-VERIFIED — Hostinger support's control-plane review attributes the shutdown to emergency security-patch maintenance. The audit did not identify an internal actor or job ID.
 **Priority:** P2
+**Verification type:** investigation
+**Live investigation evidence:** 2026-10-20 · source hostinger-support · reference hpanel-response-2026-10-20 · env hostinger/srv1754834 · scenario emergency-security-patch-restart · proves shutdown-cause
 **Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
 **Found:** 2026-10-17, operator paged by `PublicEndpointDown` for `https://frontend.3ai-talk.org/`

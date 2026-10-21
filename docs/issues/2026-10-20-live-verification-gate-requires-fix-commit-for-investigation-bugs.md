@@ -34,9 +34,11 @@ was not bypassed.
 There is no supported evidence shape for provider-confirmed incident cause or other investigation
 bugs with no code fix.
 
-## Recommended follow-up
+## Resolution
 
-Define an explicit, auditable evidence form for investigation-only bugs (for example, provider
-case/reference plus dated control-plane finding), then update the validator and tests to accept
-that form without weakening the existing fix-verification requirements. Until then, keep this
-incident at `VERIFIED` and retain the provider response as evidence in the bug record.
+Added a distinct `**Verification type:** investigation` and typed
+`**Live investigation evidence:**` format for provider/audit-confirmed investigations with no
+software fix commit. The gate rejects malformed evidence, missing investigation typing, and use
+of this path on a bug that declares a fix commit. Existing code-fix verification still requires
+the original `**Fix commit:**` and ancestry-checked `**Live evidence:**` format. Regression tests
+cover both the new path and its boundaries.
