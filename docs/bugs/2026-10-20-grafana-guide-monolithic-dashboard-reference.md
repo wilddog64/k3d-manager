@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-20 (operator report)
 **Branch:** k3d-manager-v1.43.5
-**Status:** OPEN — documentation refactor pending
+**Status:** LIVE-VERIFIED — operator-confirmed GitHub screenshots, 2026-10-21; fix `802c21c8`
+**Fix commit:** `802c21c8`
+**Live evidence:** 2026-10-21 · run operator-screenshot-grafana-guide-index · env GitHub · scenario rendered-index-inventory-and-navigation · commit 802c21c8 · proves E2
 **Priority:** P3 — documentation usability and maintenance; no runtime impact
 **Severity:** low
 **Approval:** operator authorized implementation dispatch on 2026-10-21: “let's work on these … dispatch them in queue”
@@ -28,6 +30,15 @@ This is a *documentation structure/content drift defect*, not a Grafana availabi
 ## Root cause / investigation
 
 The guide accumulated panel-by-panel reference material as the number of deployed dashboards expanded, without separating an overview/navigation page from individual references. Some older hardcoded inventory counts were not updated. Confirm the current dashboard inventory and deployment locations before restructuring.
+
+## Live verification — 2026-10-21
+
+The operator supplied a GitHub-rendered screenshot of `docs/guides/grafana-dashboards.md`. It
+shows the concise inventory and links to standalone references, distinguishes public endpoint
+probes from dashboards, and links to shared operations guidance. This confirms the monolithic
+guide has been replaced by a navigable landing page. The split is pushed on
+`k3d-manager-v1.43.5` as `802c21c8` and includes 14 dashboard pages plus shared operations.
+Status is LIVE-VERIFIED.
 
 ## Expected behavior / proposed design
 

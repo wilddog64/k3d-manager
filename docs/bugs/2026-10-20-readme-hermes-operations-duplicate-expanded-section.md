@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-20 (operator screenshot, GitHub README)
 **Branch:** k3d-manager-v1.43.5
-**Status:** OPEN — documentation cleanup not yet implemented
+**Status:** LIVE-VERIFIED — operator-confirmed GitHub README screenshot, 2026-10-21; fix `2c32ad31`
+**Fix commit:** `2c32ad31`
+**Live evidence:** 2026-10-21 · run operator-screenshot-readme-hermes · env GitHub · scenario rendered-README-Guides-and-Providers · commit 2c32ad31 · proves E2
 **Priority:** P3 — readability and information architecture; no functional impact
 **Severity:** low
 **Approval:** operator authorized implementation dispatch on 2026-10-21: “let's work on these … dispatch them in queue”
@@ -36,6 +38,14 @@ This is a documentation hierarchy / presentation bug, **not** a broken or absent
 ## Root cause / investigation
 
 The README grew a second Hermes-specific explanatory section even though Hermes already has a canonical `docs/guides/hermes.md` linked from the Guides index. Confirm any README-only material before consolidation; do not assume the diagram has already been duplicated in the guide.
+
+## Live verification — 2026-10-21
+
+The operator supplied a GitHub-rendered README screenshot showing exactly one Hermes operations
+entry in the **Guides** list, followed by the remaining guide entries and then **Providers**. The
+separate expanded Hermes section is absent. The implementation is pushed on
+`k3d-manager-v1.43.5` as `2c32ad31`; the screenshot confirms the rendered layout. Status is
+LIVE-VERIFIED.
 
 ## Acceptance
 

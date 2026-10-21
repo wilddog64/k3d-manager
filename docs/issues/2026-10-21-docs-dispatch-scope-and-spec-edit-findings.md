@@ -47,6 +47,10 @@ Failed to fetch https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.
 Failed to fetch https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.5/docs/guides/grafana-dashboards/k3dm-bugs.md: Cache miss
 ```
 
+The operator subsequently supplied GitHub-rendered screenshots of the README and Grafana index.
+They confirm both intended layouts; the corresponding bugs were updated to LIVE-VERIFIED. The
+earlier cache-miss limitation is resolved by this operator-provided browser evidence.
+
 The Grafana status output included:
 
 ```text
