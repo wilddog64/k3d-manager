@@ -43,7 +43,20 @@ make e2e-replay RUNNER=m2 succeeded — job 8074f64e
 INFO: [e2e-remote] replay complete: published=0 still pending=0
 ```
 
-This is useful evidence that the Make target completed with no reports pending, but it is not the
-thread command under test (`k3dm e2e-replay RUNNER=m2` as a bare message in an existing E2E thread).
-The replay bug remains offline VERIFIED and awaits that specific live check. Do not run it unless
-the operator intends to trigger a real replay.
+This first screenshot exercised the direct Make route, not the thread command. The operator then
+sent the exact bare thread command `k3dm e2e-replay RUNNER=m2` and Slack showed:
+
+```text
+k3dm e2e-replay RUNNER=m2
+make e2e-replay queued — job 3198fa72
+make e2e-replay RUNNER=m2 started by slack-thread:U4C9LDQP2 — job 3198fa72
+make e2e-replay RUNNER=m2 succeeded — job 3198fa72
+./scripts/k3d-manager e2e_runner_replay m2
+running under bash version 5.3.20(1)-release
+running under bash version 5.3.20(1)-release
+INFO: [e2e-remote] replay complete: published=0 still_pending=0
+```
+
+The queued acknowledgment arrived before the start and terminal notices, all correlated to the
+same child job ID. Exit succeeded with no reports pending, so this is not a replay error. The
+thread acknowledgment bug is LIVE-VERIFIED.

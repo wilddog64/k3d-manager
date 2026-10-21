@@ -1,6 +1,8 @@
 # Bug: Slack thread k3dm e2e-replay command receives no acknowledgment
 
-**Status:** VERIFIED — offline tests passed; awaiting operator live verification
+**Status:** LIVE-VERIFIED — operator confirmed queued acknowledgment and successful no-pending replay in the Slack thread on 2026-10-21
+**Fix commit:** `fd1b40b0`
+**Live evidence:** 2026-10-21 · run 3198fa72 · env Slack/thread · scenario k3dm-e2e-replay-no-pending · commit 740abbbe · proves fix
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — ChatOps execution visibility
 **Filed:** 2026-10-14, operator request
@@ -69,9 +71,11 @@ No live webhook logs or runner replay outcome were provided; the command may hav
 - `_agent_audit`: passed in the commit hook, including the explicitly annotated role-expectation change.
 - No live `e2e-replay` was triggered; live verification remains operator-controlled.
 
-The 2026-10-21 screenshot showed `/make e2e-replay RUNNER=m2` succeeding with no pending reports.
-That exercises the direct Make route, not the bare `k3dm e2e-replay RUNNER=m2` thread-command path
-covered by this bug, so the live verification status remains pending. See
+An initial screenshot showed `/make e2e-replay RUNNER=m2`, which exercises the direct Make route
+and did not verify this bug. The operator then sent the exact bare `k3dm e2e-replay RUNNER=m2`
+message in the E2E Slack thread. Slack posted queued, started, and succeeded notices, all with job
+ID `3198fa72`; the terminal output reported `published=0 still_pending=0`. This is a successful
+no-pending replay, distinct from a command failure. The bug is LIVE-VERIFIED. Evidence:
 `docs/issues/2026-10-21-slack-live-verification-results.md`.
 
 Do not dispatch a live replay or publish reports during implementation; live acceptance remains operator-controlled.
