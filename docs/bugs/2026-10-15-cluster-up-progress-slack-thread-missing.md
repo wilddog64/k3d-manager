@@ -2,11 +2,13 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — reproduce and trace timestamp propagation; root cause unconfirmed
+**Status:** OPEN — dispatched 2026-10-21; reproduce and trace timestamp propagation; root cause unconfirmed
 **Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low
-**Approval:** explicit operator request 2026-10-15 to file bug; no implementation approved
+**Approval:** operator explicitly requested dispatch on 2026-10-21
 **Evidence:** operator Slack screenshot 2026-10-15 approximately 07:35 PDT, AWS ACG sandbox `cluster-up` job `5f5cff23`
+
+**Additional live evidence:** operator Slack screenshots 2026-10-21 show the `/k3dm targets` response while AWS `cluster-up` job `2b6e4f97` is still running, followed by its progress update as a separate top-level message rather than a visible reply in the originating thread. The screenshot establishes the placement symptom, not the underlying Slack timestamps or root cause.
 
 ## Symptom
 
@@ -37,6 +39,25 @@ Trace the **actual async `cluster-up` notification path**, not only `cluster-sta
 - No change to cluster provisioning, execution permissions, or AWS resources is required to correct message routing.
 
 **Implementation:** not started.
+
+## Dispatch scope (2026-10-21)
+
+Implement and test outbound thread-context preservation for asynchronous lifecycle notifications, anchored on the observed `cluster-up` progress path. Audit the shared `cluster-down`, `cluster-resume`, `cluster-refresh`, and Hostinger-refresh routes only where they use the same lifecycle notification path. Keep all notifications for a job on the original intended parent; failures to thread must be visible and correlated without exposing secrets. Add deterministic tests that assert actual channel and `thread_ts` payloads, including successive progress notifications and fallbacks. Do not run real AWS or cluster lifecycle operations.
+
+This dispatch does not include the separate cloud-bridge `make test-all` incident below or incoming Slack `thread_broadcast` handling; those require their own scoped work. Do not expand into unrelated Slack commands or provisioning behavior.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/lib/webhook/agent.py`
+- `scripts/lib/webhook/lifecycle.py`
+- `scripts/lib/webhook/render.py`
+- `scripts/lib/webhook/status.py`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_stale_cleanup.py`
+- `scripts/tests/bin/test_webhook_cluster_status_thread.py`
+- `scripts/tests/bin/webhook_lifecycle.py`
+- `scripts/tests/lib/webhook.bats`
 
 
 ## Expanded source audit — 2026-10-15 (operator-requested)
