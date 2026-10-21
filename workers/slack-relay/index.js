@@ -161,7 +161,7 @@ function parseK3dm(text) {
       if (confirm) return { error: 'Unexpected duplicate confirm token.' }
       confirm = true; freeKey = null; continue
     }
-    const m = /^([A-Z][A-Z_]{0,31})=(\S{1,256})$/.exec(part)
+    const m = /^([A-Z][A-Z_]{0,31})=(.{1,256})$/.exec(part)
     if (m) {
       args[m[1]] = m[2]
       freeKey = K3DM_FREE_TEXT_KEYS.has(m[1]) ? m[1] : null

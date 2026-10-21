@@ -31,6 +31,21 @@ _helpers = {}
 _LOG = get_logger("webhook.lifecycle")
 
 
+def _make_target_argv(argv_tail):
+    """Encode free-text Q before it crosses GNU Make's shell recipe boundary."""
+    make_args = list(argv_tail)
+    if make_args and make_args[0] == "find-similar-docs":
+        transported = []
+        for value in make_args[1:]:
+            if value.startswith("Q="):
+                encoded = base64.b64encode(value[2:].encode("ascii")).decode("ascii")
+                transported.append(f"Q_B64={encoded}")
+            else:
+                transported.append(value)
+        return [make_args[0], *transported]
+    return make_args
+
+
 def configure_runtime(log, notify_job, push_metrics, analyze_stall, analyze_failure,
                       redact_secrets, spawn_job, helpers):
     """Inject entrypoint-owned runtime hooks and orchestration state."""
@@ -123,17 +138,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         (job_dir / "status").write_text("running")
         log_file.touch()
         _notify_job(job_id, f"🛠️ *make {label}* started by {actor} — job `{job_id}`")
-        make_args = list(argv_tail)
-        if make_args and make_args[0] == "find-similar-docs":
-            transported = []
-            for value in make_args[1:]:
-                if value.startswith("Q="):
-                    encoded = base64.b64encode(value[2:].encode("ascii")).decode("ascii")
-                    transported.append(f"Q_B64={encoded}")
-                else:
-                    transported.append(value)
-            make_args = [make_args[0], *transported]
-        cmd = ["make", "--no-print-directory", *make_args]
+        cmd = ["make", "--no-print-directory", *_make_target_argv(argv_tail)]
         env = {**os.environ, "K3DM_JUNIT_XML": str(job_dir / "junit.xml")}
         _LOG.debug("make job %s argv=%r", job_id, cmd)
         progress_timer = threading.Timer(120, _post_progress)

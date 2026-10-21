@@ -469,7 +469,7 @@ def test_request_helper_actions_and_arguments_match_bridge():
 
 @pytest.mark.parametrize("action, argument", [
     ("make-fix-status", "NS=bad;ns"),
-    ("make-find-similar-docs", "Q=$(x)"),
+    ("make-find-similar-docs", "Q=" + "x" * 201),
 ])
 def test_request_helper_rejects_invalid_action_arguments_without_filing(action, argument):
     with pytest.raises(SystemExit) as error:

@@ -13,6 +13,7 @@ _spec = importlib.util.spec_from_file_location(
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
 from webhook import policy
+from webhook.lifecycle import _make_target_argv
 from webhook.make_targets import CLUSTER_COMMANDS
 
 wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
@@ -58,6 +59,15 @@ class MakeTargetTests(unittest.TestCase):
     def test_query_length_is_bounded(self):
         _, error = wh.parse_make_request("find-similar-docs", {"Q": "a" * 500}, False)
         self.assertIsNotNone(error)
+
+    def test_query_is_base64_encoded_before_make_recipe(self):
+        import base64
+        query = "what's recent; $(id)"
+        argv = _make_target_argv(["find-similar-docs", f"Q={query}", "K=5"])
+        self.assertEqual(argv[0], "find-similar-docs")
+        self.assertEqual(base64.b64decode(argv[1].split("=", 1)[1], validate=True).decode(), query)
+        self.assertEqual(argv[2], "K=5")
+        self.assertEqual(_make_target_argv(["fix-sync", "APP=frontend"]), ["fix-sync", "APP=frontend"])
 
     def test_result_count_must_be_a_small_integer(self):
         for bad in ("0", "51", "999", "5x", "-1"):
