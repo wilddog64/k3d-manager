@@ -5,9 +5,8 @@ import re
 
 JOB_ID_RE = re.compile(r"[0-9a-f]{8,64}")
 NS_RE = re.compile(r"[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?")
-# Prose search text. Kept byte-identical to webhook _ARG_PATTERNS["Q"]: every shell
-# metacharacter is excluded because the value reaches a Makefile recipe.
-Q_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}")
+# Prose search text. Kept byte-identical to webhook _ARG_PATTERNS["Q"].
+Q_RE = re.compile(r"[!-~][\x20-\x7e]{0,199}")
 RUNNER_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 # The /cluster-diagnose provider set; the webhook resolves each to a kube context.
 PROVIDER_RE = re.compile(r"hostinger|aws|gcp|az|hub")

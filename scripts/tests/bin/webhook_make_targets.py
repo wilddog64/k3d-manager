@@ -32,14 +32,25 @@ class MakeTargetTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(argv, ["find-similar-docs", "Q=eso 403 on a vault path"])
 
+    def test_find_similar_docs_accepts_natural_language_apostrophe(self):
+        query = "what's recent e2e-remote issues"
+        argv, error = wh.parse_make_request("find-similar-docs", {"Q": query, "K": "5"}, False)
+        self.assertIsNone(error)
+        self.assertEqual(argv, ["find-similar-docs", f"K=5", f"Q={query}"])
+
     def test_find_similar_docs_requires_a_query(self):
         _, error = wh.parse_make_request("find-similar-docs", {}, False)
         self.assertIn("requires Q", error)
 
-    def test_query_rejects_every_shell_metacharacter(self):
-        """Q reaches a Makefile recipe, where $(Q) expands into a shell command line."""
-        for bad in ('a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
-                    "a>f", "a<f", "a#c", "a\\b", "a\nb", "a'q"):
+    def test_query_shell_metacharacters_are_validated_then_transported_out_of_shell(self):
+        """The bounded printable query is base64 transported across the Make recipe."""
+        for safe in ('what\'s recent', 'a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
+                     "a>f", "a<f", "a#c", "a\\b"):
+            with self.subTest(value=safe):
+                argv, error = wh.parse_make_request("find-similar-docs", {"Q": safe}, False)
+                self.assertIsNone(error)
+                self.assertEqual(argv[-1], f"Q={safe}")
+        for bad in ("a\nb", "\nabc"):
             with self.subTest(value=bad):
                 _, error = wh.parse_make_request("find-similar-docs", {"Q": bad}, False)
                 self.assertIsNotNone(error, f"{bad!r} was accepted")

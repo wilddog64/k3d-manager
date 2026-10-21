@@ -10,11 +10,9 @@ _ARG_PATTERNS = {
     "DIGEST": re.compile(r"sha256:[0-9a-f]{64}"),
     "FIX_CONTEXT": re.compile(r"ubuntu-k3s|ubuntu-hostinger|k3d-k3d-cluster"),
     "CRONJOB": re.compile(r"app-cve-scan|argocd-cve-scan"),
-    # Q reaches a Makefile recipe, where $(Q) expands unquoted into a shell command
-    # line. Every shell metacharacter is excluded so the recipe's "$(Q)" cannot be
-    # broken out of: no quote, backslash, dollar, backtick, semicolon, pipe,
-    # ampersand, redirect, parenthesis, newline or "#".
-    "Q": re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}"),
+    # Q is base64 transported across Make's recipe boundary before decoding to argv.
+    # Restrict it to printable ASCII so it is safe for logs and the retrieval CLI.
+    "Q": re.compile(r"[!-~][\x20-\x7e]{0,199}"),
     "K": re.compile(r"[1-9]|[1-4][0-9]|50"),
     "SMOKE_ONLY": re.compile(r"offline|cluster"),
     # A DNS-style ArgoCD application prefix, including the separator before
@@ -123,4 +121,5 @@ def make_target_help(role, role_allows):
         lines.append("")
         lines.append("*Cluster lifecycle* — separate slash commands, not `/k3dm` targets:")
         lines.extend(cluster_lines)
+    lines.append('Use `find-similar-docs Q="what\'s recent e2e-remote issues" [K=5]` for a natural-language search.')
     return "\n".join(lines)

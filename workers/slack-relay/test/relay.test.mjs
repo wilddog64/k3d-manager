@@ -292,7 +292,7 @@ test('/k3dm relays target, args, confirm and user id to /api/v1/make', async () 
   const body = 'command=/k3dm&text=' + encodeURIComponent('fix-delete-pod APP=frontend NS=shopping-cart-apps confirm') +
     '&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
   const response = await worker.dispatch(signed('/slack/commands', body))
-  assert.match(await response.text(), /Queuing/)
+  assert.match(await response.text(), /Request received.*validating/)
   const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/make')
   assert.ok(call)
   assert.deepEqual(JSON.parse(call.init.body), { target: 'fix-delete-pod', args: { APP: 'frontend', NS: 'shopping-cart-apps' },
@@ -334,6 +334,17 @@ test('/k3dm Q takes a multi-word query up to the end of the line', async () => {
 test('/k3dm Q stops at the next KEY=value', async () => {
   const { payload } = await k3dmArgs('find-similar-docs Q=stale node ip after restart K=10')
   assert.deepEqual(payload.args, { Q: 'stale node ip after restart', K: '10' })
+})
+
+test('/k3dm Q accepts quoted apostrophes and preserves exact text', async () => {
+  const { payload } = await k3dmArgs('find-similar-docs Q="what\'s recent e2e-remote issues" K=5')
+  assert.deepEqual(payload.args, { Q: "what's recent e2e-remote issues", K: '5' })
+})
+
+test('/k3dm rejects unterminated quotes before relaying', async () => {
+  const { text, payload } = await k3dmArgs('find-similar-docs Q="unfinished question')
+  assert.match(text, /unterminated quoted value/)
+  assert.equal(payload, undefined)
 })
 
 test('/k3dm Q stops at confirm', async () => {

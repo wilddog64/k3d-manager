@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import sys
@@ -815,18 +816,25 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         _notify_job(job_id, f"🔎 *cluster-diagnose* queued — job `{new_job_id}`")
 
     elif cmd == "k3dm":
-        parts = command.strip().lstrip("/").split()
+        try:
+            parts = shlex.split(command.strip().lstrip("/"), posix=True)
+        except ValueError as exc:
+            _notify_job(job_id, f"Invalid k3dm quoting: {exc}. Use double quotes around multiword Q values.")
+            return
         target = parts[1].lower() if len(parts) > 1 else "help"
         args = {}
         confirm = False
         for part in parts[2:]:
             if part.lower() == "confirm":
+                if confirm:
+                    _notify_job(job_id, "Unexpected duplicate `confirm` token.")
+                    return
                 confirm = True
             elif "=" in part:
                 key, value = part.split("=", 1)
                 args[key] = value
             else:
-                _notify_job(job_id, "Usage: `k3dm <target> [KEY=value ...] [confirm]`")
+                _notify_job(job_id, "Unexpected argument. Use `Q=\"natural language query\"` for multiword searches.")
                 return
         if target == "help":
             help_text = f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}"

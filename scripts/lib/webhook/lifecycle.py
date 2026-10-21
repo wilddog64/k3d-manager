@@ -2,6 +2,7 @@
 """Long-running cluster orchestration for k3dm-webhook."""
 
 import datetime
+import base64
 import os
 import signal
 import threading
@@ -122,7 +123,17 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         (job_dir / "status").write_text("running")
         log_file.touch()
         _notify_job(job_id, f"🛠️ *make {label}* started by {actor} — job `{job_id}`")
-        cmd = ["make", "--no-print-directory", *argv_tail]
+        make_args = list(argv_tail)
+        if make_args and make_args[0] == "find-similar-docs":
+            transported = []
+            for value in make_args[1:]:
+                if value.startswith("Q="):
+                    encoded = base64.b64encode(value[2:].encode("ascii")).decode("ascii")
+                    transported.append(f"Q_B64={encoded}")
+                else:
+                    transported.append(value)
+            make_args = [make_args[0], *transported]
+        cmd = ["make", "--no-print-directory", *make_args]
         env = {**os.environ, "K3DM_JUNIT_XML": str(job_dir / "junit.xml")}
         _LOG.debug("make job %s argv=%r", job_id, cmd)
         progress_timer = threading.Timer(120, _post_progress)

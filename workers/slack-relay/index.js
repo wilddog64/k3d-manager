@@ -136,14 +136,31 @@ function parseClusterDiagnose(text) {
 const K3DM_FREE_TEXT_KEYS = new Set(['Q'])
 
 function parseK3dm(text) {
-  const parts = (text || '').trim().split(/\s+/).filter(Boolean)
+  const parts = []
+  let token = '', quoted = false, escaped = false
+  for (const char of (text || '').trim()) {
+    if (escaped) { token += char; escaped = false; continue }
+    if (char === '\\' && quoted) { escaped = true; continue }
+    if (char === '"') { quoted = !quoted; continue }
+    if (/\s/.test(char) && !quoted) {
+      if (token) parts.push(token)
+      token = ''
+      continue
+    }
+    token += char
+  }
+  if (escaped || quoted) return { error: 'Invalid /k3dm quoting: unterminated quoted value or escape. Use double quotes around multiword Q values.' }
+  if (token) parts.push(token)
   const target = (parts.shift() || 'help').toLowerCase()
   if (!/^[a-z][a-z0-9-]{0,40}$/.test(target)) return { error: K3DM_USAGE }
   const args = {}
   let confirm = false
   let freeKey = null
   for (const part of parts) {
-    if (part.toLowerCase() === 'confirm') { confirm = true; freeKey = null; continue }
+    if (part.toLowerCase() === 'confirm') {
+      if (confirm) return { error: 'Unexpected duplicate confirm token.' }
+      confirm = true; freeKey = null; continue
+    }
     const m = /^([A-Z][A-Z_]{0,31})=(\S{1,256})$/.exec(part)
     if (m) {
       args[m[1]] = m[2]
@@ -507,7 +524,7 @@ async function handle(req, event) {
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
       else if (isHelp && data && data.text) await postResponseUrl(responseUrl, data.text)
     })())
-    return jsonReply(isHelp ? '📋 Fetching /k3dm targets…' : `🛠️ Queuing \`make ${payload.target}\`…`, threadTs, true)
+    return jsonReply(isHelp ? '📋 Fetching /k3dm targets…' : `📨 Request received for \`make ${payload.target}\`; validating…`, threadTs, true)
   }
 
   if (command === '/ask' || command === '/claude' || command === '/gemini' || command === '/codex') {
