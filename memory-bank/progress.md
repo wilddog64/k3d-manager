@@ -7,6 +7,12 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Added `docs/plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md` as v1.43.7 plan 2 of 5. It specifies vendor/model provenance per worker attempt and separately for the primary coordinator, backward-compatible unknown handling, bounded dashboard metrics, and regression coverage. It explicitly excludes model routing or automatic selection and establishes this telemetry as a prerequisite to the broader v1.45.1 routing proposal.
 - No runtime code or dashboard was changed. `make check-doc-links` passed (3 changed/new files); `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_check_doc_links.py` passed 24/24; commit `da4761b3` was pushed to `origin/k3d-manager-v1.43.5`.
 
+## 2026-10-21 dispatched bug verification and landing
+
+- `dispatch-dashboard-missing-codex-telemetry` landed as `63d604dd`; focused pytest passed 12/12 and Agent Dispatch dashboard BATS passed 7/7, including the landing gate. Commit-hook `_agent_audit` passed. Marked its bug VERIFIED; live Grafana/exporter confirmation remains with the operator.
+- `slack-smoke-target-override` landed as `611bc1f8`; focused unittest passed 39/39 and cloud-bridge pytest passed 83/83, including the landing gate. Commit-hook `_agent_audit` passed. Marked its bug VERIFIED; webhook rollout and explicit-target Slack smoke confirmation remain with the operator.
+- Neither live verification was claimed or performed.
+
 ## 2026-10-20 Hostinger multi-service P1 investigation
 
 - Read-only diagnosis found repeated M4 frontend/Pushgateway port-forward TCP/6443 timeouts around the outage, followed by forwarding recovery. This supports a transient M4-to-Hostinger Kubernetes API path interruption but does not establish the responsible network segment.

@@ -1,6 +1,6 @@
 # Bug: Slack smoke command cannot specify an ArgoCD target
 
-**Status:** OPEN — Slack smoke fails closed when multiple eligible shopping-cart targets exist, and the Slack Make allowlist cannot pass the supported selector
+**Status:** VERIFIED — explicit Slack target selector is allowlisted and validated; operator live verification pending
 **Priority:** P2
 **Filed:** 2026-10-21
 **Detected by:** operator Slack live verification, job `a3d1097b`
@@ -50,3 +50,14 @@ operator cannot choose the intended target through Slack.
 Do not alter `bin/smoke-test-cluster-health` target resolution or cluster health checks. Do not
 contact or mutate a cluster. Keep the task limited to allowlisting a validated explicit selector,
 regression tests, and documentation.
+
+## Offline verification
+
+- Landed on `k3d-manager-v1.43.5` as `611bc1f8` (`fix(slack): allow explicit smoke target prefix`).
+- `python3 -m unittest scripts.tests.bin.webhook_make_targets`: **39 tests passed**.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_cloud_bridge.py`: **83 passed**.
+- The dispatcher's land gate reran both commands successfully; commit hook `_agent_audit` passed.
+- No live Slack/webhook verification was performed. After deploying/restarting the webhook, run
+  `/k3dm smoke ARGOCD_APP_PREFIX=<chosen-target-prefix>` (for example,
+  `ARGOCD_APP_PREFIX=ubuntu-hostinger-` or `ubuntu-k3s-`) and confirm the intended single target is
+  checked. Without an explicit selector, the existing fail-closed behavior must remain.

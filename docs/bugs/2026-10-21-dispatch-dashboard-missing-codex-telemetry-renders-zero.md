@@ -1,6 +1,6 @@
 # Bug: Dispatch dashboard renders missing Codex telemetry as zero
 
-**Status:** OPEN — landed tasks without a recorded Codex exit are displayed with zero runs/time
+**Status:** VERIFIED — missing Codex exit metrics are omitted; operator live verification pending
 **Priority:** P3
 **Filed:** 2026-10-21
 **Detected by:** operator review of the k3dm Agent Dispatch dashboard
@@ -51,3 +51,11 @@ measured zero work. Tokens are already omitted when unavailable.
 
 Do not edit the dashboard layout or query, mutate Pushgateway/Grafana, or modify ledger history.
 Only correct exporter semantics and add regression tests.
+
+## Offline verification
+
+- Landed on `k3d-manager-v1.43.5` as `63d604dd` (`fix(dispatch): omit missing codex usage samples`).
+- `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_dispatch_metrics.py`: **12 passed**.
+- `bats scripts/tests/plugins/agent_dispatch_dashboard.bats`: **7/7 passed**.
+- The dispatcher's land gate reran both commands successfully. Commit hook `_agent_audit` passed; the intentional replacement of the old zero-run expectation is documented with an allow marker.
+- No live Grafana/Pushgateway verification was performed. Operator should confirm the two historical rows show elapsed time while missing Codex duration/run values remain blank after the exporter rollout.
