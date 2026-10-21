@@ -25,7 +25,8 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-20 Slack bug dispatch attempt
 
 - Added file scopes and verification gates to the two existing Slack P2 bug specs; pushed as `3e7a2358`.
-- Dispatched `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` as separate non-network tasks. Both workers exited without terminal markers; dispatcher status reports `terminated unexpectedly`. The smoke worktree contains unverified edits, replay worktree is clean; neither task test suite ran and no live replay was triggered. Preserved worktrees and logs; root cause is unknown. Recorded in `docs/issues/2026-10-20-slack-bug-dispatch-workers-terminated-unexpectedly.md`.
+- Dispatched `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` as separate non-network tasks. An early status check transiently reported `terminated unexpectedly`; both later completed with exit 0 and final messages. Smoke BATS 10/10 and ShellCheck clean; replay pytest 34/34. No live replay was triggered and neither task was landed. Preserved their worktrees/logs and recorded the timing/status discrepancy in `docs/issues/2026-10-20-slack-bug-dispatch-workers-terminated-unexpectedly.md`.
+- Operator requested cleanup of stale dispatch slugs `e2e-sandbox-live-verify`, `pr-checks-table-misalignment-r5`, and `pr-checks-table-misalignment-r6`. Confirmed all worktrees were clean and no matching remote branches existed, then removed the three local worktrees/branches; run directories/logs were retained.
 
 ## 2026-10-19
 
