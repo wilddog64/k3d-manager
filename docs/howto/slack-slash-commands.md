@@ -374,7 +374,7 @@ bin/k3dm-webhook-setup --uninstall
 | `e2e-sandbox-provision-preview` | admin | | `DIGEST` | | 300 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
-| `smoke` | operator | | `SMOKE_ONLY` | | 900 |
+| `smoke` | operator | | `SMOKE_ONLY`, `ARGOCD_APP_PREFIX` | | 900 |
 | `monitoring-pause` | operator | | | | 600 |
 | `monitoring-resume` | operator | | | | 600 |
 | `fix-restart` | operator | `APP`, `NS` | `FIX_CONTEXT` | | 300 |
@@ -391,7 +391,10 @@ channel via `response_url` when the job completes.
 
 `smoke` runs the same gate as `make smoke`: the offline sweep always, and the cluster sweep
 when the cluster is reachable. `SMOKE_ONLY` narrows it to one half — `SMOKE_ONLY=offline` skips
-everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. It is `operator`
+everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. When multiple
+shopping-cart ArgoCD applications are eligible, `ARGOCD_APP_PREFIX` selects the intended target;
+for example, `ARGOCD_APP_PREFIX=ubuntu-hostinger-`. The smoke check still fails closed if more than
+one target matches the supplied prefix. Both selectors are validated by the webhook. It is `operator`
 rather than `reader` because the cluster half reads Vault secrets and performs real Keycloak,
 ArgoCD and frontend logins, and its 900s timeout replaces the 300s default because the Vault, ESO
 and login stages run serially with retries.
@@ -400,6 +403,7 @@ Examples:
 
 - `/k3dm smoke`
 - `/k3dm smoke SMOKE_ONLY=offline`
+- `/k3dm smoke ARGOCD_APP_PREFIX=ubuntu-hostinger-`
 
 `e2e-sandbox` runs unattended, so it can only use an **already valid** ACG session: its
 preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path needs a

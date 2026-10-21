@@ -17,6 +17,9 @@ _ARG_PATTERNS = {
     "Q": re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}"),
     "K": re.compile(r"[1-9]|[1-4][0-9]|50"),
     "SMOKE_ONLY": re.compile(r"offline|cluster"),
+    # A DNS-style ArgoCD application prefix, including the separator before
+    # the application name (for example, ubuntu-hostinger-).
+    "ARGOCD_APP_PREFIX": re.compile(r"(?=.{2,64}\Z)[a-z0-9]+(?:-[a-z0-9]+)*-"),
 }
 
 MAKE_TARGETS = {
@@ -41,7 +44,7 @@ MAKE_TARGETS = {
     "e2e-sandbox-provision-preview": {"min_role": "admin", "optional": ("DIGEST",), "timeout": 300, "summary": "read-only preview of e2e-sandbox-provision"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},
-    "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY",), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},
+    "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY", "ARGOCD_APP_PREFIX"), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},
     "app-cve-scan": {"min_role": "operator", "timeout": 900, "optional": ("CRONJOB",), "summary": "trigger the app-cluster CVE scan now"},
     "monitoring-pause": {"min_role": "operator", "timeout": 600, "summary": "scale hub observability to zero"},
     "monitoring-resume": {"min_role": "operator", "timeout": 600, "summary": "restore paused hub observability"},

@@ -264,6 +264,38 @@ class MakeTargetTests(unittest.TestCase):
                 self.assertIsNone(argv)
                 self.assertIn("invalid value for SMOKE_ONLY", error)
 
+    def test_smoke_accepts_a_valid_argocd_app_prefix(self):
+        for prefix in ("ubuntu-hostinger-", "ubuntu-k3s-"):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(
+                    wh.parse_make_request("smoke", {"ARGOCD_APP_PREFIX": prefix}, None),
+                    (["smoke", f"ARGOCD_APP_PREFIX={prefix}"], None),
+                )
+
+    def test_smoke_accepts_both_selector_arguments(self):
+        self.assertEqual(
+            wh.parse_make_request(
+                "smoke",
+                {"SMOKE_ONLY": "cluster", "ARGOCD_APP_PREFIX": "ubuntu-hostinger-"},
+                None,
+            ),
+            (["smoke", "ARGOCD_APP_PREFIX=ubuntu-hostinger-", "SMOKE_ONLY=cluster"], None),
+        )
+
+    def test_smoke_argocd_app_prefix_rejects_unsafe_or_incomplete_values(self):
+        for value in (
+            "", "ubuntu-hostinger", "-ubuntu-", "ubuntu--hostinger-", "Ubuntu-hostinger-",
+            "ubuntu-hostinger-;id", "ubuntu-hostinger-$(id)", "a" * 64 + "-",
+        ):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("smoke", {"ARGOCD_APP_PREFIX": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for ARGOCD_APP_PREFIX", error)
+
+    def test_smoke_help_documents_argocd_app_prefix(self):
+        help_text = wh.make_target_help("operator", wh._role_allows)
+        self.assertIn("[ARGOCD_APP_PREFIX=…]", help_text)
+
     def test_smoke_rejects_arguments_it_does_not_declare(self):
         _, error = wh.parse_make_request("smoke", {"APP": "x"}, None)
         self.assertIn("does not accept APP", error)
