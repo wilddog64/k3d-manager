@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-21 Grafana bug dashboard hard refresh
+
+- Applied `kubectl --context k3d-k3d-cluster -n cicd annotate application hub-grafana-dashboards argocd.argoproj.io/refresh=hard --overwrite`; output: `application.argoproj.io/hub-grafana-dashboards annotated`. Verified Argo consumed the annotation; reconciliation at `2026-10-21T12:23:22Z`, `sync=Synced`, `health=Healthy`, `operation=Succeeded`. No sync or manifest change was requested.
+
 ## 2026-10-21 Slack thread actor live verification
 
 - Operator replied `k3dm fix-list` in a bot thread. Job `4148ca73` succeeded and its start notice displayed `started by slack-thread:U4C9LDQP2`. This proves the thread-started job records the Slack user rather than only the role. Updated `docs/bugs/2026-10-18-slack-thread-jobs-record-role-not-user.md` to LIVE-VERIFIED; fix commit `bc1399eb`.

@@ -13,6 +13,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Latest live investigations and records
 
+- Refreshed Argo CD Application `hub-grafana-dashboards` after the thread-actor LIVE-VERIFIED status update. `argocd.argoproj.io/refresh=hard` was accepted and consumed; latest check: reconciled `2026-10-21T12:23:22Z`, `Synced`, `Healthy`, operation `Succeeded`.
+
 - P3 Slack thread actor attribution is LIVE-VERIFIED: operator's `k3dm fix-list` thread reply produced job `4148ca73`, whose started notice identified `slack-thread:U4C9LDQP2`. Fix `bc1399eb`; evidence recorded in `docs/bugs/2026-10-18-slack-thread-jobs-record-role-not-user.md`.
 
 - Dispatched the observed P3 lifecycle thread-context bug as `cluster-up-progress-thread-context` from `docs/bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md`. Isolated worktree is `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/cluster-up-progress-thread-context`; authorized status confirms `running`, scope `in-scope`. The initial sandboxed status misread process visibility; elevated read-only status confirmed the worker is active. No fix or verification result yet.
