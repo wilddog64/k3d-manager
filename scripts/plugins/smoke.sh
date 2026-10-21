@@ -32,6 +32,32 @@ function _smoke_execute() {
   _run_command -- "${SMOKE_BIN_DIR}/${_script#bin/}" >"$_log" 2>&1
 }
 
+function _smoke_failure_excerpt() {
+  local _log="$1" _line _count=0 _shown=0
+  if [[ ! -f "$_log" || ! -r "$_log" ]]; then
+    printf '  diagnostics_unavailable: cluster-health log is missing or unreadable. Check the smoke job transcript with /k3dm logs <job-id>.\n'
+    return
+  fi
+  _count="$(grep -cE '^[[:space:]]*\[FAIL\]' "$_log" 2>/dev/null || true)"
+  if [[ "$_count" -eq 0 ]]; then
+    printf '  diagnostics_unavailable: no [FAIL] details found in cluster-health log. Check /k3dm logs <job-id> for the full smoke transcript.\n'
+    return
+  fi
+  printf '  smoke_check_failed: %s cluster-health failure(s)\n' "$_count"
+  while IFS= read -r _line; do
+    [[ "$_line" == *'[FAIL]'* ]] || continue
+    _line="$(printf '%s' "$_line" | LC_ALL=C tr -cd '\11\12\15\40-\176' | sed -E 's/(token|password|secret|api[_-]?key|authorization)([[:space:]]*[:=][[:space:]]*|[[:space:]]+)[^[:space:]]+/\1=[REDACTED]/Ig; s/(Bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig')"
+    printf '  %s\n' "${_line:0:240}"
+    _shown=$((_shown + 1))
+    [[ "$_shown" -ge 5 ]] && break
+  done < "$_log"
+  if [[ "$_count" -gt "$_shown" ]]; then
+    printf '  ... %s additional failure(s) omitted. Retrieve details with /k3dm logs <job-id>.\n' "$((_count - _shown))"
+  else
+    printf '  Next: retrieve the full bounded job transcript with /k3dm logs <job-id>.\n'
+  fi
+}
+
 function smoke_run() {
   local _filter="${1:-}"
   local _run_dir _tier _name _script _log _status _reason _check_rc
@@ -65,6 +91,11 @@ function smoke_run() {
     printf '%-15s %-9s %s %s\n' "$_name" "$_tier" "$_status" "$_reason"
     if [[ "$_status" != "PASS" ]]; then
       printf '  log: %s\n' "$_log"
+      if [[ "$_name" == "cluster-health" && "$_status" == "FAIL" ]]; then
+        _smoke_failure_excerpt "$_log"
+      elif [[ "$_name" == "cluster-health" && "$_status" == "SKIP" ]]; then
+        printf '  environment_unavailable: infra context is unreachable; retry after restoring cluster access.\n'
+      fi
     fi
   done < <(_smoke_records)
   printf 'smoke: %d passed, %d failed, %d skipped\n' "$_passed" "$_failed" "$_skipped"

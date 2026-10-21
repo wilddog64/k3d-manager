@@ -16,6 +16,9 @@ EOF
   cat > "$K3DM_TEST_BIN/smoke-test-cluster-health" <<'EOF'
 #!/usr/bin/env bash
 echo cluster >> "$CALLS_LOG"
+if [[ -n "${CLUSTER_OUTPUT:-}" ]]; then
+  printf '%b' "$CLUSTER_OUTPUT"
+fi
 exit "${CLUSTER_RC:-0}"
 EOF
   chmod +x "$K3DM_TEST_BIN"/*
@@ -56,6 +59,31 @@ EOF
   CLUSTER_RC=1 run smoke_run cluster
   [ "$status" -ne 0 ]
   [[ "$output" == *"cluster-health  cluster   FAIL"* ]]
+}
+
+@test "smoke: cluster failures include bounded redacted actionable details" {
+  CLUSTER_OUTPUT=$'[PASS] one check ok\n[FAIL] app A password: swordfish\n[FAIL] app B token=abc123\n[FAIL] app C failed\n[FAIL] app D failed\n[FAIL] app E failed\n[FAIL] app F failed\n' CLUSTER_RC=1 run smoke_run cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"smoke_check_failed: 6 cluster-health failure(s)"* ]]
+  [[ "$output" == *"[FAIL] app A password=[REDACTED]"* ]]
+  [[ "$output" == *"[FAIL] app B token=[REDACTED]"* ]]
+  [[ "$output" == *"additional failure(s) omitted"* ]]
+  [[ "$output" != *"swordfish"* ]]
+  [[ "$output" != *"abc123"* ]]
+}
+
+@test "smoke: missing failure details are reported as unavailable" {
+  CLUSTER_RC=1 run smoke_run cluster
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"diagnostics_unavailable"* ]]
+  [[ "$output" == *"/k3dm logs <job-id>"* ]]
+}
+
+@test "smoke: successful cluster output stays concise" {
+  CLUSTER_OUTPUT=$'[PASS] all good\n' run smoke_run cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"[PASS] all good"* ]]
+  [[ "$output" != *"diagnostics_unavailable"* ]]
 }
 
 @test "smoke: offline filter never invokes cluster" {
