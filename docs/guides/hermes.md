@@ -16,6 +16,23 @@ and [`docs/architecture/hermes-phase2-repair-scope.md`](../architecture/hermes-p
 [`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`](../plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md),
 [`docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`](../plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md).
 
+The operating cycle is read-only sensing, deterministic correlation, Slack reporting, and a
+closed repair proposal. A human approves an exact action only after Hermes revalidates its
+precondition; Hermes then samples again to report the result.
+
+```mermaid
+flowchart LR
+    S[Read-only sensors\nESO · ArgoCD · reachability\nnode pressure · CI · app health]
+    C[Deterministic correlator\nsustained multi-signal incident]
+    R[Slack report\nevidence + possible prior art]
+    P[Allowlisted repair proposal\nexact command + action ID]
+    A[Human approval\nprecondition re-validated]
+    X[Scoped repair + post-repair sample]
+
+    S --> C --> R --> P --> A --> X
+    X -.-> S
+```
+
 ---
 
 ## The pieces
