@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-21 Slack thread actor live verification
+
+- Operator replied `k3dm fix-list` in a bot thread. Job `4148ca73` succeeded and its start notice displayed `started by slack-thread:U4C9LDQP2`. This proves the thread-started job records the Slack user rather than only the role. Updated `docs/bugs/2026-10-18-slack-thread-jobs-record-role-not-user.md` to LIVE-VERIFIED; fix commit `bc1399eb`.
+
 ## 2026-10-21 dispatch outbound lifecycle thread-context bug
 
 - Updated existing P3 `docs/bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md` with current operator screenshot evidence, explicit dispatch authorization, and file/scope allowlist. Scope is async outbound lifecycle thread preservation; the cloud-bridge Make incident and incoming `thread_broadcast` issue are excluded. `make check-doc-links` passed (`2267 file(s) OK`); `_agent_lint` and `_agent_audit` passed. Pushed scope commit `89514d35`.

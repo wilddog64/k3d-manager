@@ -1,7 +1,8 @@
 # Bug: jobs started from a Slack thread record the role, not the user
 
 **Filed:** 2026-10-18 (Claude, from an operator screenshot)
-**Status:** FIXED — landed, awaiting webhook restart + E2
+**Status:** LIVE-VERIFIED — 2026-10-21: operator's Slack thread screenshot shows the job started by `slack-thread:U4C9LDQP2`, satisfying E2.
+**Live evidence:** 2026-10-21 · run 4148ca73 · env slack/k3d-manager · scenario thread-fix-list-actor · commit bc1399eb · proves fix
 **Fix commit:** `bc1399eb`
 **Priority:** P3 — audit-trail gap; the command runs correctly
 **Severity:** low
@@ -99,3 +100,4 @@ interface:
 ## Verification log
 
 - 2026-10-19: Codex (dispatcher) fix landed `bc1399eb`. Claude verified: on the pre-fix webhook, 4 of the 5 `test_webhook_thread_actor.py` tests are red (N1). The fallback-to-role test passes either way (M3). Codex's change broke the thread-broadcast routing test, whose stub took no kwargs; Claude updated that test to assert `user_id` is passed. It landed with `--allow-out-of-scope`, and the spec Files now list it. `pytest scripts/tests/bin` 734 passed, 1 skipped.
+- 2026-10-21: Operator ran `k3dm fix-list` as a reply in a bot thread. Slack job `4148ca73` displayed `started by slack-thread:U4C9LDQP2` and succeeded, proving the actor is the Slack user rather than the role. E2 is satisfied; marked LIVE-VERIFIED.
