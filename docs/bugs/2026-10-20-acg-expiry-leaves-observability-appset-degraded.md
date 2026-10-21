@@ -5,9 +5,16 @@
 **Priority:** P2 — stale GitOps objects produce persistent degraded health after disposable sandbox expiry; cleanup/re-provisioning ownership is unclear
 **Severity:** medium
 **Approval:** filing requested by operator 2026-10-20; no approval to mutate live infrastructure
+**Dispatch approval:** operator requested review and dispatch on 2026-10-21; read-only investigation only, no cluster or Argo CD mutation
 **Component:** ACG k3s-aws sandbox lifecycle cleanup; Argo CD ApplicationSet management on persistent hub
 **Related:** `bin/cluster-down`, `bin/cleanup-stale-sandbox`, `make e2e-sandbox`; see also `docs/bugs/2026-10-18-keep-hub-down-leaves-sandbox-frontend-agents.md`
 **Environment:** persistent Argo CD hub, disposable ACG AWS sandbox (`ubuntu-k3s`)
+
+## Files
+
+- `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md`
+- `docs/issues/2026-10-21-acg-observability-appset-investigation.md`
+- `docs/issues/2026-10-21-acg-observability-appset-triage-spec.md`
 
 ## Symptom
 

@@ -108,3 +108,9 @@ Use the bug docs for acceptance criteria and the archive for historical context;
 - Hostinger remained up since 2026-10-17, k3s was active, and no incident-window OOM/link/disk journal matches were found. Current read-only checks showed API `/readyz=ok`, node/app/data workloads ready, Vault and `vault-backend` Ready, and public frontend/products HTTP 200.
 - Fresh Hostinger status job `dc9e4089` had 20 OK / 1 fail: only ArgoCD direct password login unavailable; ArgoCD SSO succeeded. Operator `make status` screenshot reported HEALTHY; its hub snapshot was stale, not a live-service failure.
 - Canonical Hostinger incident record is OPEN at P2 (downgraded from P1 after recovery); root cause remains unconfirmed and ArgoCD direct-login has an SSO workaround. No runtime changes performed. See `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`.
+# 2026-10-21 P2 bug dispatch queue
+
+- Prepared six scoped dispatches from the operator screenshot: hub-data macOS Bats fixture portability, DR freshness diagnostics, Slack multi-job thread targeting, cluster-up thread recurrence triage, expired ACG observability AppSet triage, and Hostinger multi-service incident triage.
+- The last three are explicitly read-only investigations; no Slack API, infrastructure mutation, DR operation, or deployment is authorized. Networked investigations must run one at a time.
+- Older P3 ACG sandbox reaper record is already implemented and is not the P2 `observability-acg` issue in this queue.
+- Dispatch start/verification and commit SHA will be recorded in progress.md.

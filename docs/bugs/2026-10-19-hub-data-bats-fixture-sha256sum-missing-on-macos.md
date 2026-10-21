@@ -3,6 +3,7 @@
 **Filed:** 2026-10-19 (operator-provided live `make test` output; ChatGPT investigation)
 **Branch:** `k3d-manager-v1.43.5`
 **Status:** OPEN — reproduced in a live macOS test run; fix and post-fix verification pending
+**Approval:** operator requested review and dispatch on 2026-10-21; scope is test-fixture portability only
 **Priority:** P2 — recovery-preflight safety assertions are never reached, and offline `make test` fails on the primary macOS runner
 **Severity:** Medium — test coverage and CI/observability reliability are impaired; no evidence here that production hub recovery itself is broken
 **Component:** `scripts/tests/plugins/hub_data.bats`, `make test` / `test-all` Bats dispatcher
@@ -101,3 +102,6 @@ make: *** [test-all] Error 2
 ```
 
 The complete local run transcript is `scratch/test-logs/all/20261020-171339.log`. Update Status, verification timestamp, and live-evidence metadata only after a real fix and matching verification.
+## Files
+
+- `scripts/tests/plugins/hub_data.bats`

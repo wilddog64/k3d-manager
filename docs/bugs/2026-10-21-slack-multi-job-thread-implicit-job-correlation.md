@@ -6,7 +6,7 @@
 **Priority:** P2 — ChatOps job correlation / diagnostics reliability
 **Status:** OPEN — source-confirmed selection ambiguity; live job misselection not yet proven
 **Verification:** NOT LIVE-VERIFIED as a fix; 2026-10-21 Slack observations are live reproduction evidence only
-**Approval:** operator explicitly requested bug filing and push to current feature branch; no runtime fix or PR authorized
+**Approval:** operator requested review and dispatch on 2026-10-21; offline implementation is authorized, but no Slack messages, live job tests, deployment, or PR are authorized
 **Component:** Slack Events API thread routing, thread-to-job selection, implicit `logs`/`status`/`diagnosis`/`kill` semantics
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (FIXED / LIVE-VERIFIED 2026-10-20; do not regress); `docs/bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md` (LIVE-VERIFIED 2026-10-21); `docs/bugs/2026-10-02-cluster-status-report-not-threaded.md` (FIXED); `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`.
 
@@ -75,3 +75,13 @@ Run focused Python Slack thread tests and applicable stubbed webhook tests; do n
 ## Scope / disposition
 
 Documentation-only P2 bug report. No code implementation, no Slack messages sent, no live job triggered, no PR, no merge, and no production change. Status remains OPEN until corrected and verified.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/lib/webhook/render.py`
+- `scripts/tests/bin/test_webhook_thread_dispatch.py`
+- `scripts/tests/bin/test_webhook_cluster_status_thread.py`
+- `scripts/tests/bin/test_webhook_thread_actor.py`
+- `scripts/tests/bin/webhook_lifecycle.py`
+- `docs/howto/slack-slash-commands.md`

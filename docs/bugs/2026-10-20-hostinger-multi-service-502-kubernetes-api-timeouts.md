@@ -7,8 +7,14 @@
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
 **Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
+**Dispatch approval:** operator requested review and dispatch on 2026-10-21; read-only evidence gathering only, no recovery or live changes
 **Component:** `k3s-hostinger` node/control plane, public frontend ingress/port-forward, shopping-cart data layer, Vault/ESO; precise fault domain TBD
 **Affected:** `ubuntu-hostinger`, `https://frontend.3ai-talk.org/`, `shopping-cart-apps`, `shopping-cart-data`, Hostinger `ClusterSecretStore/vault-backend`
+## Files
+
+- `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`
+- `docs/issues/2026-10-21-hostinger-multi-service-incident-investigation.md`
+- `docs/issues/2026-10-21-hostinger-multi-service-incident-triage-spec.md`
 **Related:**
 - `docs/bugs/2026-10-17-hostinger-node-unresponsive-then-rebooted.md` (earlier 25-minute hypervisor-initiated Hostinger shutdown; **not proven to recur**)
 - `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md` (prior sealed-Vault defect fixed and LIVE-VERIFIED Oct 18; **do not assume same root cause**)

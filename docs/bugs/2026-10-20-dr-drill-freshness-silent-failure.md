@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P2 — repeated scheduled freshness failures lack actionable diagnostics and the DR evidence is past its eight-day assurance window
 **Severity:** moderate — DR readiness evidence is stale and the automated workflow cannot distinguish its failure mode; no evidence that an actual recovery drill failed
-**Approval:** operator requested investigation and bug filing if necessary on 2026-10-20; no authorization for live DR operations
+**Approval:** operator requested review and dispatch on 2026-10-21; live DR operations, data-repo deployment, and synthetic result publication remain unauthorized
 **Component:** `scripts/etc/dr/drill-freshness.sh`, `scripts/tests/plugins/dr_drill_freshness.bats`, installed copy `wilddog64/k3dm-hub-data:main/drill-freshness.sh`
 **Related:** `docs/plans/v1.46.0-scheduled-dr-drill.md` (weekly unattended drill is already queued; do not duplicate); `docs/howto/hub-dr-drill.md`; `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md`
 
@@ -88,3 +88,8 @@ interface:
 - Do NOT run a destructive DR drill, touch the production hub, or publish synthetic green results.
 - Do NOT change the success/age contract to hide failures.
 - Do NOT commit directly to `main` or bypass the normal review process.
+## Files
+
+- `scripts/etc/dr/drill-freshness.sh`
+- `scripts/tests/plugins/dr_drill_freshness.bats`
+- `docs/howto/hub-dr-drill.md`

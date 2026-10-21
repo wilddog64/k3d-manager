@@ -8,6 +8,7 @@
 **Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
+
 **Evidence:** operator Slack screenshot 2026-10-15 approximately 07:35 PDT, AWS ACG sandbox `cluster-up` job `5f5cff23`
 
 **Additional live evidence:** operator Slack screenshots 2026-10-21 show the `/k3dm targets` response while AWS `cluster-up` job `2b6e4f97` is still running, followed by its progress update as a separate top-level message rather than a visible reply in the originating thread. The screenshot establishes the placement symptom, not the underlying Slack timestamps or root cause.
