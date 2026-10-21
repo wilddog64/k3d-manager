@@ -41,6 +41,7 @@ For Slack-initiated `make smoke`, deliver an actionable, **safe, bounded** diagn
 ## Acceptance / regression tests
 
 - [ ] Stub cluster-health emitting multiple `[FAIL]` lines: Slack shows specific reasons with a bounded, redacted diagnostic excerpt.
+- [ ] A target-selection failure beginning with `[TARGET]` includes its bounded diagnostic and the following candidate/context lines; it must not be reported as `diagnostics_unavailable`.
 - [ ] Mixed PASS/FAIL: only relevant failures highlighted, with count and check names.
 - [ ] Missing/unreadable log: Slack reports diagnostics unavailable plus actionable job identifier, not a misleading generic path.
 - [ ] Long/multiline output, ANSI/control characters, and secret-like content are sanitized and truncated deterministically.
@@ -79,5 +80,22 @@ The operator's Slack `/make smoke` run still returned `diagnostics_unavailable`.
 shopping-cart targets were found. The reporter only extracts `[FAIL]` lines, so it omitted the
 actionable `[TARGET]` explanation. See `docs/issues/2026-10-21-slack-live-verification-results.md`.
 This bug is reopened; do not mark LIVE-VERIFIED.
+
+### Follow-up dispatch evidence
+
+The exact retained log for Slack job `09e916e4` was:
+
+```text
+[TARGET] expected exactly one shopping-cart target, found 2
+  ubuntu-hostinger-shopping-cart-basket -> ubuntu-hostinger
+  ubuntu-k3s-shopping-cart-basket -> ubuntu-k3s
+/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/../bin/smoke-test-cluster-health command failed (2): /Users/cliang/src/gitrepo/personal/k3d-manager/scripts/../bin/smoke-test-cluster-health
+ERROR: failed to execute /Users/cliang/src/gitrepo/personal/k3d-manager/scripts/../bin/smoke-test-cluster-health: 2
+```
+
+Follow-up implementation must report the `[TARGET]` reason and bounded candidate context as
+actionable diagnostics, while preserving redaction and the five-line/240-character bounds. Keep
+the fix in `scripts/plugins/smoke.sh` and `scripts/tests/plugins/smoke.bats`; do not modify
+`bin/smoke-test-cluster-health` or cluster behavior.
 
 Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.
