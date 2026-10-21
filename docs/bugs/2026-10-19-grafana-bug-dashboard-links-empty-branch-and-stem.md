@@ -3,6 +3,7 @@
 **Filed:** 2026-10-19 (operator reported a broken link while reviewing a P1 bug)
 **Branch:** `k3d-manager-v1.43.5`
 **Status:** OPEN — offline fix `2036253f` is landed, but operator reports a live dashboard row still opens a GitHub 404 (`docs/bugs/.md`); investigate deployment/runtime link resolution.
+**Offline regression follow-up:** test-only strengthening landed as `7cea0f18`; dashboard YAML unchanged; live E2 remains unresolved.
 **Priority:** P2 — the table displays bug records but clicking a bug cannot open its source document; users can locate documents manually
 **Severity:** medium (bug-tracking navigation and traceability are broken; not a cluster/runtime failure)
 **Approval:** operator authorized scoped offline implementation dispatch on 2026-10-21: “can you dispatch this bug?” Live Grafana/ArgoCD changes are not authorized by this dispatch.
