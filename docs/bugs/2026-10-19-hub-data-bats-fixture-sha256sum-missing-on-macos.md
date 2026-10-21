@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-19 (operator-provided live `make test` output; ChatGPT investigation)
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** OPEN — reproduced in a live macOS test run; fix and post-fix verification pending
+**Status:** VERIFIED — fixture portability fix landed in `845606a5`; 114/114 focused BATS cases pass. Mac-hosted `make test`/`test-all` live confirmation is queued.
 **Approval:** operator requested review and dispatch on 2026-10-21; scope is test-fixture portability only
 **Priority:** P2 — recovery-preflight safety assertions are never reached, and offline `make test` fails on the primary macOS runner
 **Severity:** Medium — test coverage and CI/observability reliability are impaired; no evidence here that production hub recovery itself is broken
@@ -89,7 +89,9 @@ interface:
 
 ## Verification status
 
-OPEN. The 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). Reproduced in Slack job `be53f685` on 2026-10-20 and again in `c30366d6`: hub-data fixture setup failed at `scripts/tests/plugins/hub_data.bats:126` with `sha256sum: command not found` (exit 127). In `c30366d6`, named affected tests included hub-data restore/export/prune and recovery-preflight assertions, all blocked in fixture setup before their intended assertions. The full `make test-all` reported 1,747 cases / 56 failures / exit 2. This remains a test-fixture portability defect; no fix was attempted. The 56 failures span separate test areas and are not all attributed to this issue; 55 non-`sha256sum` failures remain untriaged in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Verbatim latest evidence:
+The fix landed as `845606a5`. Independent verification on 2026-10-21: `bats scripts/tests/plugins/hub_data.bats` passed 114/114; `_agent_audit`, `_agent_lint`, and `git diff --check` passed. `shellcheck -S warning` reports the same seven pre-existing diagnostics as the release-branch baseline (2 SC2034, 3 SC2155, 2 SC2209; no new diagnostics). The simulated `shasum` fallback test passed. Live Mac-hosted `make test`/`test-all` remains queued for the operator; do not mark LIVE-VERIFIED until that run is recorded.
+
+Historical reproduction: the 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). Reproduced in Slack job `be53f685` on 2026-10-20 and again in `c30366d6`: hub-data fixture setup failed at `scripts/tests/plugins/hub_data.bats:126` with `sha256sum: command not found` (exit 127). In `c30366d6`, named affected tests included hub-data restore/export/prune and recovery-preflight assertions, all blocked in fixture setup before their intended assertions. The full `make test-all` reported 1,747 cases / 56 failures / exit 2. The 56 failures span separate test areas and are not all attributed to this issue; 55 non-`sha256sum` failures remain untriaged in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Verbatim latest evidence:
 
 ```text
 not ok 1171 recover preflight: a failed k3d listing refuses instead of treating the hub as absent
