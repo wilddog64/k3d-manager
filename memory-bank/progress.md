@@ -3,8 +3,8 @@
 ## 2026-10-20 dispatch queue and stale PID recovery
 
 - Dashboard Bug Tracking links: dispatched task `2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem` exited successfully. Focused BATS was 21 passed with 1 release-branch skip; dashboard JSON and `git diff --check` passed. Worktree remains unlanded; live row clicks remain required.
-- Slack help: task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` had no terminal marker after its worker PID was reused. Root cause: resume used `kill -0` only, unlike status which checks recorded process-start identity. Fixed resume guard and added regression test; commit `e12b9d87` is pushed. The task resumed and exited successfully. Focused pytest: 29 passed; `scripts/tests/lib/webhook.bats` still has two role-helper failures (tests 66–67), so do not land until reviewed.
-- Hostinger node outage: added an offline-only dispatch scope/report path. Live SSH, Hostinger panel/API, cluster access, and infrastructure changes are explicitly out of scope; the task will identify evidence still needed from the operator.
+- Slack help: task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` had no terminal marker after its worker PID was reused. Root cause: resume used `kill -0` only, unlike status which checks recorded process-start identity. Fixed resume guard and added regression test; commit `e12b9d87` is pushed. The task resumed and exited successfully. Focused pytest: 29 passed; `scripts/tests/lib/webhook.bats` ended 59 passed, 6 skipped, 3 failed (tests 25, 66, 67). Do not land until these failures are reviewed.
+- Hostinger node outage: added an offline-only dispatch scope/report path, then dispatched it. Task `2026-10-17-hostinger-node-unresponsive-then-rebooted` exited successfully and produced `docs/issues/2026-10-20-hostinger-node-outage-evidence-review.md`. No live SSH, Hostinger panel/API, cluster access, or infrastructure changes. Operator hPanel activity log for 2026-10-17 17:45–18:11 UTC remains necessary to identify who initiated the power-off.
 
 ## 2026-10-20 queued bug dispatches
 

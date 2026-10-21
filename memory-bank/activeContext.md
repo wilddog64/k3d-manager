@@ -37,7 +37,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
-- Dispatch queue (2026-10-20): dashboard-link implementation exited successfully (focused BATS 21 tests plus one release-branch skip; JSON and diff checks passed), unlanded pending review and live clicks. Slack help task resumed successfully after fixing stale-PID identity handling (`e12b9d87`); focused pytest passed 29/29, but webhook BATS had failures 66–67 and must be reviewed before landing. Hostinger task is scoped to offline evidence review only; no live host/provider access or infrastructure change.
+- Dispatch queue (2026-10-20): dashboard-link implementation exited successfully (focused BATS 21 tests plus one release-branch skip; JSON and diff checks passed), unlanded pending review and live clicks. Slack help task resumed successfully after fixing stale-PID identity handling (`e12b9d87`); focused pytest passed 29/29, but webhook BATS was 59 passed / 6 skipped / 3 failed (tests 25, 66, 67), so review before landing. Hostinger's offline evidence review exited successfully; `docs/issues/2026-10-20-hostinger-node-outage-evidence-review.md` identifies the hPanel activity log needed to resolve the initiator. No live host/provider access or infrastructure change.
 
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
 - Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.
