@@ -44,6 +44,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - After webhook restart, operator Slack job `a3d1097b` showed the `[TARGET] expected exactly one shopping-cart target, found 2` diagnostic with both candidate apps and destinations. This live-verifies the reporting fix; the smoke gate correctly remains failed because it must not choose a cluster implicitly.
 - Filed P2 `docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`: Slack currently permits only `SMOKE_ONLY` for smoke, preventing an explicit `ARGOCD_APP_PREFIX` selection. Dispatched as `slack-smoke-target-override`; dispatcher reports `running`, scope `in-scope`. No cluster behavior or target-selection default is being changed. Evidence commit `f39bd0e2` is pushed.
 
+## 2026-10-21 Dispatch dashboard historical metrics
+
+- Investigated screenshot rows `slack-explicit-job-logs` and `slack-make-log-selection`. Ledger contains only `start` and `land` for each; no `codex_exit`. Their elapsed values (96 seconds / 1.60 minutes and 299 seconds / 4.98 minutes) are valid, but tokens are unavailable and zero runs/time are exporter defaults for absent terminal events, not evidence of no Codex work.
+- These runs predate `2de716d8`, which added terminal status markers and `codex_exit` events. No telemetry was backfilled and no dashboard changes were made. Findings: `docs/issues/2026-10-21-dispatch-dashboard-legacy-task-metrics-missing.md`.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.
