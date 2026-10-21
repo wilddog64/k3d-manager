@@ -1,6 +1,8 @@
 # Bug: Slack make smoke reports cluster-health FAIL without actionable diagnostics
 
-**Status:** VERIFIED — `[TARGET]` follow-up passed offline tests; awaiting operator live verification
+**Status:** LIVE-VERIFIED — Slack job `a3d1097b` surfaced the bounded `[TARGET]` reason and both candidate contexts after the webhook restart; smoke correctly failed closed on ambiguous target selection
+**Live evidence:** 2026-10-21 · run a3d1097b · env Slack/Make · scenario smoke-target-diagnostic-output · commit 36dfb1e2 · proves fix
+**Fix commit:** `36dfb1e2`
 **Priority:** P2
 **Filed:** 2026-10-13
 **Detected by:** human
@@ -107,5 +109,35 @@ the fix in `scripts/plugins/smoke.sh` and `scripts/tests/plugins/smoke.bats`; do
   clean; `_agent_audit` passed in the commit hook.
 - Status is VERIFIED offline. Operator must restart the webhook and rerun `/make smoke` for
   live verification.
+
+### Live verification — 2026-10-21
+
+After the webhook restart, Slack job `a3d1097b` returned the target-selection diagnostic and
+candidate details directly in the thread:
+
+```text
+make smoke queued — job a3d1097b
+make smoke started by slack:wilddog64:U4C9LDQP2 — job a3d1097b
+make smoke failed (rc 2) — job a3d1097b
+./scripts/k3d-manager smoke_run
+running under bash version 5.3.20(1)-release
+check           tier      status
+webhook         offline   PASS
+cluster-health  cluster   FAIL
+  log: /var/folders/xc/ye_fyZ14272dpg2z7yqvg5w0000gn/T//k3dm-smoke/20261021T011004Z-55192/cluster-health.log
+  smoke_check_failed: 1 cluster-health failure(s)
+  [TARGET] expected exactly one shopping-cart target, found 2
+    ubuntu-hostinger-shopping-cart-basket -> ubuntu-hostinger
+    ubuntu-k3s-shopping-cart-basket -> ubuntu-k3s
+  Next: retrieve the full bounded job transcript with /k3dm logs <job-id>.
+smoke: 1 passed, 1 failed, 0 skipped
+make: *** [smoke] Error 1
+```
+
+The reporting fix is LIVE-VERIFIED: the Slack output contains the actionable bounded target
+diagnostic and candidates. The smoke command's nonzero result is a separate, intentional
+fail-closed response to two eligible targets; it is not evidence that the reporter regressed.
+Slack currently does not allow passing `ARGOCD_APP_PREFIX`, so selection support is tracked in
+`docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`.
 
 Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.

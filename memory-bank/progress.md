@@ -39,6 +39,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Operator's initial `/make e2e-replay RUNNER=m2` completed successfully with `published=0 still pending=0`, but used the direct Make route. Operator then sent bare `k3dm e2e-replay RUNNER=m2` in the E2E thread; queued, started, and succeeded notices all referenced job `3198fa72`, with terminal output `published=0 still_pending=0`. Updated replay bug to LIVE-VERIFIED.
 - Dispatched and landed the smoke `[TARGET]` diagnostic follow-up as `36dfb1e2`. It includes `[TARGET]` lines and indented context while keeping output bounded/redacted. Independent BATS passed 11/11, ShellCheck clean, `_agent_audit` passed. Bug is VERIFIED offline; operator must restart the webhook and repeat `/make smoke` for live verification.
 
+## 2026-10-21 Slack smoke target selection
+
+- After webhook restart, operator Slack job `a3d1097b` showed the `[TARGET] expected exactly one shopping-cart target, found 2` diagnostic with both candidate apps and destinations. This live-verifies the reporting fix; the smoke gate correctly remains failed because it must not choose a cluster implicitly.
+- Filed P2 `docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`: Slack currently permits only `SMOKE_ONLY` for smoke, preventing an explicit `ARGOCD_APP_PREFIX` selection. Dispatch pending. No cluster behavior or target-selection default is being changed.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.

@@ -60,3 +60,22 @@ INFO: [e2e-remote] replay complete: published=0 still_pending=0
 The queued acknowledgment arrived before the start and terminal notices, all correlated to the
 same child job ID. Exit succeeded with no reports pending, so this is not a replay error. The
 thread acknowledgment bug is LIVE-VERIFIED.
+
+## Smoke diagnostics follow-up
+
+After the webhook restart, Slack job `a3d1097b` showed the expected bounded target-selection
+diagnostic and both candidate contexts. The relevant output was:
+
+```text
+cluster-health  cluster   FAIL
+  smoke_check_failed: 1 cluster-health failure(s)
+  [TARGET] expected exactly one shopping-cart target, found 2
+    ubuntu-hostinger-shopping-cart-basket -> ubuntu-hostinger
+    ubuntu-k3s-shopping-cart-basket -> ubuntu-k3s
+  Next: retrieve the full bounded job transcript with /k3dm logs <job-id>.
+```
+
+This confirms the `[TARGET]` reporter fix is live. The smoke command correctly exits nonzero
+because its target resolver refuses to select one of the two candidates implicitly. The Slack
+Make allowlist currently does not accept `ARGOCD_APP_PREFIX`; follow-up is tracked in
+`docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`.
