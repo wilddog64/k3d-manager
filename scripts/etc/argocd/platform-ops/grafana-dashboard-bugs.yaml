@@ -1131,9 +1131,7 @@ data:
                   "live_evidence": 13
                 },
                 "excludeByName": {
-                  "bug": true,
                   "sort_key": true,
-                  "branch": true,
                   "release": true,
                   "__name__": true,
                   "job": true,
@@ -1324,6 +1322,30 @@ data:
                         "targetBlank": true
                       }
                     ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "bug"
+                },
+                "properties": [
+                  {
+                    "id": "hideFrom",
+                    "value": {"viz": true, "legend": false, "tooltip": false}
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "branch"
+                },
+                "properties": [
+                  {
+                    "id": "hideFrom",
+                    "value": {"viz": true, "legend": false, "tooltip": false}
                   }
                 ]
               },

@@ -242,6 +242,31 @@ if check == "link":
     url = links[0][0]["url"]
     assert "${__data.fields.branch}" in url and "${__data.fields.bug}" in url, url
     assert links[0][0]["targetBlank"] is True
+    # Model the post-organize frame: excludeByName removes columns, while
+    # hideFrom.viz keeps metadata available to data-link interpolation.
+    organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+    assert not organize["excludeByName"].get("branch") and not organize["excludeByName"].get("bug")
+    hidden = {}
+    for override in table["fieldConfig"]["overrides"]:
+        for prop in override["properties"]:
+            if prop["id"] == "hideFrom":
+                hidden[override["matcher"]["options"]] = prop["value"]
+    assert hidden["bug"]["viz"] and hidden["branch"]["viz"]
+    rows = [
+        {"branch": "release/v1.43.5", "bug": "2026-10-18-register-app-cluster-role-lookup-exits-silently", "title": "App cluster role lookup"},
+        {"branch": "feature/dashboard-fix", "bug": "2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem", "title": "Dashboard links"},
+    ]
+    for row in rows:
+        post_transform = {key: value for key, value in row.items() if key not in organize["excludeByName"]}
+        resolved = url.replace("${__data.fields.branch}", post_transform.get("branch", ""))
+        resolved = resolved.replace("${__data.fields.bug}", post_transform.get("bug", ""))
+        assert "/blob//" not in resolved and "/docs/bugs/.md" not in resolved, resolved
+        assert f"/blob/{row['branch']}/docs/bugs/{row['bug']}.md" in resolved, resolved
+    # Negative control: the original organize exclusion reproduces both blanks.
+    broken_frame = {key: value for key, value in rows[0].items() if key not in {"branch", "bug"}}
+    broken = url.replace("${__data.fields.branch}", broken_frame.get("branch", ""))
+    broken = broken.replace("${__data.fields.bug}", broken_frame.get("bug", ""))
+    assert "/blob//" in broken and "/docs/bugs/.md" in broken, broken
 elif check == "sort":
     transforms = [t["id"] for t in table["transformations"]]
     assert transforms.index("sortBy") < transforms.index("organize"), transforms
@@ -258,7 +283,8 @@ elif check == "layout":
 elif check == "columns":
     organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
-    assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
+    assert {"sort_key", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
+    assert not {"bug", "branch"} & hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
     assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
     assert organize["indexByName"]["fixed_in"] == 6
