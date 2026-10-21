@@ -98,6 +98,7 @@ This is a **distinct second-stage validation failure**, not the thread-parser us
 - `bin/k3dm-webhook`
 - `scripts/lib/webhook/make_targets.py`
 - `scripts/lib/webhook/cloud_actions.py`
+- `scripts/lib/webhook/lifecycle.py` — encode validated free-text before Make's shell boundary and restore it as argv in the retrieval command
 - `Makefile`
 - `workers/slack-relay/index.js`
 - `workers/slack-relay/test/relay.test.mjs`
