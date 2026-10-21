@@ -1,5 +1,10 @@
 # Progress — compressed operational log
 
+## 2026-10-21 Slack help live verification and landing
+
+- Landed the dispatched fix for `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` as `61230daa` on `k3d-manager-v1.43.5` and pushed it to origin. Verification: canonical webhook BATS `1..68` passed (5 expected skips); focused pytest `29 passed`; ShellCheck, diff check, `_agent_lint`, and `_agent_audit` passed. Initial sandboxed BATS attempts could not bind the temporary localhost server; rerunning through the approved elevated path passed, with tripwire blocking 74 credential-tool calls.
+- Operator screenshot live-verifies `/k3dm targets` returning while AWS `cluster-up` is still running. It also shows lifecycle progress as a top-level notification rather than a thread reply; this is a distinct existing P3, `docs/bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md`, and remains OPEN.
+
 ## 2026-10-21 documentation bug dispatch queue
 
 - Reviewed P3 bugs for README/Hermes duplication, the monolithic Grafana guide, and CVE/Trivy GitHub rendering failure; pushed the authorization/scope update as `b05ccf6c`.

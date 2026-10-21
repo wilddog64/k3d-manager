@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** VERIFIED — 2026-10-21: independent offline verification passed in the isolated dispatch worktree; live Slack verification is pending after the fix is landed and deployed.
+**Status:** LIVE-VERIFIED — 2026-10-21: operator Slack screenshot shows the `/k3dm targets` help response arriving while `cluster-up (aws)` is still running. The separate cluster-up progress notification remains top-level; that is tracked by `2026-10-15-cluster-up-progress-slack-thread-missing.md` and is not covered by this fix.
+**Live evidence:** 2026-10-21 · run 2b6e4f97 · env slack/k3d-manager · scenario k3dm-help-during-cluster-up · commit 61230daa · proves fix
+**Fix commit:** 61230daa
 **Priority:** P2 — ChatOps command reliability
 **Reported incident:** AWS `cluster-up` job `f58814c3`, Oct 15 around 10:52–10:54 local time
 
@@ -47,7 +49,7 @@ Operator screenshot shows `cluster-up (aws)` started at 10:52 (job `f58814c3`), 
 - `scripts/tests/bin/test_webhook_stale_cleanup.py`
 - `scripts/tests/lib/webhook.bats`
 
-**Implementation:** dispatched changes are in an isolated worktree and remain unlanded. No live Slack command or infrastructure action has been performed.
+**Implementation:** landed as `61230daa` on `k3d-manager-v1.43.5`. The help response now uses bounded chunk delivery; delivery attempts and command-handler exceptions are correlated to the Slack event and recorded without secrets. Thread-targeted replies do not fall back to non-thread-capable incoming webhooks.
 
 ## Offline verification — 2026-10-20
 
@@ -107,8 +109,7 @@ _agent_lint exit=0
 _agent_audit exit=0
 ```
 
-The dispatcher reports the task exited successfully and in-scope. Its four changed files remain
-uncommitted and unlanded in the isolated worktree. This is offline verification only; no live Slack
-command was sent. After the code is landed and deployed, the operator should run `k3dm help` while a
-`cluster-up` is still running and confirm the help response appears promptly in the originating
-Slack conversation/thread.
+The operator's 2026-10-21 screenshot shows the `/k3dm targets` response during an active AWS
+`cluster-up`, confirming the responsive help path in live Slack. The same screenshot shows the
+cluster-up progress update as a separate top-level message; that distinct thread-context defect
+remains open under `2026-10-15-cluster-up-progress-slack-thread-missing.md`.

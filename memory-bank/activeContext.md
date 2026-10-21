@@ -43,7 +43,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
-- Dispatch verification (2026-10-20): Grafana Bug Tracking link fix landed as `2036253f`, focused BATS 21 passed / 1 release-only skip, JSON and diff checks passed; live row clicks remain pending. Hostinger evidence review landed as `a0c4e6da` and confirms offline classification only; initiating actor remains unknown pending hPanel activity log. Slack help task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` is VERIFIED offline in its isolated worktree: Python 3.15 test-loader failures fixed; focused pytest 29/29 and webhook BATS 68 passed / 5 expected skips, shellcheck, `_agent_lint`, `_agent_audit`, and diff checks passed. Four task files remain unlanded; operator live Slack verification is pending deployment. Dispatcher stale-PID recovery fix is `e12b9d87`.
+- Slack help task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` landed as `61230daa` and is LIVE-VERIFIED by the operator's 2026-10-21 Slack screenshot showing `/k3dm targets` responding while AWS `cluster-up` remained running. Webhook BATS passed 68/68 (5 expected skips), focused pytest passed 29/29, ShellCheck/diff-check and `_agent_lint`/`_agent_audit` passed. Separate cluster-up progress threading remains open as P3 under `2026-10-15-cluster-up-progress-slack-thread-missing.md`.
 
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
 - Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.
