@@ -5,7 +5,7 @@
 **Status:** OPEN — offline fix `2036253f` is landed, but operator reports a live dashboard row still opens a GitHub 404 (`docs/bugs/.md`); investigate deployment/runtime link resolution.
 **Priority:** P2 — the table displays bug records but clicking a bug cannot open its source document; users can locate documents manually
 **Severity:** medium (bug-tracking navigation and traceability are broken; not a cluster/runtime failure)
-**Approval:** pending — bug filed at operator request; implementation not approved
+**Approval:** operator authorized scoped offline implementation dispatch on 2026-10-21: “can you dispatch this bug?” Live Grafana/ArgoCD changes are not authorized by this dispatch.
 **Release:** v1.43.5 (bug; exempt from plan cap)
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (Grafana `k3dm-bugs`, "Bugs" table)
 **Related:** `docs/bugs/2026-10-11-bug-dashboard-cannot-list-open-bugs.md`; `scripts/tests/plugins/grafana_dashboard_bugs.bats`
