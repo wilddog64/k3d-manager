@@ -21,21 +21,21 @@ Queuing make find-similar-docs…
 
 ## Findings and limits
 
-The live attempt failed. In the landed source, the relay acknowledgment is `Request received for make …; validating…`, not `Queuing make …`; the backend `Q` validation accepts printable ASCII, including apostrophes. The older acknowledgment strongly indicates that the deployed relay is stale. The screenshot alone cannot identify whether the webhook backend is also stale, nor does it show the exact submitted query.
+The live attempt failed. In the landed source, the relay acknowledgment is `Request received for make …; validating…`, not `Queuing make …`; the backend `Q` validation accepts printable ASCII, including apostrophes. The screenshot's acknowledgment is not enough to identify which component generated it or prove that the relay is stale. It also does not show the exact submitted query.
 
 ## Follow-up
 
-Verify deployed revisions for both the Slack relay and webhook include `74d79eac`/`997587d6`. Then retry `k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack and verify successful execution with the full unchanged query. Keep the canonical bug OPEN until that live check passes.
+From the current release branch, run the documented rollout steps for both components (`make deploy-worker` for the Cloudflare relay and `make restart-webhook` for the local webhook) if they have not already been done. Then retry `k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack and verify successful execution with the full unchanged query. Keep the canonical bug OPEN until that live check passes.
 
 ## Redispatched investigation task
 
-**Slug:** `slack-find-similar-docs-deployment-gap`
+**Slug:** `slack-find-similar-docs-live-q-failure-followup`
 
-Investigate the rollout gap for the already-landed parser fix. Compare the release branch commits with `origin/main`, inspect the Cloudflare Worker deployment workflow and the webhook's local service/restart mechanism, and document the exact safe promotion/deployment sequence and how to verify each component's running revision. Do not change deployment triggers, deploy anything, restart services, or duplicate the parser implementation. If repository evidence does not establish the webhook deployment mechanism or required steps, state that uncertainty explicitly.
+Treat the current release branch as the intended deployment source. Inspect the Slack relay and webhook code paths, identify safe read-only ways to establish which release-branch revisions are active (or state if runtime revision cannot be queried), and document the component-specific rollout/restart steps and live acceptance check. Determine whether any remaining parser/validation defect exists in the landed code. Do not deploy, restart services, change deployment triggers, or duplicate an already-correct implementation.
 
 **Files:**
 
 - `docs/issues/2026-10-21-slack-find-similar-docs-live-verification-failed.md`
 - `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md` (read-only reference)
-- `.github/workflows/deploy-worker.yml` (read-only reference)
+- `.github/workflows/deploy-worker.yml` (read-only reference; supplementary, not the release-branch deployment baseline)
 - `docs/architecture/webhook-server.md` (read-only reference)

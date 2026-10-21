@@ -80,7 +80,7 @@ This is **not LIVE-VERIFIED**. After the webhook deployment is updated, verify i
 
 ### Live verification failure — 2026-10-21
 
-The operator tried the slash command twice; both returned `⚠️ invalid value for Q` after a `Queuing make find-similar-docs…` acknowledgment. This does not pass the live gate. The committed relay now acknowledges with `Request received … validating…`, and the committed backend accepts the apostrophe-containing query. The old acknowledgment is evidence that at least the relay deployment is stale; the screenshot cannot establish whether the webhook backend is stale as well. Reopen deployment verification: confirm the relay and webhook are both running revisions containing `74d79eac`/`997587d6`, then retry the exact natural-language query and confirm successful retrieval.
+The operator tried the slash command twice; both returned `⚠️ invalid value for Q` after a `Queuing make find-similar-docs…` acknowledgment. This does not pass the live gate. The landed relay source uses a different immediate acknowledgment, but the screenshot text alone does not prove the relay is stale: Slack may show a response from another stage, and the acknowledgment does not identify the responding component. The repository's operating model deploys from the checked-out release branch; verify that the webhook was restarted and the relay deployed from that branch after `74d79eac`/`997587d6`, then retry the exact natural-language query and confirm successful retrieval.
 
 
 ## Additional reproduction: slash command returns `invalid value for Q`
