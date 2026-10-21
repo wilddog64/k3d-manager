@@ -88,4 +88,4 @@ interface:
 
 ## Verification status
 
-OPEN. The 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). The operator supplied the later failure excerpt; no post-fix evidence exists yet. Update Status, verification timestamp, and live-evidence metadata only after a real fix and matching verification.
+OPEN. The 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). Reproduced again in Slack job `be53f685` on 2026-10-20: test 1171 failed during `make_fixture` at `scripts/tests/plugins/hub_data.bats:126` with `sha256sum: command not found` (exit 127); the full `make test-all` reported 1,747 cases / 56 failures / exit 2. This remains a test-fixture portability defect; no fix was attempted. Full live-run findings: `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Update Status, verification timestamp, and live-evidence metadata only after a real fix and matching verification.

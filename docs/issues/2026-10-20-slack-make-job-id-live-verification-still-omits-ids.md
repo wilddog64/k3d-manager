@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-20
 **Related bug:** `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`
-**Result:** Partial / inconclusive deployment verification; no live pass
+**Result:** Live notice check failed; full test command exited nonzero, so no live pass
 
 ## What was tested
 
@@ -20,7 +20,24 @@ THREAD: :hammer_and_wrench: *make test-all* queued [k3d-manager]
 running under bash version 5.3.20(1)-release```
 ````
 
-The job was still running at the time inspected; no terminal notice was observed.
+The run later terminated with `make test-all failed (rc 2)`. That terminal Slack notice also omitted the job ID. The full suite reported 1,747 cases with 56 failures; this broad test failure is separate from the notice-ID behavior and was not fully triaged here.
+
+Verbatim terminal output from the job log:
+
+````text
+not ok 1171 recover preflight: a failed k3d listing refuses instead of treating the hub as absent
+# (from function `make_fixture' in file scripts/tests/plugins/hub_data.bats, line 125,
+#  in test file scripts/tests/plugins/hub_data.bats, line 967)
+#   `make_fixture; source_plugin' failed with status 127
+# /Users/cliang/src/gitrepo/personal/k3d-manager/scripts/tests/plugins/hub_data.bats: line 126: sha256sum: command not found
+make[1]: *** [test] Error 1
+[k3dm-test-metrics] 1747 cases, 56 failed
+[k3dm-test-metrics] metrics pushed: test-all/local
+[test-all] metrics log: /var/folders/nc/y0_fv7412472dpg2z7y0yq5w0000gn/T//k3dm-test-all-1792540915.log
+make: *** [test-all] Error 2
+````
+
+The `sha256sum` fixture failure is already tracked in `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md`. Other failures remain untriaged; the captured local transcript is `scratch/test-logs/all/20261020-170156.log`.
 
 ## Diagnostics and actual output
 
@@ -47,5 +64,6 @@ Not established. The Slack notices prove the process handling this request did n
 
 1. Rotate the potentially exposed Slack bot token and signing secret, then update the secure local store / LaunchAgent using the established rotation procedure.
 2. From the updated release checkout, run `make restart-webhook`.
-3. Run another Slack `/make test-all`; verify queued, started, progress if emitted, and terminal notices all contain the same ID, and `logs <job-id>` retrieves the matching output.
-4. Only then mark the related bug LIVE-VERIFIED.
+3. Use a successful, safe Slack Make target for the notice retest; the observed `test-all` run itself failed with 56 cases, including a known macOS fixture failure.
+4. Verify queued, started, progress if emitted, and terminal notices all contain the same ID, and `logs <job-id>` retrieves the matching output.
+5. Only then mark the related bug LIVE-VERIFIED.
