@@ -10,7 +10,7 @@
 
 The explicit-target handler resolves a job ID and then sends successful `status`/`logs` replies using that target job's notification context. A target job such as a `cluster-status` child can have `thread_ts` but lack `channel_id`; its parent thread anchor has the channel context. The live operator check showed the explicit status request received no visible bot reply. Preserve trusted parent Slack delivery context on the target before sending the response.
 
-## Scope
+## Files
 
 Only change these files:
 
