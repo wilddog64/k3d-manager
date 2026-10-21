@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-20 queued bug dispatches
+
+- The Grafana Bug Tracking link task exited successfully in its isolated worktree. Focused `grafana_dashboard_bugs.bats` passed 21 tests (one release-branch-only skip); dashboard JSON validation and `git diff --check` passed. The task changes remain unlanded pending independent review; live URL clicks are still needed.
+- Added the missing `## Files` allowlist to `docs/bugs/2026-10-15-slack-k3dm-help-no-response-during-cluster-up.md` so it can be safely dispatched after this scope update is committed and pushed.
+- The Hostinger node outage bug remains an investigation-only queue item. No SSH/hPanel access or infrastructure action will be performed without explicit operator direction.
+
 Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memory-bank/archive/2026-10-07-to-2026-10-16-compressed.md`; the prior full file remains recoverable from git history.
 
 ## 2026-10-21 dispatch vendor/model attribution plan

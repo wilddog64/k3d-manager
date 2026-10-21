@@ -37,6 +37,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Open / pending
 
+- Dispatch queue (2026-10-20): `2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem` exited successfully in its isolated worktree; focused BATS passed 21 tests with one release-branch skip, dashboard JSON validation and `git diff --check` passed. Changes remain unlanded; live link clicks remain pending. The Slack `k3dm help` bug now has an explicit `## Files` allowlist, pending commit/push before dispatch. Hostinger outage remains a read-only evidence review; no live host/provider action is authorized by this queue.
+
 - E2E frontend/product-catalog bootstrap-order fix `4ebaaec5`: bug is `LIVE-VERIFIED` from Slack job `f8ea6d69`, E2E run `1792450928-16408`, with 4/4 tests passed.
 - Slack Make-log lookup fix `d5e7b7f5`: bug is `VERIFIED`; operator must run a live Slack Make command and then `logs <job-id>` to confirm the transcript is returned.
 - Slack explicit job-ID lookup fix `177ba541`: bug is `LIVE-VERIFIED` from operator Slack job `26f2035e` and E2E run `1792455493-30189` (exit code 0 / result pass).

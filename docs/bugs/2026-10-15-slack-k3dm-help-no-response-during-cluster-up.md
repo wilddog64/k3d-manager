@@ -40,4 +40,11 @@ Operator screenshot shows `cluster-up (aws)` started at 10:52 (job `f58814c3`), 
 - Verify unauthorized actors get explicit feedback, authorized actors are not dropped by dedupe/role handling, and Slack event HTTP acknowledgment isn't conflated with successful command execution.
 - Use mocked Slack calls; no live cluster provision or destructive operation in tests.
 
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_stale_cleanup.py`
+- `scripts/tests/lib/webhook.bats`
+
 **Implementation:** not started. No Slack command or live infrastructure was invoked to file this report.
