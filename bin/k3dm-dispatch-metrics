@@ -194,10 +194,12 @@ def render(events, bad_lines, now=None):
             labels = f'window="{window}",version="{version}",slug="{slug}"'
             if tokens is not None:
                 lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
-            lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
+            if runs:
+                lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
             if elapsed_seconds is not None:
                 lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
-            lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
+            if runs:
+                lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
         lines.append(f'k3dm_dispatch_task_skipped{{window="{window}"}} {skipped}')
         truncated = int(len(valid_tasks) > TASK_CAP)
         lines.append(f'k3dm_dispatch_task_truncated{{window="{window}"}} {truncated}')

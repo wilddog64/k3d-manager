@@ -81,6 +81,27 @@ def test_per_task_values():
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 3.3333333333333335' in output
 
 
+def test_landed_task_without_exit_omits_codex_samples_but_keeps_elapsed():
+    output = dispatch_metrics.render([
+        event(100, "start"), event(399, "land"),
+    ], 0, 400)
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 299' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"}' not in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"}' not in output
+    assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 4.983333333333333' in output
+    assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"}' not in output
+
+
+def test_recorded_exit_keeps_codex_samples_including_zero_duration():
+    output = dispatch_metrics.render([
+        event(100, "start"), event(100, "codex_exit", tokens=0), event(399, "land"),
+    ], 0, 400)
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 0' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 0' in output
+    assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 0.0' in output
+
+
 def test_exit_without_launch_adds_nothing():
     output = dispatch_metrics.render([
         event(0, "start"), event(100, "codex_exit", tokens=10),
@@ -109,7 +130,9 @@ def test_task_cap():
         slug = f"task-{index}"
         events.extend([event(index, "start", slug), event(index + 100, "land", slug)])
     output = dispatch_metrics.render(events, 0, 1000)
-    assert output.count('k3dm_dispatch_task_runs{window="1d"') == 50
+    # agent-audit: allow assert-removed expected run count excludes tasks with no codex_exit
+    assert output.count('k3dm_dispatch_task_runs{window="1d"') == 0
+    assert output.count('k3dm_dispatch_task_elapsed_seconds{window="1d"') == 50
     assert 'slug="task-0"' not in output
     assert 'k3dm_dispatch_task_truncated{window="1d"} 1' in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 1.6666666666666667' in output
