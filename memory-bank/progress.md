@@ -6,6 +6,12 @@
 - Slack help: task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` had no terminal marker after its worker PID was reused. Root cause: resume used `kill -0` only, unlike status which checks recorded process-start identity. Fixed resume guard and added regression test; commit `e12b9d87` is pushed. The task resumed and exited successfully. Focused pytest: 29 passed; `scripts/tests/lib/webhook.bats` ended 59 passed, 6 skipped, 3 failed (tests 25, 66, 67). Do not land until these failures are reviewed.
 - Hostinger node outage: added an offline-only dispatch scope/report path, then dispatched it. Task `2026-10-17-hostinger-node-unresponsive-then-rebooted` exited successfully and produced `docs/issues/2026-10-20-hostinger-node-outage-evidence-review.md`. No live SSH, Hostinger panel/API, cluster access, or infrastructure changes. Operator hPanel activity log for 2026-10-17 17:45–18:11 UTC remains necessary to identify who initiated the power-off.
 
+## 2026-10-20 independent verification and live handoff
+
+- Grafana Bug Tracking links: independently reran `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` (21 passed, 1 release-branch-only skip); `shellcheck -S warning -x` and `git diff --check` were clean. Dispatcher land gate passed; fix landed/pushed as `2036253f`. Marked bug VERIFIED offline; two live GitHub row clicks remain.
+- Slack k3dm help: independently reran focused pytest (29 passed; pytest emitted a cache permission warning) and `bats scripts/tests/lib/webhook.bats` (59 passed, 6 skipped, 3 failed: tests 25, 66, 67). Kept bug OPEN and changes unlanded; appended exact output to its bug record. No live Slack message sent.
+- Hostinger outage: independently reviewed the offline evidence report; `make check-doc-links` passed (2246 files) and report was landed/pushed as `a0c4e6da`. Marked incident classification VERIFIED offline, but the initiating actor is unconfirmed; operator hPanel activity evidence is required for live attribution.
+
 ## 2026-10-20 queued bug dispatches
 
 - The Grafana Bug Tracking link task exited successfully in its isolated worktree. Focused `grafana_dashboard_bugs.bats` passed 21 tests (one release-branch-only skip); dashboard JSON validation and `git diff --check` passed. The task changes remain unlanded pending independent review; live URL clicks are still needed.

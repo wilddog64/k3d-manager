@@ -47,4 +47,27 @@ Operator screenshot shows `cluster-up (aws)` started at 10:52 (job `f58814c3`), 
 - `scripts/tests/bin/test_webhook_stale_cleanup.py`
 - `scripts/tests/lib/webhook.bats`
 
-**Implementation:** not started. No Slack command or live infrastructure was invoked to file this report.
+**Implementation:** dispatched changes are in an isolated worktree and remain unlanded. No live Slack command or infrastructure action has been performed.
+
+## Offline verification — 2026-10-20
+
+The dispatched implementation is **not verified for landing**. Focused tests passed:
+
+```text
+python3 -m pytest -q scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_stale_cleanup.py
+29 passed
+```
+
+The broader required suite did not pass:
+
+```text
+bats scripts/tests/lib/webhook.bats
+59 passed, 6 skipped, 3 failed
+not ok 25 Slack cluster parser accepts tokens in any order and dry-run isolates execution
+not ok 66 webhook role helpers preserve token admin and fail closed
+not ok 67 webhook fix mode requires operator+ role, not question phrasing
+```
+
+The changes remain in the isolated dispatch worktree and are not landed. No live Slack command
+was sent. Diagnose the three suite failures and complete any missing acceptance coverage before
+marking VERIFIED or requesting live verification.

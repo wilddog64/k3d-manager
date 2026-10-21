@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-19 (operator reported a broken link while reviewing a P1 bug)
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** OPEN
+**Status:** VERIFIED — offline E1 passed and fix landed as `2036253f` on `k3d-manager-v1.43.5`; live E2 row-click verification is pending.
 **Priority:** P2 — the table displays bug records but clicking a bug cannot open its source document; users can locate documents manually
 **Severity:** medium (bug-tracking navigation and traceability are broken; not a cluster/runtime failure)
 **Approval:** pending — bug filed at operator request; implementation not approved

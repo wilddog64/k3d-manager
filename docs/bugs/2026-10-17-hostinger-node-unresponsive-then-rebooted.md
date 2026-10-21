@@ -1,6 +1,6 @@
 # Bug: Hostinger node went unresponsive for ~25 minutes, then rebooted
 
-**Status:** OPEN — previous-boot journal read 2026-10-17: the outage was a hypervisor-initiated power-off, not a hang; who triggered it is unconfirmed
+**Status:** VERIFIED — offline review confirms an orderly hypervisor-initiated power-off, not a guest hang ([evidence review](../issues/2026-10-20-hostinger-node-outage-evidence-review.md), landed as `a0c4e6da`). Who initiated it remains unknown pending the operator's hPanel activity log.
 **Priority:** P2
 **Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
