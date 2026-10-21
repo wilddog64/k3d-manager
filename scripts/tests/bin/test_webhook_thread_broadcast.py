@@ -98,6 +98,53 @@ def test_thread_broadcast_routes_known_job_thread(monkeypatch, caplog):
     assert "slack message ignored" not in caplog.text
 
 
+def test_thread_broadcast_routes_orphan_command_to_thread_anchor(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
+    monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "operator")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
+    monkeypatch.setattr(wh, "_handle_thread_command", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    request = _slack_request({
+        "type": "message", "subtype": "", "user": "U1", "channel": "C1",
+        "thread_ts": "1700000000.000010", "ts": "1700000000.000011",
+        "text": "k3dm e2e-replay RUNNER=m2",
+    }, event_id="Ev-orphan")
+    wh._Handler.do_POST(request)
+
+    anchors = list(tmp_path.iterdir())
+    assert len(anchors) == 1
+    assert (anchors[0] / "status").read_text() == "thread-anchor"
+    assert (anchors[0] / "thread_ts").read_text() == "1700000000.000010"
+    assert calls[0][0][1:] == ("k3dm e2e-replay RUNNER=m2", "operator", "C1")
+
+
+def test_duplicate_event_id_dispatches_once(monkeypatch):
+    calls = []
+    monkeypatch.setattr(wh, "_seen_event_ids", __import__("collections").OrderedDict())
+    monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
+    monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "operator")
+    monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda _thread_ts: "job-1")
+    monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
+    monkeypatch.setattr(wh, "_handle_thread_command", lambda *args, **kwargs: calls.append(args))
+    event = {
+        "type": "message", "subtype": "", "user": "U1", "channel": "C1",
+        "thread_ts": "1700000000.000020", "ts": "1700000000.000021",
+        "text": "k3dm e2e-replay RUNNER=m2",
+    }
+
+    wh._Handler.do_POST(_slack_request(event, event_id="Ev-duplicate"))
+    wh._Handler.do_POST(_slack_request(event, event_id="Ev-duplicate"))
+
+    assert len(calls) == 1
+
+
 def test_subtype_drop_is_logged_without_message_text(monkeypatch, caplog):
     monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
     monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)

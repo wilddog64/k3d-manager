@@ -751,7 +751,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
     if channel_id:
         (JOB_DIR / job_id / "channel_id").write_text(channel_id)
     required = _thread_command_min_role(command)
-    if not _role_allows(role, required):
+    if cmd != "k3dm" and not _role_allows(role, required):
         _audit_remote_action(
             "/slack/events", f"thread-{cmd or 'unknown'}", actor, role, False,
             reason=f"requires {required}",
@@ -822,12 +822,12 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
             (new_job_dir / "thread_ts").write_text(thread_ts)
         if channel_id:
             (new_job_dir / "channel_id").write_text(channel_id)
+        _notify_job(job_id, f"🛠️ *make {target}* queued — job `{new_job_id}`")
         threading.Thread(
             target=_run_make_target,
             args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), actor),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🛠️ *make {target}* queued — job `{new_job_id}`")
 
     elif cmd == "argocd-upgrade":
         parts = command.strip().lstrip("/").split()
@@ -1215,17 +1215,29 @@ def _notify_job(job_id, text):
     response_url_file = JOB_DIR / job_id / "response_url"
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
     posted = False
-    if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
-        posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
-    if not posted and response_url:
-        posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
-    if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
-        ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
-        if ts and not thread_ts:
-            thread_ts_file.write_text(ts)
-        posted = bool(ts)
-    if not posted and SLACK_WEBHOOK_URL:
-        _slack_post(SLACK_WEBHOOK_URL, text)
+    route = "none"
+    try:
+        if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
+            route = "bot_thread"
+            posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+        if not posted and response_url:
+            route = "response_url"
+            posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
+        if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
+            route = "bot_fallback"
+            ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
+            if ts and not thread_ts:
+                thread_ts_file.write_text(ts)
+            posted = bool(ts)
+        if not posted and SLACK_WEBHOOK_URL:
+            route = "webhook_fallback"
+            posted = bool(_slack_post(SLACK_WEBHOOK_URL, text))
+    except Exception as exc:
+        _LOG.warning("slack notification failed job=%s route=%s reason=%s", job_id, route, type(exc).__name__)
+        return False
+    if not posted:
+        _LOG.warning("slack notification failed job=%s route=%s reason=not_delivered", job_id, route)
+    return posted
 
 
 def _analyze_stall(lines):

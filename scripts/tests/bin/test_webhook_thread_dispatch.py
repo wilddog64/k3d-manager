@@ -73,6 +73,39 @@ def test_slack_make_job_records_target_for_make_log_selection(dispatch_env):
     assert notices == [f"🛠️ *make test-all* queued — job `{queued[0].name}`"]
 
 
+def test_e2e_replay_is_acknowledged_before_stub_worker_starts(dispatch_env, monkeypatch):
+    started, notices = dispatch_env
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
+    order = []
+    monkeypatch.setattr(wh, "_notify_job", lambda _job, text: order.append(("notice", text)) or True)
+
+    class OrderedThread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            self.args = args
+
+        def start(self):
+            order.append(("worker", self.args[0]))
+
+    monkeypatch.setattr(wh.threading, "Thread", OrderedThread)
+    monkeypatch.setattr(wh, "_role_allows", lambda _actual, _required: True)
+    wh._handle_thread_command("job", "k3dm e2e-replay RUNNER=m2", "operator", "C1", "U1")
+
+    assert order[0][0] == "notice"
+    assert "e2e-replay" in order[0][1] and "queued" in order[0][1]
+    assert order[1][0] == "worker"
+    assert (wh.JOB_DIR / order[1][1] / "target").read_text() == "e2e-replay"
+
+
+@pytest.mark.parametrize("command", ["k3dm e2e-replay", "k3dm e2e-replay RUNNER=bad_value"])
+def test_e2e_replay_invalid_request_gets_explanation_without_worker(dispatch_env, command, monkeypatch):
+    started, notices = dispatch_env
+    monkeypatch.setattr(wh, "_role_allows", lambda actual, required: actual == "admin" or (actual == "operator" and required in {"operator", "reader"}))
+    wh._handle_thread_command("job", command, "operator", "C1")
+    assert started == []
+    assert len(notices) == 1
+    assert "requires RUNNER" in notices[0] or "invalid value for RUNNER" in notices[0]
+
+
 def test_direct_make_route_uses_job_id_in_thread_notice_and_response(
     monkeypatch, tmp_path
 ):
@@ -120,6 +153,23 @@ def test_direct_make_route_uses_job_id_in_thread_notice_and_response(
     assert started[0][1][0] == job_id
 
 
+def test_notification_failure_logs_safe_reason_code(monkeypatch, tmp_path, caplog):
+    import logging
+
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "")
+    monkeypatch.setattr(wh, "SLACK_CHANNEL_ID", "")
+    monkeypatch.setattr(wh, "SLACK_WEBHOOK_URL", "")
+    (tmp_path / "job").mkdir()
+
+    with caplog.at_level(logging.WARNING, logger="webhook"):
+        delivered = wh._notify_job("job", "private command payload")
+
+    assert delivered is False
+    assert "reason=not_delivered" in caplog.text
+    assert "private command payload" not in caplog.text
+
+
 def test_kill_still_dispatches(dispatch_env, monkeypatch):
     _started, notices = dispatch_env
     monkeypatch.setattr(wh, "_running_procs", {"job": 123})
@@ -149,14 +199,14 @@ def test_unknown_word_still_gets_unknown_reply(dispatch_env):
     assert "Unknown command" in notices[0]
 
 
-def test_reader_k3dm_is_denied_without_worker(dispatch_env):
+def test_reader_e2e_replay_is_denied_without_worker(dispatch_env):
     started, notices = dispatch_env
 
-    wh._handle_thread_command("job", "k3dm test-all", "reader", "C1")
+    wh._handle_thread_command("job", "k3dm e2e-replay RUNNER=m2", "reader", "C1")
 
     assert started == []
     assert len(notices) == 1
-    assert "requires role *admin*" in notices[0]
+    assert "requires role *operator*" in notices[0]  # agent-audit: allow assert-removed replay target is operator-scoped
 
 
 def test_logs_explicit_id_reads_requested_child(dispatch_env):
