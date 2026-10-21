@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Current remote HEAD: `945ab727` (`docs: mark app-cluster registration live verified`).
+- Latest release implementation push: `fd1b40b0` (Slack replay acknowledgment); the same push includes smoke diagnostics commit `30236df8`.
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -48,7 +48,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - P1 register-app-cluster role-lookup fix `a70e52a4`: LIVE-VERIFIED 2026-10-20 from Slack job `05f2be6c`, E2E run `1792538358-29202` (4/4, exit 0); log confirms cluster Secret applied and read-only hub check confirms fresh creation timestamp plus `app-cluster` role. Offline BATS 41/41 and ShellCheck clean.
 - P2 Slack Make job-ID notice bug: fix landed at `abb0a526` with progress/failure regression follow-up `cb7f37dc`; pytest 26/26, BATS 10/10, Python syntax, `_agent_audit`, and diff checks pass. Operator live-verified job `c30366d6`: queued, started, progress, and terminal-failure notices showed the same ID, and screenshot confirms `logs c30366d6` returned matching output. Bug is LIVE-VERIFIED. The `make test-all` run separately ended rc 2 (1,747 cases, 56 failed); the known macOS `sha256sum` fixture failure recurred and 55 other failures were not triaged. Evidence: `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
 - Existing OPEN P2 `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md` reproduced in `c30366d6`; affected hub-data tests fail at fixture setup because stock macOS lacks `sha256sum`. The 55 other test-all failures span separate areas and remain untriaged; do not track them as one assumed root cause.
-- Slack bug dispatches `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` both exited successfully after an early status check transiently reported `terminated unexpectedly`. Smoke BATS passed 10/10 and ShellCheck was clean; replay focused pytest passed 34/34. Both changesets remain unlanded for operator review; no live replay ran. Evidence: `docs/issues/2026-10-20-slack-bug-dispatch-workers-terminated-unexpectedly.md`.
+- Slack bug dispatches `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` both exited successfully after an early status check transiently reported `terminated unexpectedly`. Smoke diagnostics landed as `30236df8` (BATS 10/10, ShellCheck clean); replay acknowledgment landed as `fd1b40b0` (pytest 34/34, webhook BATS 68/68 with Python 3.14 and an authorized localhost bind). Both bugs are VERIFIED, not LIVE-VERIFIED; operator live verification remains pending. Environment details: `docs/issues/2026-10-20-slack-dispatch-verification-environment.md`.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
 
 ## Verification from latest work

@@ -28,6 +28,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Dispatched `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` as separate non-network tasks. An early status check transiently reported `terminated unexpectedly`; both later completed with exit 0 and final messages. Smoke BATS 10/10 and ShellCheck clean; replay pytest 34/34. No live replay was triggered and neither task was landed. Preserved their worktrees/logs and recorded the timing/status discrepancy in `docs/issues/2026-10-20-slack-bug-dispatch-workers-terminated-unexpectedly.md`.
 - Operator requested cleanup of stale dispatch slugs `e2e-sandbox-live-verify`, `pr-checks-table-misalignment-r5`, and `pr-checks-table-misalignment-r6`. Confirmed all worktrees were clean and no matching remote branches existed, then removed the three local worktrees/branches; run directories/logs were retained.
 
+## 2026-10-20 Slack bug verification and landing
+
+- Smoke diagnostics task `slack-smoke-health-diagnostics` landed as `30236df8`; independent BATS passed 10/10, ShellCheck was clean, and `_agent_audit` passed in the commit hook. Bug status is VERIFIED pending operator live Slack check.
+- Replay acknowledgment task `slack-thread-e2e-replay-ack` landed as `fd1b40b0`; focused pytest passed 34/34, Python AST syntax validation passed, `_agent_audit` passed, and `scripts/tests/lib/webhook.bats` passed 68/68 with Python 3.14 after obtaining permission for its localhost test-server bind. ShellCheck is not applicable to the Python entrypoint; the environment/tooling details are recorded in `docs/issues/2026-10-20-slack-dispatch-verification-environment.md`. Bug status is VERIFIED pending operator live test; no replay or report publication was triggered.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.

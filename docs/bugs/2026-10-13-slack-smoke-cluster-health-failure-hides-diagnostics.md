@@ -1,6 +1,6 @@
 # Bug: Slack make smoke reports cluster-health FAIL without actionable diagnostics
 
-**Status:** OPEN
+**Status:** VERIFIED — offline tests passed; awaiting operator live verification
 **Priority:** P2
 **Filed:** 2026-10-13
 **Detected by:** human
@@ -63,5 +63,13 @@ This is **reporting/diagnostic visibility**, not a fix for the unknown cluster-h
 
 - `bats scripts/tests/plugins/smoke.bats`
 - `shellcheck scripts/plugins/smoke.sh`
+
+## Offline verification — 2026-10-20
+
+- Landed on `k3d-manager-v1.43.5` as commit `30236df8`.
+- `bats scripts/tests/plugins/smoke.bats`: 10/10 passed.
+- `shellcheck scripts/plugins/smoke.sh`: clean (exit 0).
+- `_agent_audit`: passed in the commit hook.
+- No live Slack smoke command has been run for verification.
 
 Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.
