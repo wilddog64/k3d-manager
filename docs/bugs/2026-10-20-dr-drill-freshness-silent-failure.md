@@ -1,10 +1,11 @@
 # Bug: DR drill freshness workflow fails silently when last successful result is stale
 
 **Filed:** 2026-10-20 (operator GitHub failure notification; investigated with GitHub Actions logs and results branch)
-**Status:** OPEN
+**Status:** VERIFIED — offline fix landed as `c20d90cd` on 2026-10-21; live data-repo workflow verification pending
 **Priority:** P2 — repeated scheduled freshness failures lack actionable diagnostics and the DR evidence is past its eight-day assurance window
 **Severity:** moderate — DR readiness evidence is stale and the automated workflow cannot distinguish its failure mode; no evidence that an actual recovery drill failed
 **Approval:** operator requested review and dispatch on 2026-10-21; live DR operations, data-repo deployment, and synthetic result publication remain unauthorized
+**Verification:** focused BATS 7/7; ShellCheck, Bash syntax, `git diff --check`, documentation links, and `_agent_audit` passed. The installed `wilddog64/k3dm-hub-data:main/drill-freshness.sh` was not changed or live-tested.
 **Component:** `scripts/etc/dr/drill-freshness.sh`, `scripts/tests/plugins/dr_drill_freshness.bats`, installed copy `wilddog64/k3dm-hub-data:main/drill-freshness.sh`
 **Related:** `docs/plans/v1.46.0-scheduled-dr-drill.md` (weekly unattended drill is already queued; do not duplicate); `docs/howto/hub-dr-drill.md`; `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md`
 

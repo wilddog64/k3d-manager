@@ -6,6 +6,7 @@
 **Fix commit:** `6b324441`
 **Priority:** P2 — terminal cluster-up failure-analysis thread correlation suspected lost (raised from P3 2026-10-21).
 **Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
+**Investigation:** Read-only triage report landed at `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md` (`8b70f1a4`). Safe local delivery records support a routing/context failure, but do not identify the failure-analysis event or prove Slack-rendered placement. Bug remains OPEN; no fix was implemented by this triage.
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
 
