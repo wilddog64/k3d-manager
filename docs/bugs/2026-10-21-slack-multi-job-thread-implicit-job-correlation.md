@@ -4,13 +4,17 @@
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Priority:** P2 — ChatOps job correlation / diagnostics reliability
-**Status:** VERIFIED — explicit job targeting landed in `6c6cbd0b`; focused thread dispatch/broadcast suites pass 45/45
-**Verification:** Offline verified 2026-10-21; LIVE-VERIFICATION PENDING. A separate broader `test_webhook_ask_docs_thread.py` run still has one notification-stub failure; see task verification notes.
-**Approval:** operator requested review and dispatch on 2026-10-21; offline implementation is authorized, but no Slack messages, live job tests, deployment, or PR are authorized
+**Status:** OPEN — explicit targeting is offline-verified, but operator live check on 2026-10-21 showed target-job replies are not delivered
+**Verification:** Initial implementation offline-verified in `6c6cbd0b`; LIVE-VERIFICATION FAILED on 2026-10-21 pending delivery-context follow-up.
+**Approval:** operator authorized dispatch of a scoped follow-up fix on 2026-10-21; no additional Slack messages, live job tests, deployment, or PR are authorized without operator approval
 **Component:** Slack Events API thread routing, thread-to-job selection, implicit `logs`/`status`/`diagnosis`/`kill` semantics
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (FIXED / LIVE-VERIFIED 2026-10-20; do not regress); `docs/bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md` (LIVE-VERIFIED 2026-10-21); `docs/bugs/2026-10-02-cluster-status-report-not-threaded.md` (FIXED); `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`.
 
 ## Symptom and live evidence
+
+Follow-up live check on 2026-10-21: in the thread containing `cluster-status` job `76933b92`, the operator sent `logs 76933b92` and received an “unknown or records expired” error, then sent `status 76933b92` and observed no bot reply. The queued `cluster-status` message and status report were visible in the same thread. This proves the explicit-target experience is not yet live-verified; it does not prove whether the first ID was mistyped. The missing reply to the second command is the actionable regression.
+
+Source review found that the explicit-target path switches notification delivery from the parent thread anchor to the target job directory. The parent context has the Slack channel ID, while status workers persist the target job's thread timestamp but do not persist its channel ID. `_notify_job()` requires channel/thread context to post a bot-thread reply. Follow-up spec: `docs/issues/2026-10-21-slack-explicit-target-reply-context-spec.md`.
 
 In Slack channel `#acg-automation` on 2026-10-21 (PDT), a `make fix-list` job `cc07714e` created parent thread `1792585073.083669`. Multiple subsequent independent commands intentionally shared this thread:
 
