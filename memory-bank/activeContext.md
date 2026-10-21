@@ -5,7 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
-- Latest release push: `127e8439` records the active Slack smoke selector dispatch; the dispatch dashboard historical-metrics finding is documented locally. Replay fix live-verified from job `3198fa72`.
+- Latest release push: `fb4b1bb8` records the dispatch-dashboard telemetry bug spec; task `dispatch-dashboard-missing-codex-telemetry` is running. Slack smoke selector task is also active. Replay fix live-verified from job `3198fa72`.
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.
 - Release plan cap: v1.43.5 has five plan slots; do not add another plan without splitting/releasing.
@@ -50,7 +50,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 - Existing OPEN P2 `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md` reproduced in `c30366d6`; affected hub-data tests fail at fixture setup because stock macOS lacks `sha256sum`. The 55 other test-all failures span separate areas and remain untriaged; do not track them as one assumed root cause.
 - Slack smoke diagnostics follow-up `slack-smoke-target-diagnostics` landed as `36dfb1e2`; it surfaces bounded `[TARGET]` diagnostics and candidate context. Independent BATS passed 11/11, ShellCheck clean, `_agent_audit` passed. Operator live-verified the reporting fix with Slack job `a3d1097b`; the smoke command correctly refused to guess between Hostinger and k3s targets. Explicit Slack selector support is P2 `docs/bugs/2026-10-21-slack-smoke-target-override-not-allowlisted.md`, dispatched as `slack-smoke-target-override` (running, in scope). Replay acknowledgment landed as `fd1b40b0` (pytest 34/34, webhook BATS 68/68); operator verified exact thread command `k3dm e2e-replay RUNNER=m2`: queued, started, and succeeded notices all used job `3198fa72`, ending `published=0 still_pending=0`. Replay bug is LIVE-VERIFIED. Evidence: `docs/issues/2026-10-21-slack-live-verification-results.md`.
 - Dispatch dashboard rows for `slack-explicit-job-logs` and `slack-make-log-selection` show valid elapsed time but missing Codex tokens/exit metrics: their ledger has only `start` and `land`, no `codex_exit`. These are pre-`2de716d8` historical records; displayed zero runs/time means missing telemetry, not no work. Evidence: `docs/issues/2026-10-21-dispatch-dashboard-legacy-task-metrics-missing.md`.
-- Filed P3 `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md` to stop treating missing Codex exits as zero usage; dispatch pending.
+- Filed P3 `docs/bugs/2026-10-21-dispatch-dashboard-missing-codex-telemetry-renders-zero.md` to stop treating missing Codex exits as zero usage; dispatched as `dispatch-dashboard-missing-codex-telemetry`, currently running and in scope.
 - Hostinger Vault watchdog and several teardown/dashboard items have their live follow-ups recorded in the bug docs and recent progress below.
 
 ## Verification from latest work
