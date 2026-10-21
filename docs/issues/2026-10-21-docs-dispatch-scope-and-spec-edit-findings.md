@@ -51,6 +51,12 @@ The operator subsequently supplied GitHub-rendered screenshots of the README and
 They confirm both intended layouts; the corresponding bugs were updated to LIVE-VERIFIED. The
 earlier cache-miss limitation is resolved by this operator-provided browser evidence.
 
+On 2026-10-21 the operator clarified that the CVE-title report concerns clicking the Grafana Bug
+Tracking row, which still reaches a GitHub 404 at `docs/bugs/.md`; it is the existing Grafana
+bug-dashboard link bug, not the CVE architecture guide rendering issue. Reopened the existing P2
+record and noted that the offline fix `2036253f` still needs live dashboard deployment/interpolation
+verification.
+
 The Grafana status output included:
 
 ```text
