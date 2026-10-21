@@ -3,7 +3,7 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
-**Status:** VERIFIED — landed offline fix; operator live Slack verification pending
+**Status:** OPEN — live verification failed; deployed command path still rejects Q
 **Fix commits:** `74d79eac`, `997587d6`
 **Approval:** operator explicitly requested review and dispatch on 2026-10-21; implementation is authorized within the scoped files below
 
@@ -77,6 +77,10 @@ The fix landed on `k3d-manager-v1.43.5` in `74d79eac` and `997587d6`. Offline ve
 - Python AST parsing, `_agent_audit`, `_agent_lint`, and `git diff --check` passed.
 
 This is **not LIVE-VERIFIED**. After the webhook deployment is updated, verify in Slack by sending `k3dm find-similar-docs Q="what's recent e2e-remote issues"` and confirm it is accepted and the retrieval receives the exact full query; also check malformed quotes receive a clear rejection. Record the resulting Slack/job evidence before changing the status to LIVE-VERIFIED.
+
+### Live verification failure — 2026-10-21
+
+The operator tried the slash command twice; both returned `⚠️ invalid value for Q` after a `Queuing make find-similar-docs…` acknowledgment. This does not pass the live gate. The committed relay now acknowledges with `Request received … validating…`, and the committed backend accepts the apostrophe-containing query. The old acknowledgment is evidence that at least the relay deployment is stale; the screenshot cannot establish whether the webhook backend is stale as well. Reopen deployment verification: confirm the relay and webhook are both running revisions containing `74d79eac`/`997587d6`, then retry the exact natural-language query and confirm successful retrieval.
 
 
 ## Additional reproduction: slash command returns `invalid value for Q`
