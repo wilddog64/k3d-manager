@@ -53,3 +53,15 @@ For Slack-initiated `make smoke`, deliver an actionable, **safe, bounded** diagn
 This is **reporting/diagnostic visibility**, not a fix for the unknown cluster-health failure. The operator should be able to debug remotely without shell access. Implementation may reuse existing webhook job-tail / artifact reporting with limits and RBAC rather than inventing a new log access path.
 
 **No executable code or cluster resources changed as part of filing.**
+
+## Files
+
+- `scripts/plugins/smoke.sh`
+- `scripts/tests/plugins/smoke.bats`
+
+## Verification gates
+
+- `bats scripts/tests/plugins/smoke.bats`
+- `shellcheck scripts/plugins/smoke.sh`
+
+Keep diagnostic capture bounded and redacted. Do not change cluster-health assertions or runtime cluster behavior for this reporting fix.

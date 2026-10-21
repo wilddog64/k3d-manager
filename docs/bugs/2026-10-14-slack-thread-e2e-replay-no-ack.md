@@ -45,3 +45,19 @@ No live webhook logs or runner replay outcome were provided; the command may hav
 - [ ] Live acceptance uses a controlled pending/no-pending replay in Slack and records whether reports were actually published; distinguish no pending reports from command failure.
 
 **Scope:** File/report only. No webhook/runtime code or remote E2E results modified.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_thread_dispatch.py`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_thread_actor.py`
+- `scripts/tests/lib/webhook.bats`
+
+## Verification gates
+
+- `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_thread_actor.py`
+- `bats scripts/tests/lib/webhook.bats`
+- `shellcheck bin/k3dm-webhook`
+
+Do not dispatch a live replay or publish reports during implementation; live acceptance remains operator-controlled.
