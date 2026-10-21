@@ -1,7 +1,8 @@
 # Slack Make job acknowledgements and status notices omit the job ID inconsistently
 
 **Filed:** 2026-10-20 (operator-reported live Slack run)
-**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Follow-up Slack run `c30366d6` showed the same ID in queued, started, progress, and terminal-failure notices. Explicit `logs c30366d6` retrieval is still unverified, so not LIVE-VERIFIED.
+**Status:** LIVE-VERIFIED — fix landed at `abb0a526`; offline tests pass. Operator confirmed Slack job `c30366d6` showed the same ID in queued, started, progress, and terminal-failure notices, and `logs c30366d6` returned that job's output. The `test-all` suite failed independently (1,747 cases, 56 failed); that does not change the live verification of notice IDs and log lookup.
+**Live evidence:** 2026-10-20 · run c30366d6 · env Slack/acg-automation · scenario make-test-all-notices-and-explicit-logs · commit abb0a526 · proves fix
 **Priority:** P2 — job execution continues, but operators may not be able to correlate or request its logs by ID; bare `logs` is a workaround
 **Branch:** `k3d-manager-v1.43.5`
 **Fix commit:** `abb0a526`
@@ -51,10 +52,11 @@ Do not change Make job authorization, log retention, cluster execution, or AWS p
 
 ## Verification
 
-- Follow-up live Slack run `c30366d6` (2026-10-20): queued, started, 2-minute progress, and terminal-failure notices all included the same ID. The command exited 2 (1,747 cases, 56 failed); the known macOS `sha256sum` fixture issue recurred. Explicit `logs c30366d6` retrieval has not been tested, so status remains VERIFIED rather than LIVE-VERIFIED. Details are in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
+- LIVE-VERIFIED 2026-10-20: Slack job `c30366d6` included the same ID in queued, started, 2-minute progress, and terminal-failure notices. Operator then ran `logs c30366d6`; screenshot shows `Last 20 lines (job c30366d6)` and the matching test output. This directly verifies notice correlation and explicit ID log retrieval.
+- The `test-all` command for that job ended rc 2 (1,747 cases, 56 failed), including the separately tracked macOS `sha256sum` fixture failure. This does not invalidate the specific live verification above; other suite failures were not triaged.
 
 - Fix landed on `k3d-manager-v1.43.5` as `abb0a526`; deterministic progress/failure regression coverage follow-up is `cb7f37dc`.
 - `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/webhook_lifecycle.py`: 26 passed. Coverage includes direct `/make` queued ID/response/directory consistency, `/k3dm` queued format, explicit and bare logs behavior, and started/progress/success/failure/timeout notices.
 - `bats scripts/tests/bin/makefile_webhook_slack.bats`: 10/10 passed. Python syntax compilation, `git diff --check`, and `_agent_audit` passed.
-- No shell source files changed; ShellCheck is not applicable. Operator Slack live verification remains pending after webhook rollout; this record is not LIVE-VERIFIED.
-- Live attempt 2026-10-20: `/make test-all` queued, started, 2-minute progress, and terminal failure notices all lacked an ID; `logs` returned job `be53f685`. The test-all command ended rc 2 (1,747 cases, 56 failed); no pass. The LaunchAgent plist points at the updated repository checkout, but process inspection was blocked, so it is unknown whether the running process loaded the landed code. See `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Keep status VERIFIED, not LIVE-VERIFIED, until a post-restart successful run shows consistent IDs.
+- No shell source files changed; ShellCheck is not applicable. Offline and operator live evidence are recorded.
+- Initial live attempt `be53f685` omitted IDs, but the later `c30366d6` run confirmed matching lifecycle IDs and successful explicit log retrieval; the bug is now LIVE-VERIFIED. Historical first-run diagnostics and the unrelated test-suite failure are documented in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.

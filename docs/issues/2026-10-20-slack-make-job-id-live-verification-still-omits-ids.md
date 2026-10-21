@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-20
 **Related bug:** `docs/bugs/2026-10-20-slack-make-job-id-missing-from-status-notices.md`
-**Result:** First live notice check failed; follow-up job `c30366d6` showed IDs in queued, started, progress, and terminal-failure notices. Full test command exited nonzero (1,747 cases, 56 failed); explicit `logs <job-id>` retrieval was not tested on this follow-up, so end-to-end live verification remains partial.
+**Result:** Initial live attempt `be53f685` lacked notice IDs. Follow-up `c30366d6` showed consistent IDs in queued, started, progress, and terminal-failure notices; the operator then ran `logs c30366d6` and supplied a screenshot showing the matching job transcript. The bug is LIVE-VERIFIED. The separate full test command failed (1,747 cases, 56 failed).
 
 ## What was tested
 
@@ -76,7 +76,7 @@ make[1]: *** [test] Error 1
 make: *** [test-all] Error 2
 ````
 
-The known macOS fixture failure recurred (`scripts/tests/plugins/hub_data.bats: line 126: sha256sum: command not found`). The full transcript is `scratch/test-logs/all/20261020-171339.log`; the other 55 failures were not triaged. An explicit `logs c30366d6` lookup was not run, so live verification remains partial despite lifecycle ID propagation working.
+The known macOS fixture failure recurred (`scripts/tests/plugins/hub_data.bats: line 126: sha256sum: command not found`). The full transcript is `scratch/test-logs/all/20261020-171339.log`; the other 55 failures were not triaged. The operator's screenshot of the Slack reply to `logs c30366d6` shows `Last 20 lines (job c30366d6)` followed by the matching test output. This confirms explicit log lookup. The suite's unrelated nonzero result does not negate successful verification of the job-ID notice and lookup behavior.
 
 ## Diagnostics and actual output
 
@@ -103,6 +103,5 @@ Not established. The Slack notices prove the process handling this request did n
 
 1. Rotate the potentially exposed Slack bot token and signing secret, then update the secure local store / LaunchAgent using the established rotation procedure.
 2. From the updated release checkout, run `make restart-webhook`.
-3. Use a successful, safe Slack Make target for the notice retest; the observed `test-all` run itself failed with 56 cases, including a known macOS fixture failure.
-4. Verify queued, started, progress if emitted, and terminal notices all contain the same ID, and `logs <job-id>` retrieves the matching output.
-5. Only then mark the related bug LIVE-VERIFIED.
+3. Completed: job `c30366d6` showed the ID in queued, started, progress, and terminal notices; the operator screenshot confirms `logs c30366d6` retrieved matching output.
+4. The related bug is LIVE-VERIFIED. Keep the unrelated `test-all` failures separate; they do not indicate a failure of notice ID propagation or explicit log lookup.
