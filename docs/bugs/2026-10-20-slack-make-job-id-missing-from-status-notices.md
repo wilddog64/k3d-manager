@@ -1,7 +1,7 @@
 # Slack Make job acknowledgements and status notices omit the job ID inconsistently
 
 **Filed:** 2026-10-20 (operator-reported live Slack run)
-**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Awaiting operator Slack live verification after webhook rollout.
+**Status:** VERIFIED — fix landed at `abb0a526`; offline tests pass. Slack live attempt `be53f685` still showed queued/started notices without IDs; webhook rollout state is unconfirmed, so retest after restart. Not LIVE-VERIFIED.
 **Priority:** P2 — job execution continues, but operators may not be able to correlate or request its logs by ID; bare `logs` is a workaround
 **Branch:** `k3d-manager-v1.43.5`
 **Fix commit:** `abb0a526`
@@ -55,3 +55,4 @@ Do not change Make job authorization, log retention, cluster execution, or AWS p
 - `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/webhook_lifecycle.py`: 26 passed. Coverage includes direct `/make` queued ID/response/directory consistency, `/k3dm` queued format, explicit and bare logs behavior, and started/progress/success/failure/timeout notices.
 - `bats scripts/tests/bin/makefile_webhook_slack.bats`: 10/10 passed. Python syntax compilation, `git diff --check`, and `_agent_audit` passed.
 - No shell source files changed; ShellCheck is not applicable. Operator Slack live verification remains pending after webhook rollout; this record is not LIVE-VERIFIED.
+- Live attempt 2026-10-20: `/make test-all` thread still showed `make test-all queued` and `make test-all started by slack:wilddog64:U4C9LDQP2` without an ID; `logs` returned job `be53f685`. The LaunchAgent plist points at the updated repository checkout, but process inspection was blocked, so it is unknown whether the running process loaded the landed code. See `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Keep status VERIFIED, not LIVE-VERIFIED, until a post-restart run shows consistent IDs.
