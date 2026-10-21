@@ -256,17 +256,21 @@ if check == "link":
         {"branch": "release/v1.43.5", "bug": "2026-10-18-register-app-cluster-role-lookup-exits-silently", "title": "App cluster role lookup"},
         {"branch": "feature/dashboard-fix", "bug": "2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem", "title": "Dashboard links"},
     ]
-    for row in rows:
-        post_transform = {key: value for key, value in row.items() if key not in organize["excludeByName"]}
+    def render_link(row, excluded):
+        post_transform = {key: value for key, value in row.items() if key not in excluded}
         resolved = url.replace("${__data.fields.branch}", post_transform.get("branch", ""))
         resolved = resolved.replace("${__data.fields.bug}", post_transform.get("bug", ""))
+        return resolved
+
+    for row in rows:
+        resolved = render_link(row, organize["excludeByName"])
         assert "/blob//" not in resolved and "/docs/bugs/.md" not in resolved, resolved
         assert f"/blob/{row['branch']}/docs/bugs/{row['bug']}.md" in resolved, resolved
-    # Negative control: the original organize exclusion reproduces both blanks.
-    broken_frame = {key: value for key, value in rows[0].items() if key not in {"branch", "bug"}}
-    broken = url.replace("${__data.fields.branch}", broken_frame.get("branch", ""))
-    broken = broken.replace("${__data.fields.bug}", broken_frame.get("bug", ""))
-    assert "/blob//" in broken and "/docs/bugs/.md" in broken, broken
+    # Run the same post-transform resolver against the original exclusion
+    # configuration. It must reproduce the empty-ref/stem URL from the bug.
+    original_exclusions = {**organize["excludeByName"], "branch": True, "bug": True}
+    original_result = render_link(rows[0], original_exclusions)
+    assert "/blob//" in original_result and "/docs/bugs/.md" in original_result, original_result
 elif check == "sort":
     transforms = [t["id"] for t in table["transformations"]]
     assert transforms.index("sortBy") < transforms.index("organize"), transforms
