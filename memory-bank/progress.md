@@ -22,6 +22,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Slack job `c30366d6` completed. Queued, started, progress, and terminal-failure messages consistently included the ID; operator screenshot then confirmed `logs c30366d6` returned the matching transcript. Marked the notice/log-correlation bug LIVE-VERIFIED. The run separately ended rc 2 (1,747 cases, 56 failed); the tracked macOS `sha256sum` fixture failure recurred and 55 other failures were not triaged. Evidence is in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
 - Confirmed the recurring hub-data `sha256sum` test-fixture failure is already tracked as OPEN P2 in `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md`; appended `c30366d6` reproduction output there. Did not create an umbrella bug for the remaining 55 failures because they span distinct test areas and have not been triaged.
 
+## 2026-10-20 Slack bug dispatch attempt
+
+- Added file scopes and verification gates to the two existing Slack P2 bug specs; pushed as `3e7a2358`.
+- Dispatched `slack-smoke-health-diagnostics` and `slack-thread-e2e-replay-ack` as separate non-network tasks. Both workers exited without terminal markers; dispatcher status reports `terminated unexpectedly`. The smoke worktree contains unverified edits, replay worktree is clean; neither task test suite ran and no live replay was triggered. Preserved worktrees and logs; root cause is unknown. Recorded in `docs/issues/2026-10-20-slack-bug-dispatch-workers-terminated-unexpectedly.md`.
+
 ## 2026-10-19
 
 - Investigated Slack job `8417cf04` / E2E run `1792410757-29778`. ACG credentials and both Kubernetes APIs passed preflight. The 420s hub-app gate failed on frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`.
