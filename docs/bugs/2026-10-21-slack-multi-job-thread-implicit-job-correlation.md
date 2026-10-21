@@ -4,8 +4,8 @@
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5
 **Priority:** P2 — ChatOps job correlation / diagnostics reliability
-**Status:** OPEN — source-confirmed selection ambiguity; live job misselection not yet proven
-**Verification:** NOT LIVE-VERIFIED as a fix; 2026-10-21 Slack observations are live reproduction evidence only
+**Status:** VERIFIED — explicit job targeting landed in `6c6cbd0b`; focused thread dispatch/broadcast suites pass 45/45
+**Verification:** Offline verified 2026-10-21; LIVE-VERIFICATION PENDING. A separate broader `test_webhook_ask_docs_thread.py` run still has one notification-stub failure; see task verification notes.
 **Approval:** operator requested review and dispatch on 2026-10-21; offline implementation is authorized, but no Slack messages, live job tests, deployment, or PR are authorized
 **Component:** Slack Events API thread routing, thread-to-job selection, implicit `logs`/`status`/`diagnosis`/`kill` semantics
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (FIXED / LIVE-VERIFIED 2026-10-20; do not regress); `docs/bugs/2026-10-14-slack-thread-e2e-replay-no-ack.md` (LIVE-VERIFIED 2026-10-21); `docs/bugs/2026-10-02-cluster-status-report-not-threaded.md` (FIXED); `docs/bugs/2026-10-06-cloud-bridge-make-job-status-empty-output.md`.
