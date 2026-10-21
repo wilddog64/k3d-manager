@@ -2,7 +2,8 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** VERIFIED — fix landed in `6b324441`; operator live Slack confirmation pending
+**Status:** LIVE-VERIFIED — offline fix `6b324441`; operator confirmed `cluster-resume` job `6cb1f04b` stayed in its Slack thread on 2026-10-21
+**Fix commit:** `6b324441`
 **Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
@@ -150,4 +151,6 @@ Evidence: https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses
 - Webhook BATS: all 68 cases passed, including 6 expected environment-gated skips.
 - Python AST parsing passed for `bin/k3dm-webhook` and `scripts/lib/webhook/lifecycle.py`; `git diff --check` clean; `_agent_audit` passed.
 - ShellCheck is not applicable to `bin/k3dm-webhook` because it is a Python entrypoint.
-- Offline coverage verifies intended channel/thread payloads and lifecycle notification fallback. Live Slack rendering and channel behavior remain unverified; operator confirmation is required before LIVE-VERIFIED.
+- Offline coverage verifies intended channel/thread payloads and lifecycle notification fallback. Live Slack evidence is recorded below.
+- Operator live evidence: Slack screenshots show Hostinger `cluster-resume` job `6cb1f04b` queued, started, and succeeded in the same thread, with the same job ID on each lifecycle notification. This verifies the deployed async lifecycle thread-context behavior. The job completed in 0 minutes, so no timed progress notification was exercised live; the progress timer path is covered by the offline `cluster-up` regression test.
+**Live evidence:** 2026-10-21 · run 6cb1f04b · env hostinger/slack · scenario cluster-resume-threaded-start-and-success · commit 6b324441 · proves fix
