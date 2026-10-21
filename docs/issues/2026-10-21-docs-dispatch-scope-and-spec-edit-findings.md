@@ -29,6 +29,14 @@ scope: out-of-scope (allowed)
 
 The CVE task's changed bug-spec section was removed after this report. Its worktree is clean.
 
+During independent landing, the dispatcher initially could not create/acquire its landing lock
+from the restricted execution context. The same landing command succeeded after requesting the
+required elevated filesystem access; no lock or user data was removed.
+
+```text
+[codex-dispatch] ERROR: could not remove stale landing lock
+```
+
 The Grafana status output included:
 
 ```text
