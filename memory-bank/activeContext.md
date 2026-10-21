@@ -13,6 +13,8 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 
 ## Latest live investigations and records
 
+- Three P3 documentation bugs were authorized for sequential Codex dispatch on 2026-10-21: README/Hermes duplication, the monolithic Grafana dashboards guide, and GitHub rendering failure for CVE/Trivy architecture guides. The third remains investigation-first; no speculative source edits. Dispatch queue is pending task starts.
+
 - Hostinger node outage: operator-provided support response attributes the 2026-10-17 17:46:15 UTC shutdown to emergency security-patch maintenance, consistent with the guest QEMU-agent log. Added a typed investigation-only evidence path to the LIVE-VERIFIED gate, with boundary tests; the bug is now `LIVE-VERIFIED`. Internal actor/job ID remains unavailable.
 
 - Slack job `8417cf04`, E2E run `1792410757-29778`: preflight passed, but the 420-second hub-app gate failed with frontend `Synced/Degraded` and product-catalog `OutOfSync/Healthy`. Read-only diagnosis found frontend Nginx exiting because `product-catalog.shopping-cart-apps.svc.cluster.local` did not exist when frontend started. Product-catalog later became healthy, but frontend remained `CrashLoopBackOff`. Detailed evidence: `docs/issues/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md`; dashboard-facing bug: `docs/bugs/2026-10-19-e2e-sandbox-provision-frontend-upstream-race.md` (P2 OPEN).

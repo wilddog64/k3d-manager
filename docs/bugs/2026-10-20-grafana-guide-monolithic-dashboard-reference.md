@@ -5,7 +5,7 @@
 **Status:** OPEN — documentation refactor pending
 **Priority:** P3 — documentation usability and maintenance; no runtime impact
 **Severity:** low
-**Approval:** operator requested bug filing before any implementation on 2026-10-20
+**Approval:** operator authorized implementation dispatch on 2026-10-21: “let's work on these … dispatch them in queue”
 **Component:** `docs/guides/grafana-dashboards.md`, dashboard documentation navigation
 **Related:** `README.md` (Grafana Dashboards link); `scripts/etc/argocd/platform-ops/grafana-dashboard-*.yaml`; `scripts/etc/grafana/dashboards/*.yaml`
 

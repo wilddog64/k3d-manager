@@ -5,7 +5,7 @@
 **Status:** OPEN — documentation cleanup not yet implemented
 **Priority:** P3 — readability and information architecture; no functional impact
 **Severity:** low
-**Approval:** operator requested bug filing 2026-10-20; implementation not authorized
+**Approval:** operator authorized implementation dispatch on 2026-10-21: “let's work on these … dispatch them in queue”
 **Component:** `README.md` (Guides index and separate Hermes operations section)
 **Related:** `docs/guides/hermes.md`, `docs/architecture/hermes-phase1-monitoring-scope.md`, `docs/architecture/hermes-phase2-repair-scope.md`
 

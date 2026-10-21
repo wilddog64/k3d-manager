@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-21 documentation bug dispatch queue
+
+- Reviewed P3 bugs for the duplicate README Hermes section, monolithic Grafana dashboards guide, and CVE/Trivy GitHub rendering failure. Operator authorized implementation/investigation dispatch. Updated each bug's Approval record; added the affected Trivy guide to the CVE investigation file scope, with source edits contingent on a reproducible document-specific cause. Tasks will be dispatched sequentially.
+
 ## 2026-10-20 Hostinger provider evidence and investigation verification path
 
 - Operator supplied Hostinger support's control-plane review: no customer stop/reboot was recorded at 2026-10-17 17:46:15 UTC; Hostinger attributed the shutdown to a platform-initiated emergency security-patch maintenance restart. No internal actor or job ID was exposed.
