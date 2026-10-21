@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — offline lifecycle thread-context fix verified 2026-10-21; live Slack confirmation pending
+**Status:** VERIFIED — fix landed in `6b324441`; operator live Slack confirmation pending
 **Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
@@ -142,3 +142,12 @@ The same invocation is corroborated by GitHub-backed bridge responses: request `
 - Add regression coverage specifically for externally queued Make jobs, distinct from the existing `cluster-up` assertions; do not run another large test suite only to exercise Slack notification formatting.
 
 Evidence: https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
+
+## Verification log — 2026-10-21
+
+- Commit `c681227d` added the lifecycle context propagation fix and regression tests; dispatcher land gate rebased and landed it as `6b324441` on `k3d-manager-v1.43.5`, then pushed the branch to origin.
+- Independent focused pytest: 74 passed across thread dispatch, cluster status thread, thread broadcast, and stale cleanup suites.
+- Webhook BATS: all 68 cases passed, including 6 expected environment-gated skips.
+- Python AST parsing passed for `bin/k3dm-webhook` and `scripts/lib/webhook/lifecycle.py`; `git diff --check` clean; `_agent_audit` passed.
+- ShellCheck is not applicable to `bin/k3dm-webhook` because it is a Python entrypoint.
+- Offline coverage verifies intended channel/thread payloads and lifecycle notification fallback. Live Slack rendering and channel behavior remain unverified; operator confirmation is required before LIVE-VERIFIED.

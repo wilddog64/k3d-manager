@@ -11,7 +11,9 @@
 ## 2026-10-21 dispatch outbound lifecycle thread-context bug
 
 - Updated existing P3 `docs/bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md` with current operator screenshot evidence, explicit dispatch authorization, and file/scope allowlist. Scope is async outbound lifecycle thread preservation; the cloud-bridge Make incident and incoming `thread_broadcast` issue are excluded. `make check-doc-links` passed (`2267 file(s) OK`); `_agent_lint` and `_agent_audit` passed. Pushed scope commit `89514d35`.
-- Dispatched as `cluster-up-progress-thread-context`. Worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.5/cluster-up-progress-thread-context` is running and in-scope. Sandbox process inspection initially reported `terminated unexpectedly`; authorized read-only status confirmed `running`. No code result yet.
+- Dispatched as `cluster-up-progress-thread-context`. The worker finished with two allowed out-of-scope changes (bug evidence and regression tests); reviewed the patch and independently verified it. Focused pytest passed 74/74, webhook BATS had 68 passing cases including 6 environment-gated skips, Python AST and diff-check passed, and `_agent_audit` passed. ShellCheck is inapplicable to the Python webhook entrypoint. Committed as `c681227d`, land gate passed, and pushed as `6b324441` on `origin/k3d-manager-v1.43.5`. Canonical bug is VERIFIED offline; operator live Slack confirmation is next. No AWS or cluster lifecycle operation was run.
+- Closeout workflow recorded in `activeContext.md`: independently verify dispatch results, commit unfinished worker changes, land/push, mark VERIFIED offline, then proactively hand off exact live-verification steps; only operator live evidence can advance to LIVE-VERIFIED.
+- One unprivileged post-land webhook BATS attempt was blocked by localhost binding (`curl` connection failures; test helper status assertions failed). Re-running the same suite with approved local-server permission passed all cases. Details are recorded in `docs/issues/2026-10-21-webhook-bats-sandbox-localhost-bind.md`.
 
 ## 2026-10-21 Slack help live verification and landing
 
