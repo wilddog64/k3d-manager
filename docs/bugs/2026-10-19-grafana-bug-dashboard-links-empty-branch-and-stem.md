@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-19 (operator reported a broken link while reviewing a P1 bug)
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** VERIFIED — offline E1 passed and fix landed as `2036253f` on `k3d-manager-v1.43.5`; live E2 row-click verification is pending.
+**Status:** OPEN — offline fix `2036253f` is landed, but operator reports a live dashboard row still opens a GitHub 404 (`docs/bugs/.md`); investigate deployment/runtime link resolution.
 **Priority:** P2 — the table displays bug records but clicking a bug cannot open its source document; users can locate documents manually
 **Severity:** medium (bug-tracking navigation and traceability are broken; not a cluster/runtime failure)
 **Approval:** pending — bug filed at operator request; implementation not approved
@@ -57,6 +57,21 @@ The existing `grafana_dashboard_bugs.bats` link test checks only that the URL
 template **contains** `${__data.fields.branch}` and `${__data.fields.bug}`.
 It does not test that these fields are accessible after transformations or that
 the resulting link is usable. The test therefore passes for a broken dashboard.
+
+## Live reproduction after offline fix — 2026-10-21
+
+The operator clarified that the reported failure is clicking the CVE-remediation
+bug title in the Grafana Bug Tracking table, not opening the CVE architecture guide
+itself. The click opens GitHub's 404 page, which reports it cannot find a valid ref
+in `docs/bugs/.md`; this matches the empty-ref/empty-stem signature above. The
+offline fix `2036253f` preserves `branch` and `bug` through the table transformation,
+but this live report shows E2 is not satisfied. Keep the bug OPEN until the live
+dashboard's synced ConfigMap revision and exact resolved URL establish whether the
+fix has not synced or Grafana still cannot interpolate the transformed fields.
+
+The dashboard source contains one data-link template on the visible `Bug` field,
+shared by every row. Therefore this is a table-wide failure mode, not a CVE-row-specific
+link. All bug-title clicks may be affected until the live link resolves correctly.
 
 ## Fix requirements
 
