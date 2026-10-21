@@ -26,3 +26,16 @@ The live attempt failed. In the landed source, the relay acknowledgment is `Requ
 ## Follow-up
 
 Verify deployed revisions for both the Slack relay and webhook include `74d79eac`/`997587d6`. Then retry `k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack and verify successful execution with the full unchanged query. Keep the canonical bug OPEN until that live check passes.
+
+## Redispatched investigation task
+
+**Slug:** `slack-find-similar-docs-deployment-gap`
+
+Investigate the rollout gap for the already-landed parser fix. Compare the release branch commits with `origin/main`, inspect the Cloudflare Worker deployment workflow and the webhook's local service/restart mechanism, and document the exact safe promotion/deployment sequence and how to verify each component's running revision. Do not change deployment triggers, deploy anything, restart services, or duplicate the parser implementation. If repository evidence does not establish the webhook deployment mechanism or required steps, state that uncertainty explicitly.
+
+**Files:**
+
+- `docs/issues/2026-10-21-slack-find-similar-docs-live-verification-failed.md`
+- `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md` (read-only reference)
+- `.github/workflows/deploy-worker.yml` (read-only reference)
+- `docs/architecture/webhook-server.md` (read-only reference)
