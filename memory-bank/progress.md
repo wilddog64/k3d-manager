@@ -5,7 +5,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-21 dispatch vendor/model attribution plan
 
 - Added `docs/plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md` as v1.43.7 plan 2 of 5. It specifies vendor/model provenance per worker attempt and separately for the primary coordinator, backward-compatible unknown handling, bounded dashboard metrics, and regression coverage. It explicitly excludes model routing or automatic selection and establishes this telemetry as a prerequisite to the broader v1.45.1 routing proposal.
-- No runtime code or dashboard was changed. Plan validation: pending.
+- No runtime code or dashboard was changed. `make check-doc-links` passed (3 changed/new files); `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_check_doc_links.py` passed 24/24; commit `da4761b3` was pushed to `origin/k3d-manager-v1.43.5`.
 
 ## 2026-10-20 Hostinger multi-service P1 investigation
 
