@@ -1,5 +1,10 @@
 # Progress — compressed operational log
 
+## 2026-10-21 review of two Slack command bugs
+
+- Reviewed P3 `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md`: confirmed it covers both thread free-text parsing and slash-command Q validation/acknowledgment, including the shell-injection boundary. Operator authorized dispatch; added a bounded `## Files` scope for parser/relay/validation, Make invocation, tests, and help docs.
+- Reviewed P3 `docs/bugs/2026-10-15-e2e-slack-runner-interface-inconsistent.md`: implementation is explicitly a v1.46.0 candidate subject to release prioritization; no v1.46.0 branch exists, while this checkout is v1.43.5. Held implementation dispatch pending the operator's release-slot direction.
+
 ## 2026-10-21 MinIO status observability gap
 
 - Filed `docs/bugs/2026-10-21-hermes-minio-upload-status-not-visible.md` as an OPEN P3 observability bug, separate from the fixed MinIO uploader runtime-install bug. Code review confirmed the webhook's `Data layer` result is based on four StatefulSet readiness checks and Hermes reports the aggregate, not the upload hook's last result. Acceptance covers explicit success/failure/unknown, timestamped and sanitized evidence, and failed-to-successful alert recovery. Implementation approval remains pending.

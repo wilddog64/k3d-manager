@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
 **Status:** OPEN — observed in Slack and parser confirmed; implementation not started
-**Approval:** operator explicitly requested P3 bug filing; no implementation authorized
+**Approval:** operator explicitly requested review and dispatch on 2026-10-21; implementation is authorized within the scoped files below
 
 ## Observed failure
 
@@ -92,3 +92,18 @@ This is a **distinct second-stage validation failure**, not the thread-parser us
 3. Support a query with an apostrophe, e.g. `what's recent e2e-remote issues`, in both paths after end-to-end hardening; verify the **exact unchanged string** reaches the retrieval command.
 4. On invalid `Q`, surface a precise validation reason and distinguish `request received` from `accepted/queued` or `started`; do not tell the user it is queued before successful validation.
 5. Add separate regression tests for the Cloudflare relay parser, `/api/v1/make` backend validation, thread parser, and complete valid/invalid acknowledgment sequences, including malicious input cases.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/lib/webhook/make_targets.py`
+- `scripts/lib/webhook/cloud_actions.py`
+- `Makefile`
+- `workers/slack-relay/index.js`
+- `workers/slack-relay/test/relay.test.mjs`
+- `scripts/tests/lib/webhook.bats`
+- `scripts/tests/plugins/slack_slash_commands.bats`
+- `scripts/tests/bin/webhook_make_targets.py`
+- `scripts/tests/bin/test_cloud_bridge.py`
+- `scripts/lib/help/utils.sh`
+- `docs/howto/find-prior-art.md`
