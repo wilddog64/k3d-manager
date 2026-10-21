@@ -356,6 +356,19 @@ bin/k3dm-webhook-setup --uninstall
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
+### Selecting a job in a Slack thread
+
+A thread may contain several independent jobs. Job-scoped replies therefore require an exact
+job ID: `logs <job-id>`, `status <job-id>`, `diagnosis <job-id>`, or `kill <job-id>`.
+The webhook rejects a bare form with usage guidance instead of guessing from whichever job
+directory was touched most recently. The requested job must belong to the same Slack thread
+and channel. `kill` remains subject to its normal operator role gate. For `logs` and
+`diagnosis`, an empty result reports whether output is still pending or no persisted output
+is available; it does not imply that an output existed and was lost. Use the job ID from that
+operation's queued/started/terminal notice. `cluster-status` remains an independent operation
+and posts its result in the request's parent thread. Bare `check` and `echo` are not webhook
+commands; they are ignored, so a nearby asynchronous report is not attributed to either text.
+
 `/ask-docs` source paths are links to GitHub at the webhook's checked-out branch; set `K3DM_ASK_DOCS_LINK_REF` to override the branch.
 
 ### /k3dm targets

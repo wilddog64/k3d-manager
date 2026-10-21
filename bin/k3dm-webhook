@@ -631,8 +631,8 @@ def _record_acg_state(provider):
     )
 
 
-def _find_job_by_thread_ts(thread_ts):
-    """Return job_id whose thread_ts file matches, or None. Skips ask sub-jobs."""
+def _find_job_by_thread_ts(thread_ts, channel_id=""):
+    """Return a stable delivery context for a Slack thread; never infer its job."""
     if not JOB_DIR.exists():
         return None
     candidates = []
@@ -642,41 +642,41 @@ def _find_job_by_thread_ts(thread_ts):
             if action_file.exists() and action_file.read_text().strip() in {"ask", "ask-docs"}:
                 continue
             if ts_file.read_text().strip() == thread_ts:
+                channel_file = ts_file.parent / "channel_id"
+                if channel_id and channel_file.exists() and channel_file.read_text().strip() != channel_id:
+                    continue
                 candidates.append(ts_file.parent)
         except OSError:
             pass
-    candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
-    non_anchors = []
+    if not candidates:
+        return None
+    # Prefer the original anchor, then use immutable directory name ordering.
+    anchors = []
     for path in candidates:
         status_file = path / "status"
-        status = status_file.read_text(errors="replace").strip() if status_file.exists() else ""
-        if status != "thread-anchor":
-            non_anchors.append(path)
-    return (non_anchors or candidates)[0].name if (non_anchors or candidates) else None
+        if status_file.exists() and status_file.read_text(errors="replace").strip() == "thread-anchor":
+            anchors.append(path)
+    return sorted(anchors or candidates, key=lambda path: path.name)[0].name
 
 
-def _resolve_thread_log_job(anchor_job_id, command, channel_id):
-    """Resolve an optional explicit log ID without crossing the Slack thread boundary."""
-    parts = command.strip().split()
-    if len(parts) > 2:
-        return None, "Usage: `logs [job-id]`"
-    if len(parts) == 1:
-        thread_ts = _thread_ts_for_job(anchor_job_id)
-        return (_find_job_by_thread_ts(thread_ts) if thread_ts else anchor_job_id), None
+def _resolve_thread_job_target(anchor_job_id, command, channel_id):
+    """Resolve a mandatory explicit job ID and enforce its thread/channel boundary."""
+    parts = command.strip().lstrip("/").split()
+    if len(parts) != 2 or not _JOB_ID_RE.fullmatch(parts[1]):
+        return None, "Usage: `logs|status|diagnosis|kill <job-id>` — include the exact job ID"
     requested_id = parts[1]
-    if not _JOB_ID_RE.fullmatch(requested_id):
-        return None, "Usage: `logs [job-id]`"
     requested_dir = JOB_DIR / requested_id
-    if not requested_dir.exists():
-        return requested_id, None
+    if not requested_dir.is_dir():
+        return None, f"⚠️ Job `{requested_id}` is unknown or its records have expired"
     anchor_thread = _thread_ts_for_job(anchor_job_id)
     requested_thread = _thread_ts_for_job(requested_id)
-    if anchor_thread and requested_thread and anchor_thread != requested_thread:
+    if anchor_thread and requested_thread != anchor_thread:
         return None, f"⚠️ Job `{requested_id}` is not in this Slack thread"
-    requested_channel_file = requested_dir / "channel_id"
-    if channel_id and requested_channel_file.exists():
-        if requested_channel_file.read_text(errors="replace").strip() != channel_id:
-            return None, f"⚠️ Job `{requested_id}` is not in this Slack channel"
+    requested_channel = _read_job_value(requested_id, "channel_id")
+    anchor_channel = _read_job_value(anchor_job_id, "channel_id")
+    expected_channel = channel_id or anchor_channel
+    if expected_channel and requested_channel and requested_channel != expected_channel:
+        return None, f"⚠️ Job `{requested_id}` is not in this Slack channel"
     return requested_id, None
 
 
@@ -779,6 +779,13 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         )
         _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_actor_role(role)}*.")
         return
+    delivery_job_id = job_id
+    if cmd in {"kill", "diagnosis", "status", "logs"}:
+        target_id, error = _resolve_thread_job_target(delivery_job_id, command, channel_id)
+        if error:
+            _notify_job(delivery_job_id, error)
+            return
+        job_id = target_id
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)
         command = f"ask {cmd} {_alias_parts[1]}" if len(_alias_parts) > 1 else f"ask {cmd}"
@@ -898,7 +905,9 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
             except Exception as exc:
                 _notify_job(job_id, f"⚠️ Diagnosis failed: {exc}")
         else:
-            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+            status = _read_job_value(job_id, "status") or "unknown"
+            reason = "output is not available yet" if status in {"queued", "running"} else "no persisted output is available"
+            _notify_job(job_id, f"⚠️ Job `{job_id}` has no output: {reason} (status `{status}`)")
 
     elif cmd == "status":
         status_file = JOB_DIR / job_id / "status"
@@ -906,16 +915,15 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
 
     elif cmd == "logs":
-        log_job_id, error = _resolve_thread_log_job(job_id, command, channel_id)
-        if error:
-            _notify_job(job_id, error)
-            return
+        log_job_id = job_id
         output = read_job_output(JOB_DIR / log_job_id, redact=_redact_secrets)
         if output:
             last = [line.rstrip() for line in output.splitlines() if line.strip()][-20:]
             _notify_job(job_id, f"📋 *Last 20 lines* (job `{log_job_id}`)\n```{chr(10).join(last)}```")
         else:
-            _notify_job(job_id, f"⚠️ No log found for job `{log_job_id}`")
+            status = _read_job_value(log_job_id, "status") or "unknown"
+            reason = "output is not available yet" if status in {"queued", "running"} else "no persisted output is available"
+            _notify_job(job_id, f"⚠️ Job `{log_job_id}` has no output: {reason} (status `{status}`)")
 
     elif cmd == "cluster-status":
         new_job_id = str(uuid.uuid4())[:8]
@@ -2220,7 +2228,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 text = ev_text
                 cmd = text.lstrip("/").lower().split()[0] if text else ""
                 if is_thread_reply:
-                    job_id = _find_job_by_thread_ts(thread_ts)
+                    job_id = _find_job_by_thread_ts(thread_ts, ev_channel_id)
                     _LOG.debug("slack thread reply thread_ts=%r job_id=%r cmd=%r", thread_ts, job_id, cmd)
                     if job_id:
                         threading.Thread(

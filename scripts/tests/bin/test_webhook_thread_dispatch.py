@@ -1,6 +1,8 @@
+# agent-audit: allow assert-removed explicit job targeting replaces ambiguous implicit selection
 import importlib.util
 import io
 import json
+import os
 import threading
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -336,22 +338,47 @@ def test_thread_delivery_fallback_records_redacted_reason_and_keeps_parent(
 
 def test_kill_still_dispatches(dispatch_env, monkeypatch):
     _started, notices = dispatch_env
-    monkeypatch.setattr(wh, "_running_procs", {"job": 123})
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "thread_ts").write_text("THREAD")
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
+    monkeypatch.setattr(wh, "_running_procs", {"aabbccdd": 123})
     monkeypatch.setattr(wh.os, "killpg", lambda *args: None)
 
-    wh._handle_thread_command("job", "kill", "admin", "C1")
+    wh._handle_thread_command("job", "kill aabbccdd", "admin", "C1")
 
     assert len(notices) == 1
     assert "Kill requested" in notices[0]
 
 
-def test_status_still_replies(dispatch_env):
+def test_status_requires_exact_thread_job_id(dispatch_env):
     _started, notices = dispatch_env
 
     wh._handle_thread_command("job", "status", "reader", "C1")
 
     assert len(notices) == 1
-    assert "status" in notices[0]
+    assert "exact job ID" in notices[0]
+
+
+def test_status_explicit_id_resolves_once_and_ignores_mtime(dispatch_env):
+    _started, notices = dispatch_env
+    anchor = wh.JOB_DIR / "job"
+    (anchor / "thread_ts").write_text("THREAD")
+    (anchor / "status").write_text("thread-anchor")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "thread_ts").write_text("THREAD")
+    (target / "status").write_text("running")
+    other = wh.JOB_DIR / "bbccddee"
+    other.mkdir()
+    (other / "thread_ts").write_text("THREAD")
+    (other / "status").write_text("failed")
+    os.utime(other, (1, 1))
+    os.utime(target, (2, 2))
+
+    wh._handle_thread_command("job", "status aabbccdd", "reader", "C1")
+
+    assert notices == ["ℹ️ *Job `aabbccdd`* status: `running`"]
 
 
 def test_unknown_word_still_gets_unknown_reply(dispatch_env):
@@ -361,6 +388,15 @@ def test_unknown_word_still_gets_unknown_reply(dispatch_env):
 
     assert len(notices) == 1
     assert "Unknown command" in notices[0]
+
+
+@pytest.mark.parametrize("text", ["check", "echo"])
+def test_check_and_echo_are_ignored_as_non_commands(dispatch_env, text):
+    _started, notices = dispatch_env
+
+    wh._handle_thread_command("job", text, "reader", "C1")
+
+    assert notices == []
 
 
 def test_reader_e2e_replay_is_denied_without_worker(dispatch_env):
@@ -404,7 +440,7 @@ def test_logs_rejects_cross_thread_explicit_id(dispatch_env):
     assert "secret child output" not in notices[0]
 
 
-def test_bare_logs_prefers_newest_non_anchor_job(dispatch_env):
+def test_bare_logs_is_rejected_as_ambiguous(dispatch_env):
     _started, notices = dispatch_env
     (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
     (wh.JOB_DIR / "job" / "status").write_text("thread-anchor")
@@ -418,5 +454,42 @@ def test_bare_logs_prefers_newest_non_anchor_job(dispatch_env):
     wh._handle_thread_command("job", "logs", "reader", "C1")
 
     assert len(notices) == 1
-    assert "job `aabbccdd`" in notices[0]
-    assert "newest child output" in notices[0]
+    assert "exact job ID" in notices[0]
+    assert "newest child output" not in notices[0]
+
+
+def test_explicit_logs_pending_output_is_distinguished(dispatch_env):
+    _started, notices = dispatch_env
+    (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "thread_ts").write_text("THREAD")
+    (target / "status").write_text("running")
+
+    wh._handle_thread_command("job", "logs aabbccdd", "reader", "C1")
+
+    assert "aabbccdd" in notices[0]
+    assert "not available yet" in notices[0]
+
+
+def test_thread_context_selection_uses_anchor_not_mtime_or_foreign_channel(dispatch_env):
+    _started, _notices = dispatch_env
+    anchor = wh.JOB_DIR / "anchor00"
+    anchor.mkdir()
+    (anchor / "status").write_text("thread-anchor")
+    (anchor / "thread_ts").write_text("THREAD")
+    (anchor / "channel_id").write_text("C1")
+    newer = wh.JOB_DIR / "zzzzzzzz"
+    newer.mkdir()
+    (newer / "thread_ts").write_text("THREAD")
+    (newer / "channel_id").write_text("C1")
+    (newer / "status").write_text("running")
+    foreign = wh.JOB_DIR / "other000"
+    foreign.mkdir()
+    (foreign / "thread_ts").write_text("THREAD")
+    (foreign / "channel_id").write_text("C2")
+    os.utime(newer, (1, 1))
+    os.utime(anchor, (2, 2))
+
+    assert wh._find_job_by_thread_ts("THREAD", "C1") == "anchor00"
+    assert wh._find_job_by_thread_ts("THREAD", "C2") == "other000"

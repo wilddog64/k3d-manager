@@ -75,7 +75,7 @@ def test_thread_broadcast_routes_known_job_thread(monkeypatch, caplog):
     monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
     monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
     monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "admin")
-    monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda thread_ts: "job-1")
+    monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda thread_ts, channel_id="": "job-1")
     monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: None)
     monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
     monkeypatch.setattr(wh, "_handle_thread_command", lambda *args, **kwargs: calls.append((args, kwargs)))
@@ -130,7 +130,7 @@ def test_duplicate_event_id_dispatches_once(monkeypatch):
     monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
     monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
     monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "operator")
-    monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda _thread_ts: "job-1")
+    monkeypatch.setattr(wh, "_find_job_by_thread_ts", lambda _thread_ts, channel_id="": "job-1")
     monkeypatch.setattr(wh.threading, "Thread", _ImmediateThread)
     monkeypatch.setattr(wh, "_handle_thread_command", lambda *args, **kwargs: calls.append(args))
     event = {
