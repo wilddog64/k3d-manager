@@ -88,11 +88,18 @@ restore finishes.
 
 ### 4. Freshness workflow
 
-Copy `scripts/etc/dr/drill-freshness.yml` to `.github/workflows/` and
+After review, synchronize the authoritative
+`scripts/etc/dr/drill-freshness.yml` to `.github/workflows/` and
 `scripts/etc/dr/drill-freshness.sh` to the root of the data repository's
-**`main`** branch. Scheduled workflows run only from the default branch; the
-workflow checks out `results` itself. It fails, and GitHub emails you, when the
-newest result is older than 8 days or reports `success: false`.
+**`main`** branch. The installed script is a deployment copy; keep it aligned
+with the k3d-manager source when deploying an update. Scheduled workflows run
+only from the default branch; the workflow checks out `results` itself. It
+fails, and GitHub emails you, when no valid result exists, the newest result
+reports `success: false`, or the newest successful result is older than 8 days.
+The failure log distinguishes these cases and gives the next steps: run
+`make dr-drill` on M2, then `make dr-drill-publish` on M4. A stale successful
+result means the evidence needs refreshing; it does not mean the recovery drill
+itself failed.
 
 ## Daily export
 
