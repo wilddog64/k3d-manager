@@ -1,5 +1,10 @@
 # Progress — compressed operational log
 
+## 2026-10-21 MinIO status observability gap
+
+- Filed `docs/bugs/2026-10-21-hermes-minio-upload-status-not-visible.md` as an OPEN P3 observability bug, separate from the fixed MinIO uploader runtime-install bug. Code review confirmed the webhook's `Data layer` result is based on four StatefulSet readiness checks and Hermes reports the aggregate, not the upload hook's last result. Acceptance covers explicit success/failure/unknown, timestamped and sanitized evidence, and failed-to-successful alert recovery. Implementation approval remains pending.
+- `make check-doc-links` and staged `_agent_audit` passed; no application code changed.
+
 ## 2026-10-21 MinIO verification and cart-badge dispatch follow-up
 
 - Marked the MinIO uploader fix LIVE-VERIFIED: `shopping-cart-infra` main contains `83e8880d6dba22ebe3ffda36f052d7ce870887d7`; focused BATS passed 8/8. Live evidence combines the recorded successful PostSync Jobs and storefront images with operator screenshots showing ArgoCD Synced/Healthy and Hermes data-layer 4/4 ready/no superseded failed Jobs. Operator could not locate the historical resolved notification; the unrelated `ubuntu-k3s/trivy-system` notification was excluded, and this evidence limitation is explicit in the canonical bug.
