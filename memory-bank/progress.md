@@ -20,6 +20,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-20 Slack Make test-all follow-up
 
 - Slack job `c30366d6` completed. Queued, started, progress, and terminal-failure messages consistently included the ID; operator screenshot then confirmed `logs c30366d6` returned the matching transcript. Marked the notice/log-correlation bug LIVE-VERIFIED. The run separately ended rc 2 (1,747 cases, 56 failed); the tracked macOS `sha256sum` fixture failure recurred and 55 other failures were not triaged. Evidence is in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`.
+- Confirmed the recurring hub-data `sha256sum` test-fixture failure is already tracked as OPEN P2 in `docs/bugs/2026-10-19-hub-data-bats-fixture-sha256sum-missing-on-macos.md`; appended `c30366d6` reproduction output there. Did not create an umbrella bug for the remaining 55 failures because they span distinct test areas and have not been triaged.
 
 ## 2026-10-19
 

@@ -88,4 +88,16 @@ interface:
 
 ## Verification status
 
-OPEN. The 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). Reproduced again in Slack job `be53f685` on 2026-10-20: test 1171 failed during `make_fixture` at `scripts/tests/plugins/hub_data.bats:126` with `sha256sum: command not found` (exit 127); the full `make test-all` reported 1,747 cases / 56 failures / exit 2. This remains a test-fixture portability defect; no fix was attempted. Full live-run findings: `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Update Status, verification timestamp, and live-evidence metadata only after a real fix and matching verification.
+OPEN. The 2026-10-19 cloud-bridge job `7e59e3ff` was still running at the last checked status (07:37:18 PDT). Reproduced in Slack job `be53f685` on 2026-10-20 and again in `c30366d6`: hub-data fixture setup failed at `scripts/tests/plugins/hub_data.bats:126` with `sha256sum: command not found` (exit 127). In `c30366d6`, named affected tests included hub-data restore/export/prune and recovery-preflight assertions, all blocked in fixture setup before their intended assertions. The full `make test-all` reported 1,747 cases / 56 failures / exit 2. This remains a test-fixture portability defect; no fix was attempted. The 56 failures span separate test areas and are not all attributed to this issue; 55 non-`sha256sum` failures remain untriaged in `docs/issues/2026-10-20-slack-make-job-id-live-verification-still-omits-ids.md`. Verbatim latest evidence:
+
+```text
+not ok 1171 recover preflight: a failed k3d listing refuses instead of treating the hub as absent
+# (from function `make_fixture' in file scripts/tests/plugins/hub_data.bats, line 125,
+#  in test file scripts/tests/plugins/hub_data.bats, line 967)
+#   `make_fixture; source_plugin' failed with status 127
+# /Users/cliang/src/gitrepo/personal/k3d-manager/scripts/tests/plugins/hub_data.bats: line 126: sha256sum: command not found
+[k3dm-test-metrics] 1747 cases, 56 failed
+make: *** [test-all] Error 2
+```
+
+The complete local run transcript is `scratch/test-logs/all/20261020-171339.log`. Update Status, verification timestamp, and live-evidence metadata only after a real fix and matching verification.
