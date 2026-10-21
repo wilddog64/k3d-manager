@@ -402,7 +402,7 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run pid session_id n network_slug
+  local slug="" prompt_file="" rel version task run session_id n network_slug
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -416,8 +416,7 @@ _dispatch_resume() {
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   [[ ! -f "$run/landed" ]] || _dispatch_error "task has landed: $slug"
-  [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
-  if [[ -n "$pid" && ! -f "$run/exit" ]] && kill -0 "$pid" 2>/dev/null; then
+  if [[ ! -f "$run/exit" ]] && _dispatch_worker_matches_start "$run"; then
     _dispatch_error "Codex is still running"
   fi
   session_id="$(sed -n 's/^session id: //p' "$run/codex.log" 2>/dev/null | head -n 1)"

@@ -454,6 +454,20 @@ EOF
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-3.log" ]
 }
 
+@test "codex dispatch: resume accepts a dead worker whose PID identity is stale" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit"
+  sed -i.bak 's/^process_start=.*/process_start=not-the-worker/' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-2.log" ]
+}
+
 @test "codex dispatch: resume passes the state root and runs in the worktree" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
