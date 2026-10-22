@@ -83,6 +83,17 @@ Then invoke `/k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Sla
 
 ## Investigation checks
 
+## Successful live verification — 2026-10-21
+
+The operator later supplied a Slack screenshot showing:
+
+```text
+✅ make find-similar-docs Q=what's recent e2e-remote issues succeeded — job 08ae7d06
+Prior art for: "what's recent e2e-remote issues"
+```
+
+The response includes relevant prior-art results. This supersedes the earlier failed live attempts for acceptance: the exact query was accepted and retrieval returned results. The canonical bug is now LIVE-VERIFIED. The screenshot does not identify the deployed source revision, so none is inferred.
+
 ```text
 check-doc-links: 2288 file(s) OK
 1..8

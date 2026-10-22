@@ -3,7 +3,9 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
-**Status:** VERIFIED — offline tests pass; live verification pending
+**Status:** LIVE-VERIFIED — operator Slack job `08ae7d06` succeeded on 2026-10-21
+**Live evidence:** 2026-10-21 · run 08ae7d06 · env Slack/thread · scenario find-similar-docs-free-text-Q · commit 997587d6 · proves fix
+**Fix commit:** `997587d6`
 **Fix commits:** `74d79eac`, `997587d6`
 **Approval:** operator explicitly requested review and dispatch on 2026-10-21; implementation is authorized within the scoped files below
 
@@ -76,7 +78,11 @@ The fix landed on `k3d-manager-v1.43.5` in `74d79eac` and `997587d6`. Offline ve
 - `bats scripts/tests/lib/webhook.bats scripts/tests/plugins/slack_slash_commands.bats` — 76 tests, 6 environment-gated skips, no failures.
 - Python AST parsing, `_agent_audit`, `_agent_lint`, and `git diff --check` passed.
 
-This is **VERIFIED, not LIVE-VERIFIED**. The offline gates establish that the landed release-branch code accepts and safely transports the query. The previous live attempt failed, so the running components still need rollout/restart and confirmation. From the current release checkout run `make deploy-worker` and `make restart-webhook`, then invoke `/k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack. Confirm the job succeeds and the exact full query reaches retrieval; share the result so the status can advance to LIVE-VERIFIED.
+At the time of the failed attempts, the offline gates established that the landed release-branch code accepted and safely transported the query, but live verification was pending. The later successful operator run below supersedes that pending status.
+
+### Live verification — 2026-10-21
+
+Operator screenshot shows Slack job `08ae7d06` succeeded for the exact query `what's recent e2e-remote issues`. The output begins `Prior art for: "what's recent e2e-remote issues"` and returns matching prior-art documents, including E2E remote-runner and harness items. This confirms the natural-language query, including its apostrophe and spaces, passed through the live command and produced retrieval results. Status advanced to **LIVE-VERIFIED**. The screenshot does not independently establish which deployment revision served the request.
 
 ### Live verification failure — 2026-10-21
 
