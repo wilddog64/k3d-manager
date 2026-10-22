@@ -307,3 +307,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-22 proposed v2.7.x application fraud risk milestone
 
 - At operator suggestion, added candidate v2.7.x Account Abuse & Fraud Risk Detection to `docs/roadmap.md` on `k3d-manager-v1.43.5` (commit `f0fec250ed4fcf1c6ff51983fe75f896d321389b`). Slices v2.7.0 threat model/events, v2.7.1 rules and review, v2.7.2 optional evaluated ML, v2.7.3 application E2E and Grafana. It belongs to a suitable account-based app, not core IDS; do not resurrect retiring shopping-cart or assume TwinkleAI needs fraud scoring. Roadmap only, no deployment, no implementation spec or PR.
+
+## 2026-10-22 post-v3 intent-to-verified-software benchmark placement
+
+- Operator clarified that testing intent-driven AI development using unfamiliar Meta/interview questions belongs **after v3.0.0**, not in v2.x. Updated `docs/roadmap.md` on `k3d-manager-v1.43.5` (commit `cf3ceff9981ede8116ecb46a1673a927eea4a62b`) with an unversioned post-v3.0.0 benchmark theme, blinded independently verified acceptance, equal-budget multi-model comparisons, isolated deployments and safety boundaries. v2.6 autonomous investigation and v2.7 application fraud candidates remain separate. Roadmap only; no PR or implementation.
