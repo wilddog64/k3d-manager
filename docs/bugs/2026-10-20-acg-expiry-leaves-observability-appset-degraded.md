@@ -12,6 +12,8 @@
 
 **Source-path finding (2026-10-21):** `bin/cluster-up` previously proceeded after applying the app-cluster Secret without verifying its exact persisted identity/provider/server. Its later Argo CD connection loop accepts substring matches and continues after timeout. A scoped fix now reads the Secret back and fails bring-up with an actionable expected/observed diagnostic unless it is exactly `cluster-ubuntu-k3s`, `ubuntu-k3s`, `k3s-aws`, and the configured sandbox server. This demonstrates a source invariant gap, but does not establish that it caused the observed missing live registration or that expiry caused the state. The remaining safe live repro is documented in `docs/issues/2026-10-21-acg-observability-appset-investigation.md`; live expiry/re-provision acceptance remains pending.
 
+**Live verification attempt (2026-10-21):** ACG bring-up stopped before registration: `ubuntu@ubuntu` did not answer SSH within 180s. The chained `make down` then began deleting the CloudFormation stack. This does not verify the fix; see `docs/issues/2026-10-21-acg-live-verification-node-ssh-timeout.md`.
+
 ## Files
 
 - `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md`
