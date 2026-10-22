@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "action": "diagnose-describe-pod",
+  "args": {
+    "provider": "hostinger",
+    "namespace": "shopping-cart-apps",
+    "name": "codex-verify-nonexistent-diagnostic-pod-20261022"
+  },
+  "requested_by": "chatgpt-cloud",
+  "requested_at": "2026-10-22T11:37:30Z",
+  "expires_at": "2026-10-22T12:07:30Z"
+}
