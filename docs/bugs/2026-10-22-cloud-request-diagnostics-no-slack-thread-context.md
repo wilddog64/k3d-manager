@@ -1,35 +1,98 @@
-# Cloud-request diagnostic reports omit job ID and Slack thread context
+# Cloud-request diagnostic reports omit the job ID
 
 **Filed:** 2026-10-22
 **Status:** OPEN — observed during live verification; no fix dispatched
 **Priority:** P3
-**Component:** `bin/k3dm-cloud-request`, diagnostics cloud-bridge route, Slack result delivery
+**Severity:** low
+**Approval:** pending — operator approved splitting and re-scoping this doc on 2026-10-22; dispatch not yet approved
+**Release:** v1.43.5 (bug; exempt from the plan cap)
+**Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`)
+**Related:** `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md` (owns the Slack
+destination half split out of this bug; see "Split" below)
 
 ## Summary
 
-Diagnostics submitted through `bin/k3dm-cloud-request` can produce a Slack result message that omits the webhook job ID and does not reply in the originating Slack thread. The cloud-request action payload carries the diagnostic action and its allowlisted arguments, but no Slack `channel_id` or `thread_ts` context. The diagnostics webhook endpoint accepts optional `channel_id` and `thread_ts`; without those values it cannot target an originating Slack thread. The diagnostic report text also does not include the generated job ID, even though the HTTP 202 response returns it.
+Diagnostics submitted through `bin/k3dm-cloud-request` produce a Slack result that omits the webhook
+job ID. The bridge's HTTP 202 response returns the ID, but nothing in the Slack message lets an
+operator match it to that response or query its status.
 
-This is separate from the Hostinger diagnostic exit-status fix (`6be25c92`): that fix classifies command failures, while this issue concerns job identification and placement of cloud-request results. Direct Slack `cluster-diagnose` commands have a separate route that propagates the Slack thread context.
+This is separate from the Hostinger diagnostic exit-status fix (`6be25c92`), which classifies
+command failures.
 
 ## Evidence
 
-- On 2026-10-22, the operator submitted `diagnose-describe-pod` through `bin/k3dm-cloud-request` with `--wait-final`. The captured initial bridge response was HTTP 202 with job `a1573d1c` still queued; that capture alone does not establish whether final polling later timed out.
-- The operator supplied a cloud-agent Slack screenshot showing the `NotFound` diagnostic output as a standalone result without a job ID, and reported that it did not reply in a thread.
-- The tmux and cloud-agent evidence show two separate executions of the same safe diagnostic, not duplicate delivery from one job. Duplicate posting is not claimed as a defect.
-- `scripts/lib/webhook/cloud_actions.py` defines the cloud-request diagnostic actions with only diagnostic resource arguments (`provider`, `namespace`, and `name` as applicable); no Slack thread-destination arguments are exposed.
-- `bin/k3dm-webhook`'s `/api/v1/diagnostics` handler accepts optional `thread_ts` and `channel_id`, and `scripts/lib/webhook/status.py::_post_status_report` uses those values to select an existing thread or start a status thread. The cloud-request CLI route supplies no originating Slack context.
-- `scripts/lib/webhook/status.py::_run_cluster_diagnostics` constructs and posts the diagnostic output without adding `job_id`; the bridge's initial HTTP 202 response carries the ID separately.
+- On 2026-10-22 the operator submitted `diagnose-describe-pod` through `bin/k3dm-cloud-request`
+  with `--wait-final`. The bridge returned HTTP 202 with job `a1573d1c`.
+- The operator's screenshot of the Slack result shows the `NotFound` diagnostic output with no job ID.
+- `scripts/lib/webhook/status.py::_run_cluster_diagnostics(job_id, ...)` receives `job_id`, but the
+  report text it builds (the `title` line per action, then provider, output and status) never
+  includes it. The same report is posted for direct Slack `cluster-diagnose` commands, so those
+  lack the ID too.
+- The tmux and cloud-agent evidence show two separate executions of the same safe diagnostic, not
+  duplicate delivery from one job. Duplicate posting is not claimed as a defect.
 
-## Expected behavior
+## Split (2026-10-22)
 
-Diagnostic reports should include the job ID so operators can correlate the Slack result with the bridge response and query its status. When an operator intentionally requests a diagnostic from a Slack thread through the cloud-request workflow, the result should be associated with that same thread, or the workflow should clearly state that it will be posted separately. A caller must not be able to use arbitrary channel/thread values to post into unauthorized Slack conversations.
+The original filing also reported that the result does not reply in the originating Slack thread.
+That half is not a code defect: a cloud session submits from the `cloud-requests` branch and has no
+Slack thread of its own, and letting a request carry `channel_id`/`thread_ts` would let any branch
+writer post into arbitrary conversations. Choosing the destination is a trust decision. It belongs to
+`docs/plans/v1.44.0-cloud-request-slack-notification-routing.md` (approved-channel routing for
+cloud requests), not to this bug. This bug changes no Slack destination.
 
-## Scope for follow-up
+## Fix
 
-Investigate a safe context-propagation design, with tests for thread association, missing context, and rejection of unauthorized destinations. Do not change Hostinger diagnostics, Slack direct-command routing, or cloud-request final-polling behavior under this bug unless investigation establishes a direct dependency. No live Slack posting or code change is authorized by this finding.
+- **F1.** In `_run_cluster_diagnostics`, include the job ID in the report: one line
+  `_Job: \`<job_id>\`_` written immediately after the action's `title` line, for every action.
+- **F2.** Tests in a new `scripts/tests/bin/test_diagnostics_job_id.py`: run
+  `_run_cluster_diagnostics` with the command spawn and Slack posting stubbed (as
+  `scripts/tests/bin/test_diagnostics_all_pods.py` does) and assert the posted report contains the
+  job ID, for a successful, a failing and a timed-out command.
 
-## Reproduction
+## Files
 
-1. Submit an allowlisted diagnostic using `bin/k3dm-cloud-request`.
-2. Observe its result delivered to Slack.
-3. Observe that the Slack result omits the job ID returned by the bridge and is not a reply in the initiating Slack thread because the request payload contains no originating Slack thread identifier.
+- `scripts/lib/webhook/status.py`
+- `scripts/tests/bin/test_diagnostics_job_id.py`
+- `CHANGELOG.md`
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: Every diagnostics report posted by _run_cluster_diagnostics contains the job ID it was called with, for success, command failure and timeout.
+  - id: M2
+    text: The job ID in the report equals the one in the bridge's HTTP 202 response for the same request.
+must_not:
+  - id: N1
+    text: A diagnostics report must not omit the job ID (red on the pre-fix status.py).
+  - id: N2
+    text: The fix must not change the Slack destination (channel, thread or response_url) of any report.
+  - id: N3
+    text: The fix must not change the diagnostic command, its arguments, masking or output clipping.
+evidence:
+  - id: E1
+    proves: [M1, N1, N2, N3]
+    kind: offline
+    text: pytest scripts/tests/bin/test_diagnostics_job_id.py with spawn and posting stubbed; N1 red on the pre-fix status.py; scripts/tests/bin/test_diagnostics_all_pods.py still green.
+  - id: E2
+    proves: [M1, M2]
+    kind: live
+    text: After make restart-webhook the operator submits one allowlisted diagnostic via bin/k3dm-cloud-request; Claude reads the Slack screenshot and the 202 response and confirms the IDs match.
+interface:
+  - scripts/lib/webhook/status.py _run_cluster_diagnostics(job_id, response_url, thread_ts=None, channel_id="", request=None)
+  - bin/k3dm-cloud-request diagnostic actions (HTTP 202 response carries job_id)
+```
+
+## Definition of Done
+
+- [ ] F1–F2 on `k3d-manager-v1.43.5`; only the Files above change.
+- [ ] N1 shown red against the pre-fix `status.py`.
+- [ ] `pytest scripts/tests/bin` green.
+- [ ] Commit: `fix(webhook): include the job ID in diagnostics reports`
+
+## What NOT to Do
+
+- Do NOT create a PR, commit to `main`, or use `--no-verify`.
+- Do NOT add `channel_id`/`thread_ts` to cloud-request payloads or change Slack routing; that is the v1.44.0 plan.
+- Do NOT post to Slack or run real diagnostics in tests.
