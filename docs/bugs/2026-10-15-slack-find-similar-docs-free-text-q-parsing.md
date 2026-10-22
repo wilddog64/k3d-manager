@@ -3,7 +3,7 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
-**Status:** OPEN — live verification failed; deployed command path still rejects Q
+**Status:** OPEN — live verification failed; deployed component revisions are unconfirmed
 **Fix commits:** `74d79eac`, `997587d6`
 **Approval:** operator explicitly requested review and dispatch on 2026-10-21; implementation is authorized within the scoped files below
 

@@ -23,9 +23,65 @@ Queuing make find-similar-docs…
 
 The live attempt failed. In the landed source, the relay acknowledgment is `Request received for make …; validating…`, not `Queuing make …`; the backend `Q` validation accepts printable ASCII, including apostrophes. The screenshot's acknowledgment is not enough to identify which component generated it or prove that the relay is stale. It also does not show the exact submitted query.
 
+## Release-branch trace
+
+Deployment baseline for this investigation is `k3d-manager-v1.43.5`, not `main`. The inspected checkout contains both fixes (`74d79eac`, `997587d6`) and the current source path is internally consistent:
+
+- `workers/slack-relay/index.js:parseK3dm` preserves unkeyed words as part of free-text `Q`; its slash-command response is `Request received for make …; validating…`.
+- `scripts/lib/webhook/make_targets.py` accepts printable ASCII for `Q`, including apostrophes, with a 200-character maximum.
+- `scripts/lib/webhook/lifecycle.py:_make_target_argv` base64-encodes `Q` before passing it across Make's recipe boundary.
+- `Makefile` target `find-similar-docs` decodes `Q_B64` and passes the result to `scripts/find-similar-docs.py` as one argv value after `--`.
+- `make deploy-worker` runs Wrangler from the checkout's `workers/slack-relay` directory and performs a smoke request. It deploys that local worker source.
+- `make restart-webhook` kickstarts the local `com.k3d-manager.webhook` LaunchAgent, then invokes `restart-cloud-bridge`. The webhook launchd plist uses the checkout's `bin/k3dm-webhook` and repository root; the restart is needed to reload changed Python files.
+
+No remaining code defect was found in the current slash-command Q parsing, validation, or Make transport path. The screenshot's `Queuing make …` acknowledgment and `invalid value for Q` error conflict with current relay/backend behavior, so an older or mixed rollout is a plausible explanation. The screenshot does not identify the responding component or show the exact query, so this is not proof that rollout/restart was skipped. No endpoint in the inspected source exposes the active worker or webhook source revision; runtime revisions remain unconfirmed.
+
 ## Follow-up
 
-From the current release branch, run the documented rollout steps for both components (`make deploy-worker` for the Cloudflare relay and `make restart-webhook` for the local webhook) if they have not already been done. Then retry `k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack and verify successful execution with the full unchanged query. Keep the canonical bug OPEN until that live check passes.
+On the deployment host, check out and update `k3d-manager-v1.43.5` through commit `997587d6` (including `74d79eac`), then run these commands from that checkout, in order:
+
+```sh
+git rev-parse --abbrev-ref HEAD
+git merge-base --is-ancestor 74d79eac HEAD && git merge-base --is-ancestor 997587d6 HEAD
+make deploy-worker
+make restart-webhook
+```
+
+The first two commands confirm the release branch and that both fix commits are ancestors of the checkout. `make deploy-worker` publishes the local checkout's Cloudflare Worker source and runs its smoke request. `make restart-webhook` reloads the checkout's webhook through launchd and restarts the cloud bridge if its LaunchAgent is installed. These are the required rollout actions; repository state alone cannot establish whether they were previously run for this incident.
+
+Then invoke `/k3dm find-similar-docs Q="what's recent e2e-remote issues"` in Slack. Confirm the request passes validation, the job completes, and retrieval receives the exact unchanged query. Record that both components were rolled out from the release checkout and attach the successful job/result evidence. Keep the canonical bug OPEN until this live check passes; the initial acknowledgment is not acceptance evidence.
+
+## Investigation checks
+
+```text
+check-doc-links: 2288 file(s) OK
+1..8
+ok 1 slack commands doc lists the cluster-status slash commands
+ok 2 slack commands doc manifest matches the relay command set
+ok 3 slack commands doc gives a concrete example for each command
+ok 4 slack commands doc fix mode names the real FIX_CONTEXT override
+ok 5 slack relay allowlist includes cluster-status and hostinger-status
+ok 6 slack relay assigns remote-operator roles to cluster commands
+ok 7 slack relay forwards remote-operator metadata headers
+ok 8 slack relay parses cluster-diagnose payloads
+```
+
+The combined BATS run failed in its localhost HTTP cases. Actual output included:
+
+```text
+1..76
+not ok 2 POST with wrong token returns 401
+#   `[ "$status" -eq 0 ]' failed
+not ok 20 Slack ignores signed unknown and user-less commands without creating anchors
+#   `response="$(_slack_event '{"event":{"type":"message","user":"U-unknown","text":"/cluster-status","ts":"1"}}')"' failed with status 7
+not ok 43 POST /cluster with response_url stored in job dir
+#   `"${_WEBHOOK_URL}/api/v1/cluster")' failed with status 7
+ok 49 Level 1: POST queues job and GET /status returns job output # skip set K3DM_WEBHOOK_LIVE=1 to enable
+ok 51 Level 2: POST current chart version returns success without running make up # skip set K3DM_WEBHOOK_LEVEL2=1 to enable (requires cluster)
+ok 52 Level 3: tunnel rejects wrong token with 401 # skip set K3DM_WEBHOOK_LEVEL3=1 to enable (requires tunnel)
+```
+
+The same 76-case command was repeated with `--jobs 1` and failed on the same category of localhost cases. A separate run of `bats --print-output-on-failure scripts/tests/lib/webhook.bats` passed all 68 cases; six live/cluster-gated cases were skipped by their documented environment guards. The slash-command suite passed 8/8 above. The contrasting result suggests a local HTTP test harness/port issue, but its root cause was not established. `git diff --check` and `_agent_audit` exited 0. No ShellCheck target applies because this documentation-only change touched no shell files.
 
 ## Redispatched investigation task
 
