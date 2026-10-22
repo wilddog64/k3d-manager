@@ -22,6 +22,23 @@ which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
 
 **Check the instance before debugging the query.**
 
+### Firing alert timing
+
+The **Firing Alerts by Category** table remains an aggregate count by category, alert name,
+severity, and cluster. Its adjacent **Currently Firing Alert Instances** table provides one
+row per alert instance (up to 200 rows), including the rule labels, **Active since (UTC;
+pending included)**, and elapsed **Active duration**. Alert identity stays per-instance, so
+several Trivy findings under one rule can have different timestamps.
+
+The timestamp comes from Prometheus `ALERTS_FOR_STATE`, which records when a rule entered
+pending/active evaluation. A rule's `for:` interval means this can be earlier than the actual
+firing transition, so the dashboard deliberately does not call it **Fired at** or **Firing
+for**. Rows without this metric are omitted; an empty detail table means no firing instance
+has a matching active-state sample. No resolved time is inferred. The Prometheus expression
+matches those samples to `ALERTS{alertstate="firing"}` and caps the detail view at 200
+instances. Use the configured Alertmanager UI to inspect authoritative current alert details
+and start times; the dashboard does not embed API credentials or expand external access.
+
 ## The producer chain
 
 Dashboard data has several paths: some panels read metrics Prometheus scrapes natively, while

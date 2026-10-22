@@ -347,12 +347,45 @@ _assert_no_panel_overlap() {
 }
 
 @test "Grafana Overview Firing Alerts and Request Rate panels stay byte-identical" {
-  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
+  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12 or .id == 13)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12 or .id == 13)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
 }
 
 @test "Grafana Overview Firing Alerts by Category panels satisfy the table contract" {
   _assert_category_contract "${OVERVIEW}"
   _assert_category_contract "${HUB_OVERVIEW}"
+}
+
+_assert_firing_instance_contract() {
+  local dashboard_file="$1"
+  local dashboard_json detail category
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  detail="$(jq -c '.panels[] | select(.id == 13)' <<<"$dashboard_json")" || return 1
+  category="$(jq -c '.panels[] | select(.id == 12)' <<<"$dashboard_json")" || return 1
+  jq -e '(.type == "table") and (.title | contains("Active Since (UTC; pending included)")) and (.description | contains("not an exact fired-at time")) and (.description | contains("for: interval")) and ([.targets[].expr | contains("bottomk(200") ] | all) and ([.targets[].expr | contains("ALERTS_FOR_STATE") ] | all) and ([.targets[].expr | contains("alertstate=\"firing\"") ] | all) and (.targets | length == 2) and ([.transformations[].id] | index("merge") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("dateTimeAsIso") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("s") != null)' <<<"$detail" >/dev/null || return 1
+  jq -e '(.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Trivy.*"))' <<<"$category" >/dev/null || return 1
+  jq -e '.timezone == "utc"' <<<"$dashboard_json" >/dev/null || return 1
+}
+
+@test "Grafana Overview firing instance detail contract is safe and preserves category counts" {
+  _assert_firing_instance_contract "${OVERVIEW}"
+  _assert_firing_instance_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview firing instance fixtures preserve per-instance context and safe fallbacks" {
+  local fixture result
+  fixture='[{"alertname":"TrivyCriticalVulnerabilityDetected","cluster":"hub","instance":"cve-a","active_since":1761070000,"pending_for_seconds":0},{"alertname":"TrivyCriticalVulnerabilityDetected","cluster":"ubuntu-hostinger","instance":"cve-b","active_since":1761073600,"pending_for_seconds":300},{"alertname":"TargetDown","cluster":"acg","instance":"node-exporter","active_since":1761075000,"pending_for_seconds":60},{"alertname":"HostDiskMetricsStale","cluster":"hub","instance":"node-exporter","active_since":null,"pending_for_seconds":0}]'
+  result="$(jq -c '[.[] | select(.active_since != null) | {alertname, cluster, instance, active_since, active_duration: (1761075600 - .active_since), label: "Active since (UTC; pending included)"}]' <<<"$fixture")"
+  jq -e 'length == 3 and .[0].active_since != .[1].active_since and .[0].instance != .[1].instance and .[1].active_duration == 2000 and all(.[]; .label == "Active since (UTC; pending included)")' <<<"$result" >/dev/null
+  [ "$(jq 'length' <<<'[]')" = '0' ]
+}
+
+@test "Grafana Overview firing instance regression rejects the pre-fix missing detail panel" {
+  local snapshot="${BATS_TEST_TMPDIR}/overview-no-instance-panel.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | .panels |= map(select(.id != 13)) | tojson))' "$snapshot"
+  run _assert_firing_instance_contract "$snapshot"
+  printf 'pre-fix representation (detail panel absent): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
 }
 
 @test "Grafana Overview panels do not overlap" {

@@ -84,6 +84,95 @@ data:
           "title": "Firing Alerts by Category",
           "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true}, "indexByName": {"category": 0, "alertname": 1, "severity": 2, "cluster": 3, "Value": 4}, "renameByName": {"category": "Category", "alertname": "Alert", "severity": "Severity", "cluster": "Cluster", "Value": "Count"}}}],
           "type": "table"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "One row per currently firing alert instance (maximum 200 rows). Active since comes from Prometheus ALERTS_FOR_STATE, which marks entry into pending/active evaluation and can precede firing by the rule's for: interval. It is not an exact fired-at time. Active duration is elapsed since that timestamp. Dashboard timezone is UTC. Missing ALERTS_FOR_STATE samples are omitted; use Alertmanager for current firing details.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "cellOptions": {
+                  "type": "auto"
+                }
+              },
+              "mappings": [],
+              "noValue": "No firing instances with active-state timestamps"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #A"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 22
+          },
+          "id": 13,
+          "options": {
+            "showHeader": true
+          },
+          "targets": [
+            {
+              "expr": "label_replace(bottomk(200, ALERTS_FOR_STATE{alertname!~\"Watchdog|InfoInhibitor\"} and ignoring(alertstate) ALERTS{alertstate=\"firing\", alertname!~\"Watchdog|InfoInhibitor\"}), \"cluster\", \"hub\", \"cluster\", \"^$\")",
+              "format": "table",
+              "instant": true,
+              "legendFormat": "Active since",
+              "refId": "A"
+            },
+            {
+              "expr": "time() - (label_replace(bottomk(200, ALERTS_FOR_STATE{alertname!~\"Watchdog|InfoInhibitor\"} and ignoring(alertstate) ALERTS{alertstate=\"firing\", alertname!~\"Watchdog|InfoInhibitor\"}), \"cluster\", \"hub\", \"cluster\", \"^$\"))",
+              "format": "table",
+              "instant": true,
+              "legendFormat": "Active duration",
+              "refId": "B"
+            }
+          ],
+          "title": "Currently Firing Alert Instances — Active Since (UTC; pending included)",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "Value #A": "Active since (UTC; pending included)",
+                  "Value #B": "Active duration"
+                }
+              }
+            }
+          ],
+          "type": "table"
         }
       ],
       "schemaVersion": 41,
