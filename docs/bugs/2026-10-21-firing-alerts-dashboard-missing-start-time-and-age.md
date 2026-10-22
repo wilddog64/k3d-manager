@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** VERIFIED (offline) — final category/identity/severity/local-time follow-up landed as `f37757b0`; operator live Grafana verification remains pending because Argo CD was serving the prior revision
+**Status:** REOPENED — P3 live dashboard failure observed 2026-10-22 after offline fixes (`63d53576`, `309d77bf`, `28e74901`, `f37757b0`): active-alert instance panel has zero rows while aggregate has 41, CVE creation-time panel is blank in screenshot, and required identity/column layout is not rendered. Root cause and deployed revision require verification; offline passing tests do not close this.
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -10,6 +10,68 @@
 **Found by:** operator, Grafana at approximately 13:40 PDT on 2026-10-21
 **Component:** Grafana alert and Trivy vulnerability panels; vulnerability inventory exporter
 **Related:** `docs/bugs/2026-10-02-grafana-overview-firing-alerts-and-request-rate-no-data.md`, `docs/bugs/2026-10-02-grafana-overview-readable-title-collides-with-stock-dashboard.md`
+
+## Reopened — 2026-10-22: live timestamp panels empty and column contract unmet
+
+**Recurred:** 2026-10-22 — operator screenshot shows 41 firing alerts in aggregate while new per-instance active-since table reports `No firing instances with active-state timestamps`; CVE report-created panel appears blank; only the two timestamp column headers are rendered rather than the required alert identity fields.
+**Classification:** P3 dashboard usability/data availability regression, **not** evidence that alert evaluation or Trivy scanning has stopped. Root cause is not confirmed without runtime query results and the deployed ConfigMap revision.
+**Evidence:** operator screenshots at approximately 07:00 PDT 2026-10-22 and source inspection of branch `k3d-manager-v1.43.5`. Do not treat screenshots as evidence that the deployed dashboard is at branch HEAD or that `ALERTS_FOR_STATE` itself is absent.
+
+### What exists in source now
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml` and `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml` contain active-alert panel **13** and CVE report-created panel **14**.
+- Panel 13 joins `ALERTS_FOR_STATE` to `ALERTS{alertstate="firing"}` via `and ignoring(alertstate)`, then uses `bottomk(200, ...)`, label replacement, two table queries (`A`: timestamp in milliseconds; `B`: `time() - active_timestamp`), `merge`, `filterFieldsByName`, and `organize`. A missing metric or nonmatching labelset eliminates rows *before* Grafana's transformations. The screenshot's two visible timestamp headers do not prove data or label availability.
+- Panel 13 source `organize.indexByName` specifies Namespace, Cluster, Alert, Category, App, Pod, Instance, Severity, Active since (local; pending included), Elapsed time since active. This is ten **physical columns when all three identity labels exist**, with absent optional identity labels omitted—not evidence the live panel rendered that order. Preserve the intended adjacent identity slot.
+- Panel 14 queries `topk(200, trivy_vulnerability_report_created_timestamp_seconds) * 1000`.
+- **Correction to earlier source-only triage:** `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml` *does implement* `trivy_vulnerability_report_created_timestamp_seconds` using VulnerabilityReport `metadata.creationTimestamp`. Its deployed version, exporter HTTP payload, Prometheus target/scrape, and live metric series were NOT inspected here. Never claim the producer is absent merely because the metric search index did not find it.
+- `scripts/tests/plugins/grafana_dashboard_appsets.bats` confirms JSON expressions, transforms and field lists. It does not execute PromQL against real metric series or assert the resulting Grafana data frame/displayed rows.
+
+### Repair procedure — diagnosis first, no infrastructure mutation
+
+1. **Confirm deployed revision and datasource.** Compare Git branch HEAD, Argo CD `hub-grafana-dashboards` synced revision, live ConfigMap `monitoring/grafana-dashboard-overview-readable` JSON, dashboard panel JSON, and the selected Prometheus datasource. Do the same for the relevant app-cluster dashboard copy when applicable. If live ConfigMap/dashboard differs from HEAD, diagnose drift and obtain separate operator authorization before sync or rollout; do not patch the live dashboard ad hoc.
+2. **Run these four independent instant queries in Grafana Explore on the panel's exact Prometheus datasource** and capture numeric/result labels (not only a screenshot of the panel):
+   ```promql
+   count(ALERTS{alertstate="firing",alertname!~"Watchdog|InfoInhibitor"})
+   count(ALERTS_FOR_STATE{alertname!~"Watchdog|InfoInhibitor"})
+   count(ALERTS_FOR_STATE{alertname!~"Watchdog|InfoInhibitor"} and ignoring(alertstate) ALERTS{alertstate="firing",alertname!~"Watchdog|InfoInhibitor"})
+   count(trivy_vulnerability_report_created_timestamp_seconds)
+   ```
+   If `count` yields **no vector**, interpret that as absent series, not a numeric zero. Inspect sample label sets using bounded instant queries for `ALERTS` and `ALERTS_FOR_STATE`; do not assume `ignoring(alertstate)` is sufficient. If both inputs exist but the joined count is empty, check unmatched labels and/or PromQL matching cardinality; use explicit `on(...)` **only for proven unique identity keys**, without collapsing distinct alerts or causing many-to-many matches. Do not convert an absent timestamp into a fabricated start time. If the joined query has rows, inspect raw query A and B data frames before `merge`, after `merge`, after field filtering, and after `organize` to locate the rendering error.
+3. **Verify the CVE pipeline end to end:** check whether the deployed vulnerability-inventory-exporter includes `metadata.creationTimestamp` code, whether the exporter endpoint actually emits `trivy_vulnerability_report_created_timestamp_seconds`, its ServiceMonitor/target scrape status, and whether Prometheus returns instances. Compare a returned timestamp against the matching Kubernetes VulnerabilityReport metadata. If the metric exists in Prometheus but panel 14 is blank, examine panel query/datasource/time-range/transformations. If metric is absent, determine exporter runtime, access/RBAC, invalid/missing timestamps, or scrape/reload drift before modifying the query. Do not substitute alert start time for CVE report creation time.
+4. **Fix the real defect at its producer/query/transformation layer** based on evidence. Retain bounded 200-row behavior, existing 41-alert aggregate logic, correct UTC epoch seconds-to-Grafana-milliseconds conversion, browser-local display timezone, and pending-included caveat. A count-only smoke test is insufficient.
+5. **Make the operator-facing column contract unambiguous.** The exact canonical order is Namespace → Cluster → Alert → Category → App → Pod → Instance → Severity → Active since (local; pending included) → Elapsed time since active, with available App/Pod/Instance columns contiguous as one identity group and missing optional labels omitted. Never invent missing Pod for Trivy's image-aggregated alert rule. Do not hide required fields merely because test fixtures omit them. The older six-field prose shorthand is superseded by this explicit column/identity contract.
+6. **Add data-backed regression tests.** Use representative fixtures: two firing alerts with distinguishable labels, Trivy image-aggregate without pod, an alert with app/pod/instance, timestamp series with an extra label, no timestamp metric, and no alerts. Evaluate the PromQL with promtool or a disposable Prometheus if available, assert the joined query returns the right rows/timestamps and rejects a deliberate broken matcher; also test merged data frames or integration-level Grafana rendering for exact visible headers and order. Test the CVE exporter sample emission and panel query together, including missing and valid creation timestamps. A JSON substring assertion alone must NOT satisfy the regression gate.
+7. **Live-verify before closure:** after approved deployment, attach query outputs, exact dashboard/exporter revision, screenshot of populated general and CVE tables, actual visible column order, sample timestamp verification against Prometheus/Kubernetes, and unchanged alert aggregate. Record operator approval and mark LIVE-VERIFIED only after the display and semantic checks pass.
+
+### Additional acceptance for this recurrence
+
+```yaml
+must:
+  - id: M7
+    text: With nonzero firing ALERTS and corresponding ALERTS_FOR_STATE samples in Prometheus, the instance panel renders nonzero correctly identified rows; any unsupported/missing timestamp condition is explicit rather than masquerading as no alerts.
+  - id: M8
+    text: The live alert-instance table's actual visible headers follow the canonical ordering and preserve available app/pod/instance identity (optional absent fields are not fabricated).
+  - id: M9
+    text: When valid VulnerabilityReport creation timestamps are emitted and scraped, the CVE panel renders rows with source-backed report creation time and workload context.
+  - id: M10
+    text: Offline tests exercise populated query results and/or Grafana data frames, not just expected panel JSON text; deployment revision and live evidence are recorded separately.
+must_not:
+  - id: N4
+    text: Do not label a blank query as healthy, mark LIVE-VERIFIED based solely on BATS JSON-shape tests, or replace missing timestamps with invented values.
+  - id: N5
+    text: Do not change alert aggregation rules, scan schedules, or cluster infrastructure solely to make the table display rows.
+evidence:
+  - id: E3
+    kind: offline
+    proves: [M7, M8, M9, M10, N4, N5]
+    text: Query-evaluation fixtures show red-green for the missing-data and field-order failure modes; exporter timestamp series and dashboard target/transform output are checked together.
+  - id: E4
+    kind: live
+    proves: [M7, M8, M9, M10, N4]
+    text: Deployed Git/Argo revision, raw Prometheus counts and sample labels, exporter target scrape, exact rendered table headers/rows, screenshot and correlated alert/report timestamps.
+```
+
+**Do not do during this documentation-only reopen:** deploy/sync, change Prometheus/Trivy configuration, alter implementation, or create a PR.
 
 ## Initial finding and live follow-up
 
@@ -184,10 +246,10 @@ Offline verification covers the compact active-alert table, preserved category c
 ## Definition of Done
 
 - [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [x] Generic table is compact/readable and orders Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since, Elapsed time since active; CVE detail includes report owner and report-created time while retaining aggregate counts.
-- [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
+- [ ] Generic table **renders populated rows** in the required order and with available identity labels, while the CVE view renders actual report timestamps; offline JSON configuration alone is insufficient.
+- [ ] Add data-backed/query-evaluation and rendered-column regression evidence; existing JSON-shape and exporter fixture checks remain historical offline evidence.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
-- [x] Record fix SHA, verification evidence and status transition in this bug.
+- [ ] Record a verified corrective fix SHA, deployed revision, query evidence, live screenshot and final status transition; historical SHAs remain documented.
 
 ## Category, identity, severity, and duration-label verification (2026-10-22)
 
