@@ -6,7 +6,7 @@
 
 ## 2026-10-21 ACG observability ApplicationSet live verification
 
-- Operator screenshot after completed ACG bring-up showed `observability-acg` green/Healthy with 3 Applications. Operator then ran `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`; terminal output confirmed CloudFormation deletion, hub deregistration, and retirement of `ApplicationSet/observability-acg`, while preserving the Hub. Canonical `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md` is LIVE-VERIFIED. Down also warned that the frontend-browser HTTP system LaunchDaemon remained installed; record: `docs/issues/2026-10-21-acg-down-frontend-browser-launchdaemon-remains.md`. The independent ArgoCD reconnect timeout is recorded in its own issue.
+- Operator screenshot after completed ACG bring-up showed `observability-acg` green/Healthy with 3 Applications. Operator then ran `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`; terminal output confirmed CloudFormation deletion, hub deregistration, and retirement of `ApplicationSet/observability-acg`, while preserving the Hub. Canonical `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md` is LIVE-VERIFIED. Down also warned that the frontend-browser HTTP system LaunchDaemon remained installed; record: `docs/issues/2026-10-21-acg-down-frontend-browser-launchdaemon-remains.md`. The independent ArgoCD reconnect timeout is recorded in its own issue. Records and statuses pushed in `b5edff2b`; code originated in [lib-foundation PR #72](https://github.com/wilddog64/lib-foundation/pull/72).
 
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 
