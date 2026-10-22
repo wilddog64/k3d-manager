@@ -63,11 +63,15 @@ Keep the current aggregated category counts and deliver two focused detail views
   Cluster → Alert → App/pod identity → Active since → Active for**. The App/pod identity
   slot shows available `app` and `pod`/`instance` values (adjacent within that slot if both
   are present); do not fabricate missing identity. Hide `__name__`, `group`, `tier`, and
-  other irrelevant/raw labels; retain an explicit pending-included caveat.
+  other irrelevant/raw labels; retain an explicit pending-included caveat. Set the dashboard
+  timezone to browser-local so timestamps follow the viewer's laptop/browser timezone.
 - A separate bounded CVE finding table with CVE ID, severity, cluster, namespace, image,
-  workload/report owner, package, installed/fixed version, and **Report created at (UTC)**
+  workload/report owner, package, installed/fixed version, and **Report created at (local)**
   sourced from the VulnerabilityReport `metadata.creationTimestamp`. Do not call this field
   “Detected at,” “First seen,” or imply it is the vulnerability's initial detection time.
+
+The Prometheus samples remain Unix timestamps; Grafana performs timezone display conversion.
+Do not change stored timestamps or elapsed-duration calculations for local display.
 
 The Trivy alert rule groups by cluster, namespace, and image repository, and sets `app` from
 the image repository; it does not preserve a pod label. Do not change this alert aggregation
@@ -97,13 +101,13 @@ must:
   - id: M1
     text: The existing aggregated Firing Alerts by Category counts remain available and correct.
   - id: M2
-    text: The general alert table columns are ordered Namespace, Cluster, Alert, App/pod identity, Active since, Active for; available target identifiers remain visible and times are readable UTC.
+    text: The general alert table columns are ordered Namespace, Cluster, Alert, App/pod identity, Active since (local; pending included), Active for; available target identifiers remain visible and Grafana uses browser-local timezone.
   - id: M3
     text: No active-state timestamp is labeled as firing time or CVE detection time; the caveat is visible.
   - id: M4
     text: Missing timestamps, no firing alerts, and multiple instances of one alert are handled without fabricated values.
   - id: M5
-    text: A separate CVE detail view exposes VulnerabilityReport creation time labeled Report created at (UTC), plus image and workload/report-owner context.
+    text: A separate CVE detail view exposes VulnerabilityReport creation time labeled Report created at (local), plus image and workload/report-owner context.
   - id: M6
     text: Source access, labels, cardinality, row limits, and dashboard definitions remain safe and synchronized; guides document semantics.
 must_not:
@@ -117,11 +121,11 @@ evidence:
   - id: E1
     kind: offline
     proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3]
-    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, exact alert-column order and available app/pod/instance identity, CVE report owner, readable UTC/time units, limits, and synchronized dashboard definitions.
+    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, exact alert-column order and available app/pod/instance identity, CVE report owner, browser-local timezone and timestamp units, limits, and synchronized dashboard definitions.
   - id: E2
     kind: live
     proves: [M1, M2, M3, M4]
-    text: After separately approved rollout, confirm the general alert view identifies app and available pod/instance, the CVE view identifies image and report owner, and compare Report created at to VulnerabilityReport metadata.creationTimestamp; verify aggregate counts. This does not verify first-detected time.
+    text: After separately approved rollout, confirm the general alert view identifies app and available pod/instance, the CVE view identifies image and report owner, both timestamps render in the viewer's browser-local timezone, and Report created at matches VulnerabilityReport metadata.creationTimestamp after timezone conversion; verify aggregate counts. This does not verify first-detected time.
 interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml
   - scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml
@@ -172,6 +176,7 @@ Offline verification covers the compact active-alert table, preserved category c
 - Source finding: Trivy alert labels include `app` mapped from `image_repository`, but the rule aggregates by image and has no pod label. The CVE exporter already has `resource_name`, but the CVE table omits it.
 - Approved change: add available `app`, `pod`/`instance` identifiers to the general table and `resource_name` as workload/report-owner context in the CVE table. Keep tables focused; do not expose noisy metric labels or alter alert grouping to invent pod-level identity.
 - Operator specified the exact general-table order: **Namespace → Cluster → Alert → App/pod identity → Active since → Active for**. Do not add Severity to this table; severity and full finding context remain in the separate CVE view.
+- Operator requested both timestamps use the viewer's laptop/browser-local timezone rather than forced UTC. Set the dashboard JSON `timezone` to `browser`; keep the underlying Unix timestamps and elapsed duration semantics unchanged.
 - Redispatch only within the existing `Files` list. No rollout/live mutation is authorized.
 
 ## Definition of Done
