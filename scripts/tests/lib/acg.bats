@@ -1,234 +1,520 @@
 #!/usr/bin/env bats
-# scripts/tests/lib/acg.bats — unit tests for acg.sh credential helpers
+# shellcheck shell=bash disable=SC1091,SC2317
+bats_require_minimum_version 1.5.0
 
 setup() {
-  _info() { :; }
-  _run_command() { shift; "$@"; }
-  _write_sensitive_file() {
-    local path="$1" data="$2"
-    mkdir -p "$(dirname "$path")"
-    printf '%s' "$data" > "$path"
-    chmod 600 "$path"
-  }
-  export -f _info _run_command
-  export -f _write_sensitive_file
-
-  export HOME="${BATS_TEST_TMPDIR}"
-  source "scripts/plugins/acg.sh"
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  mkdir -p "${HOME}"
+  # shellcheck source=/dev/null
+  source "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
 }
 
-# _acg_write_credentials
+_acg_credential_test_fixture() {
+  local fixture_dir="${BATS_TEST_TMPDIR}/credential-test-fixture"
+  mkdir -p "${fixture_dir}/bin" "${fixture_dir}/playwright"
+  cp "${BATS_TEST_DIRNAME}/../../lib/acg/bin/acg-credential-test" "${fixture_dir}/bin/acg-credential-test"
 
-@test "_acg_write_credentials writes [default] profile to ~/.aws/credentials" {
-  _acg_write_credentials "AKIAIOSFODNN7EXAMPLE" "wJalrXUtnFEMI/K7MDENG" "AQoDYXdzEJr"
-  run cat "${HOME}/.aws/credentials"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"[default]"* ]]
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" == *"aws_secret_access_key=wJalrXUtnFEMI/K7MDENG"* ]]
-  [[ "$output" == *"aws_session_token=AQoDYXdzEJr"* ]]
-}
+  cat > "${fixture_dir}/cdp.sh" <<'EOF'
+_browser_launch() { :; }
+EOF
 
-@test "_acg_write_credentials sets file permissions to 600" {
-  _acg_write_credentials "AKID" "SECRET" "TOKEN"
-  run bash -c "stat -c '%a' \"${HOME}/.aws/credentials\" 2>/dev/null || stat -f '%A' \"${HOME}/.aws/credentials\""
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"600"* ]]
-}
-
-@test "_acg_write_credentials creates ~/.aws directory if missing" {
-  rm -rf "${HOME}/.aws"
-  _acg_write_credentials "AKID" "SECRET" "TOKEN"
-  [ -f "${HOME}/.aws/credentials" ]
-}
-
-# acg_import_credentials
-
-@test "acg_import_credentials parses label format (Pluralsight UI copy)" {
-  local input="AWS Access Key ID: AKIAIOSFODNN7EXAMPLE
-AWS Secret Access Key: wJalrXUtnFEMI/K7MDENG
-AWS Session Token: AQoDYXdzEJr"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-}
-
-@test "acg_import_credentials parses export format" {
-  local input="export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG
-export AWS_SESSION_TOKEN=AQoDYXdzEJr"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-}
-
-@test "acg_import_credentials succeeds with AKIA key and no session token" {
-  local input="export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG"
-  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
-  [ "$status" -eq 0 ]
-  run cat "${HOME}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" != *"aws_session_token"* ]]
-}
-
-@test "acg_import_credentials returns 1 on empty/unparseable input" {
-  run bash -c "source scripts/plugins/acg.sh && printf '' | acg_import_credentials"
-  [ "$status" -eq 1 ]
-}
-
-@test "acg_import_credentials --help exits 0" {
-  run acg_import_credentials --help
-  [ "$status" -eq 0 ]
-}
-
-@test "acg_get_credentials --help exits 0" {
-  run acg_get_credentials --help
-  [ "$status" -eq 0 ]
-}
-
-# _acg_extend_playwright
-
-_acg_stub_node() {
-  local exit_code="$1" message="$2"
-  local stub_dir="${BATS_TEST_TMPDIR}/bin"
-  mkdir -p "$stub_dir"
-  cat > "${stub_dir}/node" <<NODE
+  cat > "${fixture_dir}/bin/node" <<'EOF'
 #!/usr/bin/env bash
-echo "$message"
-exit $exit_code
-NODE
-  chmod +x "${stub_dir}/node"
-  printf '%s\n' "$stub_dir"
-}
-
-_acg_stub_ssh_keyscan() {
-  local stub_dir="${BATS_TEST_TMPDIR}/bin"
-  mkdir -p "$stub_dir"
-  cat > "${stub_dir}/ssh-keyscan" <<'NODE'
-#!/usr/bin/env bash
-set -euo pipefail
-host="${@: -1}"
-case "${host}" in
-  2.2.2.2) printf '%s\n' "2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY" ;;
-  3.3.3.3) printf '%s\n' "3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2" ;;
-  *) printf '%s\n' "${host} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDEFAULTKEY" ;;
+case "$1" in
+  */acg_credentials.js)
+    printf 'AWS_ACCESS_KEY_ID=test-key\nAWS_SECRET_ACCESS_KEY=test-secret\n'
+    ;;
+  */acg_restart.js)
+    printf 'restart\n' >> "${ACG_RESTART_SENTINEL}"
+    ;;
 esac
-NODE
-  chmod +x "${stub_dir}/ssh-keyscan"
-  printf '%s\n' "$stub_dir"
+EOF
+  chmod +x "${fixture_dir}/bin/node"
+
+  cat > "${fixture_dir}/bin/aws" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  --version)
+    if [[ "${AWS_STUB_SCENARIO}" == 'broken-cli' ]]; then
+      printf 'dyld: Library not loaded\n' >&2
+      exit 1
+    fi
+    printf 'aws-cli/2.test\n'
+    ;;
+  sts)
+    case "${AWS_STUB_SCENARIO}" in
+      invalid-credentials)
+        printf 'An error occurred (InvalidClientTokenId)\n' >&2
+        exit 1
+        ;;
+      network-error)
+        printf 'Could not connect to the endpoint URL\n' >&2
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+EOF
+  chmod +x "${fixture_dir}/bin/aws"
+  printf '%s\n' "${fixture_dir}"
 }
 
-@test "_acg_extend_playwright: returns 0 when node script succeeds" {
-  local stub_dir old_path
-  stub_dir=$(_acg_stub_node 0 "EXTEND_OK")
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
+@test "acg template emitter renders the requested agent fleet" {
+  local rendered="${BATS_TEST_TMPDIR}/fleet.yaml"
 
-  run _acg_extend_playwright "https://example.com/sandbox"
+  _acg_render_template 4 "${BATS_TEST_DIRNAME}/../../lib/acg/etc/acg-cluster.yaml" "${rendered}"
+
+  [ "$(grep -c '^  Agent[0-9][0-9]*Instance:' "${rendered}")" -eq 4 ]
+  [ "$(grep -c '^  Agent[0-9][0-9]*PublicIP:' "${rendered}")" -eq 4 ]
+  [ "$(grep -c '^  ServerInstance:' "${rendered}")" -eq 1 ]
+}
+
+@test "acg template emitter preserves the two-agent default" {
+  local rendered="${BATS_TEST_TMPDIR}/default.yaml"
+
+  unset ACG_AGENT_COUNT
+  _acg_validate_agent_count
+  _acg_render_template "${_ACG_AGENT_COUNT}" "${BATS_TEST_DIRNAME}/../../lib/acg/etc/acg-cluster.yaml" "${rendered}"
+
+  [ "$(grep -c '^  Agent[0-9][0-9]*Instance:' "${rendered}")" -eq 2 ]
+  [ "$(grep -c '^  Agent[0-9][0-9]*PublicIP:' "${rendered}")" -eq 2 ]
+}
+
+@test "acg agent discovery collects every ordered stack output" {
+  _run_command() {
+    printf 'Agent1PublicIP\t%s\nAgent2PublicIP\t%s\nAgent3PublicIP\t%s\n' \
+      10.0.0.11 10.0.0.12 10.0.0.13
+  }
+  _acg_discover_agent_ips
+
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 3 ]
+  [ "${_ACG_AGENT_IPS[0]}" = "10.0.0.11" ]
+  [ "${_ACG_AGENT_IPS[2]}" = "10.0.0.13" ]
+}
+
+@test "acg agent discovery orders agents numerically, not lexically" {
+  # Deliberately out of order, with Agent10 present to expose a lexical sort
+  # (lexically Agent10 sorts before Agent2 — must not happen here).
+  _run_command() {
+    printf 'Agent2PublicIP\t%s\nAgent10PublicIP\t%s\nAgent1PublicIP\t%s\n' \
+      10.0.0.2 10.0.0.10 10.0.0.1
+  }
+  _acg_discover_agent_ips
+
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 3 ]
+  [ "${_ACG_AGENT_IPS[0]}" = "10.0.0.1" ]
+  [ "${_ACG_AGENT_IPS[1]}" = "10.0.0.2" ]
+  [ "${_ACG_AGENT_IPS[2]}" = "10.0.0.10" ]
+}
+
+@test "acg agent discovery keeps two IPs when the default is used" {
+  _run_command() {
+    printf 'Agent1PublicIP\t%s\nAgent2PublicIP\t%s\n' 10.0.0.11 10.0.0.12
+  }
+  _acg_discover_agent_ips
+
+  [ "${#_ACG_AGENT_IPS[@]}" -eq 2 ]
+}
+
+@test "_acg_update_ssh_config creates missing SSH config and server target idempotently" {
+  _acg_update_ssh_config "44.247.81.210"
+  [ -f "${HOME}/.ssh/config" ]
+  run cat "${HOME}/.ssh/config"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"EXTEND_OK"* ]]
+  [[ "$output" == *"Host ubuntu"* ]]
+  [[ "$output" == *"HostName 44.247.81.210"* ]]
 
-  PATH="$old_path"
+  _acg_update_ssh_config "44.247.81.210"
+  run grep -c '^Host ubuntu$' "${HOME}/.ssh/config"
+  [ "$output" -eq 1 ]
 }
 
-@test "_acg_sync_known_hosts prunes stale managed AWS IPs and records current ones" {
-  skip "Feature not yet implemented: see docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md"
-  local stub_dir old_path
+@test "_acg_update_ssh_config adds server stanza without changing agent aliases" {
+  mkdir -p "${HOME}/.ssh"
+  cat > "${HOME}/.ssh/config" <<'EOF'
+Host ubuntu-1
+  HostName 10.0.0.1
+Host ubuntu-2
+  HostName 10.0.0.2
+EOF
+
+  _acg_update_ssh_config "44.247.81.210"
+  run cat "${HOME}/.ssh/config"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host ubuntu-1
+  HostName 10.0.0.1"* ]]
+  [[ "$output" == *"Host ubuntu-2
+  HostName 10.0.0.2"* ]]
+  [[ "$output" == *"Host ubuntu
+  HostName 44.247.81.210"* ]]
+}
+
+@test "_acg_update_ssh_config updates existing server and tunnel stanzas" {
   mkdir -p "${HOME}/.ssh"
   cat > "${HOME}/.ssh/config" <<'EOF'
 Host ubuntu
-  HostName 1.1.1.1
-  User ubuntu
+  HostName 192.0.2.10
 Host ubuntu-tunnel
-  HostName 1.1.1.1
-  User ubuntu
+  HostName 192.0.2.10
 Host ubuntu-1
-  HostName 2.2.2.2
-  User ubuntu
-Host ubuntu-2
-  HostName 3.3.3.3
-  User ubuntu
-EOF
-  cat > "${HOME}/.ssh/known_hosts" <<'EOF'
-1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY
-4.4.4.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAISTALEKEY
+  HostName 10.0.0.1
 EOF
 
-  stub_dir=$(_acg_stub_ssh_keyscan)
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
-
-  _acg_sync_known_hosts "4.4.4.4"
-
-  PATH="$old_path"
-
-  run cat "${HOME}/.ssh/known_hosts"
+  _acg_update_ssh_config "44.247.81.210"
+  run cat "${HOME}/.ssh/config"
   [ "$status" -eq 0 ]
-  [[ "$output" != *"4.4.4.4"* ]]
-  [[ "$output" == *"1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY"* ]]
-  [[ "$output" == *"2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY"* ]]
-  [[ "$output" == *"3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2"* ]]
+  [[ "$output" == *"Host ubuntu
+  HostName 44.247.81.210"* ]]
+  [[ "$output" == *"Host ubuntu-tunnel
+  HostName 44.247.81.210"* ]]
+  [[ "$output" == *"Host ubuntu-1
+  HostName 10.0.0.1"* ]]
 }
 
-@test "_acg_extend_playwright: returns 1 when node script fails" {
-  local stub_dir old_path
-  stub_dir=$(_acg_stub_node 1 "Extend button not found")
-  old_path="$PATH"
-  PATH="${stub_dir}:$PATH"
-
-  run _acg_extend_playwright "https://example.com/sandbox"
-  [ "$status" -eq 1 ]
-
-  PATH="$old_path"
-}
-
-@test "acg_watch_start reloads the agent so retargeted run-dir logs take effect" {
-  local old_path fake_bin capture plist_path
-  export K3DM_RUN_DIR="${BATS_TEST_TMPDIR}/run"
-  export _ACG_WATCH_PLIST_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.acg-watch.plist"
-  export _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
-  plist_path="${_ACG_WATCH_PLIST_PATH}"
-  fake_bin="${BATS_TEST_TMPDIR}/bin"
-  capture="${BATS_TEST_TMPDIR}/launchctl-loads.log"
-  mkdir -p "${fake_bin}" "${K3DM_RUN_DIR}"
-
-  cat > "${fake_bin}/launchctl" <<EOF
-#!/usr/bin/env bash
-if [ "\$1" = "list" ]; then exit 0; fi
-if [ "\$1" = "load" ]; then grep -F 'k3d-manager-acg-watch.err' "\$2" >> "${capture}" || true; fi
-exit 0
-EOF
-  chmod +x "${fake_bin}/launchctl"
-
-  __acg_stub_acg_watch_start() {
-    cat > "${_ACG_WATCH_PLIST_PATH}" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>StandardOutPath</key>
-  <string>/tmp/k3d-manager-acg-watch.out</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/k3d-manager-acg-watch.err</string>
-</dict>
-</plist>
-PLIST
-    launchctl load "${_ACG_WATCH_PLIST_PATH}"
+@test "acg rejects malformed or zero agent counts before any aws call" {
+  aws_calls="${BATS_TEST_TMPDIR}/aws.calls"
+  _run_command() {
+    printf '%s\n' "$*" >> "${aws_calls}"
+    return 1
   }
-  export -f __acg_stub_acg_watch_start
+  _err() { :; }
+  export ACG_AGENT_COUNT="not-a-number"
 
-  old_path="${PATH}"
-  export PATH="${fake_bin}:${PATH}"
-  run acg_watch_start "https://example.com/sandbox"
-  export PATH="${old_path}"
-  [ "$status" -eq 0 ]
+  run acg_provision --confirm
+  [ "${status}" -ne 0 ]
+  [ ! -e "${aws_calls}" ]
 
-  run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.err" "${plist_path}"
-  [ "$status" -eq 0 ]
+  export ACG_AGENT_COUNT=0
+  run acg_provision --confirm
+  [ "${status}" -ne 0 ]
+  [ ! -e "${aws_calls}" ]
+}
 
-  run tail -n 1 "${capture}"
-  [[ "${output}" == *"${K3DM_RUN_DIR}/k3d-manager-acg-watch.err"* ]]
+@test "acg source has no hardcoded first or second agent names" {
+  run grep -nE 'Agent[12]([^0-9]|$)|agent[12]_ip' "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg CDP plist uses the Playwright browser and active profile" {
+  local browser_bin="${BATS_TEST_TMPDIR}/playwright-chromium"
+  touch "${browser_bin}"
+  chmod +x "${browser_bin}"
+  _acg_resolve_cdp_browser_bin() {
+    printf '%s\n' "${browser_bin}"
+  }
+
+  _acg_chrome_cdp_write_plist
+
+  [ -f "${_ACG_CHROME_CDP_PLIST}" ]
+  grep -F "<string>${browser_bin}</string>" "${_ACG_CHROME_CDP_PLIST}"
+  run ! grep -F '/Applications/Google Chrome.app' "${_ACG_CHROME_CDP_PLIST}"
+  grep -F -- "--user-data-dir=${PLAYWRIGHT_AUTH_DIR}" "${_ACG_CHROME_CDP_PLIST}"
+  [[ "${PLAYWRIGHT_AUTH_DIR}" == */pw-profile ]]
+}
+
+@test "acg CDP plist is not written without a Playwright browser" {
+  _acg_resolve_cdp_browser_bin() {
+    return 1
+  }
+
+  run _acg_chrome_cdp_write_plist
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'Playwright-managed Chromium not found'* ]]
+  [ ! -e "${_ACG_CHROME_CDP_PLIST}" ]
+}
+
+@test "acg credential test does not restart when aws CLI cannot run" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=broken-cli \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'the aws CLI is present but cannot run'* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "acg credential test does not restart when aws CLI is missing" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+  rm -f "${fixture_dir}/bin/aws"
+  ln -s "$(command -v bash)" "${fixture_dir}/bin/bash"
+  if env PATH="${fixture_dir}/bin:/usr/bin:/bin" bash -c 'command -v aws' >/dev/null 2>&1; then
+    skip "aws is installed in /usr/bin or /bin; cannot exercise the missing-CLI branch on this host"
+  fi
+
+  run env PATH="${fixture_dir}/bin:/usr/bin:/bin" ACG_RESTART_SENTINEL="${sentinel}" \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'the aws CLI is not installed or not on PATH'* ]]
+  [[ "${output}" != *'present but cannot run'* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "acg credential test restarts once for rejected AWS credentials" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=invalid-credentials \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [ "$(wc -l < "${sentinel}")" -eq 1 ]
+}
+
+@test "acg credential test does not restart for an AWS network error" {
+  local fixture_dir sentinel="${BATS_TEST_TMPDIR}/restart-sentinel"
+  fixture_dir=$(_acg_credential_test_fixture)
+
+  run env PATH="${fixture_dir}/bin:${PATH}" ACG_RESTART_SENTINEL="${sentinel}" AWS_STUB_SCENARIO=network-error \
+    "${fixture_dir}/bin/acg-credential-test" 'https://example.test/sandbox' --provider aws
+
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *'Could not connect to the endpoint URL'* ]]
+  [ ! -e "${sentinel}" ]
+}
+
+@test "acg_watch retries a failed extend and stops retrying on success" {
+  local instance_calls="${BATS_TEST_TMPDIR}/instance-calls"
+  local extend_calls="${BATS_TEST_TMPDIR}/extend-calls"
+  : >"${instance_calls}"
+  : >"${extend_calls}"
+  sleep() { :; }
+  _acg_get_instance_id() {
+    local calls
+    calls=$(wc -l <"${instance_calls}")
+    printf 'call\n' >>"${instance_calls}"
+    if [[ "${calls}" -eq 0 ]]; then
+      printf 'i-a\n'
+    else
+      printf '\n'
+    fi
+  }
+  _acg_extend_playwright() {
+    local calls
+    calls=$(wc -l <"${extend_calls}")
+    printf 'call\n' >>"${extend_calls}"
+    [[ "${calls}" -ge 2 ]]
+  }
+
+  run acg_watch 1
+
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l <"${extend_calls}")" -eq 3 ]
+  [[ "${output}" == *"attempt 1/3"* ]]
+  [[ "${output}" == *"attempt 2/3"* ]]
+  [[ "${output}" != *"extend manually"* ]]
+}
+
+@test "acg_watch gives up after 3 failed attempts" {
+  local instance_calls="${BATS_TEST_TMPDIR}/instance-calls"
+  local extend_calls="${BATS_TEST_TMPDIR}/extend-calls"
+  : >"${instance_calls}"
+  : >"${extend_calls}"
+  sleep() { :; }
+  _acg_get_instance_id() {
+    local calls
+    calls=$(wc -l <"${instance_calls}")
+    printf 'call\n' >>"${instance_calls}"
+    if [[ "${calls}" -eq 0 ]]; then
+      printf 'i-a\n'
+    else
+      printf '\n'
+    fi
+  }
+  _acg_extend_playwright() {
+    printf 'call\n' >>"${extend_calls}"
+    return 1
+  }
+
+  run acg_watch 1
+
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l <"${extend_calls}")" -eq 3 ]
+  [[ "${output}" == *"Extend failed 3 times"* ]]
+}
+
+@test "the launchd wrapper runs acg_extend.js with node found under a launchd PATH" {
+  local node_dir="${BATS_TEST_TMPDIR}/nodebin"
+  mkdir -p "${node_dir}"
+  cat >"${node_dir}/node" <<NODE
+#!/usr/bin/env bash
+printf '%s\n' "\$@" > "${BATS_TEST_TMPDIR}/node-args"
+NODE
+  chmod +x "${node_dir}/node"
+
+  PATH="${node_dir}:${PATH}" _acg_watch_write_wrapper 'https://example.test/sandbox'
+  run env PATH=/usr/bin:/bin bash "${_ACG_WATCH_WRAPPER}"
+
+  [ "${status}" -eq 0 ]
+  grep -F 'playwright/acg_extend.js' "${BATS_TEST_TMPDIR}/node-args"
+  grep -F 'https://example.test/sandbox' "${BATS_TEST_TMPDIR}/node-args"
+  run grep -F '../../k3d-manager' "${_ACG_WATCH_WRAPPER}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "the wrapper writer refuses when node is absent" {
+  if [[ -e /usr/bin/node || -e /bin/node ]]; then
+    skip "node exists in /usr/bin or /bin on this runner"
+  fi
+
+  run env HOME="${HOME}" PATH=/usr/bin:/bin bash -c \
+    'source "'"${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"'"; _acg_watch_write_wrapper https://example.test/sandbox'
+
+  [ "${status}" -ne 0 ]
+}
+
+@test "the launchd watcher plist runs every 30 minutes" {
+  _acg_watch_write_plist
+  grep -F '<integer>1800</integer>' "${_ACG_WATCH_PLIST_PATH}"
+  run grep -F '12600' "${_ACG_WATCH_PLIST_PATH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg_watch defaults to a 30-minute interval" {
+  sleep() { printf '%s\n' "$1" >>"${BATS_TEST_TMPDIR}/sleep-args"; }
+  _acg_get_instance_id() { printf '\n'; }
+
+  run acg_watch
+  [ "${status}" -eq 0 ]
+  [ "$(head -n1 "${BATS_TEST_TMPDIR}/sleep-args")" = "1800" ]
+}
+
+_acg_teardown_fixture() {
+  local fixture_dir="${BATS_TEST_TMPDIR}/teardown-fixture"
+  mkdir -p "${fixture_dir}"
+  cat >"${fixture_dir}/aws" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *"describe-stacks"*)
+    case "${ACG_TEARDOWN_SCENARIO}" in
+      success|delete-fails|wait-fails) printf 'CREATE_COMPLETE\n' ;;
+      missing) printf '%s\n' 'An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id k3d-manager-cluster does not exist' >&2; exit 255 ;;
+      throttled) printf '%s\n' 'An error occurred (Throttling) when calling the DescribeStacks operation: Rate exceeded' >&2; exit 255 ;;
+      denied) printf '%s\n' 'An error occurred (AccessDenied) when calling the DescribeStacks operation: User is not authorized' >&2; exit 255 ;;
+    esac
+    ;;
+  *"delete-stack"*)
+    if [[ "${ACG_TEARDOWN_SCENARIO}" == delete-fails ]]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+  *"stack-delete-complete"*)
+    if [[ "${ACG_TEARDOWN_SCENARIO}" == wait-fails ]]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+esac
+EOF
+  cat >"${fixture_dir}/kubectl" <<'EOF'
+#!/usr/bin/env bash
+printf 'kubectl %s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *"get-contexts"*) exit 0 ;;
+  *"delete-context"*) exit 0 ;;
+esac
+EOF
+  chmod +x "${fixture_dir}/aws" "${fixture_dir}/kubectl"
+  printf '%s\n' "${fixture_dir}"
+}
+
+@test "acg_teardown deletes a found stack and reports success" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=success \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Stack deleted"* ]]
+  grep -F 'cloudformation delete-stack' "${calls}"
+  grep -F 'cloudformation wait stack-delete-complete' "${calls}"
+  grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown treats a missing stack as success" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=missing \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"nothing to tear down"* ]]
+  [[ "${output}" != *"ValidationError"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+}
+
+@test "acg_teardown returns 2 on a throttled lookup without deleting" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=throttled \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 2 ]
+  [[ "${output}" != *"Throttling"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 2 on an access-denied lookup" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=denied \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; acg_teardown --confirm' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 2 ]
+  [[ "${output}" != *"AccessDenied"* ]]
+  run ! grep -F 'cloudformation delete-stack' "${calls}"
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 3 and returns to the shell when delete fails" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=delete-fails \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; rc=0; acg_teardown --confirm || rc=$?; echo FUNCTION_RETURNED; exit "$rc"' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 3 ]
+  [[ "${output}" == *"FUNCTION_RETURNED"* ]]
+  run ! grep -F 'kubectl config delete-context' "${calls}"
+}
+
+@test "acg_teardown returns 3 and returns to the shell when delete wait fails" {
+  local fixture_dir calls
+  fixture_dir=$(_acg_teardown_fixture)
+  calls="${BATS_TEST_TMPDIR}/teardown-calls"
+  : >"${calls}"
+
+  run env PATH="${fixture_dir}:${PATH}" ACG_CALLS_FILE="${calls}" ACG_TEARDOWN_SCENARIO=wait-fails \
+    bash -c 'source "${1}"; _acg_check_credentials() { return 0; }; rc=0; acg_teardown --confirm || rc=$?; echo FUNCTION_RETURNED; exit "$rc"' _ \
+    "${BATS_TEST_DIRNAME}/../../lib/acg/acg.sh"
+
+  [ "${status}" -eq 3 ]
+  [[ "${output}" == *"FUNCTION_RETURNED"* ]]
+  run ! grep -F 'kubectl config delete-context' "${calls}"
 }
