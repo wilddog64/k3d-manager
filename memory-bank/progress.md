@@ -303,3 +303,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 ## 2026-10-22 v2.6.x autonomous investigation roadmap
 
 - Operator requested placing Autonomous Investigation Maturity in the v2.x roadmap. Added candidate milestone v2.6.0 and phased v2.6.1–v2.6.3 under `docs/roadmap.md` on `k3d-manager-v1.43.5` (commit `3c0981674fe6d078181f468bcbfa2d3b498fae74`). It follows v2.5.0 Conversational Operations Assistant and uses read-only bounded investigation, evidence provenance, independent evaluation, escalation and fail-closed policies. Roadmap only, no implementation spec, dispatcher action, deployment or PR.
+
+## 2026-10-22 proposed v2.7.x application fraud risk milestone
+
+- At operator suggestion, added candidate v2.7.x Account Abuse & Fraud Risk Detection to `docs/roadmap.md` on `k3d-manager-v1.43.5` (commit `f0fec250ed4fcf1c6ff51983fe75f896d321389b`). Slices v2.7.0 threat model/events, v2.7.1 rules and review, v2.7.2 optional evaluated ML, v2.7.3 application E2E and Grafana. It belongs to a suitable account-based app, not core IDS; do not resurrect retiring shopping-cart or assume TwinkleAI needs fraud scoring. Roadmap only, no deployment, no implementation spec or PR.
