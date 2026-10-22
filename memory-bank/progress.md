@@ -2,7 +2,7 @@
 
 ## 2026-10-21 ACG SSH destination investigation
 
-- Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: hostname resolution failed and k3sup did not start. The SSH config lacked `Host ubuntu`; `_acg_update_ssh_config` only updated existing stanzas. Follow-up `k3s-aws-ssh-target-host-block-fix` was ported upstream because the consumer subtree hook blocks direct commits. lib-foundation branch `fix/acg-ssh-server-target`, source commit `9796162` and memory commit `9b90ca6`, passed clean-env ACG BATS 28/28, source ShellCheck, audit and diff check. Claude owns PR/release/tag; subtree pull is still needed. Keep the canonical bug OPEN and do not ask operator to retry yet. No teardown or AWS mutation was run; stack may still be billable.
+- Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: hostname resolution failed and k3sup did not start. `_acg_update_ssh_config` did not create a missing `Host ubuntu` stanza. lib-foundation PR #72 merged to main at `c307df2`; the subtree pull landed on `k3d-manager-v1.43.5` as squash `18f7c8cc` plus merge `205d4272`. Post-pull clean-env ACG BATS passed 28/28; ShellCheck and agent-rigor passed. Canonical bug is VERIFIED offline; operator live verification remains. No AWS/SSH/cluster operation was run by Codex; existing stack may still be billable.
 
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 

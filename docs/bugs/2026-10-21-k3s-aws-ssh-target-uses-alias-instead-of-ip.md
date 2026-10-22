@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** OPEN — upstream fix verified on lib-foundation `9796162`; awaiting Claude's release and subtree pull; live verification pending
+**Status:** VERIFIED (offline) — lib-foundation PR #72 merged at `c307df2` and pulled into the v1.43.5 subtree; operator live verification pending
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -120,11 +120,21 @@ No live infrastructure operation was run. This evidence does not establish
 live verification.
 
 The follow-up could not be committed directly under `scripts/lib/foundation/`;
-the protected-subtree hook requires upstream-first changes. The source/test fix
-is now pushed in lib-foundation branch `fix/acg-ssh-server-target` at `9796162`
-(clean-env ACG BATS 28/28; source ShellCheck, if-count audit, and diff check
-passed). Claude owns PR/release/tag. k3d-manager must subtree-pull the released
-change before the bug can be marked VERIFIED or offered for live verification.
+the protected-subtree hook requires upstream-first changes. Lib-foundation PR
+[#72](https://github.com/wilddog64/lib-foundation/pull/72) merged to `main` at
+`c307df2`. Its update was pulled into this release branch with `git subtree pull
+--prefix=scripts/lib/foundation https://github.com/wilddog64/lib-foundation.git
+main --squash`; subtree squash commit `18f7c8cc` covers upstream
+`c8e18225..c307df28`, and the subtree merge commit is `205d4272`.
+
+Post-pull verification passed: clean-environment
+`bats scripts/lib/foundation/scripts/tests/lib/acg.bats` (28/28),
+`shellcheck scripts/lib/foundation/scripts/lib/acg/acg.sh`, and
+`AGENT_AUDIT_MAX_IF=8 bash scripts/lib/foundation/scripts/lib/agent_rigor.sh
+scripts/lib/foundation/scripts/lib/acg/acg.sh`. The source now creates the
+missing `Host ubuntu` stanza idempotently while preserving agent/tunnel aliases.
+No AWS, SSH, or live cluster operation was run. The bug is VERIFIED offline;
+operator live verification remains pending.
 
 ## Scope for dispatch
 
