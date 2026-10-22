@@ -6,7 +6,7 @@
 
 ## 2026-10-22 CVE guide and SSH host-block verification
 
-- Operator confirmed that refreshing the affected GitHub page restored rendering. Marked `docs/bugs/2026-10-20-cve-remediation-guide-github-render-error.md` LIVE-VERIFIED as an investigation outcome; no content-specific root cause or source change was identified. HTTP fetch investigation had already shown both guides and three representative Markdown pages render.
+- Operator confirmed that refreshing the affected GitHub page restored rendering. Investigation task `cve-guide-github-render-investigation` is landed as `012c7eee`; the canonical bug remains LIVE-VERIFIED, with the detailed HTTP fetch results and limits recorded in `docs/bugs/2026-10-20-cve-remediation-guide-github-render-error.md`. Offline verification: link-checker pytest 24/24, `make check-doc-links` 2302 files, agent-rigor BATS 11/11, `_agent_audit`, `_agent_lint`, and `git diff --check` passed. No content-specific root cause or source change was identified. The initial dispatcher landing refusal and recovery are documented in `docs/issues/2026-10-22-cve-guide-investigation-landing-recovery.md`.
 - Landed downstream ACG missing-host regression coverage as `2b83f499`. Independent BATS: 57 passed, one existing skip; ShellCheck, `git diff --check`, `_agent_audit`, and `_agent_lint` passed in the landing gate. The protected lib-foundation source hunk was excluded: upstream memory records its `|| return 1` as unreachable under `_run_command`'s hard-exit behavior. Per operator direction, the SSH follow-up is recorded VERIFIED offline, not LIVE-VERIFIED.
 
 ## 2026-10-21 ACG SSH destination investigation
