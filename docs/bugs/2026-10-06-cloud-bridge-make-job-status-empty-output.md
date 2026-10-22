@@ -226,3 +226,21 @@ Together these verify the Make transcript through Slack and the terminal failure
 cloud-bridge for the same job. The separate `agent@cloud` screenshot says that session could
 not directly access the endpoint and contains no second request result; it does not contradict
 the successful tmux request. The bug is now LIVE-VERIFIED.
+
+The operator later supplied the structured `agent@cloud` response, confirming that it did not
+execute the request:
+
+```json
+{
+  "job_id": "fb7db078",
+  "request": "job-status",
+  "request_executed": false,
+  "response_received": false,
+  "status": "unknown",
+  "output": null,
+  "error": "Cloud-bridge endpoint unavailable from this session"
+}
+```
+
+This is a session-access limitation, not a negative cloud-bridge result. The successful tmux
+response above remains the live verification evidence.
