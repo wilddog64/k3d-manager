@@ -4,7 +4,7 @@
 **Status:** OPEN — source-level failure path verified; EC2-side root cause not established
 **Priority:** P3 — intermittent sandbox readiness and poor diagnostics; reclassify P2 if reproducibly blocks provisioning
 **Severity:** low pending recurrence/impact evidence
-**Approval:** operator explicitly requested filing a P3 bug on 2026-10-21; implementation not approved
+**Approval:** operator explicitly requested dispatch/implementation on 2026-10-21 after a second live reproduction; offline code/tests authorized, no additional live provisioning or teardown authorized
 **Release:** v1.43.5 (bug; exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Found by:** operator, Slack failure analysis job `aeeeb11f` on 2026-10-21 around 13:36 PDT
@@ -67,6 +67,20 @@ preventing installation while the server is unreachable. However:
 
 The older SSM-registration/fallback issues concern a different transport phase;
 they do not establish the cause of this SSH probe failure.
+
+## Second live reproduction (2026-10-21)
+
+During the operator's `make up CLUSTER_PROVIDER=k3s-aws` attempt, the tmux pane showed:
+
+```text
+INFO: [shopping_cart] Installing k3s on ubuntu@ubuntu via k3sup...
+WARN: [shopping_cart] ssh-keyscan ubuntu not ready after 120s — k3sup may prompt
+ERROR: [shopping_cart] ubuntu@ubuntu did not answer SSH within 180s — node unresponsive; not starting k3sup
+WARN: [acg-up] failed (exit 1) — cleaning up local processes...
+make: *** [up] Error 1
+```
+
+The existing fail-closed readiness guard worked: `k3sup` was not started. The warning and error still do not identify why SSH failed because keyscan/SSH diagnostics are not surfaced. The subsequent explicitly chained `make down` completed CloudFormation deletion and hub deregistration; this confirms teardown, not the EC2-side cause. Do not infer that the node was booting, that SSH later recovered, or that authentication/networking was the cause. Exact full output is preserved in `docs/issues/2026-10-21-acg-live-verification-node-ssh-timeout.md`.
 
 ## Expected behavior
 
@@ -140,7 +154,7 @@ interface:
 - [ ] Root cause of the reported job verified from EC2/CloudFormation and SSH evidence, or recorded as unknown.
 - [ ] Focused regression tests red on original behavior and green with the fix.
 - [ ] Relevant offline test suite passes without contacting real cloud hosts.
-- [ ] Operator separately approves implementation and verifies E2 before LIVE-VERIFIED.
+- [x] Operator explicitly authorized offline implementation/dispatch on 2026-10-21; E2 remains pending and requires a future operator-approved live run before LIVE-VERIFIED.
 - [ ] Record fix SHA, verification evidence, and final status in this bug document.
 
 ## What NOT to Do
@@ -149,3 +163,14 @@ interface:
 - Do NOT modify implementation code or provision/tear down AWS infrastructure while filing.
 - Do NOT assume the 180-second timeout proves cloud-init or sshd was late.
 - Do NOT bypass SSH readiness or print secrets to improve diagnostics.
+
+## Files
+
+- `scripts/plugins/shopping_cart.sh`
+- `scripts/lib/providers/k3s-aws.sh`
+- `bin/k3dm-webhook`
+- `scripts/tests/plugins/shopping_cart.bats`
+- `scripts/tests/bin/`
+- `docs/howto/acg.md`
+- `docs/bugs/2026-10-21-k3s-aws-ssh-readiness-timeout-hides-failure-cause.md`
+- `docs/issues/2026-10-21-k3s-aws-ssh-readiness-dispatch-spec.md`
