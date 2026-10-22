@@ -222,6 +222,16 @@ The agent log on the node is `/var/log/amazon/ssm/amazon-ssm-agent.log`. Ignore 
 — that is Default Host Management Configuration failing and is irrelevant. The real line above it
 is `EC2RoleRequestError: no EC2 instance role found`.
 
+### SSH readiness timeout
+
+If k3s-aws reports an SSH readiness timeout, the message gives the last observed, redacted
+connection-failure class and elapsed wait. This identifies what the SSH client reported; it does
+not establish whether the EC2 instance finished booting or whether `sshd` is running. Inspect the
+existing CloudFormation stack status/events and the instance state/status checks before retrying.
+The provider reuses a healthy stack; do not start duplicate provisioning or tear down a stack
+solely because SSH timed out. If the stack is in a failed state, follow its current state and the
+provider's recovery path.
+
 ## Data-layer sync that never converges
 
 `cluster-up` Step 10b waits for the `<cluster>-data-layer` ArgoCD Application to reach `Synced`

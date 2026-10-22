@@ -213,12 +213,15 @@
         source scripts/lib/core.sh
         source scripts/plugins/shopping_cart.sh
         _err() { printf "%s\n" "$*"; return 1; }
+        _fake_elapsed=0
+        _ubuntu_k3s_elapsed_seconds() { printf "%s" "$_fake_elapsed"; }
+        _ubuntu_k3s_wait_sleep() { _fake_elapsed=$((_fake_elapsed + $1)); }
         _ubuntu_k3s_wait_ssh_ready node ubuntu key
       '\''
   '
   [ "$status" -ne 0 ]
-  [[ "$output" == *"did not answer SSH"* ]]
-  [ "$(cat "${BATS_TEST_TMPDIR}/ssh-count")" -eq 4 ]
+  [[ "$output" == *"SSH readiness failed"* && "$output" == *"other SSH failure"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/ssh-count")" -eq 3 ]
 }
 
 @test "SSH readiness succeeds when the second probe answers" {
@@ -237,6 +240,63 @@
       '\''
   '
   [ "$status" -eq 0 ]
+}
+
+@test "SSH readiness classifies common failures and redacts diagnostics and key paths" {
+  run bash -c '
+    elapsed_file="${BATS_TEST_TMPDIR}/ssh-classification-elapsed"
+    SSH_ELAPSED_FILE="${elapsed_file}" SCRIPT_DIR="$(pwd)/scripts" K3DM_SSH_READY_TIMEOUT=1 bash -c '\''
+      source scripts/lib/system.sh
+      source scripts/lib/core.sh
+      source scripts/plugins/shopping_cart.sh
+      _err() { printf "%s\\n" "$*"; return 1; }
+      _ubuntu_k3s_elapsed_seconds() { cat "${SSH_ELAPSED_FILE}"; }
+      ssh() { printf "%s\\n" "${SSH_FAILURE_TEXT} arbitrary diagnostic-token /private/keys/task.pem" >&2; printf 1 > "${SSH_ELAPSED_FILE}"; return 255; }
+      assert_failure() {
+        SSH_FAILURE_TEXT="$2"
+        printf 0 > "${SSH_ELAPSED_FILE}"
+        message=$( _ubuntu_k3s_wait_ssh_ready node ubuntu "/private/keys/task.pem" 2>&1 ) || true
+        [[ "${message}" == *"$1"* ]] || { printf "missing classification: %s\\n" "${message}"; return 1; }
+        [[ "${message}" != *"arbitrary diagnostic-token"* && "${message}" != *"/private/keys/task.pem"* ]]
+      }
+      assert_failure "connection refused" "ssh: connect to host node port 22: Connection refused" &&
+      assert_failure "connection timed out" "banner exchange: Connection to node port 22: Connection timed out" &&
+      assert_failure "authentication rejected" "Permission denied (publickey)" &&
+      assert_failure "hostname resolution failed" "ssh: Could not resolve hostname node: Name or service not known"
+    '\''
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "SSH readiness deadline includes probe time and caps the final wait" {
+  run bash -c '
+    timeout_log="${BATS_TEST_TMPDIR}/ssh-connect-timeouts"
+    timeout_clock="${BATS_TEST_TMPDIR}/ssh-timeout-clock"
+    SSH_TIMEOUT_LOG="${timeout_log}" SSH_TIMEOUT_CLOCK="${timeout_clock}" SCRIPT_DIR="$(pwd)/scripts" K3DM_SSH_READY_TIMEOUT=45 bash -c '\''
+      source scripts/lib/system.sh
+      source scripts/lib/core.sh
+      source scripts/plugins/shopping_cart.sh
+      printf 0 > "${SSH_TIMEOUT_CLOCK}"
+      _err() { printf "%s\\n" "$*"; return 1; }
+      _ubuntu_k3s_elapsed_seconds() { cat "${SSH_TIMEOUT_CLOCK}"; }
+      _ubuntu_k3s_wait_sleep() { current=$(cat "${SSH_TIMEOUT_CLOCK}"); printf "%s" "$((current + $1))" > "${SSH_TIMEOUT_CLOCK}"; }
+      ssh() {
+        for arg in "$@"; do
+          case "${arg}" in ConnectTimeout=*) printf "%s\\n" "${arg#*=}" >> "${SSH_TIMEOUT_LOG}" ;; esac
+        done
+        current=$(cat "${SSH_TIMEOUT_CLOCK}")
+        printf "%s" "$((current + 17))" > "${SSH_TIMEOUT_CLOCK}"
+        printf "Connection timed out\\n" >&2
+        return 255
+      }
+      _ubuntu_k3s_wait_ssh_ready node ubuntu "/private/keys/task.pem"
+    '\''
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 45s (budget 45s): connection timed out"* ]]
+  [ "$(sed -n '1p' "${BATS_TEST_TMPDIR}/ssh-connect-timeouts")" = 45 ]
+  [ "$(sed -n '2p' "${BATS_TEST_TMPDIR}/ssh-connect-timeouts")" = 18 ]
+  [[ "$output" != *"/private/keys/task.pem"* ]]
 }
 
 @test "server install does not invoke k3sup when SSH preflight fails" {

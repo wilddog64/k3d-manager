@@ -94,6 +94,14 @@ The existing fail-closed readiness guard worked: `k3sup` was not started. The wa
 - Preserve existing sandbox security boundaries; never print keys, tokens, or
   raw credential-bearing command lines.
 
+## Offline implementation status
+
+The source change captures SSH stderr locally and emits only an allowlisted failure class with
+elapsed wait and budget. The success probe remains the gate before `k3sup`; failure-analysis
+guidance now distinguishes observations from hypotheses and directs operators to inspect current
+CloudFormation and EC2 state before retrying. The 2026-10-21 EC2-side cause remains **unknown**.
+No AWS/EC2 query or live verification was performed for this change.
+
 ## Proposed fix scope
 
 1. In the readiness helper, capture bounded/redacted SSH diagnostic evidence and
