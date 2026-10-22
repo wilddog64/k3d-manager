@@ -25,10 +25,11 @@ which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
 ### Firing alert timing
 
 The **Firing Alerts by Category** table remains an aggregate count by category, alert name,
-severity, and cluster. The **Active Alert Instances** table has an allowlist of alert,
-severity, cluster, namespace, instance, **Active since (UTC; pending included)**, and
-**Active for**, capped at 200 rows. Raw metric labels such as `__name__`, `group`, and `tier`
-are hidden. Alert identity stays per-instance, so several Trivy findings under one rule can
+severity, and cluster. The **Active Alert Instances** table is capped at 200 rows and orders its allowlist as
+namespace, cluster, alert, app, pod, instance, **Active since (local; pending included)**, and
+**Active for**. App, pod, and instance values appear only when the alert provides them; Trivy
+alerts use `app` for the image repository and do not carry a pod label. Raw metric labels such
+as `__name__`, `group`, and `tier` are hidden. Alert identity stays per-instance, so several Trivy findings under one rule can
 have different active-state timestamps.
 
 The timestamp comes from Prometheus `ALERTS_FOR_STATE`, which records when a rule entered
@@ -37,8 +38,9 @@ firing transition, so it is not an exact firing start. The explicit pending-incl
 must remain visible. Rows without this metric are omitted; an empty detail table means no
 firing instance has a matching active-state sample. No resolved time is inferred.
 
-The separate **CVE Findings — Report Created at (UTC)** table shows up to 200 current findings
-with CVE, severity, cluster, namespace, image, package, and installed/fixed version context.
+The separate **CVE Findings — Report Created at (local)** table shows up to 200 current findings
+with CVE, severity, cluster, namespace, image, workload/report owner, package, and
+installed/fixed version context.
 Its timestamp metric is sourced from VulnerabilityReport `metadata.creationTimestamp`. It
 records when Trivy created the report object, not when the vulnerability was first detected;
 reports without a valid creation timestamp do not receive a fabricated value.
