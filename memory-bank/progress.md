@@ -2,7 +2,7 @@
 
 ## 2026-10-21 ACG SSH destination investigation
 
-- Operator's later `make up CLUSTER_PROVIDER=k3s-aws` reached the new readiness diagnostics, which reported `hostname resolution failed` for `ubuntu@ubuntu` after 180s. Code review found the cause: `scripts/etc/k3s/vars.sh` eagerly defaults `UBUNTU_K3S_EXTERNAL_IP` to the SSH alias `ubuntu`, masking the fresh `Host ubuntu` IP written by ACG provisioning; `deploy_app_cluster` then skips its SSH-config lookup. This supports an alias/target-selection bug, not an EC2 boot/network conclusion. Filed P2 `docs/bugs/2026-10-21-k3s-aws-ssh-target-uses-alias-instead-of-ip.md` and dispatched `k3s-aws-ssh-target-resolution-fix` from `docs/issues/2026-10-21-k3s-aws-ssh-target-fix-spec.md`; task is running. Spec/bug commits pushed: `b17c324b`, `efe5cb76`. No implementation or AWS stack mutation performed. Live verification remains pending.
+- Operator's later `make up CLUSTER_PROVIDER=k3s-aws` reached readiness diagnostics, which reported `hostname resolution failed` for `ubuntu@ubuntu` after 180s. Code review traced the cause to the eager `UBUNTU_K3S_EXTERNAL_IP=ubuntu` source-time default masking the fresh SSH-config IP. Dispatched `k3s-aws-ssh-target-resolution-fix`; landed and pushed as `60b43b22`. Independent `shopping_cart.bats` passed 41/41, shellcheck, `_agent_lint`, `_agent_audit`, diff check, docs links, and dispatcher gate passed. `k3s_aws_provider.bats` had two teardown failures (28/30) both on the task branch and unchanged release branch; recorded separately as baseline failures. Canonical bug is VERIFIED offline only; operator live verification is pending. No live stack mutation was performed by Codex.
 
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 

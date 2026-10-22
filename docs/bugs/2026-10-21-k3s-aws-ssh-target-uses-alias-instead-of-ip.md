@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** OPEN — implementation complete and offline-tested; live verification pending
+**Status:** VERIFIED — offline fix landed in `60b43b22`; operator live verification pending
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -80,7 +80,9 @@ checks that an explicit `UBUNTU_K3S_EXTERNAL_IP` remains authoritative. A DNS
 resolution failure now stops readiness immediately while retaining the
 fail-closed guard. `shellcheck -S warning` for touched shell files,
 `git diff --check`, and `_agent_audit` passed. The related provider contract
-suite had two existing teardown/deregistration failures (28/30); details are in
+suite had two teardown/deregistration failures (28/30) on both the task branch
+and unchanged release branch before this fix, confirming they are pre-existing
+baseline failures; details are in
 `docs/issues/2026-10-21-k3s-aws-ssh-target-provider-contract-failures.md`.
 No live infrastructure operation was run. This evidence does not establish
 live verification.
