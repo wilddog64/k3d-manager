@@ -351,6 +351,8 @@ after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap. Plan 1 of 
 ledger. This adds `--repo`/`--branch` to `bin/k3dm-codex-dispatch`, a `repo` field on every ledger event,
 and a `repo` label on the per-task series. The operator needs that data for research.
 
+Plan 2 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
