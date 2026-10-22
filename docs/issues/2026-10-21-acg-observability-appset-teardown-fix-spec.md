@@ -28,3 +28,15 @@ Before changing code, inspect Argo CD ApplicationSet deletion/cascade/finalizer 
 - The related bug and investigation documents above
 
 No live infrastructure, cluster state, credentials, or other ApplicationSets are in scope.
+
+## Files
+
+- `bin/cluster-down`
+- `bin/cluster-up`
+- `scripts/lib/providers/k3s-aws.sh`
+- `scripts/plugins/argocd.sh`
+- `scripts/tests/bin/cluster_down.bats`
+- `scripts/tests/bin/cluster_up.bats`
+- `scripts/tests/plugins/argocd.bats`
+- `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md`
+- `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md`
