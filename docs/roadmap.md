@@ -768,6 +768,78 @@ and replies with current source evidence, uncertainty and safe next steps.
   future v2.x capability; v3.0.0 multi-agent product team consumes that
   interface. Do not advertise v2.5.0 as a general-purpose app-building agent.
 
+### Candidate milestone — v2.6.0: Autonomous Ticket & Incident Investigation
+
+**Proposed 2026-10-22 (operator requested roadmap placement; not yet an implementation spec).**
+Extend the v2.5.0 conversational assistant with a **bounded, evidence-driven investigation
+loop** for engineering tickets, runtime alerts and repeatable operational incidents. The
+purpose is to reduce operator-led diagnostic prompting, **not** to grant an LLM unrestricted
+execution privileges or conflate a plausible explanation with a verified root cause.
+
+**Dependencies / ordering:** v2.0.0 stable reference workload; v2.1 read-only gateway;
+v2.2 deterministic policy/RBAC; v2.4 swappable provider adapter; v2.5.0 authenticated,
+thread-safe conversational context and cited read-only diagnostics. Reuse v2.3's action
+contracts as policy references, but do **not** execute remediation in v2.6.0. Hermes
+alert-driven triage, cloud-bridge allowlisted tools, RAG + Git history, and the existing
+issue/bug/spec lifecycle are predecessors, not features to rebuild.
+
+**Phased delivery within the v2.6.x series** (each patch/minor slice gets an independent
+task spec and follows the maximum-five-plan-docs-per-release rule):
+
+| Slice | Deliverable | Acceptance boundary |
+|---|---|---|
+| v2.6.0 | Ticket/alert intake and **structured investigation case** with source identity, severity, evidence links, deduplication, missing-context detection and ownership | Ingest a known incident and preserve provenance; no automatic bug-file mutation or alert acknowledgement |
+| v2.6.1 | **Bounded hypothesize → read-only diagnostic → evaluate** loop, with competing hypotheses, deterministic allowlisted tool selection, iteration/time/token limits and escalation on inconclusive evidence | Replay incidents from frozen fixtures; unsupported claims and out-of-allowlist actions fail tests |
+| v2.6.2 | Evidence-backed findings report with confidence calibration, alternatives considered, safe next actions and draft bug/spec handoff for human review | Independent evaluator checks findings against held-out ground truth; no self-certified root cause |
+| v2.6.3 | Operational evaluation and Grafana dashboard: root-cause correctness, abstention quality, investigation completeness, latency, tool budget, human corrections and cost per accepted diagnosis | Operator-approved live *read-only* investigations plus correlated evidence; synthetic replay cannot be labeled live-verified |
+
+**Investigation contract (design requirements):**
+1. Input: authenticated Slack ticket/thread, GitHub issue or Hermes alert; normalize a
+   stable case ID, incident window, affected cluster/repo and source provenance. Preserve
+   existing permissions and refrain from assuming all channels are enabled.
+2. Gather: read-only Prometheus/Alertmanager/ArgoCD state, approved log summaries,
+   Git commits, past `docs/{bugs,issues,plans}` and RAG excerpts with source references
+   and freshness. Retrieval text and tool outputs are untrusted evidence, never instructions.
+3. Reason: explicit hypotheses, evidence-for/evidence-against, and unknowns; a model may
+   select from **deterministically validated** read-only tools, but cannot expand its tool
+   allowlist, issue arbitrary shell/SSH, bypass cloud-request authentication or grant roles.
+4. Control: finite iteration/tool/time/token budgets, circuit breakers, loop detection,
+   no-evidence/contradictory-evidence exits, resumable audit state and dedupe across Slack
+   retries. Protect secrets, redact logs and avoid high-cardinality metric labels.
+5. Report: separate `observed`, `inferred`, `hypothesis`, `unknown` and
+   `independently verified`. Record timestamps, evidence links, requests, tool outcomes,
+   hypothesis revisions and why investigation stopped. Never report resolved from silence,
+   missing telemetry, or a healthy Argo CD status alone.
+6. Human boundary: diagnosis/report only. Draft a bug or suggested repair for review,
+   but **no autonomous code changes, merges, syncs, pod restarts, secret reads, permission
+   grants or write-side cloud-bridge calls**. Existing v2.3 approval-and-retest workflow
+   remains separately authorized.
+7. Evaluation: frozen historical incident replay with held-out root causes, injected
+   missing/stale/contradictory evidence, duplicate alerts, prompt injection, denial of
+   permissions, unreachable tools and runaway-loop attempts. Independent tests are authored
+   from acceptance contracts rather than agent implementation; track confidence calibration,
+   correct abstentions, human escalation and outcome/token, not just ticket throughput.
+
+**Exit criteria before calling v2.6.x autonomous investigation mature:** measurable
+improvement over an operator-directed baseline on the *same* blinded incident corpus;
+stable security/authorization boundaries; reproducible independent offline evaluation;
+operator-reviewed real incident evidence; and calibrated abstention when evidence is
+insufficient. Define numeric quality thresholds after a baseline and sample-size review,
+rather than inventing accuracy or cost targets now.
+
+**Not in this milestone:** autonomous remediation, broad network IDS, unattended release
+management, arbitrary repository writes, generalized product development or unbounded
+multi-agent orchestration. Integrate the separate proposed Falco IDS work from v1.51.0
+only if it has actually shipped and exposes approved read-only signals; it is not a hard
+dependency. This milestone feeds v3.0.0's multi-agent product team with more trustworthy
+incident investigation, but does not itself implement the product team.
+
+**Scheduling:** roadmap candidate only; no `docs/plans/v2.6.x-*.md` files, new
+branch, live action, or dispatch is authorized by this entry. Scope each slice only
+when predecessor releases are ready and the operator approves implementation.
+
+---
+
 ### Candidate theme — v2.x: model economics
 
 **Proposed 2026-10-16 (operator; not yet scoped).** Compare Claude-only, Codex-only and
