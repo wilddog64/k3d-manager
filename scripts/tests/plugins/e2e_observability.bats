@@ -177,6 +177,33 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "exporter exposes report creation timestamps without inventing missing values" {
+  run python3 - "${EXPORTER}" <<'PY'
+import ast, sys, yaml, textwrap
+docs = list(yaml.safe_load_all(open(sys.argv[1])))
+cm = next(d for d in docs if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert 'def report_timestamp(metadata):' in src
+assert 'trivy_vulnerability_report_created_timestamp_seconds' in src
+assert 'if report_created > 0:' in src
+assert 'metadata.creationTimestamp as Unix seconds' in src
+assert 'not first detection time' in src
+tree = ast.parse(src)
+timestamp_fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "timestamp")
+report_fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "report_timestamp")
+ns = {"datetime": __import__("datetime").datetime}
+exec(compile(ast.Module(body=[timestamp_fn], type_ignores=[]), "exporter", "exec"), ns)
+exec(compile(ast.Module(body=[report_fn], type_ignores=[]), "exporter", "exec"), ns)
+assert ns["report_timestamp"]({"creationTimestamp":"2026-10-22T12:00:00Z"}) > 0
+assert ns["report_timestamp"]({}) == 0
+assert '("cluster", "namespace", "resource_name", "image_repository", "image_tag", "vulnerability_id", "severity", "package", "installed_version", "fixed_version")' in src
+assert 'for labels, created_seconds in report_created_state.values():' in src
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "exporter preserves remediation cache when refresh fails" {
   run python3 - "${EXPORTER}" <<'PY'
 import sys, yaml

@@ -361,14 +361,23 @@ _assert_firing_instance_contract() {
   dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
   detail="$(jq -c '.panels[] | select(.id == 13)' <<<"$dashboard_json")" || return 1
   category="$(jq -c '.panels[] | select(.id == 12)' <<<"$dashboard_json")" || return 1
-  jq -e '(.type == "table") and (.title | contains("Active Since (UTC; pending included)")) and (.description | contains("not an exact fired-at time")) and (.description | contains("for: interval")) and ([.targets[].expr | contains("bottomk(200") ] | all) and ([.targets[].expr | contains("ALERTS_FOR_STATE") ] | all) and ([.targets[].expr | contains("alertstate=\"firing\"") ] | all) and (.targets | length == 2) and ([.transformations[].id] | index("merge") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("dateTimeAsIso") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("s") != null)' <<<"$detail" >/dev/null || return 1
+  jq -e '(.type == "table") and (.title | contains("Active Since (UTC; pending included)")) and (.description | contains("not a firing start or CVE detection time")) and (.description | contains("for: 15m")) and ([.targets[].expr | contains("bottomk(200") ] | all) and (.targets[0].expr | endswith("* 1000")) and ([.targets[].expr | contains("ALERTS_FOR_STATE") ] | all) and ([.targets[].expr | contains("alertstate=\"firing\"") ] | all) and (.targets | length == 2) and ([.transformations[].id] | index("merge") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("alertname") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("__name__") == null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("dateTimeAsIso") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("s") != null)' <<<"$detail" >/dev/null || return 1
   jq -e '(.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Trivy.*"))' <<<"$category" >/dev/null || return 1
+  jq -e '(.panels[] | select(.id == 14) | .title == "CVE Findings — Report Created at (UTC)") and (.panels[] | select(.id == 14) | .targets[0].expr | contains("topk(200, trivy_vulnerability_report_created_timestamp_seconds) * 1000")) and (.panels[] | select(.id == 14) | .description | contains("not when the vulnerability was first detected")) and ([.panels[] | select(.id == 14) | .transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("vulnerability_id") != null)' <<<"$dashboard_json" >/dev/null || return 1
   jq -e '.timezone == "utc"' <<<"$dashboard_json" >/dev/null || return 1
 }
 
 @test "Grafana Overview firing instance detail contract is safe and preserves category counts" {
   _assert_firing_instance_contract "${OVERVIEW}"
   _assert_firing_instance_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview CVE report-time panels stay synchronized and bounded" {
+  local app_cve hub_cve
+  app_cve="$(jq -S '.panels[] | select(.id == 14)' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))"
+  hub_cve="$(jq -S '.panels[] | select(.id == 14)' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))"
+  [ -n "$app_cve" ] && [ "$app_cve" = "$hub_cve" ]
+  jq -e '(.targets[0].expr | startswith("topk(200,")) and (.targets[0].expr | endswith("* 1000")) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("Value") != null)' <<<"$app_cve" >/dev/null
 }
 
 @test "Grafana Overview firing instance fixtures preserve per-instance context and safe fallbacks" {

@@ -25,19 +25,23 @@ which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
 ### Firing alert timing
 
 The **Firing Alerts by Category** table remains an aggregate count by category, alert name,
-severity, and cluster. Its adjacent **Currently Firing Alert Instances** table provides one
-row per alert instance (up to 200 rows), including the rule labels, **Active since (UTC;
-pending included)**, and elapsed **Active duration**. Alert identity stays per-instance, so
-several Trivy findings under one rule can have different timestamps.
+severity, and cluster. The **Active Alert Instances** table has an allowlist of alert,
+severity, cluster, namespace, instance, **Active since (UTC; pending included)**, and
+**Active for**, capped at 200 rows. Raw metric labels such as `__name__`, `group`, and `tier`
+are hidden. Alert identity stays per-instance, so several Trivy findings under one rule can
+have different active-state timestamps.
 
 The timestamp comes from Prometheus `ALERTS_FOR_STATE`, which records when a rule entered
 pending/active evaluation. A rule's `for:` interval means this can be earlier than the actual
-firing transition, so the dashboard deliberately does not call it **Fired at** or **Firing
-for**. Rows without this metric are omitted; an empty detail table means no firing instance
-has a matching active-state sample. No resolved time is inferred. The Prometheus expression
-matches those samples to `ALERTS{alertstate="firing"}` and caps the detail view at 200
-instances. Use the configured Alertmanager UI to inspect authoritative current alert details
-and start times; the dashboard does not embed API credentials or expand external access.
+firing transition, so it is not an exact firing start. The explicit pending-included caveat
+must remain visible. Rows without this metric are omitted; an empty detail table means no
+firing instance has a matching active-state sample. No resolved time is inferred.
+
+The separate **CVE Findings — Report Created at (UTC)** table shows up to 200 current findings
+with CVE, severity, cluster, namespace, image, package, and installed/fixed version context.
+Its timestamp metric is sourced from VulnerabilityReport `metadata.creationTimestamp`. It
+records when Trivy created the report object, not when the vulnerability was first detected;
+reports without a valid creation timestamp do not receive a fabricated value.
 
 ## The producer chain
 

@@ -4,6 +4,13 @@
 
 Native `trivy-operator` metrics, no exporter in the path.
 
+The hub **Grafana Health & Firing Alerts** dashboard also has a separate, bounded CVE findings
+table. Its **Report created at (UTC)** value comes from the VulnerabilityReport object's
+`metadata.creationTimestamp`; it is the report creation time, not the vulnerability's first
+detection time. The general alert table's `ALERTS_FOR_STATE` timestamp is **Active since** and
+includes any pending interval (the Trivy alert rule uses `for: 15m`); it is not a CVE detection
+or exact firing-start time. The aggregate category counts remain the alert-count view.
+
 | Panel | Query basis |
 |---|---|
 | Trivy Scan Job Failures (30m) | `increase(kube_job_status_failed{namespace="trivy-system",job_name=~"scan-.*"}[30m])` |
