@@ -7,7 +7,7 @@
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
 **Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
-**Dispatch approval:** operator requested review and dispatch on 2026-10-21 and 2026-10-22; read-only fault-attribution follow-up only, no recovery or live changes
+**Dispatch approval:** operator requested review and dispatch on 2026-10-21 and 2026-10-22. The original outage attribution remains read-only; on 2026-10-22 the operator separately authorized a bounded offline fix for the confirmed diagnostic exit-status reporting defect. No outage recovery or live changes are authorized.
 **Component:** `k3s-hostinger` node/control plane, public frontend ingress/port-forward, shopping-cart data layer, Vault/ESO; precise fault domain TBD
 **Affected:** `ubuntu-hostinger`, `https://frontend.3ai-talk.org/`, `shopping-cart-apps`, `shopping-cart-data`, Hostinger `ClusterSecretStore/vault-backend`
 ## Files
@@ -15,6 +15,7 @@
 - `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`
 - `docs/issues/2026-10-21-hostinger-multi-service-incident-investigation.md`
 - `docs/issues/2026-10-21-hostinger-multi-service-incident-triage-spec.md`
+- `docs/issues/2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md`
 **Related:**
 - `docs/bugs/2026-10-17-hostinger-node-unresponsive-then-rebooted.md` (earlier 25-minute hypervisor-initiated Hostinger shutdown; **not proven to recur**)
 - `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md` (prior sealed-Vault defect fixed and LIVE-VERIFIED Oct 18; **do not assume same root cause**)
@@ -34,7 +35,7 @@ The scope expanded from one failing frontend to a Hostinger app-cluster incident
 | 21:18:24 | Alertmanager warning email / critical SMS | `PublicEndpointDown`, `instance=https://frontend.3ai-talk.org/`, `job=blackbox-public-ui`, last status HTTP **502** for 5 min. |
 | 21:21:24 | Bridge request `20261020T212043Z-make-status-public` | `make-status-public` queued as webhook job `98ec31a9`. |
 | 21:21:54 | Bridge final job result | Five samples: frontend **0/5**, status `[502,502,502,502,502]`. Other endpoints (ArgoCD, Keycloak, Prometheus, Alertmanager, Grafana, webhook) **5/5** each. Verdict `SINGLE-SERVICE` at probe time; this is *not* proof that the Hostinger Kubernetes API or data plane is healthy. |
-| 21:21–21:23 | Cloud pod diagnostic | Initial `namespace=frontend` request rejected (not approved namespace). Corrected to `provider=hostinger, namespace=shopping-cart-apps`: queued job `88461022`. Returned `Unable to connect to the server: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)`. Webhook job reported `success` despite underlying kubectl failure text — a **diagnostic success-classification gap**, investigate separately. |
+| 21:21–21:23 | Cloud pod diagnostic | Initial `namespace=frontend` request rejected (not approved namespace). Corrected to `provider=hostinger, namespace=shopping-cart-apps`: queued job `88461022`. Returned `Unable to connect to the server: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)`. Webhook job reported `success` despite underlying kubectl failure text — a **diagnostic success-classification gap**. A 2026-10-22 source review confirmed `_run_cluster_diagnostics` marks every non-timeout command successful without checking its process exit code; see the scoped fix spec. |
 | ~21:23 | Operator Slack `hostinger-status` screenshot | Cluster status **FAIL (13 OK / 0 warn / 8 fail)**; frontend 502, product images 502, Pushgateway connection refused, ClusterSecretStore kubectl timed out, ExternalSecrets kubectl timed out, data layer **4 not ready** (including `postgres-orders` and `postgresql-payment`), ArgoCD password login HTTP unavailable. Public ArgoCD/Keycloak/Grafana/Prometheus remained reachable through their exposed endpoints. |
 | ~21:25–21:26 | Operator ArgoCD screenshots | `ubuntu-hostinger-data-layer` and `ubuntu-hostinger-shopping-cart-namespace` both **Degraded / Synced**, destination `ubuntu-hostinger`. Last Sync Oct 18 is **not** last successful health refresh. Aggregate UI had previously displayed 30 Healthy/Synced; compare freshness and scope before interpreting. |
 | ~21:27 | Operator ArgoCD resource/event screenshot | Multiple data-layer ExternalSecrets appear Degraded/Synced. One `UpdateFailed` message: `error processing spec.data[0] (key: secret/data/redis/orders-cache), err: ClusterSecretStore "vault-backend" is not ready`. Event counter **35**, first occurrence around **3 days ago**; this may predate today's public outage. |
@@ -62,6 +63,18 @@ No restart, sync, deletion, or other runtime remediation was performed. Keep thi
 - [Hostinger-status recheck](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T212310Z-job-status-hostinger-recheck.json) — still running at last check.
 
 ## Known facts vs hypotheses
+
+## Confirmed diagnostic-result classification defect — 2026-10-22
+
+The API-path fault domain remains unknown; no infrastructure remediation is justified. Separate from that unresolved incident cause, source inspection confirmed a narrow webhook diagnostic defect related to the incident's pod check:
+
+- `scripts/lib/webhook/status.py::_posix_spawn_capture` receives `_rc, output, timed_out` from `_spawn_capture_text` but returns only `(output.strip(), timed_out)`.
+- `_run_cluster_diagnostics` marks a command `failed` when it times out, but otherwise writes `status=success` after including any output. A `kubectl` command that exits nonzero promptly—such as the recorded API timeout—can therefore leave a failed diagnostic presented as a successful job.
+- This is a reporting/classification defect, not evidence that the status caused the 2026-10-20 outage. The captured text still showed the timeout, but consumers that rely on the job status can be misled.
+
+**Dispatch authorization — 2026-10-22:** operator requested investigation, bug-detail update, and dispatch. Implement only return-code-aware classification for `/api/v1/diagnostics`, with focused regression coverage. Do not broaden into Hostinger network/control-plane remediation, Argo CD login, status-probe semantics, or infrastructure changes. The incident stays OPEN with its root cause unassigned.
+
+Implementation scope and acceptance are in [`2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md`](../issues/2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md).
 
 **Established at incident time:**
 
