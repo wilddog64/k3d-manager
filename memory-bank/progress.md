@@ -2,7 +2,11 @@
 
 ## 2026-10-21 ACG SSH destination investigation
 
-- Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: hostname resolution failed and k3sup did not start. `_acg_update_ssh_config` did not create a missing `Host ubuntu` stanza. lib-foundation PR #72 merged to main at `c307df2`; the subtree pull landed on `k3d-manager-v1.43.5` as squash `18f7c8cc` plus merge `205d4272`. Post-pull clean-env ACG BATS passed 28/28; ShellCheck and agent-rigor passed. Canonical bug is VERIFIED offline; operator live verification remains. No AWS/SSH/cluster operation was run by Codex; existing stack may still be billable.
+- Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: hostname resolution failed and k3sup did not start. `_acg_update_ssh_config` did not create a missing `Host ubuntu` stanza. lib-foundation PR #72 merged to main at `c307df2`; the subtree pull landed on `k3d-manager-v1.43.5` as squash `18f7c8cc` plus merge `205d4272`. Post-pull clean-env ACG BATS passed 28/28; ShellCheck and agent-rigor passed. Operator subsequently completed `make up CLUSTER_PROVIDER=k3s-aws`; the SSH configuration used the provisioned IP and k3s reported the 3-node cluster ready. Canonical SSH-target bug is LIVE-VERIFIED. A separate ArgoCD controller reconnect timeout warned and proceeded; details in `docs/issues/2026-10-21-acg-up-argocd-controller-reconnect-warning.md`.
+
+## 2026-10-21 ACG observability ApplicationSet live verification
+
+- Operator screenshot after completed ACG bring-up showed `observability-acg` green/Healthy with 3 Applications. Operator then ran `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`; terminal output confirmed CloudFormation deletion, hub deregistration, and retirement of `ApplicationSet/observability-acg`, while preserving the Hub. Canonical `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md` is LIVE-VERIFIED. Down also warned that the frontend-browser HTTP system LaunchDaemon remained installed; record: `docs/issues/2026-10-21-acg-down-frontend-browser-launchdaemon-remains.md`. The independent ArgoCD reconnect timeout is recorded in its own issue.
 
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 

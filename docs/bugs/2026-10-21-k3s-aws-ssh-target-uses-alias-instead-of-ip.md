@@ -1,7 +1,8 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** VERIFIED (offline) — lib-foundation PR #72 merged at `c307df2` and pulled into the v1.43.5 subtree; operator live verification pending
+**Status:** LIVE-VERIFIED — lib-foundation PR #72 merged at `c307df2`, pulled into the v1.43.5 subtree, and operator `make up CLUSTER_PROVIDER=k3s-aws` passed the SSH/k3s provisioning failure point on 2026-10-21
+**Fix commit:** `205d4272`
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -98,9 +99,8 @@ safe diagnostic rather than waiting the full SSH timeout against an alias as an 
 ## Verification / live status
 
 The first target-selection change, `60b43b22`, passed its offline tests but did
-not cover the missing-`Host ubuntu` case and failed live as recorded above. This
-bug is OPEN again pending the follow-up. Live verification requires a later
-operator-approved ACG bring-up; no live verification is claimed.
+not cover the missing-`Host ubuntu` case and failed live as recorded above. The
+follow-up fix and subsequent operator live verification are recorded below.
 
 Offline implementation evidence (2026-10-21): `bats
 scripts/tests/plugins/shopping_cart.bats` passed 41/41, including regression
@@ -133,14 +133,22 @@ Post-pull verification passed: clean-environment
 `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/foundation/scripts/lib/agent_rigor.sh
 scripts/lib/foundation/scripts/lib/acg/acg.sh`. The source now creates the
 missing `Host ubuntu` stanza idempotently while preserving agent/tunnel aliases.
-No AWS, SSH, or live cluster operation was run. The bug is VERIFIED offline;
-operator live verification remains pending.
+The bug was VERIFIED offline; live verification is recorded below.
 
-## Scope for dispatch
+Operator live verification (2026-10-21): during the operator's `make up
+CLUSTER_PROVIDER=k3s-aws`, SSH configuration was updated to the provisioned
+server IP and the k3s server and agents reached Ready; output reported `Cluster
+ready. 3-node k3s cluster provisioned.` The operator confirmed `make up`
+completed. The run also emitted a separate 120-second ArgoCD controller
+reconnect warning but continued into later setup; this does not indicate an
+SSH-target regression and is tracked separately in
+`docs/issues/2026-10-21-acg-up-argocd-controller-reconnect-warning.md`.
+
+**Live evidence:** 2026-10-21 · run operator-tmux-make-up · env k3s-aws · scenario completed-bring-up-after-ssh-resolution · commit 95e901e2 · proves fix
+
+## Original scope for dispatch
 
 Inspect sourcing and override contracts, fix the stale/defaulted target precedence,
-and add focused offline regression coverage. Do not edit unrelated provider code,
-do not run `make up`/`make down`, and do not modify or delete the currently running
-CloudFormation stack. Commit and push on `k3d-manager-v1.43.5` through the normal
-dispatcher workflow; after offline verification, leave live verification to the
-operator.
+and add focused offline regression coverage. Do not edit unrelated provider code.
+This original task scope is historical; the operator later performed live
+verification as documented above.

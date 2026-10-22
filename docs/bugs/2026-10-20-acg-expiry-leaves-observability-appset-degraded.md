@@ -1,7 +1,8 @@
 # Bug: expired ACG sandbox leaves stale Argo CD ApplicationSet observability-acg degraded
 
 **Filed:** 2026-10-20 (operator screenshot, Argo CD ApplicationSets UI)
-**Status:** VERIFIED — registration guard `bc8f2dae` and teardown lifecycle fix `d26574dc` landed; live verification pending
+**Status:** LIVE-VERIFIED — registration guard `bc8f2dae` and teardown lifecycle fix `d26574dc` landed; operator confirmed healthy bring-up and successful live teardown on 2026-10-21
+**Fix commit:** `d26574dc`
 **Priority:** P2 — stale GitOps objects produce persistent degraded health after disposable sandbox expiry; cleanup/re-provisioning ownership is unclear
 **Severity:** medium
 **Approval:** filing requested by operator 2026-10-20; no approval to mutate live infrastructure
@@ -17,6 +18,31 @@
 **Follow-up live evidence (2026-10-21):** The operator's post-teardown screenshot still shows `observability-acg` Degraded with 0 Applications. Source inspection identified the specific remaining gap: `bin/cluster-down` calls `_k3s_aws_deregister_cluster`, which removes the cluster Secret and destination-matching Applications but leaves the directly applied `ApplicationSet/observability-acg` behind. A narrow teardown/reprovision lifecycle fix is dispatched in `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md`; no live resources were modified.
 
 **Offline lifecycle fix (2026-10-21):** Confirmed AWS teardown now precedes hub deregistration in both `bin/cluster-down` and the provider `destroy_cluster` path. An unsuccessful AWS lookup/delete, or invalid AWS credentials, preserves the hub registration and `observability-acg`. After successful deletion, cleanup removes only destination-matching generated Applications and then deletes the fixed-name `ApplicationSet/observability-acg`; `--ignore-not-found` makes repeats safe. Bring-up verifies the exact persisted `cluster-ubuntu-k3s` registration before `deploy_observability_acg` reapplies the ACG set.
+
+**Live bring-up verification (2026-10-21):** During the
+operator's completed `make up CLUSTER_PROVIDER=k3s-aws`, the supplied Argo CD
+ApplicationSets screenshot shows `observability-acg` with a green Healthy status
+and 3 Applications. This confirms the set is present and healthy after cluster
+registration. The same bring-up passed the k3s 3-node readiness step. The
+operator has not run `make down`, so deletion after confirmed AWS teardown and
+the full teardown/re-bring-up lifecycle are not yet live-verified. A separate
+ArgoCD controller reconnect timeout warning occurred during setup but did not
+prevent completion; see
+`docs/issues/2026-10-21-acg-up-argocd-controller-reconnect-warning.md`.
+
+**Live teardown verification (2026-10-21):** Operator ran
+`make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1`. Output confirmed CloudFormation
+stack deletion, then reported `Deregistered cluster-ubuntu-k3s + generated
+Applications and retired ApplicationSet/observability-acg from hub ArgoCD
+(cicd)`. Teardown completed with `cloud teardown: verified`; the local Hub was
+preserved. Together with the preceding screenshot showing
+`observability-acg` Healthy with 3 Applications after bring-up, this verifies
+the live registration/re-registration and confirmed-teardown cleanup paths.
+The operator then supplied a post-teardown Argo CD screenshot:
+`observability-acg` is absent, and the remaining displayed ApplicationSets are
+Healthy. This visually confirms the retired set no longer appears in the hub UI.
+
+**Live evidence:** 2026-10-21 · run operator-tmux-make-down · env k3s-aws · scenario confirmed-stack-teardown-retires-appset · commit d26574dc · proves fix
 
 Argo CD normally cascades ApplicationSet deletion to owned Applications, and an Application's `resources-finalizer.argocd.argoproj.io` can then prune its managed resources ([ApplicationSet deletion documentation](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/Application-Deletion/)). This cleanup first removes the finalizer from Applications matching the retired ACG destination and deletes those Applications, so their managed resources are not pruned by Argo CD. The cluster has already been confirmed deleted. The fixed ApplicationSet delete is namespace scoped and can only target `observability-acg`; Hub, Hostinger, `grafana-dashboards-acg`, and unrelated resources are not selected. A Kubernetes deletion error is surfaced as a deregistration warning and is safe to retry.
 
