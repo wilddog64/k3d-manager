@@ -964,6 +964,45 @@ validated intent contracts rather than unreviewed prompts or hand-written specs.
 On 2026-10-12, eight finished Codex worktrees were waiting on Claude's verify-and-land step. That
 step is the known bottleneck the experiment must test.
 
+### Post-v3.0.0 candidate — Intent-to-Verified-Software benchmark
+
+**Roadmap placement corrected 2026-10-22 (operator): after v3.0.0, not in v2.x.**
+Use external, unfamiliar engineering/system-design interview-style prompts (including
+automated ticket investigation and fake-account risk classification) as a **benchmark
+corpus**, not as automatic product-feature requests. This is an evaluation of the
+v3.0.0 multi-agent product team's ability to translate natural-language intent into
+validated requirements, architecture, implementation, deployment and independently
+verified outcomes. It must follow, not block or enlarge, the v2.x gateway/conversation/
+investigation milestones.
+
+- **Input integrity:** Freeze original prompts, version their source/rights metadata,
+  classify domain and difficulty, and keep held-out tasks unseen by development
+  agents. Do not assume an interview solution's intended scope equals production requirements.
+- **Independent oracle:** A separate human-reviewed evaluator derives acceptance
+  criteria from the original prompt, without reading the implementer's generated
+  spec or code. Ambiguities, missing requirements and justified clarification or
+  abstention are scored explicitly.
+- **Experimental controls:** Compare Claude-only, coordinated Claude/Codex and
+  multi-agent/independent-QA variants using equivalent starting repositories,
+  tools, time/token budgets and infrastructure. Repeat enough trials to expose
+  variance; do not conflate model selection with extra time or privileged tools.
+- **Outcome measurement:** Intent fidelity, externally validated acceptance pass
+  rate, functional and security correctness, deployability, architecture review,
+  clarification burden, human corrections, rework, wall-clock latency and cost
+  per *independently verified* delivery. Distinguish spec-only, simulated test,
+  isolated live E2E and customer/operator acceptance.
+- **Safety:** Run unfamiliar application builds in disposable vCluster/ACG
+  environments; no production credentials, live customer data, silent cloud
+  spending, automatic promotion or release authorization. ML/fraud exercises
+  use synthetic or appropriately consented, governed data.
+- **Sequence:** First establish a stable v3.0.0 multi-agent delivery baseline;
+  next implement the benchmark harness and blind oracle; then compare workflows
+  and publish results with failure cases and uncertainty. Decide the exact
+  post-v3 release number only when v3.0.0 proves stable and a scope doc is approved.
+
+**Status:** Future research/evaluation theme only. No v2.x spec slot, no new
+implementation spec or dispatch, and no commitment to deliver this in v3.0.0.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
