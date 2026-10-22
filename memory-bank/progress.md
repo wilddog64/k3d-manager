@@ -2,10 +2,12 @@
 
 ## 2026-10-22 P2 follow-up dispatches
 
+- Lifecycle thread recurrence fix independently verified and landed/pushed as `85722ce3`. Focused pytest: 78 passed; `scripts/tests/lib/webhook.bats`: 68 cases, six expected environment-gated skips, all others passed. Python AST, `git diff --check`, and dispatcher landing gate passed. The response-URL fallback no longer anchors the job to an unrelated configured default channel when channel/thread context is unavailable. Canonical P2 is VERIFIED offline only; operator live check remains pending. Sandbox loopback failure and approved passing rerun are recorded in `docs/issues/2026-10-22-cluster-thread-verification-loopback-sandbox.md`.
+
 - Updated the lifecycle Slack-thread P2 record with sanitized `aeeeb11f` delivery findings and dispatched `cluster-lifecycle-thread-recurrence-fix` for offline source audit, regression tests, and a bounded fix if the defect is reproducible.
 - Tightened the Hostinger P2 task to historical provider/API-path attribution and separate Argo CD direct-login evidence, strictly read-only; dispatched `hostinger-multi-service-incident-attribution` as the sole networked worker.
 - Both tasks were created from pushed release commit `a8a83209`. The default status initially reported “terminated unexpectedly,” but the sandbox denied `ps`; elevated checks showed them running, and both later exited successfully. This false negative is recorded in `docs/issues/2026-10-22-dispatch-status-ps-permission-false-negative.md`.
-- Lifecycle worker reports response-URL fallback fix candidate, pytest 78 passed, webhook BATS 68 cases with 6 expected skips, Python compile and `_agent_audit`/`_agent_lint` clean. It added `scripts/tests/bin/test_webhook_thread_dispatch.py`, not listed in the original exact `Files` allowlist; candidate remains isolated and unlanded pending resolution. No Slack/AWS/cluster operations ran.
+- Lifecycle worker's fix landed as `85722ce3`; the new test-file path was explicitly accepted by the operator's landing request. No Slack/AWS/cluster operations ran.
 - Hostinger worker's read-only report reconciles the timeline and separates the persistent Argo CD direct-login failure from the recovered frontend/API incident; root cause remains unknown. `make check-doc-links` passed (2303 files), `git diff --check` clean. Report remains isolated and unlanded. No runtime probes or mutations were performed.
 
 ## 2026-10-22 Slack explicit job-ID live verification

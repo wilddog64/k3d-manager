@@ -2,8 +2,8 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** REOPENED — P2 suspected recurrence 2026-10-21 (failure analysis job `aeeeb11f` appears outside parent thread); prior fix `6b324441` was live-verified for a different resume job.
-**Fix commit:** `6b324441`
+**Status:** VERIFIED — P2 offline fix landed 2026-10-22 as `85722ce3`; operator live verification of failure-analysis/cleanup replies remains pending. Historical Slack-rendered placement for `aeeeb11f` remains unverified.
+**Fix commits:** `6b324441`, `85722ce3`
 **Priority:** P2 — terminal cluster-up failure-analysis thread correlation suspected lost (raised from P3 2026-10-21).
 **Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
 **Investigation:** Read-only triage report landed at `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md` (`8b70f1a4`). Safe local delivery records support a routing/context failure, but do not identify the failure-analysis event or prove Slack-rendered placement. Newer safe fields and delivery summaries below provide a concrete regression target; no fix was implemented by the triage.
@@ -46,6 +46,20 @@ and a bounded code fix for async lifecycle delivery if the tests establish a
 defect. Do not call Slack, inspect credentials, run AWS/cluster lifecycle
 commands, or claim the historical message's placement is proven. Preserve live
 verification as a separate operator check.
+
+**Offline verification and landing — 2026-10-22:** Fix `85722ce3` prevents a failed `response_url` delivery with unknown channel/thread context from falling back to the configured default channel and persisting that unrelated message timestamp as the job's thread parent. A regression test confirms the next failure-analysis notification retries the original response URL without an unrelated bot-channel anchor, records the route/delivery state, and keeps the private URL redacted. The existing failed-cluster-up notification test now asserts failure-analysis content and child job correlation.
+
+Independent verification passed:
+
+```text
+$ python3 -m pytest -q -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/test_webhook_stale_cleanup.py scripts/tests/bin/test_webhook_cluster_status_thread.py
+78 passed in 0.51s
+
+$ bats scripts/tests/lib/webhook.bats
+68 cases passed; 6 expected live/environment skips. Full output: `docs/issues/2026-10-22-cluster-thread-verification-loopback-sandbox.md`.
+```
+
+The first sandboxed BATS invocation could not connect to its local HTTP test server; rerunning with approved loopback access passed all 68 cases (six expected live/environment skips). Python AST parsing and `git diff --check` passed; ShellCheck does not apply to the Python webhook entrypoint. The dispatcher landing gate passed and pushed `85722ce3` to `origin/k3d-manager-v1.43.5`. No Slack, AWS, Kubernetes, or lifecycle operation was run. This is offline VERIFIED only; operator live verification remains required before LIVE-VERIFIED.
 
 ### Investigation and acceptance
 
