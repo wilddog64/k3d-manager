@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** OPEN — live Grafana review found the implemented table is too wide and its time field is not a CVE detection timestamp; follow-up dispatch approved 2026-10-22
+**Status:** VERIFIED — offline implementation landed; operator live Grafana verification pending
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -134,6 +134,21 @@ interface:
 
 Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` passed 44/44; `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats`, `_agent_lint`, `_agent_audit`, and `git diff --check` passed. The live screenshot subsequently showed the implementation did not meet usability/provenance expectations, so this result is historical offline evidence only; do not treat the issue as resolved or LIVE-VERIFIED.
 
+## Follow-up verification (2026-10-22)
+
+The scoped fix landed and was pushed to `k3d-manager-v1.43.5` as `309d77bf`.
+Independent offline verification:
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats`: 45/45 passed.
+- `bats scripts/tests/plugins/e2e_observability.bats`: 25 passed, 2 expected skips (`promtool` unavailable).
+- `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: passed, no diagnostics.
+- `_agent_audit` and `_agent_lint`: passed (AI lint is disabled in this environment).
+- `git diff --cached --check`: passed.
+- `make check-doc-links`: `check-doc-links: 2311 file(s) OK`.
+- Dispatcher landing gate reran both BATS suites, ShellCheck, and doc links after rebase; passed.
+
+Offline verification covers the compact active-alert table, preserved category counts, bounded CVE table, synchronized dashboard panels, and report timestamp provenance/absence. This is **not LIVE-VERIFIED**. Operator should inspect the deployed Grafana dashboard after rollout and compare one displayed **Report created at (UTC)** value against that finding's VulnerabilityReport `metadata.creationTimestamp`; confirm active-since is readable UTC, raw labels are hidden, and category counts remain. First-detected time is not represented.
+
 ## Follow-up dispatch approval (2026-10-22)
 
 - Live finding: generic table is too wide; `__name__` repeats the metric name; `group`/`tier` are unclear/noisy; displayed timestamp is epoch-like; no CVE report/detection time is shown.
@@ -142,9 +157,9 @@ Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats
 
 ## Definition of Done
 
-- [ ] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [ ] Generic table is compact/readable; separate CVE detail uses report creation time and retains aggregate counts.
-- [ ] Targeted exporter/dashboard tests cover timestamp provenance, missing values, field selection, bounds, and synchronized definitions.
+- [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
+- [x] Generic table is compact/readable; separate CVE detail uses report creation time and retains aggregate counts.
+- [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, field selection, bounds, and synchronized definitions.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
 - [ ] Record fix SHA, verification evidence and status transition in this bug.
 
