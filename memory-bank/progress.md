@@ -7,6 +7,7 @@
 ## 2026-10-21 Slack find-similar-docs rollout investigation
 
 - Read-only trace on `k3d-manager-v1.43.5` found no remaining code defect in slash/thread Q parsing, validation, or Make transport. `make deploy-worker` deploys the checked-out Worker and smoke-tests it; `make restart-webhook` kickstarts the checked-out webhook LaunchAgent and restarts cloud bridge. No runtime source revision endpoint was found. Investigation task `slack-find-similar-docs-live-q-failure-followup` landed as `de023621`; focused BATS passed 8/8, doc links passed (`2289 file(s) OK`), `_agent_audit` and `git diff --check` passed. Operator subsequently provided successful Slack job `08ae7d06`: the exact query `what's recent e2e-remote issues` was echoed and prior-art results returned. Updated the canonical bug to LIVE-VERIFIED; no serving revision is inferred. No deployment or restart was performed by Codex.
+- Follow-up comparison: operator's `logs 08ae7d06` reply was usage, while a separate explicit `logs fb7db078` returned a test-all transcript. The visible ID matches the eight-hex validator; source emits usage before record lookup, so this is not evidence of a missing log. Filed P2 `docs/bugs/2026-10-21-slack-find-similar-docs-job-logs-rejected.md`; exact event text/context and runtime revision are not available, so root cause remains open.
 
 ## 2026-10-21 Slack multi-job thread-targeting verification
 
