@@ -466,6 +466,64 @@ def test_logs_explicit_id_reads_requested_child(dispatch_env):
     assert "child output" in notices[0]
 
 
+@pytest.mark.parametrize("target_name", ["find-similar-docs", "test-all"])
+def test_slack_events_explicit_logs_resolves_make_target(dispatch_env, monkeypatch, target_name):
+    _started, notices = dispatch_env
+    anchor = wh.JOB_DIR / "job"
+    (anchor / "status").write_text("thread-anchor")
+    (anchor / "thread_ts").write_text("1700000000.000001")
+    (anchor / "channel_id").write_text("C1")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "status").write_text("success")
+    (target / "thread_ts").write_text("1700000000.000001")
+    (target / "channel_id").write_text("C1")
+    (target / "target").write_text(target_name)
+    (target / "make.log").write_text(f"output for {target_name}")
+
+    class ImmediateThread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            self.target, self.args, self.kwargs = target, args, kwargs or {}
+
+        def start(self):
+            self.target(*self.args, **self.kwargs)
+
+    monkeypatch.setattr(wh.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
+    monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "reader")
+
+    body = json.dumps({
+        "type": "event_callback",
+        "event_id": f"Ev-{target_name}",
+        "event": {
+            "type": "message", "subtype": "", "user": "U1", "channel": "C1",
+            "thread_ts": "1700000000.000001", "ts": "1700000000.000002",
+            "text": "logs aabbccdd",
+        },
+    }).encode()
+    response = {}
+    request = type("FakeHandler", (), {
+        "path": "/slack/events",
+        "headers": {"Content-Length": str(len(body)), "X-Slack-Request-Timestamp": "1700000000",
+                    "X-Slack-Signature": "v0=test"},
+        "rfile": io.BytesIO(body),
+        "send_response": lambda self, code: response.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, payload: response.update(code=code, payload=payload),
+    })()
+
+    wh._Handler.do_POST(request)
+
+    assert response["code"] == 200
+    assert len(notices) == 1
+    assert "job `aabbccdd`" in notices[0]
+    assert f"output for {target_name}" in notices[0]
+    assert "Usage:" not in notices[0]
+
+
 def test_logs_rejects_cross_thread_explicit_id(dispatch_env):
     _started, notices = dispatch_env
     (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD-A")
