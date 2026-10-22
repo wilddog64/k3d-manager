@@ -38,6 +38,17 @@ The find-similar-docs job's successful output is visible, but its transcript and
 
 In a later `k3dm fix-list` thread, the operator sent the visible command `logs 013fdfe9` and received the same generic usage response, then repeated the same visible command and received `Last 20 lines (job 013fdfe9)` with the expected `fix-list` Make output. This is an intermittent parse/routing symptom across targets, not uniquely a find-similar-docs log-file issue. It also shows that the explicit lookup and log-selection path can succeed. The screenshots do not provide raw Slack event bodies, so whether the first event differed invisibly or was routed through different runtime state remains unknown. Keep this issue OPEN pending exact cause; do not infer that the earlier `status 08ae7d06` failure is resolved.
 
+### Operator hypothesis: annotated/truncated ID — 2026-10-21
+
+The operator suspects the failed inline command may have contained `...` (or another
+non-hex suffix), while the successful retry was plain text. This is consistent with the
+current parser: `_resolve_thread_job_target()` splits on whitespace and requires the ID
+token to match `^[0-9a-f]{8}$`; for example, `logs 013fdfe9...` is intentionally rejected
+with usage, while `logs 013fdfe9` is accepted. The screenshots' rendered text alone cannot
+confirm the exact underlying message body. This is a plausible explanation, not a confirmed
+root cause. It would also need to be checked against the reported `status 08ae7d06` attempt;
+its exact submitted text and response remain unavailable.
+
 ## Source trace and limits
 
 - In `bin/k3dm-webhook`, `_resolve_thread_job_target()` emits the usage text only when the normalized command does not contain exactly two whitespace-separated tokens or the second token fails `_JOB_ID_RE`.
@@ -48,11 +59,11 @@ In a later `k3dm fix-list` thread, the operator sent the visible command `logs 0
 
 ## Reproduction and investigation
 
-1. Run a controlled `find-similar-docs` command through the same Slack entry point and capture its queued/succeeded job ID and thread.
-2. In that thread, send the exact plain-text message `logs <that-job-id>` and capture the reply.
-3. In the same webhook process and thread, request `logs <known-good-job-id>` for a job already proven to work, to isolate entry point/target effects from channel, user, and runtime differences.
+1. Confirm the exact message text of the failed `logs 08ae7d06` and `status 08ae7d06` attempts, including any trailing ellipsis, punctuation, Slack markup, or copied placeholder. Do not infer the raw text from a visually similar screenshot.
+2. If the failed token included non-hex text, classify that individual usage response as expected validation, then retry the exact plain-text command in the same thread.
+3. If the raw ID was exactly eight lowercase hex characters, reproduce with a controlled find-similar-docs job and compare it with `logs <known-good-job-id>` in otherwise identical context.
 4. Inspect sanitized webhook debug logs for the event's `text`, `thread_ts`, the `_find_job_by_thread_ts()` selected anchor, and `_resolve_thread_job_target()` result. Do not log tokens, response URLs, query secrets, or transcript contents beyond existing redaction policy.
-5. Compare the `find-similar-docs` job directory metadata (`target`, `status`, `thread_ts`, `channel_id`) and `make.log` presence with the working job. Confirm the running webhook source/branch without exposing credentials.
+5. Compare the find-similar-docs job directory metadata (`target`, `status`, `thread_ts`, `channel_id`) and `make.log` presence with the working job. Confirm the running webhook source/branch without exposing credentials.
 
 No live commands were triggered by this report; reproduction remains operator-controlled.
 
@@ -62,7 +73,7 @@ For the displayed valid eight-hex ID, `logs 08ae7d06` must resolve that exact au
 
 ## Acceptance criteria
 
-- [ ] Identify which input/context condition makes the handler reject the visible `logs 08ae7d06` request; distinguish event text parsing, thread-anchor selection, runtime-version mismatch, and job-record lifecycle.
+- [ ] Determine whether the rejected inline commands actually included an ellipsis or other non-hex suffix; if not, identify the input/context condition causing rejection (event text parsing, thread-anchor selection, runtime-version mismatch, or job-record lifecycle).
 - [ ] Add regression coverage for explicit `logs <id>` against a `find-similar-docs` job as well as a known working Make target, with otherwise identical thread/channel context.
 - [ ] Exact ID lookup returns that job's `make.log` (or a precise result naming the same ID); usage is reserved for malformed/missing arguments.
 - [ ] Preserve rejection of invalid IDs, cross-thread/channel protections, redaction, and the existing explicit-ID regression suite.
