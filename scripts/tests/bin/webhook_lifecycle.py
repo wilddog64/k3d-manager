@@ -255,6 +255,195 @@ class WebhookLifecycleTests(unittest.TestCase):
         lifecycle._run_cluster(job_id, "up", dry_run=True)
         self.assertEqual((job_dir / "status").read_text(), "success")
 
+    def test_short_cluster_down_posts_redacted_bounded_terminal_summary(self):
+        job_id = "a1b2c3e3"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_with_output(cmd, output_path, cwd=None, env=None):
+            self.assertEqual(cmd, ["make", "down", "KEEP_LOCAL=1"])
+            Path(output_path).write_text(
+                "Deleting stack acg-sandbox\n"
+                "Removed resources: 3\n"
+                "credential=secret-value\n"
+                "Environment:\n  API_TOKEN: raw-env-secret\n"
+                "response https://hooks.slack.com/actions/T123/B456/secret-response\n"
+            )
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_with_output
+        lifecycle._posix_spawn_job = spawn_with_output
+        lifecycle._redact_secrets = lambda text: text.replace("secret-value", "[REDACTED]")
+        lifecycle._run_cluster(job_id, "down", provider="aws")
+
+        terminal = self.notifications[-1][1]
+        self.assertIn("cluster-down* (aws)", terminal)
+        self.assertIn(f"job `{job_id}`", terminal)
+        self.assertIn("Command exit: 0", terminal)
+        self.assertIn("External teardown was not independently verified", terminal)
+        self.assertIn("Removed resources: 3", terminal)
+        self.assertIn("REDACTED", terminal)
+        self.assertNotIn("secret-value", terminal)
+        self.assertNotIn("raw-env-secret", terminal)
+        self.assertNotIn("secret-response", terminal)
+        self.assertIn("SLACK_RESPONSE_URL_REDACTED", terminal)
+        self.assertLessEqual(len(terminal), 2000)
+
+    def test_cluster_down_labels_verified_teardown_only_when_marker_is_present(self):
+        job_id = "a1b2c3e8"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_verified_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text(
+                "cloud teardown: verified (stack k3d-manager-cluster deleted or absent in us-west-2)\n"
+            )
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_verified_job
+        lifecycle._posix_spawn_job = spawn_verified_job
+        lifecycle._run_cluster(job_id, "down", provider="aws")
+
+        terminal = self.notifications[-1][1]
+        self.assertIn("CloudFormation teardown was verified by the command output", terminal)
+        self.assertNotIn("External teardown was not independently verified", terminal)
+
+    def test_cluster_up_posts_a_bounded_terminal_summary(self):
+        job_id = "a1b2c3e9"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_with_output(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("Node ready\n")
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_with_output
+        lifecycle._posix_spawn_job = spawn_with_output
+        lifecycle._run_cluster(job_id, "up", provider="aws")
+
+        terminal = self.notifications[-1][1]
+        self.assertIn("cluster-up* (aws)", terminal)
+        self.assertIn("Command exit: 0", terminal)
+        self.assertIn("Node ready", terminal)
+
+    def test_cluster_terminal_summary_handles_empty_output_and_nonzero_exit(self):
+        job_id = "a1b2c3e4"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_failing_job(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("")
+            return lifecycle.os.posix_spawn("/usr/bin/false", ["false"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_failing_job
+        lifecycle._posix_spawn_job = spawn_failing_job
+        lifecycle._run_cluster(job_id, "down", provider="aws")
+
+        terminal = self.notifications[-1][1]
+        self.assertIn("Command exit: 1", terminal)
+        self.assertIn("RuntimeError: make down KEEP_LOCAL=1 exited 1", terminal)
+        self.assertIn("cluster-down* (aws)", terminal)
+
+    def test_cluster_summary_truncates_very_long_output(self):
+        job_id = "a1b2c3e5"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_with_long_output(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("useful teardown line\n" + ("x" * 5000))
+            return lifecycle.os.posix_spawn("/usr/bin/true", ["true"], dict(env or {}), setsid=True)
+
+        lifecycle._spawn_job = spawn_with_long_output
+        lifecycle._posix_spawn_job = spawn_with_long_output
+        lifecycle._run_cluster(job_id, "down", provider="aws")
+
+        terminal = self.notifications[-1][1]
+        self.assertLessEqual(len(terminal), 2000)
+
+    def test_cluster_progress_is_kept_without_repeating_its_tail_at_finish(self):
+        job_id = "a1b2c3e6"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+        timers = []
+
+        class DeferredTimer:
+            def __init__(self, _interval, callback):
+                self.callback = callback
+                timers.append(self)
+
+            def start(self):
+                return None
+
+            def cancel(self):
+                return None
+
+        def spawn_with_progress(cmd, output_path, cwd=None, env=None):
+            Path(output_path).write_text("stack deletion still running\n")
+            return 4242
+
+        original_waitpid = lifecycle.os.waitpid
+        original_exit = lifecycle.os.WEXITSTATUS
+        original_wifexited = lifecycle.os.WIFEXITED
+        original_killpg = lifecycle.os.killpg
+
+        def finish_after_progress(pid, _options):
+            if len([text for _, text in self.notifications if "still running" in text]) == 0:
+                timers[0].callback()
+            return pid, 0
+
+        lifecycle._spawn_job = spawn_with_progress
+        lifecycle._posix_spawn_job = spawn_with_progress
+        lifecycle.os.waitpid = finish_after_progress
+        lifecycle.os.WIFEXITED = lambda _status: True
+        lifecycle.os.WEXITSTATUS = lambda _status: 0
+        lifecycle.os.killpg = lambda *_args: None
+        try:
+            with patch.object(lifecycle.threading, "Timer", DeferredTimer):
+                lifecycle._run_cluster(job_id, "down", provider="aws")
+        finally:
+            lifecycle.os.waitpid = original_waitpid
+            lifecycle.os.WEXITSTATUS = original_exit
+            lifecycle.os.WIFEXITED = original_wifexited
+            lifecycle.os.killpg = original_killpg
+
+        progress = [text for _, text in self.notifications if "still running" in text]
+        terminal = self.notifications[-1][1]
+        self.assertGreaterEqual(len(progress), 1, repr(self.notifications))
+        self.assertIn("stack deletion still running", progress[0])
+        self.assertNotIn("stack deletion still running", terminal)
+        self.assertIn("down complete", terminal)
+        self.assertIn("Command exit: 0", terminal)
+
+    def test_cluster_resume_posts_a_redacted_terminal_output_summary(self):
+        job_id = "a1b2c3e7"
+        job_dir = lifecycle.JOB_DIR / job_id
+        job_dir.mkdir()
+
+        def spawn_with_output(cmd, output_path, cwd=None, env=None):
+            self.assertIn("K3DM_RESUME=1", cmd)
+            Path(output_path).write_text("Resumed checkpoint\npassword=hidden-value\n")
+            return 5151
+
+        original_waitpid = lifecycle.os.waitpid
+        original_killpg = lifecycle.os.killpg
+        lifecycle._spawn_job = spawn_with_output
+        lifecycle._posix_spawn_job = spawn_with_output
+        lifecycle.os.waitpid = lambda pid, _options: (pid, 0)
+        lifecycle.os.killpg = lambda *_args: None
+        lifecycle._redact_secrets = lambda text: text.replace("hidden-value", "[REDACTED]")
+        try:
+            lifecycle._run_cluster_resume(job_id, provider="aws")
+        finally:
+            lifecycle.os.waitpid = original_waitpid
+            lifecycle.os.killpg = original_killpg
+
+        terminal = self.notifications[-1][1]
+        self.assertIn("cluster-resume* (aws)", terminal)
+        self.assertIn("Command exit: 0", terminal)
+        self.assertIn("Resumed checkpoint", terminal)
+        self.assertIn("REDACTED", terminal)
+        self.assertNotIn("hidden-value", terminal)
+
     def test_cluster_timeout_escalates_to_sigkill(self):
         job_id = "a1b2c3e2"
         job_dir = lifecycle.JOB_DIR / job_id
