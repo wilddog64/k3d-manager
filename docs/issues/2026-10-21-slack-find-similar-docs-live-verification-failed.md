@@ -28,6 +28,8 @@ The live attempt failed. In the landed source, the relay acknowledgment is `Requ
 Deployment baseline for this investigation is `k3d-manager-v1.43.5`, not `main`. The inspected checkout contains both fixes (`74d79eac`, `997587d6`) and the current source path is internally consistent:
 
 - `workers/slack-relay/index.js:parseK3dm` preserves unkeyed words as part of free-text `Q`; its slash-command response is `Request received for make …; validating…`.
+- For thread replies, `bin/k3dm-webhook:_handle_thread_command` uses `shlex.split`, so `Q="what's recent e2e-remote issues"` becomes one argument; the Slack quote characters are syntax and the apostrophe remains part of the value.
+- Both entrypoints send the target/args to the webhook's `/api/v1/make` handler, which calls `parse_make_request` and enforces target, role, required/optional key, and Q validation before starting the job.
 - `scripts/lib/webhook/make_targets.py` accepts printable ASCII for `Q`, including apostrophes, with a 200-character maximum.
 - `scripts/lib/webhook/lifecycle.py:_make_target_argv` base64-encodes `Q` before passing it across Make's recipe boundary.
 - `Makefile` target `find-similar-docs` decodes `Q_B64` and passes the result to `scripts/find-similar-docs.py` as one argv value after `--`.
@@ -35,6 +37,34 @@ Deployment baseline for this investigation is `k3d-manager-v1.43.5`, not `main`.
 - `make restart-webhook` kickstarts the local `com.k3d-manager.webhook` LaunchAgent, then invokes `restart-cloud-bridge`. The webhook launchd plist uses the checkout's `bin/k3dm-webhook` and repository root; the restart is needed to reload changed Python files.
 
 No remaining code defect was found in the current slash-command Q parsing, validation, or Make transport path. The screenshot's `Queuing make …` acknowledgment and `invalid value for Q` error conflict with current relay/backend behavior, so an older or mixed rollout is a plausible explanation. The screenshot does not identify the responding component or show the exact query, so this is not proof that rollout/restart was skipped. No endpoint in the inspected source exposes the active worker or webhook source revision; runtime revisions remain unconfirmed.
+
+### Read-only rollout checks
+
+The current `/api/v1/health` response contains service names, health booleans, and details only (`bin/k3dm-webhook`, health route); it has no build, Git, or source revision field. A successful health response confirms reachability, not which checkout is serving requests. On the webhook host, these read-only commands establish the LaunchAgent's configured executable/repository path and compare that checkout with the required release commits:
+
+```sh
+launchctl print "gui/$(id -u)/com.k3d-manager.webhook"
+plutil -p "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+git -C /path/from/the/launchd/ProgramArguments/repository rev-parse --show-toplevel
+git -C /path/from/the/launchd/ProgramArguments/repository rev-parse --abbrev-ref HEAD
+git -C /path/from/the/launchd/ProgramArguments/repository rev-parse HEAD
+git -C /path/from/the/launchd/ProgramArguments/repository merge-base --is-ancestor 74d79eac HEAD
+git -C /path/from/the/launchd/ProgramArguments/repository merge-base --is-ancestor 997587d6 HEAD
+git -C /path/from/the/launchd/ProgramArguments/repository status --short --branch
+```
+
+Use the repository path found in the plist rather than assuming the interactive shell's current directory. These checks identify the configured checkout and its current source, but cannot prove that an already running process loaded that source after its last restart. The health route does not report a process build revision.
+
+For the relay, inspect the Cloudflare Worker deployment history for `k3dm-slack-relay` (**Workers & Pages → k3dm-slack-relay → Deployments**) or use the read-only Wrangler command from this checkout:
+
+```sh
+cd workers/slack-relay
+npx --yes wrangler deployments list
+```
+
+Deployment history can identify active version IDs, traffic allocation, and deployment time. The current Worker source does not expose its Git commit or an application version endpoint, so a version ID alone cannot prove that `74d79eac`/`997587d6` source was deployed. Correlate the active deployment time with rollout records/operator evidence; do not infer a stale Worker from the initial Slack acknowledgment.
+
+If rollout is needed, run the documented commands from the confirmed release checkout. `make deploy-worker` deploys the source under that checkout's `workers/slack-relay` and performs its smoke request. `make restart-webhook` kickstarts the webhook LaunchAgent and also the cloud bridge when installed. These commands mutate deployment state and are for the operator only; they were not run during this investigation.
 
 ## Follow-up
 
