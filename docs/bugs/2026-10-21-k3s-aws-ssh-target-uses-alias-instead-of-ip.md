@@ -1,0 +1,82 @@
+# Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
+
+**Filed:** 2026-10-21 (operator live `make up` output)
+**Status:** OPEN — dispatching fix; live verification pending
+**Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
+**Severity:** high
+**Release:** v1.43.5 (bug; exempt from plan cap)
+**Branch:** `k3d-manager-v1.43.5`
+**Component:** `scripts/etc/k3s/vars.sh`, `scripts/plugins/shopping_cart.sh`, `scripts/lib/foundation/scripts/lib/acg/acg.sh`
+**Related:** `docs/bugs/2026-10-21-k3s-aws-ssh-readiness-timeout-hides-failure-cause.md`
+
+## Reproduction and evidence
+
+During a fresh ACG `make up CLUSTER_PROVIDER=k3s-aws`, CloudFormation succeeded and
+the provisioning code printed the server's public IP and updated the local SSH
+configuration for `Host ubuntu`. The subsequent k3s install nevertheless invoked
+SSH readiness against the literal alias `ubuntu`:
+
+```text
+INFO: [acg] Updating SSH config with IP 44.247.81.210
+INFO: [acg] Server:  44.247.81.210
+INFO: [k3s-aws] Installing k3s server + joining agents...
+INFO: [shopping_cart] Installing k3s on ubuntu@ubuntu via k3sup...
+WARN: [shopping_cart] ssh-keyscan ubuntu not ready after 120s — k3sup may prompt
+ERROR: [shopping_cart] SSH readiness failed for ubuntu@ubuntu after 180s (budget 180s): hostname resolution failed; not starting k3sup
+```
+
+The classification is direct SSH stderr evidence. It does not establish an EC2
+boot, network, or sshd failure. The CloudFormation stack remains running and
+billable after this failed bring-up; do not destroy or recreate it as part of the
+code task.
+
+## Root cause
+
+`scripts/etc/k3s/vars.sh` eagerly exports:
+
+```bash
+export UBUNTU_K3S_EXTERNAL_IP="${UBUNTU_K3S_EXTERNAL_IP:-${UBUNTU_K3S_SSH_HOST}}"
+```
+
+with `UBUNTU_K3S_SSH_HOST` defaulting to `ubuntu`. This makes
+`UBUNTU_K3S_EXTERNAL_IP=ubuntu` a nonempty value at source time. In
+`deploy_app_cluster`, the SSH config lookup is conditional on the external-IP
+variable being empty, so the freshly provisioned `Host ubuntu` `HostName` value
+is never read. The diagnostics fix correctly exposed the resulting DNS failure;
+the failure is in target selection, not proven instance readiness.
+
+## Expected behavior
+
+For the k3s-aws provisioning path, resolve the SSH destination to the provisioned
+server address or the current `Host ubuntu` `HostName`, and use that same
+destination consistently for the readiness probe and `k3sup --ip`. Preserve
+intentional explicit `UBUNTU_K3S_EXTERNAL_IP` overrides and non-AWS provider
+behavior. If the configured target cannot be resolved, fail early with a clear,
+safe diagnostic rather than waiting the full SSH timeout against an alias as an IP.
+
+## Acceptance
+
+- Regression test proves a source-time default alias does not mask the current
+  `Host ubuntu` IP after ACG provisioning.
+- Readiness probe and `k3sup --ip` use the same resolved destination.
+- An explicit operator-provided `UBUNTU_K3S_EXTERNAL_IP` remains authoritative.
+- Existing SSH readiness fail-closed behavior remains: no k3sup invocation until
+  SSH succeeds.
+- Existing non-AWS provider contracts and SSH host-alias operations remain intact.
+- No AWS, SSH, or live cluster mutation is performed by offline tests.
+
+## Verification / live status
+
+The live failure was observed before k3sup and before Argo CD registration. The
+new diagnostic fix is already offline-verified separately, but it cannot address
+this target-selection defect. Live verification of this bug requires a future
+operator-approved ACG bring-up; no live verification is claimed here.
+
+## Scope for dispatch
+
+Inspect sourcing and override contracts, fix the stale/defaulted target precedence,
+and add focused offline regression coverage. Do not edit unrelated provider code,
+do not run `make up`/`make down`, and do not modify or delete the currently running
+CloudFormation stack. Commit and push on `k3d-manager-v1.43.5` through the normal
+dispatcher workflow; after offline verification, leave live verification to the
+operator.
