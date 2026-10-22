@@ -4,7 +4,7 @@
 **Status:** OPEN — source-level naming mismatch confirmed; rename not implemented
 **Priority:** P3 — command clarity and safe operator expectations
 **Severity:** low
-**Approval:** operator approved filing this P3 bug on 2026-10-21; implementation not approved
+**Approval:** operator approved filing on 2026-10-21 and implementation dispatch on 2026-10-22
 **Release:** v1.43.5 (bug; exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Found by:** operator reviewing `/k3dm targets` command help
@@ -111,6 +111,17 @@ interface:
   - docs/howto/slack-slash-commands.md
   - docs/howto/cloud-session-requests.md
   - associated command/role/cloud-bridge tests
+
+## Files
+
+- `Makefile`
+- `scripts/lib/webhook/make_targets.py`
+- `scripts/lib/webhook/cloud_actions.py`
+- `scripts/tests/bin/webhook_make_targets.py`
+- `scripts/tests/bin/makefile_webhook_slack.bats`
+- `scripts/tests/bin/test_cloud_bridge.py`
+- `docs/howto/slack-slash-commands.md`
+- `docs/howto/cloud-session-requests.md`
 ```
 
 ## Definition of Done

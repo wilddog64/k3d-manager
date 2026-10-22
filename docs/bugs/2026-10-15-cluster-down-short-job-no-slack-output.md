@@ -6,6 +6,7 @@
 **Priority:** P3 — ChatOps observability / operator feedback
 **Severity:** low
 **Approval:** explicit operator request to file this bug, 2026-10-15
+**Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
 **Evidence:** Slack screenshot of AWS ACG sandbox teardown job `b0e9616d`, which reported `cluster-down (aws) — success in 1m` with no execution details.
 
 ## Symptom
@@ -39,5 +40,11 @@ This is a **confirmed short-job notification coverage gap**, distinct from the s
 - Empty output, output containing secrets, excessively long output, nonzero exit and timeout paths each have safe, informative terminal behavior.
 - The completion summary correctly labels **command success** versus **verified external teardown**, where separate verification is unavailable.
 - No real AWS lifecycle operation is run in automated tests.
+
+## Files
+
+- `scripts/lib/webhook/lifecycle.py`
+- `scripts/tests/bin/webhook_lifecycle.py`
+- `scripts/tests/lib/webhook.bats`
 
 **Implementation:** not started. No AWS resources or live job were modified when this bug was filed.

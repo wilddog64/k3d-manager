@@ -5,6 +5,7 @@
 **Priority:** P3 — misleading observability visualization; check status and collection remain functional
 **Severity:** low
 **Approval:** operator explicitly requested filing a P3 bug on 2026-10-21; implementation not yet approved
+**Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
 **Release:** v1.43.5 (bug; exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`, `scripts/lib/hermes/pr_checks.py`, corresponding PR-check tests and dashboard guide
@@ -104,6 +105,14 @@ interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml (panel 8; preserve panel 6)
   - scripts/tests/plugins/grafana_dashboard_pr_checks.bats and relevant Python collector tests
   - docs/guides/grafana-dashboards.md
+
+## Files
+
+- `scripts/lib/hermes/pr_checks.py`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
+- `scripts/tests/hermes/test_pr_checks.py`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
+- `docs/guides/grafana-dashboards/k3dm-pr-checks.md`
 ```
 
 ## Definition of Done

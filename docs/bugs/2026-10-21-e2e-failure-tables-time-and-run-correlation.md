@@ -4,6 +4,7 @@
 **Priority:** P3 — observability usability / audit correlation, no evidence of test execution failure
 **Release:** v1.43.5
 **Branch:** `k3d-manager-v1.43.5`
+**Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
 **Filed:** 2026-10-21, at operator request
 **Approval:** operator requested "go ahead to file P3" for the Recent runs / Failure groups / Failure details discrepancy, with established instruction to commit directly to current release branch and no PR
 **Component:** E2E Verification Grafana dashboard, E2E result exporter/metrics
@@ -65,4 +66,11 @@ The failure panels omit the `$service` variable that Recent runs applies. All ar
 - [ ] Run timestamps and resolution status are available alongside failures, and run-ID cross-panel triage is usable.
 - [ ] Offline tests pass with evidence recorded; perform separate operator-approved live verification before marking live-verified.
 - [ ] Update dashboard documentation and relevant changelog as part of the eventual fix.
-- [ ] Keep this filing documentation-only. No PR, merge, deployment, exporter restart, or runtime changes are authorized by the filing request.
+- [ ] Keep live Grafana verification, deployment, exporter restart, and runtime changes separate from the offline implementation dispatch.
+
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-e2e.yaml`
+- `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`
+- `scripts/tests/plugins/e2e_observability.bats`
+- `docs/guides/grafana-dashboards/e2e-verification.md`

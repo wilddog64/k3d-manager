@@ -4,7 +4,7 @@
 **Status:** OPEN — evidence from Grafana screenshot and dashboard source; implementation not started
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
-**Approval:** operator requested filing a P3 bug on 2026-10-21; no implementation authorization
+**Approval:** operator requested filing on 2026-10-21 and offline implementation dispatch on 2026-10-22
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Found by:** operator, Grafana at approximately 13:40 PDT on 2026-10-21
@@ -105,7 +105,14 @@ interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml
   - scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml
   - scripts/tests/plugins/grafana_dashboard_appsets.bats
-  - docs/guides/grafana-dashboards.md
+  - docs/guides/grafana-dashboards/shared-operations.md
+
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`
+- `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`
+- `scripts/tests/plugins/grafana_dashboard_appsets.bats`
+- `docs/guides/grafana-dashboards/shared-operations.md`
 ```
 
 ## Definition of Done
