@@ -250,6 +250,9 @@ def test_cluster_up_progress_and_terminal_payloads_keep_parent_thread(
     assert "still running" in payloads[1]["text"]
     terminal = payloads[-1]["text"]
     assert ("success" if exit_status == 0 else "failed") in terminal
+    if exit_status != 0:
+        assert "Failure analysis" in payloads[2]["text"]
+        assert f"job `{child_id}`" in payloads[2]["text"]
 
 
 @pytest.mark.parametrize("worker_name", ["_run_cluster_refresh", "_run_hostinger_refresh"])
@@ -334,6 +337,46 @@ def test_thread_delivery_fallback_records_redacted_reason_and_keeps_parent(
     assert delivery["thread_ts"] == "1700000000.000001"
     assert delivery["reason"] == "thread_post_rejected"
     assert "private-token" not in (job_dir / "delivery.jsonl").read_text()
+
+
+def test_response_url_failure_never_anchors_job_in_unrelated_default_channel(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(wh, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "xoxb-test")
+    monkeypatch.setattr(wh, "SLACK_CHANNEL_ID", "C-DEFAULT")
+    monkeypatch.setattr(wh, "SLACK_WEBHOOK_URL", "")
+    job_dir = tmp_path / "response-job"
+    job_dir.mkdir()
+    (job_dir / "response_url").write_text("https://hooks.slack.com/services/private")
+    response_posts = []
+    bot_posts = []
+
+    def response_post(url, text, thread_ts=None):
+        response_posts.append((url, text, thread_ts))
+        return len(response_posts) > 1
+
+    monkeypatch.setattr(wh, "_slack_post", response_post)
+    monkeypatch.setattr(
+        wh, "_post_slack_bot",
+        lambda text, thread_ts=None, channel_id=None:
+            bot_posts.append((text, thread_ts, channel_id)) or "UNRELATED-TS",
+    )
+
+    assert wh._notify_job("response-job", "first") is False
+    assert wh._notify_job("response-job", "failure analysis — job `response-job`") is True
+
+    assert response_posts == [
+        ("https://hooks.slack.com/services/private", "first", None),
+        ("https://hooks.slack.com/services/private", "failure analysis — job `response-job`", None),
+    ]
+    assert bot_posts == []
+    assert not (job_dir / "thread_ts").exists()
+    records = [json.loads(line) for line in (job_dir / "delivery.jsonl").read_text().splitlines()]
+    assert [record["route"] for record in records] == ["response_url", "response_url"]
+    assert [record["delivered"] for record in records] == [False, True]
+    assert all(record["thread_ts"] is None for record in records)
+    assert "private" not in (job_dir / "delivery.jsonl").read_text()
 
 
 def test_kill_still_dispatches(dispatch_env, monkeypatch):

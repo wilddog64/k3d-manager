@@ -1288,7 +1288,13 @@ def _notify_job(job_id, text):
                 failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
         # A configured default channel cannot safely receive a reply whose
         # originating Slack channel is unknown. Preserve the requested thread.
-        if not posted and SLACK_BOT_TOKEN and (channel_id or (not thread_ts and SLACK_CHANNEL_ID)):
+        # A response_url without channel_id belongs to its originating
+        # conversation, which may be a channel thread or an ephemeral route.
+        # Starting a thread in the configured default channel would create an
+        # unrelated parent timestamp that later response_url posts cannot use.
+        if not posted and SLACK_BOT_TOKEN and (
+            channel_id or (not thread_ts and not response_url and SLACK_CHANNEL_ID)
+        ):
             route = "bot_fallback"
             ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id or SLACK_CHANNEL_ID)
             if not ts:
