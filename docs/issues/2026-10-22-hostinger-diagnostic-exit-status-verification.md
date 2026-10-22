@@ -2,7 +2,9 @@
 
 **Task:** `hostinger-diagnostic-exit-status-fix`
 **Fix:** `6be25c92` on `k3d-manager-v1.43.5`
-**Scope:** Offline classification of explicit `/api/v1/diagnostics` command exit status only. No Hostinger, AWS, Kubernetes, Argo CD authentication, or Slack live operation was performed.
+**Scope:** Explicit `/api/v1/diagnostics` command exit-status classification. Offline verification is recorded below; operator-provided cloud-agent evidence now confirms the deployed diagnostic reports the failing result. No infrastructure mutation was performed.
+
+**Live verification — 2026-10-22:** The operator supplied a cloud-agent Slack screenshot for the safe read-only `describe-pod` probe against the unique nonexistent pod `codex-verify-nonexistent-diagnostic-pod-20261022` on provider `hostinger`. The response displayed Kubernetes `NotFound` for that pod. The operator confirmed this is the live check for this classification fix and requested it be marked LIVE-VERIFIED. This verifies the deployed diagnostic failure path only; it does not verify the historical Hostinger outage or establish its root cause. The screenshot shows the diagnostic error body, not a separate job-status field.
 
 Focused pytest and full webhook BATS output from the dispatcher landing gate:
 
