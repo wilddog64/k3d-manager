@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-21
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** OPEN — exact plain-text valid IDs are confirmed in Slack search; current checkout accepts them in focused tests, but the live runtime intermittently returned usage; root cause still unknown
+**Status:** OPEN — offline Slack Events-path regression coverage and redacted rejection diagnostics are landed and verified; the historical/live intermittent rejection remains unexplained pending operator verification
 **Priority:** P2 — ChatOps observability / job transcript retrieval
 **Component:** Slack thread command parsing and webhook job log lookup
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (explicit ID lookup fix is LIVE-VERIFIED; preserve it); `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md` (query execution is LIVE-VERIFIED)
@@ -66,6 +66,7 @@ the webhook process/version or its internal parsed argument representation.
 - Focused tests for explicit `logs`/`status` IDs and cross-thread/channel rejection passed 5/5 against this checkout (`pytest -q scripts/tests/bin/test_webhook_thread_dispatch.py -k 'status_requires_exact_thread_job_id or status_explicit_id_resolves_once_and_ignores_mtime or logs_explicit_id_reads_requested_child or logs_rejects_cross_thread_explicit_id or logs_rejects_cross_channel_explicit_id_through_parent'`). These unit tests exercise the thread handler, not the live Slack Events request or its process/runtime selection.
 - Follow-up local Events-path regression now exercises exact `logs aabbccdd` through `_Handler.do_POST`, `_find_job_by_thread_ts`, the guarded thread worker, and the explicit-ID resolver for both `find-similar-docs` and `test-all`, using the same thread/channel context. The focused selector including these cases passed 7/7; the complete `test_webhook_thread_dispatch.py` module passed 36/36. This proves the current checkout routes both target records correctly, but does not identify the historical event payload or live serving code that produced the usage replies.
 - Malformed or missing explicit-target arguments now emit a reason-coded warning with only the normalized command name, rejection reason, and token count. No message body, ID, response URL, credentials, or transcript content is logged. This instrumentation can distinguish malformed argument count from an invalid ID in future runtime logs; no such historical logs are available to classify the reported events.
+- Landed diagnostic/regression change: `7e176833` on `k3d-manager-v1.43.5`. Independent verification: `pytest -q scripts/tests/bin/test_webhook_thread_dispatch.py` passed 36/36; Python AST parse, `git diff --check`, `_agent_audit`, `_agent_lint`, and `make check-doc-links` passed (`2300 file(s) OK`); dispatcher landing gate passed. A local `py_compile` attempt could not write its cache under the isolated task worktree (`Operation not permitted`); AST parsing passed instead. This verifies current source behavior and safe diagnostics, but does not establish why the historical Slack events were parsed differently or confirm the deployed webhook revision.
 - The local LaunchAgent plist's `ProgramArguments` points at `/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-webhook`. This establishes the configured path, not the code revision loaded by the process at the time of the Slack events. `launchctl list` produced no matching service row in this session, and `pgrep` could not inspect processes (`sysmon request failed with error: sysmond service not found`); the active process/revision therefore remains unverified.
 - This usage branch runs before job-directory lookup. The response does **not** establish that the job directory or transcript is absent, expired, or malformed.
 - The `find-similar-docs` API Make path creates a normal eight-hex job directory, writes its target marker and available Slack thread/channel metadata, and uses the common `_run_make_target()` writer for `make.log`. The thread `logs` handler is target-agnostic after explicit ID resolution. Static inspection found no target-specific exclusion for `find-similar-docs`.
@@ -78,7 +79,7 @@ the webhook process/version or its internal parsed argument representation.
 3. Determine whether a stale or duplicate webhook process/runtime can account for the intermittent replies. This requires evidence; the plist path alone is not proof of the running revision.
 4. Implement the narrowest source fix supported by a reproducing test. If current code remains correct and the cause is strictly deployment/runtime state, report that and document the exact operator-safe confirmation/restart path rather than changing command semantics.
 
-No live commands were triggered by this report; reproduction remains operator-controlled.
+No live commands were triggered by this report. The instrumentation is now landed, but the original symptom remains open until an operator tests the updated webhook process and confirms exact-ID lookup behavior (or captures a reason-coded warning for a rejected command).
 
 ## Expected behavior
 

@@ -27,6 +27,7 @@
 ## 2026-10-21 intermittent Slack job lookup investigation
 
 - Slack history search confirms the exact visible messages `logs 08ae7d06` and `status 08ae7d06` each received usage; a later identical `logs 013fdfe9` was rejected once and succeeded on retry. Therefore ellipsis-only does not explain the issue. The current checkout parser and handler tests accept exact eight-hex IDs; focused tests passed 5/5. The user's LaunchAgent plist points to this checkout, but the active process/runtime revision could not be confirmed (`launchctl list` returned no matching service row; `pgrep` failed because sysmon is unavailable). Canonical P2 was updated with Slack permalinks, confirmed findings, and bounded regression/runtime investigation scope. Dispatch is next; no restart/deployment or live mutation was performed.
+- Completed dispatch `slack-job-lookup-intermittent-usage`, landed as `7e176833`, and pushed on `k3d-manager-v1.43.5`. The change adds redacted rejection diagnostics and Events-path tests for `find-similar-docs` plus `test-all`. Independent pytest passed 36/36; AST parse, `git diff --check`, `_agent_audit`, `_agent_lint`, doc links (2300 files), and dispatcher landing gate passed. The canonical bug remains OPEN because the historical cause and active webhook revision are not established; operator should test exact-ID logs/status after the updated webhook is active and capture the corresponding redacted warning if usage recurs.
 
 ## 2026-10-21 Slack multi-job thread-targeting verification
 
