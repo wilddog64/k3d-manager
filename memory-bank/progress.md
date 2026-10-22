@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-22 firing-alert dashboard live-review follow-up
+
+- Operator's Grafana screenshot found the landed per-instance panel too wide, with confusing raw labels (`__name__`, `group`, `tier`) and an epoch-like active timestamp that does not represent CVE detection time. Reopened the canonical P3 and scoped approved dispatch to compact general active-alert context plus a separate CVE finding view using VulnerabilityReport creation time, explicitly labeled **Report created at (UTC)**. True first-detected history remains out of scope. No implementation/deployment/live mutation was performed; operator live-verification approval remains separate.
+
 ## 2026-10-22 current-release P3 batch verification
 
 - Independently verified and landed five dispatched fixes on `k3d-manager-v1.43.5`: cluster-down Slack terminal summaries (`870831a4`), E2E failure-table run correlation (`73819c18`), firing-alert instance active-since/age (`63d53576`), PR-check completion timestamps (`b77a4093`), and read-only vulnerability report command naming (`bb0b95a7`).

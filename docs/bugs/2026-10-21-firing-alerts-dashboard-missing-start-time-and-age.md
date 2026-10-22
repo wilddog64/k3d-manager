@@ -1,17 +1,17 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** VERIFIED — offline tests passed; live Grafana verification pending
+**Status:** OPEN — live Grafana review found the implemented table is too wide and its time field is not a CVE detection timestamp; follow-up dispatch approved 2026-10-22
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
-**Approval:** operator requested filing on 2026-10-21 and offline implementation dispatch on 2026-10-22
+**Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Found by:** operator, Grafana at approximately 13:40 PDT on 2026-10-21
-**Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`, `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`, `scripts/tests/plugins/grafana_dashboard_appsets.bats`, `docs/guides/grafana-dashboards.md`
+**Component:** Grafana alert and Trivy vulnerability panels; vulnerability inventory exporter
 **Related:** `docs/bugs/2026-10-02-grafana-overview-firing-alerts-and-request-rate-no-data.md`, `docs/bugs/2026-10-02-grafana-overview-readable-title-collides-with-stock-dashboard.md`
 
-## Problem
+## Initial finding and live follow-up
 
 The **Grafana Health & Firing Alerts** dashboard reports **41** firing Prometheus alerts, with its
 **Firing Alerts by Category** table grouped into:
@@ -20,10 +20,19 @@ The **Grafana Health & Firing Alerts** dashboard reports **41** firing Prometheu
 - `HostDiskMetricsStale` — hub 1
 - `TargetDown` — acg 1
 
-The table currently exposes **Category, Alert, Severity, Cluster, Count** but not **Fired at**
-or **Firing for**. An operator cannot distinguish longstanding upstream-image CVE alerts
-from newly firing operational warnings or determine when a `TargetDown` instance started.
-The headline count alone does not establish recency or duration.
+The original aggregate table exposed **Category, Alert, Severity, Cluster, Count** but not
+time or duration. Offline follow-up `63d53576` added a per-alert table. The operator's live
+Grafana screenshot on 2026-10-22 verified the panel is present, but found that it is too wide
+and exposes raw labels with unclear meaning: `__name__` repeats `ALERTS_FOR_STATE`, while
+`group` and `tier` are not useful operator-facing fields. The displayed time is epoch-like,
+and the panel title does not answer when a CVE was detected. This is a presentation and
+timestamp-provenance defect, not evidence that alerts or CVE detection are failing.
+
+The user accepted a two-view design: retain a compact general alert-instance view, and add a
+separate CVE-focused view with a clearly labeled VulnerabilityReport report-created time.
+That report timestamp must not be presented as the first time the vulnerability was detected.
+True first-seen time would require persisted historical state and is explicitly outside this
+dispatch.
 
 ## Source diagnosis / constraints
 
@@ -31,45 +40,44 @@ The dashboard's existing table aggregates `ALERTS{alertstate="firing"}` by
 alert category/name/severity/cluster. Aggregation discards individual alert-instance
 identity and timing; `ALERTS` itself is a state gauge, not a firing-start timestamp.
 
-`ALERTS_FOR_STATE` can indicate when a rule entered its pending/active state, which
-may precede its transition to *firing* when the rule defines `for:`. Therefore
-`time() - ALERTS_FOR_STATE` must **not** be labeled as exact firing age.
-Prometheus rule API `activeAt` likewise may denote active/pending entry.
-Alertmanager alert `startsAt` and/or event-state data may be more appropriate,
-subject to validating semantics on the deployed Prometheus/Alertmanager version.
+`ALERTS_FOR_STATE` stores the rule's active timestamp as a Unix epoch. It can precede
+the firing transition when the rule defines `for:`. Therefore this value and its duration
+must be clearly labeled **Active since (UTC; pending included)** and **Active for**; neither
+is an exact firing start or CVE detection time. The Trivy alert rule has a `for: 15m`.
+The current inventory exporter reads VulnerabilityReport objects and finding details, but
+does not expose the report's `metadata.creationTimestamp`.
 
 This bug is about exposing reliable temporal context. It does not assert that
 any alert rule, notification, or ingestion pathway is failing.
 
 ## Expected behavior
 
-Keep the current aggregated category counts, but provide an accessible view of each
-*firing alert instance* with:
+Keep the current aggregated category counts and deliver two focused detail views:
 
-- alert name, severity, cluster, and identifying labels or a link to its detail;
-- **Fired at** timestamp and **Firing for** duration derived from a source whose
-  semantics really represent firing (or clearly relabel an earlier `active/pending since`
-  timestamp if precise firing time is unavailable);
-- unambiguous timezone, timestamp provenance, and safe fallback when timing is unavailable.
+- A compact general alert-instance table with an allowlist of useful columns (alert,
+  severity, cluster, and only necessary instance identifiers), readable **Active since**
+  UTC date/time and **Active for** duration. Hide `__name__`, `group`, `tier`, and other
+  irrelevant/raw labels; retain an explicit pending-included caveat.
+- A separate bounded CVE finding table with CVE ID, severity, cluster, namespace, image,
+  package, installed/fixed version, and **Report created at (UTC)** sourced from the
+  VulnerabilityReport `metadata.creationTimestamp`. Do not call this field “Detected at,”
+  “First seen,” or imply it is the vulnerability's initial detection time.
 
-Optionally add a last-24-hour state/timeline view for alert transitions, if event history
-is available and retention/cardinality are suitable. Do not invent a resolved timestamp
-for a presently firing alert.
+True first-detected time needs retained historical state and is out of scope. Do not add a
+timeline or invent a resolved/first-seen timestamp.
 
 ## Proposed fix scope
 
-1. Determine the source and exact semantics of timestamps for the deployed
-   Prometheus + Alertmanager stack. Verify whether Alertmanager `startsAt`,
-   Prometheus rule state, or another existing metric/API supplies the required timing.
-2. Preserve the aggregate **Firing Alerts by Category** panel. Add a bounded
-   per-instance detail table or drilldown that separates individual instances
-   (especially the 39 Trivy CVE findings) rather than pretending one grouped row
-   has one shared firing start.
-3. Use correctly labeled **Fired at** and **Firing for**, or disclose a fallback
-   such as **Active since (includes pending)**. Avoid misleading exactness.
-4. Design safe access to the data; never embed bearer tokens in dashboard JSON,
-   widen external access, or expose sensitive alert labels unnecessarily.
-5. Add offline source/query/shape tests and document where to inspect alert history.
+1. Preserve aggregate category counts and make the general alert-instance view compact,
+   human-readable, and explicitly active-since (not fired-at).
+2. Export report creation time as a numeric timestamp metric/value from the existing
+   VulnerabilityReport metadata path; do not encode timestamps as Prometheus labels.
+3. Add the dedicated CVE finding view, with bounded rows/columns and truthful report-time
+   semantics. Do not add first-detected history in this work.
+4. Keep the two embedded dashboard definitions synchronized; update exporter/dashboard
+   regression tests and the Trivy/shared-operations guidance.
+5. Preserve credential secrecy, avoid unnecessary sensitive labels/cardinality, and do not
+   change alert rules, routing, receivers, or production resources.
 
 ## Acceptance
 
@@ -78,13 +86,15 @@ must:
   - id: M1
     text: The existing aggregated Firing Alerts by Category counts remain available and correct.
   - id: M2
-    text: Operators can inspect each currently firing alert instance's grounded start-time context and elapsed duration, with an explicit timezone.
+    text: General alert rows show an allowlisted compact set of fields and readable Active since (UTC; pending included) plus elapsed active duration.
   - id: M3
-    text: Any timestamp labeled Fired at reflects a verified firing transition; a pending/active timestamp is labeled differently.
+    text: No active-state timestamp is labeled as firing time or CVE detection time; the caveat is visible.
   - id: M4
     text: Missing timestamps, no firing alerts, and multiple instances of one alert are handled without fabricated values.
   - id: M5
-    text: Source access, alert labels and panel/cardinality limits remain safe, and the dashboard guide documents semantics.
+    text: A separate CVE detail view exposes VulnerabilityReport creation time labeled Report created at (UTC), plus useful finding context.
+  - id: M6
+    text: Source access, labels, cardinality, row limits, and dashboard definitions remain safe and synchronized; guides document semantics.
 must_not:
   - id: N1
     text: Aggregated Trivy findings are assigned one invented common start time.
@@ -95,36 +105,47 @@ must_not:
 evidence:
   - id: E1
     kind: offline
-    proves: [M1, M2, M3, M4, M5, N1, N2, N3]
-    text: Fixtures cover distinct alerts, distinct instances of one rule, a rule with a pending for interval, missing timestamp, and zero alerts; dashboard tests pass and show red on pre-fix representation.
+    proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3]
+    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, compact allowlisted fields, readable UTC/time units, limits, and synchronized dashboard definitions.
   - id: E2
     kind: live
     proves: [M1, M2, M3, M4]
-    text: After separately approved rollout, compare at least one Trivy instance and one operational warning against authoritative API timestamps while the current aggregate totals remain correct.
+    text: After separately approved rollout, confirm the compact general alert view and compare a CVE row's Report created at value to its VulnerabilityReport metadata.creationTimestamp; verify aggregate counts remain correct. This does not verify first-detected time.
 interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml
   - scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml
   - scripts/tests/plugins/grafana_dashboard_appsets.bats
+  - scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml
+  - scripts/tests/plugins/e2e_observability.bats
   - docs/guides/grafana-dashboards/shared-operations.md
+  - docs/guides/grafana-dashboards/trivy-security.md
 
 ## Files
 
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`
 - `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`
 - `scripts/tests/plugins/grafana_dashboard_appsets.bats`
-
-## Verification (2026-10-22)
-
-Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` passed 44/44; `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats`, `_agent_lint`, `_agent_audit`, and `git diff --check` passed. Live Grafana verification remains pending; this is not LIVE-VERIFIED.
+- `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`
+- `scripts/tests/plugins/e2e_observability.bats`
 - `docs/guides/grafana-dashboards/shared-operations.md`
-```
+- `docs/guides/grafana-dashboards/trivy-security.md`
+
+## Previous verification (2026-10-22)
+
+Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` passed 44/44; `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats`, `_agent_lint`, `_agent_audit`, and `git diff --check` passed. The live screenshot subsequently showed the implementation did not meet usability/provenance expectations, so this result is historical offline evidence only; do not treat the issue as resolved or LIVE-VERIFIED.
+
+## Follow-up dispatch approval (2026-10-22)
+
+- Live finding: generic table is too wide; `__name__` repeats the metric name; `group`/`tier` are unclear/noisy; displayed timestamp is epoch-like; no CVE report/detection time is shown.
+- Approved disposition: compact generic active-alert context plus a separate CVE-focused finding table with VulnerabilityReport creation timestamp, explicitly not first-detected time.
+- Dispatch scope is the `interface` list and `Files` below. Tests must cover timestamp provenance, absent timestamps, field selection/units, limits, and synchronized dashboard payloads. No deployment/live mutation is authorized by this dispatch.
 
 ## Definition of Done
 
-- [ ] Timestamp provenance and pending-versus-firing semantics documented.
-- [ ] Firing alert details expose correct per-instance time/age and retain summary counts.
-- [ ] Targeted dashboard/query tests and pre-fix regression demonstration attached.
-- [ ] Operator separately approves implementation and live verification E2.
+- [ ] Active-since versus firing and report-created versus first-detected semantics are explicit.
+- [ ] Generic table is compact/readable; separate CVE detail uses report creation time and retains aggregate counts.
+- [ ] Targeted exporter/dashboard tests cover timestamp provenance, missing values, field selection, bounds, and synchronized definitions.
+- [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
 - [ ] Record fix SHA, verification evidence and status transition in this bug.
 
 ## What NOT to Do
@@ -133,3 +154,4 @@ Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats
 - Do NOT deploy anything or modify implementation code as part of filing.
 - Do NOT infer firing timestamps from the screenshot's 41-alert count.
 - Do NOT add unbounded per-alert Prometheus labels or expose credentials in Grafana.
+- Do NOT claim VulnerabilityReport creation time is the CVE's first-detected time; historical first-seen tracking is out of scope.
