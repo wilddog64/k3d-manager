@@ -840,6 +840,56 @@ when predecessor releases are ready and the operator approves implementation.
 
 ---
 
+### Candidate milestone — v2.7.x: Account Abuse & Fraud Risk Detection (application-level)
+
+**Proposed 2026-10-22 (operator suggested placement in v2.0.x; roadmap candidate only).**
+Explore reusable **account-abuse detection** for an account-based e-commerce or marketplace
+reference application. This is application-security and data-science work, **not** Falco
+runtime IDS, Istio network security or automatic blocking by k3d-manager. The platform
+provides GitOps, policy gates, observability, isolated E2E and rollback; the application
+owns identities, event semantics, labels, risk decisions and consent/privacy rules.
+
+**Placement and preconditions:** Tentatively **v2.7.x**, after the planned v2.0.0
+TwinkleAI reference-app replacement and v2.5–v2.6 conversational/investigation work.
+**Do not resurrect the shopping-cart application** solely to justify this feature:
+it is slated for retirement at v2.0.0. TwinkleAI's currently proposed real-estate
+research workload may not have registration, payments, reviews or transactions. The
+first gate is to select a real account-based service/use case; otherwise defer this
+milestone or build a small, explicitly isolated synthetic fixture in a separate
+application repository. It should not expand k3d-manager's core infrastructure scope.
+
+| Candidate slice | Capability | Acceptance gate |
+|---|---|---|
+| v2.7.0 | Threat model and events contract: signup/login/session/review/promotion patterns where supported; account/device/IP velocity with privacy constraints | Explicit app ownership, schema, consent/retention policy and reproducible synthetic fixtures; no real-person data |
+| v2.7.1 | Deterministic configurable risk rules, audit trail and human review; no hard denial by default | Offline positive/negative tests, documented false-positive cases (shared IPs, families, VPNs), safe feature flags and rollback |
+| v2.7.2 | Optional statistically calibrated classifier using held-out, time-split labeled data, with uncertainty and base-rate-aware evaluation | Compare precision/recall, PR-AUC, calibration, base rates and review workload against rules-only baseline; do not ship ML without sufficient defensible labels |
+| v2.7.3 | End-to-end application integration and observability: risk decision API, review/challenge workflow, Grafana, alerting and E2E | Operator-reviewed disposable-environment tests and drift/latency/false-positive dashboards; no production account suspension until separately approved |
+
+**Non-negotiable safeguards:** Risk score is not proof of fraud; enforce minimization,
+hash/pseudonymization where applicable, scoped access, bounded storage/retention, audit
+of reviewer overrides, and meaningful recourse for legitimate users. Never send raw
+credentials, authentication secrets, full payment details or personal identifiers to
+an LLM. Do not train on synthetic labels and present the result as real fraud-detection
+accuracy; avoid leakage via random train/test splits of correlated events. Start with
+shadow scoring and review/challenge rather than irreversible automated bans. Challenge
+accessibility, operational cost, class imbalance and adversarial adaptation must be
+tested. No claim that high overall accuracy proves good fraud detection.
+
+**Success metrics:** precision at constrained review capacity, recall, false-positive
+rate for legitimate accounts, precision-recall curve, probability calibration, challenge
+completion, review burden, p95 decision latency, feature drift and rollback reliability.
+Compare performance with a rules-only baseline, stratified by relevant non-sensitive
+operational cohorts; choose numerical thresholds after collecting credible labeled
+data and assessing harms.
+
+**Release discipline:** This is a roadmap entry, not an implementation spec, branch
+creation, model deployment or authorization to process personal data. Each future
+release follows the maximum-five-plan-documents rule. Application code/specs belong
+to the chosen app repository; k3d-manager should accept only narrowly scoped GitOps,
+policy, monitoring and integration work after separate approval.
+
+---
+
 ### Candidate theme — v2.x: model economics
 
 **Proposed 2026-10-16 (operator; not yet scoped).** Compare Claude-only, Codex-only and
