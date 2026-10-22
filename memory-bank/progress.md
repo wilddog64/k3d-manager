@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-22 P2 follow-up dispatches
+
+- Updated the lifecycle Slack-thread P2 record with sanitized `aeeeb11f` delivery findings and dispatched `cluster-lifecycle-thread-recurrence-fix` for offline source audit, regression tests, and a bounded fix if the defect is reproducible.
+- Tightened the Hostinger P2 task to historical provider/API-path attribution and separate Argo CD direct-login evidence, strictly read-only; dispatched `hostinger-multi-service-incident-attribution` as the sole networked worker.
+- Both tasks were created in-scope from pushed release commit `a8a83209`. Default status reported “terminated unexpectedly,” but the sandbox denied `ps`; elevated checks confirmed both running. Details: `docs/issues/2026-10-21-p2-bug-dispatch-worker-exits.md`. No runtime recovery or lifecycle actions were performed.
+
 ## 2026-10-22 Slack explicit job-ID live verification
 
 - Operator screenshot confirms `logs 013fdfe9` returns that job's transcript and `status 013fdfe9` reports `success`. Marked `docs/bugs/2026-10-21-slack-find-similar-docs-job-logs-rejected.md` LIVE-VERIFIED. The fix landed as `ca103021`; offline thread-dispatch tests passed 43/43. Historical intermittent rejection was not reproduced in this live check.
