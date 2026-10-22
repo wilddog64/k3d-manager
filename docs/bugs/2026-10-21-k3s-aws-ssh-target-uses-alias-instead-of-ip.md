@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** LIVE-VERIFIED — lib-foundation PR #72 merged at `c307df2`, pulled into the v1.43.5 subtree, and operator `make up CLUSTER_PROVIDER=k3s-aws` passed the SSH/k3s provisioning failure point on 2026-10-21
+**Status:** VERIFIED 2026-10-22 — SSH host-block behavior and the follow-up regression coverage passed offline (57 tests, one existing skip); regression-test commit `2b83f499`. Per operator direction, this follow-up is not marked LIVE-VERIFIED.
 **Fix commit:** `205d4272`
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
@@ -134,6 +134,13 @@ Post-pull verification passed: clean-environment
 scripts/lib/foundation/scripts/lib/acg/acg.sh`. The source now creates the
 missing `Host ubuntu` stanza idempotently while preserving agent/tunnel aliases.
 The bug was VERIFIED offline; live verification is recorded below.
+
+Follow-up regression coverage landed in `2b83f499`: downstream tests now cover
+creating a missing SSH config and `Host ubuntu` stanza idempotently, preserving
+agent aliases, and updating server/tunnel stanzas. `bats
+scripts/tests/lib/acg.bats scripts/tests/plugins/shopping_cart.bats` passed 57
+tests (one existing skip); ShellCheck and `git diff --check` passed. The
+follow-up was verified offline only, per operator direction.
 
 Operator live verification (2026-10-21): during the operator's `make up
 CLUSTER_PROVIDER=k3s-aws`, SSH configuration was updated to the provisioned
