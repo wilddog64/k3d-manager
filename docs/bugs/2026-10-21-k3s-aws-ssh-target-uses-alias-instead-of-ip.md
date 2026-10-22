@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** OPEN — first offline fix `60b43b22` was incomplete; follow-up dispatched; live verification pending
+**Status:** OPEN — upstream fix verified on lib-foundation `9796162`; awaiting Claude's release and subtree pull; live verification pending
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -118,6 +118,13 @@ baseline failures; details are in
 `docs/issues/2026-10-21-k3s-aws-ssh-target-provider-contract-failures.md`.
 No live infrastructure operation was run. This evidence does not establish
 live verification.
+
+The follow-up could not be committed directly under `scripts/lib/foundation/`;
+the protected-subtree hook requires upstream-first changes. The source/test fix
+is now pushed in lib-foundation branch `fix/acg-ssh-server-target` at `9796162`
+(clean-env ACG BATS 28/28; source ShellCheck, if-count audit, and diff check
+passed). Claude owns PR/release/tag. k3d-manager must subtree-pull the released
+change before the bug can be marked VERIFIED or offered for live verification.
 
 ## Scope for dispatch
 
