@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-22 Hostinger incident historical report landing
+
+- Reviewed and landed `hostinger-multi-service-incident-attribution` as `3794508e` in `docs/issues/2026-10-21-hostinger-multi-service-incident-investigation.md`. The read-only report adds timestamp-reconciled retained probe/job evidence, separates the persistent Argo CD direct-password symptom from the outage, and leaves the exact M4/API fault domain unassigned because provider audit, raw tunnel, and API-proxy logs were unavailable. Verification: `make check-doc-links` 2303 files OK, `git diff --check`, staged `_agent_audit`/`_agent_lint`, and dispatcher land gate passed. The canonical incident stays OPEN; there is no live fix to verify.
+
 ## 2026-10-22 firing-alert dashboard live-review follow-up
 
 - Operator's Grafana screenshot found the landed per-instance panel too wide, with confusing raw labels (`__name__`, `group`, `tier`) and an epoch-like active timestamp that does not represent CVE detection time. Reopened the canonical P3 and dispatched a compact general active-alert view plus a separate CVE findings table using VulnerabilityReport creation time, labeled **Report created at (UTC)**; true first-detected history remains out of scope. Fix landed/pushed as `309d77bf`. Independent verification: dashboard BATS 45/45; observability BATS 25 passed, 2 expected `promtool` skips; ShellCheck clean; `_agent_audit`/`_agent_lint`, diff check, and dispatcher landing gate passed; `make check-doc-links` reported 2311 files OK. Canonical bug is VERIFIED offline only; operator live Grafana review is still needed.
