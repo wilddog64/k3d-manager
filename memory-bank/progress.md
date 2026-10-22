@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-21 ACG SSH destination investigation
+
+- Operator's later `make up CLUSTER_PROVIDER=k3s-aws` reached the new readiness diagnostics, which reported `hostname resolution failed` for `ubuntu@ubuntu` after 180s. Code review found the cause: `scripts/etc/k3s/vars.sh` eagerly defaults `UBUNTU_K3S_EXTERNAL_IP` to the SSH alias `ubuntu`, masking the fresh `Host ubuntu` IP written by ACG provisioning; `deploy_app_cluster` then skips its SSH-config lookup. This supports an alias/target-selection bug, not an EC2 boot/network conclusion. Filed P2 `docs/bugs/2026-10-21-k3s-aws-ssh-target-uses-alias-instead-of-ip.md` and dispatched `k3s-aws-ssh-target-resolution-fix` from `docs/issues/2026-10-21-k3s-aws-ssh-target-fix-spec.md`; task is running. Spec/bug commits pushed: `b17c324b`, `efe5cb76`. No implementation or AWS stack mutation performed. Live verification remains pending.
+
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 
 - Completed and landed `acg-appset-registration-lifecycle-fix` on `k3d-manager-v1.43.5` at `bc8f2dae`. Independent suites passed: `bats scripts/tests/bin/cluster_up.bats` (67/67) and `bats scripts/tests/plugins/argocd.bats` (39/39); shellcheck (`-x -S warning`), `git diff --check`, `make check-doc-links` (2291 files), `_agent_lint`, and `_agent_audit` passed. Canonical ACG AppSet bug marked VERIFIED, not LIVE-VERIFIED. Operator live check remains pending. Dispatcher landing gate reported `tests: passed` and `landed: acg-appset-registration-lifecycle-fix`.
