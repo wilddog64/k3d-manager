@@ -316,7 +316,7 @@ function _k3s_aws_deregister_cluster() {
     # shellcheck source=/dev/null
     source "${SCRIPT_DIR}/plugins/argocd.sh" || {
       _warn "[k3s-aws] argocd plugin unavailable — skipping hub deregister"
-      return 0
+      return 1
     }
   fi
 
@@ -344,7 +344,13 @@ function _k3s_aws_deregister_cluster() {
         2>/dev/null
   )
 
-  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications from hub ArgoCD (${argocd_ns})"
+  # This fixed-name ApplicationSet is directly applied by the ACG lifecycle;
+  # it has no parent owner that would remove it when the destination vanishes.
+  # Generated Applications targeting this cluster were retired above first.
+  "${hub_kubectl[@]}" -n "${argocd_ns}" delete applicationset observability-acg \
+    --ignore-not-found >/dev/null 2>&1 || return 1
+
+  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications and retired ApplicationSet/observability-acg from hub ArgoCD (${argocd_ns})"
 }
 
 function _k3s_aws_retire_shell_watcher() {
@@ -454,12 +460,12 @@ HELP
     fi
   fi
 
-  _info "[k3s-aws] Deregistering sandbox from hub ArgoCD..."
-  _k3s_aws_deregister_cluster \
-    || _warn "[k3s-aws] hub deregister reported an issue — check hub for stale cluster-ubuntu-k3s"
-
   _info "[k3s-aws] Tearing down server EC2..."
   _dry_guard "tear down CloudFormation stack" acg_teardown --confirm || return 1
+
+  _info "[k3s-aws] Confirmed CloudFormation teardown; deregistering sandbox from hub ArgoCD..."
+  _k3s_aws_deregister_cluster \
+    || _warn "[k3s-aws] hub deregister reported an issue — check hub for stale cluster-ubuntu-k3s or observability-acg"
 
   _info "[k3s-aws] Cluster destroyed."
 }

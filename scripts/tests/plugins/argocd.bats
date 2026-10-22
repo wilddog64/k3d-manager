@@ -544,3 +544,28 @@ JSON
   [ "$status" -eq 0 ]
   [[ "$output" == *"Successfully deployed 1/1"* ]]
 }
+
+@test "ACG deregistration retires only observability-acg and is repeatable" {
+  local calls="${BATS_TEST_TMPDIR}/hub-kubectl.log"
+  mkdir -p "${BATS_TEST_TMPDIR}/bin"
+  cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${HUB_CALLS}"
+case "$*" in
+  *" get applications -o json") printf '{"items":[]}\n' ;;
+esac
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/kubectl"
+  export PATH="${BATS_TEST_TMPDIR}/bin:${PATH}" HUB_CALLS="${calls}"
+  export SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
+  _argocd_hub_kubectl_cmd() { printf '%s\n' "${BATS_TEST_TMPDIR}/bin/kubectl"; }
+  export -f _argocd_hub_kubectl_cmd
+  source "${SCRIPT_DIR}/lib/providers/k3s-aws.sh"
+
+  _k3s_aws_deregister_cluster
+  _k3s_aws_deregister_cluster
+
+  [ "$(grep -c 'delete applicationset observability-acg --ignore-not-found' "${calls}")" -eq 2 ]
+  [ "$(grep -c 'delete secret cluster-ubuntu-k3s' "${calls}")" -eq 2 ]
+  [ "$(grep -c 'delete applicationset ' "${calls}")" -eq 2 ]
+}

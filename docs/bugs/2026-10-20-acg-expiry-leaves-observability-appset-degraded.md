@@ -16,6 +16,10 @@
 
 **Follow-up live evidence (2026-10-21):** The operator's post-teardown screenshot still shows `observability-acg` Degraded with 0 Applications. Source inspection identified the specific remaining gap: `bin/cluster-down` calls `_k3s_aws_deregister_cluster`, which removes the cluster Secret and destination-matching Applications but leaves the directly applied `ApplicationSet/observability-acg` behind. A narrow teardown/reprovision lifecycle fix is dispatched in `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md`; no live resources were modified.
 
+**Offline lifecycle fix (2026-10-21):** Confirmed AWS teardown now precedes hub deregistration in both `bin/cluster-down` and the provider `destroy_cluster` path. An unsuccessful AWS lookup/delete, or invalid AWS credentials, preserves the hub registration and `observability-acg`. After successful deletion, cleanup removes only destination-matching generated Applications and then deletes the fixed-name `ApplicationSet/observability-acg`; `--ignore-not-found` makes repeats safe. Bring-up verifies the exact persisted `cluster-ubuntu-k3s` registration before `deploy_observability_acg` reapplies the ACG set.
+
+Argo CD normally cascades ApplicationSet deletion to owned Applications, and an Application's `resources-finalizer.argocd.argoproj.io` can then prune its managed resources ([ApplicationSet deletion documentation](https://argo-cd.readthedocs.io/en/latest/operator-manual/applicationset/Application-Deletion/)). This cleanup first removes the finalizer from Applications matching the retired ACG destination and deletes those Applications, so their managed resources are not pruned by Argo CD. The cluster has already been confirmed deleted. The fixed ApplicationSet delete is namespace scoped and can only target `observability-acg`; Hub, Hostinger, `grafana-dashboards-acg`, and unrelated resources are not selected. A Kubernetes deletion error is surfaced as a deregistration warning and is safe to retry.
+
 ## Files
 
 - `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md`
