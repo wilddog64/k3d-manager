@@ -4,7 +4,7 @@
 **Status:** OPEN — observed during live verification; no fix dispatched
 **Priority:** P3
 **Severity:** low
-**Approval:** pending — operator approved splitting and re-scoping this doc on 2026-10-22; dispatch not yet approved
+**Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/lib/webhook/status.py` (`_run_cluster_diagnostics`)
 **Related:** `docs/plans/v1.44.0-cloud-request-slack-notification-routing.md` (owns the Slack

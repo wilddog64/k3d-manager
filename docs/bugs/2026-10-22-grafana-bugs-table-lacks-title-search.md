@@ -4,7 +4,7 @@
 **Status:** OPEN — operator screenshot and dashboard configuration confirm usability gap; implementation not started
 **Priority:** P3 — dashboard usability and bug discoverability
 **Severity:** low
-**Approval:** operator explicitly requested filing a P3 bug on 2026-10-22; implementation not authorized
+**Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
 **Release:** v1.43.5 (bug; exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.5`
 **Found by:** operator reviewing k3dm Bug Tracking dashboard at approximately 08:00 PDT, 2026-10-22
