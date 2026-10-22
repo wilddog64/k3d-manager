@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** VERIFIED — offline fix landed in `60b43b22`; operator live verification pending
+**Status:** OPEN — first offline fix `60b43b22` was incomplete; follow-up dispatched; live verification pending
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -29,6 +29,36 @@ The classification is direct SSH stderr evidence. It does not establish an EC2
 boot, network, or sshd failure. The CloudFormation stack remains running and
 billable after this failed bring-up; do not destroy or recreate it as part of the
 code task.
+
+## Follow-up live reproduction (2026-10-21)
+
+After `60b43b22` was deployed locally, the operator reran `make
+up CLUSTER_PROVIDER=k3s-aws`. CloudFormation reused the healthy stack and reported
+server IP `44.247.81.210`, but the install still targeted the literal `ubuntu`:
+
+```text
+INFO: [acg] Updating SSH config with IP 44.247.81.210
+INFO: [acg] Server:  44.247.81.210
+INFO: [k3s-aws] Installing k3s server + joining agents...
+INFO: [shopping_cart] Installing k3s on ubuntu@ubuntu via k3sup...
+WARN: [shopping_cart] ssh-keyscan ubuntu not ready after 120s — k3sup may prompt
+ERROR: [shopping_cart] SSH readiness failed for ubuntu@ubuntu after 0s (budget 180s): hostname resolution failed; not starting k3sup
+WARN: [acg-up] failed (exit 1) — cleaning up local processes...
+make: *** [up] Error 1
+```
+
+Read-only inspection found no `UBUNTU_K3S_EXTERNAL_IP` override in the tmux
+session. The local `~/.ssh/config` contains `Host ubuntu-1` and `Host ubuntu-2`,
+but no `Host ubuntu` stanza. `_acg_update_ssh_config` logs the update and then
+only substitutes a matching pre-existing stanza; it does not add a missing
+server alias. With the source-time default removed by `60b43b22`,
+`deploy_app_cluster` now consults this absent stanza and falls back to `ubuntu`.
+Thus the previous offline regression fixture covered a pre-existing server stanza
+but missed the actual configuration shape. The failure is target/config
+provisioning, not evidence of an EC2 boot or SSH daemon issue. k3sup was not run.
+
+The CloudFormation stack was reused and remains present after this failed `make
+up`; no teardown was performed. It may be billable.
 
 ## Root cause
 
@@ -67,10 +97,10 @@ safe diagnostic rather than waiting the full SSH timeout against an alias as an 
 
 ## Verification / live status
 
-The live failure was observed before k3sup and before Argo CD registration. The
-new diagnostic fix is already offline-verified separately, but it cannot address
-this target-selection defect. Live verification of this bug requires a future
-operator-approved ACG bring-up; no live verification is claimed here.
+The first target-selection change, `60b43b22`, passed its offline tests but did
+not cover the missing-`Host ubuntu` case and failed live as recorded above. This
+bug is OPEN again pending the follow-up. Live verification requires a later
+operator-approved ACG bring-up; no live verification is claimed.
 
 Offline implementation evidence (2026-10-21): `bats
 scripts/tests/plugins/shopping_cart.bats` passed 41/41, including regression
@@ -78,7 +108,9 @@ coverage that sources `vars.sh` before writing the fresh `Host ubuntu` HostName,
 checks that readiness and `k3sup --ip` receive the same resolved address, and
 checks that an explicit `UBUNTU_K3S_EXTERNAL_IP` remains authoritative. A DNS
 resolution failure now stops readiness immediately while retaining the
-fail-closed guard. `shellcheck -S warning` for touched shell files,
+fail-closed guard. These tests covered an existing `Host ubuntu` stanza and an
+explicit IP override, but not a missing stanza; see the follow-up spec.
+`shellcheck -S warning` for touched shell files,
 `git diff --check`, and `_agent_audit` passed. The related provider contract
 suite had two teardown/deregistration failures (28/30) on both the task branch
 and unchanged release branch before this fix, confirming they are pre-existing

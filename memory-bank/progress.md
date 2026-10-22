@@ -2,7 +2,7 @@
 
 ## 2026-10-21 ACG SSH destination investigation
 
-- Operator's later `make up CLUSTER_PROVIDER=k3s-aws` reached readiness diagnostics, which reported `hostname resolution failed` for `ubuntu@ubuntu` after 180s. Code review traced the cause to the eager `UBUNTU_K3S_EXTERNAL_IP=ubuntu` source-time default masking the fresh SSH-config IP. Dispatched `k3s-aws-ssh-target-resolution-fix`; landed and pushed as `60b43b22`. Independent `shopping_cart.bats` passed 41/41, shellcheck, `_agent_lint`, `_agent_audit`, diff check, docs links, and dispatcher gate passed. `k3s_aws_provider.bats` had two teardown failures (28/30) both on the task branch and unchanged release branch; recorded separately as baseline failures. Canonical bug is VERIFIED offline only; operator live verification is pending. No live stack mutation was performed by Codex.
+- Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: `hostname resolution failed` (0s in readiness), and k3sup did not start. Read-only config check showed no `UBUNTU_K3S_EXTERNAL_IP` override and `~/.ssh/config` had only `Host ubuntu-1` / `Host ubuntu-2`, no server stanza. `_acg_update_ssh_config` only updates an existing stanza. Updated the canonical bug back to OPEN; dispatched `k3s-aws-ssh-target-host-block-fix` from `docs/issues/2026-10-21-k3s-aws-ssh-target-host-block-fix-spec.md`. The prior `shopping_cart.bats` 41/41 remains offline evidence for only the case it covered, not live verification. No `make down` or AWS mutation was run; reused CloudFormation stack may still be billable.
 
 ## 2026-10-21 ACG AppSet registration lifecycle fix
 
