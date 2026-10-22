@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** OPEN — evidence from Grafana screenshot and dashboard source; implementation not started
+**Status:** VERIFIED — offline tests passed; live Grafana verification pending
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator requested filing on 2026-10-21 and offline implementation dispatch on 2026-10-22
@@ -112,6 +112,10 @@ interface:
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml`
 - `scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml`
 - `scripts/tests/plugins/grafana_dashboard_appsets.bats`
+
+## Verification (2026-10-22)
+
+Landed as `63d53576`. `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` passed 44/44; `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats`, `_agent_lint`, `_agent_audit`, and `git diff --check` passed. Live Grafana verification remains pending; this is not LIVE-VERIFIED.
 - `docs/guides/grafana-dashboards/shared-operations.md`
 ```
 

@@ -1,7 +1,7 @@
 # Bug: PR Checks duration chart repeats completed runs across scrape timestamps
 
 **Filed:** 2026-10-21 (operator screenshot; repository review)
-**Status:** OPEN — diagnosis confirmed in source; live remediation not yet verified
+**Status:** VERIFIED — offline tests passed; live Grafana/Hermes verification pending
 **Priority:** P3 — misleading observability visualization; check status and collection remain functional
 **Severity:** low
 **Approval:** operator explicitly requested filing a P3 bug on 2026-10-21; implementation not yet approved
@@ -112,6 +112,10 @@ interface:
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
 - `scripts/tests/hermes/test_pr_checks.py`
 - `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
+
+## Verification (2026-10-22)
+
+Landed as `b77a4093`. `python3 -m pytest -q -p no:cacheprovider scripts/tests/hermes/test_pr_checks.py` passed 2/2; `bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats` passed 5/5; ShellCheck, `_agent_lint`, `_agent_audit`, and `git diff --check` passed. Live verification remains pending; this is not LIVE-VERIFIED.
 - `docs/guides/grafana-dashboards/k3dm-pr-checks.md`
 ```
 

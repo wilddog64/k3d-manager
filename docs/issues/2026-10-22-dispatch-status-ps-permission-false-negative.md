@@ -49,3 +49,11 @@ status path relies on `ps` to compare process start times, so a restricted `ps`
 can classify an active worker as terminated. Future diagnosis should rerun the
 read-only status check in an execution context with process visibility before
 resuming or redispatching.
+
+## Recurrence during 2026-10-22 P3 batch verification
+
+The same false-negative recurred for four dispatched P3 workers. `status`
+reported `terminated unexpectedly`, while `resume` refused with
+`[codex-dispatch] ERROR: Codex is still running`. An approved process check
+confirmed the worker shell, Node launcher, and Codex executable were alive.
+The tasks later completed and were landed; no duplicate workers were started.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — implementation not started
+**Status:** VERIFIED — offline tests passed; live Slack verification pending
 **Priority:** P3 — ChatOps observability / operator feedback
 **Severity:** low
 **Approval:** explicit operator request to file this bug, 2026-10-15
@@ -47,4 +47,4 @@ This is a **confirmed short-job notification coverage gap**, distinct from the s
 - `scripts/tests/bin/webhook_lifecycle.py`
 - `scripts/tests/lib/webhook.bats`
 
-**Implementation:** not started. No AWS resources or live job were modified when this bug was filed.
+**Verification (2026-10-22):** Landed as `870831a4`. `python3 scripts/tests/bin/webhook_lifecycle.py` passed 21/21; `bats scripts/tests/lib/webhook.bats` passed 68 tests with 6 environment-gated skips. `_agent_lint`, `_agent_audit`, and `git diff --check` passed. No AWS lifecycle operation was run. Live Slack verification remains pending; this is not LIVE-VERIFIED.

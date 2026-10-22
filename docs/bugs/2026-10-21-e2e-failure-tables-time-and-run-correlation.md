@@ -1,6 +1,6 @@
 # Bug: E2E failure tables lack consistent filtering and run/time correlation (2026-10-21)
 
-**Status:** OPEN — FILED; code-level filter mismatch confirmed; live behavior not verified
+**Status:** VERIFIED — offline tests passed; live Grafana verification pending
 **Priority:** P3 — observability usability / audit correlation, no evidence of test execution failure
 **Release:** v1.43.5
 **Branch:** `k3d-manager-v1.43.5`
@@ -74,3 +74,7 @@ The failure panels omit the `$service` variable that Recent runs applies. All ar
 - `scripts/etc/argocd/platform-ops/vulnerability-inventory-exporter.yaml`
 - `scripts/tests/plugins/e2e_observability.bats`
 - `docs/guides/grafana-dashboards/e2e-verification.md`
+
+## Verification (2026-10-22)
+
+Landed as `73819c18`. `bats scripts/tests/plugins/e2e_observability.bats` passed 26 tests; two Prometheus-rule tests were skipped because `promtool` is not installed. `shellcheck -x scripts/tests/plugins/e2e_observability.bats`, `_agent_lint`, `_agent_audit`, `make check-doc-links` (2310 files), and `git diff --check` passed. Live Grafana verification remains pending; this is not LIVE-VERIFIED.

@@ -1,7 +1,7 @@
 # Bug: read-only vuln-scan command name implies an active vulnerability scan
 
 **Filed:** 2026-10-21
-**Status:** OPEN — source-level naming mismatch confirmed; rename not implemented
+**Status:** VERIFIED — offline tests passed; live Slack/Make verification pending
 **Priority:** P3 — command clarity and safe operator expectations
 **Severity:** low
 **Approval:** operator approved filing on 2026-10-21 and implementation dispatch on 2026-10-22
@@ -118,6 +118,10 @@ interface:
 - `scripts/lib/webhook/make_targets.py`
 - `scripts/lib/webhook/cloud_actions.py`
 - `scripts/tests/bin/webhook_make_targets.py`
+
+## Verification (2026-10-22)
+
+Landed as `bb0b95a7`. `python3 scripts/tests/bin/webhook_make_targets.py` passed 43/43; `scripts/tests/bin/test_cloud_bridge.py` passed 84/84; `bats scripts/tests/bin/makefile_webhook_slack.bats` passed 10/10. Make dry-run confirmed `vuln-scan-report`, `vuln-scan`, and `trivy-scan-report` all invoke the read-only report renderer; no vulnerability scan was triggered. `_agent_lint`, `_agent_audit`, and `git diff --check` passed. Live Slack/Make verification remains pending; this is not LIVE-VERIFIED.
 - `scripts/tests/bin/makefile_webhook_slack.bats`
 - `scripts/tests/bin/test_cloud_bridge.py`
 - `docs/howto/slack-slash-commands.md`

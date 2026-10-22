@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-22 current-release P3 batch verification
+
+- Independently verified and landed five dispatched fixes on `k3d-manager-v1.43.5`: cluster-down Slack terminal summaries (`870831a4`), E2E failure-table run correlation (`73819c18`), firing-alert instance active-since/age (`63d53576`), PR-check completion timestamps (`b77a4093`), and read-only vulnerability report command naming (`bb0b95a7`).
+- Focused suites passed: lifecycle unittest 21/21 and webhook BATS 68 cases (6 environment-gated skips); E2E dashboard BATS 26 (2 `promtool` skips); dashboard appsets BATS 44/44; PR checks pytest 2/2 and BATS 5/5; vulnerability target unittest 43/43, cloud bridge pytest 84/84, Makefile Slack BATS 10/10. Applicable ShellCheck, `_agent_lint`, `_agent_audit`, diff checks, and Make dry-run passed. No live system mutation or scan was performed.
+- All five canonical records are VERIFIED offline only. Operator live verification remains pending. Begin with the safe read-only `make vuln-scan-report` check, then proceed one bug at a time; do not trigger a real teardown unless the operator has a disposable target and explicitly chooses it. See `docs/issues/2026-10-22-p3-batch-verification-environment.md` for sandbox-denied initial attempts and expected skips; dispatcher status false-negative recurrence is appended to `docs/issues/2026-10-22-dispatch-status-ps-permission-false-negative.md`.
+
 ## 2026-10-22 P2 follow-up dispatches
 
 - Lifecycle thread recurrence fix independently verified and landed/pushed as `85722ce3`. Focused pytest: 78 passed; `scripts/tests/lib/webhook.bats`: 68 cases, six expected environment-gated skips, all others passed. Python AST, `git diff --check`, and dispatcher landing gate passed. The response-URL fallback no longer anchors the job to an unrelated configured default channel when channel/thread context is unavailable. Canonical P2 is VERIFIED offline only; operator live check remains pending. Sandbox loopback failure and approved passing rerun are recorded in `docs/issues/2026-10-22-cluster-thread-verification-loopback-sandbox.md`.
