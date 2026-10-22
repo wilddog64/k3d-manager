@@ -235,6 +235,63 @@ PY
   [[ "${output}" == *"ok"* ]]
 }
 
+@test "E2E failure metrics carry run provenance and matching current status" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml
+cm = next(d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+assert '"run_date": e2e_utc(event["event_seconds"]) or "N/A"' in src
+assert src.count('"run_status": e2e_run_status(event, e2e_state)') == 2
+assert 'lines.append("e2e_run_info{" + info_body + "} " + num(event["run_seconds"]))' in src
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
+@test "E2E fixed status requires a later pass with identical run dimensions" {
+  run python3 - "${EXPORTER}" <<'PY'
+import sys, yaml, textwrap
+cm = next(d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d.get("kind") == "ConfigMap" and d["metadata"]["name"] == "vulnerability-inventory-exporter")
+src = cm["data"]["exporter.py"]
+start = src.index("def e2e_utc(seconds):")
+end = src.index("def e2e_app_service", start)
+namespace = {"time": __import__("time")}
+exec(textwrap.dedent(src[start:end]), namespace)
+status = namespace["e2e_run_status"]
+failed = {"passed": False, "tier": "2", "service": "basket", "project": "suite-a", "runner": "m4", "run_seconds": 100}
+assert status(failed, [failed, {**failed, "passed": True, "run_seconds": 200}]) == "fixed: passed 1970-01-01 00:03 UTC"
+for key, value in (("tier", "1"), ("service", "payment"), ("project", "suite-b"), ("runner", "m2")):
+    unrelated = {**failed, key: value, "passed": True, "run_seconds": 200}
+    assert status(failed, [failed, unrelated]) == "still failing", key
+assert status(failed, [failed, {**failed, "passed": True, "run_seconds": 99}]) == "still failing"
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
+@test "E2E tables share owner-service filters and exact run ID selection" {
+  run python3 - "${DASH}" <<'PY'
+import sys, yaml, json
+obj = yaml.safe_load(open(sys.argv[1]))
+dash = json.loads(obj["data"]["e2e.json"])
+vars = {v["name"]: v for v in dash["templating"]["list"]}
+assert vars["run_id"]["query"] == "label_values(e2e_run_info, run_id)"
+for panel_id in (5, 6, 7):
+    panel = next(p for p in dash["panels"] if p["id"] == panel_id)
+    expr = panel["targets"][0]["expr"]
+    for label in ("tier", "runner", "run_id"):
+        assert label + '=~"$' + label + '"' in expr, (panel_id, expr)
+for panel_id in (6, 7):
+    expr = next(p for p in dash["panels"] if p["id"] == panel_id)["targets"][0]["expr"]
+    assert 'exported_service=~"$service"' in expr, expr
+print("ok")
+PY
+  echo "$output"; [ "${status}" -eq 0 ]
+  [[ "${output}" == *"ok"* ]]
+}
+
 @test "prometheusrule defines the e2e alerts group and all alerts" {
   run python3 - "${RULE}" <<'PY'
 import sys, yaml

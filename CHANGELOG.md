@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- E2E failure tables now expose source run dates and current matching-run status, with shared
+  service/tier/runner filters and exact Run ID selection. The guide clarifies instant-query,
+  retention, and row-cap semantics.
+
 ### Fixed
 
 - App-cluster registration now continues when the existing Secret role-label lookup fails,

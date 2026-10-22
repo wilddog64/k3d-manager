@@ -2,8 +2,15 @@
 
 [← Grafana dashboards index](../grafana-dashboards.md)
 
-Templated on `$service` / `$tier` / `$runner`. Everything is exporter-fed from
-`k3dm.k3d.io/e2e-result=true` ConfigMaps.
+Templated on `$service` / `$tier` / `$runner`; the three run tables also share the
+`$run_id` selector for exact cross-panel correlation. Everything is exporter-fed from
+`k3dm.k3d.io/e2e-result=true` ConfigMaps. The exporter retains at most 200 run events.
+All three tables use instant PromQL queries, so the dashboard time picker does not select
+run event times: the panels show retained metric series currently available to Prometheus
+(subject to scrape and staleness behavior). Their caps and source cardinalities differ, so
+row counts across tables are not expected to match. Recent runs is capped at 100 and ranked
+by source run timestamp; Failure groups is capped at 200 and Failure details at 100. Failure
+rows are sorted by source `Run date (UTC)` after the query cap.
 
 | Panel | Query |
 |---|---|
@@ -12,9 +19,16 @@ Templated on `$service` / `$tier` / `$runner`. Everything is exporter-fed from
 | Failing runs in window | `count(e2e_run_info{passed="false",...})` |
 | Duration trend | `e2e_last_run_duration_seconds{...}` |
 | Recent runs | `topk(100, e2e_run_info{...,failure_ratio=~".*%.*"})`; newest first. **Run date** is when the run happened (UTC). **Status now** is `passed`, `still failing`, or `fixed: passed <date>` when a later run of the same tier/service/suite/runner passed, so an old failure is not mistaken for a current one |
-| Failure groups / details | `topk(200, e2e_failure_group_info{...})`, `topk(100, e2e_failure_info{...})` |
+| Failure groups / details | Capped at 200 / 100; both filter by service, tier, runner and exact Run ID, and show source `Run date (UTC)` plus run-level `Status now` |
 | Failure trend / causes by service | `sum by (exported_service[, kind]) (e2e_failure_group_info{...})` |
 | Top failing specs | `topk(10, sum by (exported_service,file) (e2e_failure_info{...}))` |
+
+Failure table `Service` filtering uses the failure's owning service (`exported_service` on
+these samples); Recent runs uses the consolidated run service. Failure `Status now` uses
+the same tier/service/project/runner matching as Recent runs. It describes a later matching
+pass and leaves the original failure assertion and failed run intact. `Run date (UTC)` comes
+from the event timestamp; legacy runs without that timestamp show `N/A`, never a
+ConfigMap publication time or exporter scrape time.
 
 Traps:
 
