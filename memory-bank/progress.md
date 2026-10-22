@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-21 ACG AppSet registration lifecycle fix
+
+- Completed and landed `acg-appset-registration-lifecycle-fix` on `k3d-manager-v1.43.5` at `bc8f2dae`. Independent suites passed: `bats scripts/tests/bin/cluster_up.bats` (67/67) and `bats scripts/tests/plugins/argocd.bats` (39/39); shellcheck (`-x -S warning`), `git diff --check`, `make check-doc-links` (2291 files), `_agent_lint`, and `_agent_audit` passed. Canonical ACG AppSet bug marked VERIFIED, not LIVE-VERIFIED. Operator live check remains pending. Dispatcher landing gate reported `tests: passed` and `landed: acg-appset-registration-lifecycle-fix`.
+
 ## 2026-10-21 ACG and Hostinger read-only investigation reports
 
 - Independently reviewed the ACG AppSet report and Hostinger outage follow-up against their exact read-only specs. Both task files were in scope. `make check-doc-links` passed (ACG 2281 files; Hostinger 2284 files), `git diff --check`, `_agent_audit`, and `_agent_lint` passed; dispatcher land gates passed. ACG report landed as `69f22400`; Hostinger report landed as `f87f154a`. No runtime remediation or causal claim was added; associated canonical incidents remain OPEN. Report output cites source-backed live observations with uncertainty limits.

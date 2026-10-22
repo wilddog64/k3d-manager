@@ -1,7 +1,7 @@
 # Bug: expired ACG sandbox leaves stale Argo CD ApplicationSet observability-acg degraded
 
 **Filed:** 2026-10-20 (operator screenshot, Argo CD ApplicationSets UI)
-**Status:** OPEN — diagnosis and live verification pending
+**Status:** VERIFIED — source fix landed in `bc8f2dae`; live verification pending
 **Priority:** P2 — stale GitOps objects produce persistent degraded health after disposable sandbox expiry; cleanup/re-provisioning ownership is unclear
 **Severity:** medium
 **Approval:** filing requested by operator 2026-10-20; no approval to mutate live infrastructure

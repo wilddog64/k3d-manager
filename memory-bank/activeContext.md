@@ -19,6 +19,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Latest live investigations and records
 
+- ACG AppSet registration lifecycle fix landed and was pushed to `k3d-manager-v1.43.5` as `bc8f2dae`. Independent verification passed `scripts/tests/bin/cluster_up.bats` (67/67), `scripts/tests/plugins/argocd.bats` (39/39), `shellcheck -x -S warning bin/cluster-up scripts/plugins/argocd.sh`, `git diff --check`, `make check-doc-links` (2291 files), `_agent_lint`, and `_agent_audit`. Canonical bug `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md` is VERIFIED offline; live ACG bring-up/Argo CD confirmation is still required. Do not mark LIVE-VERIFIED until operator supplies that evidence.
+
 - Refreshed Argo CD Application `hub-grafana-dashboards` after the thread-actor LIVE-VERIFIED status update. `argocd.argoproj.io/refresh=hard` was accepted and consumed; latest check: reconciled `2026-10-21T12:23:22Z`, `Synced`, `Healthy`, operation `Succeeded`.
 
 - P3 Slack thread actor attribution is LIVE-VERIFIED: operator's `k3dm fix-list` thread reply produced job `4148ca73`, whose started notice identified `slack-thread:U4C9LDQP2`. Fix `bc1399eb`; evidence recorded in `docs/bugs/2026-10-18-slack-thread-jobs-record-role-not-user.md`.
