@@ -10,7 +10,12 @@ table. Its **Report created at (local)** value comes from the VulnerabilityRepor
 detection time. Both dashboard timestamps use the viewer's browser-local timezone. The general alert
 table's `ALERTS_FOR_STATE` timestamp is **Active since** and
 includes any pending interval (the Trivy alert rule uses `for: 15m`); it is not a CVE detection
-or exact firing-start time. The aggregate category counts remain the alert-count view.
+or exact firing-start time. The aggregate category counts remain the alert-count view. The
+active-instance table orders Namespace, Cluster, Alert, Category, available App/Pod/Instance
+identity, Severity, Active since, and Elapsed time since active; it keeps per-alert instance timestamps
+and does not synthesize pod identity. Elapsed time since active is elapsed alert active-state duration from
+`ALERTS_FOR_STATE`, potentially including the pending period. It is not CVE age, time unpatched,
+first-detection time, or exact firing-start time.
 
 | Panel | Query basis |
 |---|---|

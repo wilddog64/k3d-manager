@@ -25,16 +25,19 @@ which has the "Firing Alerts by Category" table. Before 2026-10-02 it was titled
 ### Firing alert timing
 
 The **Firing Alerts by Category** table remains an aggregate count by category, alert name,
-severity, and cluster. The **Active Alert Instances** table is capped at 200 rows and orders its allowlist as
-namespace, cluster, alert, app, pod, instance, **Active since (local; pending included)**, and
-**Active for**. App, pod, and instance values appear only when the alert provides them; Trivy
-alerts use `app` for the image repository and do not carry a pod label. Raw metric labels such
+severity, and cluster. The **Active Alert Instances** table is capped at 200 rows and orders its
+allowlist as Namespace, Cluster, Alert, Category, App, Pod, Instance, Severity, **Active since
+(local; pending included)**, and **Active for**. Category uses the same alert-name classification
+as the aggregate table. App, pod, and instance values appear only when the alert provides them;
+Trivy alerts use `app` for the image repository and do not carry a pod label. Raw metric labels such
 as `__name__`, `group`, and `tier` are hidden. Alert identity stays per-instance, so several Trivy findings under one rule can
 have different active-state timestamps.
 
 The timestamp comes from Prometheus `ALERTS_FOR_STATE`, which records when a rule entered
-pending/active evaluation. A rule's `for:` interval means this can be earlier than the actual
-firing transition, so it is not an exact firing start. The explicit pending-included caveat
+pending/active evaluation. **Elapsed time since active** is the elapsed alert active-state duration from
+that timestamp. A rule's `for:` interval means this duration can include pending time and the
+timestamp can be earlier than the actual firing transition, so it is not an exact firing start.
+It is not CVE age, time unpatched, or first-detection time. The explicit pending-included caveat
 must remain visible. Rows without this metric are omitted; an empty detail table means no
 firing instance has a matching active-state sample. No resolved time is inferred.
 
