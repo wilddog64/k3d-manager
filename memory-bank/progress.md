@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-22 Slack explicit job-ID live verification
+
+- Operator screenshot confirms `logs 013fdfe9` returns that job's transcript and `status 013fdfe9` reports `success`. Marked `docs/bugs/2026-10-21-slack-find-similar-docs-job-logs-rejected.md` LIVE-VERIFIED. The fix landed as `ca103021`; offline thread-dispatch tests passed 43/43. Historical intermittent rejection was not reproduced in this live check.
+
 ## 2026-10-21 ACG SSH destination investigation
 
 - Operator's first follow-up `make up CLUSTER_PROVIDER=k3s-aws` after `60b43b22` still targeted `ubuntu@ubuntu` and failed after the 120s keyscan: hostname resolution failed and k3sup did not start. `_acg_update_ssh_config` did not create a missing `Host ubuntu` stanza. lib-foundation PR #72 merged to main at `c307df2`; the subtree pull landed on `k3d-manager-v1.43.5` as squash `18f7c8cc` plus merge `205d4272`. Post-pull clean-env ACG BATS passed 28/28; ShellCheck and agent-rigor passed. Operator subsequently completed `make up CLUSTER_PROVIDER=k3s-aws`; the SSH configuration used the provisioned IP and k3s reported the 3-node cluster ready. Canonical SSH-target bug is LIVE-VERIFIED. A separate ArgoCD controller reconnect timeout warned and proceeded; details in `docs/issues/2026-10-21-acg-up-argocd-controller-reconnect-warning.md`.

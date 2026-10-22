@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-21
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** OPEN — backtick-wrapped IDs are fixed and VERIFIED offline in `ca103021`; earlier bare-ID failures remain unexplained and live verification is pending
+**Status:** LIVE-VERIFIED 2026-10-22 — operator screenshot confirms `logs 013fdfe9` returns the transcript and `status 013fdfe9` returns `success`; fix landed in `ca103021`
+**Fix commit:** ca103021
+**Live evidence:** 2026-10-22 · run 013fdfe9 · env slack-thread · scenario explicit-id-logs-status-lookup · commit ca103021 · proves fix
 **Priority:** P2 — ChatOps observability / job transcript retrieval
 **Component:** Slack thread command parsing and webhook job log lookup
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (explicit ID lookup fix is LIVE-VERIFIED; preserve it); `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md` (query execution is LIVE-VERIFIED)
@@ -47,6 +49,20 @@ Read-only Slack history search retrieved the original message texts and timestam
 Slack message links: [find-similar-docs failed lookup](https://devopsautomationhq.slack.com/archives/C0B7ZHG2LR4/p1792628186085839?thread_ts=1792628158.377709&cid=C0B7ZHG2LR4), [find-similar-docs status attempt](https://devopsautomationhq.slack.com/archives/C0B7ZHG2LR4/p1792628328800859?thread_ts=1792628158.377709&cid=C0B7ZHG2LR4), [fix-list usage attempt](https://devopsautomationhq.slack.com/archives/C0B7ZHG2LR4/p1792628871335539?thread_ts=1792628849.468139&cid=C0B7ZHG2LR4), [same visible command succeeding](https://devopsautomationhq.slack.com/archives/C0B7ZHG2LR4/p1792628881299689?thread_ts=1792628849.468139&cid=C0B7ZHG2LR4).
 
 This confirms that the exact visible syntax was rejected at least once; it is not explained solely by an ellipsis in the displayed message. The retry shows the symptom is intermittent across different jobs.
+
+### Operator live verification — 2026-10-22
+
+The operator supplied a Slack screenshot showing both exact-ID commands succeeding in the same conversation:
+
+```text
+logs 013fdfe9
+📋 Last 20 lines (job 013fdfe9)
+...
+status 013fdfe9
+ℹ️ Job 013fdfe9 status: success
+```
+
+This live-verifies transcript and status lookup for the same explicit job ID. The backtick-wrapped form is covered by the offline Events-path regression tests; the screenshot's commands are bare IDs. The bug is closed as LIVE-VERIFIED based on the operator's requested disposition. The original intermittent rejection was not reproduced in this successful check.
 
 ### Comparator retry — 2026-10-21
 
