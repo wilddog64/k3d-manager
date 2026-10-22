@@ -227,6 +227,18 @@ function _run_acg_repair_hub_host_alias_test() {
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
 }
 
+@test "acg-up verifies exact ACG registration before deploying observability" {
+  local verify_line deploy_line
+  verify_line="$(grep -nF 'argocd_require_app_cluster_registration' bin/cluster-up | cut -d: -f1)"
+  deploy_line="$(grep -nF 'deploy_observability_acg "${_acg_observability_context}"' bin/cluster-up | cut -d: -f1)"
+  [ -n "$verify_line" ]
+  [ "$verify_line" -lt "$deploy_line" ]
+  run grep -A4 -F 'argocd_require_app_cluster_registration' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}"'* ]]
+  [[ "$output" == *'"${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"'* ]]
+}
+
 @test "acg-up does not capture the dry-run wrapper as its own base" {
   run grep -nF 'unset -f __k3dm_base_run_command' bin/cluster-up
   [ "$status" -ne 0 ]

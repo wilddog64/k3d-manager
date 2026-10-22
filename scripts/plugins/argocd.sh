@@ -1695,6 +1695,22 @@ EOF
   _argocd_set_active_app_cluster "${ARGOCD_APP_CLUSTER_NAME}"
 }
 
+function argocd_require_app_cluster_registration() {
+  local _secret="${1:?secret name required}"
+  local _name="${2:?cluster name required}"
+  local _provider="${3:?provider required}"
+  local _server="${4:?server required}"
+  local _actual
+  _actual="$(_kubectl --no-exit --quiet -n "${ARGOCD_NAMESPACE}" get secret "${_secret}" -o json 2>/dev/null \
+    | jq -r '[.metadata.labels["argocd.argoproj.io/cluster-name"] // "", .metadata.labels["k3d-manager/provider"] // "", (.data.name // "" | @base64d), (.data.server // "" | @base64d)] | join("\t")' 2>/dev/null || true)"
+  if [[ "${_actual}" != "${_name}"$'\t'"${_provider}"$'\t'"${_name}"$'\t'"${_server}" ]]; then
+    _err "[argocd] required app-cluster registration ${ARGOCD_NAMESPACE}/${_secret} is missing or mismatched"
+    _err "[argocd] expected name=${_name}, provider=${_provider}, server=${_server}; observed '${_actual:-unavailable}'"
+    return 1
+  fi
+  _info "[argocd] verified app-cluster registration ${ARGOCD_NAMESPACE}/${_secret}: ${_name} (${_provider})"
+}
+
 function _argocd_apply_secret_from_stdin() {
    local _value="${1:?value required}"
    local _ns="${2:?namespace required}"

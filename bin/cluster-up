@@ -950,6 +950,11 @@ ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
   ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
   ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}" \
   register_app_cluster
+argocd_require_app_cluster_registration \
+  "${ARGOCD_APP_CLUSTER_SECRET_NAME:-cluster-ubuntu-k3s}" \
+  "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" \
+  "${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
+  "${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:${TUNNEL_SANDBOX_LOCAL_PORT:-16443}}"
 if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
   configure_vault_app_auth_for_context "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" || true
 fi

@@ -41,6 +41,16 @@ The immediate repair owner is the ACG provision/re-registration path (`bin/clust
 
 No sync, refresh annotation, deletion, prune, apply, registration change, provisioning, or AWS mutation was performed. No alert-to-verification integration was triggered or tested during this read-only investigation.
 
+## Source-path follow-up (2026-10-21)
+
+The source defect is in the successful bring-up invariant. `bin/cluster-up` calls `register_app_cluster`, which applies the configured Secret, then proceeds without reading back its identity. Its later `argocd cluster list` loop accepts substring matches for `ubuntu-k3s` or the tunnel host, and after 120 seconds it warns and continues. Therefore it does not guarantee the exact registration required by `observability-acg` before deploying the ApplicationSet. The current `register_app_cluster` defaults and `bin/cluster-up` provider assignment produce the expected defaults (`cluster-ubuntu-k3s`, `ubuntu-k3s`, `k3s-aws`), but an apply can leave an absent or mismatched Secret without a local fail-closed diagnostic.
+
+The observed `ubuntu-k3s-app-cluster` Secret (`data.name=k3d-cluster`, provider `k3d`, server `https://kubernetes.default.svc`) is consistent with a separate hub/in-cluster registration. It does not prove how the expected registration disappeared or whether the live state came from the current bring-up path. The narrow source correction adds exact post-apply verification of secret name, cluster name, provider, and server before later setup continues. A mismatch now fails with the expected and observed fields in the diagnostic. Regression coverage includes the expected ACG registration and the observed mismatching registration shape.
+
+Remaining safe live observation: during the next operator-approved fresh ACG bring-up, record the `register_app_cluster` apply and immediate readback for `cicd/cluster-ubuntu-k3s` (Secret name, decoded `.data.name`, decoded `.data.server`, and `k3d-manager/provider`), then confirm Argo CD lists the exact `ubuntu-k3s` destination. If readback passes but the cluster is subsequently absent, capture the time and any teardown/reconcile activity around its removal. This distinguishes a bring-up registration defect from later runtime deletion without performing a mutation for this investigation.
+
+The code-path verification does not establish that sandbox expiry caused the observed state. No live infrastructure or Argo CD mutation was performed.
+
 ## Evidence captured
 
 Commands below were read-only. Relevant output is preserved verbatim; the AWS caller identity was reduced to account ID to avoid retaining unnecessary identity detail.
@@ -193,17 +203,34 @@ $ aws ec2 describe-instances --region us-west-2 --filters 'Name=tag:aws:cloudfor
 +---------------------+-----------------------------+------------------------+----------+
 ```
 
-## Rules gates
-
-The dispatch spec contains no `Rules` section or named gate commands. The following non-mutating repository/document checks were run after writing this report:
+## Rules gates (2026-10-21 source-path follow-up)
 
 ```text
-$ make check-doc-links
-check-doc-links: 2281 file(s) OK
-gate_exit=0
-
-$ git diff --check
-diff_check_exit=0
+$ bats scripts/tests/bin/cluster_up.bats
+1..67
+66 passed; test 66 failed because the sandbox denied the test fixture's loopback bind:
+PermissionError: [Errno 1] Operation not permitted
 ```
 
-No code or shell file was changed, so shellcheck and BATS implementation gates are not applicable. The Argo CD CLI read attempt failed because the cached session was invalid; kubectl-based hub reads and direct AWS read-only queries succeeded as documented above.
+```text
+$ bats scripts/tests/plugins/argocd.bats
+1..39
+39 passed
+```
+
+```text
+$ shellcheck bin/cluster-up scripts/plugins/argocd.sh
+exit=1
+ShellCheck reported existing SC1091, SC2015, SC2016 and SC2029 diagnostics in bin/cluster-up; no diagnostics were reported in the changed plugin helper.
+$ shellcheck -x scripts/plugins/argocd.sh
+exit=0
+```
+
+```text
+$ git diff --check
+exit=0
+$ bash -c 'source scripts/lib/foundation/scripts/lib/agent_rigor.sh; _agent_audit'
+exit=0
+```
+
+The standalone `_agent_audit` command is a Bash function, so it was invoked after sourcing its repository definition under Bash (direct invocation from the provided zsh shell fails because `status` is a readonly zsh variable). No live infrastructure or Argo CD mutations were performed.

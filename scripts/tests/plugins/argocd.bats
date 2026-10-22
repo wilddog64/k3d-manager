@@ -423,6 +423,24 @@ JSON
   [ "$status" -eq 1 ]
 }
 
+@test "app-cluster registration verification accepts exact identity, provider, and server" {
+  _kubectl() {
+    printf '{"metadata":{"labels":{"argocd.argoproj.io/cluster-name":"ubuntu-k3s","k3d-manager/provider":"k3s-aws"}},"data":{"name":"dWJ1bnR1LWszcw==","server":"aHR0cHM6Ly9ob3N0LmszZC5pbnRlcm5hbDoxNjQ0Mw=="}}'
+  }
+  export -f _kubectl
+  run argocd_require_app_cluster_registration cluster-ubuntu-k3s ubuntu-k3s k3s-aws https://host.k3d.internal:16443
+  [ "$status" -eq 0 ]
+}
+
+@test "app-cluster registration verification fails closed on mismatched secret" {
+  _kubectl() {
+    printf '{"metadata":{"labels":{"argocd.argoproj.io/cluster-name":"k3d-cluster","k3d-manager/provider":"k3d"}},"data":{"name":"azNkLWNsdXN0ZXI=","server":"aHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3Zj"}}'
+  }
+  export -f _kubectl
+  run argocd_require_app_cluster_registration cluster-ubuntu-k3s ubuntu-k3s k3s-aws https://host.k3d.internal:16443
+  [ "$status" -ne 0 ]
+}
+
 @test "ArgoCD Helm values substitute Keycloak OIDC settings" {
   local render_vars='$ARGOCD_PUBLIC_URL $ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_KEYCLOAK_REALM_URL $ARGOCD_KEYCLOAK_CLIENT_ID $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS'
   local rendered
