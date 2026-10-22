@@ -1,5 +1,7 @@
 # Dispatch spec: classify failed Hostinger diagnostics by command exit status
 
+**Implementation:** landed as `6be25c92` on `k3d-manager-v1.43.5`; independently verified offline. The Hostinger outage remains OPEN and unrelated to this classification result.
+
 Fix the confirmed webhook diagnostic-result classification defect recorded in [the Hostinger incident](../bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md). The 2026-10-20 API-path fault domain remains unknown and is not part of this implementation task.
 
 ## Source finding

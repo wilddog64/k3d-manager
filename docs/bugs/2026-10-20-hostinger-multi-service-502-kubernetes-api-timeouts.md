@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5 (bug; no new plan slot)
 **Status:** OPEN — incident recovered at last check; root cause unconfirmed; ArgoCD direct-login endpoint remains unavailable
+**Diagnostic-result classification sub-defect:** VERIFIED offline as `6be25c92`; operator live check of a read-only failing diagnostic remains pending. This does not verify the historical outage.
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
 **Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
@@ -75,6 +76,20 @@ The API-path fault domain remains unknown; no infrastructure remediation is just
 **Dispatch authorization — 2026-10-22:** operator requested investigation, bug-detail update, and dispatch. Implement only return-code-aware classification for `/api/v1/diagnostics`, with focused regression coverage. Do not broaden into Hostinger network/control-plane remediation, Argo CD login, status-probe semantics, or infrastructure changes. The incident stays OPEN with its root cause unassigned.
 
 Implementation scope and acceptance are in [`2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md`](../issues/2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md).
+
+**Offline fix verification — 2026-10-22:** `hostinger-diagnostic-exit-status-fix` landed as `6be25c92` on `k3d-manager-v1.43.5`. The change preserves existing `_posix_spawn_capture` callers while exposing subprocess exit status to explicit diagnostics; promptly failing commands now persist `status=failed`, successful commands remain `success`, and timeouts preserve the timeout failure path. Focused pytest passed 22/22; webhook BATS passed all 68 cases with six expected environment-gated skips. Python AST parsing, `git diff --check`, and the dispatcher landing/audit gate passed. Full test output is recorded in [`2026-10-22-hostinger-diagnostic-exit-status-verification.md`](../issues/2026-10-22-hostinger-diagnostic-exit-status-verification.md). This verifies only diagnostic job classification. It does not establish the historical Hostinger outage's root cause or the direct Argo CD login cause; the incident remains OPEN, and no live infrastructure operation was performed.
+
+**Operator live-check procedure:** From the release checkout, issue a deliberately failing but read-only `describe-pod` diagnostic through the existing cloud-request route:
+
+```bash
+bin/k3dm-cloud-request diagnose-describe-pod \
+  --arg provider=hostinger \
+  --arg namespace=shopping-cart-apps \
+  --arg name=codex-verify-nonexistent-diagnostic-pod-20261022 \
+  --wait-final
+```
+
+The unique pod name should produce a Kubernetes `NotFound` response without changing cluster state. Verify the returned job status is `failed` and its redacted output contains the diagnostic error. This checks the deployed diagnostic-result classification only; it does not reproduce or explain the 2026-10-20 outage. Do not mark the overall incident resolved from this check.
 
 **Established at incident time:**
 
