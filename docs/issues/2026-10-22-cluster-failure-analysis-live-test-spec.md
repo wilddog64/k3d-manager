@@ -1,6 +1,7 @@
 # Spec: safe live test for lifecycle failure-analysis Slack threading
 
 **Status:** Proposed; documentation/spec only. No test command or runtime behavior is implemented by this change.
+**Target release:** v1.43.7; implement on `k3d-manager-v1.43.7` after v1.43.6 merges and that release branch is cut from `main`.
 **Related bug:** `docs/bugs/2026-10-15-cluster-up-progress-slack-thread-missing.md`
 **Current fix:** `85722ce3` is VERIFIED offline. This spec addresses only the missing safe way to exercise the notification path in live Slack; it does not reopen or replace the fix.
 
@@ -44,7 +45,7 @@ If implementation is separately authorized, keep changes limited to:
 - `scripts/tests/bin/test_webhook_thread_dispatch.py` — deterministic routing, feature-gate, authorization, redaction, and no-lifecycle-side-effect coverage;
 - this spec and the related canonical bug's verification notes.
 
-No release plan file is proposed. This spec does not itself authorize implementation, deployment, or a live test; those require a separate operator-approved implementation dispatch and an explicitly enabled test window.
+The work is scheduled for v1.43.7, subject to normal release planning. This spec does not itself authorize implementation, deployment, or a live test; those require a separate operator-approved implementation dispatch and an explicitly enabled test window. Do not backport implementation into v1.43.5 or v1.43.6.
 
 ## Verification gates for a future implementation
 

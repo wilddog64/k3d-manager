@@ -9,7 +9,7 @@
 - Both tasks were created from pushed release commit `a8a83209`. The default status initially reported “terminated unexpectedly,” but the sandbox denied `ps`; elevated checks showed them running, and both later exited successfully. This false negative is recorded in `docs/issues/2026-10-22-dispatch-status-ps-permission-false-negative.md`.
 - Lifecycle worker's fix landed as `85722ce3`; the new test-file path was explicitly accepted by the operator's landing request. No Slack/AWS/cluster operations ran.
 - Hostinger worker's read-only report reconciles the timeline and separates the persistent Argo CD direct-login failure from the recovered frontend/API incident; root cause remains unknown. `make check-doc-links` passed (2303 files), `git diff --check` clean. Report remains isolated and unlanded. No runtime probes or mutations were performed.
-- Added `docs/issues/2026-10-22-cluster-failure-analysis-live-test-spec.md` as a documentation-only design for safe on-demand Slack verification without real cluster failure/cleanup. Linked it from the canonical lifecycle thread bug. No implementation, feature-flag change, Slack message, or infrastructure operation was performed; future implementation requires separate authorization.
+- Added `docs/issues/2026-10-22-cluster-failure-analysis-live-test-spec.md` as a documentation-only design for safe on-demand Slack verification without real cluster failure/cleanup; assigned implementation to v1.43.7 after v1.43.6 merges. Linked it from the canonical lifecycle thread bug. No implementation, feature-flag change, Slack message, or infrastructure operation was performed; implementation requires separate authorization.
 
 ## 2026-10-22 Slack explicit job-ID live verification
 
