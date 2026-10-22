@@ -1,7 +1,7 @@
 # Bug: k3s-aws provisioning SSH readiness timeout hides connection failure cause
 
 **Filed:** 2026-10-21 (operator Slack failure-analysis screenshot)
-**Status:** OPEN — source-level failure path verified; EC2-side root cause not established
+**Status:** VERIFIED — offline diagnostics fix landed in `293b6d76`; EC2-side root cause unknown; live verification pending
 **Priority:** P3 — intermittent sandbox readiness and poor diagnostics; reclassify P2 if reproducibly blocks provisioning
 **Severity:** low pending recurrence/impact evidence
 **Approval:** operator explicitly requested dispatch/implementation on 2026-10-21 after a second live reproduction; offline code/tests authorized, no additional live provisioning or teardown authorized
@@ -101,6 +101,8 @@ elapsed wait and budget. The success probe remains the gate before `k3sup`; fail
 guidance now distinguishes observations from hypotheses and directs operators to inspect current
 CloudFormation and EC2 state before retrying. The 2026-10-21 EC2-side cause remains **unknown**.
 No AWS/EC2 query or live verification was performed for this change.
+
+**Offline verification (2026-10-21):** `bats scripts/tests/plugins/shopping_cart.bats` passed 38/38; `python3 -m pytest -q -p no:cacheprovider scripts/tests/bin/test_webhook_ssh_failure_analysis.py` passed 1/1. ShellCheck (`-x -S warning`), Python AST parse, `git diff --check`, `_agent_lint`, `_agent_audit`, and `make check-doc-links` (2294 files) passed. Dispatcher landing gate passed. The 2026-10-21 EC2-side cause remains unknown; neither offline results nor the prior timed-out/deleted instance constitute live verification.
 
 ## Proposed fix scope
 
