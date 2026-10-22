@@ -7,7 +7,7 @@
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
 **Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
-**Dispatch approval:** operator requested review and dispatch on 2026-10-21; read-only evidence gathering only, no recovery or live changes
+**Dispatch approval:** operator requested review and dispatch on 2026-10-21 and 2026-10-22; read-only fault-attribution follow-up only, no recovery or live changes
 **Component:** `k3s-hostinger` node/control plane, public frontend ingress/port-forward, shopping-cart data layer, Vault/ESO; precise fault domain TBD
 **Affected:** `ubuntu-hostinger`, `https://frontend.3ai-talk.org/`, `shopping-cart-apps`, `shopping-cart-data`, Hostinger `ClusterSecretStore/vault-backend`
 ## Files

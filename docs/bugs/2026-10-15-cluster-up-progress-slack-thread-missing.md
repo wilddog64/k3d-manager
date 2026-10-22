@@ -6,7 +6,7 @@
 **Fix commit:** `6b324441`
 **Priority:** P2 — terminal cluster-up failure-analysis thread correlation suspected lost (raised from P3 2026-10-21).
 **Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
-**Investigation:** Read-only triage report landed at `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md` (`8b70f1a4`). Safe local delivery records support a routing/context failure, but do not identify the failure-analysis event or prove Slack-rendered placement. Bug remains OPEN; no fix was implemented by this triage.
+**Investigation:** Read-only triage report landed at `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md` (`8b70f1a4`). Safe local delivery records support a routing/context failure, but do not identify the failure-analysis event or prove Slack-rendered placement. Newer safe fields and delivery summaries below provide a concrete regression target; no fix was implemented by the triage.
 **Severity:** low
 **Approval:** operator explicitly requested dispatch on 2026-10-21
 
@@ -24,7 +24,28 @@
 
 ### Scope and uncertainty
 
-This is evidence of misplaced **failure-analysis notification**, not evidence that the LLM caused the thread loss or that all lifecycle notifications are broken. The screenshot alone does not contain Slack message `ts` or `thread_ts`, and the stored metadata for `aeeeb11f` has not been inspected. The source-level context-propagation fix already landed and a different `cluster-resume` job was live-verified in thread, so do **not** assume the former missing-context defect is still the cause. Investigate possible entry-route differences, job-local metadata, first-message anchoring, response_url posting, Slack API replies, or fallback behavior; distinguish them with evidence. A `response_url` post may succeed without persisting a new parent `ts`; check that hypothesis, but do not present it as proven.
+This is evidence of misplaced **failure-analysis notification**, not evidence that the LLM caused the thread loss or that all lifecycle notifications are broken. The screenshot alone does not contain Slack message `ts` or `thread_ts`. Safe persisted metadata is now available, but it does not identify which delivery record corresponds to failure analysis or expose Slack's returned message metadata. The source-level context-propagation fix already landed and a different `cluster-resume` job was live-verified in thread, so do **not** assume the former missing-context defect is still the cause. Investigate possible entry-route differences, job-local metadata, first-message anchoring, response_url posting, Slack API replies, or fallback behavior; distinguish them with evidence. A `response_url` post may succeed without persisting a new parent `ts`; check that hypothesis, but do not present it as proven.
+
+### Safe delivery-record findings (2026-10-21 follow-up)
+
+The read-only follow-up in `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md`
+found safe job metadata for `aeeeb11f`: `action=up`, `status=failed`, and
+`thread_ts=1792615012.460159`. The sanitized delivery record showed five
+successful `response_url` deliveries without a thread timestamp, one successful
+bot fallback without a thread timestamp, and three later response-URL attempts
+with the parent timestamp rejected as `thread_post_rejected`; `channel_id` was
+null in all records. The records contain neither returned Slack message
+timestamps nor per-notification event labels. This supports a delivery-context
+failure mode, but does not identify which delivery was failure analysis or prove
+the screenshot's rendered placement. No response URL, token, or message output
+was inspected or copied into the record.
+
+**Dispatch authorization — 2026-10-22:** operator requested review and dispatch
+of this P2 bug. Scope is offline source audit, deterministic regression tests,
+and a bounded code fix for async lifecycle delivery if the tests establish a
+defect. Do not call Slack, inspect credentials, run AWS/cluster lifecycle
+commands, or claim the historical message's placement is proven. Preserve live
+verification as a separate operator check.
 
 ### Investigation and acceptance
 
@@ -111,6 +132,13 @@ Offline source/tests confirm the metadata-loss risk and that the fixed paths ret
 ## Dispatch scope (2026-10-21)
 
 Implement and test outbound thread-context preservation for asynchronous lifecycle notifications, anchored on the observed `cluster-up` progress path. Audit the shared `cluster-down`, `cluster-resume`, `cluster-refresh`, and Hostinger-refresh routes only where they use the same lifecycle notification path. Keep all notifications for a job on the original intended parent; failures to thread must be visible and correlated without exposing secrets. Add deterministic tests that assert actual channel and `thread_ts` payloads, including successive progress notifications and fallbacks. Do not run real AWS or cluster lifecycle operations.
+
+For the `aeeeb11f` recurrence, correlate only the safe persisted summary fields
+already recorded in `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md`;
+do not access Slack credentials or raw `response_url` values. Implement only a
+reproducible source-level failure with regression coverage. Keep the historical
+Slack-rendered placement unverified unless actual Slack message metadata is
+available through an explicitly authorized safe source.
 
 This dispatch does not include the separate cloud-bridge `make test-all` incident below or incoming Slack `thread_broadcast` handling; those require their own scoped work. Do not expand into unrelated Slack commands or provisioning behavior.
 
