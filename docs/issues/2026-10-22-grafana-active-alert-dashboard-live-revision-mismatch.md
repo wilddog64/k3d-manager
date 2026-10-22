@@ -120,11 +120,11 @@ The dashboard application tracks `k3d-manager-v1.43.5` but currently resolves it
 The app's Synced/Healthy status therefore does not establish that the branch tip has been
 observed. The screenshot is not a valid live verification of the landed fix.
 
-Operator's requested final order is **Namespace → Cluster → Alert → Category → App/Pod
-identity → Severity → Active since → Active for**. The canonical bug acceptance criteria are
-being updated and a narrowly scoped follow-up is being dispatched. Do not force Argo CD refresh
-or sync, or claim LIVE-VERIFIED, without separate operator approval and evidence that the
-application has observed the intended revision.
+Operator's requested final order is **Namespace → Cluster → Alert → Category → App/Pod/Instance
+identity → Severity → Active since → Elapsed time since active**. This follow-up landed as
+`f37757b0` and passed offline verification; the deployment remains unverified until Argo CD
+observes the intended revision and the operator checks Grafana. Do not force Argo CD refresh or
+sync without separate operator approval.
 
 The initial direct Argo CD CLI query failed authentication (`token signature is invalid`); the
 read-only Kubernetes Application and ConfigMap queries above succeeded and were used instead.

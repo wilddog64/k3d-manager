@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** VERIFIED (offline) — identity/browser-local-time follow-up landed as `28e74901`; live verification found Argo CD still serving the prior revision; Category/identity column follow-up dispatched
+**Status:** VERIFIED (offline) — final category/identity/severity/local-time follow-up landed as `f37757b0`; operator live Grafana verification remains pending because Argo CD was serving the prior revision
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -184,10 +184,28 @@ Offline verification covers the compact active-alert table, preserved category c
 ## Definition of Done
 
 - [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [ ] Generic table is compact/readable and orders Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since, Elapsed time since active; CVE detail includes report owner and report-created time while retaining aggregate counts.
+- [x] Generic table is compact/readable and orders Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since, Elapsed time since active; CVE detail includes report owner and report-created time while retaining aggregate counts.
 - [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
 - [x] Record fix SHA, verification evidence and status transition in this bug.
+
+## Category, identity, severity, and duration-label verification (2026-10-22)
+
+The final column follow-up landed and was pushed as `f37757b0`.
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: 70 passed, 2 expected skips because `promtool` is unavailable.
+- `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: clean.
+- `_agent_audit`, `_agent_lint`, staged diff check, and `git diff --check`: passed.
+- `make check-doc-links`: `check-doc-links: 2312 file(s) OK`.
+- Dispatcher landing gate reran both BATS suites, ShellCheck, doc links, and diff check: passed.
+
+The active-alert panel now orders Namespace, Cluster, Alert, Category, available App/Pod/Instance,
+Severity, Active since (local; pending included), and **Elapsed time since active**. Its description
+states this duration is calculated from `ALERTS_FOR_STATE`, may include pending time, and is not
+CVE age, time unpatched, first detection, or exact firing-start time. Both dashboard definitions
+are synchronized and use browser-local timezone. This is VERIFIED offline, not LIVE-VERIFIED.
+Operator should validate the deployed panel after Argo CD observes the branch revision; no refresh,
+sync, or live change was performed here.
 
 ## Identity and local-time follow-up verification (2026-10-22)
 
