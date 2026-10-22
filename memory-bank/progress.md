@@ -6,7 +6,7 @@
 
 ## 2026-10-21 Slack find-similar-docs rollout investigation
 
-- Read-only trace on `k3d-manager-v1.43.5` found no remaining code defect in slash/thread Q parsing, validation, or Make transport. `make deploy-worker` deploys the checked-out Worker and smoke-tests it; `make restart-webhook` kickstarts the checked-out webhook LaunchAgent and restarts cloud bridge. No runtime source revision endpoint was found, so active revisions remain unconfirmed. The user-requested dispatch `slack-find-similar-docs-live-q-failure-followup` independently added read-only rollout checks and landed as `de023621`. Focused BATS passed 8/8, `make check-doc-links` passed (`2289 file(s) OK`), `_agent_audit` and `git diff --check` passed. The canonical bug remains OPEN until the live query succeeds; no service action performed. Earlier investigation notes are in `ea6cfe8b`; current task landing is on `origin/k3d-manager-v1.43.5`.
+- Read-only trace on `k3d-manager-v1.43.5` found no remaining code defect in slash/thread Q parsing, validation, or Make transport. `make deploy-worker` deploys the checked-out Worker and smoke-tests it; `make restart-webhook` kickstarts the checked-out webhook LaunchAgent and restarts cloud bridge. No runtime source revision endpoint was found, so active revisions remain unconfirmed. The user-requested dispatch `slack-find-similar-docs-live-q-failure-followup` landed as `de023621`; focused BATS passed 8/8, doc links passed (`2289 file(s) OK`), `_agent_audit` and `git diff --check` passed. The canonical bug is VERIFIED offline, not LIVE-VERIFIED; operator must deploy/restart from the release checkout and retry the exact query. No service action performed.
 
 ## 2026-10-21 Slack multi-job thread-targeting verification
 
