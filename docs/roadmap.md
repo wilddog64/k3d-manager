@@ -720,11 +720,13 @@ be validated by deterministic code and existing policy gates before any executio
   (natural language to a validated bug-count query object); do not duplicate it. Build on
   /ask-docs retrieval improvements and the established Git-backed spec/memory-bank conventions.
 
-**Placement / dependencies:** Candidate **after the v2.0.0 TwinkleAI reference workload is stable**,
-alongside the v2.x diagnostics/healing gateway; exact v2.x minor release is **TBD**. Do not
-reassign the already proposed v2.1–v2.4 gateway sequence or consume a v1.x spec slot merely by
-recording this theme. Sequence a scoped proposal after the gateway's read-only interface and
-policy boundaries are defined.
+**Placement / dependencies (2026-10-22 update):** The initial **read-only conversational
+operations** slice is now scoped as **proposed v2.5.0**, after the stable v2.0.0 reference workload
+and the existing v2.1–v2.4 gateway/policy/execution-contract/provider-adapter sequence.
+Scope: [`v2.5.0-conversational-operations-assistant.md`](plans/v2.5.0-conversational-operations-assistant.md).
+This consumes no v1.x spec slot and authorizes no implementation. The broader **engineering
+intent-to-contract** planner remains a separate later v2.x candidate (minor version TBD);
+v2.5.0 may propose read-only operational plans, not launch application builds.
 
 **v3.0.0 dependency:** The multi-agent product team must consume **validated engineering intent
 contracts**, not raw prompts that directly launch builds. Its future customer-facing application
@@ -739,6 +741,32 @@ date/release/status constraints, an ambiguous request requiring clarification, a
 unauthorized operation, and an engineering request that results in a reviewable spec without
 executing it. Later end-to-end application delivery requires deployment, functional/security
 tests, handoff, and independent customer-agent continuation evidence.
+
+### Candidate milestone — v2.5.0: Conversational Operations Assistant
+
+**Proposed 2026-10-22 (operator requested formal roadmap/spec; implementation not yet
+authorized).** Build the first stateful, evidence-grounded Slack conversational
+operations assistant on top of the gateway, model adapter and policy boundaries
+already proposed for v2.1–v2.4. Unlike `/k3dm` typed commands or standalone
+Gemini failure analysis, it understands multi-turn context, resolves an exact
+job/thread/cluster, issues bounded read-only tool plans validated by code,
+and replies with current source evidence, uncertainty and safe next steps.
+
+- **Scope:** [`v2.5.0-conversational-operations-assistant.md`](plans/v2.5.0-conversational-operations-assistant.md) — proposed plan **1 of up to 5** for v2.5.0.
+- **Authority:** Slack is the initial interface; model output never grants
+  action approval. Existing Make/webhook/cloud-bridge/Hermes remain authoritative.
+  No unrestricted shell, autonomous recovery or cluster mutation in this release.
+- **Core evidence:** provider-independent context/intent schema, thread-safe
+  persistence, deterministic RBAC/tool validation, cited diagnostics and RAG,
+  negative/ambiguous-input fixtures, privacy-safe audit and measurable
+  correctness/outcome-per-token. A live Slack thread and a real read-only job
+  investigation must pass operator verification before closing.
+- **Dependencies:** v2.0.0 stable reference app; v2.1 read-only gateway;
+  v2.2 policy; v2.3 action contracts (not executable by this feature);
+  v2.4 provider adapter. No v1.x slot displacement.
+- **Later:** validated engineering intent-to-contract authoring remains a
+  future v2.x capability; v3.0.0 multi-agent product team consumes that
+  interface. Do not advertise v2.5.0 as a general-purpose app-building agent.
 
 ### Candidate theme — v2.x: model economics
 
