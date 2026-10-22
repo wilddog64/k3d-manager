@@ -4,6 +4,8 @@
 
 - Operator's Grafana screenshot found the landed per-instance panel too wide, with confusing raw labels (`__name__`, `group`, `tier`) and an epoch-like active timestamp that does not represent CVE detection time. Reopened the canonical P3 and dispatched a compact general active-alert view plus a separate CVE findings table using VulnerabilityReport creation time, labeled **Report created at (UTC)**; true first-detected history remains out of scope. Fix landed/pushed as `309d77bf`. Independent verification: dashboard BATS 45/45; observability BATS 25 passed, 2 expected `promtool` skips; ShellCheck clean; `_agent_audit`/`_agent_lint`, diff check, and dispatcher landing gate passed; `make check-doc-links` reported 2311 files OK. Canonical bug is VERIFIED offline only; operator live Grafana review is still needed.
 
+- Operator's next live screenshot confirms the formatted UTC timestamp and compact table, but shows repeated Trivy rows without app/pod/workload identity. Source confirms the alert has `app=image_repository` but is image-aggregated (no pod label), and the exporter has report `resource_name` not yet shown in the CVE table. Reopened and redispatched the existing bug to restore these actionable fields; no code changes or live mutations by the main checkout.
+
 ## 2026-10-22 current-release P3 batch verification
 
 - Independently verified and landed five dispatched fixes on `k3d-manager-v1.43.5`: cluster-down Slack terminal summaries (`870831a4`), E2E failure-table run correlation (`73819c18`), firing-alert instance active-since/age (`63d53576`), PR-check completion timestamps (`b77a4093`), and read-only vulnerability report command naming (`bb0b95a7`).

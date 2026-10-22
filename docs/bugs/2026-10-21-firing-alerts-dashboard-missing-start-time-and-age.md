@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** VERIFIED — offline implementation landed; operator live Grafana verification pending
+**Status:** OPEN — live Grafana review found alert rows lack actionable app/pod/workload identity; follow-up dispatch approved 2026-10-22
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -34,6 +34,11 @@ That report timestamp must not be presented as the first time the vulnerability 
 True first-seen time would require persisted historical state and is explicitly outside this
 dispatch.
 
+After a Grafana browser refresh, the operator confirmed the new readable time and compact
+columns appeared. The follow-up screenshot showed repeated Trivy rows with only alert name,
+cluster, namespace, severity, active-since, and duration; it still did not identify which app,
+pod, or workload the row concerns. The allowlist hid too much context, so this issue is reopened.
+
 ## Source diagnosis / constraints
 
 The dashboard's existing table aggregates `ALERTS{alertstate="firing"}` by
@@ -55,13 +60,19 @@ any alert rule, notification, or ingestion pathway is failing.
 Keep the current aggregated category counts and deliver two focused detail views:
 
 - A compact general alert-instance table with an allowlist of useful columns (alert,
-  severity, cluster, and only necessary instance identifiers), readable **Active since**
-  UTC date/time and **Active for** duration. Hide `__name__`, `group`, `tier`, and other
-  irrelevant/raw labels; retain an explicit pending-included caveat.
+  app, pod/instance when present, severity, cluster, namespace, readable **Active since**
+  UTC date/time and **Active for** duration). Hide `__name__`, `group`, `tier`, and other
+  irrelevant/raw labels; retain an explicit pending-included caveat. Keep the identifiers
+  needed to distinguish rows and route an operator to the affected target.
 - A separate bounded CVE finding table with CVE ID, severity, cluster, namespace, image,
-  package, installed/fixed version, and **Report created at (UTC)** sourced from the
-  VulnerabilityReport `metadata.creationTimestamp`. Do not call this field “Detected at,”
-  “First seen,” or imply it is the vulnerability's initial detection time.
+  workload/report owner, package, installed/fixed version, and **Report created at (UTC)**
+  sourced from the VulnerabilityReport `metadata.creationTimestamp`. Do not call this field
+  “Detected at,” “First seen,” or imply it is the vulnerability's initial detection time.
+
+The Trivy alert rule groups by cluster, namespace, and image repository, and sets `app` from
+the image repository; it does not preserve a pod label. Do not change this alert aggregation
+or fabricate a pod identity. The CVE report's `resource_name` provides workload/report-owner
+context in the separate finding view.
 
 True first-detected time needs retained historical state and is out of scope. Do not add a
 timeline or invent a resolved/first-seen timestamp.
@@ -86,13 +97,13 @@ must:
   - id: M1
     text: The existing aggregated Firing Alerts by Category counts remain available and correct.
   - id: M2
-    text: General alert rows show an allowlisted compact set of fields and readable Active since (UTC; pending included) plus elapsed active duration.
+    text: General alert rows show compact alert/app and available pod/instance identity, plus readable Active since (UTC; pending included) and elapsed active duration.
   - id: M3
     text: No active-state timestamp is labeled as firing time or CVE detection time; the caveat is visible.
   - id: M4
     text: Missing timestamps, no firing alerts, and multiple instances of one alert are handled without fabricated values.
   - id: M5
-    text: A separate CVE detail view exposes VulnerabilityReport creation time labeled Report created at (UTC), plus useful finding context.
+    text: A separate CVE detail view exposes VulnerabilityReport creation time labeled Report created at (UTC), plus image and workload/report-owner context.
   - id: M6
     text: Source access, labels, cardinality, row limits, and dashboard definitions remain safe and synchronized; guides document semantics.
 must_not:
@@ -106,11 +117,11 @@ evidence:
   - id: E1
     kind: offline
     proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3]
-    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, compact allowlisted fields, readable UTC/time units, limits, and synchronized dashboard definitions.
+    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, compact fields including available app/pod/instance and report owner, readable UTC/time units, limits, and synchronized dashboard definitions.
   - id: E2
     kind: live
     proves: [M1, M2, M3, M4]
-    text: After separately approved rollout, confirm the compact general alert view and compare a CVE row's Report created at value to its VulnerabilityReport metadata.creationTimestamp; verify aggregate counts remain correct. This does not verify first-detected time.
+    text: After separately approved rollout, confirm the general alert view identifies app and available pod/instance, the CVE view identifies image and report owner, and compare Report created at to VulnerabilityReport metadata.creationTimestamp; verify aggregate counts. This does not verify first-detected time.
 interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml
   - scripts/etc/grafana/dashboards/grafana-overview-readable-configmap.yaml
@@ -155,11 +166,18 @@ Offline verification covers the compact active-alert table, preserved category c
 - Approved disposition: compact generic active-alert context plus a separate CVE-focused finding table with VulnerabilityReport creation timestamp, explicitly not first-detected time.
 - Dispatch scope is the `interface` list and `Files` below. Tests must cover timestamp provenance, absent timestamps, field selection/units, limits, and synchronized dashboard payloads. No deployment/live mutation is authorized by this dispatch.
 
+## Actionable target identity follow-up (2026-10-22)
+
+- Live result: timestamp formatting and label reduction are now visible, but repeated Trivy rows do not identify the affected app or target. The app/pod/workload context was over-pruned.
+- Source finding: Trivy alert labels include `app` mapped from `image_repository`, but the rule aggregates by image and has no pod label. The CVE exporter already has `resource_name`, but the CVE table omits it.
+- Approved change: add available `app`, `pod`/`instance` identifiers to the general table and `resource_name` as workload/report-owner context in the CVE table. Keep tables focused; do not expose noisy metric labels or alter alert grouping to invent pod-level identity.
+- Redispatch only within the existing `Files` list. No rollout/live mutation is authorized.
+
 ## Definition of Done
 
 - [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [x] Generic table is compact/readable; separate CVE detail uses report creation time and retains aggregate counts.
-- [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, field selection, bounds, and synchronized definitions.
+- [ ] Generic table is compact/readable and preserves actionable app/pod/instance context; CVE detail includes report owner and report-created time while retaining aggregate counts.
+- [ ] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
 - [ ] Record fix SHA, verification evidence and status transition in this bug.
 
