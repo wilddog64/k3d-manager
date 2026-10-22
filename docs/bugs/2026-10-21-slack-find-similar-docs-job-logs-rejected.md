@@ -9,19 +9,30 @@
 
 ## Symptom and evidence
 
-The operator successfully ran `make find-similar-docs Q=what's recent e2e-remote issues`; Slack reported success under job ID `08ae7d06` and returned prior-art results. In the same conversational context, the operator then sent:
+The operator ran a Slack find-similar-docs query and received a successful job with prior-art results. The observed command/result sequence is:
 
 ```text
+make find-similar-docs Q=what's recent e2e-remote issues
+✅ make find-similar-docs Q=what's recent e2e-remote issues succeeded — job 08ae7d06
+Prior art for: "what's recent e2e-remote issues"
+
 logs 08ae7d06
+Usage: logs|status|diagnosis|kill <job-id> — include the exact job ID
+
+status 08ae7d06
+Failed (operator-reported); exact Slack response was not supplied.
 ```
 
-The webhook replied:
+The operator reports that `logs <job-id>` succeeds for other jobs and that both `logs 08ae7d06` and `status 08ae7d06` fail for this find-similar-docs job. A separate screenshot provides a positive comparison:
 
 ```text
-Usage: logs|status|diagnosis|kill <job-id> — include the exact job ID
+logs fb7db078
+📋 Last 20 lines (job fb7db078)
+...
+make: *** [test-all] Error 2
 ```
 
-The operator reports that `logs <job-id>` succeeds for other jobs and this failure is specific to the find-similar-docs job. A separate screenshot shows `logs fb7db078` returning the last 20 lines of a `make test-all` job. The find-similar-docs job's successful output is visible, but its transcript could not be retrieved with its displayed job ID.
+The find-similar-docs job's successful output is visible, but its transcript and status could not be retrieved using its displayed job ID. The status failure is operator-reported; its exact response is not yet evidenced, so it must not be assumed to be the same usage error.
 
 ## Source trace and limits
 
