@@ -59,11 +59,11 @@ any alert rule, notification, or ingestion pathway is failing.
 
 Keep the current aggregated category counts and deliver two focused detail views:
 
-- A compact general alert-instance table with an allowlist of useful columns (alert,
-  app, pod/instance when present, severity, cluster, namespace, readable **Active since**
-  UTC date/time and **Active for** duration). Hide `__name__`, `group`, `tier`, and other
-  irrelevant/raw labels; retain an explicit pending-included caveat. Keep the identifiers
-  needed to distinguish rows and route an operator to the affected target.
+- The general alert-instance table uses this exact operator-facing order: **Namespace →
+  Cluster → Alert → App/pod identity → Active since → Active for**. The App/pod identity
+  slot shows available `app` and `pod`/`instance` values (adjacent within that slot if both
+  are present); do not fabricate missing identity. Hide `__name__`, `group`, `tier`, and
+  other irrelevant/raw labels; retain an explicit pending-included caveat.
 - A separate bounded CVE finding table with CVE ID, severity, cluster, namespace, image,
   workload/report owner, package, installed/fixed version, and **Report created at (UTC)**
   sourced from the VulnerabilityReport `metadata.creationTimestamp`. Do not call this field
@@ -97,7 +97,7 @@ must:
   - id: M1
     text: The existing aggregated Firing Alerts by Category counts remain available and correct.
   - id: M2
-    text: General alert rows show compact alert/app and available pod/instance identity, plus readable Active since (UTC; pending included) and elapsed active duration.
+    text: The general alert table columns are ordered Namespace, Cluster, Alert, App/pod identity, Active since, Active for; available target identifiers remain visible and times are readable UTC.
   - id: M3
     text: No active-state timestamp is labeled as firing time or CVE detection time; the caveat is visible.
   - id: M4
@@ -117,7 +117,7 @@ evidence:
   - id: E1
     kind: offline
     proves: [M1, M2, M3, M4, M5, M6, N1, N2, N3]
-    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, compact fields including available app/pod/instance and report owner, readable UTC/time units, limits, and synchronized dashboard definitions.
+    text: Exporter and dashboard fixtures cover report timestamp/absence, distinct alerts and instances, pending interval, zero findings/alerts, exact alert-column order and available app/pod/instance identity, CVE report owner, readable UTC/time units, limits, and synchronized dashboard definitions.
   - id: E2
     kind: live
     proves: [M1, M2, M3, M4]
@@ -171,6 +171,7 @@ Offline verification covers the compact active-alert table, preserved category c
 - Live result: timestamp formatting and label reduction are now visible, but repeated Trivy rows do not identify the affected app or target. The app/pod/workload context was over-pruned.
 - Source finding: Trivy alert labels include `app` mapped from `image_repository`, but the rule aggregates by image and has no pod label. The CVE exporter already has `resource_name`, but the CVE table omits it.
 - Approved change: add available `app`, `pod`/`instance` identifiers to the general table and `resource_name` as workload/report-owner context in the CVE table. Keep tables focused; do not expose noisy metric labels or alter alert grouping to invent pod-level identity.
+- Operator specified the exact general-table order: **Namespace → Cluster → Alert → App/pod identity → Active since → Active for**. Do not add Severity to this table; severity and full finding context remain in the separate CVE view.
 - Redispatch only within the existing `Files` list. No rollout/live mutation is authorized.
 
 ## Definition of Done
