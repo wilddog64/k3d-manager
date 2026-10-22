@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-10-22 Grafana active-alert identity and local-time follow-up
+
+- Independently reviewed and landed `firing-alert-dashboard-identifiers-local-time` as `28e74901` on `k3d-manager-v1.43.5`. The active-alert view retains available App/Pod/Instance identity after Namespace, Cluster, Alert; both time displays follow Grafana browser timezone. The CVE view includes report owner while preserving report-created (not first-detected) semantics.
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: 70 passed, 2 expected `promtool` skips. ShellCheck, `_agent_audit`, `_agent_lint`, diff checks, `make check-doc-links` (2311 files), and dispatcher landing gate passed. Bug is VERIFIED offline; operator live Grafana verification is pending.
+- The other recently completed task, `hostinger-multi-service-incident-attribution`, had already landed as `3794508e`. Its report is intentionally still OPEN because the exact Hostinger outage root cause is undetermined; there is no remediation to mark verified.
+
 ## 2026-10-22 Hostinger incident historical report landing
 
 - Reviewed and landed `hostinger-multi-service-incident-attribution` as `3794508e` in `docs/issues/2026-10-21-hostinger-multi-service-incident-investigation.md`. The read-only report adds timestamp-reconciled retained probe/job evidence, separates the persistent Argo CD direct-password symptom from the outage, and leaves the exact M4/API fault domain unassigned because provider audit, raw tunnel, and API-proxy logs were unavailable. Verification: `make check-doc-links` 2303 files OK, `git diff --check`, staged `_agent_audit`/`_agent_lint`, and dispatcher land gate passed. The canonical incident stays OPEN; there is no live fix to verify.

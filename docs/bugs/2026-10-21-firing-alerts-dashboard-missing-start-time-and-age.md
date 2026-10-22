@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** OPEN — live Grafana review found alert rows lack actionable app/pod/workload identity; follow-up dispatch approved 2026-10-22
+**Status:** VERIFIED (offline) — identity and browser-local-time follow-up landed as `28e74901`; operator live Grafana verification remains pending
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -182,10 +182,29 @@ Offline verification covers the compact active-alert table, preserved category c
 ## Definition of Done
 
 - [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [ ] Generic table is compact/readable and preserves actionable app/pod/instance context; CVE detail includes report owner and report-created time while retaining aggregate counts.
-- [ ] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
+- [x] Generic table is compact/readable and preserves actionable app/pod/instance context; CVE detail includes report owner and report-created time while retaining aggregate counts.
+- [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
-- [ ] Record fix SHA, verification evidence and status transition in this bug.
+- [x] Record fix SHA, verification evidence and status transition in this bug.
+
+## Identity and local-time follow-up verification (2026-10-22)
+
+The follow-up landed and was pushed to `k3d-manager-v1.43.5` as `28e74901`.
+Independent verification and dispatcher landing gates passed:
+
+- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: 70 passed, 2 expected skips because `promtool` is unavailable.
+- `shellcheck -x scripts/tests/plugins/grafana_dashboard_appsets.bats scripts/tests/plugins/e2e_observability.bats`: clean.
+- `_agent_audit`, `_agent_lint`, staged diff check, and `git diff --check`: passed.
+- `make check-doc-links`: `check-doc-links: 2311 file(s) OK`.
+- Dispatcher landing gate reran both BATS suites, ShellCheck, doc links, and diff check: passed.
+
+The active-alert table orders Namespace, Cluster, Alert, available App/Pod/Instance identity,
+Active since (local; pending included), and Active for. Dashboard timezone is `browser`; source
+timestamps and elapsed-duration semantics are unchanged. The CVE finding table includes the
+workload/report owner and labels VulnerabilityReport creation time as Report created at (local).
+This is VERIFIED offline, not LIVE-VERIFIED. After deployment, operator should confirm the
+column order and identity values, viewer-local timestamp rendering, report-owner context, and
+category counts in Grafana. No deployment or live mutation was performed.
 
 ## What NOT to Do
 
