@@ -184,3 +184,27 @@ The operator authorized a read-only cloud-bridge investigation while away from t
 Evidence URLs:
 - https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-hostinger.json
 - https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
+
+## Live Slack log-retrieval check — 2026-10-21
+
+The operator ran the read-only Slack thread target `k3dm fix-list`, which completed as job
+`013fdfe9`. The first visible `logs 013fdfe9` attempt received the generic usage response;
+the operator repeated the same visible command and Slack then returned:
+
+```text
+📋 Last 20 lines (job 013fdfe9)
+make fix-delete-pod       APP and NS are required
+make fix-eso-refresh      No arguments needed
+make fix-force-sync       APP is required
+make fix-list             List all fix targets with descriptions
+make fix-restart          APP and NS are required
+make fix-status           NS is required
+make fix-sync             APP is required
+```
+
+This is positive live evidence that a thread-originated Make job can return its own
+`make.log` through explicit `logs <job-id>`. It does **not** exercise cloud-bridge
+`job-status` for a failed Make job, so that separate acceptance criterion remains pending.
+The initial usage response is tracked separately in
+`docs/bugs/2026-10-21-slack-find-similar-docs-job-logs-rejected.md`; the identical visible
+retry succeeding leaves an intermittent command-input/routing discrepancy unresolved.

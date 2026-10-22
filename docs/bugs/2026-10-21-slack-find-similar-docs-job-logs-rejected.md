@@ -34,6 +34,10 @@ make: *** [test-all] Error 2
 
 The find-similar-docs job's successful output is visible, but its transcript and status could not be retrieved using its displayed job ID. The status failure is operator-reported; its exact response is not yet evidenced, so it must not be assumed to be the same usage error.
 
+### Comparator retry — 2026-10-21
+
+In a later `k3dm fix-list` thread, the operator sent the visible command `logs 013fdfe9` and received the same generic usage response, then repeated the same visible command and received `Last 20 lines (job 013fdfe9)` with the expected `fix-list` Make output. This is an intermittent parse/routing symptom across targets, not uniquely a find-similar-docs log-file issue. It also shows that the explicit lookup and log-selection path can succeed. The screenshots do not provide raw Slack event bodies, so whether the first event differed invisibly or was routed through different runtime state remains unknown. Keep this issue OPEN pending exact cause; do not infer that the earlier `status 08ae7d06` failure is resolved.
+
 ## Source trace and limits
 
 - In `bin/k3dm-webhook`, `_resolve_thread_job_target()` emits the usage text only when the normalized command does not contain exactly two whitespace-separated tokens or the second token fails `_JOB_ID_RE`.
