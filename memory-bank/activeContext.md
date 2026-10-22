@@ -149,3 +149,7 @@ Use the bug docs for acceptance criteria and the archive for historical context;
 
 - Operator requested a properly released Kubernetes intrusion detection spec. Created `docs/plans/v1.51.0-runtime-intrusion-detection-falco.md` (v1.51.0, plan 1/5, PROPOSED) on active branch `k3d-manager-v1.43.5`; commit `2d2fb25ad53e85a091ec18cc5140d4df6d0b7fd8`. No PR and no deployment.
 - Scope: Falco/Falcosidekick, existing Prometheus/Grafana/Alertmanager/Slack, candidate read-only Hermes diagnostics, kernel/headroom gate, independent offline and isolated live E2E evidence, fail-visible sensors; explicitly no automatic enforcement. Future release branch cut from main after predecessor merges. User approved spec authoring, not production deployment.
+
+## 2026-10-22 v2.6.x autonomous investigation roadmap
+
+- Operator requested placing Autonomous Investigation Maturity in the v2.x roadmap. Added candidate milestone v2.6.0 and phased v2.6.1–v2.6.3 under `docs/roadmap.md` on `k3d-manager-v1.43.5` (commit `3c0981674fe6d078181f468bcbfa2d3b498fae74`). It follows v2.5.0 Conversational Operations Assistant and uses read-only bounded investigation, evidence provenance, independent evaluation, escalation and fail-closed policies. Roadmap only, no implementation spec, dispatcher action, deployment or PR.
