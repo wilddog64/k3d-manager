@@ -1194,6 +1194,10 @@ function _ubuntu_k3s_wait_ssh_ready() {
       *"permission denied"*|*"authentication failed"*|*"no more authentication methods"*) classification="authentication rejected" ;;
       *"could not resolve hostname"*|*"name or service not known"*|*"temporary failure in name resolution"*) classification="hostname resolution failed" ;;
     esac
+    if [[ "${classification}" == "hostname resolution failed" ]]; then
+      _err "[shopping_cart] SSH readiness failed for ${ssh_user}@${host} after ${elapsed}s (budget ${budget}s): ${classification}; not starting k3sup"
+      return 1
+    fi
     if (( elapsed >= budget )); then
       _err "[shopping_cart] SSH readiness failed for ${ssh_user}@${host} after ${elapsed}s (budget ${budget}s): ${classification}; not starting k3sup"
       return 1
@@ -1436,7 +1440,7 @@ Then run: ./scripts/k3d-manager register_app_cluster
 Config (override via env or scripts/etc/k3s/vars.sh):
   UBUNTU_K3S_SSH_HOST          SSH host alias (default: ubuntu)
   UBUNTU_K3S_SSH_USER          SSH user       (default: ubuntu)
-  UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: UBUNTU_K3S_SSH_HOST)
+  UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: SSH config HostName, then UBUNTU_K3S_SSH_HOST)
   UBUNTU_K3S_SSH_KEY           SSH key path   (default: ~/.ssh/k3d-manager-key.pem)
   UBUNTU_K3S_LOCAL_KUBECONFIG  Local kubeconfig path (default: ~/.kube/k3s-ubuntu.yaml)
 HELP

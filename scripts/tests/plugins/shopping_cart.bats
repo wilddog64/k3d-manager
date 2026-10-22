@@ -268,6 +268,21 @@
   [ "$status" -eq 0 ]
 }
 
+@test "SSH readiness stops immediately when the target hostname cannot resolve" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts" K3DM_SSH_READY_TIMEOUT=180 bash -c '\''
+      source scripts/lib/system.sh
+      source scripts/lib/core.sh
+      source scripts/plugins/shopping_cart.sh
+      _err() { printf "%s\\n" "$*"; return 1; }
+      ssh() { printf "ssh: Could not resolve hostname ubuntu: Name or service not known\\n" >&2; return 255; }
+      _ubuntu_k3s_wait_ssh_ready ubuntu ubuntu key
+    '\''
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"after 0s (budget 180s): hostname resolution failed"* ]]
+}
+
 @test "SSH readiness deadline includes probe time and caps the final wait" {
   run bash -c '
     timeout_log="${BATS_TEST_TMPDIR}/ssh-connect-timeouts"
@@ -443,6 +458,7 @@
       printf "%s\n" "$@"
       [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"
       return 0
+      return 0
     }
     nodes_calls=0
     kubectl() {
@@ -460,6 +476,76 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"--k3s-extra-args"* ]]
   [[ "$output" == *"--disable traefik --disable servicelb --kubelet-arg=system-reserved=memory=256Mi --kubelet-arg=kube-reserved=memory=256Mi"* ]]
+}
+
+@test "deploy_app_cluster resolves source-time alias default to current SSH HostName for readiness and k3sup" {
+  run bash -c '
+    export HOME="${BATS_TEST_TMPDIR}"
+    export UBUNTU_K3S_SSH_HOST=ubuntu UBUNTU_K3S_SSH_USER=ubuntu
+    unset UBUNTU_K3S_EXTERNAL_IP
+    export UBUNTU_K3S_SSH_KEY="${HOME}/key.pem" UBUNTU_K3S_LOCAL_KUBECONFIG="${HOME}/k3s.yaml"
+    mkdir -p "${HOME}/.kube" "${HOME}/.ssh"
+    : > "${HOME}/.ssh/config"
+    printf "Host ubuntu\n  HostName 44.247.81.210\n" > "${HOME}/.ssh/config"
+    : > "${UBUNTU_K3S_SSH_KEY}"
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/etc/k3s/vars.sh
+    source scripts/plugins/shopping_cart.sh
+    _ensure_k3sup() { :; }
+    _ubuntu_k3s_trust_host() { :; }
+    _ubuntu_k3s_wait_ssh_ready() { printf "READY_TARGET=%s\n" "$1"; }
+    _setup_vault_bridge() { :; }
+    _run_command() {
+      printf "%s\n" "$@"
+      [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"
+      return 0
+    }
+    kubectl() {
+      case "$*" in
+        *"get nodes"*) [[ "$*" == *"--no-headers"* ]] && return 1; printf "node Ready\n" ;;
+        *"config get-contexts"*) return 1 ;;
+        *"config view --flatten"*) printf "config\n" ;;
+      esac
+    }
+    deploy_app_cluster --confirm
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"READY_TARGET=44.247.81.210"* ]]
+  [[ "$output" == *"--ip"*"44.247.81.210"* ]]
+}
+
+@test "deploy_app_cluster preserves explicit external IP override" {
+  run bash -c '
+    export HOME="${BATS_TEST_TMPDIR}"
+    export UBUNTU_K3S_SSH_HOST=ubuntu UBUNTU_K3S_SSH_USER=ubuntu UBUNTU_K3S_EXTERNAL_IP=198.51.100.7
+    export UBUNTU_K3S_SSH_KEY="${HOME}/key.pem" UBUNTU_K3S_LOCAL_KUBECONFIG="${HOME}/k3s.yaml"
+    mkdir -p "${HOME}/.kube" "${HOME}/.ssh"
+    printf "Host ubuntu\n  HostName 44.247.81.210\n" > "${HOME}/.ssh/config"
+    : > "${UBUNTU_K3S_SSH_KEY}"
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/etc/k3s/vars.sh
+    source scripts/plugins/shopping_cart.sh
+    _ensure_k3sup() { :; }
+    _ubuntu_k3s_trust_host() { :; }
+    _ubuntu_k3s_wait_ssh_ready() { printf "READY_TARGET=%s\n" "$1"; }
+    _setup_vault_bridge() { :; }
+    _run_command() { printf "%s\n" "$@"; [[ "$*" == *"k3sup install"* ]] && : > "${UBUNTU_K3S_LOCAL_KUBECONFIG}"; return 0; }
+    kubectl() {
+      case "$*" in
+        *"get nodes"*) [[ "$*" == *"--no-headers"* ]] && return 1; printf "node Ready\n" ;;
+        *"config get-contexts"*) return 1 ;;
+        *"config view --flatten"*) printf "config\n" ;;
+      esac
+    }
+    deploy_app_cluster --confirm
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"READY_TARGET=198.51.100.7"* ]]
+  [[ "$output" == *"--ip"*"198.51.100.7"* ]]
 }
 
 @test "_k3s_agent_is_ready matches node InternalIP, not ssh alias or public IP" {

@@ -1,7 +1,7 @@
 # Bug: k3s-aws SSH readiness probes the alias instead of the provisioned IP
 
 **Filed:** 2026-10-21 (operator live `make up` output)
-**Status:** OPEN — dispatching fix; live verification pending
+**Status:** OPEN — implementation complete and offline-tested; live verification pending
 **Priority:** P2 — blocks ACG cluster provisioning, with a manual configuration workaround
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from plan cap)
@@ -71,6 +71,19 @@ The live failure was observed before k3sup and before Argo CD registration. The
 new diagnostic fix is already offline-verified separately, but it cannot address
 this target-selection defect. Live verification of this bug requires a future
 operator-approved ACG bring-up; no live verification is claimed here.
+
+Offline implementation evidence (2026-10-21): `bats
+scripts/tests/plugins/shopping_cart.bats` passed 41/41, including regression
+coverage that sources `vars.sh` before writing the fresh `Host ubuntu` HostName,
+checks that readiness and `k3sup --ip` receive the same resolved address, and
+checks that an explicit `UBUNTU_K3S_EXTERNAL_IP` remains authoritative. A DNS
+resolution failure now stops readiness immediately while retaining the
+fail-closed guard. `shellcheck -S warning` for touched shell files,
+`git diff --check`, and `_agent_audit` passed. The related provider contract
+suite had two existing teardown/deregistration failures (28/30); details are in
+`docs/issues/2026-10-21-k3s-aws-ssh-target-provider-contract-failures.md`.
+No live infrastructure operation was run. This evidence does not establish
+live verification.
 
 ## Scope for dispatch
 
