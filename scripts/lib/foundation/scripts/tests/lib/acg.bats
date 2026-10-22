@@ -116,6 +116,61 @@ EOF
   [ "${#_ACG_AGENT_IPS[@]}" -eq 2 ]
 }
 
+@test "_acg_update_ssh_config creates missing SSH config and server target idempotently" {
+  _acg_update_ssh_config "44.247.81.210"
+  [ -f "${HOME}/.ssh/config" ]
+  run cat "${HOME}/.ssh/config"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host ubuntu"* ]]
+  [[ "$output" == *"HostName 44.247.81.210"* ]]
+
+  _acg_update_ssh_config "44.247.81.210"
+  run grep -c '^Host ubuntu$' "${HOME}/.ssh/config"
+  [ "$output" -eq 1 ]
+}
+
+@test "_acg_update_ssh_config adds server stanza without changing agent aliases" {
+  mkdir -p "${HOME}/.ssh"
+  cat > "${HOME}/.ssh/config" <<'EOF'
+Host ubuntu-1
+  HostName 10.0.0.1
+Host ubuntu-2
+  HostName 10.0.0.2
+EOF
+
+  _acg_update_ssh_config "44.247.81.210"
+  run cat "${HOME}/.ssh/config"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host ubuntu-1
+  HostName 10.0.0.1"* ]]
+  [[ "$output" == *"Host ubuntu-2
+  HostName 10.0.0.2"* ]]
+  [[ "$output" == *"Host ubuntu
+  HostName 44.247.81.210"* ]]
+}
+
+@test "_acg_update_ssh_config updates existing server and tunnel stanzas" {
+  mkdir -p "${HOME}/.ssh"
+  cat > "${HOME}/.ssh/config" <<'EOF'
+Host ubuntu
+  HostName 192.0.2.10
+Host ubuntu-tunnel
+  HostName 192.0.2.10
+Host ubuntu-1
+  HostName 10.0.0.1
+EOF
+
+  _acg_update_ssh_config "44.247.81.210"
+  run cat "${HOME}/.ssh/config"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Host ubuntu
+  HostName 44.247.81.210"* ]]
+  [[ "$output" == *"Host ubuntu-tunnel
+  HostName 44.247.81.210"* ]]
+  [[ "$output" == *"Host ubuntu-1
+  HostName 10.0.0.1"* ]]
+}
+
 @test "acg rejects malformed or zero agent counts before any aws call" {
   aws_calls="${BATS_TEST_TMPDIR}/aws.calls"
   _run_command() {

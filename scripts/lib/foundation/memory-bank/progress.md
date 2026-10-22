@@ -1,5 +1,7 @@
 # Progress — lib-foundation
 
+- [x] **Copilot PR #72 finding addressed (2026-10-21):** Removed the unreachable `|| return 1` after hard `_run_command`; failures already terminate via `_err`/`exit`. Copilot's equivalent fix is `b2b769a`; local branch merged it with local verification commit and pushed `14532f6`. Clean-env `acg.bats` passed 28/28, shellcheck and agent-rigor passed, review thread replied to and resolved. GitHub checks are rerunning after the update.
+
 - [x] **v1.26.0 fleet lifecycle Phase A (2026-08-20):** commit `8148e33` (`feat(acg): make
   CloudFormation agent fleet count-agnostic`) pushed to `origin/feat/v0.4.12`. The ACG module now
   validates `ACG_AGENT_COUNT` before AWS access, emits N discrete agent resources/outputs to a
