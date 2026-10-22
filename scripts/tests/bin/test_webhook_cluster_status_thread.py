@@ -144,6 +144,49 @@ def test_cluster_diagnose_bot_path_replies_in_existing_thread(monkeypatch, statu
     assert (tmp_path / "job" / "thread_ts").read_text() == "INCOMING"
 
 
+@pytest.mark.parametrize(
+    "exit_code,output,timeout,status,expected_output",
+    [
+        (7, "Unable to connect: token=topsecret", False, "failed",
+         "Unable to connect: token=***REDACTED***"),
+        (0, "NAMESPACE NAME READY\nkube-system coredns 1/1", False, "success",
+         "NAMESPACE NAME READY\nkube-system coredns 1/1"),
+    ],
+)
+def test_cluster_diagnostics_status_uses_command_exit_code(
+    monkeypatch, status_env, tmp_path, exit_code, output, timeout, status,
+    expected_output,
+):
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    monkeypatch.setattr(wh._status, "_spawn_capture_text",
+                        lambda *args, **kwargs: (exit_code, output, timeout))
+
+    wh._status._run_cluster_diagnostics(
+        "job", "", request={"action": "get-pods-all", "context": "ubuntu-k3s"},
+    )
+
+    assert (job_dir / "status").read_text() == status
+    saved_output = (job_dir / "output").read_text()
+    assert expected_output in saved_output
+    if exit_code:
+        assert "topsecret" not in saved_output
+
+
+def test_cluster_diagnostics_timeout_keeps_timeout_message(monkeypatch, status_env, tmp_path):
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    monkeypatch.setattr(wh._status, "_spawn_capture_text",
+                        lambda *args, **kwargs: (124, "partial output", True))
+
+    wh._status._run_cluster_diagnostics(
+        "job", "", request={"action": "get-pods-all", "context": "ubuntu-k3s"},
+    )
+
+    assert (job_dir / "status").read_text() == "failed"
+    assert "❌ diagnostics command timed out after 30s" in (job_dir / "output").read_text()
+
+
 def test_header_failure_posts_full_report_once(monkeypatch, status_env, tmp_path):
     calls = []
     monkeypatch.setattr(wh, "_start_bot_thread", lambda header: "")

@@ -91,9 +91,10 @@ def configure_runtime(log, notify_job, redact_secrets, resolve_provider,
     _smoke_test_services = smoke_test_services
 
 
-def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
-    _rc, output, timed_out = _spawn_capture_text(cmd, cwd=cwd, env=env, timeout=timeout)
-    return output.strip(), timed_out
+def _posix_spawn_capture(cmd, timeout, cwd=None, env=None, include_exit_code=False):
+    rc, output, timed_out = _spawn_capture_text(cmd, cwd=cwd, env=env, timeout=timeout)
+    result = (output.strip(), timed_out)
+    return (rc, *result) if include_exit_code else result
 
 
 def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, channel_id=""):
@@ -485,7 +486,9 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, channel_id=""
 
         _write_log(title)
         _write_log(f"_Target provider: `{provider}`_")
-        out, timed_out = _posix_spawn_capture(cmd, timeout=30)
+        exit_code, out, timed_out = _posix_spawn_capture(
+            cmd, timeout=30, include_exit_code=True,
+        )
         if timed_out:
             _write_log("\n❌ diagnostics command timed out after 30s")
             _finish("failed")
@@ -499,7 +502,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, channel_id=""
             _write_log(f"```{clipped}```")
         else:
             _write_log("_(no output returned)_")
-        _finish("success")
+        _finish("success" if exit_code == 0 else "failed")
     except Exception as exc:
         _write_log(f"ERROR: {exc}")
         _finish("failed")
