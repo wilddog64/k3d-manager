@@ -99,6 +99,12 @@ def render(prs, now, repo):
                 duration = end - check["started"]
                 labels = _labels({**base, "check": check["name"]})
                 lines.append(f"k3dm_pr_check_duration_seconds{{{labels}}} {duration}")
+            if check["completed"] is not None:
+                labels = _labels({**base, "check": check["name"]})
+                lines.append(
+                    f"k3dm_pr_check_completed_timestamp_seconds{{{labels}}} "
+                    f"{check['completed']}"
+                )
     labels = _labels({"repo": repo})
     lines.append(f"k3dm_pr_checks_open_prs{{{labels}}} {len(prs)}")
     lines.append(f"k3dm_pr_checks_last_scrape_timestamp_seconds{{{labels}}} {now}")

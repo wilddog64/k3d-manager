@@ -14,3 +14,10 @@ last good rows and usually means the Hermes GitHub token expired or was rejected
 the minimum across the selected repos; use the Repo filter to find which one failed. A repo whose
 reads have always failed is missing from the Repo filter, because the filter is built from
 `k3dm_pr_checks_open_prs`. The Hermes GitHub token needs read access to every listed repo.
+
+**Latest check duration (sampled)** shows the latest duration gauge at Prometheus scrape times.
+Repeated points for a completed check are repeated observations of the same GitHub run, not new
+executions; in-progress durations grow between polls. For a completed check, the separate
+`k3dm_pr_check_completed_timestamp_seconds` metric carries GitHub's `completed_at` timestamp as
+epoch seconds. It is emitted only for the selected latest check of each currently open PR and
+uses the bounded `repo`, `pr`, and `check` labels. The chart's x-axis remains the scrape time.

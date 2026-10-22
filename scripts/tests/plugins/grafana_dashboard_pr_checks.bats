@@ -109,6 +109,9 @@ from pathlib import Path
 
 data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
 panel = next(panel for panel in data["panels"] if panel["id"] == 8)
+assert panel["title"] == "Latest check duration (sampled)"
+assert "Prometheus scrape times" in panel["description"]
+assert "completed_at" in panel["description"]
 assert panel["options"]["legend"] == {
     "showLegend": True,
     "displayMode": "list",
@@ -117,6 +120,8 @@ assert panel["options"]["legend"] == {
 }
 assert panel["targets"][0]["expr"] == 'k3dm_pr_check_duration_seconds{repo=~"$repo"}'
 assert panel["targets"][0]["legendFormat"] == "{{repo}}#{{pr}} {{check}}"
+table = next(panel for panel in data["panels"] if panel["id"] == 6)
+assert all(target.get("instant") is True for target in table["targets"])
 PY
   [ "${status}" -eq 0 ]
 }

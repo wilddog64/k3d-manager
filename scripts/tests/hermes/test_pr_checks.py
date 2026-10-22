@@ -57,7 +57,14 @@ def test_overall_render_and_failure_output():
     rendered = pr_checks.render(prs, 250, "wilddog64/k3d-manager")
     assert 'k3dm_pr_info{repo="wilddog64/k3d-manager",pr="66"' in rendered
     assert "k3dm_pr_check_duration_seconds{repo=\"wilddog64/k3d-manager\",pr=\"66\",check=\"lint\"} 60" in rendered
+    assert "k3dm_pr_check_completed_timestamp_seconds{repo=\"wilddog64/k3d-manager\",pr=\"66\",check=\"lint\"} 160" in rendered
     assert "check=\"CodeQL\"} 50" in rendered
+    assert "completed_timestamp_seconds{repo=\"wilddog64/k3d-manager\",pr=\"66\",check=\"CodeQL\"}" not in rendered
+    assert "id=\"" not in rendered
+    later_poll = pr_checks.render(prs, 300, "wilddog64/k3d-manager")
+    completed = next(line for line in rendered.splitlines() if "completed_timestamp_seconds" in line)
+    assert completed in later_poll.splitlines()
+    assert "check=\"CodeQL\"} 100" in later_poll
     title = next(line for line in rendered.splitlines() if line.startswith("k3dm_pr_info"))
     title_value = title.split('title="', 1)[1].split('"', 1)[0]
     assert len(title_value) == 100 and title_value.endswith("…")
