@@ -41,12 +41,12 @@ do not infer any EC2 boot or network fault.
 - Keep unrelated providers and features unchanged.
 - Do not run live `make up`, `make down`, AWS, kubectl, or Argo CD operations.
 
-## Allowed files
+## Files
 
 - `scripts/etc/k3s/vars.sh`
 - `scripts/plugins/shopping_cart.sh`
 - `scripts/lib/providers/k3s-aws.sh` only if needed to scope ACG behavior
-- Relevant tests under `scripts/tests/plugins/`, `scripts/tests/lib/`, or
+- Focused tests under `scripts/tests/plugins/`, `scripts/tests/lib/`, or
   `scripts/tests/bin/`
 - `docs/bugs/2026-10-21-k3s-aws-ssh-target-uses-alias-instead-of-ip.md`
 - This dispatch spec
