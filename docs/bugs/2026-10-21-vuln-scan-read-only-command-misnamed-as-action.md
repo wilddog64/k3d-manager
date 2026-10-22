@@ -1,7 +1,9 @@
 # Bug: read-only vuln-scan command name implies an active vulnerability scan
 
 **Filed:** 2026-10-21
-**Status:** VERIFIED — offline tests passed; live Slack/Make verification pending
+**Status:** LIVE-VERIFIED — offline tests passed; operator tmux Make run returned existing reports without triggering a scan
+**Verification type:** investigation
+**Live investigation evidence:** 2026-10-22 · source operator-tmux-capture · reference work:4.1-make-vuln-scan-report · env k3d-manager-v1.43.5/hub+ubuntu-hostinger · scenario read-existing-VulnerabilityReports-without-scan · proves read-only-target-and-report-output
 **Priority:** P3 — command clarity and safe operator expectations
 **Severity:** low
 **Approval:** operator approved filing on 2026-10-21 and implementation dispatch on 2026-10-22
@@ -121,7 +123,9 @@ interface:
 
 ## Verification (2026-10-22)
 
-Landed as `bb0b95a7`. `python3 scripts/tests/bin/webhook_make_targets.py` passed 43/43; `scripts/tests/bin/test_cloud_bridge.py` passed 84/84; `bats scripts/tests/bin/makefile_webhook_slack.bats` passed 10/10. Make dry-run confirmed `vuln-scan-report`, `vuln-scan`, and `trivy-scan-report` all invoke the read-only report renderer; no vulnerability scan was triggered. `_agent_lint`, `_agent_audit`, and `git diff --check` passed. Live Slack/Make verification remains pending; this is not LIVE-VERIFIED.
+Landed as `bb0b95a7`. `python3 scripts/tests/bin/webhook_make_targets.py` passed 43/43; `scripts/tests/bin/test_cloud_bridge.py` passed 84/84; `bats scripts/tests/bin/makefile_webhook_slack.bats` passed 10/10. Make dry-run confirmed `vuln-scan-report`, `vuln-scan`, and `trivy-scan-report` all invoke the read-only report renderer; no vulnerability scan was triggered. `_agent_lint`, `_agent_audit`, and `git diff --check` passed.
+
+**Live verification (2026-10-22):** Operator ran `make vuln-scan-report` in tmux pane `work:4.1`. Captured output showed the target invoking `./scripts/k3d-manager trivy_scan_report`, then printing “VulnerabilityReport summary — Hub” and “VulnerabilityReport summary — ACG (ubuntu-hostinger)” before returning to the shell prompt. No scan was started. This verifies the live Make target and its read-only behavior; no Slack slash-command route was exercised.
 - `scripts/tests/bin/makefile_webhook_slack.bats`
 - `scripts/tests/bin/test_cloud_bridge.py`
 - `docs/howto/slack-slash-commands.md`
