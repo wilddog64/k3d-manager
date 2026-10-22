@@ -25,6 +25,7 @@ ACTION_ALLOWLIST = {
     "make-fix-status": ("POST", "/api/v1/make", {"NS": NS_RE}, "fix-status"),
     "make-status-public": ("POST", "/api/v1/make", {}, "status-public"),
     "make-observability-status": ("POST", "/api/v1/make", {}, "observability-status"),
+    "make-vuln-scan-report": ("POST", "/api/v1/make", {}, "vuln-scan-report"),
     "make-vuln-scan": ("POST", "/api/v1/make", {}, "vuln-scan"),
     "make-e2e-runner-health": ("POST", "/api/v1/make", {}, "e2e-runner-health"),
     "make-test": ("POST", "/api/v1/make", {}, "test"),

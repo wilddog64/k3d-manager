@@ -576,6 +576,23 @@ def test_make_vuln_scan_rejects_arguments():
     assert reason == "unexpected argument"
 
 
+def test_vulnerability_report_cloud_actions_keep_reader_routes_and_no_arguments():
+    assert bridge.ACTION_ALLOWLIST["make-vuln-scan-report"] == (
+        "POST", "/api/v1/make", {}, "vuln-scan-report")
+    assert bridge.ACTION_ALLOWLIST["make-vuln-scan"] == (
+        "POST", "/api/v1/make", {}, "vuln-scan")
+    for action in ("make-vuln-scan-report", "make-vuln-scan"):
+        value, reason = bridge.validate_request(request(action), now=NOW)
+        assert reason is None
+        assert value["action"] == action
+        target = bridge.ACTION_ALLOWLIST[value["action"]][3]
+        assert make_targets.MAKE_TARGETS[target]["min_role"] == "reader"
+        value, reason = bridge.validate_request(
+            request(action, {"NS": "identity"}), now=NOW)
+        assert value is None
+        assert reason == "unexpected argument"
+
+
 def test_make_fix_status_requires_ns():
     value, reason = bridge.validate_request(request("make-fix-status"), now=NOW)
     assert value is None

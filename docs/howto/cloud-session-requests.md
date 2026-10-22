@@ -68,7 +68,8 @@ is rejected by the bridge without being executed.
 | `make-fix-status` | `NS` | node + pod status for a namespace |
 | `make-status-public` | none | probe results for the public Cloudflare hostnames |
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
-| `make-vuln-scan` | none | VulnerabilityReport summary |
+| `make-vuln-scan-report` | none | Read existing VulnerabilityReports; no scan triggered |
+| `make-vuln-scan` | none | Deprecated read-only alias for `make-vuln-scan-report` |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
 | `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
 | `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
@@ -79,6 +80,8 @@ is rejected by the bridge without being executed.
 | `make-test-python` | none | both Python groups above |
 | `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
+
+`make-vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources without triggering a scan; `make-vuln-scan` remains a deprecated read-only alias. The actual `app-cve-scan` trigger is not exposed as a reader action and remains operator-only.
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected. `sandbox-up` and `sandbox-down`
 always use the ACG sandbox provider; they cannot accept a provider or other argument. They never

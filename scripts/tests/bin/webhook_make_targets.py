@@ -20,6 +20,32 @@ wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_vulnerability_report_command_is_reader_read_only_and_aliased(self):
+        targets = wh.MAKE_TARGETS
+        self.assertEqual(targets["vuln-scan-report"]["min_role"], "reader")
+        self.assertIn("existing VulnerabilityReports", targets["vuln-scan-report"]["summary"])
+        self.assertIn("no scan", targets["vuln-scan-report"]["summary"])
+        self.assertEqual(targets["vuln-scan"]["min_role"], "reader")
+        self.assertIn("deprecated read-only alias", targets["vuln-scan"]["summary"])
+        reader_help = wh.make_target_help("reader", wh._role_allows)
+        self.assertIn("vuln-scan-report", reader_help)
+        self.assertIn("`vuln-scan` — deprecated read-only alias", reader_help)
+        self.assertNotIn("app-cve-scan", reader_help)
+        self.assertIn("app-cve-scan", wh.make_target_help("operator", wh._role_allows))
+
+    def test_vulnerability_report_make_targets_share_read_only_renderer(self):
+        makefile = Path(__file__).resolve().parents[3] / "Makefile"
+        text = makefile.read_text()
+        for target in ("vuln-scan-report", "vuln-scan", "trivy-scan-report"):
+            with self.subTest(target=target):
+                blocks = re.finditer(
+                    r"(?ms)^([a-z0-9][a-z0-9 -]*):\n((?:\t[^\n]*\n?)+)", text)
+                recipe = next((block.group(2) for block in blocks
+                               if target in block.group(1).split()), None)
+                self.assertIsNotNone(recipe)
+                self.assertIn("./scripts/k3d-manager trivy_scan_report", recipe)
+        self.assertNotRegex(text, r"(?m)^vuln-scan-report:\n\t.*app_cve_scan_trigger")
+
     def test_find_similar_docs_is_reader_tier(self):
         self.assertEqual(wh.MAKE_TARGETS["find-similar-docs"]["min_role"], "reader")
 

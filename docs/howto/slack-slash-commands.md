@@ -379,7 +379,8 @@ commands; they are ignored, so a nearby asynchronous report is not attributed to
 | `fix-status` | reader | `NS` | `FIX_CONTEXT` | | 300 |
 | `status-public` | reader | | | | 300 |
 | `observability-status` | reader | | | | 300 |
-| `vuln-scan` | reader | | | | 300 |
+| `vuln-scan-report` | reader | | | | 300 |
+| `vuln-scan` | reader | deprecated alias for `vuln-scan-report` | | | 300 |
 | `e2e-runner-health` | reader | | `RUNNER` | | 300 |
 | `e2e-remote` | operator | `RUNNER` | `DIGEST` | | 3600 |
 | `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
@@ -396,6 +397,8 @@ commands; they are ignored, so a nearby asynchronous report is not attributed to
 | `e2e-runner-unlock` | admin | `RUNNER` | | yes | 300 |
 | `fix-delete-pod` | admin | `APP`, `NS` | `FIX_CONTEXT` | yes | 300 |
 | `fix-force-sync` | admin | `APP` | | yes | 300 |
+
+`/k3dm vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources; it does not start a scan. `/k3dm vuln-scan` remains a deprecated, read-only compatibility alias. The separate `app-cve-scan` command is operator-only and triggers the app-cluster CVE scan CronJob.
 
 `e2e-replay` republishes only `publication_pending` files left by a failed original publish. After a hub rebuild, use `make e2e-republish RUNNER=m2` to select and republish the newest retained summary for each service and tier from the runner. It is not a slash command: run it from a terminal on the M4.
 

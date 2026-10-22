@@ -33,6 +33,7 @@ K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 .PHONY: e2e-sandbox-provision-preview
+.PHONY: vuln-scan-report
 
 .PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
@@ -1181,7 +1182,11 @@ monitoring-pause:
 monitoring-resume:
 	./scripts/k3d-manager observability_resume $(LAYER)
 
-## Print VulnerabilityReport summary for both clusters
+## Read existing VulnerabilityReports for both clusters; no scan is triggered
+vuln-scan-report:
+	./scripts/k3d-manager trivy_scan_report
+
+## Deprecated read-only alias for vuln-scan-report
 vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
 
@@ -1543,7 +1548,8 @@ help:
 	@echo "    make observability-status       Show monitoring pod status on both clusters"
 	@echo "    make monitoring-pause           Scale hub monitoring to zero, keep Grafana up (~1 core back)"
 	@echo "    make monitoring-resume [LAYER=1|2]  Resume hub monitoring: 1=Grafana+Prometheus, 2=full (default)"
-	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
+	@echo "    make vuln-scan-report          Read existing VulnerabilityReports (no scan triggered)"
+	@echo "    make vuln-scan                  Deprecated read-only alias for vuln-scan-report"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
 	@echo "    make restore-google-app-password   Restore Gmail App Password from Keychain → Vault → Alertmanager"
