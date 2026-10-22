@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-21
 **Branch:** `k3d-manager-v1.43.5`
-**Status:** OPEN — live diagnostic confirms inline-code backticks around the explicit ID are rejected as `invalid_job_id`; a narrow parser fix is dispatched, while earlier bare-ID failures remain unexplained
+**Status:** OPEN — backtick-wrapped IDs are fixed and VERIFIED offline in `ca103021`; earlier bare-ID failures remain unexplained and live verification is pending
 **Priority:** P2 — ChatOps observability / job transcript retrieval
 **Component:** Slack thread command parsing and webhook job log lookup
 **Related:** `docs/bugs/2026-10-13-slack-logs-explicit-job-id-mismatch.md` (explicit ID lookup fix is LIVE-VERIFIED; preserve it); `docs/bugs/2026-10-15-slack-find-similar-docs-free-text-q-parsing.md` (query execution is LIVE-VERIFIED)
@@ -76,6 +76,7 @@ the webhook process/version or its internal parsed argument representation.
 
   The active `com.k3d-manager.webhook` LaunchAgent is running the configured checkout entrypoint, and `/Users/cliang/Library/Logs/k3dm-webhook.log` records `reason=invalid_job_id token_count=2` for both requests at 2026-10-22T03:11:25Z and 03:11:33Z. This confirms the immediate rejection condition: `_resolve_thread_job_target()` validates the second whitespace token directly against `^[0-9a-f]{8}$`, so the literal backticks fail validation. It does not explain earlier history entries that appeared to contain bare IDs.
 - Earlier inspection found only the configured LaunchAgent path, not the loaded process. Follow-up `launchctl print gui/501/com.k3d-manager.webhook` now confirms the service is running with PID 63528 and the configured checkout entrypoint; the new reason-coded records further confirm the updated handler is active. No stale duplicate process is indicated by this evidence.
+- Backtick normalization fix landed in `ca103021`: the resolver removes exactly one matching outer backtick pair from the explicit ID token before applying the existing strict lowercase eight-hex regex. Independent verification passed `pytest -q scripts/tests/bin/test_webhook_thread_dispatch.py` (43 passed), Python AST parsing, `git diff --check`, `_agent_audit`, and `_agent_lint`; the dispatcher rebase/land gate passed. The test module covers backtick-wrapped `logs` via the full Events path for both `find-similar-docs` and `test-all`, backtick-wrapped `status` via Events path, and rejection of malformed wrappers/extra arguments. This is VERIFIED offline for the confirmed backtick case only; the historical bare-ID reports remain open.
 - This usage branch runs before job-directory lookup. The response does **not** establish that the job directory or transcript is absent, expired, or malformed.
 - The `find-similar-docs` API Make path creates a normal eight-hex job directory, writes its target marker and available Slack thread/channel metadata, and uses the common `_run_make_target()` writer for `make.log`. The thread `logs` handler is target-agnostic after explicit ID resolution. Static inspection found no target-specific exclusion for `find-similar-docs`.
 - Slack history provides the visible message text and thread timestamps, but not the raw Events API payload as received by the webhook, selected parent/anchor job, parsed token values, or webhook process revision. The exact point where the visible command diverges from handler input remains unknown. Do not claim stale deployment, bad log persistence, or a `find-similar-docs`-specific code branch without further evidence.
@@ -103,9 +104,9 @@ status `08ae7d06`
 ## Acceptance criteria
 
 - [ ] Determine whether the rejected inline commands actually included an ellipsis or other non-hex suffix; if not, identify the input/context condition causing rejection (event text parsing, thread-anchor selection, runtime-version mismatch, or job-record lifecycle).
-- [ ] Add regression coverage for bare and backtick-wrapped explicit IDs through the Slack Events path against `find-similar-docs` and a known working Make target, with otherwise identical thread/channel context.
-- [ ] Exact ID lookup returns that job's `make.log` (or a precise result naming the same ID); usage is reserved for malformed/missing arguments.
-- [ ] Preserve rejection of invalid IDs, unbalanced backticks, extra arguments, cross-thread/channel protections, redaction, and the existing explicit-ID regression suite.
+- [x] Add regression coverage for bare and backtick-wrapped explicit IDs through the Slack Events path against `find-similar-docs` and a known working Make target, with otherwise identical thread/channel context; include the observed `status` command path.
+- [x] Exact ID lookup returns that job's `make.log` (or a precise result naming the same ID); usage is reserved for malformed/missing arguments.
+- [x] Preserve rejection of invalid IDs, unbalanced backticks, extra arguments, cross-thread/channel protections, redaction, and the existing explicit-ID regression suite.
 - [ ] Update related bug disposition only if investigation establishes a shared root cause; do not reopen the already-live-verified general explicit-ID fix solely from this target-specific symptom.
 
 ## Files
