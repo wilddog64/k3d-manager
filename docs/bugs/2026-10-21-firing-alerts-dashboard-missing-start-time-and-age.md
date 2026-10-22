@@ -101,7 +101,7 @@ must:
   - id: M1
     text: The existing aggregated Firing Alerts by Category counts remain available and correct.
   - id: M2
-    text: The general alert table columns are ordered Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since (local; pending included), Active for; Category classification matches the aggregate panel, Severity is adjacent to identity, available target identifiers remain visible, and Grafana uses browser-local timezone.
+    text: The general alert table columns are ordered Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since (local; pending included), Alert active for; Category classification matches the aggregate panel, Severity is adjacent to identity, available target identifiers remain visible, and Grafana uses browser-local timezone.
   - id: M3
     text: No active-state timestamp is labeled as firing time or CVE detection time; the caveat is visible.
   - id: M4
@@ -179,12 +179,12 @@ Offline verification covers the compact active-alert table, preserved category c
 - Operator requested both timestamps use the viewer's laptop/browser-local timezone rather than forced UTC. Set the dashboard JSON `timezone` to `browser`; keep the underlying Unix timestamps and elapsed duration semantics unchanged.
 - Redispatch only within the existing `Files` list. No rollout/live mutation is authorized.
 - Live Grafana follow-up: operator screenshot still shows the previous Alert, Cluster, Namespace, Severity, Active-since (UTC) layout. Read-only Kubernetes inspection confirmed Argo CD `hub-grafana-dashboards` reports `Synced`/`Healthy` at revision `3b70efd16869a89fca3965eb8bcebf6fe9ae9d80`; the ConfigMap still has `timezone: utc` and the old panel fields. The landed browser-local-time fix is `28e74901`, so this screenshot does not exercise that fix. Operator clarified Severity must remain adjacent to App/Pod identity; requested order is Namespace, Cluster, Alert, identity, Severity, Active since, Active for. Dispatch this column-placement follow-up; do not force Argo refresh/sync without approval.
-- Operator further clarified the exact active-alert column order: **Namespace → Cluster → Alert → Category → App/Pod identity → Severity → Active since → Active for**. Add Category classification to the per-instance rows using the same categories as the aggregate panel; do not remove Severity or alter alert grouping. The current worker must update dashboard definitions, regression assertions, and guidance within the existing file scope.
+- Operator further clarified the exact active-alert column order: **Namespace → Cluster → Alert → Category → App/Pod identity → Severity → Active since → Alert active for**. Add Category classification to the per-instance rows using the same categories as the aggregate panel; do not remove Severity or alter alert grouping. Rename the ambiguous `Active for` heading to `Alert active for`; explain that it is elapsed alert active-state duration, not CVE age or time unpatched. The current worker must update dashboard definitions, regression assertions, and guidance within the existing file scope.
 
 ## Definition of Done
 
 - [x] Active-since versus firing and report-created versus first-detected semantics are explicit.
-- [ ] Generic table is compact/readable and orders Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since, Active for; CVE detail includes report owner and report-created time while retaining aggregate counts.
+- [ ] Generic table is compact/readable and orders Namespace, Cluster, Alert, Category, App/pod/instance identity, Severity, Active since, Alert active for; CVE detail includes report owner and report-created time while retaining aggregate counts.
 - [x] Targeted exporter/dashboard tests cover timestamp provenance, missing values, target fields, bounds, and synchronized definitions.
 - [ ] Operator separately approves live verification E2 after implementation is landed and deployed.
 - [x] Record fix SHA, verification evidence and status transition in this bug.
