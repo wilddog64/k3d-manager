@@ -14,11 +14,14 @@
 
 **Live verification attempt (2026-10-21):** ACG bring-up stopped before registration: `ubuntu@ubuntu` did not answer SSH within 180s. The chained `make down` then began deleting the CloudFormation stack. This does not verify the fix; see `docs/issues/2026-10-21-acg-live-verification-node-ssh-timeout.md`.
 
+**Follow-up live evidence (2026-10-21):** The operator's post-teardown screenshot still shows `observability-acg` Degraded with 0 Applications. Source inspection identified the specific remaining gap: `bin/cluster-down` calls `_k3s_aws_deregister_cluster`, which removes the cluster Secret and destination-matching Applications but leaves the directly applied `ApplicationSet/observability-acg` behind. A narrow teardown/reprovision lifecycle fix is dispatched in `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md`; no live resources were modified.
+
 ## Files
 
 - `docs/bugs/2026-10-20-acg-expiry-leaves-observability-appset-degraded.md`
 - `docs/issues/2026-10-21-acg-observability-appset-investigation.md`
 - `docs/issues/2026-10-21-acg-observability-appset-triage-spec.md`
+- `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md`
 
 ## Symptom
 

@@ -4,6 +4,7 @@
 
 - Completed and landed `acg-appset-registration-lifecycle-fix` on `k3d-manager-v1.43.5` at `bc8f2dae`. Independent suites passed: `bats scripts/tests/bin/cluster_up.bats` (67/67) and `bats scripts/tests/plugins/argocd.bats` (39/39); shellcheck (`-x -S warning`), `git diff --check`, `make check-doc-links` (2291 files), `_agent_lint`, and `_agent_audit` passed. Canonical ACG AppSet bug marked VERIFIED, not LIVE-VERIFIED. Operator live check remains pending. Dispatcher landing gate reported `tests: passed` and `landed: acg-appset-registration-lifecycle-fix`.
 - Live check attempt failed before reaching registration: `ubuntu@ubuntu` timed out on SSH after 180s. The pane command also contained `; make down ...`, so teardown was invoked after the failed `make up`; stack deletion was still running at last inspection. No fix verification evidence was obtained. Record: `docs/issues/2026-10-21-acg-live-verification-node-ssh-timeout.md`.
+- Operator screenshot after teardown still shows `observability-acg` Degraded with zero Applications. Source review traced this to `bin/cluster-down` deregistration removing the cluster Secret and destination Applications but leaving the directly applied ApplicationSet. Wrote the narrow implementation spec `docs/issues/2026-10-21-acg-observability-appset-teardown-fix-spec.md` and queued it for dispatch; no code or live cluster state changed.
 
 ## 2026-10-21 ACG and Hostinger read-only investigation reports
 
