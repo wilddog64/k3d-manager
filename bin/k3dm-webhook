@@ -663,13 +663,15 @@ def _find_job_by_thread_ts(thread_ts, channel_id=""):
 def _resolve_thread_job_target(anchor_job_id, command, channel_id):
     """Resolve a mandatory explicit job ID and enforce its thread/channel boundary."""
     parts = command.strip().lstrip("/").split()
-    if len(parts) != 2 or not _JOB_ID_RE.fullmatch(parts[1]):
+    requested_id = parts[1] if len(parts) == 2 else ""
+    if requested_id.startswith("`") and requested_id.endswith("`"):
+        requested_id = requested_id[1:-1]
+    if len(parts) != 2 or not _JOB_ID_RE.fullmatch(requested_id):
         command_name = parts[0].lower() if parts else "missing"
         reason = "argument_count" if len(parts) != 2 else "invalid_job_id"
         _LOG.warning("slack thread target rejected command=%s reason=%s token_count=%d",
                      command_name, reason, len(parts))
         return None, "Usage: `logs|status|diagnosis|kill <job-id>` — include the exact job ID"
-    requested_id = parts[1]
     requested_dir = JOB_DIR / requested_id
     if not requested_dir.is_dir():
         return None, f"⚠️ Job `{requested_id}` is unknown or its records have expired"

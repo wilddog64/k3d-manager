@@ -467,7 +467,10 @@ def test_logs_explicit_id_reads_requested_child(dispatch_env):
 
 
 @pytest.mark.parametrize("target_name", ["find-similar-docs", "test-all"])
-def test_slack_events_explicit_logs_resolves_make_target(dispatch_env, monkeypatch, target_name):
+@pytest.mark.parametrize("job_id_text", ["aabbccdd", "`aabbccdd`"])
+def test_slack_events_explicit_logs_resolves_make_target(
+    dispatch_env, monkeypatch, target_name, job_id_text
+):
     _started, notices = dispatch_env
     anchor = wh.JOB_DIR / "job"
     (anchor / "status").write_text("thread-anchor")
@@ -496,11 +499,11 @@ def test_slack_events_explicit_logs_resolves_make_target(dispatch_env, monkeypat
 
     body = json.dumps({
         "type": "event_callback",
-        "event_id": f"Ev-{target_name}",
+        "event_id": f"Ev-{target_name}-{job_id_text}",
         "event": {
             "type": "message", "subtype": "", "user": "U1", "channel": "C1",
             "thread_ts": "1700000000.000001", "ts": "1700000000.000002",
-            "text": "logs aabbccdd",
+            "text": f"logs {job_id_text}",
         },
     }).encode()
     response = {}
@@ -524,6 +527,61 @@ def test_slack_events_explicit_logs_resolves_make_target(dispatch_env, monkeypat
     assert "Usage:" not in notices[0]
 
 
+def test_slack_events_backtick_status_resolves_exact_same_thread_job(
+    dispatch_env, monkeypatch
+):
+    _started, notices = dispatch_env
+    anchor = wh.JOB_DIR / "job"
+    (anchor / "status").write_text("thread-anchor")
+    (anchor / "thread_ts").write_text("1700000000.000001")
+    (anchor / "channel_id").write_text("C1")
+    target = wh.JOB_DIR / "aabbccdd"
+    target.mkdir()
+    (target / "status").write_text("success")
+    (target / "thread_ts").write_text("1700000000.000001")
+    (target / "channel_id").write_text("C1")
+
+    class ImmediateThread:
+        def __init__(self, *, target, args=(), kwargs=None, daemon=None):
+            self.target, self.args, self.kwargs = target, args, kwargs or {}
+
+        def start(self):
+            self.target(*self.args, **self.kwargs)
+
+    monkeypatch.setattr(wh.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(wh, "_verify_slack_signature", lambda *args: True)
+    monkeypatch.setattr(wh, "_rate_limited", lambda _bucket: False)
+    monkeypatch.setattr(wh, "_slack_user_is_allowlisted", lambda _user: True)
+    monkeypatch.setattr(wh, "_slack_user_role", lambda _user: "reader")
+
+    body = json.dumps({
+        "type": "event_callback",
+        "event_id": "Ev-status-backtick-aabbccdd",
+        "event": {
+            "type": "message", "subtype": "", "user": "U1", "channel": "C1",
+            "thread_ts": "1700000000.000001", "ts": "1700000000.000002",
+            "text": "status `aabbccdd`",
+        },
+    }).encode()
+    response = {}
+    request = type("FakeHandler", (), {
+        "path": "/slack/events",
+        "headers": {"Content-Length": str(len(body)), "X-Slack-Request-Timestamp": "1700000000",
+                    "X-Slack-Signature": "v0=test"},
+        "rfile": io.BytesIO(body),
+        "send_response": lambda self, code: response.update(code=code),
+        "send_header": lambda self, key, value: None,
+        "end_headers": lambda self: None,
+        "_json": lambda self, code, payload: response.update(code=code, payload=payload),
+    })()
+
+    wh._Handler.do_POST(request)
+
+    assert response["code"] == 200
+    assert len(notices) == 1
+    assert notices[0] == "ℹ️ *Job `aabbccdd`* status: `success`"
+
+
 def test_logs_rejects_cross_thread_explicit_id(dispatch_env):
     _started, notices = dispatch_env
     (wh.JOB_DIR / "job" / "thread_ts").write_text("THREAD-A")
@@ -537,6 +595,19 @@ def test_logs_rejects_cross_thread_explicit_id(dispatch_env):
     assert len(notices) == 1
     assert "not in this Slack thread" in notices[0]
     assert "secret child output" not in notices[0]
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["logs `aabbccdd", "logs aabbccdd`", "logs ``aabbccdd``", "logs aabbccdd extra"],
+)
+def test_explicit_job_id_rejects_malformed_backticks_and_extra_arguments(
+    dispatch_env, command
+):
+    target, error = wh._resolve_thread_job_target("job", command, "C1")
+
+    assert target is None
+    assert "Usage:" in error
 
 
 def test_bare_logs_is_rejected_as_ambiguous(dispatch_env):
