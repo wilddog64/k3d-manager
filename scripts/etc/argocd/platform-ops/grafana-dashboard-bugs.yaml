@@ -135,7 +135,7 @@ data:
         {
           "id": 2,
           "type": "stat",
-          "title": "Filed this release",
+          "title": "Bugs filed this release",
           "gridPos": {
             "x": 4,
             "y": 1,
@@ -179,7 +179,7 @@ data:
         {
           "id": 3,
           "type": "stat",
-          "title": "Open this release",
+          "title": "Bugs open this release",
           "gridPos": {
             "x": 8,
             "y": 1,
@@ -227,7 +227,7 @@ data:
         {
           "id": 4,
           "type": "stat",
-          "title": "Fixed this release",
+          "title": "Bugs fixed this release",
           "gridPos": {
             "x": 12,
             "y": 1,
@@ -1978,6 +1978,40 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plan"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open plan document",
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "branch"
+                },
+                "properties": [
+                  {
+                    "id": "hideFrom",
+                    "value": {
+                      "viz": true,
+                      "legend": false,
+                      "tooltip": false
+                    }
+                  }
+                ]
+              },
               {
                 "matcher": {
                   "id": "byName",

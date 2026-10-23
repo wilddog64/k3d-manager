@@ -96,6 +96,13 @@ def test_plan_approval_and_plan_metrics(metrics, tmp_path):
     assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
 
 
+def test_plan_info_carries_the_scanned_branch_for_doc_links(metrics, tmp_path):
+    docs = {"docs/plans/v1.44.0-next.md": "# Next\n**Status:** READY\n"}
+    output = metrics._plan_metrics(tmp_path, "origin/k3d-manager-v1.43.5", texts=docs)
+    row = next(line for line in output.splitlines() if line.startswith("k3dm_plan_info{"))
+    assert 'branch="k3d-manager-v1.43.5"' in row
+    assert 'release="v1.44.0"' in row
+
 def test_plan_metrics_reads_worktree_top_level_only(metrics, tmp_path):
     plans=tmp_path / "docs/plans"
     plans.mkdir(parents=True)

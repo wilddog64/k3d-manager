@@ -202,6 +202,7 @@ def _plan_approval(text, release):
 def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     texts = _plan_texts(root, ref) if texts is None else texts
     info, counts, skipped = [], defaultdict(int), 0
+    branch = _scan_branch(root, ref)
     for path, text in texts.items():
         match = _PLAN_FILE_RE.fullmatch(Path(path).name)
         if not match or not isinstance(text, str):
@@ -220,7 +221,7 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
             title = title[:119] + "…"
         order = _release_order(release)
         approval = _plan_approval(text, release)
-        info.append(f'k3dm_plan_info{{repo="{repo}",release="{release}",release_order="{order}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}"}} 1')
+        info.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{release}",release_order="{order}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}"}} 1')
         counts[(release, order, execution, verification)] += 1
     lines = info + [f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
                     for (release, order, execution, verification), count in sorted(counts.items())]

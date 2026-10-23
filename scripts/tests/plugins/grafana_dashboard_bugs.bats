@@ -218,6 +218,23 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "plan names link to the plan doc on the scanned branch, and bug tiles say bugs" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["id"]: p for p in d["panels"]}
+overrides={o["matcher"]["options"]: o["properties"] for o in panels[107]["fieldConfig"]["overrides"]}
+links=next(p["value"] for p in overrides["Plan"] if p["id"]=="links")
+assert links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md"
+assert links[0]["targetBlank"] is True
+assert next(p["value"] for p in overrides["branch"] if p["id"]=="hideFrom")["viz"] is True
+assert "branch" not in panels[107]["transformations"][0]["options"]["excludeByName"]
+assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed this release","Bugs open this release","Bugs fixed this release"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bug dashboard release plans row shows joined plan state without not-started inference" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
