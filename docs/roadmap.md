@@ -543,6 +543,12 @@ unreachable, the Worker returns a small static maintenance page.
 Check whether Cloudflare's own custom error pages are available on this plan before choosing the
 Worker.
 
+**One E2E command with runner selection** (operator, 2026-10-23). Plan 1 of 5 is
+[`e2e-unified-runner-command`](plans/v1.46.1-e2e-unified-runner-command.md): `k3dm e2e-remote
+RUNNER=m2|m4|aws` with a validated runner per execution environment, replacing the three separate
+E2E commands, with a deprecation path for `e2e-sandbox`. Split out of a v1.43.5 P3 bug, which keeps
+only the error-message fix. Design spec; Files and Acceptance are written when v1.46.1 starts.
+
 ### Candidate milestone — v1.47.0
 
 **Infra e2e and promotion gate — the only item in this release** (operator, 2026-10-10). `make
