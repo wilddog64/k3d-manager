@@ -4,6 +4,7 @@
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
 **Status:** PARTIAL — fix A merged as shopping-cart-frontend #115 (`3623e5b2`). It went **live 2026-10-09**: k3d-manager `ce21efda` repinned Hostinger to `sha-05ec17e` (`sha256:17f46a0d…`), and the rollout completed. The public bundle contains "Login took too long". The hung-login retry screen still needs a browser check while Keycloak's Postgres restarts. Fix C merged as shopping-cart-infra #108 (`03c6206f`) and was verified live 2026-10-09: the hub probe runs `sh -c 'pg_isready -U "$POSTGRES_USER" ...'`, with 0 `role "root"` log lines in 1h. B is deferred because the PV is pinned to agent-0.
 **Priority:** P2 — login recovers on its own once the DB is back, but the page never tells the user
+**Release:** v1.43.5 — remaining browser check during the 2026-10-29 hub rebuild drill, when the Keycloak DB restarts (backlog triage, Claude, 2026-10-22)
 **Severity:** Medium
 **Component:**
 - `shopping-cart-frontend`: `src/pages/LoginCallback.tsx`

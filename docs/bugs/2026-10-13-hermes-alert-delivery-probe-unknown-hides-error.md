@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.44.0` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — observed in Hermes/Grafana screenshot; exact live probe failure **not yet verified**
 **Priority:** P2 — alert delivery monitoring unavailable; manual read-only probe is a workaround
+**Release:** v1.44.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Severity:** Medium — blind spot in monitoring the alert delivery path; **not evidence of an actual alert blackout**
 **Component:** `scripts/lib/hermes/sensors.py` (`alert_delivery`); `bin/k3dm-alert-delivery-status`; Hermes dashboard
 **Related:** `docs/bugs/2026-09-23-hostinger-alertmanager-discards-every-alert.md`

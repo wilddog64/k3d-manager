@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.44.0` (triage 2026-10-15, operator-approved placement)
 **Status:** OPEN — needs live Prometheus and Alertmanager verification; root cause not established
 **Priority:** P2 — failed offline test is visible on dashboard but expected warning notification is unconfirmed/missing; workaround is manual dashboard review
+**Release:** v1.44.0 (bug fix carried per docs/roadmap.md) (backlog triage, Claude, 2026-10-22)
 **Severity:** medium
 **Origin:** operator screenshot 2026-10-15 ~05:35 PDT, K3DM Tests dashboard; operator reported no corresponding email
 

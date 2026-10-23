@@ -2,7 +2,7 @@
 
 **Repo:** shopping-cart-infra
 **Branch:** docs/next-improvements
-**Status:** ignoreDifferences in place; RespectIgnoreDifferences missing
+**Status:** FIXED — superseded: the data layer moved to `scripts/etc/argocd/applicationsets/data-git.yaml`, which carries the StatefulSet `ignoreDifferences` and `RespectIgnoreDifferences=true` since `0c9b2707` (v1.7.1); `argocd/applications/data-layer.yaml` is no longer the deploy path (backlog triage, Claude, 2026-10-22)
 **Priority:** P2 — selfHeal can revert the ignored StatefulSet fields; the workaround is a manual sync
 
 ## Context
