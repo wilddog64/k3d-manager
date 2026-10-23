@@ -123,6 +123,14 @@ _assert_category_contract() {
   jq -e '(.type == "table") and (.targets[0].expr | contains("ALERTS{alertstate=\"firing\"")) and (.targets[0].expr | contains("Watchdog|InfoInhibitor")) and (.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Image vulnerabilities")) and (.targets[0].expr | contains("Trivy.*")) and (.targets[0].expr | contains("\"cluster\", \"hub\", \"cluster\", \"\"")) and (.targets[0].format == "table") and (.targets[0].instant == true) and ([.transformations[] | select(.id == "organize") | .options.renameByName.Value] | index("Count") != null)' <<<"$category" >/dev/null || return 1
 }
 
+_assert_active_alert_empty_cell_contract() {
+  local dashboard_file="$1"
+  local dashboard_json panel
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  panel="$(jq -c '.panels[] | select(.id == 13)' <<<"$dashboard_json")" || return 1
+  jq -e '(.fieldConfig.defaults.noValue == "—") and ((.fieldConfig.defaults.noValue | contains("No firing")) | not) and (.description | contains("An empty table means no firing instance has an active-state timestamp."))' <<<"$panel" >/dev/null
+}
+
 _assert_no_panel_overlap() {
   local dashboard_file="$1"
   yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -e '
@@ -385,6 +393,11 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview Firing Alerts by Category panels satisfy the table contract" {
   _assert_category_contract "${OVERVIEW}"
   _assert_category_contract "${HUB_OVERVIEW}"
+}
+
+@test "active alert instances use a dash for missing labels in both dashboards" {
+  _assert_active_alert_empty_cell_contract "${OVERVIEW}"
+  _assert_active_alert_empty_cell_contract "${HUB_OVERVIEW}"
 }
 
 _assert_firing_instance_contract() {

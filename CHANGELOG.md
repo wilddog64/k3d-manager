@@ -12,6 +12,8 @@
 
 - Bug counts now treat IMPLEMENTED documents as closed and label DEFERRED documents separately in Slack.
 
+- Active Alert Instances now show a dash for missing alert labels; the empty-table explanation is in the panel description.
+
 - The k3dm Bug Tracking table's **Bug** title column can now be filtered from its header while preserving the existing repository, release, and verification query selections.
 
 - Fixed unbalanced PromQL parentheses in the Active Alert Instances dashboard queries and added
