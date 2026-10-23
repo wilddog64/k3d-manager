@@ -202,8 +202,8 @@ function _e2e_sandbox_hub_apps_ready() {
     bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
     [[ -z "$bad" ]] && break
     if (( frontend_recovery_attempted == 0 )) \
-      && awk '$1 == "ubuntu-k3s-shopping-cart-frontend" && $2 == "Synced" && $3 == "Degraded"' <<< "$listing" | grep -q . \
-      && awk '$1 == "ubuntu-k3s-shopping-cart-product-catalog" && $2 == "Synced" && $3 == "Healthy"' <<< "$listing" | grep -q .; then
+      && awk '$1 == "ubuntu-k3s-shopping-cart-frontend" && $2 == "Synced" && $3 == "Degraded" {f=1} END {exit !f}' <<< "$listing" \
+      && awk '$1 == "ubuntu-k3s-shopping-cart-product-catalog" && $2 == "Synced" && $3 == "Healthy" {f=1} END {exit !f}' <<< "$listing"; then
       frontend_recovery_attempted=1
       _warn "[e2e] frontend upstream recovery: product-catalog is healthy but frontend is degraded; restarting deployment/frontend once"
       _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/frontend || \

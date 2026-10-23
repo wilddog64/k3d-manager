@@ -369,7 +369,7 @@ _stub_preview_mutations() {
   KUBECTL_READYZ_RC=0
   run _e2e_sandbox_cluster_ready
   [ "$status" -eq 0 ]
-  ! grep -Eq '(^| )make ' "$CALL_LOG"
+  run ! grep -Eq '(^| )make ' "$CALL_LOG"
 }
 
 @test "provisioning calls make up only for the k3s-aws provider" {

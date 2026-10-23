@@ -51,7 +51,7 @@ data:
             "multi": true,
             "includeAll": true,
             "allValue": ".*",
-            "current": {"selected": true, "text": ["v1.43.4"], "value": ["v1.43.4"]},
+            "current": {"selected": true, "text": ["v1.43.5"], "value": ["v1.43.5"]},
             "hide": 0
           },
           {
