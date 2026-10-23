@@ -481,8 +481,26 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"[stub] deregister"* ]]
   [[ "$output" == *"[stub] acg_teardown"* ]]
-  [ "$(printf "%s\n" "$output" | grep -n "\[stub\] deregister" | cut -d: -f1)" -lt \
-    "$(printf "%s\n" "$output" | grep -n "\[stub\] acg_teardown" | cut -d: -f1)" ]
+  [ "$(printf "%s\n" "$output" | grep -n "\[stub\] acg_teardown" | cut -d: -f1)" -lt \
+    "$(printf "%s\n" "$output" | grep -n "\[stub\] deregister" | cut -d: -f1)" ]
+}
+
+@test "_provider_k3s_aws_destroy_cluster skips deregister when acg_teardown fails" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _k3s_aws_deregister_cluster() { echo "[stub] deregister"; return 0; }
+    acg_teardown() { echo "[stub] acg_teardown"; return 1; }
+    tunnel_stop() { return 0; }
+    _ACG_WATCH_PID_FILE="$(mktemp)"; rm -f "$_ACG_WATCH_PID_FILE"
+    _provider_k3s_aws_destroy_cluster --confirm
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"[stub] acg_teardown"* ]]
+  [[ "$output" != *"[stub] deregister"* ]]
 }
 
 @test "_k3s_aws_deregister_cluster DRY_RUN describes the hub cleanup" {
@@ -533,10 +551,34 @@ setup() {
     source scripts/lib/provider.sh
     source scripts/lib/providers/k3s-aws.sh
     _argocd_hub_kubectl_cmd() { echo kubectl; }
+    LOG="$(mktemp)"
+    kubectl() {
+      printf "%s\n" "$*" >> "$LOG"
+      case "$*" in
+        *"get applications"*) return 0 ;;
+        *"delete"*"--ignore-not-found"*) return 0 ;;
+      esac
+      return 1
+    }
+    _k3s_aws_deregister_cluster
+    cat "$LOG"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"delete applicationset observability-acg --ignore-not-found"* ]]
+}
+
+@test "_k3s_aws_deregister_cluster fails when hub kubectl is unreachable" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/lib/providers/k3s-aws.sh
+    _argocd_hub_kubectl_cmd() { echo kubectl; }
     kubectl() { return 1; }
     _k3s_aws_deregister_cluster
   '
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
 }
 
 @test "k3s-aws keeps SSM when registration and tunnel succeed" {
