@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
+import sys
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+from hermes.prior_art import doc_meta, doc_status  # noqa: E402
+from webhook import bug_count  # noqa: E402
 
 
 @pytest.fixture
@@ -74,6 +78,31 @@ def test_tally_unknown_status_and_all_priority_buckets(tally_module, tmp_path):
     assert data["unknown"] == 1 and data["open"] == 0
     assert set(data["by_priority"]) == {"P0", "P1", "P2", "P3", "unset"}
     assert data["by_priority"]["unset"]["unknown"] == 1
+
+
+def test_implemented_is_closed_and_deferred_is_labeled_in_tally_and_reply(tally_module, tmp_path, monkeypatch):
+    bugs = tmp_path / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "implemented.md").write_text("**Priority:** P1\n**Status:** IMPLEMENTED — landed\n")
+    (bugs / "deferred.md").write_text("**Priority:** P1\n**Status:** DEFERRED — later\n")
+    (bugs / "open.md").write_text("**Priority:** P1\n**Status:** OPEN\n")
+    _commit(tmp_path, "seed")
+
+    release = tally_module.tally("HEAD")["unknown"]
+    assert (release["closed"], release["open"]) == (1, 2)
+    assert {item["path"] for item in release["open_paths"]} == {
+        "docs/bugs/deferred.md", "docs/bugs/open.md"}
+    assert next(item for item in release["open_paths"] if item["path"].endswith("deferred.md"))["status"] == "deferred"
+    assert doc_meta("**Status:** IMPLEMENTED\n")[1] == "closed"
+    assert doc_status("**Status:** DEFERRED\n")[1] == "deferred"
+    assert doc_status("**Status:** OPEN\n")[1] == "open"
+    assert doc_status("no status\n")[1] == "unknown"
+
+    payload = json.dumps({"ref": "HEAD", "releases": {"unknown": release}})
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
+    answer = bug_count.reply(bug_count.CountQuery("unknown", None, None))
+    assert "2 open (1 deferred)" in answer
+    assert "Deferred: " in answer and "Open: " in answer
 
 
 def test_tally_read_failure_returns_exit_two_and_no_stdout(tally_module, monkeypatch, capsys):

@@ -164,7 +164,8 @@ def test_doc_meta_closed_status_prefixes(status):
 
 
 def test_doc_meta_open_and_unknown_states():
-    assert pa.doc_meta("**Status:** IMPLEMENTED — no release\n") == ("unset", "open")
+    assert pa.doc_meta("**Status:** OPEN — no release\n") == ("unset", "open")
+    assert pa.doc_meta("**Status:** IMPLEMENTED — no release\n") == ("unset", "closed")  # agent-audit: allow assert-removed IMPLEMENTED now classifies as closed by design
     assert pa.doc_meta("# bug\nno status\n") == ("unset", "unknown")
     assert pa.doc_meta("Status: FIXED\n") == ("unset", "closed")
     assert pa.doc_meta("## Status\n\nFixed on 2026-10-09\n") == ("unset", "closed")
@@ -182,7 +183,7 @@ def test_doc_meta_open_and_unknown_states():
 def test_doc_status_classifies_without_changing_doc_meta(status, expected, verified):
     text = f"**Priority:** P2\n**Status:** {status}\n"
     assert pa.doc_status(text) == ("P2", expected, verified)
-    old_state = "closed" if status.startswith(("FIXED", "VERIFIED", "LIVE-VERIFIED")) else "open"
+    old_state = "closed" if status.startswith(("FIXED", "VERIFIED", "LIVE-VERIFIED", "IMPLEMENTED")) else "open"
     assert pa.doc_meta(text) == ("P2", old_state)
 
 

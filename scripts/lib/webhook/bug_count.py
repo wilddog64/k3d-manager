@@ -141,10 +141,14 @@ def reply(query):
         if query.priority:
             open_items = [item for item in open_items if item.get("priority") == query.priority]
             unknown_items = [item for item in unknown_items if item.get("priority") == query.priority]
+        deferred_count = sum(isinstance(item, dict) and item.get("status") == "deferred" for item in open_items)
+        lines[-1] = lines[-1].replace(f"{counts.get('open', 0)} open,",
+                                      f"{counts.get('open', 0)} open ({deferred_count} deferred),")
         for item in open_items[:10]:
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
-            lines.append(f"Open: {_doc_link(path)}")
+            label = "Deferred" if isinstance(item, dict) and item.get("status") == "deferred" else "Open"
+            lines.append(f"{label}: {_doc_link(path)}")
         for item in unknown_items[:10]:
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
