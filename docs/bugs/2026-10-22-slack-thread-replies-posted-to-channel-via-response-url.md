@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P2 — answers land as top-level channel posts, detached from the question; workaround: ask with a new top-level `/ask-docs`
 **Severity:** medium
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `bin/k3dm-webhook` (`_notify_job`, `_handle_thread_command` ask-docs branch)
 **Related:** `docs/bugs/2026-10-01-ask-docs-thread-follow-up-silently-dropped.md` (its 2026-10-22 recurrence fix `18a9e7ef` added the `response_url` copy), `docs/bugs/2026-10-18-slack-thread-broadcast-reply-silently-ignored.md`
