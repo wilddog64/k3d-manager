@@ -57,6 +57,7 @@ So both report IMPLEMENTED and DEFERRED docs as open.
 - `scripts/bug-tally.py`
 - `scripts/lib/webhook/bug_count.py`
 - `scripts/tests/bin/test_bug_tally.py`
+- `scripts/tests/bin/test_prior_art.py` (added at review: its doc_meta expectations pinned IMPLEMENTED as open)
 - `CHANGELOG.md`
 
 ## Acceptance
