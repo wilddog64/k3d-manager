@@ -404,6 +404,13 @@ under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, 
 overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
 explicit exclusion of `e2e-sandbox`.
 
+Plan 2 (operator, 2026-10-23: "let's do v1.44.0"; placed in v1.44.1 because v1.44.0 is at its cap and
+this depends on its submitter authentication): **agents in Slack threads, first slice.**
+`@codex dispatch <spec>` and `@gemini review <task>` from the operator's Slack identity run through
+the relay, the webhook allowlist and `make codex-dispatch`, and each agent replies in the thread when
+its step finishes. Design and limits: [agents working together in Slack
+threads](#candidate-theme--v2x-agents-working-together-in-slack-threads). Spec to be written.
+
 ### Candidate milestone — v1.44.2 (patch)
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
@@ -985,9 +992,9 @@ there: Codex implements, Gemini reviews, Codex fixes, Claude verifies and asks t
   (`project_hermes_slack_approval`).
 
 **Placement:** the first slice (`@codex dispatch <spec>`, `@gemini review <task>`, threaded replies)
-after the v2.1 read-only gateway and v2.2 policy, because a chat message must not start a dispatch
-until submitters are authenticated end to end. The full multi-agent conversation is the interface of
-v3.0.0 below.
+is v1.44.1 plan 2 (operator, 2026-10-23), after v1.44.0's submitter authentication, because a chat
+message must not start a dispatch until its sender is authenticated. The full multi-agent
+conversation stays v2.x and is the interface of v3.0.0 below.
 
 ### Candidate theme — v2.x: agent devbox service
 
