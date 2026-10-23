@@ -1,7 +1,7 @@
 # Bug: bug tally counts IMPLEMENTED and DEFERRED bugs as open
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshot at 18:11 PDT)
-**Status:** OPEN
+**Status:** FIXED offline — `aba93fc0` (Luna; Claude review: N1/N2 red on pre-fix, updated stale test_prior_art.py expectations); live E2 pending make restart-webhook + Slack v1.43.0 count
 **Priority:** P3 — wrong counts in Slack and one dashboard metric; the per-bug dashboard rows are correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" to dispatching to Luna after bugs-table-title-filter
