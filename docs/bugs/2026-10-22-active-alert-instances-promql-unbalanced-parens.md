@@ -1,7 +1,7 @@
 # Bug: Active Alert Instances panel query has an unbalanced parenthesis
 
 **Filed:** 2026-10-22 (Claude, from the operator's Grafana screenshot)
-**Status:** OPEN
+**Status:** FIXED offline — `c993c5df` (Luna; Claude review: N1 red on pre-fix, 47/47 bats green); live E2 pending ArgoCD sync
 **Priority:** P3 — one dashboard panel shows an error; alert detection and delivery are unaffected
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching the panel-13 fix to Luna

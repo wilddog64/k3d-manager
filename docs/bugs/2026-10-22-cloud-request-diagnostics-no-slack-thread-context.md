@@ -1,7 +1,7 @@
 # Cloud-request diagnostic reports omit the job ID
 
 **Filed:** 2026-10-22
-**Status:** OPEN — observed during live verification; no fix dispatched
+**Status:** FIXED offline — `ec81caa3` (Luna; Claude review: N1 red on pre-fix (3 failed), 15 pytest green); live E2 pending `make restart-webhook`
 **Priority:** P3
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
