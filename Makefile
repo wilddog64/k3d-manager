@@ -31,7 +31,7 @@ GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -412,6 +412,10 @@ codex-resume:
 ## Abandon a Codex task (SLUG=slug, YES=1 to remove)
 codex-abandon:
 	@if [ "$(YES)" = 1 ]; then bin/k3dm-codex-dispatch abandon --slug '$(SLUG)' --yes; else bin/k3dm-codex-dispatch abandon --slug '$(SLUG)'; fi
+
+## Prune landed task worktrees across releases (YES=1 to remove)
+codex-prune:
+	@bin/k3dm-codex-dispatch prune $(if $(filter 1,$(YES)),--yes,)
 
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:

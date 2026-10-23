@@ -302,6 +302,59 @@ EOF
   git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/one
 }
 
+@test "codex dispatch: prune removes landed current and earlier release tasks and branch-only leftovers" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.8"
+  git -C "$FIXTURE" branch task/v9.9.9/current
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/current" task/v9.9.9/current >/dev/null
+  git -C "$FIXTURE" checkout -b k3d-manager-v9.9.8 >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.8
+  git -C "$FIXTURE" checkout k3d-manager-v9.9.9 >/dev/null
+  git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.8:refs/remotes/origin/k3d-manager-v9.9.8
+  git -C "$FIXTURE" branch task/v9.9.8/older origin/k3d-manager-v9.9.8
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.8/older" task/v9.9.8/older >/dev/null
+  git -C "$FIXTURE" branch task/v9.9.9/orphan
+  run dispatch prune
+  [ "$status" -eq 0 ]; [[ "$output" == *"would prune: v9.9.9/current"* ]]; [[ "$output" == *"would prune: v9.9.8/older"* ]]; [[ "$output" == *"would prune: v9.9.9/orphan"* ]]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/current" ]; [ -d "$K3DM_WORKTREE_ROOT/v9.9.8/older" ]
+  git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan
+  run dispatch prune --yes
+  [ "$status" -eq 0 ]; [[ "$output" == *"pruned: 3 kept: 0"* ]]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/current" ]; [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.8/older" ]
+  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/current || false
+  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.8/older || false
+  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan || false
+}
+
+@test "codex dispatch: prune keeps unsafe tasks and preserves run research data" {
+  git -C "$FIXTURE" branch task/v9.9.9/dirty
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/dirty" task/v9.9.9/dirty >/dev/null
+  printf 'dirty\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/dirty/a.txt"
+  git -C "$FIXTURE" checkout -b task/v9.9.9/ahead
+  printf 'ahead\n' >"$FIXTURE/ahead.txt"; git -C "$FIXTURE" add ahead.txt; git -C "$FIXTURE" commit -m ahead >/dev/null
+  git -C "$FIXTURE" checkout k3d-manager-v9.9.9 >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  git -C "$FIXTURE" branch task/v9.9.9/running
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/ahead.run" "$K3DM_WORKTREE_ROOT/v9.9.9/running.run"
+  printf 'not-json\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  printf 'metrics\n' >"$K3DM_WORKTREE_ROOT/metrics.log"
+  printf 'research\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/ahead.run/codex.log"
+  printf '%s\n' "$$" >"$K3DM_WORKTREE_ROOT/v9.9.9/running.run/pid"
+  before="$(find "$K3DM_WORKTREE_ROOT" -name '*.run' -type f -print | sort | xargs shasum)"
+  run dispatch prune
+  [ "$status" -eq 0 ]; [[ "$output" == *"keep: v9.9.9/ahead (unapplied commits)"* ]]; [[ "$output" == *"keep: v9.9.9/dirty (uncommitted changes)"* ]]; [[ "$output" == *"keep: v9.9.9/running (worker running)"* ]]
+  [[ "$output" == *"pruned: 0 kept: 3"* ]]
+  run dispatch prune --yes
+  [ "$status" -eq 0 ]; [[ "$output" == *"pruned: 0 kept: 3"* ]]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/dirty" ]; git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/ahead
+  [ "$before" = "$(find "$K3DM_WORKTREE_ROOT" -name '*.run' -type f -print | sort | xargs shasum)" ]
+  [ "$(<"$K3DM_WORKTREE_ROOT/ledger.jsonl")" = not-json ]; [ "$(<"$K3DM_WORKTREE_ROOT/metrics.log")" = metrics ]
+}
+
+@test "codex dispatch: prune rejects unknown options" {
+  run dispatch prune --force
+  [ "$status" -eq 2 ]; [[ "$output" == *"unknown prune option"* ]]
+}
+
 @test "codex dispatch: scope uses the recorded spec, not a root markdown file" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   run dispatch start --spec docs/plans/v9.9.9-demo.md; [ "$status" -eq 0 ]; sleep 1

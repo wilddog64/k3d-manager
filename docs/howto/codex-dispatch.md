@@ -33,6 +33,19 @@ make codex-abandon SLUG=example
 make codex-abandon SLUG=example YES=1
 ```
 
+## Pruning old task worktrees
+
+`make codex-prune` previews landed task worktrees and leftover task branches across every release
+under `K3DM_WORKTREE_ROOT`. It keeps tasks with unapplied commits, uncommitted work, a live worker,
+or no matching remote release branch. Run the preview first, then add `YES=1` to remove eligible
+worktrees and branches. The command leaves every `.run` directory and its logs, plus the dispatch
+ledger and metrics, untouched.
+
+```bash
+make codex-prune
+make codex-prune YES=1
+```
+
 Worktree caveats:
 
 - Gitignored files such as `.envrc`, `bin/.ask-sandbox/`, `node_modules` and `.wrangler` are not in a new worktree. Anything that needs them fails there.

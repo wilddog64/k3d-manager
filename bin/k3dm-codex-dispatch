@@ -157,6 +157,7 @@ Usage:
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
+  bin/k3dm-codex-dispatch prune [--yes]
 EOF
 }
 
@@ -453,6 +454,65 @@ _dispatch_abandon() {
   echo "abandoned: $slug"
 }
 
+_dispatch_prune() {
+  local yes=0 arg version_dir version slug path branch release run_dir reason pruned=0 kept=0
+  local -a candidates=()
+  while (($#)); do
+    case "$1" in
+      --yes) (( yes == 0 )) || _dispatch_error "duplicate prune option: $1"; yes=1; shift ;;
+      *) _dispatch_error "unknown prune option: $1" ;;
+    esac
+  done
+  [[ -n "$_dispatch_repo_root" ]] || _dispatch_error "prune must run inside a git repository"
+  for version_dir in "$_dispatch_worktree_root"/*/; do
+    [[ -d "$version_dir" ]] || continue
+    version="${version_dir%/}"; version="${version##*/}"
+    for path in "$version_dir"*; do
+      [[ -d "$path" && "$path" != *.run ]] || continue
+      slug="${path##*/}"
+      candidates+=("$version/$slug")
+    done
+    for branch in $(git -C "$_dispatch_repo_root" for-each-ref --format='%(refname:short)' "refs/heads/task/$version/"); do
+      slug="${branch##*/}"
+      [[ -d "$version_dir$slug" ]] || candidates+=("$version/$slug")
+    done
+  done
+  # Deduplicate candidates that may have been found by both directory and branch scans.
+  local -A seen=()
+  for arg in "${candidates[@]}"; do
+    [[ -z "${seen[$arg]:-}" ]] || continue
+    seen[$arg]=1
+    version="${arg%%/*}"; slug="${arg#*/}"; path="$_dispatch_worktree_root/$version/$slug"
+    branch="task/$version/$slug"; release="origin/k3d-manager-$version"; run_dir="$_dispatch_worktree_root/$version/$slug.run"
+    reason=""
+    if ! git -C "$_dispatch_repo_root" show-ref --verify --quiet "refs/remotes/$release"; then
+      reason="no release branch"
+    elif git -C "$_dispatch_repo_root" show-ref --verify --quiet "refs/heads/$branch" &&
+         git -C "$_dispatch_repo_root" cherry "$release" "$branch" | grep '^+' >/dev/null; then
+      reason="unapplied commits"
+    elif [[ -d "$path" ]] && [[ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]]; then
+      reason="uncommitted changes"
+    elif [[ ! -e "$run_dir/exit" && -f "$run_dir/pid" ]] &&
+         kill -0 "$(<"$run_dir/pid")" 2>/dev/null; then
+      reason="worker running"
+    fi
+    if [[ -n "$reason" ]]; then
+      echo "keep: $version/$slug ($reason)"
+      ((kept += 1))
+    elif (( yes )); then
+      if [[ -d "$path" ]]; then git -C "$_dispatch_repo_root" worktree remove "$path" || { echo "keep: $version/$slug (uncommitted changes)"; ((kept += 1)); continue; }; fi
+      if git -C "$_dispatch_repo_root" show-ref --verify --quiet "refs/heads/$branch"; then git -C "$_dispatch_repo_root" branch -D "$branch" >/dev/null; fi
+      echo "pruned: $version/$slug"
+      ((pruned += 1))
+    else
+      echo "would prune: $version/$slug"
+      ((pruned += 1))
+    fi
+  done
+  if (( yes )); then git -C "$_dispatch_repo_root" worktree prune; fi
+  echo "pruned: $pruned kept: $kept"
+}
+
 main() {
   (($#)) || { _dispatch_usage; exit 2; }
   case "$1" in
@@ -462,6 +522,7 @@ main() {
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
+    prune) shift; _dispatch_prune "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;
   esac

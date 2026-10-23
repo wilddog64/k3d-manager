@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Added `make codex-prune` to preview and remove landed task worktrees and branches across releases while preserving dispatch run data.
+
 - Slack notifications for thread commands now reply in the originating thread before falling back to a slash-command response URL.
 
 - `ask-docs` truncates long replies at a safe line boundary with a marker, and bug tallies omit zero deferred counts.
