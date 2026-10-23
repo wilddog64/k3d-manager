@@ -9,18 +9,31 @@ setup() {
   cat > "$STUB_BIN/git" <<'STUB'
 #!/usr/bin/env bash
 printf 'git %q\n' "$*" >> "$CALL_LOG"
-if [[ "$*" == *clone* ]]; then dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/"; fi
-if [[ "$*" == *commit* ]]; then rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots"; fi
-if [[ "$*" == *rev-parse* ]]; then printf 'SHA-SENTINEL\n'; fi
-if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" != 1 ]]; then printf 'SHA-SENTINEL\trefs/heads/snapshots\n'; fi
-if [[ "$*" == *ls-tree* ]]; then printf 'results/20261010T182508Z.json\n'; fi
-if [[ "$*" == *show* ]]; then printf '{"success":true,"export":"%s"}\n' "${DR_TEST_RESULT_EXPORT:-20261009T120000Z}"; fi
-if [[ "$*" == *config* ]]; then printf 'apiVersion: v1\nkind: Config\n' ; fi
-if [[ "$*" == *fetch* && "${DR_TEST_FETCH_FAIL:-0}" == 1 ]]; then exit 1; fi
-if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" == 1 ]]; then printf 'OTHER-SHA\trefs/heads/snapshots\n'; fi
-if [[ "$*" == *push* ]]; then printf 'push %s\n' "$*" >> "$TEST_ROOT/push.log"; fi
-if [[ "$*" == *rm\ * ]]; then printf 'rm %s\n' "$*" >> "$TEST_ROOT/git.log"; fi
-if [[ "$*" == *write-tree* || "$*" == *commit-tree* ]]; then printf 'NEW-SHA\n'; fi
+args=("$@")
+index=0
+while (( index < ${#args[@]} )); do
+  if [[ "${args[index]}" == -C ]]; then
+    index=$((index + 2))
+    continue
+  fi
+  git_subcommand="${args[index]}"
+  break
+done
+case "$git_subcommand" in
+  clone) dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/" ;;
+  commit) rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots" ;;
+  rev-parse) printf 'SHA-SENTINEL\n' ;;
+  ls-remote)
+    if [[ "${DR_TEST_REMOTE_MISMATCH:-0}" != 1 ]]; then printf 'SHA-SENTINEL\trefs/heads/snapshots\n'; else printf 'OTHER-SHA\trefs/heads/snapshots\n'; fi
+    ;;
+  ls-tree) printf 'results/20261010T182508Z.json\n' ;;
+  show) printf '{"success":true,"export":"%s"}\n' "${DR_TEST_RESULT_EXPORT:-20261009T120000Z}" ;;
+  config) printf 'apiVersion: v1\nkind: Config\n' ;;
+  fetch) [[ "${DR_TEST_FETCH_FAIL:-0}" != 1 ]] || exit 1 ;;
+  push) printf 'push %s\n' "$*" >> "$TEST_ROOT/push.log" ;;
+  rm) printf 'rm %s\n' "$*" >> "$TEST_ROOT/git.log" ;;
+  write-tree|commit-tree) printf 'NEW-SHA\n' ;;
+esac
 STUB
   cat > "$STUB_BIN/vault" <<'STUB'
 #!/usr/bin/env bash
@@ -161,6 +174,20 @@ write_sha256_manifest() {
   run bash -c 'cd "$1" && shasum -a 256 -c SHA256SUMS' _ "$dir"
   [ "$status" -eq 0 ]
   [[ "$output" == *"alpha.age: OK"* && "$output" == *"inventory.json: OK"* ]]
+}
+
+@test "git stub dispatches on subcommand when -C paths contain git words" {
+  run "$STUB_BIN/git" -C "$TEST_ROOT/ssh-config-guard" status
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run "$STUB_BIN/git" -C "$TEST_ROOT/commit-show-push" status
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -e "$TEST_ROOT/last-snapshots" ]
+  [ ! -e "$TEST_ROOT/push.log" ]
+  run "$STUB_BIN/git" -C "$TEST_ROOT/ssh-config-guard" config
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'apiVersion: v1\nkind: Config' ]]
 }
 
 source_plugin() {
