@@ -117,9 +117,9 @@ assert "k3dm_bug_fixed_in_release_docs" in panels[4]["targets"][0]["expr"]
 assert panels[8]["title"] == "Bugs filed per release, open vs fixed"
 assert panels[25]["targets"][0]["expr"] == 'sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs{repo="$repo"}) > 0'
 assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
-    {"x": 0, "y": 6, "w": 8, "h": 9},
-    {"x": 8, "y": 6, "w": 8, "h": 9},
-    {"x": 16, "y": 6, "w": 8, "h": 9},
+    {"x": 0, "y": 20, "w": 8, "h": 9},
+    {"x": 8, "y": 20, "w": 8, "h": 9},
+    {"x": 16, "y": 20, "w": 8, "h": 9},
 ]
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["fixed_in"] == 6
@@ -183,8 +183,9 @@ import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['title']=='Release plans — $release')
-added=[p for p in panels if p['gridPos']['y'] >= 40]
-assert all(p['gridPos']['y'] >= 40 for p in added)
+added=[p for p in panels if p['id'] >= 100]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 10]
+assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 19
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
 assert 'group_left(dispatch_state, slug)' in expr and ' or on(plan) ' in expr
@@ -302,9 +303,9 @@ elif check == "sort":
     assert sort == [{"field": "sort_key", "desc": False}], sort
 elif check == "layout":
     assert panels[22]["type"] == "row"
-    assert table["gridPos"] == {"x": 0, "y": 20, "w": 24, "h": 12}, table["gridPos"]
-    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 20 for i in (9, 10, 11, 12, 13, 14, 16, 17))
-    assert panels[15]["gridPos"]["y"] == 32
+    assert table["gridPos"] == {"x": 0, "y": 34, "w": 24, "h": 12}, table["gridPos"]
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 34 for i in (9, 10, 11, 12, 13, 14, 16, 17))
+    assert panels[15]["gridPos"]["y"] == 46
     rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
     owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
     assert owner == 22, owner
@@ -344,11 +345,11 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 live = panels[24]
 assert live["title"] == "Live-verified"
 assert 'live_verified="true"' in live["targets"][0]["expr"]
-assert panels[13]["gridPos"] == {"x": 8, "y": 16, "w": 3, "h": 4}
-assert panels[16]["gridPos"] == {"x": 11, "y": 16, "w": 3, "h": 4}
-assert live["gridPos"] == {"x": 14, "y": 16, "w": 4, "h": 4}
-assert panels[17]["gridPos"] == {"x": 18, "y": 16, "w": 3, "h": 4}
-assert panels[14]["gridPos"] == {"x": 21, "y": 16, "w": 3, "h": 4}
+assert panels[13]["gridPos"] == {"x": 8, "y": 30, "w": 3, "h": 4}
+assert panels[16]["gridPos"] == {"x": 11, "y": 30, "w": 3, "h": 4}
+assert live["gridPos"] == {"x": 14, "y": 30, "w": 4, "h": 4}
+assert panels[17]["gridPos"] == {"x": 18, "y": 30, "w": 3, "h": 4}
+assert panels[14]["gridPos"] == {"x": 21, "y": 30, "w": 3, "h": 4}
 table = panels[23]
 assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
 PY
