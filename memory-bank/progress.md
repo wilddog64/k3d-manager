@@ -334,3 +334,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-22 ask-docs thread recurrence landed 18a9e7ef (offline); live E2 pending: restart-webhook + thread ask-docs.
 - [x] 2026-10-22 ask-docs thread recurrence LIVE VERIFIED (answer in diagnostics job thread).
 - [ ] 2026-10-22 filed P3 docs/bugs/2026-10-22-ask-docs-reply-truncated-mid-slack-link.md (ask-docs reply cut mid Slack link + '(0 deferred)' noise); approved; dispatched to Luna (slug ask-docs-reply-truncation).
+- [ ] 2026-10-22 filed P3 docs/bugs/2026-10-22-agent-dispatch-dashboard-default-red-at-80.md (9 dispatch-dashboard panels default red at 80); approved; queued for Luna after ask-docs-reply-truncation.
