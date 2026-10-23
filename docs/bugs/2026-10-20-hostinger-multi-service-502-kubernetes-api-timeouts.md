@@ -248,3 +248,24 @@ screenshots. Claude read the Mac side read-only.
 for the broken proxy streams and the multi-service 502s. Kubernetes on Hostinger stayed healthy. Why
 the tunnel dropped is still open: an ISP or Hostinger network blip is the next thing to check, using
 the 30 `systemd-networkd` lines.
+
+**`systemd-networkd` (30 lines):** every line is a pod veth on `cni0`. There are pairs at :00 and :03 every
+five minutes (the CronJob pod), plus two veths at 10:50:51 (pods restarted after the tunnel came back).
+Hostinger's own uplink logged no link, carrier or DHCP change, so its network stayed up. The drop was
+on the Mac/ISP side of the route, or in the SSH session itself.
+
+**Recovery gap:** about 10 minutes from the drop (~10:40) to the reconnect (10:50:44). The tunnel runs
+`autossh -M 0` with `ServerAliveInterval=30`, `ServerAliveCountMax=3` and `ExitOnForwardFailure=yes`,
+so the drop should have been detected in about 90 seconds. The remaining ~8 minutes are unexplained.
+Two candidates:
+- autossh backing off between failed restarts.
+- A reconnect refused while Hostinger's sshd still held `:8200` from the stale session (no
+  server-side `ClientAlive*`), which `ExitOnForwardFailure` turns into an exit and another restart.
+
+The tunnel logs for the window are gone (recreated 2026-10-23 04:31), so neither can be confirmed
+from this incident.
+
+**Next:** the fix is about recovery speed, not Kubernetes.
+- Keep the tunnel's stderr across restarts so the next drop shows its exit reason.
+- Consider server-side `ClientAliveInterval`/`ClientAliveCountMax` on Hostinger so a stale `-R 8200`
+  is released quickly.
