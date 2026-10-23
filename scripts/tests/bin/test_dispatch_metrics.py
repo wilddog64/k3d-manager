@@ -1,7 +1,9 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 import sys
+import time
 from pathlib import Path
 import pytest
 
@@ -51,7 +53,9 @@ def test_windows_latest_resume_and_malformed_lines(tmp_path):
 def test_dry_run_does_not_open_connection(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path))
     monkeypatch.setattr(dispatch_metrics.urllib.request, "urlopen", lambda *_: (_ for _ in ()).throw(AssertionError()))
-    assert dispatch_metrics.main(["--dry-run"]) == 0
+    # agent-audit: allow assert-removed dry-run call now passes --codex-home and --prices
+    assert dispatch_metrics.main(["--dry-run", "--codex-home", str(tmp_path / "codex"),
+                                  "--prices", str(tmp_path / "prices-missing.json")]) == 0
     assert "k3dm_dispatch_ledger_timestamp_seconds" in capsys.readouterr().out
 
 
@@ -220,8 +224,12 @@ def test_time_window_output_matches_pre_release_scope_golden():
         event(now - 40 * 86400, "land", "old", verifier_lines=99, wait_seconds=60),
     ]
     output = dispatch_metrics.render(rows, 1, now)
-    actual = "\n".join(line for line in output.splitlines() if 'window="' in line and
-                        any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
+    legacy = ("k3dm_dispatch_landed", "k3dm_dispatch_land_attempts", "k3dm_dispatch_codex_tokens_per_landed",
+              "k3dm_dispatch_verifier_lines_per_landed", "k3dm_dispatch_wait_minutes_per_landed",
+              "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
+              "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
+    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
+                        'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
 k3dm_dispatch_land_attempts{window="1d",result="tests"} 1
@@ -359,7 +367,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 13
+    assert sum("$window" in expr for expr in expressions) == 20
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -375,3 +383,105 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert link[0]["targetBlank"] is True
     assert "version" not in per_spec["transformations"][1]["options"]["excludeByName"]
     assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])
+
+
+def test_api_cost_uses_last_session_event_and_counts_all_attempts():
+    rates = {"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
+    rows = [
+        event(10, "codex_usage", session="s1", model="gpt-5.6-luna", input=611180,
+              cached_input=561408, output=5912),
+        event(11, "codex_usage", session="s1", model="gpt-5.6-luna", input=611180,
+              cached_input=561408, output=5912),
+        event(12, "codex_usage", session="s2", model="gpt-5.6-luna", input=1_000_000,
+              cached_input=0, output=0),
+        event(13, "codex_usage", "two", session="s3", model="gpt-5.6-luna", input=5_000_000,
+              cached_input=0, output=0),
+        event(14, "land", "one"), event(15, "land_refused", "two", reason="tests"),
+    ]
+    metrics = dispatch_metrics._task_metrics(rows[:3], rows[4], rates)
+    assert abs(metrics["api_cost_usd"] - (0.02827696 + 0.2)) < 1e-9
+    output = dispatch_metrics.render(rows, 0, 20, prices=rates)
+    assert 'k3dm_dispatch_api_cost_usd{window="1d"} 1.22827696' in output
+    assert 'k3dm_dispatch_api_cost_per_landed_usd{window="1d"} 1.22827696' in output
+
+
+def test_unpriced_model_keeps_tokens_and_release_has_no_coverage():
+    rows = [event(10, "codex_usage", model="other-model", session="u1", input=10,
+                  cached_input=4, output=2, version="v9.9.9")]
+    output = dispatch_metrics.render(rows, 0, 20, prices={})
+    assert 'k3dm_dispatch_api_cost_unpriced_sessions{window="1d"} 1' in output
+    assert 'kind="cached_input"} 4' in output
+    assert 'model="other-model"' not in '\n'.join(line for line in output.splitlines()
+                                                       if 'api_cost_by_model' in line)
+    assert 'k3dm_dispatch_codex_sessions{window="v9.9.9"' not in output
+
+
+def test_coverage_reads_only_recent_session_metadata_and_usage(tmp_path, monkeypatch):
+    now = int(time.time())
+    home = tmp_path / "codex"
+    folder = home / "sessions/2026/10/23"
+    folder.mkdir(parents=True)
+    records = [
+        ("s1", now - 100, True), ("s2", now - 200, True), ("s3", now - 300, False),
+    ]
+    for session, started, _ in records:
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
+        path = folder / f"rollout-{session}.jsonl"
+        path.write_text("\n".join([
+            json.dumps({"type": "session_meta", "payload": {"id": session, "timestamp": stamp}}),
+            json.dumps({"type": "turn_context", "payload": {"model": "gpt-5.6-luna"}}),
+            json.dumps({"type": "event_msg", "payload": {"info": {"total_token_usage": {
+                "input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0}}}}),
+            json.dumps({"type": "event_msg", "payload": {"user_prompt": "SECRET-PROMPT"}}),
+        ]) + "\n")
+    old = folder / "rollout-old.jsonl"
+    old.write_text("should never be opened\n")
+    os.utime(old, (now - 31 * 86400, now - 31 * 86400))
+    real_open = open
+    def guarded_open(name, *args, **kwargs):
+        assert Path(name) != old
+        return real_open(name, *args, **kwargs)
+    monkeypatch.setattr("builtins.open", guarded_open)
+    ledger = [event(now - 50, "codex_usage", session="s1", model="gpt-5.6-luna",
+                    input=1_000_000, cached_input=0, output=0)]
+    output = dispatch_metrics.render(ledger, 0, now,
+        prices={"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.2}},
+        codex_home=home)
+    assert f'k3dm_dispatch_codex_sessions{{window="1d",ledgered="true"}} 1' in output
+    assert f'k3dm_dispatch_codex_sessions{{window="1d",ledgered="false"}} 2' in output
+    assert f'k3dm_dispatch_unledgered_api_cost_usd{{window="1d"}} 0.4' in output
+    assert "SECRET-PROMPT" not in output
+
+
+def test_subscriptions_are_global_and_unlabelled_by_window():
+    output = dispatch_metrics.render([], 0, 10, subscriptions={"chatgpt": 20, "claude": 20,
+        "gemini": 20, "github": 4})
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_subscription_usd_per_month")]
+    assert len(lines) == 4
+    assert all('window=' not in line for line in lines)
+
+
+def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
+    dashboard_path = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
+    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
+    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    by_title = {panel["title"]: panel for panel in dashboard["panels"]}
+    titles = {"Codex at API prices", "Per landed spec", "Cached input", "Subscriptions / month",
+              "Ledger coverage", "By model", "Projected / month"}
+    assert titles <= by_title.keys()
+    assert 'window="7d"' in by_title["Projected / month"]["targets"][0]["expr"]
+    assert 'window="$window"' not in by_title["Projected / month"]["targets"][0]["expr"]
+    outside_override = next(item for item in by_title["Ledger coverage"]["fieldConfig"]["overrides"]
+                            if item["matcher"] == {"id": "byName", "options": "outside the ledger"})
+    properties = {prop["id"]: prop["value"] for prop in outside_override["properties"]}
+    assert properties["unit"] == "currencyUSD"
+    assert properties["decimals"] == 2
+    boxes = []
+    for panel in dashboard["panels"]:
+        pos = panel.get("gridPos")
+        if not pos or panel.get("type") == "row":
+            continue
+        rect = (pos["x"], pos["y"], pos["x"] + pos["w"], pos["y"] + pos["h"])
+        for prior in boxes:
+            assert rect[2] <= prior[0] or prior[2] <= rect[0] or rect[3] <= prior[1] or prior[3] <= rect[1]
+        boxes.append(rect)

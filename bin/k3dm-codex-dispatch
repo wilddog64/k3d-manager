@@ -102,6 +102,40 @@ _dispatch_codex_exit() {
   _dispatch_schedule_metrics
 }
 
+_dispatch_codex_usage() {
+  local log="$1" version="$2" slug="$3" session_id codex_home file usage model input cached output
+  local -a matches=()
+  session_id="$(sed -n 's/^session id: //p' "$log" 2>/dev/null | head -n 1)"
+  codex_home="${CODEX_HOME:-${HOME}/.codex}"
+  if [[ -z "$session_id" ]]; then
+    echo "[codex-dispatch] WARNING: no session id in $log" >&2; return 1
+  fi
+  while IFS= read -r file; do [[ -n "$file" ]] && matches+=("$file"); done \
+    < <(find "$codex_home/sessions" -type f -name "rollout-*-${session_id}.jsonl" -print 2>/dev/null)
+  if ((${#matches[@]} != 1)); then
+    echo "[codex-dispatch] WARNING: expected one session file for ${session_id}, found ${#matches[@]}" >&2; return 1
+  fi
+  file="${matches[0]}"
+  usage="$(jq -sc '[.[] | .payload.info.total_token_usage? // empty] | last // empty' "$file" 2>/dev/null)"
+  model="$(jq -sr '[.[] | (.payload.model? // .payload.info.model? // empty) | select(type == "string")] | last // empty' "$file" 2>/dev/null)"
+  if [[ -z "$usage" ]] || ! jq -e 'type == "object" and (.input_tokens|type=="number") and (.cached_input_tokens|type=="number") and (.output_tokens|type=="number")' <<<"$usage" >/dev/null 2>&1; then
+    echo "[codex-dispatch] WARNING: could not parse token usage for ${session_id}" >&2; return 1
+  fi
+  input="$(jq -r '.input_tokens' <<<"$usage")"
+  cached="$(jq -r '.cached_input_tokens' <<<"$usage")"
+  output="$(jq -r '.output_tokens' <<<"$usage")"
+  if [[ -n "$model" ]]; then
+    _dispatch_ledger_event codex_usage "$version" "$slug" --arg session "$session_id" --arg model "$model" \
+      --argjson input "$input" --argjson cached_input "$cached" --argjson output "$output" \
+      '.session=$session|.model=$model|.input=$input|.cached_input=$cached_input|.output=$output'
+  else
+    _dispatch_ledger_event codex_usage "$version" "$slug" --arg session "$session_id" --argjson input "$input" \
+      --argjson cached_input "$cached" --argjson output "$output" \
+      '.session=$session|.model=null|.input=$input|.cached_input=$cached_input|.output=$output'
+  fi
+  _dispatch_schedule_metrics
+}
+
 _dispatch_worker() {
   local operation="$1" worktree="$2" run="$3" version="$4" slug="$5" network="$6" n="${7:-}" session_id="${8:-}"
   local -a state_vars
@@ -130,6 +164,7 @@ _dispatch_worker() {
   if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"; then
     _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
   fi
+  _dispatch_codex_usage "$log" "$version" "$slug" || true
   return "$exit_code"
 }
 
@@ -158,7 +193,32 @@ Usage:
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
   bin/k3dm-codex-dispatch prune [--yes]
+  bin/k3dm-codex-dispatch usage-backfill
 EOF
+}
+
+_dispatch_usage_backfill() {
+  local path version slug log session backfilled=0 missing=0
+  local ledger="$_dispatch_worktree_root/ledger.jsonl"
+  while IFS= read -r -d '' path; do
+    version="${path%/*}"; version="${version##*/}"
+    slug="${path##*/}"; slug="${slug%.run}"
+    while IFS= read -r -d '' log; do
+      session="$(sed -n 's/^session id: //p' "$log" 2>/dev/null | head -n 1)"
+      [[ -n "$session" ]] || { ((missing += 1)); continue; }
+      if jq -se --arg v "$version" --arg s "$slug" --arg id "$session" \
+        'any(.[]; .event == "codex_usage" and .version == $v and .slug == $s and .session == $id)' \
+        "$ledger" >/dev/null 2>&1; then continue; fi
+      if _dispatch_codex_usage "$log" "$version" "$slug"; then ((backfilled += 1)); else
+        if ! find "${CODEX_HOME:-${HOME}/.codex}/sessions" -type f \
+          -name "rollout-*-${session}.jsonl" -print -quit 2>/dev/null | grep -q .; then
+          ((missing += 1))
+        fi
+      fi
+    done < <(find "$path" -maxdepth 1 -type f -name 'codex*.log' -print0)
+  done < <(find "$_dispatch_worktree_root" -mindepth 2 -maxdepth 2 -type d -name '*.run' -print0 2>/dev/null)
+  echo "backfilled: $backfilled"
+  echo "missing: $missing"
 }
 
 _dispatch_release_branch() {
@@ -523,6 +583,7 @@ main() {
     resume) shift; _dispatch_resume "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
     prune) shift; _dispatch_prune "$@" ;;
+    usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;
   esac

@@ -6,6 +6,10 @@
 
 - The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.
 
+- The Agent dispatch ledger records cumulative Codex session input, cached-input and output tokens;
+  its dashboard estimates API-equivalent costs by task, scope and model, plus ledger coverage and
+  subscription costs. Prices are explicitly maintained in `scripts/etc/agent/codex-model-prices.json`.
+
 - The k3dm Agent dispatch dashboard's Window selector now lists each release from v1.43.0 (the start of the
   dispatch ledger) after 1d, 7d and 30d. A release scope counts that release's lands and refusals whenever
   they happened, so a release's totals stop shifting as time windows roll over; the time-window output is

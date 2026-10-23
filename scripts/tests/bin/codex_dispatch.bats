@@ -3,7 +3,7 @@
 setup() {
   export FIXTURE="$BATS_TEST_TMPDIR/fixture" ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   export K3DM_WORKTREE_ROOT="$BATS_TEST_TMPDIR/worktrees" HOME="$BATS_TEST_TMPDIR/home"
-  export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9"
+  export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9" CODEX_HOME="$BATS_TEST_TMPDIR/codex-home"
   export K3DM_CODEX_BIN="$BATS_TEST_TMPDIR/codex-stub"
   mkdir -p "$FIXTURE" "$HOME" "$K3DM_WORKTREE_ROOT"
   git init --bare "$ORIGIN" >/dev/null
@@ -621,4 +621,45 @@ EOF
   ledger="$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tokens' "$ledger")" = null ]
   [[ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
+}
+
+@test "codex dispatch: start records session token usage from CODEX_HOME" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  mkdir -p "$CODEX_HOME/sessions/2026/10/23"
+  cat >"$CODEX_HOME/sessions/2026/10/23/rollout-test-01a122dd-71c3-7763-87f0-3de505f10168.jsonl" <<'EOF'
+{"type":"session_meta","payload":{"id":"01a122dd-71c3-7763-87f0-3de505f10168","timestamp":"2026-10-23T10:00:00Z"}}
+{"type":"turn_context","payload":{"model":"gpt-5.6-luna"}}
+{"type":"event_msg","payload":{"info":{"total_token_usage":{"input_tokens":611180,"cached_input_tokens":561408,"output_tokens":5912,"reasoning_output_tokens":10}}}}
+EOF
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  usage="$(jq -s 'map(select(.event == "codex_usage")) | .[0]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$(jq -r '.session' <<<"$usage")" = 01a122dd-71c3-7763-87f0-3de505f10168 ]
+  [ "$(jq -r '.model' <<<"$usage")" = gpt-5.6-luna ]
+  [ "$(jq -r '.input' <<<"$usage")" = 611180 ]
+  [ "$(jq -r '.cached_input' <<<"$usage")" = 561408 ]
+  [ "$(jq -r '.output' <<<"$usage")" = 5912 ]
+}
+
+@test "codex dispatch: missing session usage warns but start succeeds" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug one
+  [ "$status" -eq 0 ]; sleep 1
+  grep -q 'WARNING: expected one session file' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/supervisor.log"
+  [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+}
+
+@test "codex dispatch: usage-backfill is idempotent" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  mkdir -p "$CODEX_HOME/sessions/2026/10/23"
+  cat >"$CODEX_HOME/sessions/2026/10/23/rollout-test-01a122dd-71c3-7763-87f0-3de505f10168.jsonl" <<'EOF'
+{"type":"session_meta","payload":{"id":"01a122dd-71c3-7763-87f0-3de505f10168","timestamp":"2026-10-23T10:00:00Z"}}
+{"type":"turn_context","payload":{"model":"gpt-5.6-luna"}}
+{"type":"event_msg","payload":{"info":{"total_token_usage":{"input_tokens":10,"cached_input_tokens":2,"output_tokens":3}}}}
+EOF
+  run dispatch usage-backfill
+  [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 1"* ]]; [[ "$output" == *"missing: 0"* ]]
+  run dispatch usage-backfill
+  [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 0"* ]]
+  [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
 }

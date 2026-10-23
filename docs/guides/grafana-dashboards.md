@@ -53,6 +53,31 @@ The **Order** column comes from the plan number on each document's `**Release:**
 
 Approval is `explicit` unless the line is absent (`none`) or begins with `pending`; plans before v1.43.2 use `n/a`. Dispatch is joined by the plan filename stem from the Codex dispatch ledger. Only a start event that records a `docs/plans/` spec can appear; `landed` describes integration and does not change verification. Missing dispatch telemetry displays **no record**. The dashboard deliberately does not infer **not started** from missing information or **done** from implementation. As the operator requirements say: “Include every planned specification”; “Keep execution state separate from verification state”; “Don't infer completion from missing information.” Each **Dispatch** cell links to that release in Agent dispatch, and the Agent dispatch dashboard has a top-level **Bug Tracking** link back. The Agent dispatch **Window** selector lists the time windows and ledger releases from v1.43.0 onward; v1.43.0 is the coverage floor because earlier releases predate the ledger. Its **Release** cells link back to Bug Tracking. A release before v1.43.0 has no dispatch scope, so its row link opens an empty dispatch view.
 
+## Agent dispatch costs
+
+The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
+configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
+Rates live in `scripts/etc/agent/codex-model-prices.json`; update a model's input, cached-input and
+output rates there when pricing changes. Models without an explicit entry remain unpriced.
+
+- **API equiv.** in Per spec is the sum for that landed task's priced Codex sessions. An empty cell
+  means at least one session is unpriced or no session usage was recorded.
+- **Codex at API prices** totals all priced usage in scope, including refused and abandoned attempts.
+- **Per landed spec** divides that same total by landed tasks. Landed means the tests and scope gate
+  passed; it does not mean live-verified.
+- **Cached input** shows cached input tokens as a share of input tokens.
+- **Subscriptions / month** shows the fixed ChatGPT, Claude, Gemini and GitHub plan costs; only the
+  ChatGPT plan pays for Codex.
+- **Ledger coverage** compares Codex sessions started in the selected time window with sessions
+  present in the dispatch ledger. It has no release-scope value; “outside the ledger” estimates the
+  cost of sessions missing from that ledger.
+- **By model** splits priced usage by model. **Projected / month** scales the last seven days of
+  Codex usage to 30 days and remains pinned to 7d regardless of the selected window.
+
+`bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
+session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
+tuples and reports missing session files.
+
 ## CVE Auto-Patch triage
 
 ### Release forecast
