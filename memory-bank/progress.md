@@ -322,3 +322,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-22 Diagnostics job ID LIVE VERIFIED: 202 job `9f369739` matches the `_Job:` line in the delivered Slack report. Panel-13 live check still pending ArgoCD sync + screenshot. Luna on `bugs-table-title-filter`.
 - [ ] 2026-10-22 Filed P3 docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md (Slack v1.43.0 count listed 2 IMPLEMENTED + 1 DEFERRED as open; _CLOSED_RE lacks IMPLEMENTED). Approval pending; queue for Luna after bugs-table-title-filter.
 - [x] 2026-10-22 Panel 13 LIVE VERIFIED (c993c5df). Bugs-table filter landed 7869b9ac (live pending). HubDataExport*/HostDiskMetricsStale cleared after SSH alias restore. Firing-alerts bug stays REOPENED pending E4 count comparison.
+- [x] 2026-10-22 Firing-alerts dashboard bug VERIFIED live (Inspect Stats 41 rows = 41 firing). Filed P3 active-alert-instances-novalue-fills-missing-labels (approval pending).

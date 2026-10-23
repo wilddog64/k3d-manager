@@ -1,7 +1,7 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** REOPENED — P3 live dashboard failure observed 2026-10-22 after offline fixes (`63d53576`, `309d77bf`, `28e74901`, `f37757b0`): active-alert instance panel has zero rows while aggregate has 41, CVE creation-time panel is blank in screenshot, and required identity/column layout is not rendered. Root cause and deployed revision require verification; offline passing tests do not close this.
+**Status:** VERIFIED — live 2026-10-22 PDT after `c993c5df`: Active Alert Instances Inspect → Stats shows 41 rows, matching Firing Alerts (Prometheus) = 41 (25 hub + 15 ubuntu-hostinger Trivy + 1 acg TargetDown); Active since and Elapsed render; CVE Findings shows Report Created. Follow-up: `2026-10-22-active-alert-instances-novalue-fills-missing-labels.md`
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -302,3 +302,8 @@ Operator screenshot: the Active Alert Instances panel now renders rows with Acti
 time values, and CVE Findings shows a populated Report Created column. This is partial E2/E4 evidence
 only. E4 still needs the raw Prometheus counts compared with the panel's row count (the aggregate
 showed 41; the screenshot shows the first 7 rows). The bug stays REOPENED until that comparison is done.
+
+## Live verification — 2026-10-22 (E4 closed)
+
+Operator Inspect → Stats on Active Alert Instances: Total number rows = 41, equal to the Firing Alerts
+(Prometheus) stat and to Firing Alerts by Category (25 + 15 + 1). Every firing instance has a row.
