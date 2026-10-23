@@ -11,6 +11,7 @@
 ### Fixed
 
 - `ask-docs` truncates long replies at a safe line boundary with a marker, and bug tallies omit zero deferred counts.
+- Agent Dispatch dashboard panels now use explicit neutral colours, with green landed outcomes and orange refusal reasons.
 
 - Bug counts now treat IMPLEMENTED documents as closed and label DEFERRED documents separately in Slack.
 

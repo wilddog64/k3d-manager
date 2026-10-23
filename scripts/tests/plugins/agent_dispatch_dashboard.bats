@@ -118,3 +118,37 @@ assert "independent verifier" in panel["description"]
 PY
   [ "$status" -eq 0 ]
 }
+
+@test "agent dispatch dashboard: stat and bar gauge panels use explicit colours" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+by_id = {panel["id"]: panel for panel in panels}
+for panel in panels:
+    if panel["type"] not in ("stat", "bargauge"):
+        continue
+    defaults = panel["fieldConfig"]["defaults"]
+    assert "thresholds" in defaults or defaults.get("color", {}).get("mode") == "fixed", panel["id"]
+land = by_id[8]
+assert land["options"]["displayMode"] == "basic"
+overrides = {item["matcher"].get("options"): item["properties"] for item in land["fieldConfig"]["overrides"]}
+def fixed_color(series):
+    prop = next(item for item in overrides[series] if item["id"] == "color")
+    assert prop["value"]["mode"] == "fixed"
+    return prop["value"]["fixedColor"]
+assert fixed_color("landed") == "green"
+for series in ("rebase", "scope", "tests"):
+    assert fixed_color(series) != "green", series
+for panel_id, expected in {
+    2: {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 0.8}]},
+    9: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 86400}]},
+    13: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 0.5}]},
+}.items():
+    assert by_id[panel_id]["fieldConfig"]["defaults"]["thresholds"] == expected, panel_id
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
