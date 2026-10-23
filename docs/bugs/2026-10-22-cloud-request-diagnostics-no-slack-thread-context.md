@@ -1,7 +1,7 @@
 # Cloud-request diagnostic reports omit the job ID
 
 **Filed:** 2026-10-22
-**Status:** FIXED offline — `ec81caa3` (Luna; Claude review: N1 red on pre-fix (3 failed), 15 pytest green); live E2 pending `make restart-webhook`
+**Status:** VERIFIED — `ec81caa3`; live E2 2026-10-22 17:19 PDT: `diagnose-pods` (hub, platform-ops) returned 202 job `9f369739`; the posted report line 2 is `_Job: \`9f369739\`_`, delivered (route `bot_fallback`, unchanged)
 **Priority:** P3
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
