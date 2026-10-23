@@ -13,6 +13,9 @@
 - Fixed unbalanced PromQL parentheses in the Active Alert Instances dashboard queries and added
   offline validation for dashboard query expressions.
 
+- Cloud-request diagnostic reports now include the webhook job ID so operators can match Slack
+  results to the HTTP 202 response.
+
 - App-cluster registration now continues when the existing Secret role-label lookup fails,
   applying the Secret without a role label instead of exiting silently.
 

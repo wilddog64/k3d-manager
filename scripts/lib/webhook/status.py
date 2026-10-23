@@ -485,6 +485,7 @@ def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, channel_id=""
             ]
 
         _write_log(title)
+        _write_log(f"_Job: `{job_id}`_")
         _write_log(f"_Target provider: `{provider}`_")
         exit_code, out, timed_out = _posix_spawn_capture(
             cmd, timeout=30, include_exit_code=True,
