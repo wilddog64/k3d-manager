@@ -372,5 +372,6 @@ def test_dispatch_dashboard_window_variable_and_release_link():
                             if item["matcher"]["options"] == "Release")
     link = next(prop["value"] for prop in release_override["properties"] if prop["id"] == "links")
     assert link[0]["url"] == "/d/k3dm-bugs?var-release=${__data.fields.version}"
+    assert link[0]["targetBlank"] is True
     assert "version" not in per_spec["transformations"][1]["options"]["excludeByName"]
     assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])
