@@ -8,7 +8,7 @@
 
 - The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory.
 
-- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed this release.
+- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed; hidden metadata columns use `custom.hidden`, because `hideFrom` does not hide a table column.
 
 ### Changed
 

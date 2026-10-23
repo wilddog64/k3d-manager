@@ -228,9 +228,13 @@ overrides={o["matcher"]["options"]: o["properties"] for o in panels[107]["fieldC
 links=next(p["value"] for p in overrides["Plan"] if p["id"]=="links")
 assert links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md"
 assert links[0]["targetBlank"] is True
-assert next(p["value"] for p in overrides["branch"] if p["id"]=="hideFrom")["viz"] is True
+assert next(p["value"] for p in overrides["branch"] if p["id"]=="custom.hidden") is True
+bug_overrides={o["matcher"]["options"]: o["properties"] for o in panels[23]["fieldConfig"]["overrides"]}
+assert next(p["value"] for p in bug_overrides["branch"] if p["id"]=="custom.hidden") is True
+width=lambda n: [p["value"] for o in panels[107]["fieldConfig"]["overrides"] if o["matcher"]["options"]==n for p in o["properties"] if p["id"]=="custom.width"]
+assert width("Plan") and width("Title")
 assert "branch" not in panels[107]["transformations"][0]["options"]["excludeByName"]
-assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed this release","Bugs open this release","Bugs fixed this release"]
+assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed","Bugs open","Bugs fixed"]
 PY
   [ "${status}" -eq 0 ]
 }

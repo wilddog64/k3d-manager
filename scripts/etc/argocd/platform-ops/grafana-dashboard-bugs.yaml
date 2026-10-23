@@ -135,7 +135,7 @@ data:
         {
           "id": 2,
           "type": "stat",
-          "title": "Bugs filed this release",
+          "title": "Bugs filed",
           "gridPos": {
             "x": 4,
             "y": 1,
@@ -179,7 +179,7 @@ data:
         {
           "id": 3,
           "type": "stat",
-          "title": "Bugs open this release",
+          "title": "Bugs open",
           "gridPos": {
             "x": 8,
             "y": 1,
@@ -227,7 +227,7 @@ data:
         {
           "id": 4,
           "type": "stat",
-          "title": "Bugs fixed this release",
+          "title": "Bugs fixed",
           "gridPos": {
             "x": 12,
             "y": 1,
@@ -1338,6 +1338,10 @@ data:
                   {
                     "id": "hideFrom",
                     "value": {"viz": true, "legend": false, "tooltip": false}
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               },
@@ -1350,6 +1354,10 @@ data:
                   {
                     "id": "hideFrom",
                     "value": {"viz": true, "legend": false, "tooltip": false}
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               },
@@ -1723,7 +1731,7 @@ data:
         {
           "id": 103,
           "type": "stat",
-          "title": "Implemented, verification unknown",
+          "title": "Implemented, unverified",
           "gridPos": {
             "x": 8,
             "y": 6,
@@ -1985,6 +1993,30 @@ data:
                 },
                 "properties": [
                   {
+                    "id": "custom.width",
+                    "value": 300
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Title"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 420
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plan"
+                },
+                "properties": [
+                  {
                     "id": "links",
                     "value": [
                       {
@@ -2009,6 +2041,10 @@ data:
                       "legend": false,
                       "tooltip": false
                     }
+                  },
+                  {
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               },
