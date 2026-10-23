@@ -22,6 +22,9 @@
 - Cloud-request diagnostic reports now include the webhook job ID so operators can match Slack
   results to the HTTP 202 response.
 
+- `ask-docs` thread follow-ups now inherit the parent job's Slack routing context, so answers
+  stay in the originating channel thread.
+
 - App-cluster registration now continues when the existing Secret role-label lookup fails,
   applying the Secret without a role label instead of exiting silently.
 
