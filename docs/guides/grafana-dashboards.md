@@ -33,6 +33,12 @@ All dashboard ConfigMaps use the `grafana_dashboard: "1"` label in the `monitori
 
 In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
+## CVE Auto-Patch triage
+
+| Symptom | Meaning | Check |
+|---|---|---|
+| **Our images with no Trivy report** has a row | The critical-CVE table cannot vouch for that running image because no VulnerabilityReport exists | Check the app-cluster Trivy Operator scan jobs and report in the listed namespace; findings panels cannot show an unscanned image |
+
 ## Shared operations
 
 - [Producer chain and provenance](grafana-dashboards/shared-operations.md#the-producer-chain)

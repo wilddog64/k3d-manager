@@ -15,6 +15,8 @@
   `Sc...`. The four open-priority panels, which only show a small number, are now 2 columns wide
   and titled `P0` to `P3`; every other panel is at least 3 columns.
 
+- The CVE Auto-Patch dashboard now exposes running `wilddog64/*` images without VulnerabilityReports, alerts after six hours, and removes the ACG scan-job TTL that starved the single scan slot.
+
 - Added `make codex-prune` to preview and remove landed task worktrees and branches across releases while preserving dispatch run data.
 
 - Slack notifications for thread commands now reply in the originating thread before falling back to a slash-command response URL.
