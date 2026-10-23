@@ -404,6 +404,23 @@ under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, 
 overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
 explicit exclusion of `e2e-sandbox`.
 
+### Candidate milestone — v1.44.2 (patch)
+
+**Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
+their specs"). Branch `k3d-manager-v1.44.2`, cut from `main` after v1.44.1 merges. Plan 1 of 5 is
+[`cloud-bridge-offline-test-run-diagnostics`](plans/v1.44.2-cloud-bridge-offline-test-run-diagnostics.md):
+a reader-scoped cloud action returns the most recent recorded offline test run, with its failing
+suites, missing stages and bounded, redacted failure reasons. No test runs remotely, and no raw log
+leaves the laptop. It follows the 2026-10-20 `test-all` alerts the operator could not triage while away.
+
+### Candidate milestone — v1.44.3 (patch)
+
+**Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
+from `main` after v1.44.2 merges. Plan 1 of 5 is
+[`cloud-bridge-vault-health`](plans/v1.44.3-cloud-bridge-vault-health.md): one fixed reader-scoped
+action, `vault-status`, for `hub` or `hostinger` only. It separates sealed, unreachable, Kubernetes
+API down and ESO failing, with no token and no unseal. It follows the 2026-10-20 Hostinger 502 incident.
+
 ### Candidate milestone — v1.45.0
 
 **Docs drift detection.** Facts that can be derived from code (module tables, route tables,
