@@ -4,7 +4,7 @@
 **Status:** OPEN — aliases restored and export recovered 2026-10-22 (exit 0, `snapshots` → 663918f); what emptied the file is not yet identified
 **Priority:** P2 — nightly DR export stopped (last success 2026-10-21 03:32 PDT); workaround: restore the aliases by hand
 **Severity:** medium
-**Approval:** pending — investigation approved by the operator 2026-10-22 ("go ahead"); fix spec below awaits approval
+**Approval:** approved — operator, 2026-10-22: "go ahead for that ssh-config spec" (fix spec F1–F6)
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** M4 `~/.ssh/config`; ACG SSH config writers in lib-foundation `scripts/lib/acg/acg.sh`
 (`_acg_update_ssh_config`, `_acg_upsert_ssh_host`); `scripts/plugins/hub_data.sh`; `bin/k3dm-disk-metrics`
