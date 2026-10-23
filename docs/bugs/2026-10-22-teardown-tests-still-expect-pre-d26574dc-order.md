@@ -39,8 +39,8 @@
 
 Rewrite the six tests to the current contract. No production code changes.
 
-- **F1.** `cluster_down_acceptance.bats`: split `assert_cleanup_ran` into local cleanup
-  (`vault-pf.pid` gone) and hub cleanup. In the four failure-path tests assert local cleanup ran,
+- **F1.** `cluster_down_acceptance.bats`: keep the name `assert_cleanup_ran` but make it check local cleanup only
+  (`vault-pf.pid` gone), and add `assert_hub_cleanup_ran` for hub cleanup. In the four failure-path tests assert local cleanup ran,
   `delete secret cluster-ubuntu-k3s` is **absent** from the kubectl log, and the output contains
   `Preserving hub registration`. Keep every other assertion (UNVERIFIED summary,
   `assert_no_bare_verified`, no `delete-stack` where present today). Add hub-cleanup-present
@@ -107,4 +107,4 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT change `bin/cluster-down`, `scripts/lib/providers/k3s-aws.sh` or any production code to make a test pass.
 - Do NOT delete a test; rewrite it to the current contract.
-- Do NOT weaken an assertion by removing it; any removed assert needs an `# agent-audit: allow assert-removed <reason>` naming this bug.
+- Do NOT remove any line beginning with `assert_` from a BATS file: `_agent_audit` blocks it and has no BATS escape (the `allow assert-removed` marker covers Python only). Keep helper names and call lines; change helper bodies and add new assertions beside them. (Corrected 2026-10-23 at review.)
