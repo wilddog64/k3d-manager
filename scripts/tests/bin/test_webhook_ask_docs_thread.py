@@ -66,7 +66,7 @@ def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
     assert (subjobs[0] / "thread_ts").read_text() == "T"
     assert (subjobs[0] / "channel_id").read_text() == "C1"
     assert (subjobs[0] / "thread_source").read_text() == "bot"
-    assert (subjobs[0] / "response_url").read_text() == "https://example.invalid/response"
+    assert not (subjobs[0] / "response_url").exists()  # agent-audit: allow assert-removed response_url no longer copied to the sub-job (bug F2)
     assert calls[0] == ("what is X", True)
     assert ("doc answer", "T", "C1") in calls
     assert ("doc answer", "T", "C1") in bot_calls  # agent-audit: allow assert-removed answer now carries the parent channel by design

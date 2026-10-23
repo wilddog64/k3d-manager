@@ -1156,7 +1156,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
         (new_job_dir / "action").write_text("ask-docs")
-        for context_name in ("channel_id", "thread_source", "response_url"):
+        for context_name in ("channel_id", "thread_source"):
             context_file = JOB_DIR / job_id / context_name
             if context_file.exists():
                 (new_job_dir / context_name).write_text(context_file.read_text())
@@ -1280,7 +1280,7 @@ def _notify_job(job_id, text):
     intended_channel = channel_id or ""
     failure = "not_delivered"
     try:
-        if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
+        if SLACK_BOT_TOKEN and channel_id and thread_ts:
             route = "bot_thread"
             posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
             if not posted:

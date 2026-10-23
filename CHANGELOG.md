@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Slack notifications for thread commands now reply in the originating thread before falling back to a slash-command response URL.
+
 - `ask-docs` truncates long replies at a safe line boundary with a marker, and bug tallies omit zero deferred counts.
 - Agent Dispatch dashboard panels now use explicit neutral colours, with green landed outcomes and orange refusal reasons.
 
