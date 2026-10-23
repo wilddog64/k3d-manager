@@ -193,6 +193,8 @@ steps=tiles['Plans in release']['fieldConfig']['defaults']['thresholds']['steps'
 assert any(s.get('value')==6 and s['color']=='red' for s in steps)
 assert not any('not started' in (p['title']+' '+str(p.get('fieldConfig',{}).get('defaults',{}).get('mappings',[]))).lower() for p in added)
 assert 'no record' in json.dumps(table).lower()
+exprs=[t['expr'] for p in added for t in p.get('targets',[])]
+assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
 PY
   [ "${status}" -eq 0 ]
 }

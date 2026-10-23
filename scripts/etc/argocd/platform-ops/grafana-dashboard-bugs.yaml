@@ -1646,7 +1646,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\"}) or vector(0)",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -1694,7 +1694,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=~\"proposed|ready|in_progress\"}) or vector(0)",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -1733,7 +1733,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=\"implemented\",verification=\"unknown\"}) or vector(0)",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"implemented\",verification=\"unknown\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -1781,7 +1781,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",verification=\"live_verified\"}) or vector(0)",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",verification=\"live_verified\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -1825,7 +1825,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=\"unknown\"}) or vector(0)",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"unknown\"}) or vector(0)",
               "instant": true
             }
           ],
@@ -1873,7 +1873,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "count((k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\",execution=~\"proposed|ready|in_progress\"} * on(plan) group_left k3dm_dispatch_plan_state{dispatch_state=\"landed\"})) or vector(0)",
+              "expr": "count((k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} * on(plan) group_left k3dm_dispatch_plan_state{dispatch_state=\"landed\"})) or vector(0)",
               "instant": true
             }
           ],
@@ -1925,7 +1925,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\"}",
+              "expr": "(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) k3dm_plan_info{repo=\"$repo\",release=~\"$release\"}",
               "instant": true,
               "format": "table"
             }
