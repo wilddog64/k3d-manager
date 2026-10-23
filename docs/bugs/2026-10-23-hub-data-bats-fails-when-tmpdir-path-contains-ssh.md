@@ -1,10 +1,10 @@
-# Bug: `hub_data.bats` fails when the `TMPDIR` path contains `ssh-config-guard`
+# Bug: `hub_data.bats` fails when the `TMPDIR` path contains `config`
 
 **Filed:** 2026-10-23 (Claude, found while landing `ssh-config-guard`)
 **Status:** OPEN
 **Priority:** P3 — test-only; it breaks `bin/k3dm-codex-dispatch land` for any task whose slug produces such a path
 **Severity:** low
-**Approval:** pending
+**Approval:** explicit 2026-10-23 "sounds good" (operator), in answer to Claude's offer to fix the doc so the operator can dispatch it
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/tests/plugins/hub_data.bats`
 **Related:** `docs/bugs/2026-10-22-ssh-config-lost-operator-host-aliases.md`
@@ -29,8 +29,19 @@ What makes them fail:
 | `~/.local/share/k3d-manager/probe/x.run/state/tmp` | 0 |
 | `~/.local/share/k3d-manager/probe/ssh-config-guard/tmp` | 6 |
 
-Only the path text changes between the rows, so some stub or assertion matches the string
-`ssh` (or `config`, or `guard`) inside a path that comes from `TMPDIR`.
+Only the path text changes between the rows. Narrowed 2026-10-23 (Claude) on the six failing tests:
+a path containing `ssh-config-guard` or `xxx-config-xxx` gives 6 failures, `ssh-xxxxxx-guard` gives 0.
+The word is `config`.
+
+**Root cause.** The `git` stub in `setup()` (`scripts/tests/plugins/hub_data.bats:18`) matches the
+whole argument string:
+
+    if [[ "$*" == *config* ]]; then printf 'apiVersion: v1\nkind: Config\n' ; fi
+
+Any stubbed `git` call whose arguments include a `TMPDIR`-derived path containing `config` also
+prints a kubeconfig, which corrupts the output the tests assert on. Other lines in the same stub use
+the same substring style (`*commit*`, `*show*`, `*push*`, `*clone*`), so they would break the same way
+for a path containing those words.
 
 ## Workaround used
 
@@ -40,10 +51,13 @@ green (120 tests) with the default `TMPDIR`.
 
 ## Fix
 
-- **F1.** Find the stub or assertion in `hub_data.bats` that matches on `TMPDIR` path text, and anchor
-  it to the command or argument instead of a substring.
+- **F1.** In the `git` stub, match on the git subcommand (the first non-option argument, after any
+  `-C <dir>`), not a substring of `"$*"`. Do this for every line of that stub, not only `config`, so a
+  path containing `commit`, `show`, `push` or `clone` cannot trigger them either. Keep each line's
+  current behaviour for the real subcommand.
 - **F2.** Add a regression test: run the affected tests with a `TMPDIR` whose path contains
-  `ssh-config-guard` (for example `$BATS_TEST_TMPDIR/ssh-config-guard/tmp`).
+  `ssh-config-guard` (for example `$BATS_TEST_TMPDIR/ssh-config-guard/tmp`), and one whose path contains
+  `commit-show-push`.
 
 ## Files
 
