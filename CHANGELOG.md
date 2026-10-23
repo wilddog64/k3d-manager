@@ -6,7 +6,7 @@
 
 - `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.
 
-- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory.
+- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory. The forecast sits between the plan tiles and the Plans table; its Remaining releases table lists only unshipped milestones (the plan count no longer adds rows for shipped releases) and hides the `job` and `instance` labels.
 
 - The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed; hidden metadata columns use `custom.hidden`, because `hideFrom` does not hide a table column.
 
