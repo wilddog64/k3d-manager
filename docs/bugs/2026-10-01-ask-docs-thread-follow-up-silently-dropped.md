@@ -5,7 +5,7 @@
 **Severity:** low. `/ask-docs` now opens a thread (fix `61d6d3fb`). A follow-up typed in that
 thread as `ask-docs <question>` gets no reply at all. The same follow-up as `ask <question>`
 answers in the thread, so the two commands behave differently.
-**Status:** REOPENED — recurrence 2026-10-22, see "Recurrence — 2026-10-22"
+**Status:** FIXED offline — recurrence fix `18a9e7ef` (Luna; Claude review: N1 red on pre-fix with route=none, 164 webhook tests green); live E2 pending make restart-webhook + a thread follow-up
 **Priority:** P2 — thread follow-ups get no answer; workaround: ask with a new top-level `/ask-docs`
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch the recurrence fix to Luna
 **Related:** `2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`
