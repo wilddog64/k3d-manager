@@ -1,7 +1,7 @@
 # Bug: Active Alert Instances shows "No firing instances…" in cells of a firing alert
 
 **Filed:** 2026-10-22 (Claude, from the operator's Inspect → Data screenshot)
-**Status:** OPEN
+**Status:** FIXED offline — `40ff7c74` (Luna; Claude review: N1 red on pre-fix, PromQL unchanged, bats green); live E2 pending ArgoCD sync
 **Priority:** P3 — misleading cell text; the row, count and timestamps are correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna after bug-tally-implemented-deferred
