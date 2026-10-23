@@ -374,3 +374,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Roadmap: v2.x candidate "agent devbox service" added 2026-10-23 (operator go); after v2.5.0, v3.0.0 dependency, no spec slot. Commit 2458d61b.
 - [x] Roadmap devbox candidate extended 2026-10-23 (untrusted-code isolation, per-repo prepared images, forwarded preview ports). Commit 95159bf9.
 - [x] Roadmap: v2.x candidate "agents working together in Slack threads" added 2026-10-23 (operator: "sounds good"); first slice after v2.1/v2.2, full version = v3.0.0 interface. Commit 38c38753.
+- [ ] Slack agent-thread first slice scheduled as v1.44.1 plan 2 (operator asked v1.44.0; v1.44.0 at cap + depends on its submitter auth). Spec not yet written. Commit 1a02eb59.
