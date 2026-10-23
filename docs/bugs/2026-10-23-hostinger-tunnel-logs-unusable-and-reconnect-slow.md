@@ -1,7 +1,7 @@
 # Bug: Hostinger tunnel logs can't place a drop in time, and reconnect waits on 75-second TCP timeouts
 
 **Filed:** 2026-10-23 (Claude, from the 2026-10-22 Hostinger 502 investigation)
-**Status:** FIXED (offline) at `5f9fb209` — live E2 pending
+**Status:** FIXED at `5f9fb209` — live E2 verified except the first timestamped line (appears at the next drop)
 **Priority:** P2 — a tunnel drop causes multi-service 502s, and its evidence is lost or has no timestamps
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-23: "go ahead"
@@ -117,3 +117,17 @@ interface:
   `autossh`. Each stderr line came out as `[2026-10-23T14:38:30Z] …`, and the arguments included
   `ConnectTimeout=10`. `_tunnel_forward_pattern` still matches the exec'd `autossh … -N ubuntu`.
 - Landed as `5f9fb209`.
+
+## Live evidence E2 (2026-10-23, after the operator reran `tunnel_start`)
+
+- `launchctl list`: both `com.k3d-manager.ssh-tunnel` (autossh pid 83296, child `ssh` 83298) and
+  `com.k3d-manager.ssh-tunnel-vault` (pid 82712) are running.
+- `ps`: both invocations carry `-o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=3`
+  and `ExitOnForwardFailure=yes`. The forward agent runs through the generated wrapper (a `bash`
+  timestamping child sits next to `ssh`).
+- `kubectl --context ubuntu-hostinger get --raw /readyz` returns `ok` through the tunnel.
+- The forward agent reports `runs = 2` and `last exit code = 1`: the first instance exited once during
+  the reload, and launchd restarted it. Nothing was logged.
+- **Still open:** a live timestamped `.err` line. A healthy tunnel writes nothing to stderr, so the
+  first one will appear at the next drop or reconnect. The format was already shown offline by
+  running the generated wrapper.
