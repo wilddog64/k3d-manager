@@ -1,7 +1,7 @@
 # Cloud-request diagnostic reports omit the job ID
 
 **Filed:** 2026-10-22
-**Status:** VERIFIED — `ec81caa3`; live E2 2026-10-22 17:19 PDT: `diagnose-pods` (hub, platform-ops) returned 202 job `9f369739`; the posted report line 2 is `_Job: \`9f369739\`_`, delivered (route `bot_fallback`, unchanged)
+**Status:** VERIFIED — `ec81caa3`; live E2 2026-10-22 17:19 PDT: `diagnose-pods` (hub, platform-ops) returned 202 job `9f369739`; the posted report line 2 is `_Job: \`9f369739\`_`, delivered (route `bot_fallback`, unchanged); operator Slack screenshot at 17:18 PDT shows `Job: 9f369739` under the title
 **Priority:** P3
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
