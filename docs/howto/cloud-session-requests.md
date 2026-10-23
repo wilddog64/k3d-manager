@@ -138,6 +138,7 @@ cannot choose it, and an `action` key in `args` is rejected as an unexpected arg
 | action | args | what you get back (via `job-status`) |
 |---|---|---|
 | `diagnose-pods` | `provider`, `namespace` | pods in one namespace |
+| `diagnose-pods-all` | `provider` | pods in every namespace (`kubectl get pods --all-namespaces -o wide`) |
 | `diagnose-describe-pod` | `provider`, `namespace`, `name` | `kubectl describe pod`, sensitive env values masked |
 | `diagnose-logs` | `provider`, `namespace`, `name` | the last 120 log lines of the pod's default container |
 | `diagnose-apps` | none | hub ArgoCD Applications |

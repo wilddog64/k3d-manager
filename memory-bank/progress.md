@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+## 2026-10-23 cloud bridge `diagnose-pods-all`
+
+- 2026-10-23 (cloud session): Added bridge action `diagnose-pods-all` (`provider` only → webhook `get-pods-all`) to `scripts/lib/webhook/cloud_actions.py`, so a cloud session can read every namespace's pods; howto table and CHANGELOG updated. `test_cloud_bridge.py` + `test_diagnostics_all_pods.py`: 99 passed. Takes effect when the operator restarts the bridge on this branch; not live-verified. Rechecked the other two 2026-09-29 follow-ups: the dashboard/alert-routing bug docs were filed 2026-09-29/30 and are FIXED, and the e2e payment auth decision (option b, Keycloak token) was made 2026-10-02; that bug waits only on a live Tier 1 rerun.
+
 ## 2026-10-22 Grafana active-alert identity and local-time follow-up
 
 - Independently reviewed and landed `firing-alert-dashboard-identifiers-local-time` as `28e74901` on `k3d-manager-v1.43.5`. The active-alert view retains available App/Pod/Instance identity after Namespace, Cluster, Alert; both time displays follow Grafana browser timezone. The CVE view includes report owner while preserving report-created (not first-detected) semantics.

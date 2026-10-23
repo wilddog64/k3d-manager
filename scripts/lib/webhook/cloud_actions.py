@@ -39,6 +39,7 @@ ACTION_ALLOWLIST = {
     "make-e2e": ("POST", "/api/v1/make", {}, "e2e"),
     "diagnose-pods": ("POST", "/api/v1/diagnostics",
                       {"provider": PROVIDER_RE, "namespace": NS_RE}, {"action": "get-pods"}),
+    "diagnose-pods-all": ("POST", "/api/v1/diagnostics", {"provider": PROVIDER_RE}, {"action": "get-pods-all"}),
     "diagnose-describe-pod": ("POST", "/api/v1/diagnostics",
                               {"provider": PROVIDER_RE, "namespace": NS_RE, "name": NAME_RE},
                               {"action": "describe-pod"}),

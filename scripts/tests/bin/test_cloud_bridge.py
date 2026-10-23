@@ -711,6 +711,7 @@ def test_test_suite_actions_post_their_target():
 
 DIAGNOSE_ACTIONS = {
     "diagnose-pods": ("get-pods", {"provider": "hostinger", "namespace": "identity"}),
+    "diagnose-pods-all": ("get-pods-all", {"provider": "hub"}),
     "diagnose-describe-pod": ("describe-pod", {"provider": "hub", "namespace": "identity", "name": "keycloak-0"}),
     "diagnose-logs": ("logs", {"provider": "aws", "namespace": "shopping-cart-payment", "name": "payment-0"}),
     "diagnose-apps": ("get-apps", {}),
