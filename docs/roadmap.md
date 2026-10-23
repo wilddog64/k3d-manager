@@ -872,6 +872,28 @@ only if it has actually shipped and exposes approved read-only signals; it is no
 dependency. This milestone feeds v3.0.0's multi-agent product team with more trustworthy
 incident investigation, but does not itself implement the product team.
 
+**Candidate slice — v2.6.4: security triage of runtime detections** (operator, 2026-10-23, after a
+public design exercise on agent-based detection over streaming telemetry; design here is our own).
+Deterministic rules see every event; the agent sees only what they flag. Falco (v1.51.0) and the
+existing Alertmanager rules are the detection stage. The v2.6.0–v2.6.3 investigation loop becomes
+the triage stage for their findings, with these additions:
+
+- **Event fields are attacker-controlled.** A command line, file path or container name in a Falco
+  event can carry text aimed at the agent. Fields reach the model as quoted data with length limits,
+  never as instructions, and the replay corpus includes injected events (contract item 7).
+- **Volume budget, not throughput engineering.** The hub emits megabytes a day, not a terabyte: no
+  streaming bus. A per-hour cap on cases sent to the model, dedupe by rule and workload, and a counter
+  of findings that went untriaged because the cap was hit.
+- **Our own agents are in scope.** Codex and Gemini runs (devbox and Slack-thread candidates) are a
+  telemetry source: an agent task that spawns a shell outside its worktree, or reaches a host outside
+  its egress list, is a finding like any other.
+- **Reproducible verdicts.** Each triage records the rule version, the event, the evidence it read and
+  the model and prompt version, so a verdict can be replayed later.
+- **Report only.** A verdict drafts a `docs/bugs/` entry or a Slack notice; no quarantine, pod
+  deletion or network change (the v1.51.0 non-goals hold).
+
+Depends on v1.51.0 actually shipping Falco with read-only signals, and on v2.6.0–v2.6.3.
+
 **Scheduling:** roadmap candidate only; no `docs/plans/v2.6.x-*.md` files, new
 branch, live action, or dispatch is authorized by this entry. Scope each slice only
 when predecessor releases are ready and the operator approves implementation.
