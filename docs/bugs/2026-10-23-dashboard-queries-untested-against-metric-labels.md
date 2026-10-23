@@ -12,12 +12,13 @@
 ## Symptom
 
 Plan `release-plan-tracking` landed at `10362f51` with every offline gate green: 102 pytest, 93 BATS,
-5/5 mutations caught. Two query defects in the new Release plans row passed every gate:
+5/5 mutations caught. Three query defects in the new Release plans row passed every gate:
 
 | Defect | Effect | Found by | Fix |
 |---|---|---|---|
 | Plans table fallback used a bare `or` | every dispatched plan listed twice, once as "no record" | Claude's review, by reading the query | `ee28dbb5` → `10362f51`: `or on(plan)` |
 | Panels filtered `release_order=~"$release"` | the whole row showed 0 and "No data" on the live hub | the operator's screenshot, after deploy | `44ff27ba`: `release=~"$release"` |
+| "no record" mapped from an empty `dispatch_state` | with no plan dispatched, the label was absent, so the Dispatch columns did not exist | the operator's screenshot, after the fix above | fallback sets `dispatch_state="none"` via `label_replace`; `none` maps to "no record" |
 
 Both errors were in the spec Claude wrote, and Luna implemented them as written. The dashboard tests
 could not catch them, because they assert on the dashboard JSON text, for example that `' or '`
@@ -49,7 +50,8 @@ because every test passed `texts=` directly and none read from a ref. That one w
   2. substitutes the dashboard variables the way Grafana does, applying each variable's `regex` to
      its `label_values` result;
   3. evaluates every target expr against those series and asserts that it returns at least one
-     series. A `table` target must return one row per entity; for the Plans table, one row per plan.
+     series. A `table` target must return one row per entity, and every column its `organize`
+     transformation names must exist; for the Plans table, one row per plan with a `dispatch_state`.
 
   Evaluate with real PromQL: `promtool test rules`, using each expr as a recording rule, from a pinned
   `prom/prometheus` image (or a local `promtool` when present). Skip only when neither is available,

@@ -1925,7 +1925,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) k3dm_plan_info{repo=\"$repo\",release=~\"$release\"}",
+              "expr": "(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"}, \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")",
               "instant": true,
               "format": "table"
             }
@@ -2050,7 +2050,7 @@ data:
                       {
                         "type": "value",
                         "options": {
-                          "": {
+                          "none": {
                             "text": "no record",
                             "color": "gray"
                           },
