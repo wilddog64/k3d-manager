@@ -7,7 +7,7 @@ thread as `ask-docs <question>` gets no reply at all. The same follow-up as `ask
 answers in the thread, so the two commands behave differently.
 **Status:** REOPENED — recurrence 2026-10-22, see "Recurrence — 2026-10-22"
 **Priority:** P2 — thread follow-ups get no answer; workaround: ask with a new top-level `/ask-docs`
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch the recurrence fix to Luna
 **Related:** `2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`
 
 ## Observed (operator, 2026-10-01; webhook log)
