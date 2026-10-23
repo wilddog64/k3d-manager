@@ -111,23 +111,18 @@ def _task_metrics(task_events, land_event):
     }
 
 
-def _window_metrics(events, now, seconds):
-    cutoff = now - seconds
-    current = [event for event in events if event["ts"] >= cutoff]
+def _scope_metrics(events, selected, landed_selected):
     attempts = {result: 0 for result in RESULTS}
-    landed = {}
-    for event in current:
+    for event in selected:
         if event.get("event") == "land":
             attempts["landed"] += 1
         elif event.get("event") == "land_refused" and event.get("reason") in attempts:
             attempts[event["reason"]] += 1
-    for event in events:
-        if event.get("event") != "land":
-            continue
+    landed = {}
+    for event in landed_selected:
         key = (event.get("version"), event.get("slug"))
         if key not in landed or event["ts"] >= landed[key]["ts"]:
             landed[key] = event
-    landed = {key: event for key, event in landed.items() if event["ts"] >= cutoff}
 
     states = _task_states(events)
     token_values = []
@@ -176,56 +171,101 @@ def _window_metrics(events, now, seconds):
     }
 
 
+def _window_metrics(events, now, seconds):
+    cutoff = now - seconds
+    selected = [event for event in events if event["ts"] >= cutoff]
+    latest_lands = {}
+    for event in events:
+        if event.get("event") != "land":
+            continue
+        key = (event.get("version"), event.get("slug"))
+        if key not in latest_lands or event["ts"] >= latest_lands[key]["ts"]:
+            latest_lands[key] = event
+    landed_selected = [event for event in latest_lands.values() if event["ts"] >= cutoff]
+    return _scope_metrics(events, selected, landed_selected)
+
+
+def _normalize_version(value):
+    if not isinstance(value, str) or not VERSION_RE.fullmatch(value):
+        return None
+    return "v" + value.lstrip("v")
+
+
+def _releases(events):
+    releases = {_normalize_version(event.get("version")) for event in events
+                if event.get("event") == "start"}
+    releases.discard(None)
+    return sorted(releases, key=lambda version: tuple(int(part) for part in version[1:].split(".")))
+
+
+def _release_metrics(events, release):
+    selected = [event for event in events
+                if _normalize_version(event.get("version")) == release
+                and event.get("event") in {"land", "land_refused"}]
+    landed = [event for event in events
+              if _normalize_version(event.get("version")) == release and event.get("event") == "land"]
+    latest_lands = {}
+    for event in landed:
+        key = (release, event.get("slug"))
+        if key not in latest_lands or event["ts"] >= latest_lands[key]["ts"]:
+            latest_lands[key] = event
+    return _scope_metrics(events, selected, list(latest_lands.values()))
+
+
+def _render_scope(lines, window, metrics):
+    lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
+    for result in RESULTS:
+        lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
+                     f'{metrics["attempts"][result]}')
+    lines.append(f'k3dm_dispatch_codex_tokens_per_landed{{window="{window}"}} '
+                 f'{metrics["tokens"]}')
+    lines.append(f'k3dm_dispatch_verifier_lines_per_landed{{window="{window}"}} '
+                 f'{metrics["verifier"]}')
+    if metrics["wait"] is not None:
+        lines.append(f'k3dm_dispatch_wait_minutes_per_landed{{window="{window}"}} '
+                     f'{metrics["wait"]}')
+    if metrics["elapsed"] is not None:
+        lines.append(f'k3dm_dispatch_elapsed_minutes_per_landed{{window="{window}"}} '
+                     f'{metrics["elapsed"]}')
+    if metrics["codex_minutes"] is not None:
+        lines.append(f'k3dm_dispatch_codex_minutes_per_landed{{window="{window}"}} '
+                     f'{metrics["codex_minutes"]}')
+    for cause in REWORK_CAUSES:
+        lines.append(f'k3dm_dispatch_rework_landed{{window="{window}",cause="{cause}"}} '
+                     f'{metrics["rework"][cause]}')
+    if metrics["rework_ratio"] is not None:
+        lines.append(f'k3dm_dispatch_rework_ratio{{window="{window}"}} '
+                     f'{metrics["rework_ratio"]}')
+    valid_tasks = []
+    skipped = 0
+    for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):
+        _, version, slug, *_ = task
+        if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
+                and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
+            skipped += 1
+            continue
+        valid_tasks.append(task)
+    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs in valid_tasks[:TASK_CAP]:
+        labels = f'window="{window}",version="{version}",slug="{slug}"'
+        if tokens is not None:
+            lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
+        if runs:
+            lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
+        if elapsed_seconds is not None:
+            lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
+        if runs:
+            lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
+    lines.append(f'k3dm_dispatch_task_skipped{{window="{window}"}} {skipped}')
+    truncated = int(len(valid_tasks) > TASK_CAP)
+    lines.append(f'k3dm_dispatch_task_truncated{{window="{window}"}} {truncated}')
+
 def render(events, bad_lines, now=None):
     now = time.time() if now is None else now
     lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}"]
     for window, seconds in WINDOWS.items():
-        metrics = _window_metrics(events, now, seconds)
-        lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
-        for result in RESULTS:
-            lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
-                         f'{metrics["attempts"][result]}')
-        lines.append(f'k3dm_dispatch_codex_tokens_per_landed{{window="{window}"}} '
-                     f'{metrics["tokens"]}')
-        lines.append(f'k3dm_dispatch_verifier_lines_per_landed{{window="{window}"}} '
-                     f'{metrics["verifier"]}')
-        if metrics["wait"] is not None:
-            lines.append(f'k3dm_dispatch_wait_minutes_per_landed{{window="{window}"}} '
-                         f'{metrics["wait"]}')
-        if metrics["elapsed"] is not None:
-            lines.append(f'k3dm_dispatch_elapsed_minutes_per_landed{{window="{window}"}} '
-                         f'{metrics["elapsed"]}')
-        if metrics["codex_minutes"] is not None:
-            lines.append(f'k3dm_dispatch_codex_minutes_per_landed{{window="{window}"}} '
-                         f'{metrics["codex_minutes"]}')
-        for cause in REWORK_CAUSES:
-            lines.append(f'k3dm_dispatch_rework_landed{{window="{window}",cause="{cause}"}} '
-                         f'{metrics["rework"][cause]}')
-        if metrics["rework_ratio"] is not None:
-            lines.append(f'k3dm_dispatch_rework_ratio{{window="{window}"}} '
-                         f'{metrics["rework_ratio"]}')
-        valid_tasks = []
-        skipped = 0
-        for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):
-            _, version, slug, *_ = task
-            if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
-                    and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
-                skipped += 1
-                continue
-            valid_tasks.append(task)
-        for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs in valid_tasks[:TASK_CAP]:
-            labels = f'window="{window}",version="{version}",slug="{slug}"'
-            if tokens is not None:
-                lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
-            if runs:
-                lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
-            if elapsed_seconds is not None:
-                lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
-            if runs:
-                lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
-        lines.append(f'k3dm_dispatch_task_skipped{{window="{window}"}} {skipped}')
-        truncated = int(len(valid_tasks) > TASK_CAP)
-        lines.append(f'k3dm_dispatch_task_truncated{{window="{window}"}} {truncated}')
+        _render_scope(lines, window, _window_metrics(events, now, seconds))
+    for release in _releases(events):
+        _render_scope(lines, release, _release_metrics(events, release))
     task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
     lines.append(f"k3dm_dispatch_running {task_states.count('running')}")
     lines.append(f"k3dm_dispatch_awaiting_land {task_states.count('awaiting')}")

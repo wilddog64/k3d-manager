@@ -4,6 +4,12 @@
 
 ### Added
 
+- The k3dm Agent dispatch dashboard's Window selector now lists each release from v1.43.0 (the start of the
+  dispatch ledger) after 1d, 7d and 30d. A release scope counts that release's lands and refusals whenever
+  they happened, so a release's totals stop shifting as time windows roll over; the time-window output is
+  unchanged. The Bug Tracking Plans table's Dispatch cell opens Agent dispatch on that release, Agent
+  dispatch's Release cell opens Bug Tracking on it, and each dashboard links to the other at the top.
+
 - The cloud bridge accepts `diagnose-pods-all` (`provider` only), the bridge form of `/cluster-diagnose <provider>`: it sends the webhook's fixed `get-pods-all` action and returns `kubectl get pods --all-namespaces -o wide` through `job-status`.
 
 - `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.

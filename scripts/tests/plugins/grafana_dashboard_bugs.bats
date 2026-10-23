@@ -531,3 +531,20 @@ for column in ("Verified", "Live-verified"):
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "Plans Dispatch links to the release in Agent dispatch" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in d["panels"] if p["id"] == 107)
+exclude=panel["transformations"][0]["options"]["excludeByName"]
+assert "release" not in exclude
+links=next(prop["value"] for override in panel["fieldConfig"]["overrides"]
+           if override["matcher"]["options"] == "Dispatch"
+           for prop in override["properties"] if prop["id"] == "links")
+assert links[0]["url"] == "/d/k3dm-agent-dispatch?var-window=${__data.fields.release}"
+assert any(item.get("url") == "/d/k3dm-agent-dispatch" for item in d["links"])
+PY
+  [ "${status}" -eq 0 ]
+}

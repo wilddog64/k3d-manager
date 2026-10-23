@@ -203,3 +203,174 @@ def test_rework_ratio_absent_without_landed_spec():
     output = dispatch_metrics.render([event(0, "start"), event(10, "codex_exit")], 0, 100)
     assert "k3dm_dispatch_rework_ratio" not in output
     assert _rework(output, "7d", "any") == 0
+
+
+def test_time_window_output_matches_pre_release_scope_golden():
+    now = 1_000_000
+    rows = [
+        event(now - 100, "start", "one"), event(now - 90, "codex_exit", "one", tokens=12345),
+        event(now - 80, "codex_exit", "one", tokens=20000),
+        event(now - 70, "land", "one", verifier_lines=4, wait_seconds=120),
+        event(now - 200, "start", "two"), event(now - 190, "codex_exit", "two", tokens=100),
+        event(now - 180, "land_refused", "two", reason="tests"),
+        event(now - 40, "start", "three"), event(now - 30, "codex_exit", "three", tokens=None),
+        event(now - 20, "start", "four"),
+        event(now - 60, "start", "five"), event(now - 50, "codex_exit", "five", tokens=1),
+        event(now - 10, "resume", "five", n=2),
+        event(now - 40 * 86400, "land", "old", verifier_lines=99, wait_seconds=60),
+    ]
+    output = dispatch_metrics.render(rows, 1, now)
+    actual = "\n".join(line for line in output.splitlines() if 'window="' in line and
+                        any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
+    expected = '''k3dm_dispatch_landed{window="1d"} 1
+k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
+k3dm_dispatch_land_attempts{window="1d",result="tests"} 1
+k3dm_dispatch_land_attempts{window="1d",result="scope"} 0
+k3dm_dispatch_land_attempts{window="1d",result="rebase"} 0
+k3dm_dispatch_codex_tokens_per_landed{window="1d"} 20000.0
+k3dm_dispatch_verifier_lines_per_landed{window="1d"} 4.0
+k3dm_dispatch_wait_minutes_per_landed{window="1d"} 2.0
+k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 0.5
+k3dm_dispatch_codex_minutes_per_landed{window="1d"} 0.16666666666666666
+k3dm_dispatch_rework_landed{window="1d",cause="rerun"} 1
+k3dm_dispatch_rework_landed{window="1d",cause="tests"} 0
+k3dm_dispatch_rework_landed{window="1d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="1d",cause="any"} 1
+k3dm_dispatch_rework_ratio{window="1d"} 1.0
+k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 20000
+k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 10
+k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 30
+k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_skipped{window="1d"} 0
+k3dm_dispatch_task_truncated{window="1d"} 0
+k3dm_dispatch_landed{window="7d"} 1
+k3dm_dispatch_land_attempts{window="7d",result="landed"} 1
+k3dm_dispatch_land_attempts{window="7d",result="tests"} 1
+k3dm_dispatch_land_attempts{window="7d",result="scope"} 0
+k3dm_dispatch_land_attempts{window="7d",result="rebase"} 0
+k3dm_dispatch_codex_tokens_per_landed{window="7d"} 20000.0
+k3dm_dispatch_verifier_lines_per_landed{window="7d"} 4.0
+k3dm_dispatch_wait_minutes_per_landed{window="7d"} 2.0
+k3dm_dispatch_elapsed_minutes_per_landed{window="7d"} 0.5
+k3dm_dispatch_codex_minutes_per_landed{window="7d"} 0.16666666666666666
+k3dm_dispatch_rework_landed{window="7d",cause="rerun"} 1
+k3dm_dispatch_rework_landed{window="7d",cause="tests"} 0
+k3dm_dispatch_rework_landed{window="7d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="7d",cause="any"} 1
+k3dm_dispatch_rework_ratio{window="7d"} 1.0
+k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one"} 20000
+k3dm_dispatch_task_codex_seconds{window="7d",version="9.9.9",slug="one"} 10
+k3dm_dispatch_task_elapsed_seconds{window="7d",version="9.9.9",slug="one"} 30
+k3dm_dispatch_task_runs{window="7d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_skipped{window="7d"} 0
+k3dm_dispatch_task_truncated{window="7d"} 0
+k3dm_dispatch_landed{window="30d"} 1
+k3dm_dispatch_land_attempts{window="30d",result="landed"} 1
+k3dm_dispatch_land_attempts{window="30d",result="tests"} 1
+k3dm_dispatch_land_attempts{window="30d",result="scope"} 0
+k3dm_dispatch_land_attempts{window="30d",result="rebase"} 0
+k3dm_dispatch_codex_tokens_per_landed{window="30d"} 20000.0
+k3dm_dispatch_verifier_lines_per_landed{window="30d"} 4.0
+k3dm_dispatch_wait_minutes_per_landed{window="30d"} 2.0
+k3dm_dispatch_elapsed_minutes_per_landed{window="30d"} 0.5
+k3dm_dispatch_codex_minutes_per_landed{window="30d"} 0.16666666666666666
+k3dm_dispatch_rework_landed{window="30d",cause="rerun"} 1
+k3dm_dispatch_rework_landed{window="30d",cause="tests"} 0
+k3dm_dispatch_rework_landed{window="30d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="30d",cause="any"} 1
+k3dm_dispatch_rework_ratio{window="30d"} 1.0
+k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one"} 20000
+k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="one"} 10
+k3dm_dispatch_task_elapsed_seconds{window="30d",version="9.9.9",slug="one"} 30
+k3dm_dispatch_task_runs{window="30d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_skipped{window="30d"} 0
+k3dm_dispatch_task_truncated{window="30d"} 0'''
+    assert actual == expected
+    first_window = next(index for index, line in enumerate(output.splitlines()) if 'window="' in line)
+    last_time_window = max(index for index, line in enumerate(output.splitlines())
+                           if any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
+    first_release = next(index for index, line in enumerate(output.splitlines()) if 'window="v' in line)
+    assert first_window < last_time_window < first_release
+
+
+def test_release_scope_includes_old_lands():
+    now = 100 * 86400
+    output = dispatch_metrics.render([
+        event(now - 70 * 86400, "start", "old", version="v1.43.0"),
+        event(now - 60 * 86400, "land", "old", version="v1.43.0"),
+    ], 0, now)
+    assert 'k3dm_dispatch_landed{window="v1.43.0"} 1' in output
+    assert 'slug="old"' in output and 'window="v1.43.0",version="v1.43.0",slug="old"' in output
+    assert 'k3dm_dispatch_landed{window="30d"} 0' in output
+
+
+def test_release_versions_normalize_and_sort_numerically():
+    events = [
+        event(1, "start", "plain", version="1.43.3"), event(2, "land", "plain", version="1.43.3"),
+        event(3, "start", "prefixed", version="v1.43.3"), event(4, "land", "prefixed", version="v1.43.3"),
+        event(5, "start", "later", version="v1.43.10"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_landed{window="v1.43.3"} 2' in output
+    assert 'window="1.43.3"' not in output
+    assert dispatch_metrics._releases(events) == ["v1.43.3", "v1.43.10"]
+
+
+def test_invalid_version_is_time_scoped_but_not_release_scoped():
+    output = dispatch_metrics.render([
+        event(10, "start", "main", version="main"), event(20, "land", "main", version="main"),
+    ], 0, 100)
+    assert 'k3dm_dispatch_landed{window="7d"} 1' in output
+    assert 'window="main"' not in output
+
+
+def test_started_release_without_lands_emits_zero():
+    output = dispatch_metrics.render([event(1, "start", version="v2.0.0")], 0, 100)
+    assert 'k3dm_dispatch_landed{window="v2.0.0"} 0' in output
+
+
+def test_release_elapsed_uses_full_task_history():
+    now = 100 * 86400
+    output = dispatch_metrics.render([
+        event(now - 40 * 86400, "start", version="v1.43.5"),
+        event(now - 86400, "land", version="v1.43.5"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="7d",version="v1.43.5",slug="one"} 3369600' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="v1.43.5",version="v1.43.5",slug="one"} 3369600' in output
+
+
+def test_global_metrics_are_emitted_once_without_scope_labels():
+    output = dispatch_metrics.render([event(1, "start"), event(2, "land")], 0, 10)
+    lines = output.splitlines()
+    for metric in ("k3dm_dispatch_running", "k3dm_dispatch_awaiting_land",
+                   "k3dm_dispatch_ledger_timestamp_seconds", "k3dm_dispatch_ledger_bad_lines"):
+        matching = [line for line in lines if line.startswith(metric)]
+        assert len(matching) == 1
+        assert "{" not in matching[0]
+
+
+def test_dispatch_dashboard_window_variable_and_release_link():
+    dashboard_path = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
+    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
+    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    window = dashboard["templating"]["list"][0]
+    assert window["type"] == "query"
+    assert window["query"]["query"] == "label_values(k3dm_dispatch_landed, window)"
+    assert window["sort"] == 7 and window["current"]["value"] == "7d"
+    expressions = [target["expr"] for panel in dashboard["panels"]
+                   for target in panel.get("targets", [])]
+    assert sum("$window" in expr for expr in expressions) == 13
+    assert all('window="$window"' in expr for expr in expressions
+               if any(metric in expr for metric in (
+                   "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
+                   "k3dm_dispatch_verifier_lines_per_landed", "k3dm_dispatch_wait_minutes_per_landed",
+                   "k3dm_dispatch_codex_tokens_per_landed", "k3dm_dispatch_elapsed_minutes_per_landed",
+                   "k3dm_dispatch_codex_minutes_per_landed", "k3dm_dispatch_task_",
+                   "k3dm_dispatch_rework_ratio")))
+    per_spec = next(panel for panel in dashboard["panels"] if panel["id"] == 12)
+    release_override = next(item for item in per_spec["fieldConfig"]["overrides"]
+                            if item["matcher"]["options"] == "Release")
+    link = next(prop["value"] for prop in release_override["properties"] if prop["id"] == "links")
+    assert link[0]["url"] == "/d/k3dm-bugs?var-release=${__data.fields.version}"
+    assert "version" not in per_spec["transformations"][1]["options"]["excludeByName"]
+    assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])

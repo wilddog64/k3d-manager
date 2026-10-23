@@ -11,6 +11,13 @@ data:
     {
       "title": "k3dm Bug Tracking",
       "uid": "k3dm-bugs",
+      "links": [
+        {
+          "type": "link",
+          "title": "Agent dispatch",
+          "url": "/d/k3dm-agent-dispatch"
+        }
+      ],
       "tags": [
         "k3dm"
       ],
@@ -2023,6 +2030,24 @@ data:
                         "title": "Open plan document",
                         "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md",
                         "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dispatch"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open this release in Agent dispatch",
+                        "url": "/d/k3dm-agent-dispatch?var-window=${__data.fields.release}",
+                        "targetBlank": false
                       }
                     ]
                   }
