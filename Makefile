@@ -31,7 +31,7 @@ GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -404,6 +404,10 @@ codex-status:
 ## Land a verified Codex task (SLUG=slug)
 codex-land:
 	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,)
+
+## Land a finished Codex task while Claude is away; marks it review pending (SLUG=slug, TEST=cmd)
+codex-land-pending:
+	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)'
 
 ## Resume a Codex task (SLUG=slug, PROMPT=path)
 codex-resume:

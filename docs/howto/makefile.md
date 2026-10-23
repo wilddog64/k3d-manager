@@ -85,6 +85,7 @@ After a rebuild, generate the new target map and restore with:
 | `make codex-dispatch SPEC=...` | Start Codex in an isolated worktree for a spec |
 | `make codex-status` | Show Codex task state, changes, and scope |
 | `make codex-land SLUG=... TEST='bats scripts/tests/...'` | Rebase, test, and land a verified, in-scope task; use `NO_TEST=1` for docs-only work |
+| `make codex-land-pending SLUG=... TEST='...'` | Land a finished task while Claude is away: commit with the spec's message, land, push, and mark the spec `LANDED — Claude review pending` |
 | `make codex-resume SLUG=... PROMPT=...` | Send a follow-up prompt to the same Codex session |
 | `make codex-abandon SLUG=... [YES=1]` | Preview or remove an abandoned task |
 | `make dispatch-metrics [DRY_RUN=1]` | Export Codex dispatch ledger metrics to Pushgateway, or render them locally |

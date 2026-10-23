@@ -33,6 +33,33 @@ make codex-abandon SLUG=example
 make codex-abandon SLUG=example YES=1
 ```
 
+## Landing while Claude is away
+
+When Codex finishes a task and Claude is not available to review it, the operator can land it
+with one command:
+
+```bash
+make codex-land-pending SLUG=example TEST="bats scripts/tests/plugins/example.bats"
+```
+
+It refuses unless the main checkout is on a clean release branch that is not behind `origin` and
+the task's state is `exited successfully`. Then it:
+
+1. commits the worktree with the message from the spec's `- [ ] Commit: \`...\`` line;
+2. runs `codex-land` with `TEST` and pushes the release branch;
+3. rewrites the spec's `**Status:**` line to `LANDED — Claude review pending (<sha>, <time>)`,
+   appends a pending line to `memory-bank/progress.md`, commits that and pushes.
+
+It never marks a task verified or fixed. Claude's review (tests shown red on the pre-fix code,
+small fixes as new commits) and any live evidence follow when Claude is back, and only then does
+the status change to FIXED. If the change touches dashboards, ApplicationSets, `platform-ops` or
+the webhook, landing is safe, but hold `make appsets-reapply`, `make platform-ops` and
+`make restart-webhook` until that review.
+
+`land` tests the rebased commit before it is pushed, so a test that requires HEAD to be on
+`origin` fails there. The four `e2e_remote.bats` dispatch tests do: give `TEST` a `bats -f`
+filter that excludes them, and run the full suite after the push.
+
 ## Pruning old task worktrees
 
 `make codex-prune` previews landed task worktrees and leftover task branches across every release

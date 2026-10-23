@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+# Land a finished Codex task while Claude is away: commit, land, push, and mark the spec
+# "LANDED — Claude review pending". It never marks anything verified.
+
+set -euo pipefail
+
+_lp_root="$(git rev-parse --show-toplevel 2>/dev/null || { cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd; })"
+_lp_worktree_root="${K3DM_WORKTREE_ROOT:-${HOME}/.local/share/k3d-manager/worktrees}"
+_lp_dispatch="${K3DM_CODEX_DISPATCH_BIN:-${_lp_root}/bin/k3dm-codex-dispatch}"
+
+_lp_die() {
+  echo "[codex-land-pending] ERROR: $*" >&2
+  exit 1
+}
+
+_lp_commit_message() {
+  local spec="$1"
+  sed -n -E 's/^- \[.\] \**Commit( message)?:?\**:? *`([^`]+)`.*$/\2/p' "$spec" | head -1
+}
+
+_lp_mark_status() {
+  local spec="$1" sha="$2" when="$3" tmp
+  tmp="$(mktemp)"
+  awk -v line="**Status:** LANDED — Claude review pending (\`${sha}\`, ${when})" '
+    !done && /^\*\*Status:\*\*/ { print line; done = 1; next }
+    { print }
+    END { exit done ? 0 : 3 }
+  ' "$spec" >"$tmp" || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$spec"
+}
+
+_lp_usage() {
+  echo "usage: bin/k3dm-codex-land-pending --slug SLUG --test CMD" >&2
+  exit 2
+}
+
+_lp_main() {
+  local slug="" test_cmd="" rel version task run spec msg sha when task_status
+  while (($#)); do
+    case "$1" in
+      --slug) slug="${2:-}"; shift 2 ;;
+      --test) test_cmd="${2:-}"; shift 2 ;;
+      *) _lp_usage ;;
+    esac
+  done
+  [[ -n "$slug" && -n "$test_cmd" ]] || _lp_usage
+
+  rel="$(git -C "$_lp_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  [[ "$rel" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _lp_die "checkout is on '${rel:-detached}', not a release branch"
+  version="${rel#k3d-manager-}"
+  task="$_lp_worktree_root/$version/$slug"
+  run="$task.run"
+  [[ -d "$task" && -f "$run/spec" ]] || _lp_die "no dispatched task '$slug' for $version"
+
+  if ! git -C "$_lp_root" diff --quiet || ! git -C "$_lp_root" diff --cached --quiet; then
+    _lp_die "the main checkout has uncommitted changes; commit or set them aside first"
+  fi
+  git -C "$_lp_root" fetch -q origin
+  git -C "$_lp_root" merge-base --is-ancestor "origin/$rel" HEAD \
+    || _lp_die "local $rel is behind origin; run: git pull --ff-only origin $rel"
+
+  task_status="$("$_lp_dispatch" status "$slug")"
+  grep -qx 'state: exited successfully' <<<"$task_status" \
+    || _lp_die "task '$slug' has not exited successfully; check: make codex-status"
+
+  spec="$_lp_root/$(cat "$run/spec")"
+  [[ -f "$spec" ]] || _lp_die "spec not found: $spec"
+  msg="$(_lp_commit_message "$spec")"
+  [[ -n "$msg" ]] || _lp_die "no '- [ ] Commit: \`...\`' line in $spec"
+
+  if [[ -n "$(git -C "$task" status --porcelain)" ]]; then
+    git -C "$task" add -A
+    git -C "$task" commit -q -m "$msg"
+  fi
+
+  "$_lp_dispatch" land --slug "$slug" --test "$test_cmd"
+  git -C "$_lp_root" push -q origin "$rel"
+  sha="$(git -C "$_lp_root" rev-parse --short HEAD)"
+  when="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
+
+  _lp_mark_status "$spec" "$sha" "$when" || _lp_die "landed $sha, but $spec has no **Status:** line; update it by hand"
+  printf -- '- [ ] **%s** landed `%s` %s by the operator — Claude review + live evidence pending.\n' \
+    "$slug" "$sha" "$when" >>"$_lp_root/memory-bank/progress.md"
+  git -C "$_lp_root" add -- "$spec" "$_lp_root/memory-bank/progress.md"
+  git -C "$_lp_root" commit -q -m "docs: record $slug landed, review pending"
+  git -C "$_lp_root" push -q origin "$rel"
+
+  echo "landed: $slug at $sha (review pending)"
+  echo "hold: if it changes dashboards, ApplicationSets, platform-ops or the webhook, do not run appsets-reapply, platform-ops or restart-webhook until Claude reviews it"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  _lp_main "$@"
+fi
