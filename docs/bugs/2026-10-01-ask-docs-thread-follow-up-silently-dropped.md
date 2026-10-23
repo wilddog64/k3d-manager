@@ -5,7 +5,9 @@
 **Severity:** low. `/ask-docs` now opens a thread (fix `61d6d3fb`). A follow-up typed in that
 thread as `ask-docs <question>` gets no reply at all. The same follow-up as `ask <question>`
 answers in the thread, so the two commands behave differently.
-**Status:** FIXED
+**Status:** REOPENED — recurrence 2026-10-22, see "Recurrence — 2026-10-22"
+**Priority:** P2 — thread follow-ups get no answer; workaround: ask with a new top-level `/ask-docs`
+**Approval:** pending
 **Related:** `2026-10-01-ask-answers-not-threaded-and-ask-docs-no-fast-mode.md`
 
 ## Observed (operator, 2026-10-01; webhook log)
@@ -104,3 +106,71 @@ retrieval sub-job with the parent thread timestamp, preserve `--sources`/`-s`, s
 question, and invoke `_run_ask_docs` without a channel ID so the answer is posted back into the
 existing thread. Thread lookup skips `ask-docs` sub-jobs, the help text includes the command, and
 the command retains the default `reader` role floor.
+
+## Recurrence — 2026-10-22
+
+**Found by:** `scripts/tests/bin/test_webhook_ask_docs_thread.py::test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread`,
+red on `k3d-manager-v1.43.5`. The test log shows
+`slack notification failed job=<sub> route=none channel=missing thread_ts=T reason=not_delivered`.
+
+**Cause.** `61230daa` ("checkpoint: before operation", 2026-10-21) added a guard to `_notify_job` in
+`bin/k3dm-webhook`: it no longer posts to the configured default channel when the job has a
+`thread_ts` but no `channel_id`, so a reply cannot land in an unrelated channel. The thread
+`ask-docs` handler (`_handle_thread_command`, `cmd == "ask-docs"`) creates the sub-job with only
+`thread_ts` and calls `_run_ask_docs(..., channel_id="")`. With no channel and no `response_url`,
+the answer reaches `_notify_job` and is dropped with `route=none`. The guard is correct; the sub-job
+is missing the parent's routing.
+
+### Fix
+
+- **F1.** In the thread `ask-docs` handler, copy the parent job's `channel_id`, `thread_source` and
+  `response_url` files (each only if it exists) into the new sub-job directory, next to the existing
+  `thread_ts` copy. Do not change the `_notify_job` guard.
+- **F2.** Update the test: the fixture's parent job gets a `channel_id` file (`C1`), and the test
+  asserts the answer is posted with `thread_ts="T"` and `channel_id="C1"`. Add a second test: a
+  parent with no `channel_id` and no `response_url` still records `not_delivered` (the guard holds).
+- **F3.** `CHANGELOG.md` entry.
+
+### Files
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_ask_docs_thread.py`
+- `CHANGELOG.md`
+
+### Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: An ask-docs follow-up in a job thread whose parent job has channel_id C posts its answer to thread_ts of that thread in channel C.
+  - id: M2
+    text: The sub-job directory contains the parent's channel_id, thread_source and response_url when the parent has them.
+must_not:
+  - id: N1
+    text: An ask-docs thread follow-up whose parent has a channel_id must not end with route=none / not_delivered (red on the pre-fix code).
+  - id: N2
+    text: A job with thread_ts but no channel_id and no response_url must not be posted to the configured default channel (the _notify_job guard is unchanged).
+evidence:
+  - id: E1
+    kind: offline
+    proves: [M1, M2, N1, N2]
+    text: pytest scripts/tests/bin/test_webhook_ask_docs_thread.py and the full scripts/tests/bin suite; N1 red on the pre-fix code.
+  - id: E2
+    kind: live
+    proves: [M1]
+    text: After make restart-webhook, the operator replies `ask-docs what is the bug tally` in an existing k3d-manager job thread and the answer appears in that thread.
+interface:
+  - bin/k3dm-webhook _handle_thread_command(job_id, text, role) with "ask-docs <question>"
+  - Job directory files thread_ts, channel_id, thread_source, response_url under JOB_DIR/<job_id>/
+```
+
+### Definition of Done
+
+- [ ] F1–F3 on `k3d-manager-v1.43.5`; only the Files above change.
+- [ ] N1 shown red against the pre-fix code.
+- [ ] Commit: `fix(webhook): route ask-docs thread follow-ups to the parent's channel`
+
+### What NOT to Do
+
+- Do NOT relax the `_notify_job` default-channel guard.
+- Do NOT create a PR, commit to `main`, or use `--no-verify`.
