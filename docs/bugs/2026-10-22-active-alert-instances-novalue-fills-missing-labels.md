@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P3 — misleading cell text; the row, count and timestamps are correct
 **Severity:** low
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna after bug-tally-implemented-deferred
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** Grafana Health & Firing Alerts, panel "Active Alert Instances"
 **Related:** `docs/bugs/2026-10-21-firing-alerts-dashboard-missing-start-time-and-age.md`
