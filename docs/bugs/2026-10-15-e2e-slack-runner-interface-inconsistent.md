@@ -3,7 +3,7 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — operator-facing command contract / interface consistency
-**Status:** OPEN — split 2026-10-23: this bug is narrowed to the error message and help text; the unified command moved to `docs/plans/v1.46.1-e2e-unified-runner-command.md`
+**Status:** FIXED (offline) — `87313693` 2026-10-23; E3 live pending (operator runs `k3dm e2e-remote RUNNER=aws`)
 **Approval:** operator explicitly requested appropriate bug filing on 2026-10-15; split approved 2026-10-23 (operator: "yes, please split the way you suggested")
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/plugins/e2e_remote.sh`, `scripts/lib/webhook/make_targets.py`
