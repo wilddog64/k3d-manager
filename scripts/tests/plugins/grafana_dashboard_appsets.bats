@@ -4,6 +4,7 @@ ACG="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-ac
 HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
+BUGS_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"
 OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
 HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml"
 PLATFORM_OPS_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops"
@@ -90,6 +91,18 @@ _assert_build_info_contract() {
   [ "$(jq -c '[.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Version") | .properties[] | select(.id == "custom.width") | .value]' <<<"$panel")" = '[90]' ] || return 1
   [ "$(jq -c '[.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Edition") | .properties[] | select(.id == "custom.width") | .value]' <<<"$panel")" = '[90]' ] || return 1
   jq -e 'all(.fieldConfig.overrides[]?; (.matcher.id == "byName" and .matcher.options == "Pod") | not)' <<<"$panel" >/dev/null || return 1
+}
+
+_bugs_panel() {
+  local dashboard_file="$1"
+  yq -r '.data["k3dm-bugs.json"]' "$dashboard_file" | jq -c '.panels[] | select(.title == "Bugs")'
+}
+
+_assert_bugs_table_filter_contract() {
+  local dashboard_file="$1"
+  local panel
+  panel="$(_bugs_panel "$dashboard_file")" || return 1
+  jq -e '([.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Bug") | .properties[] | select(.id == "custom.filterable" and .value == true)] | length == 1) and (.targets[0].expr | contains("repo=\"$repo\"")) and (.targets[0].expr | contains("release=~\"$release\"")) and (.targets[0].expr | contains("live_verified=~\"$verified\""))' <<<"$panel" >/dev/null || return 1
 }
 
 _assert_query_contract() {
@@ -332,6 +345,25 @@ _assert_no_panel_overlap() {
 @test "Grafana Overview Build Info panels use the positive table contract" {
   _assert_build_info_contract "${OVERVIEW}"
   _assert_build_info_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Bugs table title is filterable and preserves query selectors" {
+  _assert_bugs_table_filter_contract "${BUGS_DASHBOARD}"
+}
+
+@test "Grafana Bugs table contract rejects an unfilterable title and missing selector" {
+  local snapshot="${BATS_TEST_TMPDIR}/grafana-bugs-mutated.yaml"
+  cp "${BUGS_DASHBOARD}" "$snapshot"
+  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .fieldConfig.overrides[] | select(.matcher.options == "Bug") | .properties) |= map(select(.id != "custom.filterable")) | tojson))' "$snapshot"
+  run _assert_bugs_table_filter_contract "$snapshot"
+  printf 'pre-fix representation (title filter missing): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+
+  cp "${BUGS_DASHBOARD}" "$snapshot"
+  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .targets[0].expr) |= sub("repo=\\\"\\$repo\\\","; "") | tojson))' "$snapshot"
+  run _assert_bugs_table_filter_contract "$snapshot"
+  printf 'mutation (query missing repo matcher): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
 }
 
 @test "Grafana Overview Build Info panels stay byte-identical" {

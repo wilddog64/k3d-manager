@@ -31,6 +31,8 @@ The repository ships separate hub and ACG Grafana instances, with dashboards pla
 
 All dashboard ConfigMaps use the `grafana_dashboard: "1"` label in the `monitoring` namespace for sidecar discovery. A missing dashboard points first to deployment, namespace, or label; a loaded dashboard with empty panels points first to its producer.
 
+In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
+
 ## Shared operations
 
 - [Producer chain and provenance](grafana-dashboards/shared-operations.md#the-producer-chain)

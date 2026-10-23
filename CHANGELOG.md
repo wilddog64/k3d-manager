@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- The k3dm Bug Tracking table's **Bug** title column can now be filtered from its header while preserving the existing repository, release, and verification query selections.
+
 - Fixed unbalanced PromQL parentheses in the Active Alert Instances dashboard queries and added
   offline validation for dashboard query expressions.
 

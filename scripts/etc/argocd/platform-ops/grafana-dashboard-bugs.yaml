@@ -1314,6 +1314,10 @@ data:
                 },
                 "properties": [
                   {
+                    "id": "custom.filterable",
+                    "value": true
+                  },
+                  {
                     "id": "links",
                     "value": [
                       {
