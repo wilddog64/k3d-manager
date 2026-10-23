@@ -90,6 +90,13 @@ Grafana's column filter is a value picker with a search box, matching on the
 displayed value. Confirm in E2 that it is usable for ~100 rows; if not, reopen
 with the fallback.
 
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
+- `scripts/tests/plugins/grafana_dashboard_appsets.bats`
+- `docs/guides/grafana-dashboards.md`
+- `CHANGELOG.md`
+
 ## Acceptance
 
 ```yaml
