@@ -53,3 +53,13 @@ Keep operator aliases out of the file tools rewrite: put them in `~/.ssh/config.
 `~/.ssh/config` start with `Include ~/.ssh/config.d/*`, or move ACG hosts to their own included file
 written by `acg.sh`. Either way, any test touching SSH config must run under a temp `HOME`. An
 Acceptance block is added once the cause is known.
+
+## Impact found 2026-10-22: the nightly DR export failed
+
+The scheduled `hub_data_export_scheduled` run at 03:30 PDT on 2026-10-22 failed at the clone of
+`github-k3dm-hub-data:wilddog64/k3dm-hub-data.git` ("Please make sure you have the correct access
+rights"), because that Host alias was missing. It pushed the failure metric only, so
+`HubDataExportStale` fired once 36h had passed since the last good export (2026-10-21 03:32 PDT),
+at about 16:02 PDT. The 17:01 PDT run, after the alias was restored, succeeded (snapshot
+`20261023T000111Z`) and pushed a fresh `k3dm_hub_data_export_last_success_timestamp_seconds`.
+Losing the aliases silently breaks DR backups, so this raises the stakes of the preventive fix.
