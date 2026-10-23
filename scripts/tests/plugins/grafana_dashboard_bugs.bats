@@ -255,7 +255,8 @@ bug_overrides={o["matcher"]["options"]: o["properties"] for o in panels[23]["fie
 assert next(p["value"] for p in bug_overrides["branch"] if p["id"]=="custom.hidden") is True
 width=lambda n: [p["value"] for o in panels[107]["fieldConfig"]["overrides"] if o["matcher"]["options"]==n for p in o["properties"] if p["id"]=="custom.width"]
 assert width("Plan") and width("Title")
-assert "branch" not in panels[107]["transformations"][0]["options"]["excludeByName"]
+organize=next(t for t in panels[107]["transformations"] if t["id"]=="organize")
+assert "branch" not in organize["options"]["excludeByName"]
 assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed","Bugs open","Bugs fixed"]
 PY
   [ "${status}" -eq 0 ]
@@ -282,6 +283,31 @@ assert 'label_replace(' in expr and '"dispatch_state", "none"' in expr
 assert table['fieldConfig']['overrides'] and any('none' in str(o.get('properties')) and 'no record' in str(o.get('properties')) for o in table['fieldConfig']['overrides'])
 exprs=[t['expr'] for p in added for t in p.get('targets',[])]
 assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard Plans table orders plans numerically and shows dependencies" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+table=next(p for p in data['panels'] if p['id']==107)
+assert table['description']=="Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line."
+transforms=table['transformations']
+convert=next(i for i,t in enumerate(transforms) if t['id']=='convertFieldType')
+organize=next(i for i,t in enumerate(transforms) if t['id']=='organize')
+assert convert < organize
+assert transforms[convert]['options']['conversions']==[{'targetField':'order','destinationType':'number'}]
+options=transforms[organize]['options']
+assert options['indexByName']['order']==1
+assert options['renameByName']['order']=='Order'
+assert options['renameByName']['depends_on']=='Depends on'
+assert table['options']['sortBy']==[{'displayName':'Order','desc':False}]
+overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
+order_props={p['id']:p['value'] for p in overrides['Order']}
+assert order_props['custom.width']==70 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==160 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -538,7 +564,8 @@ import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panel=next(p for p in d["panels"] if p["id"] == 107)
-exclude=panel["transformations"][0]["options"]["excludeByName"]
+organize=next(t for t in panel["transformations"] if t["id"]=="organize")
+exclude=organize["options"]["excludeByName"]
 assert "release" not in exclude
 links=next(prop["value"] for override in panel["fieldConfig"]["overrides"]
            if override["matcher"]["options"] == "Dispatch"

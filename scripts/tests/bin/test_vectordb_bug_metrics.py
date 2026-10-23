@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import runpy
 import subprocess
 import sys
@@ -102,6 +103,31 @@ def test_plan_info_carries_the_scanned_branch_for_doc_links(metrics, tmp_path):
     row = next(line for line in output.splitlines() if line.startswith("k3dm_plan_info{"))
     assert 'branch="k3d-manager-v1.43.5"' in row
     assert 'release="v1.44.0"' in row
+
+
+def test_plan_metrics_emits_order_and_resolves_dependencies_in_second_pass(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.43.5-a.md": "# A\n**Release:** v1.43.5 (plan 2 of 5)\n**Depends on:** `docs/plans/v1.43.5-z.md` (plan 4)\n",
+        "docs/plans/v1.43.5-z.md": "# Z\n**Release:** v1.43.5 (plan 4 of 5)\n",
+        "docs/plans/v1.43.5-ten.md": "# Ten\n**Release:** v1.43.5 (plan 10 of 12)\n",
+        "docs/plans/v1.43.5-none.md": "# None\n",
+        "docs/plans/v1.43.5-mixed.md": "# Mixed\n**Release:** v1.43.5 (plan 3 of 5)\n**Depends on:** `docs/plans/v1.43.5-z.md`, `docs/plans/v1.43.4-foo.md`, `docs/plans/v1.43.5-z.md`\n",
+        "docs/plans/v1.43.5-empty.md": "# Empty\n**Depends on:** no path here\n",
+        "docs/plans/v1.43.4-other-release.md": "# Other\n**Release:** v1.43.4 (plan 1 of 4)\n",
+        "docs/plans/v1.43.5-cross.md": "# Cross\n**Release:** v1.43.5 (plan 5 of 5)\n**Depends on:** `docs/plans/v1.43.4-other-release.md`\n",
+        "docs/plans/v1.43.5-no-order-dependency.md": "# No order\n",
+        "docs/plans/v1.43.5-no-order-user.md": "# User\n**Release:** v1.43.5 (plan 1 of 5)\n**Depends on:** `docs/plans/v1.43.5-no-order-dependency.md`\n",
+    }
+    rows = [line for line in metrics._plan_metrics(tmp_path, texts=docs).splitlines()
+            if line.startswith("k3dm_plan_info{")]
+    by_plan = {re.search(r'plan="([^"]+)"', row).group(1): row for row in rows}
+    assert 'order="2",depends_on="plan 4"' in by_plan["v1.43.5-a"]
+    assert 'order="10"' in by_plan["v1.43.5-ten"]
+    assert 'order="",depends_on="-"' in by_plan["v1.43.5-none"]
+    assert 'depends_on="plan 4, v1.43.4-foo"' in by_plan["v1.43.5-mixed"]
+    assert 'depends_on="-"' in by_plan["v1.43.5-empty"]
+    assert 'depends_on="v1.43.4-other-release"' in by_plan["v1.43.5-cross"]
+    assert 'depends_on="v1.43.5-no-order-dependency"' in by_plan["v1.43.5-no-order-user"]
 
 def test_plan_metrics_reads_worktree_top_level_only(metrics, tmp_path):
     plans=tmp_path / "docs/plans"

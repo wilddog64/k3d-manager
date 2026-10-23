@@ -35,7 +35,9 @@ In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column he
 
 ### Release plans
 
-The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads only each plan's H1, `**Status:**`, and `**Approval:**`; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
+The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Release:**`, and `**Depends on:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
+
+The **Order** column comes from the plan number on each document's `**Release:**` line, and **Depends on** lists the plan paths from its `**Depends on:**` line. A plan whose dependency has not been implemented is not ready to dispatch.
 
 | Status starts with | Execution | Verification |
 |---|---|---|

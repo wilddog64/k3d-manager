@@ -1927,6 +1927,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
+          "description": "Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -1947,6 +1948,17 @@ data:
           ],
           "transformations": [
             {
+              "id": "convertFieldType",
+              "options": {
+                "conversions": [
+                  {
+                    "destinationType": "number",
+                    "targetField": "order"
+                  }
+                ]
+              }
+            },
+            {
               "id": "organize",
               "options": {
                 "excludeByName": {
@@ -1961,18 +1973,22 @@ data:
                 },
                 "indexByName": {
                   "release": 0,
-                  "plan": 1,
-                  "title": 2,
-                  "execution": 3,
-                  "verification": 4,
-                  "approval": 5,
-                  "dispatch_state": 6,
-                  "slug": 7
+                  "order": 1,
+                  "plan": 2,
+                  "title": 3,
+                  "depends_on": 4,
+                  "execution": 5,
+                  "verification": 6,
+                  "approval": 7,
+                  "dispatch_state": 8,
+                  "slug": 9
                 },
                 "renameByName": {
                   "release": "Release",
+                  "order": "Order",
                   "plan": "Plan",
                   "title": "Title",
+                  "depends_on": "Depends on",
                   "execution": "Execution",
                   "verification": "Verification",
                   "approval": "Approval",
@@ -1993,6 +2009,34 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Depends on"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 160
+                  }
+                ]
+              },
               {
                 "matcher": {
                   "id": "byName",
@@ -2176,7 +2220,7 @@ data:
           "options": {
             "sortBy": [
               {
-                "displayName": "Plan",
+                "displayName": "Order",
                 "desc": false
               }
             ],

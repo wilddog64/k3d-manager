@@ -203,6 +203,8 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     texts = _plan_texts(root, ref) if texts is None else texts
     info, counts, skipped = [], defaultdict(int), 0
     branch = _scan_branch(root, ref)
+    plans = {}
+    parsed = []
     for path, text in texts.items():
         match = _PLAN_FILE_RE.fullmatch(Path(path).name)
         if not match or not isinstance(text, str):
@@ -221,8 +223,35 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
             title = title[:119] + "…"
         order = _release_order(release)
         approval = _plan_approval(text, release)
-        info.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{release}",release_order="{order}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}"}} 1')
+        release_line = re.search(
+            r"^\*\*Release:\*\*\s*v\d+\.\d+\.\d+\s*\(plan\s+(\d+)\s+of\b",
+            text, re.MULTILINE | re.IGNORECASE)
+        plan_order = release_line.group(1) if release_line else ""
+        if plan_order:
+            plans[plan] = (release, plan_order)
+        depends_line = re.search(r"^\*\*Depends on:\*\*.*$", text,
+                                 re.MULTILINE | re.IGNORECASE)
+        paths = []
+        if depends_line:
+            for dependency in re.findall(r"`(docs/plans/[^`]+\.md)`", depends_line.group(0)):
+                stem = Path(dependency).stem
+                if stem not in paths:
+                    paths.append(stem)
+        parsed.append((release, plan, title, execution, verification, approval,
+                       plan_order, paths))
         counts[(release, order, execution, verification)] += 1
+    for release, plan, title, execution, verification, approval, plan_order, paths in parsed:
+        dependencies = []
+        for stem in paths:
+            dependency = plans.get(stem)
+            if dependency and dependency[0] == release:
+                dependencies.append(f"plan {dependency[1]}")
+            else:
+                dependencies.append(stem)
+        depends_on = ", ".join(dependencies) if dependencies else "-"
+        depends_on = re.sub(r'["\\\t\r\n]+', " ", depends_on)
+        depends_on = " ".join(depends_on.split())
+        info.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{release}",release_order="{_release_order(release)}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}",order="{plan_order}",depends_on="{depends_on}"}} 1')
     lines = info + [f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
                     for (release, order, execution, verification), count in sorted(counts.items())]
     lines.extend([f'k3dm_plan_info_skipped{{repo="{repo}"}} {skipped}',
