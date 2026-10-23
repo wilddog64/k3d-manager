@@ -1,7 +1,7 @@
 # Bug: six teardown tests still expect the pre-`d26574dc` hub-deregister order
 
 **Filed:** 2026-10-22 (Claude, from a full BATS run on `k3d-manager-v1.43.5`)
-**Status:** OPEN
+**Status:** FIXED `99048395` — 77/77 bats green (11 acceptance, 32 k3s-aws, 34 cluster-down); offline-only change
 **Priority:** P3 — test-only; the suite is red on the release branch, the code is correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes, go for that proposal" (file for Luna)
