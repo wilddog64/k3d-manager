@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- `ask-docs` truncates long replies at a safe line boundary with a marker, and bug tallies omit zero deferred counts.
+
 - Bug counts now treat IMPLEMENTED documents as closed and label DEFERRED documents separately in Slack.
 
 - Active Alert Instances now show a dash for missing alert labels; the empty-table explanation is in the panel description.

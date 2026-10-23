@@ -105,6 +105,19 @@ def test_implemented_is_closed_and_deferred_is_labeled_in_tally_and_reply(tally_
     assert "Deferred: " in answer and "Open: " in answer
 
 
+def test_bug_count_omits_zero_deferred_count(monkeypatch):
+    release = {
+        "by_priority": {}, "total": 1, "closed": 0, "open": 1, "unknown": 0,
+        "open_paths": [{"path": "docs/bugs/open.md", "status": "open"}],
+        "unknown_paths": [],
+    }
+    payload = json.dumps({"ref": "HEAD", "releases": {"unknown": release}})
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
+    answer = bug_count.reply(bug_count.CountQuery("unknown", None, None))
+    assert "1 open," in answer
+    assert "deferred" not in answer
+
+
 def test_tally_read_failure_returns_exit_two_and_no_stdout(tally_module, monkeypatch, capsys):
     monkeypatch.setattr(tally_module, "tally", lambda _ref: (_ for _ in ()).throw(OSError("unreadable")))
     assert tally_module.main(["--json", "--ref", "HEAD"]) == 2

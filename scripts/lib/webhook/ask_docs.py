@@ -19,6 +19,7 @@ ASK_DOCS_MIN_SCORE = float(os.environ.get("K3DM_ASK_DOCS_MIN_SCORE", "0.60"))
 RECENT_POOL = 50
 MAX_EXCERPT_CHARS = 600
 MAX_REPLY_CHARS = 3000
+TRUNCATION_MARKER = "…(truncated; name a release to see the full list)"
 MAX_FAILURE_METADATA_CHARS = 1200
 _LINK_REF_CACHE = None
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
@@ -215,8 +216,25 @@ def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, s
     available = MAX_REPLY_CHARS - len(source_lines) - 2
     if available < 0:
         available = 0
+    if len(prose) > available:
+        content_limit = max(0, available - len(TRUNCATION_MARKER) - 1)
+        newline = prose.rfind("\n", 0, content_limit + 1)
+        if newline >= 0:
+            prose = prose[:newline].rstrip()
+        else:
+            in_link = False
+            boundary = -1
+            for index, character in enumerate(prose[:content_limit + 1]):
+                if character == "<":
+                    in_link = True
+                elif character == ">":
+                    in_link = False
+                elif character.isspace() and not in_link:
+                    boundary = index
+            prose = prose[:boundary].rstrip() if boundary >= 0 else ""
+        prose = f"{prose}\n{TRUNCATION_MARKER}" if prose else TRUNCATION_MARKER
     return AskDocsResult(
-        prose[:available].rstrip() + "\n\n" + source_lines,
+        prose + "\n\n" + source_lines,
         status=status,
         metadata=metadata,
     )

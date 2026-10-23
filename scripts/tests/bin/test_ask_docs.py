@@ -289,6 +289,25 @@ def test_long_reply_keeps_every_source_link_intact(monkeypatch):
         assert ask_docs._doc_link(path) in reply
 
 
+def test_long_prose_truncates_on_line_boundary_before_sources(monkeypatch):
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "main")
+    links = [ask_docs._doc_link(f"docs/bugs/{index}-{'x' * 90}.md") for index in range(40)]
+    prose = "\n".join(links)
+    reply = ask_docs._reply(prose, ["docs/bugs/source.md"])
+    prose_part, sources = reply.split("\n\nSources:", 1)
+    assert len(reply) <= ask_docs.MAX_REPLY_CHARS
+    assert prose_part.endswith(ask_docs.TRUNCATION_MARKER)
+    assert prose_part.count("<") == prose_part.count(">")
+    assert prose_part[: -len(ask_docs.TRUNCATION_MARKER)].rstrip().endswith(">")
+    assert ask_docs._doc_link("docs/bugs/source.md") in sources
+
+
+def test_short_prose_is_returned_unchanged():
+    prose = "A short answer."
+    result = ask_docs._reply(prose, [])
+    assert result == prose + "\n\nSources: none"
+
+
 def test_unsafe_source_path_is_plain_text(monkeypatch):
     path = "docs/bugs/bad|path.md"
     monkeypatch.setattr(ask_docs, "_allowed_path", lambda _path: True)
