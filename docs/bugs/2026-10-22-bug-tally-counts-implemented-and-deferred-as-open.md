@@ -4,7 +4,7 @@
 **Status:** OPEN
 **Priority:** P3 — wrong counts in Slack and one dashboard metric; the per-bug dashboard rows are correct
 **Severity:** low
-**Approval:** pending
+**Approval:** approved — operator, 2026-10-22: "yes" to dispatching to Luna after bugs-table-title-filter
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/lib/hermes/prior_art.py` (`_CLOSED_RE`, `doc_meta`); `scripts/bug-tally.py`; `scripts/lib/webhook/bug_count.py`
 **Related:** `docs/bugs/2026-10-10-ask-docs-bug-count-ignores-release-range.md`
