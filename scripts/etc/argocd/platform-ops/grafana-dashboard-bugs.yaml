@@ -759,11 +759,11 @@ data:
         {
           "id": 9,
           "type": "stat",
-          "title": "Open P0",
+          "title": "P0",
           "gridPos": {
             "x": 0,
             "y": 16,
-            "w": 3,
+            "w": 2,
             "h": 4
           },
           "targets": [
@@ -808,11 +808,11 @@ data:
         {
           "id": 10,
           "type": "stat",
-          "title": "Open P1",
+          "title": "P1",
           "gridPos": {
-            "x": 3,
+            "x": 2,
             "y": 16,
-            "w": 3,
+            "w": 2,
             "h": 4
           },
           "targets": [
@@ -857,11 +857,11 @@ data:
         {
           "id": 11,
           "type": "stat",
-          "title": "Open P2",
+          "title": "P2",
           "gridPos": {
-            "x": 6,
+            "x": 4,
             "y": 16,
-            "w": 3,
+            "w": 2,
             "h": 4
           },
           "targets": [
@@ -902,11 +902,11 @@ data:
         {
           "id": 12,
           "type": "stat",
-          "title": "Open P3",
+          "title": "P3",
           "gridPos": {
-            "x": 9,
+            "x": 6,
             "y": 16,
-            "w": 3,
+            "w": 2,
             "h": 4
           },
           "targets": [
@@ -949,9 +949,9 @@ data:
           "type": "stat",
           "title": "Fixed",
           "gridPos": {
-            "x": 12,
+            "x": 8,
             "y": 16,
-            "w": 2,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -997,7 +997,7 @@ data:
           "id": 16,
           "type": "stat",
           "title": "Verified",
-          "gridPos": {"x": 14, "y": 16, "w": 3, "h": 4},
+          "gridPos": {"x": 11, "y": 16, "w": 3, "h": 4},
           "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
@@ -1008,7 +1008,7 @@ data:
           "id": 24,
           "type": "stat",
           "title": "Live-verified",
-          "gridPos": {"x": 17, "y": 16, "w": 3, "h": 4},
+          "gridPos": {"x": 14, "y": 16, "w": 4, "h": 4},
           "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"fixed\",live_verified=\"true\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}},
@@ -1019,7 +1019,7 @@ data:
           "id": 17,
           "type": "stat",
           "title": "Deferred",
-          "gridPos": {"x": 20, "y": 16, "w": 2, "h": 4},
+          "gridPos": {"x": 18, "y": 16, "w": 3, "h": 4},
           "targets": [{"refId": "A", "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=\"deferred\",release=~\"$release\"}) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#8e8e8e"}}},
@@ -1031,9 +1031,9 @@ data:
           "type": "stat",
           "title": "Scan age",
           "gridPos": {
-            "x": 22,
+            "x": 21,
             "y": 16,
-            "w": 2,
+            "w": 3,
             "h": 4
           },
           "targets": [

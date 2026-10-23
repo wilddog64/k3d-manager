@@ -106,7 +106,7 @@ that an evidence commit contains it (`make check-bug-evidence` sweeps every doc)
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
-The summary strip follows the Release dropdown and shows Open P0–P3, Fixed, Verified,
+The summary strip follows the Release dropdown and shows open P0–P3 (titled P0 to P3), Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
 Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
 document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the

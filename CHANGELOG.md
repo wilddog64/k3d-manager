@@ -10,6 +10,11 @@
 
 ### Fixed
 
+- **Bug dashboard summary strip no longer truncates Fixed, Deferred and Scan age.** Nine stat
+  panels shared 24 grid columns, so three were 2 columns wide and showed `Fix...`, `De...` and
+  `Sc...`. The four open-priority panels, which only show a small number, are now 2 columns wide
+  and titled `P0` to `P3`; every other panel is at least 3 columns.
+
 - Added `make codex-prune` to preview and remove landed task worktrees and branches across releases while preserving dispatch run data.
 
 - Slack notifications for thread commands now reply in the originating thread before falling back to a slash-command response URL.
