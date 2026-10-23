@@ -365,6 +365,21 @@ function _e2e_runner_allowed() {
   return 1
 }
 
+function _e2e_runner_denied_message() {
+  local runner="${1:-}"
+  case "$runner" in
+    aws|acg|sandbox)
+      _err "[e2e-remote] runner '${runner}' is not an e2e-remote runner; for Tier 2 E2E on the ACG sandbox use 'e2e-sandbox' (Slack: k3dm e2e-sandbox)"
+      ;;
+    m4|local|hub)
+      _err "[e2e-remote] runner '${runner}' is not an e2e-remote runner; for Tier 1 E2E on this host use 'e2e' (Slack: k3dm e2e)"
+      ;;
+    *)
+      _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+      ;;
+  esac
+}
+
 # A dispatch-owned token identifying this M4 process, safe for a grep -qxF match
 # (hostname, epoch, pid — no shell metacharacters).
 function _e2e_lock_token() {
@@ -424,7 +439,7 @@ function e2e_runner_dispatch() {
 
   [[ -n "$runner" ]] || _err "usage: e2e_runner_dispatch <runner> [digest]"
   if ! _e2e_runner_allowed "$runner"; then
-    _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+    _e2e_runner_denied_message "$runner"
   fi
   if ! _e2e_valid_digest "$digest"; then
     _err "[e2e-remote] invalid DIGEST '${digest}' (expected empty or [repo@]sha256:<64 hex>)"
@@ -907,7 +922,7 @@ function e2e_runner_replay() {
   local runner="${1:-}"
   _e2e_remote_load_conf
   [[ -n "$runner" ]] || _err "usage: e2e_runner_replay <runner>"
-  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  _e2e_runner_allowed "$runner" || _e2e_runner_denied_message "$runner"
   if ! _e2e_remote_ssh "true"; then
     _err "[e2e-remote] runner ${runner} unreachable; cannot replay"
   fi
@@ -962,7 +977,7 @@ function e2e_runner_republish() {
   local runner="${1:-}"
   _e2e_remote_load_conf
   [[ -n "$runner" ]] || _err "usage: e2e_runner_republish <runner>"
-  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  _e2e_runner_allowed "$runner" || _e2e_runner_denied_message "$runner"
   if ! _e2e_remote_ssh "true"; then
     _err "[e2e-remote] runner ${runner} unreachable; cannot republish"
   fi
@@ -1009,7 +1024,7 @@ function e2e_runner_republish() {
 function e2e_runner_unlock() {
   local runner="${1:-}"
   [[ -n "$runner" ]] || _err "usage: e2e_runner_unlock <runner>"
-  _e2e_runner_allowed "$runner" || _err "[e2e-remote] runner '${runner}' not in allowlist (${E2E_RUNNER_ALLOWLIST})"
+  _e2e_runner_allowed "$runner" || _e2e_runner_denied_message "$runner"
 
   local info age running
   info="$(_e2e_remote_ssh "if [ -e \"${E2E_M2_LOCK}\" ]; then now=\$(date -u +%s); mt=\$(stat -f %m \"${E2E_M2_LOCK}\" 2>/dev/null || stat -c %Y \"${E2E_M2_LOCK}\" 2>/dev/null || echo \$now); echo age=\$((now-mt)); if pgrep -f e2e_verify_vcluster >/dev/null 2>&1; then echo running=1; else echo running=0; fi; else echo age=-1; fi" || true)"

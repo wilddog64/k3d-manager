@@ -373,6 +373,14 @@ commands; they are ignored, so a nearby asynchronous report is not attributed to
 
 ### /k3dm targets
 
+#### Which E2E command?
+
+| Command | Where it runs | Tier | Example |
+|---|---|---|---|
+| `e2e` | Disposable vCluster on this host | Tier 1 | `/k3dm e2e` |
+| `e2e-remote` | Remote runner (currently `m2`) | Tier 1 | `/k3dm e2e-remote RUNNER=m2` |
+| `e2e-sandbox` | ACG sandbox | Tier 2 | `/k3dm e2e-sandbox` |
+
 | Target | Role | Required | Optional | Confirm | Timeout |
 |---|---|---|---|---|---|
 | `fix-list` | reader | | | | 300 |

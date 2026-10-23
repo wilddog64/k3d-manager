@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- Denied `e2e-remote` runners now point operators to `e2e-sandbox` or `e2e` as appropriate, and Slack help and the slash-command guide explain where each E2E command runs.
+
 - Hostinger and sandbox SSH tunnel logs now prefix stderr lines with UTC timestamps, rotate above 5 MB, and use a 10-second SSH connect timeout. `cluster-down` preserves the running Hostinger tunnel logs.
 
 - **Bug dashboard summary strip no longer truncates Fixed, Deferred and Scan age.** Nine stat

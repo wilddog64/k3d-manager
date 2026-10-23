@@ -20,6 +20,26 @@ wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_e2e_help_summaries_change_without_changing_target_contracts(self):
+        expected = {
+            "e2e-remote": {
+                "min_role": "operator", "required": ("RUNNER",),
+                "optional": ("DIGEST",), "timeout": 3600,
+                "summary": "Tier 1 e2e on a remote runner (RUNNER=m2); ACG sandbox: e2e-sandbox; this host: e2e",
+            },
+            "e2e": {
+                "min_role": "operator", "optional": ("DIGEST",),
+                "timeout": 3600,
+                "summary": "Tier 1 e2e in a disposable vCluster on this host",
+            },
+        }
+        for target, contract in expected.items():
+            with self.subTest(target=target):
+                self.assertEqual(wh.MAKE_TARGETS[target], contract)
+        help_text = wh.make_target_help("operator", wh._role_allows)
+        self.assertIn("`e2e-remote RUNNER=… [DIGEST=…]` — " + expected["e2e-remote"]["summary"] + " (operator)", help_text)
+        self.assertIn("`e2e [DIGEST=…]` — " + expected["e2e"]["summary"] + " (operator)", help_text)
+
     def test_vulnerability_report_command_is_reader_read_only_and_aliased(self):
         targets = wh.MAKE_TARGETS
         self.assertEqual(targets["vuln-scan-report"]["min_role"], "reader")
