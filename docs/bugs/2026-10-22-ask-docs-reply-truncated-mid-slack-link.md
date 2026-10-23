@@ -1,7 +1,7 @@
 # Bug: ask-docs reply is cut mid Slack link, and the bug count repeats "(0 deferred)"
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshots during the ask-docs thread live check)
-**Status:** OPEN
+**Status:** FIXED offline — `ee456c83` (Luna; Claude review: N1 and N2 red on pre-fix, existing '(1 deferred)' test still green, 53 tests green); live E2 pending make restart-webhook + `/ask-docs what is the bug tally`
 **Priority:** P3 — cosmetic; the last listed doc renders as raw markup, every other line is correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" to filing and dispatching to Luna
