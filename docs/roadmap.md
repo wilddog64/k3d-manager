@@ -963,6 +963,32 @@ Next steps, smallest first:
 | Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
+### Candidate theme — v2.x: agents working together in Slack threads
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Mention an agent
+in Slack (`@codex`, `@gemini`, `@claude`) and it works in that thread, and the other agents reply to it
+there: Codex implements, Gemini reviews, Codex fixes, Claude verifies and asks the operator to approve.
+
+- **Our bot identities, not vendor Slack apps.** A mention goes Slack relay → webhook allowlist →
+  `make codex-dispatch`, so every run lands in the dispatch ledger and metrics. A vendor integration
+  would run outside the dispatcher and lose the research data.
+- **Mentions name a spec or bug doc.** Channel text is untrusted input. A free-form request goes to
+  Claude, who turns it into a spec first (the intent engine above). Only allowlisted actions run:
+  dispatch, review, fix findings, status.
+- **The ledger drives turns.** Each agent posts when its step finishes, and that post hands the next
+  step to the next agent. Git, specs, memory-bank and the ledger stay authoritative; a thread links
+  to commits, test output and dashboards.
+- **Bounded exchanges.** Each thread has a turn cap and a token budget, and Claude's verdict closes the
+  loop, so two agents cannot ping-pong a disagreement.
+- **Current roles hold.** Gemini never runs live-cluster verification; one agent per worktree; no
+  agent approves another's work. Land and merge need the operator's MFA approval
+  (`project_hermes_slack_approval`).
+
+**Placement:** the first slice (`@codex dispatch <spec>`, `@gemini review <task>`, threaded replies)
+after the v2.1 read-only gateway and v2.2 policy, because a chat message must not start a dispatch
+until submitters are authenticated end to end. The full multi-agent conversation is the interface of
+v3.0.0 below.
+
 ### Candidate theme — v2.x: agent devbox service
 
 **Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Give each
