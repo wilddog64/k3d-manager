@@ -3,7 +3,7 @@
 **Filed:** 2026-10-20 (operator-approved live incident triage)
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5 (bug; no new plan slot)
-**Status:** OPEN — incident recovered at last check; root cause unconfirmed; ArgoCD direct-login endpoint remains unavailable
+**Status:** MONITORING — 2026-10-23: the 10-22 recurrence is explained (M4→Hostinger tunnel down on an M4/ISP path outage; Hostinger k3s and uplink healthy). Tunnel logging and reconnect fix `5f9fb209`. Close once a recurrence leaves timestamped tunnel logs that confirm the same fault domain. ArgoCD direct-login endpoint still unavailable (SSO workaround).
 **Diagnostic-result classification sub-defect:** LIVE-VERIFIED at `6be25c92`. Operator-provided cloud-agent Slack evidence on 2026-10-22 shows the deployed read-only `describe-pod` diagnostic returning Kubernetes `NotFound` for the deliberately nonexistent pod. This verifies the diagnostic failure path only, not the historical outage or its cause.
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
