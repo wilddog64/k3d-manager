@@ -968,8 +968,8 @@ Next steps, smallest first:
 **Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Give each
 dispatched agent task its own on-demand, isolated development environment instead of a worktree on
 the operator's laptop. The intent engine above decides *what* to build; the devbox is *where* an agent
-builds it. Prompted by a public system-design exercise on remote dev environments; the design here is
-our own.
+builds it. Prompted by two public system-design exercises (remote devboxes, a browser IDE platform); the
+design here is our own.
 
 | Concern | Today | Gap |
 |---|---|---|
@@ -979,6 +979,19 @@ our own.
 | Access gateway | Webhook, Cloudflare tunnel, cloud-bridge requests | No short-lived, per-session access |
 | Fast start | vCluster per PR, prebuilt images | No warm pool, no snapshots |
 | Cost and productivity | Agent dispatch dashboard, v1.43.5 cost plans | Not attributed per environment |
+
+A second exercise, on a browser-IDE style platform, adds three requirements that matter more for
+agents than for people:
+
+- **Agent code is untrusted.** Isolation is the core of the design, not an add-on: one task cannot
+  reach another task's workspace, the hub, or internal networks beyond an explicit egress list.
+- **Per-repo prepared environments.** Build each repo's toolchain image ahead of time (TwinkleAI,
+  shopping-cart, k3d-manager), so a dispatch starts in seconds rather than after a fresh install.
+- **Forwarded ports for review.** A server the agent starts is reachable through the authenticated
+  gateway, so the operator or the QA agent can test a running preview before anything lands.
+
+Durability follows from our model: the branch is the work product, so a lost machine costs at most
+the uncommitted diff, and snapshots can stay infrequent.
 
 **Placement:** after v2.5.0, before v3.0.0, and a v3.0.0 dependency alongside the intent engine.
 Likely gated on the Mac Mini M5 as the first compute pool. Nothing moves into v1.4x.
