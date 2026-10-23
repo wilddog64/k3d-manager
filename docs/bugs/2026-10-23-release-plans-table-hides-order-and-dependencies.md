@@ -1,6 +1,6 @@
 # Bug: the Release plans table hides implementation order and dependencies
 
-**Status:** OPEN — dispatched to Luna 2026-10-23
+**Status:** FIXED `62a06bb3` — E1/E2 green (91 pytest, 28 bats); E3 live pending (Argo refresh + screenshot)
 **Priority:** P3
 **Severity:** low — the order and dependencies exist in the plan documents, but the dashboard does not show them
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
