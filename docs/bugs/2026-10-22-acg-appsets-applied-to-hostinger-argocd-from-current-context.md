@@ -52,7 +52,7 @@ function. Elsewhere in the same plugin, hub writes name `_hub_context="k3d-k3d-c
 ## Files
 
 - `scripts/plugins/observability.sh`
-- a BATS test under `scripts/tests/` (new or existing file)
+- `scripts/tests/plugins/*.bats` (a BATS test, new or existing file)
 - `CHANGELOG.md`
 
 ## Acceptance

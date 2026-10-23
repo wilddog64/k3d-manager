@@ -1,7 +1,7 @@
 # Bug: `~/.ssh/config` lost its operator host aliases; hub data export and M2 disk probe fail
 
 **Filed:** 2026-10-22 (Claude, from firing HubDataExportFailed/Stale and HostDiskMetricsStale)
-**Status:** OPEN — aliases restored and export recovered 2026-10-22 (exit 0, `snapshots` → 663918f); what emptied the file is not yet identified
+**Status:** FIXED (offline) — `f3002d12` (2026-10-23): `_ssh_config_guard` restores the aliases from `~/.ssh/config.d/operator` before the nightly export and at cluster-up Step 0. Live E2 pending: the operator moves the aliases into the fragment; what emptied the file is still unidentified
 **Priority:** P2 — nightly DR export stopped (last success 2026-10-21 03:32 PDT); workaround: restore the aliases by hand
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-22: "go ahead for that ssh-config spec" (fix spec F1–F6)
