@@ -326,3 +326,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-22 bug-tally fix reviewed (N1/N2 red pre-fix; Claude updated stale test_prior_art.py expectations). Land BLOCKED: spec Files omitted test_prior_art.py; --allow-out-of-scope denied by auto-mode classifier, awaiting operator. noValue fix dispatched (slug alert-instances-novalue). 4 pytest failures pre-exist on branch (cni_ipam guide, open_for M5 x2, ask_docs_thread) — untriaged.
 - [x] 2026-10-22 bug-tally fix LANDED aba93fc0 (operator ran land with --allow-out-of-scope). Live E2 pending restart-webhook.
 - [x] 2026-10-22 noValue fix LANDED ad4c91dd; live E2 pending ArgoCD sync (TargetDown row app/group show —).
+- [x] 2026-10-22 bug-tally fix LIVE VERIFIED via /ask-docs (17 fixed, 1 open (1 deferred)). Note: Slack ask-docs is its own slash command (/ask-docs), not a /k3dm target.
