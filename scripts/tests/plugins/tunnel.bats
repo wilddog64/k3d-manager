@@ -14,6 +14,7 @@ setup() {
   export TUNNEL_PLIST_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.ssh-tunnel.plist"
   export TUNNEL_VAULT_PLIST_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.ssh-tunnel-vault.plist"
   export TUNNEL_VAULT_WRAPPER_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.ssh-tunnel-vault.sh"
+  export TUNNEL_FORWARD_WRAPPER_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.ssh-tunnel.sh"
   source "${PLUGINS_DIR}/tunnel.sh"
 }
 
@@ -73,7 +74,7 @@ setup() {
   run tunnel_start
   [ "$status" -eq 0 ]
   [[ -f "${TUNNEL_PLIST_PATH}" ]]
-  grep -q "0.0.0.0:6443:localhost:6443" "${TUNNEL_PLIST_PATH}"
+  grep -q "0.0.0.0:6443:localhost:6443" "${TUNNEL_FORWARD_WRAPPER_PATH}"
   grep -q "load" "${BATS_TEST_TMPDIR}/launchctl.log"
 }
 
@@ -81,8 +82,8 @@ setup() {
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   export -f _tunnel_autossh_path
   _tunnel_write_plist
-  grep -q '<string>-L</string>' "${TUNNEL_PLIST_PATH}"
-  run grep -q '<string>-R</string>' "${TUNNEL_PLIST_PATH}"
+  grep -q -- '-L 0.0.0.0:6443:localhost:6443' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  run grep -q '-R' "${TUNNEL_FORWARD_WRAPPER_PATH}"
   [ "$status" -ne 0 ]
 }
 
@@ -153,7 +154,7 @@ setup() {
 
 @test "sandbox tunnel_start uses sandbox agents and does not accept Hostinger autossh" {
   unset TUNNEL_LOCAL_PORT TUNNEL_LAUNCHD_LABEL TUNNEL_PLIST_PATH
-  unset TUNNEL_VAULT_LAUNCHD_LABEL TUNNEL_VAULT_PLIST_PATH TUNNEL_VAULT_WRAPPER_PATH
+  unset TUNNEL_VAULT_LAUNCHD_LABEL TUNNEL_VAULT_PLIST_PATH TUNNEL_VAULT_WRAPPER_PATH TUNNEL_FORWARD_WRAPPER_PATH
   export HOME="${BATS_TEST_TMPDIR}/sandbox-home"
   pgrep() {
     local _pattern="${2:-}"
@@ -168,7 +169,7 @@ setup() {
   run tunnel_start
   [ "$status" -eq 0 ]
   [[ "$output" != *"already running"* ]]
-  grep -q '0.0.0.0:16443:localhost:6443' "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.ssh-tunnel.plist"
+  grep -q '0.0.0.0:16443:localhost:6443' "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.ssh-tunnel.sh"
   grep -q -- '-R 8200:127.0.0.1:18200' "${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.ssh-tunnel-vault.sh"
   [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel.plist" ]
   [ ! -e "${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel-vault.plist" ]
@@ -193,4 +194,42 @@ setup() {
   [ "$status" -eq 0 ]
   grep -Fq -- 'autossh .* -N ubuntu$' "${BATS_TEST_TMPDIR}/pkill-patterns.log"
   grep -Fq -- 'ssh -N .*-R 8200:127\.0\.0\.1:18200 ubuntu$' "${BATS_TEST_TMPDIR}/pkill-patterns.log"
+}
+
+
+@test "generated tunnel wrappers timestamp stderr and bound SSH connection time" {
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  export -f _tunnel_autossh_path
+  _tunnel_write_plist
+  _tunnel_write_vault_agent
+  grep -Eq "date -u.*%Y-%m-%dT%H:%M:%SZ" "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q 'ConnectTimeout=10' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q 'ServerAliveInterval=30' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q 'ServerAliveCountMax=3' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q 'ExitOnForwardFailure=yes' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q 'ConnectTimeout=10' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -q 'ServerAliveInterval=30' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -q 'ServerAliveCountMax=3' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -q 'ExitOnForwardFailure=yes' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -Eq "date -u.*%Y-%m-%dT%H:%M:%SZ" "${TUNNEL_VAULT_WRAPPER_PATH}"
+  grep -q "${TUNNEL_FORWARD_WRAPPER_PATH}" "${TUNNEL_PLIST_PATH}"
+}
+
+@test "tunnel log rotation replaces old backup only above five megabytes" {
+  _tunnel_resolve_scope() { :; }
+  _TUNNEL_LOG_BASE="${BATS_TEST_TMPDIR}/test-tunnel"
+  printf small > "${_TUNNEL_LOG_BASE}.err"
+  _tunnel_rotate_logs
+  [ -f "${_TUNNEL_LOG_BASE}.err" ]
+  [ ! -e "${_TUNNEL_LOG_BASE}.err.1" ]
+  dd if=/dev/zero of="${_TUNNEL_LOG_BASE}.err" bs=1048576 count=6 2>/dev/null
+  printf old > "${_TUNNEL_LOG_BASE}.err.1"
+  _tunnel_rotate_logs
+  [ ! -e "${_TUNNEL_LOG_BASE}.err" ]
+  [ "$(wc -c < "${_TUNNEL_LOG_BASE}.err.1" | tr -d ' ')" -eq 6291456 ]
+}
+
+@test "cluster-down preserves Hostinger tunnel logs" {
+  run grep -F '/tmp/k3d-manager-tunnel.' "${BATS_TEST_DIRNAME}/../../../bin/cluster-down"
+  [ "$status" -ne 0 ]
 }

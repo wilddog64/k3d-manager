@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Hostinger and sandbox SSH tunnel logs now prefix stderr lines with UTC timestamps, rotate above 5 MB, and use a 10-second SSH connect timeout. `cluster-down` preserves the running Hostinger tunnel logs.
+
 - **Bug dashboard summary strip no longer truncates Fixed, Deferred and Scan age.** Nine stat
   panels shared 24 grid columns, so three were 2 columns wide and showed `Fix...`, `De...` and
   `Sc...`. The four open-priority panels, which only show a small number, are now 2 columns wide
