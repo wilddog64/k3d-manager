@@ -269,3 +269,12 @@ from this incident.
 - Keep the tunnel's stderr across restarts so the next drop shows its exit reason.
 - Consider server-side `ClientAliveInterval`/`ClientAliveCountMax` on Hostinger so a stale `-R 8200`
   is released quickly.
+
+**Correction and M4-side evidence (2026-10-23):** the hub `com.k3d-manager.ssh-tunnel` agent carries
+only `-L 6443`. The reverse `:8200` path is the separate `com.k3d-manager.ssh-tunnel-vault` agent, whose
+wrapper frees a stale `:8200` with `fuser` before it reconnects, so the stale-port explanation above
+does not hold. That agent's `/tmp/k3d-manager-tunnel-vault.err` was last written at 03:49 PDT
+(10:49 UTC). It ends with a keepalive timeout (`Timeout, server … not responding`) followed by repeated
+`connect to host … port 22: Operation timed out`. The M4 could not open TCP to Hostinger:22, which
+confirms an M4/ISP path outage. The log has no timestamps, so the sequence can't be placed more
+precisely. Follow-up fix: `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`.
