@@ -77,7 +77,8 @@ def test_pool_used_panels_warn_at_eighty_percent():
 def test_guide_names_dashboard_in_inventory_and_triage():
     guide = GUIDE_PATH.read_text()
     assert "| k3dm Host Pod IP Pool | `k3dm-host-cni-ipam` |" in guide
-    assert "**k3dm Host Pod IP Pool** shows `No data`" in guide
+    triage = (GUIDE_PATH.parent / "grafana-dashboards" / "shared-operations.md").read_text()
+    assert "**k3dm Host Pod IP Pool** shows `No data`" in triage  # agent-audit: allow assert-removed same assertion, now on the split sub-page
 
 
 def test_host_disk_dashboard_is_unchanged():

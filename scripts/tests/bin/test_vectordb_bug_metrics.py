@@ -378,7 +378,7 @@ def test_acceptance_M1_M2_M3_M4_N1_N2_N3_open_for_until_live_verified(metrics, t
 
 
 def test_acceptance_M5_grafana_guide_defines_open_for_until_live_verified():
-    guide = (ROOT / "docs/guides/grafana-dashboards.md").read_text(encoding="utf-8")
+    guide = (ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md").read_text(encoding="utf-8")
     assert "Open for counts from filed until the bug is LIVE-VERIFIED." in guide
 
 

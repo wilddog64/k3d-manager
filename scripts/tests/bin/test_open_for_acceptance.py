@@ -113,7 +113,7 @@ def test_n2_old_release_stays_minus_two(repo):
 
 
 def test_m5_guide_states_open_for_until_live_verified():
-    text = (REPO / "docs/guides/grafana-dashboards.md").read_text()
+    text = (REPO / "docs/guides/grafana-dashboards/k3dm-bugs.md").read_text()
     paragraphs = re.split(r"\n\s*\n", text)
     assert any(re.search(r"open for", p, re.I) and re.search(r"live-verified", p, re.I)
                and re.search(r"until|counts", p, re.I) for p in paragraphs)
