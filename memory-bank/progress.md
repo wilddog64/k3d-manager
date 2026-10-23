@@ -337,4 +337,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-22 filed P3 docs/bugs/2026-10-22-agent-dispatch-dashboard-default-red-at-80.md (9 dispatch-dashboard panels default red at 80); approved; queued for Luna after ask-docs-reply-truncation.
 - [x] 2026-10-22 ask-docs truncation landed ee456c83 (offline); live E2 pending restart-webhook. dispatch-dashboard-colours running in Luna.
 - [x] 2026-10-22 ask-docs truncation LIVE VERIFIED.
-- [x] 2026-10-22 dispatch dashboard colours landed  (offline); live E2 pending ArgoCD sync + screenshot.
+- [x] 2026-10-22 dispatch dashboard colours landed b6c09614 (offline); live E2 pending ArgoCD sync + screenshot.

@@ -1,7 +1,7 @@
 # Bug: agent-dispatch dashboard panels turn red at 80 with no meaning
 
 **Filed:** 2026-10-22 (Claude, from the operator's screenshots of Land outcomes and the stat column)
-**Status:** FIXED offline — `` (Luna; Claude review: queries/titles/layout unchanged, N1 red on pre-fix, bats green); live E2 pending ArgoCD sync + a dashboard screenshot
+**Status:** FIXED offline — `b6c09614` (Luna; Claude review: queries/titles/layout unchanged, N1 red on pre-fix, bats green); live E2 pending ArgoCD sync + a dashboard screenshot
 **Priority:** P3 — cosmetic; the numbers are right, the colour implies a problem that does not exist
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to file and queue for Luna after ask-docs-reply-truncation
