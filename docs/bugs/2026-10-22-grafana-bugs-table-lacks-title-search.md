@@ -1,7 +1,7 @@
 # Bug: k3dm Bug Tracking Bugs table has no title search or keyword filter
 
 **Filed:** 2026-10-22
-**Status:** OPEN — operator screenshot and dashboard configuration confirm usability gap; implementation not started
+**Status:** FIXED offline — `7869b9ac` (Luna; Claude review: N1 red on pre-fix, bats green); live E2 pending ArgoCD sync + column-filter screenshot
 **Priority:** P3 — dashboard usability and bug discoverability
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna

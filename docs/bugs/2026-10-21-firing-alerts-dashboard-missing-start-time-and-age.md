@@ -295,3 +295,10 @@ category counts in Grafana. No deployment or live mutation was performed.
 - Do NOT infer firing timestamps from the screenshot's 41-alert count.
 - Do NOT add unbounded per-alert Prometheus labels or expose credentials in Grafana.
 - Do NOT claim VulnerabilityReport creation time is the CVE's first-detected time; historical first-seen tracking is out of scope.
+
+## Live note — 2026-10-22 (after `c993c5df`)
+
+Operator screenshot: the Active Alert Instances panel now renders rows with Active since and Elapsed
+time values, and CVE Findings shows a populated Report Created column. This is partial E2/E4 evidence
+only. E4 still needs the raw Prometheus counts compared with the panel's row count (the aggregate
+showed 41; the screenshot shows the first 7 rows). The bug stays REOPENED until that comparison is done.
