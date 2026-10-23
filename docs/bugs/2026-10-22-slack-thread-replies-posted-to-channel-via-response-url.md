@@ -47,8 +47,8 @@ The diagnostics thread worked only because that parent job had no `response_url`
   channel when `thread_ts` is set and `channel_id` is unknown.
 - **F2.** In the `ask-docs` branch of `_handle_thread_command`, copy `channel_id` and
   `thread_source` only; stop copying `response_url` into the sub-job.
-- **F3.** Tests in `scripts/tests/bin/test_webhook_ask_docs_thread.py` and a new or existing
-  `_notify_job` routing test: a job with channel_id + thread_ts + response_url and no thread_source
+- **F3.** Tests in `scripts/tests/bin/test_webhook_ask_docs_thread.py` and
+  `scripts/tests/bin/test_webhook_ask_delivery.py`: a job with channel_id + thread_ts + response_url and no thread_source
   posts via the bot into the thread, and `response_url` is not called; when the bot post fails, it
   falls back to `response_url`; a job with thread_ts and no channel_id still never posts to the
   default channel; the ask-docs sub-job has no `response_url` file.
