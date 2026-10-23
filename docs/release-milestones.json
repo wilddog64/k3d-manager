@@ -11,6 +11,7 @@
     {"version": "v1.45.0", "kind": "minor"},
     {"version": "v1.45.1", "kind": "patch"},
     {"version": "v1.45.2", "kind": "patch"},
+    {"version": "v1.45.3", "kind": "patch"},
     {"version": "v1.46.0", "kind": "minor"},
     {"version": "v1.46.1", "kind": "patch"},
     {"version": "v1.47.0", "kind": "minor"},

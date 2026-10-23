@@ -487,6 +487,35 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
 
+### Candidate milestone — v1.45.3 (patch)
+
+**Mac workstation protection for the two operator MacBooks** (operator, 2026-10-23). Everything
+security-related so far watches the cluster: Trivy, cosign and Kyverno at admission, and Falco
+(v1.51.0) on Linux nodes only. The laptops get nothing beyond Apple's built-ins. Yet they hold the
+login Keychain, the SSH keys and the GitHub tokens, and they run agents that execute code. Malware
+that rewrites itself defeats signature checks such as XProtect, so this release relies on allowlists
+and watching behaviour instead. It needs no cluster changes and nothing from v1.44.x or v1.45.x.
+
+| Piece | What it does | Rollout |
+|---|---|---|
+| Santa allowlist | Blocks any program that is not allowed. A changed binary gets a new fingerprint, so code that rewrites itself is blocked, not missed. | Monitor-only for two weeks on both Macs, then review what it logged. Switch to blocking only after the operator approves. |
+| BlockBlock | Alerts when anything installs itself to run at startup, the step almost every info-stealer needs. | Alert only. |
+| LuLu | Outbound firewall that asks before a new program connects out, to catch data being sent away. | Allow the agents, Homebrew, git and kubectl first; alert on anything else. |
+| osquery | Reports startup items, Keychain access and newly allowed binaries to the hub, so the v2.6.4 triage loop also covers the laptops. | Read-only queries on a schedule, small volume. |
+| Keychain hygiene | The login Keychain locks when the laptop is idle; no "Always Allow" on token items. | Checklist in the guide. |
+
+Constraints:
+- Installing and configuring the tools is the operator's job. Claude writes the spec, the
+  configuration and the guide, and runs no privileged or system-extension change on either Mac.
+- Santa stays monitor-only until the operator approves blocking.
+- The osquery output must never carry secret values, Keychain item contents or full command lines.
+  It sends only names, paths and counts, under the same label rules as the Falco plan.
+- Agent sandboxes (the Codex seatbelt and the ssh-config guard) are kept, not replaced.
+
+Deliverables: a `docs/guides/` page for Mac workstation protection, and one plan doc. v1.45.3
+holds **1 of 5 plans** (spec not yet written). Branch `k3d-manager-v1.45.3` is cut from `main`
+after v1.45.2 merges.
+
 ### Candidate milestone — v1.46.0
 
 **Hermes self-recovery via the webhook.** When `HermesNotRunning` fires, Alertmanager routes it to a
