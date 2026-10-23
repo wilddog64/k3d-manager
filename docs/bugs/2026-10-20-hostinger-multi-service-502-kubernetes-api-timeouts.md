@@ -177,3 +177,30 @@ interface:
 - Do not commit this documentation to `main`; use `k3d-manager-v1.43.5`.
 - Do not classify an unresponsive diagnostic as a healthy cluster merely because the webhook job status was `success`.
 - Do not change live infrastructure in the course of filing this bug.
+
+## Recurrence — 2026-10-22 03:42–03:50 PDT (Claude, read-only)
+
+- `~/.local/share/k3d-manager/logs/pushgateway-pf.log` and `frontend-browser-http.log` both log
+  `dial tcp 2.25.146.252:6443: i/o timeout` on every restart from 03:42:41 to 03:49:49 PDT
+  (14 and 15 lines). Forwarding resumed at 03:50:22. The public frontend was very likely 502 for
+  about 8 minutes; check for a `PublicEndpointDown` firing around 03:47.
+- The Hostinger node stayed `Ready` (last transition 2026-07-22). No pod restarted in that window:
+  the newest restarts are 37h and 5d8h old. Workloads did not fail; only the M4 path to the
+  API server dropped.
+- The M4 did not sleep: `pmset -g log` shows no Sleep/Wake events in either window, with
+  `caffeinate` holding PreventSystemSleep.
+- The M4 → `:6443` timeouts in the PF logs, bucketed by PDT hour: Oct 12 01h (5), Oct 17 10–11h (45,
+  the known hypervisor shutdown), Oct 17 20h (5), Oct 18 22h (1), **Oct 20 14h (32, this incident)**,
+  **Oct 22 03h (29)**. Dropouts of several minutes are recurring, not a one-off.
+
+**What this establishes:** the public frontend and the Hostinger Pushgateway reach Hostinger only
+through `kubectl port-forward` from the M4, which goes through the Hostinger API server. Any loss of
+M4 → `2.25.146.252:6443` is a public outage, even when every workload is healthy. That design
+dependency is the confirmed **fault domain**. The **cause** of the drops (Hostinger-side firewall or
+k3s, provider network, or the M4's ISP path) is still unknown.
+
+**Next evidence (operator, needs SSH):** the Hostinger k3s journal and kernel log for
+2026-10-22 10:40–10:52 UTC, and whether the node itself had outbound connectivity in that window.
+If Hostinger saw no API disruption, the drop is in the network path and the remedy is
+architectural. The candidate is serving the public path from Hostinger itself (cloudflared on the
+node) instead of a laptop port-forward. That is a plan for a release, not a bug fix.
