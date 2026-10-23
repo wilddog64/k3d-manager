@@ -218,7 +218,7 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "release forecast sits between the plan tiles and the Plans table, and lists only unshipped milestones" {
+@test "release forecast sits between the plan tiles and the Plans table, and lists only unshipped milestones for the selected release" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
@@ -230,7 +230,10 @@ assert tiles["y"]+tiles["h"] <= forecast < by_title["Plans"]["gridPos"]["y"]
 table=by_title["Remaining releases"]
 plans_expr=next(t["expr"] for t in table["targets"] if t["refId"]=="E")
 head=plans_expr.split(" or on(version) ",1)[0]
-assert 'and on(version) k3dm_release_milestone_info{repo="$repo",state!="shipped"}' in head, head
+assert 'and on(version) k3dm_release_milestone_info{repo="$repo",version=~"$release",state!="shipped"}' in head, head
+for target in table["targets"]:
+    assert 'version=~"$release"' in target["expr"], (target["refId"], target["expr"])
+assert 'k3dm_plan_release_docs{repo="$repo",release=~"$release"}' in plans_expr
 excluded=next(t for t in table["transformations"] if t["id"]=="organize")["options"]["excludeByName"]
 assert excluded.get("job") and excluded.get("instance")
 PY
