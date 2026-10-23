@@ -330,3 +330,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-22 4 old pytest reds: 3 guide tests repointed to split sub-pages (6262437d); 4th = REGRESSION — ask-docs thread follow-ups dropped (route=none) since 61230daa _notify_job guard; reopened docs/bugs/2026-10-01-ask-docs-thread-follow-up-silently-dropped.md as P2, approval pending.
 - [ ] 2026-10-22 ask-docs thread recurrence approved; dispatched to Luna (slug ask-docs-thread-channel).
 - [x] 2026-10-22 noValue fix LIVE VERIFIED (TargetDown row app/group = —).
+- [x] 2026-10-22 roadmap: PracHub Meta questions → forward theme (Q7 dead-letter notify, Q8 evidence-before-diagnosis, Q16 bug-count reconciliation, Q17 path canonicalization) + calibration corpus under the post-v3 benchmark.

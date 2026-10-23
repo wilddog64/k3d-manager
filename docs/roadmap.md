@@ -1005,6 +1005,14 @@ investigation milestones.
 **Status:** Future research/evaluation theme only. No v2.x spec slot, no new
 implementation spec or dispatch, and no commitment to deliver this in v3.0.0.
 
+**Calibration corpus (operator, 2026-10-22).** Classic interview coding problems with one known
+correct answer (for example: simplify a Unix path, shortest clear path in an 8-directional grid,
+sum of BST values in a range), drawn from the categories on the PracHub Meta interview list
+(`https://prachub.com/companies/meta`). Their purpose is calibration: a known answer measures how
+often the intent → Acceptance → implementer → blind-verifier loop delivers correct code, which a
+real bug cannot. Write our own problem statements and record source and rights metadata; never
+copy third-party question text or paywalled content.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
@@ -1060,6 +1068,23 @@ milestone only when it gets a scope doc.
   exposes the operator's credentials, so this starts as a read-only go/no-go evaluation in a separate
   OS user. Not before v1.43.5. Plan: `docs/plans/claude-self-hosted-runner-evaluation.md`
   (operator, 2026-10-15).
+- **Hardening ideas from interview design questions (operator, 2026-10-22)** — three of the
+  PracHub Meta questions (`https://prachub.com/companies/meta`) describe problems this repo hit the
+  same week. Each needs a scope doc or bug spec before it gets a version.
+  - *Notification delivery (Q7: notification system at scale).* `_notify_job` in
+    `bin/k3dm-webhook` logs `route=none` and drops a reply it cannot route (recurrence in
+    `docs/bugs/2026-10-01-ask-docs-thread-follow-up-silently-dropped.md`). An undeliverable reply
+    should go to a dead-letter record and raise an alert instead of disappearing.
+  - *Evidence before diagnosis (Q8: diagnose a server crash with concrete Linux evidence).* The
+    `~/.ssh/config` wipe (`docs/bugs/2026-10-22-ssh-config-lost-operator-host-aliases.md`) has no
+    root cause because nothing recorded the write. Back up or audit-log writes to operator-owned
+    files, so the next incident starts with evidence.
+  - *Validate a reporting repair (Q16).* The bug-tally fix
+    (`docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md`) was proven by
+    hand. Add a reconciliation check that the Slack bug count and the dashboard's per-bug rows
+    agree for every release.
+  - *Path canonicalization (Q17)* doubles as a calibration problem (see the benchmark entry above)
+    and as input validation for directory traversal (`../`) in webhook and cloud-request arguments.
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio
