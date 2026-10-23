@@ -204,3 +204,47 @@ k3s, provider network, or the M4's ISP path) is still unknown.
 If Hostinger saw no API disruption, the drop is in the network path and the remedy is
 architectural. The candidate is serving the public path from Hostinger itself (cloudflared on the
 node) instead of a laptop port-forward. That is a plan for a release, not a bug fix.
+
+## Evidence 2026-10-23: Hostinger journal for 2026-10-22 10:35–10:55 UTC
+
+The operator ran `journalctl` in the Hostinger browser terminal: 401 lines in the window, read through
+screenshots. Claude read the Mac side read-only.
+
+- **Line count by source:**
+
+| Source | Lines |
+|---|---|
+| systemd | 147 |
+| k3s | 92 |
+| kernel | 60 |
+| systemd-networkd | 30 |
+| socat | 27 |
+| sshd | 16 |
+| systemd-logind | 12 |
+| `k3dm-cni-ipam-sweep` | 4 |
+
+- **k3s:** no slow-request warnings ("apply request took too long"), no leader-election loss, no
+  request timeouts, so the API server was not saturated. Errors seen:
+  - `upgradeaware.go:428 "Error proxying data from client to backend"` at 10:42:39 and 10:44:05
+    (once local, once from an external client to `:6443`): broken port-forward or exec streams.
+  - Cgroup read errors while pods were torn down (10:35, 10:51): noise.
+  - A `vault-unseal-watch` CronJob sync error (10:35).
+- **socat:** `connect(... 127.0.0.1:8200): Connection refused` at 10:46:19–10:48:35. Hostinger `:8200`
+  is the reverse end of the Mac's `com.k3d-manager.ssh-tunnel` (`-R 8200:127.0.0.1:18200`, the Vault
+  path ESO uses), so that tunnel was down.
+- **sshd:** `Accepted publickey for ubuntu` from the Mac's public IP at 10:50:44, with two connections:
+  the tunnel reconnecting. Recovery matches the end of the incident.
+- **kernel:** a veth created at :00 and removed by :03 every five minutes (a routine CronJob pod). No
+  other kernel events.
+- **systemd:** routine units (sysstat, two successful `k3dm-cni-ipam-sweep` runs). User 1000's SSH
+  sessions closed. Volumes for four pods were unmounted.
+- **Mac side:**
+  - `pmset -g log` shows no Sleep or Wake between 03:35 and 03:55 PDT.
+  - `/tmp/k3d-manager-tunnel.{out,err}` were recreated empty on 2026-10-23 04:31, so they hold
+    nothing for the incident.
+
+**Working conclusion:** the Mac→Hostinger SSH tunnel (`-L 6443` plus `-R 8200`) was down from about
+10:40 to 10:50:44 UTC. Every Mac-side port-forward to Hostinger depends on `-L 6443`, so this accounts
+for the broken proxy streams and the multi-service 502s. Kubernetes on Hostinger stayed healthy. Why
+the tunnel dropped is still open: an ISP or Hostinger network blip is the next thing to check, using
+the 30 `systemd-networkd` lines.
