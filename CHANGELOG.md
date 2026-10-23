@@ -6,6 +6,8 @@
 
 - `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.
 
+- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory.
+
 - The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states.
 
 ### Changed

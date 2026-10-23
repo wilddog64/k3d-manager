@@ -488,6 +488,118 @@ def _current_release(root, ref):
     return match.group(1) if match else None
 
 
+def _release_tags(root):
+    rows = _git_out(root, "for-each-ref", "--format=%(refname:short) %(creatordate:unix)",
+                    "refs/tags/v*").splitlines()
+    tags = []
+    for row in rows:
+        name, _, stamp = row.partition(" ")
+        if _VERSION_RE.fullmatch(name) and stamp.strip().isdigit():
+            tags.append((name, int(stamp)))
+    return sorted(tags, key=lambda item: _version(item[0]))
+
+
+def _load_milestones(root, ref=None):
+    root = Path(root)
+    if ref:
+        raw = _git_out(root, "show", f"{ref}:docs/release-milestones.json")
+    else:
+        raw = (root / "docs/release-milestones.json").read_text(encoding="utf-8")
+    payload = json.loads(raw)
+    milestones = payload.get("milestones")
+    if not isinstance(milestones, list):
+        raise ValueError("milestones must be a list")
+    versions, targets = set(), 0
+    for milestone in milestones:
+        version = milestone.get("version") if isinstance(milestone, dict) else None
+        if not version:
+            raise ValueError("milestone missing version")
+        if not _VERSION_RE.fullmatch(version):
+            raise ValueError(f"invalid milestone version: {version}")
+        if version in versions:
+            raise ValueError(f"duplicate milestone version: {version}")
+        versions.add(version)
+        targets += bool(milestone.get("target"))
+    if targets != 1:
+        raise ValueError(f"expected exactly one target, found {targets}")
+    return payload
+
+
+def _cadence(tags, window=12):
+    dated = sorted(tags, key=lambda item: item[1])
+    gaps = [dated[index][1] - dated[index - 1][1] for index in range(1, len(dated))]
+    gaps = sorted(gaps[-window:])
+    if len(gaps) < 6:
+        return None
+    def nearest_rank(percent):
+        return gaps[max(0, (len(gaps) * percent + 99) // 100 - 1)]
+    return {"p25": nearest_rank(25), "p50": nearest_rank(50), "p75": nearest_rank(75),
+            "gaps": len(gaps), "last_ts": max(ts for _, ts in dated)}
+
+
+def _forecast(milestones, tags, cadence, now):
+    shipped = {version for version, _ in tags}
+    rows, blocked = [], False
+    k = 0
+    for item in milestones:
+        version = item["version"]
+        row = {**item, "overdue": False}
+        if version in shipped:
+            row["state"] = "shipped"
+        elif blocked:
+            row["state"] = "after_blocked"
+        elif item.get("blocked_by") and not item.get("blocked_done", False):
+            row["state"] = "blocked"
+            blocked = True
+        elif cadence is None:
+            row["state"] = "insufficient"
+        else:
+            k += 1
+            row["state"] = "forecast"
+            for bound, key in (("low", "p25"), ("mid", "p50"), ("high", "p75")):
+                value = cadence["last_ts"] + k * cadence[key]
+                if value < now:
+                    value = now
+                    row["overdue"] = True
+                row[bound] = value
+        rows.append(row)
+    return rows
+
+
+def _forecast_metrics(root, ref=None, now=None, repo="k3d-manager"):
+    now = int(time.time() if now is None else now)
+    tags = _release_tags(root)
+    milestones = _load_milestones(root, ref)["milestones"]
+    cadence = _cadence(tags)
+    rows = _forecast(milestones, tags, cadence, now)
+    lines = [f'k3dm_release_shipped_timestamp_seconds{{repo="{repo}",version="{v}"}} {ts}'
+             for v, ts in tags[-20:]]
+    gaps = cadence["gaps"] if cadence else max(0, len(tags) - 1)
+    lines.append(f'k3dm_release_cadence_window_gaps{{repo="{repo}"}} {gaps}')
+    if cadence:
+        for quantile, key in (("0.25", "p25"), ("0.5", "p50"), ("0.75", "p75")):
+            lines.append(f'k3dm_release_cadence_seconds{{repo="{repo}",quantile="{quantile}"}} {cadence[key]}')
+    current = _current_release(root, ref)
+    remaining, target_seen = 0, False
+    for position, row in enumerate(rows, 1):
+        version = row["version"]
+        blocked_by = re.sub(r'["\\\r\n]+', " ", row.get("blocked_by", ""))[:80]
+        blocked_by = " ".join(blocked_by.split())
+        lines.append(f'k3dm_release_milestone_info{{repo="{repo}",version="{version}",release_order="{_release_order(version)}",position="{position}",kind="{row.get("kind", "")}",state="{row["state"]}",blocked_by="{blocked_by}",target="{str(bool(row.get("target"))).lower()}",current="{str(version == current).lower()}",overdue="{str(row["overdue"]).lower()}"}} 1')
+        if row["state"] != "shipped":
+            remaining += 1
+        if row.get("target"):
+            target_seen = True
+        if row["state"] == "forecast":
+            lines.extend(f'k3dm_release_milestone_forecast_seconds{{repo="{repo}",version="{version}",bound="{bound}"}} {row[bound]}'
+                         for bound in ("low", "mid", "high"))
+        if target_seen:
+            break
+    lines.extend([f'k3dm_release_milestones_remaining{{repo="{repo}"}} {remaining}',
+                  f'k3dm_release_forecast_scan_timestamp_seconds{{repo="{repo}"}} {now}'])
+    return "\n".join(lines) + "\n"
+
+
 def _tally(root, ref=None, full=False, repo="k3d-manager", repo_dir=None):
     root = Path(root)
     args = [sys.executable, str(root / "scripts" / "bug-tally.py"), "--json", "--ref", ref or "HEAD"]
@@ -559,6 +671,10 @@ def publish_bug_metrics(root, ref=None):
         _push_bug_group("k3dm-plan-docs", _plan_metrics(root, ref), method="PUT")
     except Exception as exc:
         print(f"plan metrics skipped (non-fatal): {exc}", file=sys.stderr)
+    try:
+        _push_bug_group("k3dm-release-forecast", _forecast_metrics(root, ref), method="PUT")
+    except Exception as exc:
+        print(f"release forecast skipped (non-fatal): {exc}", file=sys.stderr)
     try:
         payload = _tally(root, ref, full=True)
         tally = payload["releases"]

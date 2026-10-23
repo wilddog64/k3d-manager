@@ -1,4 +1,5 @@
 import os
+import json
 import runpy
 import subprocess
 import sys
@@ -257,6 +258,141 @@ def test_bug_metrics_pushes_separate_group(metrics, monkeypatch, tmp_path):
     monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
     assert metrics.publish_bug_metrics(_repo(tmp_path)) is True
     assert any("/metrics/job/k3dm-bug-docs" in str(getattr(url, "full_url", url)) for url in urls)
+
+
+def test_release_cadence_nearest_rank_and_minimum(metrics):
+    tags = [(f"v1.0.{i}", i * (i + 1) // 2) for i in range(13)]
+    assert metrics._cadence(tags) == {"p25": 3, "p50": 6, "p75": 9, "gaps": 12, "last_ts": 78}
+    assert metrics._cadence(tags[:6]) is None
+    assert metrics._cadence([(f"v1.0.{i}", i // 2 * 100) for i in range(13)]) ["p25"] == 0
+
+
+def test_release_tags_ignore_non_semver_and_cadence_uses_date_order(metrics, tmp_path):
+    _git_repo(tmp_path, {"seed.md": "seed\n"})
+    dates = [
+        ("v1.1.0", "2026-01-01T00:00:00Z"),
+        ("v1.2.0", "2026-01-03T00:00:00Z"),
+        ("v1.1.1", "2026-01-13T00:00:00Z"),
+        ("v1.3.0", "2026-01-07T00:00:00Z"),
+        ("v1.4.0", "2026-01-21T00:00:00Z"),
+        ("v1.5.0", "2026-01-31T00:00:00Z"),
+        ("v1.6.0", "2026-03-02T00:00:00Z"),
+    ]
+    for name, date in dates + [("v1.2", "2026-01-03T00:00:00Z"),
+                               ("lib-v0.5.2", "2026-01-03T00:00:00Z")]:
+        env = {**os.environ, "GIT_COMMITTER_DATE": date, "GIT_AUTHOR_DATE": date}
+        subprocess.run(["git", "tag", "-a", name, "-m", name], cwd=tmp_path,
+                       env=env, check=True)
+    tags = metrics._release_tags(tmp_path)
+    expected = sorted((name for name, _ in dates), key=lambda v: tuple(map(int, v[1:].split("."))))
+    assert [version for version, _ in tags] == expected
+    cadence = metrics._cadence(tags)
+    assert cadence and cadence["gaps"] == 6
+    assert (cadence["p25"], cadence["p50"], cadence["p75"]) == (
+        4 * 86400, 6 * 86400, 10 * 86400)
+    assert cadence["last_ts"] == max(stamp for _, stamp in tags)
+
+
+def test_release_forecast_blocking_and_overdue(metrics):
+    items = [{"version": "v1.0.1"}, {"version": "v1.0.2"},
+             {"version": "v1.0.3", "blocked_by": "external"}, {"version": "v1.0.4"}]
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 100}
+    rows = metrics._forecast(items, [("v1.0.0", 1)], cadence, 105)
+    assert rows[0]["low"] == 110 and rows[1]["mid"] == 140
+    assert rows[0]["overdue"] is False
+    assert [row["state"] for row in rows[2:]] == ["blocked", "after_blocked"]
+    assert all("low" not in row for row in rows[2:])
+    rows = metrics._forecast([{"version": f"v1.0.{i}"} for i in range(1, 5)], [], None, 105)
+    assert [row["state"] for row in rows] == ["insufficient"] * 4
+
+
+def test_release_forecast_unblocked_shipped_and_overdue_positions(metrics):
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 100}
+    items = [
+        {"version": "v1.0.1"},
+        {"version": "v1.0.2"},
+        {"version": "v1.0.3", "blocked_by": "external", "blocked_done": True},
+        {"version": "v1.0.4", "target": True},
+    ]
+    rows = metrics._forecast(items, [], cadence, 105)
+    assert [(row["low"], row["mid"], row["high"]) for row in rows] == [
+        (110, 120, 130), (120, 140, 160), (130, 160, 190), (140, 180, 220)]
+    rows = metrics._forecast(items, [("v1.0.1", 1)], cadence, 105)
+    assert rows[0]["state"] == "shipped" and "low" not in rows[0]
+    assert (rows[1]["low"], rows[1]["mid"], rows[1]["high"]) == (110, 120, 130)
+    overdue = metrics._forecast([{"version": "v1.0.5"}], [],
+                                {"p25": 10, "p50": 20, "p75": 30, "last_ts": 0}, 11)[0]
+    assert overdue["low"] == 11 and overdue["overdue"] is True
+
+
+def _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path):
+    _git_repo(root, {"bug.md": "# Bug\n**Priority:** P2\n**Status:** OPEN\n"})
+    (root / "docs/plans").mkdir(parents=True, exist_ok=True)
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": [
+        {"version": "v1.0.7"},
+        {"version": "v1.0.8", "blocked_by": "outside work"},
+        {"version": "v1.0.9", "target": True},
+    ]}))
+    for index in range(7):
+        date = f"2026-01-{index + 1:02d}T00:00:00Z"
+        env = {**os.environ, "GIT_COMMITTER_DATE": date, "GIT_AUTHOR_DATE": date}
+        subprocess.run(["git", "tag", "-a", f"v1.0.{index}", "-m", "release"],
+                       cwd=root, env=env, check=True)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__,
+                        "_tally", lambda *_a, **_k: {"releases": {}, "fixed_in": {}})
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_verification_times",
+                        lambda *_a, **_k: {})
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_bug_status_metrics",
+                        lambda *_a, **_k: "open metrics\n")
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_release_metrics",
+                        lambda *_a, **_k: "release metrics\n")
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__,
+                        "_publish_lib_foundation_bugs", lambda: None)
+    pushed = []
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_push_bug_group",
+                        lambda job, payload, method="POST", **_k: pushed.append((job, method, payload)) or True)
+    return pushed
+
+
+def test_forecast_metrics_and_publish_put_and_blocking(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    pushed = _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path)
+    out = metrics._forecast_metrics(root, now=2_000_000_000)
+    assert 'version="v1.0.8"' in out and 'state="blocked"' in out
+    assert 'version="v1.0.9"' in out and 'state="after_blocked"' in out
+    assert all(f'k3dm_release_milestone_forecast_seconds{{repo="k3d-manager",version="{version}"' not in out
+               for version in ("v1.0.8", "v1.0.9"))
+    info = [line for line in out.splitlines() if line.startswith("k3dm_release_milestone_info{")]
+    assert info and all('overdue="true"' in line or 'overdue="false"' in line for line in info)
+    assert metrics.publish_bug_metrics(root) is True
+    forecast = next(entry for entry in pushed if entry[0] == "k3dm-release-forecast")
+    assert forecast[1] == "PUT"
+
+
+def test_malformed_forecast_is_nonfatal_to_other_groups(metrics, monkeypatch, tmp_path, capsys):
+    root = tmp_path / "repo"
+    root.mkdir()
+    pushed = _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path)
+    (root / "docs/release-milestones.json").write_text("{")
+    assert metrics.publish_bug_metrics(root) is True
+    captured = capsys.readouterr()
+    assert "release forecast skipped (non-fatal)" in captured.err
+    jobs = [job for job, _, _ in pushed]
+    assert "k3dm-bug-docs" in jobs and "k3dm-plan-docs" in jobs
+    assert "k3dm-bug-open" in jobs and "k3dm-bug-releases" in jobs
+
+
+def test_load_milestones_validates_target_and_versions(metrics, tmp_path):
+    path = tmp_path / "docs/release-milestones.json"
+    path.parent.mkdir()
+    for milestones in ([{"version": "v1.0.0", "target": True}, {"version": "v1.0.0"}],
+                       [{"version": "v1.0.0"}],
+                       [{"version": "v1.0.0", "target": True}, {"version": "v1.0.1", "target": True}],
+                       [{"version": "1.44", "target": True}]):
+        path.write_text(json.dumps({"milestones": milestones}))
+        with pytest.raises(ValueError):
+            metrics._load_milestones(tmp_path)
 
 
 def test_bug_metrics_read_failure_does_not_push(metrics, monkeypatch, tmp_path):

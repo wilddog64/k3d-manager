@@ -53,6 +53,10 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 
 ## CVE Auto-Patch triage
 
+### Release forecast
+
+The **Release forecast** row reads the ordered inventory in `docs/release-milestones.json`, maintained alongside the roadmap. Update the JSON in the same commit as any roadmap split. The scanner derives cadence from the last 12 date-ordered gaps between annotated k3d-manager release tags and uses nearest-rank 25th, 50th, and 75th percentiles to make earliest, expected, and latest estimates for each remaining milestone. A milestone blocked by outside work and every later milestone have no dates because the release chain cannot safely proceed past the blocker until it is marked done.
+
 | Symptom | Meaning | Check |
 |---|---|---|
 | **Our images with no Trivy report** has a row | The critical-CVE table cannot vouch for that running image because no VulnerabilityReport exists | Check the app-cluster Trivy Operator scan jobs and report in the listed namespace; findings panels cannot show an unscanned image |

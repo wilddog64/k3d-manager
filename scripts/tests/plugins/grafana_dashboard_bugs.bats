@@ -12,6 +12,47 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "release forecast panels align by version and map dates and states" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d["panels"]
+new=[p for p in panels if 26 <= p["id"] <= 32]
+tiles={p["id"]:p for p in new}
+table=tiles[32]
+assert len(new)==7
+names=[p.get("title","") for p in new]
+names += list(next(t for t in table["transformations"] if t["id"]=="organize")["options"].get("renameByName",{}).values())
+assert all(not re.search(r"ship|release date", name, re.I) for name in names)
+assert all(tiles[i]["fieldConfig"]["defaults"].get("noValue") for i in (28,29,30,31))
+for field in ("Value #B","Value #C","Value #D"):
+ override=next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"]==field)
+ assert {p["id"]:p["value"] for p in override["properties"]}.get("noValue")=="-"
+ assert "custom.noValue" not in {p["id"] for p in override["properties"]}
+exprs={t["refId"]:t["expr"] for t in table["targets"]}
+assert all(f"by (version)" in exprs[k] for k in "BCDE")
+assert all(re.fullmatch(r"version", label) for label in re.findall(r"(?:sum|max) by \(([^)]+)\)", " ".join(exprs[k] for k in "BCDE")))
+assert "sum by (release)" not in exprs["E"]
+assert all(f'bound="{bound}"' in exprs[ref] for ref,bound in zip("BCD",("low","mid","high")))
+assert [t["id"] for t in table["transformations"]]==["merge","convertFieldType","organize"]
+assert table["transformations"][-1]["options"]["excludeByName"].get("Value #A") is True
+conversion=table["transformations"][1]["options"]["conversions"]
+assert any(c["targetField"]=="position" and c["destinationType"]=="number" for c in conversion)
+state_expr=tiles[31]["targets"][0]["expr"]
+assert all(f"({code} * k3dm_release_milestone_info" in state_expr for code in range(1,5))
+mapping=tiles[31]["fieldConfig"]["defaults"]["mappings"]
+assert set(mapping[0]["options"])=={"1","2","3","4"}
+assert {k:v["text"] for k,v in mapping[0]["options"].items()}=={"1":"blocked upstream","2":"insufficient history","3":"forecast","4":"shipped"}
+for panel in new:
+ a=panel["gridPos"]
+ for other in panels:
+  if other["id"]==panel["id"]: continue
+  b=other["gridPos"]
+  assert a["x"]+a["w"]<=b["x"] or b["x"]+b["w"]<=a["x"] or a["y"]+a["h"]<=b["y"] or b["y"]+b["h"]<=a["y"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bug dashboard has a release variable" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys

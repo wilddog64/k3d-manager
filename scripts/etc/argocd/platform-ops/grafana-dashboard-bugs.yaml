@@ -2087,6 +2087,396 @@ data:
             ],
             "showHeader": true
           }
+        },
+        {
+          "id": 26,
+          "type": "row",
+          "title": "Release forecast",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 54,
+            "w": 24,
+            "h": 1
+          },
+          "panels": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 27,
+          "type": "stat",
+          "title": "Releases to target",
+          "gridPos": {
+            "x": 0,
+            "y": 55,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_release_milestones_remaining{repo=\"$repo\"}",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 28,
+          "type": "stat",
+          "title": "Median days per release",
+          "gridPos": {
+            "x": 4,
+            "y": 55,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_release_cadence_seconds{repo=\"$repo\",quantile=\"0.5\"} / 86400",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "insufficient history"
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 29,
+          "type": "stat",
+          "title": "Target forecast (earliest)",
+          "gridPos": {
+            "x": 8,
+            "y": 55,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "min(k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"} * on(version) group_left k3dm_release_milestone_info{repo=\"$repo\",target=\"true\"}) * 1000",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "no date \u2014 see table",
+              "unit": "dateTimeAsIso"
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 30,
+          "type": "stat",
+          "title": "Target forecast (latest)",
+          "gridPos": {
+            "x": 12,
+            "y": 55,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"} * on(version) group_left k3dm_release_milestone_info{repo=\"$repo\",target=\"true\"}) * 1000",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "no date \u2014 see table",
+              "unit": "dateTimeAsIso"
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 31,
+          "type": "stat",
+          "title": "Target state",
+          "gridPos": {
+            "x": 16,
+            "y": 55,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "(1 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"forecast\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "-",
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "blocked upstream",
+                      "color": "orange"
+                    },
+                    "2": {
+                      "text": "insufficient history",
+                      "color": "yellow"
+                    },
+                    "3": {
+                      "text": "forecast",
+                      "color": "green"
+                    },
+                    "4": {
+                      "text": "shipped",
+                      "color": "blue"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 32,
+          "type": "table",
+          "title": "Remaining releases",
+          "gridPos": {
+            "x": 0,
+            "y": 59,
+            "w": 24,
+            "h": 12
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"}",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "B",
+              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"}) * 1000",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "C",
+              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"mid\"}) * 1000",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "D",
+              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"}) * 1000",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "E",
+              "expr": "sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\")) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"})",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "convertFieldType",
+              "options": {
+                "conversions": [
+                  {
+                    "targetField": "position",
+                    "destinationType": "number"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "position": 0,
+                  "version": 1,
+                  "kind": 2,
+                  "state": 3,
+                  "blocked_by": 4,
+                  "Value #E": 5,
+                  "Value #B": 6,
+                  "Value #C": 7,
+                  "Value #D": 8
+                },
+                "renameByName": {
+                  "position": "Position",
+                  "version": "Version",
+                  "kind": "Kind",
+                  "state": "State",
+                  "blocked_by": "Blocked by",
+                  "Value #E": "Plans",
+                  "Value #B": "Forecast \u2014 earliest",
+                  "Value #C": "Forecast \u2014 expected",
+                  "Value #D": "Forecast \u2014 latest"
+                },
+                "excludeByName": {
+                  "repo": true,
+                  "release_order": true,
+                  "target": true,
+                  "current": true,
+                  "overdue": true,
+                  "Time": true,
+                  "Value #A": true,
+                  "__name__": true
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #C"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #D"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Position",
+                "desc": false
+              }
+            ]
+          }
         }
       ]
     }
