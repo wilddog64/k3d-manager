@@ -381,3 +381,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] Slack agent-thread first slice scheduled as v1.44.1 plan 2 (operator asked v1.44.0; v1.44.0 at cap + depends on its submitter auth). Spec not yet written. Commit 1a02eb59.
 - [x] Roadmap: v2.6.4 candidate "security triage of runtime detections" (Falco → v2.6 investigation loop; no 1 TB pipeline) added 2026-10-23; Falco spec Deferred points to it. Commit 36dcc8ff.
 - [ ] Bug hub-data TMPDIR: root cause narrowed to git stub `*config*` (hub_data.bats:18); doc updated + approved 2026-10-23; operator to dispatch. Commit 89d9adfb.
+- [ ] Bug hub-data TMPDIR dispatched 2026-10-23 (14:08 PDT) via make codex-dispatch; runs alongside plan 3.
