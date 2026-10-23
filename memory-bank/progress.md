@@ -332,3 +332,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-22 noValue fix LIVE VERIFIED (TargetDown row app/group = —).
 - [x] 2026-10-22 roadmap: PracHub Meta questions → forward theme (Q7 dead-letter notify, Q8 evidence-before-diagnosis, Q16 bug-count reconciliation, Q17 path canonicalization) + calibration corpus under the post-v3 benchmark.
 - [x] 2026-10-22 ask-docs thread recurrence landed 18a9e7ef (offline); live E2 pending: restart-webhook + thread ask-docs.
+- [x] 2026-10-22 ask-docs thread recurrence LIVE VERIFIED (answer in diagnostics job thread).
