@@ -389,3 +389,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Plan 3 follow-up `c1e82de1` live-verified 2026-10-23: Per spec Release link opened Bug Tracking (release=v1.43.5) in a new tab; plan tiles now 3 live-verified / 0 unverified / 2 not implemented.
 - [ ] **Plan 4 dispatch-api-cost** revised (Files, Acceptance M1–M8/N1–N5/E1–E3, renamed title, Argo deploy path) and dispatched 2026-10-23. Plan 5 claude-cost waits for plan 4 to land.
 - [ ] **P3 release-plans-table order/dependencies** filed + dispatched 2026-10-23 (operator ask; bug, outside the cap). Runs alongside plan 4; overlaps only guide + CHANGELOG.
+- [ ] **P3 teardown-tests pre-d26574dc order** dispatched 2026-10-23 (6 reds confirmed: acceptance 4/5/6/8, k3s_aws 33/36). Overlaps others only in CHANGELOG.
