@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- Fixed unbalanced PromQL parentheses in the Active Alert Instances dashboard queries and added
+  offline validation for dashboard query expressions.
+
 - App-cluster registration now continues when the existing Secret role-label lookup fails,
   applying the Secret without a role label instead of exiting silently.
 

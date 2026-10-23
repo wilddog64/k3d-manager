@@ -368,6 +368,70 @@ _assert_firing_instance_contract() {
   jq -e '.timezone == "browser"' <<<"$dashboard_json" >/dev/null || return 1
 }
 
+_assert_dashboard_promql_parentheses() {
+  local dashboard_file="$1"
+  local expr
+  while IFS= read -r expr; do
+    python3 -c 'import sys
+s=sys.argv[1]
+depth=0; quoted=False; escaped=False; calls=[]; i=0
+while i < len(s):
+    c=s[i]
+    if quoted:
+        if escaped: escaped=False
+        elif c == "\\": escaped=True
+        elif c == "\"": quoted=False
+    elif c == "\"": quoted=True
+    elif s.startswith("label_replace(", i):
+        calls.append(i + len("label_replace"))
+    elif c == "(": depth += 1
+    elif c == ")":
+        depth -= 1
+        if depth < 0: sys.exit(1)
+    i += 1
+if quoted or depth != 0: sys.exit(1)
+# Each call position must have a matching closing delimiter, accounting for nesting.
+for start in calls:
+    depth=0; braces=0; brackets=0; quoted=False; escaped=False; commas=0
+    for c in s[start:]:
+        if quoted:
+            if escaped: escaped=False
+            elif c == "\\": escaped=True
+            elif c == "\"": quoted=False
+        elif c == "\"": quoted=True
+        elif c == "(": depth += 1
+        elif c == "{": braces += 1
+        elif c == "}": braces -= 1
+        elif c == "[": brackets += 1
+        elif c == "]": brackets -= 1
+        elif c == "," and depth == 1 and braces == 0 and brackets == 0: commas += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0: break
+    if depth != 0 or commas != 4: sys.exit(1)
+if len(calls) != s.count("label_replace("): sys.exit(1)' "$expr" || return 1
+    if command -v promtool >/dev/null 2>&1; then
+      local rules_file="${BATS_TEST_TMPDIR}/panel-13-rules.yml"
+      python3 -c 'import json,sys; print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryParse","expr":sys.argv[1]}]}]}))' "$expr" >"$rules_file" || return 1
+      promtool check rules "$rules_file" >/dev/null || return 1
+    fi
+  done < <(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -r '.panels[].targets[]?.expr // empty')
+}
+
+@test "Grafana Overview panel expressions have balanced PromQL parentheses" {
+  _assert_dashboard_promql_parentheses "${OVERVIEW}"
+  _assert_dashboard_promql_parentheses "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview expression guard rejects an unbalanced mutation" {
+  local snapshot="${BATS_TEST_TMPDIR}/overview-unbalanced-expression.yaml"
+  cp "${OVERVIEW}" "${snapshot}"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 13) | .targets[0].expr) |= ("(" + .) | tojson))' "${snapshot}"
+  if _assert_dashboard_promql_parentheses "${snapshot}"; then
+    return 1
+  fi
+}
+
 @test "Grafana Overview firing instance detail contract is safe and preserves category counts" {
   _assert_firing_instance_contract "${OVERVIEW}"
   _assert_firing_instance_contract "${HUB_OVERVIEW}"
