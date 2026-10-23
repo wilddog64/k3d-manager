@@ -131,13 +131,13 @@ is missing the parent's routing.
   parent with no `channel_id` and no `response_url` still records `not_delivered` (the guard holds).
 - **F3.** `CHANGELOG.md` entry.
 
-### Files
+## Files
 
 - `bin/k3dm-webhook`
 - `scripts/tests/bin/test_webhook_ask_docs_thread.py`
 - `CHANGELOG.md`
 
-### Acceptance
+## Acceptance (recurrence)
 
 ```yaml
 must:
@@ -164,13 +164,13 @@ interface:
   - Job directory files thread_ts, channel_id, thread_source, response_url under JOB_DIR/<job_id>/
 ```
 
-### Definition of Done
+## Definition of Done (recurrence)
 
 - [ ] F1–F3 on `k3d-manager-v1.43.5`; only the Files above change.
 - [ ] N1 shown red against the pre-fix code.
 - [ ] Commit: `fix(webhook): route ask-docs thread follow-ups to the parent's channel`
 
-### What NOT to Do
+## What NOT to Do (recurrence)
 
 - Do NOT relax the `_notify_job` default-channel guard.
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
