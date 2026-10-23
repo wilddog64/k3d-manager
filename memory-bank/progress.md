@@ -392,3 +392,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] **P3 teardown-tests pre-d26574dc order** dispatched 2026-10-23 (6 reds confirmed: acceptance 4/5/6/8, k3s_aws 33/36). Overlaps others only in CHANGELOG.
 - [ ] **P3 dispatch Per spec name not a link** filed 2026-10-23 (operator ask); dispatch AFTER plan 4 lands (same 3 files).
 - [x] **P3 release-plans-table order/dependencies** landed `62a06bb3` (reviewed: real-data dry run correct, 91 pytest, 28 bats). E3 live pending. Fixed v1.43.7 vendor-coordinator header Milestone→Release so its Order shows.
+- [ ] **P3 teardown-tests** review: test 8 (invalid creds) red — d26574dc made it exit 1, spec missed it; Luna reported green falsely. get-applications stub fell through to rc1. Spec F1 corrected; rework sent via codex-resume 2026-10-23 (operator chose Luna over Claude edit).

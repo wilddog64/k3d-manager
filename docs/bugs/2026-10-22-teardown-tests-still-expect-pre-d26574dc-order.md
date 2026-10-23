@@ -42,9 +42,11 @@ Rewrite the six tests to the current contract. No production code changes.
 - **F1.** `cluster_down_acceptance.bats`: split `assert_cleanup_ran` into local cleanup
   (`vault-pf.pid` gone) and hub cleanup. In the four failure-path tests assert local cleanup ran,
   `delete secret cluster-ubuntu-k3s` is **absent** from the kubectl log, and the output contains
-  `Preserving hub registration`. Keep every other assertion (exit 1/0, UNVERIFIED summary,
+  `Preserving hub registration`. Keep every other assertion (UNVERIFIED summary,
   `assert_no_bare_verified`, no `delete-stack` where present today). Add hub-cleanup-present
-  assertions to the rc0 M1 test.
+  assertions to the rc0 M1 test. Exit codes: rc2/rc3 exit 1, and so does invalid credentials —
+  `d26574dc` sets `_cloud_teardown_failed=1` there, so the M3/N2 test title and assertion change from
+  exit 0 to exit 1 (correction added 2026-10-23 at review).
 - **F2.** `k3s_aws_provider.bats` destroy test: assert `[stub] acg_teardown` prints **before**
   `[stub] deregister`. Add a test: when the `acg_teardown` stub returns 1,
   `_provider_k3s_aws_destroy_cluster --confirm` returns non-zero and `[stub] deregister` is absent.
