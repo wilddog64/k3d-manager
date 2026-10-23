@@ -275,7 +275,7 @@ _dispatch_start() {
   fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
-  _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" '.["network"]=$network'
+  _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" '.["network"]=$network | .["spec"]=$spec'
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
 Run the spec's Rules gates and paste their output.

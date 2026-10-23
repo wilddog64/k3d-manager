@@ -16,6 +16,7 @@ REWORK_CAUSES = ("rerun", "tests", "claude_edit", "any")
 TASK_CAP = 50
 VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
 
 
 def _root():
@@ -57,6 +58,28 @@ def _task_state(task_events):
     if not exits or max(exits) < max(launches):
         return "running"
     return "awaiting"
+
+
+def _dispatch_state(task_events):
+    ordered = sorted(enumerate(task_events), key=lambda item: (item[1].get("ts", 0), item[0]))
+    last = ordered[-1][1].get("event") if ordered else None
+    if last == "land":
+        return "landed"
+    if last == "abandon":
+        return "abandoned"
+    last_exit = max((e.get("ts", 0) for _, e in ordered if e.get("event") == "codex_exit"), default=None)
+    later_launch = any(e.get("event") in {"start", "resume"} and
+                       (last_exit is None or e.get("ts", 0) > last_exit) for _, e in ordered)
+    if later_launch:
+        return "running"
+    latest_refusal = max((e.get("ts", 0) for _, e in ordered if e.get("event") == "land_refused"), default=None)
+    if latest_refusal is not None and (last_exit is None or latest_refusal > last_exit):
+        return "refused"
+    if last_exit is not None:
+        exit_event = next(e for _, e in reversed(ordered)
+                          if e.get("event") == "codex_exit" and e.get("ts", 0) == last_exit)
+        return "awaiting_land" if exit_event.get("exit") == 0 else "codex_failed"
+    return "running" if any(e.get("event") in {"start", "resume"} for _, e in ordered) else "unknown"
 
 
 def _task_metrics(task_events, land_event):
@@ -206,6 +229,24 @@ def render(events, bad_lines, now=None):
     task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
     lines.append(f"k3dm_dispatch_running {task_states.count('running')}")
     lines.append(f"k3dm_dispatch_awaiting_land {task_states.count('awaiting')}")
+    plan_tasks, skipped = {}, 0
+    for key, task_events in _task_states(events).items():
+        starts = [event for event in task_events if event.get("event") == "start" and event.get("spec")]
+        if not starts:
+            continue
+        start = max(starts, key=lambda event: event.get("ts", 0))
+        spec = start.get("spec")
+        stem = Path(spec).stem if isinstance(spec, str) else ""
+        if not PLAN_STEM_RE.fullmatch(stem):
+            skipped += 1
+            continue
+        candidate = (start.get("ts", 0), key, task_events)
+        if stem not in plan_tasks or candidate[0] > plan_tasks[stem][0]:
+            plan_tasks[stem] = candidate
+    for stem, (_, key, task_events) in sorted(plan_tasks.items()):
+        version, slug = key
+        lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
+    lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
 

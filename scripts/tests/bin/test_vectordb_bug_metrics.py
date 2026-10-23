@@ -50,6 +50,76 @@ def _commit(root, message, date):
     subprocess.run(["git", "commit", "-qm", message], cwd=root, env=env, check=True)
 
 
+@pytest.mark.parametrize(("status", "expected"), [
+    ("LIVE-VERIFIED — live", ("implemented", "live_verified")),
+    ("VERIFIED — tests", ("implemented", "verified")),
+    ("IMPLEMENTED BY Codex", ("implemented", "unknown")),
+    ("DONE", ("implemented", "unknown")), ("LANDED", ("implemented", "unknown")),
+    ("MERGED", ("implemented", "unknown")), ("SHIPPED", ("implemented", "unknown")),
+    ("IN PROGRESS", ("in_progress", "n/a")), ("IN-PROGRESS", ("in_progress", "n/a")),
+    ("DISPATCHED", ("in_progress", "n/a")), ("PENDING CODEX", ("in_progress", "n/a")),
+    ("READY", ("ready", "n/a")), ("APPROVED", ("ready", "n/a")),
+    ("PROPOSED", ("proposed", "n/a")), ("SPEC", ("proposed", "n/a")),
+    ("DRAFT", ("proposed", "n/a")), ("PLAN", ("proposed", "n/a")),
+    ("PLANNED", ("proposed", "n/a")), ("SCOPED", ("proposed", "n/a")),
+    ("QUEUED FOR v1.50.0", ("proposed", "n/a")),
+    ("DEFERRED", ("deferred", "n/a")), ("MOVED", ("deferred", "n/a")),
+    ("SPLIT", ("deferred", "n/a")), ("SUPERSEDED", ("cancelled", "n/a")),
+    ("CANCELLED", ("cancelled", "n/a")), ("CANCELED", ("cancelled", "n/a")),
+    ("DROPPED", ("cancelled", "n/a")), ("WITHDRAWN", ("cancelled", "n/a")),
+    ("IMPLEMENTED — Claude-verified: pytest 106/106; live proof pending", ("implemented", "unknown")),
+    ("Garbage", ("unknown", "unknown")), (None, ("unknown", "unknown")),
+])
+def test_plan_state_leading_status_only(metrics, status, expected):
+    assert metrics._plan_state(status) == expected
+
+
+def test_plan_approval_and_plan_metrics(metrics, tmp_path):
+    assert metrics._plan_approval("**Approval:** explicit by operator", "v1.43.5") == "explicit"
+    assert metrics._plan_approval("**Approval:** pending — review", "v1.43.5") == "pending"
+    assert metrics._plan_approval("", "v1.43.5") == "none"
+    assert metrics._plan_approval("", "v1.43.1") == "n/a"
+    docs = {
+        "docs/plans/v1.43.5-a.md": '# v1.43.5 — Foo\n**Status:** READY\n**Approval:** explicit\n',
+        "docs/plans/v1.43.5-b.md": '# A "quoted" `title`\n**Status:** IMPLEMENTED\n',
+        "docs/plans/v1.42.0-old.md": '# Old\n**Status:** VERIFIED\n',
+        "docs/plans/roadmap-v1.md": '# Skip\n',
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = [line for line in output.splitlines() if line.startswith("k3dm_plan_info{")]
+    assert len(rows) == 3
+    assert 'plan="v1.43.5-a",title="Foo",execution="ready",verification="n/a",approval="explicit"' in rows[0]
+    assert 'title="A quoted title"' in rows[1]
+    assert metrics._release_order("v1.43.5") in rows[0]
+    assert 'k3dm_plan_info_skipped{repo="k3d-manager"} 1' in output
+    assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
+
+
+def test_plan_metrics_reads_worktree_top_level_only(metrics, tmp_path):
+    plans=tmp_path / "docs/plans"
+    plans.mkdir(parents=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** READY\n")
+    (plans / "sub").mkdir()
+    (plans / "sub/v1.43.5-nested.md").write_text("# Nested")
+    out = metrics._plan_metrics(tmp_path)
+    assert 'plan="v1.43.5-one"' in out
+    assert "nested" not in out
+
+
+def test_plan_metrics_reads_git_ref_top_level_only(metrics, tmp_path):
+    _git_repo(tmp_path, {"2026-10-23-seed.md": "# Seed\n"})
+    plans = tmp_path / "docs/plans"
+    (plans / "sub").mkdir(parents=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** READY\n")
+    (plans / "sub/v1.43.5-nested.md").write_text("# Nested")
+    subprocess.run(["git", "add", "docs/plans"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "plans"], cwd=tmp_path, check=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** PROPOSED\n")
+    out = metrics._plan_metrics(tmp_path, "HEAD")
+    assert 'plan="v1.43.5-one"' in out and 'execution="ready"' in out
+    assert "nested" not in out
+
+
 def test_status_date_formats_status_dates(metrics):
     assert metrics._status_date("LIVE-VERIFIED — 2026-10-16T21:35:33Z: x") == "2026-10-16 21:35Z"
     assert metrics._status_date("LIVE-VERIFIED 2026-10-15 — x") == "2026-10-15"
@@ -474,7 +544,7 @@ def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch
     assert metrics.publish_bug_metrics(tmp_path) is True
     assert len(calls) == 1
     methods = {r.full_url.rsplit("/", 1)[-1]: r.method for r in requests if getattr(r, "data", None)}
-    assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST"}
+    assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST", "k3dm-plan-docs": "PUT"}
     open_body = next(r.data.decode() for r in requests
                      if getattr(r, "full_url", "").endswith("/metrics/job/k3dm-bug-open"))
     assert "k3dm_bug_open_info" not in open_body
@@ -577,6 +647,7 @@ def test_bug_status_metrics_push_is_put_and_release_inventory_stays_post(metrics
     assert methods["k3dm-bug-docs"] == "POST"
     assert methods["k3dm-bug-open"] == "PUT"
     assert methods["k3dm-bug-releases"] == "POST"
+    assert methods["k3dm-plan-docs"] == "PUT"
 
 
 def test_bug_status_metrics_failure_does_not_block_other_groups(metrics, monkeypatch, tmp_path):
@@ -787,11 +858,15 @@ def test_lib_foundation_series_carry_repo_and_push_to_their_own_instance(metrics
     assert result is True
     assert {job: method for job, (method, _body) in pushes.items()} == {
         "k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST",
+        "k3dm-plan-docs": "PUT",
         "k3dm-bug-docs/instance/lib-foundation": "POST",
         "k3dm-bug-open/instance/lib-foundation": "PUT",
         "k3dm-bug-releases/instance/lib-foundation": "POST",
     }
     for job, (_method, body) in pushes.items():
+        if job == "k3dm-plan-docs":
+            assert 'k3dm_plan_info_skipped{repo="k3d-manager"}' in body
+            continue
         repo = "lib-foundation" if job.endswith("/instance/lib-foundation") else "k3d-manager"
         series = [line for line in body.splitlines() if line.startswith("k3dm_bug")]
         assert series
@@ -827,7 +902,7 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
                                    lf_tally_error=breakage == "tally_fails")
     assert result is True
     km_jobs = {job for job in pushes if "/instance/" not in job}
-    assert km_jobs == {"k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases"}
+    assert km_jobs == {"k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases", "k3dm-plan-docs"}  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-plan-docs
     lf_jobs = {job for job in pushes if job.endswith("/instance/lib-foundation")}
     assert lf_jobs == {
         "missing_dir": set(), "no_origin_main": set(),
@@ -836,3 +911,19 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
                         "k3dm-bug-releases/instance/lib-foundation"},
     }[breakage]
     assert "lib-foundation" in capsys.readouterr().err
+
+
+def test_plan_push_failure_is_nonfatal(metrics, monkeypatch, tmp_path, capsys):
+    pushed=[]
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_push_bug_group",
+                        lambda job, payload, method="POST": pushed.append((job, method)) or True)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_publish_lib_foundation_bugs", lambda: None)
+    _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert ("k3dm-plan-docs", "PUT") in pushed
+    pushed.clear()
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_plan_metrics",
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("plan parse")))
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert any(job == "k3dm-bug-docs" for job, _method in pushed)
+    assert "plan metrics skipped (non-fatal): plan parse" in capsys.readouterr().err

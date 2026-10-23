@@ -33,6 +33,24 @@ All dashboard ConfigMaps use the `grafana_dashboard: "1"` label in the `monitori
 
 In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
+### Release plans
+
+The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads only each plan's H1, `**Status:**`, and `**Approval:**`; the filename determines its release. Execution and verification are independent labels derived from the leading Status words:
+
+| Status starts with | Execution | Verification |
+|---|---|---|
+| LIVE-VERIFIED | implemented | live_verified |
+| VERIFIED | implemented | verified |
+| IMPLEMENTED, DONE, LANDED, MERGED, SHIPPED | implemented | unknown |
+| IN PROGRESS, IN-PROGRESS, DISPATCHED, PENDING CODEX | in_progress | n/a |
+| READY, APPROVED | ready | n/a |
+| PROPOSED, SPEC, DRAFT, PLAN, PLANNED, SCOPED, QUEUED | proposed | n/a |
+| DEFERRED, MOVED, SPLIT | deferred | n/a |
+| SUPERSEDED, CANCELLED, CANCELED, DROPPED, WITHDRAWN | cancelled | n/a |
+| anything else or no Status | unknown | unknown |
+
+Approval is `explicit` unless the line is absent (`none`) or begins with `pending`; plans before v1.43.2 use `n/a`. Dispatch is joined by the plan filename stem from the Codex dispatch ledger. Only a start event that records a `docs/plans/` spec can appear; `landed` describes integration and does not change verification. Missing dispatch telemetry displays **no record**. The dashboard deliberately does not infer **not started** from missing information or **done** from implementation. As the operator requirements say: “Include every planned specification”; “Keep execution state separate from verification state”; “Don't infer completion from missing information.”
+
 ## CVE Auto-Patch triage
 
 | Symptom | Meaning | Check |

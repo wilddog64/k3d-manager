@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states.
+
 ### Changed
 
 - E2E failure tables now expose source run dates and current matching-run status, with shared

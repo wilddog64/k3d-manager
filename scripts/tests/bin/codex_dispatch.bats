@@ -78,6 +78,12 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
 }
 
+@test "codex dispatch: start records the spec path in the ledger" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/one.argv" STUB_ENV="$BATS_TEST_TMPDIR/one.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  [ "$(jq -r -s '.[0].spec' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "docs/plans/v9.9.9-demo.md" ]
+}
+
 @test "codex dispatch: piped start returns before Codex exits" {
   export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/one.argv" STUB_ENV="$BATS_TEST_TMPDIR/one.env"
   timeout_bin=timeout

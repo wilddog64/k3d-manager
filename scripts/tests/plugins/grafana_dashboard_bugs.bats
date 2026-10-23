@@ -177,6 +177,26 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bug dashboard release plans row shows joined plan state without not-started inference" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d['panels']; row=next(p for p in panels if p['title']=='Release plans — $release')
+added=[p for p in panels if p['gridPos']['y'] >= 40]
+assert all(p['gridPos']['y'] >= 40 for p in added)
+table=next(p for p in added if p['title']=='Plans')
+expr=table['targets'][0]['expr']
+assert 'group_left(dispatch_state, slug)' in expr and ' or on(plan) ' in expr
+tiles={p['title']:p for p in added if p['type']=='stat'}
+steps=tiles['Plans in release']['fieldConfig']['defaults']['thresholds']['steps']
+assert any(s.get('value')==6 and s['color']=='red' for s in steps)
+assert not any('not started' in (p['title']+' '+str(p.get('fieldConfig',{}).get('defaults',{}).get('mappings',[]))).lower() for p in added)
+assert 'no record' in json.dumps(table).lower()
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bug dashboard bar charts blank the labels of empty segments" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys

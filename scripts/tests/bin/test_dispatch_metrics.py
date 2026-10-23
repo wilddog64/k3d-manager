@@ -3,6 +3,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+import pytest
 
 SCRIPT = Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"
 SPEC = importlib.util.spec_from_loader("dispatch_metrics", importlib.machinery.SourceFileLoader("dispatch_metrics", str(SCRIPT)))
@@ -122,6 +123,34 @@ def test_invalid_label_values_skipped():
     assert 'k3dm_dispatch_task_skipped{window="1d"} 2' in output
     assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="bad slug"}' not in output
     assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="latest",slug="good"}' not in output
+
+
+def test_per_plan_dispatch_state_uses_latest_started_task():
+    events = [
+        event(1, "start", "old", spec="docs/plans/v1.43.5-a.md"),
+        event(2, "codex_exit", "old", exit=0), event(3, "land", "old"),
+        event(4, "start", "new", spec="docs/plans/v1.43.5-a.md"),
+        event(5, "codex_exit", "new", exit=0),
+        event(6, "start", "bug", spec="docs/bugs/2026-10-17-x.md"),
+        event(7, "start", "legacy"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_plan_state{plan="v1.43.5-a",version="9.9.9",slug="new",dispatch_state="awaiting_land"} 1' in output
+    assert "k3dm_dispatch_plan_state_skipped 1" in output
+    assert 'plan="legacy"' not in output
+
+
+@pytest.mark.parametrize(("events", "expected"), [
+    ([event(1,"start" )], "running"),
+    ([event(1,"start"),event(2,"codex_exit",exit=1)], "codex_failed"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0)], "awaiting_land"),
+    ([event(1,"start"),event(2,"codex_exit",exit=1),event(3,"land_refused")], "refused"),
+    ([event(1,"start"),event(2,"codex_exit",exit=1),event(3,"land_refused"),event(4,"resume")], "running"),
+    ([event(1,"start"),event(2,"land")], "landed"),
+    ([event(1,"start"),event(2,"abandon")], "abandoned"),
+])
+def test_dispatch_state_table(events, expected):
+    assert dispatch_metrics._dispatch_state(events) == expected
 
 
 def test_task_cap():

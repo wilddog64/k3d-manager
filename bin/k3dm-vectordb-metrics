@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,7 @@ _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 _BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
 _SCAN_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 _BUG_STEM_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+_PLAN_FILE_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)-([a-z0-9][a-z0-9-]*)\.md$")
 _FILED_RE = re.compile(r"^\*\*Filed:\*\*\s*(\d{4}-\d{2}-\d{2})\s*$", re.MULTILINE)
 _HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 _STATUS_DATE_RE = re.compile(r"^(?:LIVE-)?VERIFIED\b[\s:,\u2013\u2014-]*"
@@ -131,6 +133,99 @@ def _bug_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     lines = [f'k3dm_bug_docs{{repo="{repo}",priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
              for priority, state in counts]
     lines.append(f'k3dm_bug_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}')
+    return "\n".join(lines) + "\n"
+
+
+def _plan_texts(root, ref=None):
+    root = Path(root)
+    if ref:
+        listing = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", ref,
+                                  "docs/plans"], capture_output=True, text=True, check=True)
+        paths = [p for p in listing.stdout.splitlines()
+                 if p.startswith("docs/plans/") and p.endswith(".md") and "/" not in p[len("docs/plans/"):]]
+        request = "".join(f"{ref}:{path}\n" for path in paths).encode()
+        blob = subprocess.run(["git", "-C", str(root), "cat-file", "--batch"], input=request,
+                              capture_output=True, check=True, timeout=60).stdout
+        texts = {}
+        offset = 0
+        for path in paths:
+            end = blob.index(b"\n", offset)
+            header = blob[offset:end].split()
+            if len(header) != 3 or header[1] != b"blob":
+                raise RuntimeError(f"git cat-file: unexpected header for {path}")
+            start, size = end + 1, int(header[2])
+            try:
+                texts[path] = blob[start:start + size].decode("utf-8")
+            except UnicodeDecodeError:
+                texts[path] = None
+            offset = start + size + 1
+        return texts
+    texts = {}
+    for path in sorted((root / "docs/plans").glob("*.md")):
+        try:
+            texts[path.relative_to(root).as_posix()] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            texts[path.relative_to(root).as_posix()] = None
+    return texts
+
+
+def _plan_state(status_value):
+    value = (status_value or "").strip().upper()
+    if re.match(r"^LIVE-VERIFIED(?:\b|\s|—|–|-|:)", value):
+        return "implemented", "live_verified"
+    if re.match(r"^VERIFIED(?:\b|\s|—|–|-|:)", value):
+        return "implemented", "verified"
+    if re.match(r"^(IMPLEMENTED|DONE|LANDED|MERGED|SHIPPED)(?:\b|\s|—|–|-|:)", value):
+        return "implemented", "unknown"
+    if re.match(r"^(IN PROGRESS|IN-PROGRESS|DISPATCHED|PENDING CODEX)(?:\b|\s|—|–|-|:)", value):
+        return "in_progress", "n/a"
+    if re.match(r"^(READY|APPROVED)(?:\b|\s|—|–|-|:)", value):
+        return "ready", "n/a"
+    if re.match(r"^(PROPOSED|SPEC|DRAFT|PLAN|PLANNED|SCOPED|QUEUED)(?:\b|\s|—|–|-|:)", value):
+        return "proposed", "n/a"
+    if re.match(r"^(DEFERRED|MOVED|SPLIT)(?:\b|\s|—|–|-|:)", value):
+        return "deferred", "n/a"
+    if re.match(r"^(SUPERSEDED|CANCELLED|CANCELED|DROPPED|WITHDRAWN)(?:\b|\s|—|–|-|:)", value):
+        return "cancelled", "n/a"
+    return "unknown", "unknown"
+
+
+def _plan_approval(text, release):
+    if not _release_at_least(release, (1, 43, 2)):
+        return "n/a"
+    match = re.search(r"^\*\*Approval:\*\*\s*(.*?)\s*$", text, re.MULTILINE | re.IGNORECASE)
+    if not match:
+        return "none"
+    return "pending" if match.group(1).lower().startswith("pending") else "explicit"
+
+
+def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
+    texts = _plan_texts(root, ref) if texts is None else texts
+    info, counts, skipped = [], defaultdict(int), 0
+    for path, text in texts.items():
+        match = _PLAN_FILE_RE.fullmatch(Path(path).name)
+        if not match or not isinstance(text, str):
+            skipped += 1
+            continue
+        release = "v" + ".".join(match.groups()[:3])
+        plan = Path(path).stem
+        status = _status_value(text)
+        execution, verification = _plan_state(status)
+        heading = _HEADING_RE.search(text)
+        title = heading.group(1) if heading else match.group(4).replace("-", " ")
+        title = re.sub(r"^v\d+\.\d+\.\d+\s*[—–:-]\s*", "", title, flags=re.IGNORECASE)
+        title = re.sub(r'["\\\t\r\n]+', " ", title.replace("`", "").replace("*", ""))
+        title = " ".join(title.split())
+        if len(title) > 120:
+            title = title[:119] + "…"
+        order = _release_order(release)
+        approval = _plan_approval(text, release)
+        info.append(f'k3dm_plan_info{{repo="{repo}",release="{release}",release_order="{order}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}"}} 1')
+        counts[(release, order, execution, verification)] += 1
+    lines = info + [f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
+                    for (release, order, execution, verification), count in sorted(counts.items())]
+    lines.extend([f'k3dm_plan_info_skipped{{repo="{repo}"}} {skipped}',
+                  f'k3dm_plan_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}'])
     return "\n".join(lines) + "\n"
 
 
@@ -460,6 +555,10 @@ def publish_bug_metrics(root, ref=None):
         _publish_lib_foundation_bugs()
         return False
     pushed = _push_bug_group("k3dm-bug-docs", payload)
+    try:
+        _push_bug_group("k3dm-plan-docs", _plan_metrics(root, ref), method="PUT")
+    except Exception as exc:
+        print(f"plan metrics skipped (non-fatal): {exc}", file=sys.stderr)
     try:
         payload = _tally(root, ref, full=True)
         tally = payload["releases"]

@@ -1615,6 +1615,478 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           }
+        },
+        {
+          "id": 100,
+          "type": "row",
+          "title": "Release plans — $release",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 40,
+            "w": 24,
+            "h": 1
+          },
+          "panels": [],
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 101,
+          "type": "stat",
+          "title": "Plans in release",
+          "gridPos": {
+            "x": 0,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 6
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 102,
+          "type": "stat",
+          "title": "Not yet implemented",
+          "gridPos": {
+            "x": 4,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=~\"proposed|ready|in_progress\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": []
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 103,
+          "type": "stat",
+          "title": "Implemented, verification unknown",
+          "gridPos": {
+            "x": 8,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=\"implemented\",verification=\"unknown\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 104,
+          "type": "stat",
+          "title": "Live-verified",
+          "gridPos": {
+            "x": 12,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",verification=\"live_verified\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 105,
+          "type": "stat",
+          "title": "Status unknown",
+          "gridPos": {
+            "x": 16,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release_order=~\"$release\",execution=\"unknown\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 106,
+          "type": "stat",
+          "title": "Status lags dispatch",
+          "gridPos": {
+            "x": 20,
+            "y": 41,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count((k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\",execution=~\"proposed|ready|in_progress\"} * on(plan) group_left k3dm_dispatch_plan_state{dispatch_state=\"landed\"})) or vector(0)",
+              "instant": true
+            }
+          ],
+          "options": {
+            "graphMode": "none",
+            "colorMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "id": 107,
+          "type": "table",
+          "title": "Plans",
+          "gridPos": {
+            "x": 0,
+            "y": 45,
+            "w": 24,
+            "h": 9
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "(k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) k3dm_plan_info{repo=\"$repo\",release_order=~\"$release\"}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "repo": true,
+                  "release_order": true,
+                  "__name__": true,
+                  "job": true,
+                  "instance": true,
+                  "version": true
+                },
+                "indexByName": {
+                  "release": 0,
+                  "plan": 1,
+                  "title": 2,
+                  "execution": 3,
+                  "verification": 4,
+                  "approval": 5,
+                  "dispatch_state": 6,
+                  "slug": 7
+                },
+                "renameByName": {
+                  "release": "Release",
+                  "plan": "Plan",
+                  "title": "Title",
+                  "execution": "Execution",
+                  "verification": "Verification",
+                  "approval": "Approval",
+                  "dispatch_state": "Dispatch",
+                  "slug": "Dispatch task"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Execution"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "in_progress": {
+                            "text": "in progress",
+                            "color": "gray"
+                          },
+                          "unknown": {
+                            "text": "? unknown",
+                            "color": "yellow"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Verification"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "live_verified": {
+                            "text": "✓ live",
+                            "color": "gray"
+                          },
+                          "verified": {
+                            "text": "✓ verified",
+                            "color": "gray"
+                          },
+                          "unknown": {
+                            "text": "? unknown",
+                            "color": "yellow"
+                          },
+                          "n/a": {
+                            "text": "-",
+                            "color": "gray"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dispatch"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "": {
+                            "text": "no record",
+                            "color": "gray"
+                          },
+                          "codex_failed": {
+                            "text": "codex failed",
+                            "color": "red"
+                          },
+                          "refused": {
+                            "text": "land refused",
+                            "color": "red"
+                          },
+                          "awaiting_land": {
+                            "text": "awaiting land",
+                            "color": "orange"
+                          },
+                          "landed": {
+                            "text": "landed (code in)",
+                            "color": "green"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Plan",
+                "desc": false
+              }
+            ],
+            "showHeader": true
+          }
         }
       ]
     }
