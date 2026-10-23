@@ -1,7 +1,7 @@
 # Bug: Hostinger tunnel logs can't place a drop in time, and reconnect waits on 75-second TCP timeouts
 
 **Filed:** 2026-10-23 (Claude, from the 2026-10-22 Hostinger 502 investigation)
-**Status:** OPEN
+**Status:** FIXED (offline) at `5f9fb209` — live E2 pending
 **Priority:** P2 — a tunnel drop causes multi-service 502s, and its evidence is lost or has no timestamps
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-23: "go ahead"
@@ -108,3 +108,12 @@ interface:
 - Do NOT start, stop or reload any real launchd agent, and do NOT ssh anywhere. Tests stub everything.
 - Do NOT change the tunnel ports, the host alias, the `fuser` step in the vault wrapper, or `make clean-tmp`.
 - Do NOT modify `scripts/lib/foundation/`.
+
+## Review (Claude, 2026-10-23)
+
+- Luna's change is in scope (5 files). `bats scripts/tests/plugins/tunnel.bats`: 18/18 pass; `shellcheck` reports nothing new.
+- Pre-fix red check: the new test file fails 6 tests on the pre-fix tree (6, 7, 13, 16, 17, 18), which covers N1–N3.
+- Test 16 only greps the wrapper text, so Claude ran the generated forward wrapper against a stub
+  `autossh`. Each stderr line came out as `[2026-10-23T14:38:30Z] …`, and the arguments included
+  `ConnectTimeout=10`. `_tunnel_forward_pattern` still matches the exec'd `autossh … -N ubuntu`.
+- Landed as `5f9fb209`.
