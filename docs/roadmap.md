@@ -963,6 +963,26 @@ Next steps, smallest first:
 | Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
+### Candidate theme — v2.x: agent devbox service
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Give each
+dispatched agent task its own on-demand, isolated development environment instead of a worktree on
+the operator's laptop. The intent engine above decides *what* to build; the devbox is *where* an agent
+builds it. Prompted by a public system-design exercise on remote dev environments; the design here is
+our own.
+
+| Concern | Today | Gap |
+|---|---|---|
+| Lifecycle state machine | Dispatch ledger: start, running, exited, land or refuse | No stop/resume; no idle reaping beyond the ACG sandbox expiry |
+| Disposable compute, durable work | Worktree and `.run/` dir per task; the branch is the durable state | One shared laptop, hence the one-agent-per-sandbox and no-edit-mid-run rules |
+| Egress and secrets | Codex sandbox, Vault/ESO, the webhook allowlist | Credentials are not scoped per task; the sandbox is the agent tool's, not ours |
+| Access gateway | Webhook, Cloudflare tunnel, cloud-bridge requests | No short-lived, per-session access |
+| Fast start | vCluster per PR, prebuilt images | No warm pool, no snapshots |
+| Cost and productivity | Agent dispatch dashboard, v1.43.5 cost plans | Not attributed per environment |
+
+**Placement:** after v2.5.0, before v3.0.0, and a v3.0.0 dependency alongside the intent engine.
+Likely gated on the Mac Mini M5 as the first compute pool. Nothing moves into v1.4x.
+
 ### Candidate major — v3.0.0: multi-agent product team
 
 **Proposed 2026-10-12 (operator; scheduled for v3.0.0, not yet scoped).** A product team made of
