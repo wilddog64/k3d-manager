@@ -1,7 +1,7 @@
 # Bug: thread commands under a slash-command message reply in the channel, not the thread
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshots ~18:14 PDT)
-**Status:** OPEN
+**Status:** FIXED offline — `94985769` (Luna; Claude review: N1/N3 red on pre-fix, 167 webhook tests green); live E2 pending make restart-webhook + thread reply
 **Priority:** P2 — answers land as top-level channel posts, detached from the question; workaround: ask with a new top-level `/ask-docs`
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna

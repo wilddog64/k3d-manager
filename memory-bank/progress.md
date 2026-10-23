@@ -340,3 +340,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-22 dispatch dashboard colours landed b6c09614 (offline); live E2 pending ArgoCD sync + screenshot.
 - [ ] 2026-10-22 filed P2 docs/bugs/2026-10-22-slack-thread-replies-posted-to-channel-via-response-url.md (thread replies under slash-command msgs go to channel via response_url; 18a9e7ef's response_url copy made ask-docs follow-ups hit it); approval pending.
 - [ ] 2026-10-22 response_url thread bug approved; dispatched to Luna (slug thread-reply-bot-first).
+- [x] 2026-10-22 thread-reply routing P2 landed 94985769 (offline); live E2 pending restart. Operator: Luna works P3 bugs when Claude is off; Claude finishes P2s then back to release specs.
