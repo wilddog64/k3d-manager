@@ -382,3 +382,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Roadmap: v2.6.4 candidate "security triage of runtime detections" (Falco → v2.6 investigation loop; no 1 TB pipeline) added 2026-10-23; Falco spec Deferred points to it. Commit 36dcc8ff.
 - [ ] Bug hub-data TMPDIR: root cause narrowed to git stub `*config*` (hub_data.bats:18); doc updated + approved 2026-10-23; operator to dispatch. Commit 89d9adfb.
 - [ ] Bug hub-data TMPDIR dispatched 2026-10-23 (14:08 PDT) via make codex-dispatch; runs alongside plan 3.
+- [ ] **Plan 3 dispatch-release-scope** landed `7c0332ef` 2026-10-23 (14:10 PDT). Review: tests red on pre-change copy (N1 golden part passes pre-change), CHANGELOG added by Claude, CHANGELOG rebase conflict with diagnose-pods-all resolved keeping both. E4 live pending: make platform-ops (dispatch dashboard) + Argo hard refresh (bugs dashboard).
