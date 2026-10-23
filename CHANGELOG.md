@@ -2425,3 +2425,6 @@
 
 ### Added
 - Initial release
+### Fixed
+- Restore operator SSH host aliases from a protected config fragment before hub data export and
+  cluster bring-up, with timestamped config backups.

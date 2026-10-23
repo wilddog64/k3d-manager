@@ -30,6 +30,7 @@ fi
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/ssh_config_guard.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 # shellcheck source=scripts/lib/cloudflared_keychain.sh
@@ -395,6 +396,12 @@ if [[ "${K3DM_RESUME:-0}" != "1" ]]; then
 fi
 
 _info "[acg-up] Step 0/12 — Pruning stale public IPs from ~/.ssh/known_hosts..."
+read -r -a _ssh_required_aliases <<< "${K3DM_SSH_REQUIRED_ALIASES:-github-k3dm-hub-data m2jump}"
+if _dry_run_active; then
+  _ssh_config_guard "${_ssh_required_aliases[@]}" || _warn "[acg-up] DRY_RUN: operator SSH alias(es) missing; would repair"
+elif ! _ssh_config_guard --repair "${_ssh_required_aliases[@]}"; then
+  _warn "[acg-up] operator SSH alias repair did not complete; continuing sandbox bring-up"
+fi
 _kh="${HOME}/.ssh/known_hosts"
 if _dry_run_active; then
   _info "[acg-up] DRY_RUN: would prune stale public IPs from known_hosts"

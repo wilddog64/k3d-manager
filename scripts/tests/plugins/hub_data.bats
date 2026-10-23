@@ -1416,3 +1416,19 @@ _shim_env() {
   [ "$status" -eq 0 ]
   grep -q keychain "$CALL_LOG"
 }
+
+@test "scheduled export: SSH guard runs first and a failed guard prevents export" {
+  source_plugin
+  export K3DM_HUB_DATA_PUSHGATEWAY_URL=http://push
+  _hub_data_push_metrics() { :; }
+  _ssh_config_guard() { printf 'guard %s\n' "$*" >> "$CALL_LOG"; return "${GUARD_FAIL:-0}"; }
+  hub_data_export() { printf 'export\n' >> "$CALL_LOG"; }
+  GUARD_FAIL=0 run hub_data_export_scheduled
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$CALL_LOG")" = 'guard --repair github-k3dm-hub-data' ]
+  [ "$(sed -n '2p' "$CALL_LOG")" = export ]
+  : > "$CALL_LOG"
+  GUARD_FAIL=1 run hub_data_export_scheduled
+  [ "$status" -ne 0 ]
+  [ "$(cat "$CALL_LOG")" = 'guard --repair github-k3dm-hub-data' ]
+}
