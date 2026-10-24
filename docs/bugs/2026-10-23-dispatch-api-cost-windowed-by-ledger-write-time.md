@@ -1,6 +1,6 @@
 # Bug: dispatch API cost is windowed by when the ledger event was written, so Projected / month is inflated
 
-**Status:** OPEN
+**Status:** LANDED `f8dbf7b6` 2026-10-24 — E1 green (43 pytest; the 3 new tests and the dashboard test red on the pre-fix code). E2 dry run: 1d $0.79, 7d $3.48, 30d $9.61 (were all $9.61); observed days 1.00 / 7.00 / 14.12; Projected ≈ $14.89 (was $41.2). Dashboard part pending the Argo hard refresh.
 **Priority:** P2
 **Severity:** medium — the cost totals are right, but the 1d/7d windows and Projected / month overstate recent spend
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

@@ -418,3 +418,6 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] Operator asked for per-release totals on the Per spec table (tokens, Codex time, time to land, API equiv) — proposed table footer; pending go.
 - [x] Cloud-bridge at-most-once E2 live-verified 2026-10-24 01:16 UTC: 4 ids, 4 webhook calls, overlapping health + cluster-status both answered, outbox empty. Side note: `bin/k3dm-cloud-request` fails (stale-info push reject) when two filings race; not retried.
 - [x] P3 By model E3 live-verified 2026-10-24 (both models shown; coverage titled). Leftover: By model needs fieldConfig min 0 — fold into the Per spec totals change.
+- [x] Windowing P2 LANDED `f8dbf7b6` 2026-10-24: cost windows by session start; 7d $3.48 vs 30d $9.61; Projected ≈ $14.89 (was $41.2). Awaiting Argo hard refresh.
+- [x] Per spec totals row `74dbdcfb` (Claude, operator: "time to land can be an average but total for all others"): footer sums tokens/Codex time/runs/API equiv; mean time to land already the top-row stat; By model min 0. Awaiting Argo hard refresh + screenshot.
+- [ ] Operator asked for complexity per spec + per release — proposal pending go; v1.43.5 at 5-plan cap, so a plan goes to a later release.
