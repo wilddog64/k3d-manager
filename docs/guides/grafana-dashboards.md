@@ -69,8 +69,8 @@ output rates there when pricing changes. Models without an explicit entry remain
 - **Per landed spec** divides that same total by landed tasks. Landed means the tests and scope gate
   passed; it does not mean live-verified.
 - **Cached input** shows cached input tokens as a share of input tokens.
-- **Subscriptions / month** shows the fixed ChatGPT, Claude, Gemini and GitHub plan costs; only the
-  ChatGPT plan pays for Codex.
+- **Subscriptions / month** shows the fixed ChatGPT, Claude, Gemini, GitHub and Hostinger plan costs
+  (Hostinger is $250 per two years, so $10.42 a month); only the ChatGPT plan pays for Codex.
 - **Ledger coverage** compares Codex sessions started in the selected time window with sessions
   present in the dispatch ledger. It has no release-scope value; “outside the ledger” estimates the
   cost of sessions missing from that ledger.
