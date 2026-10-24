@@ -1,6 +1,6 @@
 # Bug: a rejected Slack bot post leaves no reason in the webhook log
 
-**Status:** OPEN — 2026-10-23
+**Status:** DISPATCHED — 2026-10-23
 **Priority:** P3
 **Severity:** low — delivery falls back correctly; only the diagnosis is blind
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
