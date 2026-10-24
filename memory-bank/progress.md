@@ -440,6 +440,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] v1.43.8 plan 1 `dispatch-release-duration` SPEC WRITTEN 2026-10-24.
 - [ ] v1.43.8 plan 2 `slack-route-system-notices-to-status-channel` SPEC WRITTEN 2026-10-24; awaiting dispatch go.
 - [~] P3 bug `prometheus-rotator-never-posts-slack-notice` DISPATCHED 2026-10-24 (v1.43.5 bug).
+- [~] claude-cost rework 2 reviewed OK 2026-10-24; rework 3 (audit allow marker) running, then land.
 - [x] Plan 4 `v1.43.5-dispatch-api-cost` VERIFIED 2026-10-24 (E3 operator screenshots, 7d + v1.43.4).
 - [ ] Plan 5 `v1.43.5-dispatch-claude-cost` DISPATCHED to Luna 2026-10-24 (amended: observed-days Projected/month, Acceptance, Files). Claude fills Claude rates before release PR.
 - [ ] v1.43.5 dispatch-claude-cost: rework 2 sent 2026-10-24 (same-release overlap undercount).
