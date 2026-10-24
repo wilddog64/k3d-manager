@@ -933,12 +933,32 @@ function observability_rotate_prometheus_basic_auth() {
   rm -f "${_vault_hdr}"
   _prometheus_acg_web_config_secret "${1:-}" || return 1
   _observability_refresh_prometheus_auth_proxy
-  if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
-      -H 'Content-Type: application/json' \
-      -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
-  fi
+  _observability_notify_rotation
   _info "[observability] Prometheus basic-auth rotated and ACG web config reapplied"
+}
+
+function _observability_notify_rotation() {
+  local _wasx=0 _webhook_url
+  case $- in *x*) _wasx=1; set +x ;; esac
+  _webhook_url="${SLACK_WEBHOOK_URL:-}"
+
+  if [[ -z "${_webhook_url}" ]]; then
+    _webhook_url=$(_kubectl get secret platform-ops-notifications -n platform-ops \
+      --context k3d-k3d-cluster -o jsonpath='{.data.slack-incoming-webhook-url}' 2>/dev/null \
+      | base64 --decode 2>/dev/null) || _webhook_url=""
+  fi
+  if [[ -z "${_webhook_url}" ]]; then
+    _warn "[observability] no Slack incoming webhook — rotation notice not sent"
+    (( _wasx )) && set -x
+    return 0
+  fi
+
+  curl -sf --max-time 10 --config - \
+    <<<"url = \"${_webhook_url}\"" \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
+  (( _wasx )) && set -x
+  return 0
 }
 
 function _prometheus_acg_web_config_secret() {

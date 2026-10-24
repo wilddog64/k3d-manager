@@ -11,7 +11,7 @@ setup() {
   source scripts/lib/system.sh
   source scripts/lib/core.sh
   source scripts/lib/provider.sh
-  source scripts/plugins/observability.sh
+  source "${OBSERVABILITY_SCRIPT:-scripts/plugins/observability.sh}"
 }
 
 @test "deploy_observability calls envsubst with \$ARGOCD_NAMESPACE and \$K3D_MANAGER_BRANCH" {
@@ -759,4 +759,57 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- 'password' "${BATS_TEST_DIRNAME}/../../etc/launchd/com.k3d-manager.prometheus-credential-rotator.plist.tmpl"
   [ "$status" -ne 0 ]
+}
+
+@test "Prometheus rotation notice reads the hub Secret without exposing its URL" {
+  local secret_url='https://hooks.slack.test/T000/B000/secret-sentinel'
+  local calls="${BATS_TEST_TMPDIR}/rotation-notice.log"
+  export ROTATION_CALLS="${calls}"
+  unset SLACK_WEBHOOK_URL
+  _kubectl() {
+    printf '%s\n' "$*" >> "${ROTATION_CALLS}"
+    printf '%s' 'aHR0cHM6Ly9ob29rcy5zbGFjay50ZXN0L1QwMDAvQjAwMC9zZWNyZXQtc2VudGluZWw='
+  }
+  curl() {
+    printf 'args:%s\n' "$*" >> "${ROTATION_CALLS}"
+    printf 'stdin:%s\n' "$(cat)" >> "${ROTATION_CALLS}"
+  }
+  run _observability_notify_rotation
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"${secret_url}"* ]]
+  run cat "${calls}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"get secret platform-ops-notifications -n platform-ops --context k3d-k3d-cluster"* ]]
+  [[ "$output" == *"stdin:url = \"${secret_url}\""* ]]
+  [[ "$output" != *"args:${secret_url}"* ]]
+}
+
+@test "Prometheus rotation notice prefers SLACK_WEBHOOK_URL without reading the Secret" {
+  local secret_url='https://hooks.slack.test/T000/B000/env-sentinel'
+  local calls="${BATS_TEST_TMPDIR}/rotation-notice-env.log"
+  export ROTATION_CALLS="${calls}" SLACK_WEBHOOK_URL="${secret_url}"
+  _kubectl() { printf 'kubectl:%s\n' "$*" >> "${ROTATION_CALLS}"; return 1; }
+  curl() {
+    printf 'args:%s\n' "$*" >> "${ROTATION_CALLS}"
+    printf 'stdin:%s\n' "$(cat)" >> "${ROTATION_CALLS}"
+  }
+  run _observability_notify_rotation
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"${secret_url}"* ]]
+  run cat "${calls}"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"platform-ops-notifications"* ]]
+  [[ "$output" == *"stdin:url = \"${secret_url}\""* ]]
+  [[ "$output" != *"args:${secret_url}"* ]]
+}
+
+@test "Prometheus rotation notice warns and succeeds when the hub Secret is unreadable" {
+  local secret_url='https://hooks.slack.test/T000/B000/failure-sentinel'
+  export SLACK_WEBHOOK_URL=
+  _kubectl() { return 1; }
+  curl() { fail "curl must not be called when the Secret read fails"; }
+  run _observability_notify_rotation
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no Slack incoming webhook — rotation notice not sent"* ]]
+  [[ "$output" != *"${secret_url}"* ]]
 }

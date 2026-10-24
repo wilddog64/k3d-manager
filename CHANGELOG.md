@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/plugins/observability.sh`: post Prometheus rotation notices using the hub's
+  `platform-ops-notifications` Secret when `SLACK_WEBHOOK_URL` is unset, without exposing the URL
+  in curl arguments.
+
 ### Added
 
 - API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
