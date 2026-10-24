@@ -120,6 +120,10 @@ interface:
 
 ## Live evidence E2 (2026-10-23, after the operator reran `tunnel_start`)
 
+> **Correction (2026-10-23 evening):** this E2 is invalid. The bare `tunnel_start` rewrote both
+> Hostinger agents to the `ubuntu` sandbox alias, and the `/readyz` check below reaches Hostinger
+> directly, not through the tunnel. See `docs/bugs/2026-10-23-bare-tunnel-start-repoints-hostinger-tunnel.md`.
+
 - `launchctl list`: both `com.k3d-manager.ssh-tunnel` (autossh pid 83296, child `ssh` 83298) and
   `com.k3d-manager.ssh-tunnel-vault` (pid 82712) are running.
 - `ps`: both invocations carry `-o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=3`
