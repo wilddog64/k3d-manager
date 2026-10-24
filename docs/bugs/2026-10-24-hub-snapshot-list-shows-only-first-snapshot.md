@@ -6,6 +6,7 @@
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Filed:** 2026-10-24, by Claude, after the operator's `make snapshot` finished
 **Approval:** filed under the operator's 2026-10-24 rule proposal "fix all P0 to P2 bugs before we cut a release"; dispatch needs a go (it touches hub backup retention).
+**Dispatch go:** operator, 2026-10-24: "can you dispatch those two items or they have dependencies that need to be waited?"
 **Component:** `scripts/plugins/hub_snapshot.sh` (`_hub_snapshot_ssh`, `hub_snapshot_list`, `_hub_snapshot_prune_verified`), `scripts/tests/plugins/hub_snapshot.bats`
 **Related:** `docs/plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md` (changes the same retention code; land this first), `docs/bugs/2026-10-08-hub-snapshot-prune-deletes-newest-no-auto-retention.md`
 
