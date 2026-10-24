@@ -1,8 +1,9 @@
 # Bug: `~/.ssh/config` lost its operator host aliases; hub data export and M2 disk probe fail
 
 **Filed:** 2026-10-22 (Claude, from firing HubDataExportFailed/Stale and HostDiskMetricsStale)
-**Status:** FIXED (offline) — `f3002d12` (2026-10-23): `_ssh_config_guard` restores the aliases from `~/.ssh/config.d/operator` before the nightly export and at cluster-up Step 0. Live E2 pending: the operator moves the aliases into the fragment; what emptied the file is still unidentified
+**Status:** VERIFIED 2026-10-24 (E2, guard half) — operator moved both aliases into `~/.ssh/config.d/operator` (08:10 PDT) with `Include` as line 1; both resolve (`github.com`, `m2-air.local`). Claude ran `_ssh_config_guard --repair` with `K3DM_SSH_CONFIG` on a copy without the `Include`: WARN for both aliases, `restored Include`, rc 0, both resolve from the copy; real config untouched. Pending: the 2026-10-25 03:30 export logs no guard WARN and HubDataExportStale stays clear. Was FIXED (offline) — `f3002d12` (2026-10-23): `_ssh_config_guard` restores the aliases from `~/.ssh/config.d/operator` before the nightly export and at cluster-up Step 0. Live E2 pending: the operator moves the aliases into the fragment; what emptied the file is still unidentified
 **Priority:** P2 — nightly DR export stopped (last success 2026-10-21 03:32 PDT); workaround: restore the aliases by hand
+**Fix commit:** `f3002d12`
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-22: "go ahead for that ssh-config spec" (fix spec F1–F6)
 **Release:** v1.43.5 (bug; exempt from the plan cap)
