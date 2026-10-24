@@ -4,6 +4,7 @@
 set -euo pipefail
 
 _TUNNEL_VARS="${SCRIPT_DIR}/etc/tunnel/vars.sh"
+_TUNNEL_SSH_HOST_EXPLICIT="${TUNNEL_SSH_HOST+x}"
 if [[ -r "$_TUNNEL_VARS" ]]; then
   # shellcheck disable=SC1090
   source "$_TUNNEL_VARS"
@@ -196,6 +197,23 @@ Config (override via env or scripts/etc/tunnel/vars.sh):
   TUNNEL_VAULT_LOCAL_PORT   Local Vault port-forward port (default: 18200)
 EOF
     return 0
+  fi
+
+  if [[ "${TUNNEL_SCOPE:-}" != "sandbox" ]]; then
+    if [[ -z "${_TUNNEL_SSH_HOST_EXPLICIT}" && "${TUNNEL_SSH_HOST}" == "ubuntu" ]]; then
+      echo "[tunnel] TUNNEL_SSH_HOST must be set explicitly for unscoped agents; use make refresh CLUSTER_PROVIDER=k3s-hostinger to restart the Hostinger tunnels" >&2
+      return 1
+    fi
+    local existing_host
+    for existing_host in "${_TUNNEL_FORWARD_WRAPPER_PATH}" "${_TUNNEL_VAULT_WRAPPER_PATH}"; do
+      if [[ -f "${existing_host}" ]]; then
+        existing_host="$(sed -nE 's/.* -N "([^"]+)".*/\1/p' "${existing_host}" | tail -n 1)"
+        if [[ -n "${existing_host}" && "${existing_host}" != "${TUNNEL_SSH_HOST}" && "${TUNNEL_FORCE_HOST:-}" != "1" ]]; then
+          echo "[tunnel] refusing to repoint unscoped agents from ${existing_host} to ${TUNNEL_SSH_HOST}; set TUNNEL_FORCE_HOST=1 to override" >&2
+          return 1
+        fi
+      fi
+    done
   fi
 
   if [[ -z "$(_tunnel_autossh_path)" ]]; then

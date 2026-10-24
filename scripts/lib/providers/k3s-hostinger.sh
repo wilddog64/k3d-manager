@@ -939,6 +939,8 @@ function _hostinger_reconcile_vault_cluster_store() {
       local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
       # shellcheck disable=SC2034
       local TUNNEL_SCOPE=""
+      # shellcheck disable=SC2034
+      local TUNNEL_FORCE_HOST=1
       TUNNEL_SSH_HOST="${ssh_target}"
       _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
       if declare -f tunnel_stop >/dev/null 2>&1; then

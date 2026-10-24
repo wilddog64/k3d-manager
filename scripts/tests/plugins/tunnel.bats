@@ -44,6 +44,100 @@ setup() {
   [[ "$output" == *"autossh not found"* ]]
 }
 
+@test "bare tunnel_start refuses unscoped default host without writing agents" {
+  unset TUNNEL_SSH_HOST
+  TUNNEL_SSH_HOST=ubuntu
+  _TUNNEL_SSH_HOST_EXPLICIT=""
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  export -f _tunnel_autossh_path
+  run tunnel_start
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"make refresh CLUSTER_PROVIDER=k3s-hostinger"* ]]
+  [ ! -e "${TUNNEL_PLIST_PATH}" ]
+  [ ! -e "${TUNNEL_VAULT_PLIST_PATH}" ]
+}
+
+@test "unscoped tunnel_start refuses changing existing host unless forced" {
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  _tunnel_is_running() { return 1; }
+  printf '#!/bin/bash\nexec /usr/bin/autossh -N "ubuntu@hostinger.example"\n' > "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  export -f _tunnel_autossh_path _tunnel_is_running
+  run tunnel_start
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"ubuntu@hostinger.example"* && "$output" == *"ubuntu"* ]]
+  export TUNNEL_FORCE_HOST=1
+  run tunnel_start
+  [ "$status" -eq 0 ]
+  grep -q -- '-N "ubuntu"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+}
+
+@test "sandbox tunnel_start keeps ubuntu as its default host" {
+  unset TUNNEL_SSH_HOST
+  TUNNEL_SSH_HOST=ubuntu
+  _TUNNEL_SSH_HOST_EXPLICIT=""
+  export TUNNEL_SCOPE=sandbox
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  _tunnel_is_running() { return 1; }
+  export -f _tunnel_autossh_path _tunnel_is_running
+  run tunnel_start
+  [ "$status" -eq 0 ]
+  grep -q -- '-N "ubuntu"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+}
+
+@test "unscoped tunnel_start with an explicit matching host succeeds" {
+  export TUNNEL_SSH_HOST="ubuntu@hostinger.example"
+  printf '#!/bin/bash\nexec /usr/bin/autossh -N "ubuntu@hostinger.example"\n' > "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  printf '#!/bin/bash\nexec /usr/bin/ssh -N -R 8200:127.0.0.1:18200 "ubuntu@hostinger.example"\n' > "${TUNNEL_VAULT_WRAPPER_PATH}"
+  _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
+  _tunnel_is_running() { return 1; }
+  _tunnel_vault_launchd_loaded() { return 1; }
+  export -f _tunnel_autossh_path _tunnel_is_running _tunnel_vault_launchd_loaded
+  run tunnel_start
+  [ "$status" -eq 0 ]
+  grep -q -- '-N "ubuntu@hostinger.example"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+}
+
+@test "Hostinger reconcile forces existing unscoped ubuntu wrappers to Hostinger" {
+  export HOME="${BATS_TEST_TMPDIR}/hostinger-home"
+  export TUNNEL_PLIST_PATH="${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel.plist"
+  export TUNNEL_VAULT_PLIST_PATH="${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel-vault.plist"
+  export TUNNEL_FORWARD_WRAPPER_PATH="${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel.sh"
+  export TUNNEL_VAULT_WRAPPER_PATH="${HOME}/Library/LaunchAgents/com.k3d-manager.ssh-tunnel-vault.sh"
+  mkdir -p "${HOME}/Library/LaunchAgents"
+  printf '#!/bin/bash\nexec /usr/bin/autossh -N "ubuntu"\n' > "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  printf '#!/bin/bash\nexec /usr/bin/ssh -N -R 8200:127.0.0.1:18200 "ubuntu"\n' > "${TUNNEL_VAULT_WRAPPER_PATH}"
+  export REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/provider.sh"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  export HOSTINGER_HOST="hostinger.example"
+  export HUB_VAULT_USE_BRIDGE=1
+  TUNNEL_SSH_HOST=""
+  _hostinger_require_host() { printf '%s\n' "${HOSTINGER_HOST}"; }
+  kubectl() { return 0; }
+  launchctl() { printf 'launchctl %s\n' "$*" >> "${BATS_TEST_TMPDIR}/launchctl.log"; }
+  ssh() { printf 'ssh %s\n' "$*" >> "${BATS_TEST_TMPDIR}/ssh.log"; }
+  uname() { printf 'Darwin\n'; }
+  _tunnel_autossh_path() { printf '%s\n' "/usr/bin/autossh"; }
+  _tunnel_is_running() { return 1; }
+  _tunnel_launchd_loaded() { return 0; }
+  _tunnel_vault_launchd_loaded() { return 0; }
+  _tunnel_vault_is_running() { return 1; }
+  _dry_guard() { shift; "$@"; }
+  _info() { :; }
+  _setup_vault_bridge() { :; }
+  shopping_cart_create_vault_bridge() { :; }
+  shopping_cart_apply_vault_token_and_cluster_secret_store() { :; }
+  vault_seed_hub_into_context() { :; }
+  shopping_cart_force_vault_secret_reconcile() { :; }
+  shopping_cart_provision_ghcr_pull_secret() { :; }
+  export -f _hostinger_require_host kubectl launchctl ssh uname _tunnel_autossh_path _tunnel_is_running
+  run _hostinger_reconcile_vault_cluster_store
+  [ "$status" -eq 0 ]
+  grep -q -- '-N "ubuntu@hostinger.example"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
+  grep -q -- '"ubuntu@hostinger.example"' "${TUNNEL_VAULT_WRAPPER_PATH}"
+  [ ! -s "${BATS_TEST_TMPDIR}/ssh.log" ]
+}
+
 @test "tunnel_start is idempotent when already running" {
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   _tunnel_is_running() { return 0; }

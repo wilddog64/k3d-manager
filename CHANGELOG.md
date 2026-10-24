@@ -39,6 +39,8 @@
 
 ### Fixed
 
+- Unscoped `tunnel_start` now requires an explicit SSH host and refuses to repoint existing tunnel agents without `TUNNEL_FORCE_HOST=1`; Hostinger reconcile sets that override for its recovery path.
+
 - `make status` now shows stale hub snapshot age in hours, explains the seven-day threshold and
   snapshot command, and labels an unparseable timestamp as `age unknown`.
 
