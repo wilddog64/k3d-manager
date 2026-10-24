@@ -224,6 +224,7 @@ def test_cluster_up_progress_and_terminal_payloads_keep_parent_thread(
     monkeypatch.setitem(lifecycle_globals, "_posix_spawn_job", lambda *args, **kwargs: 12345)
     monkeypatch.setattr(wh.os, "waitpid", lambda pid, options: (pid, exit_status))
     monkeypatch.setitem(lifecycle_globals, "_run_cleanup", lambda *args: None)
+    monkeypatch.setitem(lifecycle_globals, "_analyze_failure", lambda lines: "")
 
     class OneProgressTimer:
         count = 0

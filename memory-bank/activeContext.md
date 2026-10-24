@@ -231,3 +231,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: PR #148 rerun: BATS green (visudo fix works); 2 pytest fails = tripwire blocks docker-run promtool. Filed P1 docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md; lint installs pinned promtool 3.1.0 (sha256).
 - 2026-10-24: PR #148 Copilot review: "No open issues", 0 threads. CI run 40121661676 on 927af296 in progress.
 - 2026-10-24: CI 40121661676 red: promtool exposed latent BATS defect (raw $__rate_interval to promtool check rules). Fixed in grafana_dashboard_appsets.bats; local promtool 3.1.0: 77 BATS + 64 pytest green, [5x] mutant red.
+- 2026-10-24: CI 40122239392: pytest 1202 passed but tripwire FAIL (agy/gemini from test_webhook_thread_dispatch cluster-up [256] via real _analyze_failure). Stubbed; local full pytest under tripwire rc 0.

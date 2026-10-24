@@ -37,6 +37,13 @@ never parse ("bad number or duration syntax"). The test now expands `$__rate_int
 other template variables to `.*` before the check. Verified with promtool 3.1.0: it passes on the
 real dashboards and still fails on a `[5x]` duration mutant.
 
+Run 40122239392 then passed all 1202 pytest tests but failed the tripwire: 70 non-read blocked
+"calls". The log is line-based, so those were a handful of `agy` and `gemini` calls with multi-line
+triage prompts. Their source was `test_webhook_thread_dispatch.py::test_cluster_up_progress_and_terminal_payloads_keep_parent_thread[256]`,
+whose failing-exit case reached the real `_analyze_failure`. The test now stubs it in the lifecycle
+module. The same tripwire FAIL (72 calls) was already in run 40120581806, hidden behind the two
+docker failures. Local full suite under `tripwire.sh`: 1203 passed, rc 0, only read calls blocked.
+
 ## Acceptance
 
 ```yaml
