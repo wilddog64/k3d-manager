@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- Slack bot post failures now log the rejected channel and Slack error code, or the transport exception class.
+
 - The status smoke check now reports ArgoCD's HTTP rejection code instead of calling a rejected
   password "HTTP unavailable"; `make argocd-admin-resync` revalidates the Vault copy and repairs
   it only when ArgoCD rejects it.
