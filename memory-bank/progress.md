@@ -438,4 +438,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Roadmap candidate theme added 2026-10-23: v2.x feature flags, progressive rollout and feedback (operator "yes"); no spec until a release is picked.
 - [ ] v1.44.3 plan 2 `feature-flags-first-slice` PROPOSED 2026-10-23 ("go for it"); review pending before dispatch; needs v1.44.2 ledger + v1.43.7 cross-repo dispatch.
 - [ ] P3 Slack bot-post error logging: dispatched 2026-10-23.
-- [ ] P3 status ArgoCD login misreport + `make argocd-admin-resync`: LANDED `9f48d5f0` 2026-10-23; E2 (live resync) pending.
+- [x] P3 status ArgoCD login misreport + `make argocd-admin-resync`: LANDED `9f48d5f0`, E2 VERIFIED 2026-10-23.
