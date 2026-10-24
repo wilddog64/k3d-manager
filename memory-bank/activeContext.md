@@ -195,6 +195,6 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - Plan 4 dispatch-api-cost VERIFIED 2026-10-24 (E3 7d + v1.43.4 screenshots match exporter).
 - Plan 5 dispatch-claude-cost DISPATCHED 2026-10-24 (operator go); slug dispatch-claude-cost.
   - Review 2026-10-24: REWORK sent (release scope counts all records; Per spec Claude ≈ column missing; 10 of 12 spec tests + mutations missing; perf). 
-- restart-webhook P2 review 2026-10-24: tests green, test 1 red pre-fix; REWORK sent for bootstrap retry (5x, sleep 1) — spec's "09-16 retry" was a Claude spec error.
+- restart-webhook P2 review 2026-10-24: tests green, test 1 red pre-fix; REWORK sent for bootstrap retry (5x, sleep 1) — spec's "09-16 retry" was a Claude spec error. LANDED `0f2f1f54` + `f916f44f` 2026-10-24 (rework 3 anchored call-log greps; land gate's slug-bearing tmpdir had matched `kickstart` in a path). E2 pending: operator `make restart-webhook`, Claude checks launchctl print key list.
 - Slack bot-post error logging P3 LANDED `978b2414` 2026-10-23 (filed+dispatched same day ("go for your suggestion"); slug 2026-10-23-slack-bot-post-discards-slack-error. E2 after land: restart-webhook, rerun cluster-status, read the Slack error from the webhook log.
 - ArgoCD login misreport P3 LANDED `9f48d5f0` 2026-10-23 (E1 green, 401 test red pre-fix). E2 PASSED ~20:17 PDT (resync replaced stale Vault copy; job 9d61dfe4 ArgoCD login HTTP 200, 21/0/0). DONE.
