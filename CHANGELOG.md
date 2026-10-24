@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Bug Tracking dashboard: the "Release (filed in)" dropdown took its options only from bug docs, so a new release with no bugs filed yet (v1.43.6 on the day it was cut) could not be selected. It now also reads the release labels of `k3dm_plan_release_docs`, so every release with plans or bugs is listed. The saved default moves to `v1.43.6`.
+
 ## [1.43.5] - 2026-10-24
 
 ### Fixed

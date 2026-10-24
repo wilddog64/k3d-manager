@@ -123,7 +123,8 @@ PY
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
-assert variable["query"]["query"] == 'label_values(k3dm_bug_info{repo="$repo"}, release_order)'
+assert variable["query"]["query"] == 'label_values({__name__=~"k3dm_bug_info|k3dm_plan_release_docs",repo="$repo"}, release_order)'
+assert variable["definition"] == variable["query"]["query"]
 table = next(panel for panel in data["panels"] if panel["id"] == 23)
 organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["release_order"] == 0

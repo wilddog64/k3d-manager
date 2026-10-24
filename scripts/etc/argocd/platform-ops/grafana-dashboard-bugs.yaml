@@ -50,15 +50,15 @@ data:
             "label": "Release (filed in)",
             "type": "query",
             "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "query": {"query": "label_values(k3dm_bug_info{repo=\"$repo\"}, release_order)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
-            "definition": "label_values(k3dm_bug_info{repo=\"$repo\"}, release_order)",
+            "query": {"query": "label_values({__name__=~\"k3dm_bug_info|k3dm_plan_release_docs\",repo=\"$repo\"}, release_order)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+            "definition": "label_values({__name__=~\"k3dm_bug_info|k3dm_plan_release_docs\",repo=\"$repo\"}, release_order)",
             "regex": "/^\\S+ (?<value>\\S+)$/",
             "refresh": 2,
             "sort": 0,
             "multi": true,
             "includeAll": true,
             "allValue": ".*",
-            "current": {"selected": true, "text": ["v1.43.5"], "value": ["v1.43.5"]},
+            "current": {"selected": true, "text": ["v1.43.6"], "value": ["v1.43.6"]},
             "hide": 0
           },
           {
