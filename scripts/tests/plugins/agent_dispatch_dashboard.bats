@@ -27,8 +27,39 @@ body = text.split("agent-dispatch.json: |\n", 1)[1]
 dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
 exporter = open(sys.argv[2], encoding="utf-8").read()
 queries = "\n".join(target.get("expr", "") for panel in dashboard["panels"] for target in panel.get("targets", []))
-for metric in set(re.findall(r"\bk3dm_dispatch_[a-z0-9_]+", queries)):
+for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude)_[a-z0-9_]+", queries)):
     assert metric in exporter, metric
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch dashboard: Claude context and compaction row panels exist below existing rows" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+by_title = {p["title"]: p for p in panels}
+row = by_title["Claude context and compaction"]
+assert row["type"] == "row"
+other_bottom = max(p["gridPos"]["y"] + p["gridPos"]["h"] for p in panels if p["id"] < 33)
+assert row["gridPos"]["y"] >= other_bottom
+expected = {
+    "Claude cost per verified spec": ("stat", "currencyUSD"),
+    "Compactions per verified spec": ("stat", "short"),
+    "Compactions by trigger": ("bargauge", "none"),
+    "Re-read share after compaction": ("stat", "percentunit"),
+    "Context incidents": ("bargauge", "none"),
+    "Auto-compact threshold": ("stat", "short"),
+}
+for title, (ptype, unit) in expected.items():
+    panel = by_title[title]
+    assert panel["type"] == ptype, (title, panel["type"])
+    assert panel["fieldConfig"]["defaults"]["unit"] == unit, (title, panel["fieldConfig"]["defaults"]["unit"])
+    assert panel["gridPos"]["y"] > row["gridPos"]["y"]
+assert by_title["Compactions per verified spec"]["targets"][0]["expr"] == 'sum(k3dm_claude_compactions{window="$window"}) / k3dm_claude_verified_specs{window="$window"}'
 print("ok")
 PY
   [ "$status" -eq 0 ]

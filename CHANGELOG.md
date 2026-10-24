@@ -4,6 +4,7 @@
 
 ### Added
 
+- Export Claude context compaction, post-compaction re-read, verified-spec, context-incident, and auto-compact threshold metrics from `bin/k3dm-dispatch-metrics`, and add the **Claude context and compaction** row to the Agent Dispatch dashboard (`docs/metrics/context-window-experiment.md`).
 - Run dispatch specs on agy (Gemini 4 Argon) through the task dispatcher and record agent identity and usage in the dispatch ledger and metrics.
 
 ### Fixed

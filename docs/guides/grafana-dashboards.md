@@ -87,6 +87,8 @@ output rates there when pricing changes. Models without an explicit entry remain
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
 tuples and reports missing session files.
 
+The **Claude context and compaction** row (time windows `1d`, `7d`, `30d` only) measures what context compaction costs Claude per verified spec. **Claude cost per verified spec** divides the time window's Claude cost at API list prices (not subscription usage) by `k3dm_claude_verified_specs`, where a "verified spec" is a `docs/bugs` or `docs/plans` document whose `**Status:**` line moved to a closed state in a commit within the window (shows "No data" when the count is 0). **Compactions per verified spec** divides total `compact_boundary` events in the window by verified specs, **Compactions by trigger** splits those compactions by `auto` or `manual` trigger, and **Re-read share after compaction** shows the fraction of `Read` tool calls in the window that re-read a file already read before the latest compaction boundary in the same session. **Context incidents** splits `resumption-failure` and `missing-context-correction` counts by kind, and **Auto-compact threshold** shows the latest non-future `auto_compact_tokens` setting; the incident panels are only as complete as the hand tally in [context-window-experiment.md](../metrics/context-window-experiment.md).
+
 ## CVE Auto-Patch triage
 
 ### Release forecast

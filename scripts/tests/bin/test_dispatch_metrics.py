@@ -20,6 +20,11 @@ SPEC.loader.exec_module(dispatch_metrics)
 DASHBOARD_PATH = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
 
 
+@pytest.fixture(autouse=True)
+def _pin_pushgateway_target(monkeypatch):
+    monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+
+
 def load_dispatch_dashboard():
     dashboard_path = Path(os.environ.get("DISPATCH_DASHBOARD_PATH", DASHBOARD_PATH))
     raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
@@ -495,7 +500,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 25  # agent-audit: allow assert-removed Claude cost and token panels add four $window selectors
+    assert sum("$window" in expr for expr in expressions) == 30  # agent-audit: allow assert-removed Claude context and compaction row adds five $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1043,3 +1048,126 @@ def test_claude_daily_chart_groups_by_date_and_model():
     assert [t["id"] for t in panel["transformations"]][:2] == ["merge", "groupingToMatrix"]
     assert steps["groupingToMatrix"] == {"rowField": "date", "columnField": "model", "valueField": "Value"}
     assert panel["options"]["xField"] == "date"
+
+
+def test_claude_compactions_reads_and_tally_privacy(tmp_path):
+    assert os.environ.get("K3DM_DISPATCH_PUSHGATEWAY_URL") == "http://127.0.0.1:9"
+    now = calendar.timegm(time.strptime("2026-10-24T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    t_recent = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 3600))
+    t_week = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 3 * 86400))
+    t_old = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 40 * 86400))
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    session_lines = [
+        json.dumps({"type": "user", "message": {"content": "SECRET-PROMPT-TOKEN-123"}}),
+        json.dumps({"type": "assistant", "timestamp": t_recent, "message": {
+            "id": "m1", "model": "m", "usage": {"input_tokens": 10},
+            "content": [{"type": "tool_use", "id": "tu1", "name": "Read",
+                         "input": {"file_path": "/secret/path/alpha.py"}}]}}),
+        "not valid json {{{",
+        json.dumps({"type": "system", "subtype": "compact_boundary", "timestamp": t_recent,
+                    "sessionId": "s1", "compactMetadata": {"trigger": "manual", "preTokens": 113270,
+                                                           "postTokens": 18037, "durationMs": 45152}}),
+        json.dumps({"type": "user", "isCompactSummary": True, "message": {"content": "SECRET-SUMMARY"}}),
+        json.dumps({"type": "assistant", "timestamp": t_recent, "message": {
+            "id": "m2", "model": "m", "usage": {"input_tokens": 20},
+            "content": [
+                {"type": "tool_use", "id": "tu2", "name": "Read", "input": {"file_path": "/secret/path/alpha.py"}},
+                {"type": "tool_use", "id": "tu3", "name": "Read", "input": {"file_path": "/secret/path/beta.py"}},
+            ]}}),
+        json.dumps({"type": "system", "subtype": "compact_boundary", "timestamp": t_week,
+                    "sessionId": "s1", "compactMetadata": {"trigger": "auto", "preTokens": 195000}}),
+        json.dumps({"type": "system", "subtype": "compact_boundary", "timestamp": t_week,
+                    "sessionId": "s1", "compactMetadata": {"trigger": "auto", "preTokens": "not-an-int"}}),
+        json.dumps({"type": "system", "subtype": "compact_boundary", "timestamp": t_old,
+                    "sessionId": "s1"}),
+        json.dumps({"type": "assistant", "timestamp": t_recent, "message": {
+            "id": "m3", "model": "m", "usage": {"input_tokens": 5},
+            "content": [{"type": "tool_use", "id": "tu4", "name": "Read",
+                         "input": {"file_path": "/secret/path/beta.py"}}]}}),
+    ]
+    (projects / "session.jsonl").write_text("\n".join(session_lines) + "\n")
+    repo = tmp_path / "repo"
+    (repo / "docs/metrics").mkdir(parents=True)
+    tally_md = """# Experiment
+## Settings
+| date | auto_compact_tokens | note |
+|---|---|---|
+| 2026-10-01 | 200000 | SECRET-NOTE-INITIAL |
+| 2026-10-20 | 250000 | SECRET-NOTE-RAISED |
+| 2099-01-01 | 999999 | SECRET-FUTURE-SETTING |
+| bad-date | not-int | unparseable |
+
+## Incidents
+| date | kind | spec | note |
+|---|---|---|---|
+| 2026-10-24 | resumption-failure | v1.43.6-secret-spec | SECRET-INCIDENT-NOTE |
+| 2026-10-20 | missing-context-correction | v1.43.5-secret-spec | SECRET-CORRECTION-NOTE |
+| bad-row | unknown-kind | v1.0.0-bad | broken |
+"""
+    (repo / "docs/metrics/context-window-experiment.md").write_text(tally_md)
+    ctx = {}
+    cache = tmp_path / "cache.json"
+    records = dispatch_metrics._claude_rollup(projects, cache, ctx)
+    output = dispatch_metrics.render([event(now - 10, "start", "s1", version="v1.43.6")], 0, now,
+                                     claude_records=records, claude_prices=_claude_rates(),
+                                     claude_context=ctx, repo_root=repo)
+    assert 'k3dm_claude_compactions{window="1d",trigger="manual"} 1' in output
+    assert 'k3dm_claude_compactions{window="1d",trigger="auto"} 0' in output
+    assert 'k3dm_claude_compactions{window="7d",trigger="auto"} 2' in output
+    assert 'k3dm_claude_compactions{window="7d",trigger="manual"} 1' in output
+    assert 'k3dm_claude_compaction_pre_tokens_sum{window="7d",trigger="manual"} 113270' in output
+    assert 'k3dm_claude_compaction_pre_tokens_sum{window="7d",trigger="auto"} 195000' in output
+    assert 'k3dm_claude_reads{window="1d",kind="all"} 4' in output
+    assert 'k3dm_claude_reads{window="1d",kind="reread_after_compaction"} 2' in output
+    assert 'k3dm_claude_context_incidents{window="1d",kind="resumption-failure"} 1' in output
+    assert 'k3dm_claude_context_incidents{window="1d",kind="missing-context-correction"} 0' in output
+    assert 'k3dm_claude_context_incidents{window="7d",kind="missing-context-correction"} 1' in output
+    assert "k3dm_claude_auto_compact_tokens 250000\n" in output
+    assert 'window="v1.43.6"' not in "\n".join(
+        line for line in output.splitlines() if line.startswith("k3dm_claude_"))
+    for forbidden in ("SECRET-PROMPT", "SECRET-SUMMARY", "/secret/path", "alpha.py", "beta.py",
+                      "SECRET-NOTE", "SECRET-FUTURE", "v1.43.6-secret-spec", "v1.43.5-secret-spec",
+                      "SECRET-INCIDENT", "SECRET-CORRECTION"):
+        assert forbidden not in output
+        assert forbidden not in cache.read_text()
+
+
+def test_claude_auto_compact_tokens_omitted_when_settings_table_empty(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "docs/metrics").mkdir(parents=True)
+    (repo / "docs/metrics/context-window-experiment.md").write_text(
+        "| date | auto_compact_tokens | note |\n|---|---|---|\n"
+        "| 2099-01-01 | 300000 | future only |\n")
+    output = dispatch_metrics.render([], 0, 1_800_000_000, repo_root=repo)
+    assert "k3dm_claude_auto_compact_tokens" not in output
+
+
+def test_claude_verified_specs_counts_closed_status_transitions_in_window(tmp_path):
+    now = 1_800_000_000
+    repo = tmp_path / "repo"
+    (repo / "docs/bugs").mkdir(parents=True)
+    (repo / "docs/plans").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "T"], check=True)
+
+    def commit_doc(rel, status, ts):
+        p = repo / rel
+        p.write_text(f"# Doc\n\n**Status:** {status}\n")
+        subprocess.run(["git", "-C", str(repo), "add", rel], check=True)
+        env = os.environ.copy()
+        env["GIT_AUTHOR_DATE"] = f"{ts} +0000"
+        env["GIT_COMMITTER_DATE"] = f"{ts} +0000"
+        subprocess.run(["git", "-C", str(repo), "commit", "-qm", f"{rel} {status}"], check=True, env=env)
+
+    commit_doc("docs/bugs/outside.md", "LIVE-VERIFIED", now - 40 * 86400)
+    commit_doc("docs/bugs/in-window.md", "OPEN", now - 5 * 86400)
+    commit_doc("docs/bugs/in-window.md", "LIVE-VERIFIED — proven", now - 2 * 86400)
+    commit_doc("docs/bugs/in-window.md", "VERIFIED — updated note", now - 3600)
+    commit_doc("docs/plans/v1.43.6-open.md", "IN PROGRESS", now - 3600)
+
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_claude_verified_specs{window="1d"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="7d"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="30d"} 1' in output

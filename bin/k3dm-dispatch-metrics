@@ -10,8 +10,16 @@ import time
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
+import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from hermes.prior_art import _CLOSED_RE  # noqa: E402
 
 WINDOWS = {"1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
+COMPACT_TRIGGERS = ("auto", "manual")
+READ_KINDS = ("all", "reread_after_compaction")
+INCIDENT_KINDS = ("resumption-failure", "missing-context-correction")
 RESULTS = ("landed", "tests", "scope", "rebase")
 REWORK_CAUSES = ("rerun", "tests", "claude_edit", "any")
 TASK_CAP = 50
@@ -33,7 +41,7 @@ def _prices(path):
         return {}, {}, None, {}
 
 
-def _claude_rollup(projects_dir, cache_path):
+def _claude_rollup(projects_dir, cache_path, context_out=None):
     cache = {"offsets": {}, "records": {}}
     try:
         cache = json.loads(Path(cache_path).read_text(encoding="utf-8"))
@@ -41,6 +49,8 @@ def _claude_rollup(projects_dir, cache_path):
             raise ValueError("invalid cache")
     except (OSError, ValueError, TypeError):
         pass
+    compactions = []
+    reads = []
     root = Path(projects_dir)
     if root.is_dir():
         for path in sorted(root.rglob("*.jsonl")):
@@ -50,14 +60,62 @@ def _claude_rollup(projects_dir, cache_path):
                 offset = int(cache["offsets"].get(key, 0))
                 if size < offset:
                     offset = 0
+                start_offset = 0 if context_out is not None else offset
+                seen_paths = set()
+                pre_boundary_paths = set()
+                has_compacted = False
+                seen_read_calls = set()
+                pos = start_offset
                 with path.open("rb") as stream:
-                    stream.seek(offset)
+                    stream.seek(start_offset)
                     for raw in stream:
-                        if b'"type":"assistant"' not in raw.replace(b" ", b""):
+                        line_pos = pos
+                        pos += len(raw)
+                        stripped = raw.replace(b" ", b"")
+                        is_assistant = b'"type":"assistant"' in stripped
+                        is_boundary = context_out is not None and b'"subtype":"compact_boundary"' in stripped
+                        if not is_assistant and not is_boundary:
                             continue
                         try:
                             item = json.loads(raw)
+                        except (ValueError, TypeError):
+                            continue
+                        if not isinstance(item, dict):
+                            continue
+                        if context_out is not None and item.get("type") == "system" and item.get("subtype") == "compact_boundary":
+                            meta = item.get("compactMetadata")
+                            meta = meta if isinstance(meta, dict) else {}
+                            trigger = meta.get("trigger")
+                            trigger = trigger if trigger in COMPACT_TRIGGERS else "unknown"
+                            pre_tokens = meta.get("preTokens")
+                            pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
+                            compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
+                            has_compacted = True
+                            pre_boundary_paths = set(seen_paths)
+                            continue
+                        if item.get("type") != "assistant":
+                            continue
+                        try:
                             message = item.get("message") or {}
+                            if context_out is not None:
+                                content = message.get("content")
+                                if isinstance(content, list):
+                                    for idx, block in enumerate(content):
+                                        if not isinstance(block, dict):
+                                            continue
+                                        if block.get("type") == "tool_use" and block.get("name") == "Read":
+                                            call_id = block.get("id") or (message.get("id"), idx)
+                                            if call_id in seen_read_calls:
+                                                continue
+                                            seen_read_calls.add(call_id)
+                                            inp = block.get("input")
+                                            fpath = inp.get("file_path") if isinstance(inp, dict) else None
+                                            if isinstance(fpath, str) and fpath:
+                                                is_reread = has_compacted and fpath in pre_boundary_paths
+                                                reads.append({"ts": item.get("timestamp"), "reread": is_reread})
+                                                seen_paths.add(fpath)
+                            if line_pos < offset:
+                                continue
                             mid, model = message.get("id"), message.get("model")
                             usage = message.get("usage") or {}
                             if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
@@ -75,12 +133,108 @@ def _claude_rollup(projects_dir, cache_path):
                     cache["offsets"][key] = stream.tell()
             except (OSError, ValueError, TypeError):
                 continue
+    if context_out is not None:
+        context_out["compactions"] = compactions
+        context_out["reads"] = reads
     target = Path(cache_path)
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_name(target.name + ".tmp")
     temp.write_text(json.dumps(cache, separators=(",", ":")), encoding="utf-8")
     os.replace(temp, target)
     return list(cache["records"].values())
+
+
+def _verified_specs(repo_root, now):
+    counts = {w: 0 for w in WINDOWS}
+    root = Path(repo_root) if repo_root else _repo_root()
+    if not (root / ".git").exists():
+        return counts
+    since = int(now - max(WINDOWS.values()))
+    try:
+        proc = subprocess.run(
+            ["git", "log", f"--since=@{since}", "-p", "--format=commit %ct", "--", "docs/bugs", "docs/plans"],
+            cwd=str(root), capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return counts
+    if proc.returncode != 0:
+        return counts
+    seen = {w: set() for w in WINDOWS}
+    commit_ts = 0
+    current_file = None
+    for line in proc.stdout.splitlines():
+        if line.startswith("commit "):
+            parts = line.split()
+            try:
+                commit_ts = int(parts[1])
+            except (IndexError, ValueError):
+                commit_ts = 0
+            current_file = None
+        elif line.startswith("+++ "):
+            target = line[4:].strip()
+            current_file = None if target == "/dev/null" else (target[2:] if target.startswith("b/") else target)
+        elif current_file and line.startswith("+**Status:**"):
+            val = line[len("+**Status:**"):].strip()
+            if _CLOSED_RE.search(val):
+                for window, seconds in WINDOWS.items():
+                    if now - seconds <= commit_ts <= now:
+                        seen[window].add(current_file)
+    return {w: len(files) for w, files in seen.items()}
+
+
+def _read_context_tally(repo_root, now):
+    from datetime import date, datetime
+    root = Path(repo_root) if repo_root else _repo_root()
+    path = root / "docs/metrics/context-window-experiment.md"
+    incidents = {w: {k: 0 for k in INCIDENT_KINDS} for w in WINDOWS}
+    if not path.is_file():
+        return incidents, None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return incidents, None
+    today = datetime.fromtimestamp(now).astimezone().date()
+    mode = None
+    latest_setting = None
+    for idx, raw in enumerate(lines):
+        line = raw.strip()
+        if not line.startswith("|") or not line.endswith("|"):
+            mode = None
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        lower = [c.lower() for c in cells]
+        if lower == ["date", "auto_compact_tokens", "note"]:
+            mode = "settings"
+            continue
+        if lower == ["date", "kind", "spec", "note"]:
+            mode = "incidents"
+            continue
+        if all(c and set(c) <= {"-", ":"} for c in cells):
+            continue
+        if mode == "settings" and len(cells) >= 2:
+            try:
+                row_date = date.fromisoformat(cells[0])
+                tokens = int(cells[1])
+                if tokens <= 0 or row_date > today:
+                    continue
+                candidate = (row_date, idx, tokens)
+                if latest_setting is None or (candidate[0], candidate[1]) >= (latest_setting[0], latest_setting[1]):
+                    latest_setting = candidate
+            except ValueError:
+                continue
+        elif mode == "incidents" and len(cells) >= 2:
+            try:
+                row_date = date.fromisoformat(cells[0])
+            except ValueError:
+                continue
+            kind = cells[1]
+            if kind not in INCIDENT_KINDS or row_date > today:
+                continue
+            age_days = (today - row_date).days
+            for window, seconds in WINDOWS.items():
+                if age_days <= seconds // 86400:
+                    incidents[window][kind] += 1
+    return incidents, (latest_setting[2] if latest_setting is not None else None)
 
 
 def _claude_cost(record, prices):
@@ -553,8 +707,46 @@ def _render_cost(lines, window, usage, landed, prices):
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
     lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {unpriced}')
 
+def _render_claude_context(lines, now, claude_context, repo_root):
+    verified = _verified_specs(repo_root, now)
+    incidents, auto_tokens = _read_context_tally(repo_root, now)
+    compactions = (claude_context or {}).get("compactions") or []
+    reads = (claude_context or {}).get("reads") or []
+    for window, seconds in WINDOWS.items():
+        cutoff = now - seconds
+        if claude_context is not None:
+            comp_counts = {t: 0 for t in COMPACT_TRIGGERS}
+            comp_tokens = {t: 0 for t in COMPACT_TRIGGERS}
+            for item in compactions:
+                ts = _timestamp(item.get("ts"))
+                if ts >= cutoff:
+                    trig = item.get("trigger")
+                    if trig not in comp_counts:
+                        comp_counts[trig] = 0
+                        comp_tokens[trig] = 0
+                    comp_counts[trig] += 1
+                    comp_tokens[trig] += int(item.get("pre_tokens", 0) or 0)
+            for trig in comp_counts:
+                lines.append(f'k3dm_claude_compactions{{window="{window}",trigger="{trig}"}} {comp_counts[trig]}')
+                lines.append(f'k3dm_claude_compaction_pre_tokens_sum{{window="{window}",trigger="{trig}"}} {comp_tokens[trig]}')
+            all_reads = 0
+            rereads = 0
+            for item in reads:
+                if _timestamp(item.get("ts")) >= cutoff:
+                    all_reads += 1
+                    if item.get("reread"):
+                        rereads += 1
+            lines.append(f'k3dm_claude_reads{{window="{window}",kind="all"}} {all_reads}')
+            lines.append(f'k3dm_claude_reads{{window="{window}",kind="reread_after_compaction"}} {rereads}')
+        lines.append(f'k3dm_claude_verified_specs{{window="{window}"}} {verified[window]}')
+        for kind in INCIDENT_KINDS:
+            lines.append(f'k3dm_claude_context_incidents{{window="{window}",kind="{kind}"}} {incidents[window][kind]}')
+    if auto_tokens is not None:
+        lines.append(f"k3dm_claude_auto_compact_tokens {auto_tokens}")
+
+
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
-           codex_home=None, claude_records=None, claude_prices=None):
+           codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None):
     now = time.time() if now is None else now
     prices = prices or {}
     coverage = list(_session_files(codex_home, now)) if codex_home else None
@@ -603,6 +795,8 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         version, slug = key
         lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
+    if claude_context is not None or repo_root is not None:
+        _render_claude_context(lines, now, claude_context, repo_root)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
 
@@ -618,10 +812,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     events, bad_lines = read_ledger(_root() / "ledger.jsonl")
     model_prices, subscriptions, checked, claude_prices = _prices(args.prices)
-    claude_records = _claude_rollup(args.claude_projects, args.claude_cache) if Path(args.claude_projects).is_dir() else None
+    claude_context = {} if Path(args.claude_projects).is_dir() else None
+    claude_records = _claude_rollup(args.claude_projects, args.claude_cache, claude_context) if claude_context is not None else None
     payload = render(events, bad_lines, prices=model_prices, subscriptions=subscriptions,
                      checked=checked, codex_home=args.codex_home, claude_records=claude_records,
-                     claude_prices=claude_prices)
+                     claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root())
     if args.dry_run:
         print(payload, end="")
         return 0
