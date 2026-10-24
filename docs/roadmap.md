@@ -375,6 +375,10 @@ Plan 2 of 5 is [`slack-route-system-notices-to-status-channel`](plans/v1.43.8-sl
 channel (#grafana-notification), and operator- and agent-started posts stay in #acg-automation. The
 operator swaps the CronJob incoming webhook so ACG expiry and rotator notices follow.
 
+Plan 3 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.8-dispatch-claude-cost-by-reference.md)
+(operator, 2026-10-24): each spec is charged with the Claude turns whose tool calls name it (spec file,
+worktree, `SLUG=`), including spec writing, instead of all Claude usage while it was dispatched.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the

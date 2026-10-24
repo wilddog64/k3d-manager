@@ -450,3 +450,5 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] P3 Slack bot-post error logging: LANDED `978b2414` 2026-10-23; E2 (restart-webhook + read reason) pending. Channel ID C4CAEH8HX confirmed correct.
 - [x] P3 status ArgoCD login misreport + `make argocd-admin-resync`: LANDED `9f48d5f0`, E2 VERIFIED 2026-10-23.
 - [x] Agent Dispatch Claude panels moved up and three panel fixes `3e1df751` (2026-10-24); claude-cost E2 screenshot pending a fresh push (make dispatch-metrics).
+- [x] Claude per-landed figures release-only `559e9a07` (2026-10-24).
+- [ ] v1.43.8 plan 3 dispatch-claude-cost-by-reference: SPEC WRITTEN 2026-10-24; dispatch after the branch is cut.
