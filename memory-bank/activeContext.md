@@ -98,6 +98,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-10-23 PDT: P3 snapshot-age LANDED `ea043dfb`. P2 tunnel in rework (resume 2): F3 lets the reconcile path repoint; spec amended `37a2d879`.
 - 2026-10-23 PDT: P2 tunnel LANDED `8ca5668f`. Operator may now run `make refresh CLUSTER_PROVIDER=k3s-hostinger`; then Claude verifies agents/store/ExternalSecrets, then dispatches the status-channel P3.
 - 2026-10-23 19:05 PDT: Hostinger refresh done, P2 E2 PASSED. Found + filed P2 shared `observability-acg` set (approval pending). Status-channel P3 DISPATCHED.
+- 2026-10-23 PDT: observability-acg P2 spec written + approved; queued behind status-channel. Sandbox `make up` running in operator tmux.
 
 - 2026-10-23: Complexity plan filed `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5/5, full; approved "that's fine. we go as planned"); dispatch waits for the v1.43.7 branch. Still awaiting operator Argo hard refresh + screenshot for `f8dbf7b6` (Projected ≈ $14.9) and `74dbdcfb` (Per spec footer, By model min 0).
 
