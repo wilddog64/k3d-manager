@@ -1,0 +1,1 @@
+{"action": "job-status", "body": {"job_id": "abcd1234", "output": "2026-10-01 payment-0 Authorization: Bearer ***REDACTED***\n", "status": "running"}, "completed_at": "2026-10-24T15:53:36.871698Z", "http_status": 200, "id": "20261001T000030Z-job-status", "schema": 1, "status": "ok"}
