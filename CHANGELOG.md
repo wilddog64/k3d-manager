@@ -2495,3 +2495,5 @@
 ### Fixed
 - Restore operator SSH host aliases from a protected config fragment before hub data export and
   cluster bring-up, with timestamped config backups.
+
+- Dispatch metrics now roll up Claude Code transcript usage incrementally, report API-equivalent costs and token coverage, and show approximate per-spec Claude attribution plus daily tokens in Grafana. Shipped Claude rates are intentionally null pending confirmation.

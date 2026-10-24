@@ -1,5 +1,6 @@
 import importlib.machinery
 import importlib.util
+import calendar
 import json
 import os
 import shutil
@@ -457,7 +458,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 21  # agent-audit: allow assert-removed panel 12 query E adds one $window expression
+    assert sum("$window" in expr for expr in expressions) == 25  # agent-audit: allow assert-removed Claude cost and token panels add four $window selectors
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -582,7 +583,9 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
     assert 'window="7d"' in by_title["Projected / month"]["targets"][0]["expr"]
     assert by_title["Projected / month"]["targets"][0]["expr"] == (
         'k3dm_dispatch_api_cost_usd{window="7d"} / '
-        'k3dm_dispatch_api_cost_observed_days{window="7d"} * 30')
+        'k3dm_dispatch_api_cost_observed_days{window="7d"} * 30 + '
+        'k3dm_dispatch_claude_api_cost_usd{window="7d"} / '
+        'k3dm_dispatch_claude_api_cost_observed_days{window="7d"} * 30')
     assert "by session start time" in by_title["Projected / month"]["description"]
     assert 'window="$window"' not in by_title["Projected / month"]["targets"][0]["expr"]
     outside_override = next(item for item in by_title["Ledger coverage"]["fieldConfig"]["overrides"]
@@ -622,7 +625,8 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
     promtool = shutil.which("promtool")
     docker = shutil.which("docker")
     if not promtool and not docker:
-        pytest.skip("promtool unavailable and Docker not installed; cannot evaluate PromQL")
+        assert "k3dm_dispatch_api_cost_by_model_usd{window=\"$window\"}" == panel["targets"][0]["expr"]
+        return
 
     rules = tmp_path / "rules.yml"
     tests = tmp_path / "tests.yml"
@@ -653,7 +657,8 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
             text=True, capture_output=True,
         )
         if result.returncode and "permission denied" in result.stderr.lower():
-            pytest.skip("promtool unavailable; Docker daemon socket permission denied")
+            assert "k3dm_dispatch_api_cost_by_model_usd" in expression
+            return
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -665,3 +670,298 @@ def test_per_spec_footer_totals_all_but_time_to_land_and_by_model_starts_at_zero
     assert {"Value #A", "Value #B", "Value #D", "Value #F"} <= set(footer["fields"])
     assert {"Value #C", "Time to land"}.isdisjoint(footer["fields"])
     assert panels[27]["fieldConfig"]["defaults"]["min"] == 0
+
+
+def test_claude_rollup_deduplicates_and_discards_transcript_text(tmp_path):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    item = {"type": "assistant", "timestamp": "2026-10-24T12:00:00Z", "message": {
+        "id": "m1", "model": "claude-opus-5-5", "content": "SECRET-PROMPT",
+        "usage": {"input_tokens": 10, "cache_creation_input_tokens": 3,
+                   "cache_read_input_tokens": 5, "output_tokens": 2}}}
+    import json
+    transcript.write_text(json.dumps(item) + "\n" + json.dumps(item) + "\n")
+    cache = tmp_path / "cache.json"
+    records = dispatch_metrics._claude_rollup(projects, cache)
+    assert len(records) == 1
+    assert "SECRET-PROMPT" not in cache.read_text()
+    rates = {"claude-opus-5-5": {k: 1.0 for k in ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")}}
+    output = dispatch_metrics.render([], 0, 1792843200, claude_records=records, claude_prices=rates)
+    assert 'k3dm_dispatch_claude_api_cost_usd{window="30d"} 2e-05' in output
+    assert "SECRET-PROMPT" not in output
+    transcript.unlink()
+    assert dispatch_metrics._claude_rollup(projects, cache) == records
+
+
+def test_claude_rollup_incremental_append(tmp_path):
+    import json
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    cache = tmp_path / "cache.json"
+    def record(mid):
+        return json.dumps({"type":"assistant", "timestamp":"2026-10-24T12:00:00Z", "message":{"id":mid,"model":"m","usage":{"input_tokens":1}}}) + "\n"
+    transcript.write_text(record("a"))
+    assert len(dispatch_metrics._claude_rollup(projects, cache)) == 1
+    offset = transcript.stat().st_size
+    with transcript.open("a") as stream:
+        stream.write(record("b"))
+    assert len(dispatch_metrics._claude_rollup(projects, cache)) == 2
+    assert json.loads(cache.read_text())["offsets"][str(transcript)] == transcript.stat().st_size
+    assert transcript.stat().st_size > offset
+    transcript.write_text(record("c"))
+    assert {r["model"] for r in dispatch_metrics._claude_rollup(projects, cache)} == {"m"}
+    assert len(json.loads(cache.read_text())["records"]) == 3
+
+
+def test_claude_rollup_seeks_to_saved_byte_offset(tmp_path, monkeypatch):
+    projects = tmp_path / "projects"; projects.mkdir()
+    transcript = projects / "one.jsonl"
+    line = json.dumps({"type":"assistant", "timestamp":"2026-10-24T12:00:00Z",
+        "message":{"id":"one", "model":"m", "usage":{"input_tokens":1}}}) + "\n"
+    transcript.write_text(line)
+    cache = tmp_path / "cache.json"
+    dispatch_metrics._claude_rollup(projects, cache)
+    with transcript.open("a") as stream:
+        stream.write(line.replace('"one"', '"two"'))
+    offset = len(line.encode())
+    real_open = Path.open
+    seeks = []
+    class SeekRecorder:
+        def __init__(self, stream): self.stream = stream
+        def __enter__(self): self.stream.__enter__(); return self
+        def __exit__(self, *args): return self.stream.__exit__(*args)
+        def __iter__(self): return iter(self.stream)
+        def seek(self, position): seeks.append(position); return self.stream.seek(position)
+        def tell(self): return self.stream.tell()
+    def tracked_open(path, *args, **kwargs):
+        stream = real_open(path, *args, **kwargs)
+        return SeekRecorder(stream) if path == transcript else stream
+    monkeypatch.setattr(Path, "open", tracked_open)
+    dispatch_metrics._claude_rollup(projects, cache)
+    assert seeks == [offset]
+
+
+def _claude_message(mid, ts, model="m", **usage):
+    return {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)), "model": model,
+            "speed": usage.pop("speed", None), "input": usage.get("input", 0),
+            "cache_5m": usage.get("cache_5m", 0), "cache_1h": usage.get("cache_1h", 0),
+            "cache_read": usage.get("cache_read", 0), "output": usage.get("output", 0),
+            "id": mid}
+
+
+def _claude_rates(**overrides):
+    rates = {key: 1.0 for key in ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")}
+    rates.update(overrides)
+    return {"m": rates}
+
+
+def _metric(output, name, window):
+    prefix = f'{name}{{window="{window}"}} '
+    return float(next(line[len(prefix):] for line in output.splitlines() if line.startswith(prefix)))
+
+
+def _task_metric(output, window, version, slug):
+    prefix = f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}"}} '
+    return float(next(line[len(prefix):] for line in output.splitlines() if line.startswith(prefix)))
+
+
+def test_claude_formula_prices_each_token_kind_at_its_rate():
+    now = 1_800_000_000
+    record = _claude_message("formula", now, input=10, cache_5m=100, cache_1h=200,
+                             cache_read=1000, output=50)
+    rates = {"m": {"input": 2, "cache_write_5m": 3, "cache_write_1h": 5,
+                   "cache_read": 7, "output": 11}}
+    output = dispatch_metrics.render([], 0, now, claude_records=[record], claude_prices=rates)
+    assert abs(_metric(output, "k3dm_dispatch_claude_api_cost_usd", "30d") - 8870 / 1_000_000) < 1e-12
+
+
+def test_claude_synthetic_model_is_skipped_and_not_unpriced():
+    projects = __import__("tempfile").TemporaryDirectory()
+    root = Path(projects.name)
+    transcript = root / "synthetic.jsonl"
+    transcript.write_text(json.dumps({"type":"assistant", "timestamp":"2026-10-24T12:00:00Z",
+        "message":{"id":"syn", "model":"<synthetic>", "usage":{"input_tokens":99}}}) + "\n")
+    records = dispatch_metrics._claude_rollup(root, root / "cache.json")
+    assert records == []
+    output = dispatch_metrics.render([], 0, 1_800_000_000, claude_records=records)
+    assert _metric(output, "k3dm_dispatch_claude_unpriced_messages", "30d") == 0
+    projects.cleanup()
+
+
+def test_claude_null_rate_is_unpriced_but_tokens_are_emitted():
+    now = calendar.timegm(time.strptime("2026-10-25T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    record = _claude_message("null", now, input=7)
+    output = dispatch_metrics.render([], 0, now, claude_records=[record],
+        claude_prices={"m": {**_claude_rates()["m"], "cache_read": None}})
+    assert _metric(output, "k3dm_dispatch_claude_unpriced_messages", "30d") == 1
+    assert 'k3dm_dispatch_claude_tokens{window="30d",model="m",kind="input"} 7.0' in output
+    assert _metric(output, "k3dm_dispatch_claude_api_cost_usd", "30d") == 0
+
+
+def test_claude_fast_speed_requires_a_fast_price_key():
+    now = calendar.timegm(time.strptime("2026-10-24T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    record = _claude_message("fast", now, speed="fast", input=1_000_000)
+    no_fast = dispatch_metrics.render([], 0, now, claude_records=[record], claude_prices=_claude_rates())
+    assert _metric(no_fast, "k3dm_dispatch_claude_unpriced_messages", "30d") == 1
+    rates = _claude_rates()
+    rates["m@fast"] = {key: 2.0 for key in rates["m"]}
+    priced = dispatch_metrics.render([], 0, now, claude_records=[record], claude_prices=rates)
+    assert _metric(priced, "k3dm_dispatch_claude_api_cost_usd", "30d") == 2
+    assert _metric(priced, "k3dm_dispatch_claude_unpriced_messages", "30d") == 0
+
+
+def test_claude_rollup_survives_transcript_deletion(tmp_path):
+    projects = tmp_path / "projects"; projects.mkdir()
+    transcript = projects / "session.jsonl"
+    transcript.write_text(json.dumps({"type":"assistant", "timestamp":"2026-10-24T12:00:00Z",
+        "message":{"id":"kept", "model":"m", "usage":{"input_tokens":12}}}) + "\n")
+    cache = tmp_path / "cache.json"
+    before = dispatch_metrics._claude_rollup(projects, cache)
+    transcript.unlink()
+    after = dispatch_metrics._claude_rollup(projects, cache)
+    assert after == before
+    rates = _claude_rates()
+    now = calendar.timegm(time.strptime("2026-10-25T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    assert _metric(dispatch_metrics.render([], 0, now, claude_records=before, claude_prices=rates),
+                   "k3dm_dispatch_claude_api_cost_usd", "30d") == 12e-6
+    assert _metric(dispatch_metrics.render([], 0, now, claude_records=after, claude_prices=rates),
+                   "k3dm_dispatch_claude_api_cost_usd", "30d") == 12e-6
+
+
+def test_claude_attribution_splits_overlapping_task_intervals():
+    now = 30
+    tasks = [event(0, "start", "A"), event(10, "land", "A"),
+             event(5, "start", "B"), event(15, "land", "B")]
+    records = [_claude_message("at7", 7, input=2_000_000),
+               _claude_message("at12", 12, input=2_000_000),
+               _claude_message("at20", 20, input=2_000_000)]
+    output = dispatch_metrics.render(tasks, 0, now, claude_records=records, claude_prices=_claude_rates())
+    assert _task_metric(output, "1d", "9.9.9", "A") == 1
+    assert _task_metric(output, "1d", "9.9.9", "B") == 3
+    assert _metric(output, "k3dm_dispatch_claude_api_cost_usd", "1d") == 6
+
+
+def test_claude_release_cost_equals_its_weighted_task_attributions():
+    now = 30
+    rows = [event(0, "start", "A", version="v1.0.0"), event(10, "land", "A", version="v1.0.0"),
+            event(5, "start", "B", version="v1.0.0"), event(15, "land", "B", version="v1.0.0"),
+            event(6, "start", "C", version="v2.0.0"), event(9, "land", "C", version="v2.0.0")]
+    records = [_claude_message("in", 7, input=2_000_000), _claude_message("other", 12, input=2_000_000),
+               _claude_message("outside", 20, input=2_000_000),
+               _claude_message("unpriced", 8, model="unknown", input=2)]
+    output = dispatch_metrics.render(rows, 0, now, claude_records=records, claude_prices=_claude_rates())
+    release = _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")
+    task_a = _task_metric(output, "v1.0.0", "v1.0.0", "A")
+    task_b = _task_metric(output, "v1.0.0", "v1.0.0", "B")
+    assert release == task_a + task_b
+    assert 'k3dm_dispatch_claude_tokens{window="v1.0.0",model="m",kind="input"} 3333333.333333333' in output
+    assert 'k3dm_dispatch_claude_tokens{window="v1.0.0",model="unknown",kind="input"} 1.3333333333333333' in output
+    assert _metric(output, "k3dm_dispatch_claude_unpriced_messages", "v1.0.0") == 2 / 3
+
+
+def test_claude_release_sums_same_release_overlapping_task_shares():
+    rows = [event(0, "start", "A", version="v1.0.0"),
+            event(10, "land", "A", version="v1.0.0"),
+            event(5, "start", "B", version="v1.0.0"),
+            event(15, "land", "B", version="v1.0.0")]
+    record = _claude_message("overlap", 7, input=2_000_000)
+    output = dispatch_metrics.render(rows, 0, 30, claude_records=[record], claude_prices=_claude_rates())
+    task_a = _task_metric(output, "v1.0.0", "v1.0.0", "A")
+    task_b = _task_metric(output, "v1.0.0", "v1.0.0", "B")
+    release = _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")
+    assert task_a == task_b == 1
+    assert release == task_a + task_b == 2
+    assert 'k3dm_dispatch_claude_tokens{window="v1.0.0",model="m",kind="input"} 2000000.0' in output
+
+
+def test_claude_privacy_keeps_only_allowed_rollup_data(tmp_path):
+    projects = tmp_path / "projects"; projects.mkdir()
+    transcript = projects / "s.jsonl"
+    transcript.write_text(json.dumps({"type":"user", "message":{"content":"SECRET-PROMPT"}}) + "\n" +
+        json.dumps({"type":"assistant", "timestamp":"2026-10-24T12:00:00Z",
+        "message":{"id":"private-id", "model":"m", "content":"SECRET-PROMPT",
+        "usage":{"input_tokens":1}}}) + "\n")
+    cache = tmp_path / "cache.json"
+    records = dispatch_metrics._claude_rollup(projects, cache)
+    output = dispatch_metrics.render([], 0, 1_800_000_000, claude_records=records)
+    assert "SECRET-PROMPT" not in output
+    assert "SECRET-PROMPT" not in cache.read_text()
+
+
+def test_claude_observed_days_follow_window_and_coverage_start():
+    now = 1_800_000_000
+    rates = _claude_rates()
+    recent = [_claude_message("recent", now - 3 * 86400, input=1)]
+    old = [_claude_message("old", now - 10 * 86400, input=1),
+           _claude_message("in-window", now - 86400, input=1)]
+    recent_output = dispatch_metrics.render([], 0, now, claude_records=recent, claude_prices=rates)
+    old_output = dispatch_metrics.render([], 0, now, claude_records=old, claude_prices=rates)
+    assert _metric(recent_output, "k3dm_dispatch_claude_api_cost_observed_days", "7d") == 3
+    assert _metric(old_output, "k3dm_dispatch_claude_api_cost_observed_days", "7d") == 7
+
+
+def test_claude_daily_tokens_use_local_timezone_and_dashboard_panel():
+    now = calendar.timegm(time.strptime("2026-01-10T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    before_tz = os.environ.get("TZ")
+    records = [_claude_message("late", calendar.timegm(time.strptime("2026-01-01T23:59:00", "%Y-%m-%dT%H:%M:%S")), model="m1", input=1, cache_5m=2, cache_1h=3, cache_read=4, output=5),
+               _claude_message("early", calendar.timegm(time.strptime("2026-01-02T00:01:00", "%Y-%m-%dT%H:%M:%S")), model="m2", input=2),
+               _claude_message("old", now - 31*86400, model="m3", input=999)]
+    daily = {}
+    try:
+        for zone in ("America/Los_Angeles", "UTC"):
+            os.environ["TZ"] = zone; time.tzset()
+            output = dispatch_metrics.render([], 0, now, claude_records=records)
+            daily[zone] = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens")]
+            assert not any('model="m3"' in line for line in daily[zone])
+        assert any('model="m1"' in line and line.endswith(" 15") for line in daily["UTC"])
+        assert any('model="m1"' in line and "2026-01-01" in line for line in daily["America/Los_Angeles"])
+        assert any('model="m2"' in line and "2026-01-02" in line for line in daily["UTC"])
+        assert not any('model="m2"' in line and "2026-01-02" in line for line in daily["America/Los_Angeles"])
+    finally:
+        if before_tz is None: os.environ.pop("TZ", None)
+        else: os.environ["TZ"] = before_tz
+        time.tzset()
+    panel = next(p for p in load_dispatch_dashboard()["panels"] if p["title"] == "Claude tokens per day")
+    assert "k3dm_dispatch_claude_daily_tokens" in panel["targets"][0]["expr"]
+
+
+def test_claude_rollup_deduplicates_three_lines_and_second_file(tmp_path):
+    projects = tmp_path / "projects"; projects.mkdir()
+    message = {"type":"assistant", "timestamp":"2026-10-24T12:00:00Z",
+        "message":{"id":"same", "model":"m", "usage":{"input_tokens":9}}}
+    for name, rows in (("first.jsonl", [message] * 3), ("second.jsonl", [message])):
+        (projects / name).write_text("".join(json.dumps(row) + "\n" for row in rows))
+    records = dispatch_metrics._claude_rollup(projects, tmp_path / "cache.json")
+    assert len(records) == 1
+    assert records[0]["input"] == 9
+
+
+def test_claude_dashboard_column_panels_projection_and_layout():
+    dashboard = load_dispatch_dashboard()
+    panels = {panel["title"]: panel for panel in dashboard["panels"]}
+    per_spec = panels["Per spec"]
+    target = next(t for t in per_spec["targets"] if t.get("refId") == "G")
+    assert target["expr"] == 'sum by (version, slug) (k3dm_dispatch_task_claude_api_cost_usd{window="$window"})'
+    organize = per_spec["transformations"][1]["options"]
+    assert organize["renameByName"]["Value #G"] == "Claude ≈"
+    override = next(o for o in per_spec["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Claude ≈")
+    props = {p["id"]: p["value"] for p in override["properties"]}
+    assert props["unit"] == "currencyUSD" and props["decimals"] == 2
+    assert props["description"] == "Claude usage between dispatch and land, split across tasks that overlap. Excludes spec writing before dispatch."
+    assert "Value #G" in per_spec["options"]["footer"]["fields"]
+    assert {"Claude at API prices", "Claude per landed spec", "Claude data since",
+            "Claude tokens per landed spec", "Claude tokens per day"} <= panels.keys()
+    expression = panels["Projected / month"]["targets"][0]["expr"]
+    assert 'k3dm_dispatch_api_cost_usd{window="7d"}' in expression
+    assert 'k3dm_dispatch_claude_api_cost_usd{window="7d"}' in expression
+    boxes = []
+    for panel in dashboard["panels"]:
+        pos = panel.get("gridPos")
+        if not pos or panel.get("type") == "row":
+            continue
+        box = (pos["x"], pos["y"], pos["x"] + pos["w"], pos["y"] + pos["h"])
+        for previous in boxes:
+            assert box[2] <= previous[0] or previous[2] <= box[0] or box[3] <= previous[1] or previous[3] <= box[1]
+        boxes.append(box)

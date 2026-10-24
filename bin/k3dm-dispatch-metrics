@@ -28,9 +28,126 @@ def _repo_root():
 def _prices(path):
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        return data.get("models", {}), data.get("subscriptions_usd_per_month", {}), data.get("checked")
+        return data.get("models", {}), data.get("subscriptions_usd_per_month", {}), data.get("checked"), data.get("claude_models", {})
     except (OSError, ValueError, TypeError):
-        return {}, {}, None
+        return {}, {}, None, {}
+
+
+def _claude_rollup(projects_dir, cache_path):
+    cache = {"offsets": {}, "records": {}}
+    try:
+        cache = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+        if not isinstance(cache.get("offsets"), dict) or not isinstance(cache.get("records"), dict):
+            raise ValueError("invalid cache")
+    except (OSError, ValueError, TypeError):
+        pass
+    root = Path(projects_dir)
+    if root.is_dir():
+        for path in sorted(root.rglob("*.jsonl")):
+            key = str(path)
+            try:
+                size = path.stat().st_size
+                offset = int(cache["offsets"].get(key, 0))
+                if size < offset:
+                    offset = 0
+                with path.open("rb") as stream:
+                    stream.seek(offset)
+                    for raw in stream:
+                        if b'"type":"assistant"' not in raw.replace(b" ", b""):
+                            continue
+                        try:
+                            item = json.loads(raw)
+                            message = item.get("message") or {}
+                            mid, model = message.get("id"), message.get("model")
+                            usage = message.get("usage") or {}
+                            if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
+                                continue
+                            creation = usage.get("cache_creation") or {}
+                            cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
+                            cache1 = creation.get("ephemeral_1h_input_tokens", 0)
+                            cache["records"][mid] = {"ts": item.get("timestamp"), "model": model,
+                                "speed": usage.get("speed"), "input": usage.get("input_tokens", 0),
+                                "cache_5m": cache5, "cache_1h": cache1,
+                                "cache_read": usage.get("cache_read_input_tokens", 0),
+                                "output": usage.get("output_tokens", 0)}
+                        except (ValueError, TypeError, AttributeError):
+                            continue
+                    cache["offsets"][key] = stream.tell()
+            except (OSError, ValueError, TypeError):
+                continue
+    target = Path(cache_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temp = target.with_name(target.name + ".tmp")
+    temp.write_text(json.dumps(cache, separators=(",", ":")), encoding="utf-8")
+    os.replace(temp, target)
+    return list(cache["records"].values())
+
+
+def _claude_cost(record, prices):
+    key = record["model"] if record.get("speed") in (None, "standard") else f'{record["model"]}@{record["speed"]}'
+    rates = prices.get(key)
+    if not isinstance(rates, dict) or any(rates.get(k) is None for k in ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")):
+        return None
+    kinds = ("input", "cache_5m", "cache_1h", "cache_read", "output")
+    ratekeys = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
+    return sum(float(record.get(kind, 0) or 0) * float(rates[rk]) for kind, rk in zip(kinds, ratekeys)) / 1_000_000
+
+
+def _render_claude(lines, window, records, rates, landed, now, cutoff=None, tasks=None,
+                   all_tasks=None, time_scope=False):
+    task_scoped = not time_scope
+    selected_tasks = tasks or []
+    overlap_tasks = all_tasks or selected_tasks
+    cost = 0.0
+    unpriced = 0.0
+    totals = defaultdict(lambda: defaultdict(float))
+    task_costs = defaultdict(float)
+    for record in records:
+        timestamp = _timestamp(record.get("ts"))
+        if not task_scoped and cutoff is not None and timestamp < cutoff:
+            continue
+        overlaps = [task for task in overlap_tasks if task[0] <= timestamp <= task[1]]
+        if task_scoped and not overlaps:
+            continue
+        selected_n = sum(1 for task in overlaps if task in selected_tasks) if task_scoped else 0
+        if task_scoped and not selected_n:
+            continue
+        share = selected_n / len(overlaps) if task_scoped else 1
+        chosen_for_release = not task_scoped or selected_n > 0
+        model = record["model"]
+        amount = _claude_cost(record, rates)
+        if chosen_for_release:
+            for kind, source in (("input", "input"), ("cache_write", "cache_5m"),
+                                 ("cache_write", "cache_1h"), ("cache_read", "cache_read"),
+                                 ("output", "output")):
+                totals[model][kind] += int(record.get(source, 0) or 0) * share
+            if amount is None:
+                unpriced += share
+            else:
+                cost += amount * share
+        if amount is not None:
+            for task in selected_tasks:
+                if task[0] <= timestamp <= task[1]:
+                    task_costs[(task[2], task[3])] += amount / len(overlaps)
+    lines.append(f'k3dm_dispatch_claude_api_cost_usd{{window="{window}"}} {cost}')
+    if landed:
+        lines.append(f'k3dm_dispatch_claude_api_cost_per_landed_usd{{window="{window}"}} {cost / landed}')
+    for model, kinds in totals.items():
+        for kind, value in kinds.items():
+            lines.append(f'k3dm_dispatch_claude_tokens{{window="{window}",model="{model}",kind="{kind}"}} {value}')
+    lines.append(f'k3dm_dispatch_claude_unpriced_messages{{window="{window}"}} {unpriced}')
+    observed = [r for r in records if cutoff is None or _timestamp(r.get("ts")) >= cutoff]
+    if time_scope and observed:
+        earliest = max(cutoff or 0, min(_timestamp(r["ts"]) for r in records))
+        lines.append(f'k3dm_dispatch_claude_api_cost_observed_days{{window="{window}"}} {max(0, (now-earliest)/86400):.2f}')
+    if selected_tasks:
+        for task in selected_tasks:
+            _, _, version, slug = task
+            if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
+                    and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
+                continue
+            amount = task_costs[(version, slug)]
+            lines.append(f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}"}} {amount}')
 
 
 def _session_records(events):
@@ -287,7 +404,8 @@ def _release_metrics(events, release, prices=None):
     return _scope_metrics(events, selected, list(latest_lands.values()), prices)
 
 
-def _render_scope(lines, window, metrics, events=None, prices=None, coverage=None, time_scope=False, now=None):
+def _render_scope(lines, window, metrics, events=None, prices=None, coverage=None, time_scope=False, now=None,
+                  claude_records=None, claude_prices=None, cutoff=None):
     lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
     for result in RESULTS:
         lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
@@ -361,6 +479,23 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         unledgered = [item for item in in_window if item["session"] not in ledgered]
         cost = sum(_cost(_coverage_event(item), prices or {}) or 0 for item in unledgered)
         lines.append(f'k3dm_dispatch_unledgered_api_cost_usd{{window="{window}"}} {cost}')
+    if claude_records is not None:
+        all_tasks = []
+        scoped_tasks = []
+        scoped_keys = {(task[1], task[2]) for task in metrics["tasks"]}
+        for key, task_events in _task_states(events or []).items():
+            starts = [e["ts"] for e in task_events if e.get("event") == "start"]
+            lands = [e["ts"] for e in task_events if e.get("event") == "land"]
+            if starts and lands:
+                task_version = _normalize_version(key[0]) if not time_scope else key[0]
+                interval = (min(starts), max(lands), task_version or key[0], key[1])
+                all_tasks.append(interval)
+                normalized_key = (_normalize_version(key[0]) or key[0], key[1])
+                if (key in scoped_keys or normalized_key in scoped_keys) and len(scoped_tasks) < TASK_CAP:
+                    scoped_tasks.append(interval)
+        _render_claude(lines, window, claude_records, claude_prices or {}, metrics["landed"], now,
+                       cutoff=cutoff, tasks=scoped_tasks, all_tasks=all_tasks,
+                       time_scope=time_scope)
 
 
 def _timestamp(value):
@@ -409,17 +544,32 @@ def _render_cost(lines, window, usage, landed, prices):
     lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {unpriced}')
 
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
-           codex_home=None):
+           codex_home=None, claude_records=None, claude_prices=None):
     now = time.time() if now is None else now
     prices = prices or {}
     coverage = list(_session_files(codex_home, now)) if codex_home else None
     lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}"]
     for window, seconds in WINDOWS.items():
         _render_scope(lines, window, _window_metrics(events, now, seconds, prices), events,
-                      prices, coverage, True, now)
+                      prices, coverage, True, now, claude_records, claude_prices, now-seconds)
     for release in _releases(events):
         _render_scope(lines, release, _release_metrics(events, release, prices), events, prices,
-                      now=now)
+                      now=now, claude_records=claude_records, claude_prices=claude_prices)
+    if claude_records is not None:
+        if claude_records:
+            lines.append(f'k3dm_dispatch_claude_coverage_start_timestamp_seconds {min(_timestamp(r["ts"]) for r in claude_records)}')
+        from datetime import datetime, timedelta
+        today = datetime.fromtimestamp(now).astimezone().date()
+        daily = defaultdict(int)
+        for record in claude_records:
+            try:
+                stamp = datetime.fromisoformat(record["ts"].replace("Z", "+00:00")).astimezone().date()
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if stamp >= today - timedelta(days=29) and record["model"] != "<synthetic>":
+                daily[(stamp.isoformat(), record["model"])] += sum(int(record.get(k, 0) or 0) for k in ("input", "cache_5m", "cache_1h", "cache_read", "output"))
+        for (date, model), value in sorted(daily.items()):
+            lines.append(f'k3dm_dispatch_claude_daily_tokens{{date="{date}",model="{model}"}} {value}')
     for plan, amount in (subscriptions or {}).items():
         lines.append(f'k3dm_dispatch_subscription_usd_per_month{{plan="{plan}"}} {amount}')
     task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
@@ -452,11 +602,16 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--prices", default=str(_repo_root() / "scripts/etc/agent/codex-model-prices.json"))
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+    repo_key = str(_repo_root()).replace("/", "-")
+    parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
+    parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
     args = parser.parse_args(argv)
     events, bad_lines = read_ledger(_root() / "ledger.jsonl")
-    model_prices, subscriptions, checked = _prices(args.prices)
+    model_prices, subscriptions, checked, claude_prices = _prices(args.prices)
+    claude_records = _claude_rollup(args.claude_projects, args.claude_cache) if Path(args.claude_projects).is_dir() else None
     payload = render(events, bad_lines, prices=model_prices, subscriptions=subscriptions,
-                     checked=checked, codex_home=args.codex_home)
+                     checked=checked, codex_home=args.codex_home, claude_records=claude_records,
+                     claude_prices=claude_prices)
     if args.dry_run:
         print(payload, end="")
         return 0

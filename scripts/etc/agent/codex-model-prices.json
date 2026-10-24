@@ -7,5 +7,10 @@
     "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
     "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "output": 0.50}
   },
-  "subscriptions_usd_per_month": {"chatgpt": 20, "claude": 20, "gemini": 20, "github": 4, "hostinger": 10.42}
+  "subscriptions_usd_per_month": {"chatgpt": 20, "claude": 20, "gemini": 20, "github": 4, "hostinger": 10.42},
+  "claude_models": {
+    "claude-opus-5-5": {"input": null, "cache_write_5m": null, "cache_write_1h": null, "cache_read": null, "output": null}
+  },
+  "claude_checked": null,
+  "claude_source": null
 }
