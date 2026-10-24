@@ -457,7 +457,10 @@ for start in calls:
 if len(calls) != s.count("label_replace("): sys.exit(1)' "$expr" || return 1
     if command -v promtool >/dev/null 2>&1; then
       local rules_file="${BATS_TEST_TMPDIR}/panel-13-rules.yml"
-      python3 -c 'import json,sys; print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryParse","expr":sys.argv[1]}]}]}))' "$expr" >"$rules_file" || return 1
+      python3 -c 'import json,re,sys
+expr=sys.argv[1].replace("$__rate_interval","5m")
+expr=re.sub(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?",".*",expr)
+print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryParse","expr":expr}]}]}))' "$expr" >"$rules_file" || return 1
       promtool check rules "$rules_file" >/dev/null || return 1
     fi
   done < <(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -r '.panels[].targets[]?.expr // empty')

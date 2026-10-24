@@ -28,6 +28,15 @@ The `lint` job installs `promtool` 3.1.0 (the image version the tests pin) from 
 release tarball, checks it against the release's sha256, and puts it on PATH. The tripwire is
 unchanged, and `promtool` isn't one of the tools it shims.
 
+## Follow-on defect exposed by the fix
+
+With `promtool` on PATH, CI run 40121661676 reached a branch of `grafana_dashboard_appsets.bats`
+(`Grafana Overview panel expressions have balanced PromQL parentheses`) that no runner had ever
+executed. It sent raw Grafana expressions to `promtool check rules`, so `[$__rate_interval]` could
+never parse ("bad number or duration syntax"). The test now expands `$__rate_interval` to `5m` and
+other template variables to `.*` before the check. Verified with promtool 3.1.0: it passes on the
+real dashboards and still fails on a `[5x]` duration mutant.
+
 ## Acceptance
 
 ```yaml
