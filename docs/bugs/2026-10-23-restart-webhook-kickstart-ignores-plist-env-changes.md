@@ -5,7 +5,7 @@
 **Severity:** medium — a plist environment change is silently inert; the status channel never took effect
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, while chasing status-channel E3
-**Approval:** pending — critical (restarts the webhook's launchd job); needs the operator's dispatch go.
+**Approval:** explicit 2026-10-23. The operator said: "go ahead" (dispatch go; critical: restarts the webhook's launchd job).
 **Related:** `docs/bugs/2026-10-23-api-cluster-status-posts-to-command-channel.md`,
 `docs/bugs/2026-10-23-slack-bot-post-discards-slack-error.md`,
 `docs/bugs/2026-10-01-restart-webhook-leaves-cloud-bridge-on-stale-code.md`
