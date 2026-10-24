@@ -400,3 +400,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] **dispatch-api-cost (plan 4)** landed `8299e85d` 2026-10-23 after rework 1 (CHANGELOG conflict resolved by Claude). usage-backfill: 127 backfilled, 8 missing, idempotent.
 - [ ] **P1 bug filed** usage-backfill starts one metrics export per event: 127 concurrent exports → load 101, hub probes timed out, all Grafana panels errored ~16:53–16:58 PDT; self-recovered. Fix: single-flight lock + one export per backfill. Approval pending.
 - [ ] **dispatch-per-spec-name-not-a-link (P3)** dispatched 2026-10-23 after plan 4 landed.
+- [ ] **usage-backfill metrics-export storm (P1)** approved + dispatched 2026-10-23; runs alongside per-spec links (no shared files).
