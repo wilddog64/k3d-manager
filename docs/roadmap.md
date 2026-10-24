@@ -440,7 +440,7 @@ action, `vault-status`, for `hub` or `hostinger` only. It separates sealed, unre
 API down and ESO failing, with no token and no unseal. It follows the 2026-10-20 Hostinger 502 incident.
 
 Plan 2 is [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md) (operator,
-2026-10-23: "go for it"): flagd on every app cluster, one `basket-cart-summary` flag in
+2026-10-23: "go for it"): flagd on the ACG sandbox only (stage 1; Hostinger is a later, gated one-line stage), one `basket-cart-summary` flag in
 `shopping-cart-basket`, per-variant metrics and a rollout-health dashboard, and `make flag-set` recording
 each flip on the v1.44.2 command ledger. Depends on v1.44.2 and on v1.43.7's cross-repo dispatch.
 
@@ -1089,7 +1089,7 @@ each step, and promote or roll back on evidence. Prompted by a public system-des
 - **Read-only first.** As with the healing gateway: report and recommend before any automatic
   promotion; automatic rollback on a failed analysis is the one exception.
 
-**Placement:** first slice (flagd on app clusters, one `shopping-cart-basket` flag, per-variant
+**Placement:** first slice (flagd on the ACG sandbox first, then Hostinger, one `shopping-cart-basket` flag, per-variant
 metrics, flag-change record) is v1.44.3 plan 2 (operator, 2026-10-23: "go for it"):
 [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md). Basket is already Go, so
 it does not wait for the order/payment rewrite. Canaries, feedback endpoint and targeting are later
