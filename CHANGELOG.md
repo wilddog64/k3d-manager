@@ -4,6 +4,11 @@
 
 ### Added
 
+- Agent dispatch's Per spec table has a totals row: Codex tokens, Codex time, Codex runs and API
+  equiv. are summed over the selected window or release. Time to land is left out, since the Time
+  to land stat already shows its mean. By model bars now start at zero, so the smaller model's bar
+  is no longer drawn empty.
+
 - Agent dispatch's Per spec table links each task name to its plan or bug document on the task's release branch.
 
 - The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.

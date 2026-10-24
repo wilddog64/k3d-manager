@@ -655,3 +655,13 @@ def test_by_model_promql_returns_one_series_per_model(tmp_path):
         if result.returncode and "permission denied" in result.stderr.lower():
             pytest.skip("promtool unavailable; Docker daemon socket permission denied")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_per_spec_footer_totals_all_but_time_to_land_and_by_model_starts_at_zero():
+    panels = {panel["id"]: panel for panel in load_dispatch_dashboard()["panels"]}
+    footer = panels[12]["options"]["footer"]
+    assert footer["show"] is True
+    assert footer["reducer"] == ["sum"]
+    assert {"Value #A", "Value #B", "Value #D", "Value #F"} <= set(footer["fields"])
+    assert {"Value #C", "Time to land"}.isdisjoint(footer["fields"])
+    assert panels[27]["fieldConfig"]["defaults"]["min"] == 0

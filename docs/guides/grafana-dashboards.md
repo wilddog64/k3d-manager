@@ -56,7 +56,11 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 ## Agent dispatch costs
 
 The Agent dispatch **Per spec** table links each Spec name to its plan or bug document on the
-task's release branch; the link opens in a new tab.
+task's release branch; the link opens in a new tab. Its totals row sums Codex tokens, Codex time, Codex runs and
+API equiv. over the rows shown, so picking a release in the Window menu gives that release's
+totals. Time to land is not summed: parallel dispatches overlap, so the useful number is the mean,
+which the **Time to land** stat shows. Codex tokens counts each spec's last run only, so its total
+is low for specs that were resumed; API equiv. counts every run.
 
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
