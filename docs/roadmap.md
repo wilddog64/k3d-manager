@@ -368,8 +368,8 @@ per release on Agent Dispatch, as separate columns with no combined score. v1.43
 **Release duration on Agent Dispatch** (operator, 2026-10-24). Branch `k3d-manager-v1.43.8`, cut from
 `main` after v1.43.7 merges. Opened by Claude because v1.43.5, v1.43.6 and v1.43.7 are each at the
 five-plan cap. Plan 1 of 5 is [`dispatch-release-duration`](plans/v1.43.8-dispatch-release-duration.md):
-per release, the span from first dispatch to last land and the active time with overlapping specs
-counted once.
+per release, the span from first dispatch to PR merge (recorded once in the ledger by `/post-merge`,
+so the exporter stays offline) and the active time with overlapping specs counted once.
 
 ### Candidate milestone — v1.44.0
 
