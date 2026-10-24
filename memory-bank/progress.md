@@ -435,3 +435,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 - [x] Status-channel P3 LANDED `7016f6d0` 2026-10-23; E3 (bot invite + `K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack`) pending.
 - [ ] v1.44.2 plan 2 `command-ledger-and-cluster-reconciliation` PROPOSED 2026-10-23 ("go ahead" to write); operator design review pending before dispatch.
+- [x] Roadmap candidate theme added 2026-10-23: v2.x feature flags, progressive rollout and feedback (operator "yes"); no spec until a release is picked.

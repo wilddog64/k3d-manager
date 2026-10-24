@@ -1058,6 +1058,35 @@ is v1.44.1 plan 2 (operator, 2026-10-23), after v1.44.0's submitter authenticati
 message must not start a dispatch until its sender is authenticated. The full multi-agent
 conversation stays v2.x and is the interface of v3.0.0 below.
 
+### Candidate theme — v2.x: feature flags, progressive rollout and feedback
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Turn the
+platform's staged deploys into a rollout platform: ship a change dark, expose it in steps, measure
+each step, and promote or roll back on evidence. Prompted by a public system-design exercise
+("design a feedback and feature rollout platform"); the design here is our own.
+
+| Concern | Today | Gap |
+|---|---|---|
+| Staged rollout | `make appsets-reapply` rolls out hub first, then app clusters (`APPSETS_STAGE=hub` to soak) | Stages are per cluster, never per user, request or percentage |
+| Policy rollout | Kyverno Audit → Enforce for image signing | Done by hand; no record of who promoted it or why |
+| Gates | CI, e2e Tier 1 (vCluster) and Tier 2 (ACG sandbox), Grafana alerts | Gates run before deploy only; nothing watches a rollout after it starts |
+| Feature switches | none | No way to turn a feature on or off without a deploy |
+| Feedback | Metrics and logs per service | No signal tied to a flag variant or release step; no user feedback channel |
+
+- **Flags in git.** OpenFeature SDKs in the shopping-cart services, flagd in-cluster, flag
+  definitions synced by Argo. A flag change is a reviewed commit; nothing flips a flag outside git.
+- **Canary with analysis.** Argo Rollouts on one service first (payment or order), with Prometheus
+  analysis on error rate and latency; a failed step aborts and rolls back by itself.
+- **Feedback tied to the change.** Per-variant and per-step metrics, a Grafana rollout-health row, and
+  a small feedback endpoint whose records carry the flag variant and release.
+- **Promotion record.** Each flag flip and canary promotion is a command with an id, target, actor and
+  reason, on the command ledger of `v1.44.2-command-ledger-and-cluster-reconciliation`.
+- **Read-only first.** As with the healing gateway: report and recommend before any automatic
+  promotion; automatic rollback on a failed analysis is the one exception.
+
+**Placement:** after the shopping-cart Go rewrite (flags and canaries need services we own end to end)
+and after the v1.44.2 command ledger. No spec until the operator picks a release.
+
 ### Candidate theme — v2.x: agent devbox service
 
 **Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Give each
