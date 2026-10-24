@@ -175,6 +175,7 @@ def test_doc_meta_open_and_unknown_states():
     ("OPEN", "open", False),
     ("OPEN — spec ready", "open", False),
     ("IMPLEMENTED — landed abc", "fixed", False),
+    ("LANDED `744847f6` 2026-10-23 — E1 green", "fixed", False),
     ("VERIFIED — live", "fixed", True),
     ("LIVE-VERIFIED", "fixed", True),
     ("FIXED", "fixed", False),
@@ -183,7 +184,7 @@ def test_doc_meta_open_and_unknown_states():
 def test_doc_status_classifies_without_changing_doc_meta(status, expected, verified):
     text = f"**Priority:** P2\n**Status:** {status}\n"
     assert pa.doc_status(text) == ("P2", expected, verified)
-    old_state = "closed" if status.startswith(("FIXED", "VERIFIED", "LIVE-VERIFIED", "IMPLEMENTED")) else "open"
+    old_state = "closed" if status.startswith(("FIXED", "VERIFIED", "LIVE-VERIFIED", "IMPLEMENTED", "LANDED")) else "open"
     assert pa.doc_meta(text) == ("P2", old_state)
 
 
