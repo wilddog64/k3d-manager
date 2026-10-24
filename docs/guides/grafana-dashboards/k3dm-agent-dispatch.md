@@ -28,6 +28,10 @@ The **Claude** row, second from the top, prices this repo's Claude Code transcri
 API list rates (`scripts/etc/agent/codex-model-prices.json`). This is what the usage would cost on
 the API, not the subscription bill. A time window counts every message in it; a release counts only
 messages between each spec's first dispatch and its land, split across specs that overlap, so
-spec writing and live checks between dispatches are left out. **Claude data since** is the oldest
+spec writing and live checks between dispatches are left out.
+These figures do **not** measure what Claude spent on each Codex dispatch. Attribution is by time
+overlap: whatever Claude did while a spec was open (spec writing, design, discussion, other work) is
+charged to that spec. In a time window, **Claude per landed spec** divides all Claude work by landed
+specs; read it per release. **Claude data since** is the oldest
 transcript still on disk. **Claude tokens per day** covers the last 30 days and ignores the Spec
 window.
