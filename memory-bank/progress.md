@@ -434,3 +434,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] P3 status snapshot age missing unit (DISPATCHED 2026-10-23).
 
 - [x] Status-channel P3 LANDED `7016f6d0` 2026-10-23; E3 (bot invite + `K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack`) pending.
+- [ ] v1.44.2 plan 2 `command-ledger-and-cluster-reconciliation` PROPOSED 2026-10-23 ("go ahead" to write); operator design review pending before dispatch.

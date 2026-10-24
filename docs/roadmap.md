@@ -424,6 +424,13 @@ a reader-scoped cloud action returns the most recent recorded offline test run, 
 suites, missing stages and bounded, redacted failure reasons. No test runs remotely, and no raw log
 leaves the laptop. It follows the 2026-10-20 `test-all` alerts the operator could not triage while away.
 
+Plan 2 (operator, 2026-10-23: "go ahead") is
+[`command-ledger-and-cluster-reconciliation`](plans/v1.44.2-command-ledger-and-cluster-reconciliation.md):
+every webhook job gets a command id, an explicit target and a lease (retries return the first job;
+a lost job is `lost`, not `failed`), and a read-only per-cluster desired/observed record reports
+stale signals and drift. No auto-repair in this slice. It follows the 2026-10-23 tunnel, shared
+`observability-acg` and snapshot-age bugs. Design review pending before dispatch.
+
 ### Candidate milestone — v1.44.3 (patch)
 
 **Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
