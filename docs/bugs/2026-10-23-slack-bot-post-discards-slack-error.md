@@ -1,6 +1,6 @@
 # Bug: a rejected Slack bot post leaves no reason in the webhook log
 
-**Status:** DISPATCHED — 2026-10-23
+**Status:** LANDED `978b2414` 2026-10-23 — E1 green (pytest 33 incl. the existing status-thread tests); tests 1, 2 and 3 red on the pre-fix `render.py`. Pending E2: operator runs `make restart-webhook`, Claude reruns cluster-status and reads the Slack error from the webhook log. The channel ID `C4CAEH8HX` was confirmed correct by the operator (About tab screenshot).
 **Priority:** P3
 **Severity:** low — delivery falls back correctly; only the diagnosis is blind
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
