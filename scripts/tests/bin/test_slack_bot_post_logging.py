@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from urllib.error import URLError
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))

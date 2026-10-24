@@ -1272,8 +1272,6 @@ def _notify_job(job_id, text):
     thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
     channel_id_file = JOB_DIR / job_id / "channel_id"
     channel_id = channel_id_file.read_text().strip() if channel_id_file.exists() else None
-    thread_source_file = JOB_DIR / job_id / "thread_source"
-    thread_source = thread_source_file.read_text().strip() if thread_source_file.exists() else ""
     response_url_file = JOB_DIR / job_id / "response_url"
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
     posted = False

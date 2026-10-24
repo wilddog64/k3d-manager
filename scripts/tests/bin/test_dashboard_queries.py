@@ -174,13 +174,13 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
                       f"  - alert: {alert}",
                       f"    expr: count({record}) == {len(plan_names)}"
                       if panel.get("title") == "Plans" else f"    expr: count({record}) > 0"])
-        tests.extend(["  alert_rule_test:", f"  - eval_time: 0m", f"    alertname: {alert}",
+        tests.extend(["  alert_rule_test:", "  - eval_time: 0m", f"    alertname: {alert}",
                       "    exp_alerts:", f"    - exp_labels: {{alertname: {alert}}}"])
         if panel.get("title") == "Plans":
             missing_dispatch = f"DashboardUndispatchedPlan{index}"
             rules.extend([f"  - alert: {missing_dispatch}",
                           f"    expr: count({record}{{dispatch_state=\"none\"}}) == 1"])
-            tests.extend([f"  - eval_time: 0m", f"    alertname: {missing_dispatch}",
+            tests.extend(["  - eval_time: 0m", f"    alertname: {missing_dispatch}",
                           "    exp_alerts:",
                           f"    - exp_labels: {{alertname: {missing_dispatch}}}"])
         expected_alerts.append((panel, target))

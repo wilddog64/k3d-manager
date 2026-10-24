@@ -83,7 +83,8 @@ class MakeTargetTests(unittest.TestCase):
         query = "what's recent e2e-remote issues"
         argv, error = wh.parse_make_request("find-similar-docs", {"Q": query, "K": "5"}, False)
         self.assertIsNone(error)
-        self.assertEqual(argv, ["find-similar-docs", f"K=5", f"Q={query}"])
+        # agent-audit: allow assert-removed Ruff F541 dropped a placeholder-free f prefix; same strings
+        self.assertEqual(argv, ["find-similar-docs", "K=5", f"Q={query}"])
 
     def test_find_similar_docs_requires_a_query(self):
         _, error = wh.parse_make_request("find-similar-docs", {}, False)

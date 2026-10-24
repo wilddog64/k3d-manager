@@ -560,9 +560,10 @@ def test_coverage_reads_only_recent_session_metadata_and_usage(tmp_path, monkeyp
     output = dispatch_metrics.render(ledger, 0, now,
         prices={"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.2}},
         codex_home=home)
-    assert f'k3dm_dispatch_codex_sessions{{window="1d",ledgered="true"}} 1' in output
-    assert f'k3dm_dispatch_codex_sessions{{window="1d",ledgered="false"}} 2' in output
-    assert f'k3dm_dispatch_unledgered_api_cost_usd{{window="1d"}} 0.4' in output
+    # agent-audit: allow assert-removed Ruff F541 dropped a placeholder-free f prefix; same strings
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="true"} 1' in output
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="false"} 2' in output
+    assert 'k3dm_dispatch_unledgered_api_cost_usd{window="1d"} 0.4' in output
     assert "SECRET-PROMPT" not in output
 
 
