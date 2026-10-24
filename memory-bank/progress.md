@@ -466,3 +466,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-24: operator: plan the two coordinator-trial caveats (measuring the bug-sweep quota impression; Codex-as-coordinator interactive-session rules) in a later proper release; v1.44.1 plans stand as written.
 - [ ] 2026-10-24: placed the two coordinator caveats as v1.44.2 plans 3–4 (roadmap only; specs unwritten). Analysis spec after Claude's coordinator week; Codex-coordinator spec before Codex's week.
 - [x] 2026-10-24: snapshot-list P2 landed a602bfee (Luna, reviewed; 39/39 + red on pre-fix) and LIVE-VERIFIED via make snapshot-list (3 snapshots). Next: land dashboard-queries P2.
+- [ ] - 2026-10-24: dashboard-queries P2 FAILED real promtool run (13 queries no series — fixture omits _release_metrics/_forecast_metrics; Luna sandbox had skipped). Rework sent via codex-resume (resume 2). Then: Claude reruns with Docker, red checks, land.
