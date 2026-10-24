@@ -5,6 +5,7 @@
 **Priority:** P2 — a wrong query ships green and shows "No data" or duplicate rows; the only check is a person looking at the live dashboard
 **Severity:** medium
 **Approval:** approved to file — operator, 2026-10-23: "file a bug (maybe P2) for what you discovered"
+**Dispatch go:** operator, 2026-10-24: "let's get those two dispatched" (after Claude proposed no open P0–P2 at release cut).
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/tests/plugins/grafana_dashboard_bugs.bats`, `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
 **Related:** `docs/plans/v1.43.5-release-plan-tracking.md`, `docs/bugs/2026-10-18-dispatch-dashboard-window-variable-confused-with-time-picker.md`
