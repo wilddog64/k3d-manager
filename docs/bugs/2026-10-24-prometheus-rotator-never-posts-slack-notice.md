@@ -1,6 +1,6 @@
 # Bug: the monthly Prometheus password rotation never posts its Slack notice
 
-**Status:** OPEN — filed 2026-10-24.
+**Status:** LANDED `a54d9489` 2026-10-24. E1 green (bats 25/25, shellcheck clean); the new tests fail on the pre-fix code (the function was missing, exit 127). Review note: test 3's `curl` stub calls `fail`, which the code's `|| true` would hide, so it doesn't fully prove curl is skipped (minor). E2 live pending: next run 2026-11-01 00:00 PDT or an operator run. Was OPEN, filed 2026-10-24.
 **Priority:** P3
 **Severity:** low — the rotation itself works; only its notice is missing
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
