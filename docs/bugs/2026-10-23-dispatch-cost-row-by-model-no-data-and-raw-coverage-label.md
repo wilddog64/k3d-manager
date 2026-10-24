@@ -5,7 +5,7 @@
 **Severity:** low — the totals are correct on the same row; one panel is blank, one is mislabelled
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, from the operator's screenshot of the Cost (API-equivalent) row
-**Approval:** pending — the operator asked what the coverage label meant; no fix has been requested yet.
+**Approval:** explicit 2026-10-23. The operator said: "go ahead to dispatch P3".
 
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` (panels 24, 27)
 
