@@ -93,7 +93,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
-- 2026-10-23 18:15 PDT: Hostinger ESO down since 07:58 PDT — the tunnel-logs E2's bare `tunnel_start` repointed both Hostinger tunnel agents at `ubuntu` (dead sandbox 44.247.81.210). Filed P2 `2026-10-23-bare-tunnel-start-repoints-hostinger-tunnel.md` (approval pending); workaround `make refresh CLUSTER_PROVIDER=k3s-hostinger`. Filed P3 `2026-10-23-status-snapshot-age-missing-unit.md` (approved). Hub snapshot 14 days old; suggested `make snapshot`.
+- 2026-10-23 18:15 PDT: Hostinger ESO down since 07:58 PDT — the tunnel-logs E2's bare `tunnel_start` repointed both Hostinger tunnel agents at `ubuntu` (dead sandbox 44.247.81.210). Filed P2 `2026-10-23-bare-tunnel-start-repoints-hostinger-tunnel.md` (DISPATCHED); workaround `make refresh CLUSTER_PROVIDER=k3s-hostinger`. P3 `2026-10-23-status-snapshot-age-missing-unit.md` DISPATCHED. Hub snapshot 14 days old; suggested `make snapshot`.
 
 - 2026-10-23: Complexity plan filed `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5/5, full; approved "that's fine. we go as planned"); dispatch waits for the v1.43.7 branch. Still awaiting operator Argo hard refresh + screenshot for `f8dbf7b6` (Projected ≈ $14.9) and `74dbdcfb` (Per spec footer, By model min 0).
 
