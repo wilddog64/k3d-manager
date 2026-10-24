@@ -33,6 +33,8 @@ All dashboard ConfigMaps use the `grafana_dashboard: "1"` label in the `monitori
 
 In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
+Bug Tracking panels filter on `release=~"$release"`. The `release_order` label is used only to sort the release dropdown and release table; it contains both an ordering prefix and the release value. New dashboard panel specs must preserve this filter convention.
+
 ### Release plans
 
 The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Release:**`, and `**Depends on:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:

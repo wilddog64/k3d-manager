@@ -15,6 +15,8 @@
 
 ### Added
 
+- Offline Bug Tracking dashboard query coverage against producer-shaped metrics using real PromQL.
+
 - API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
   configurable `K3DM_STATUS_CHANNEL_ID`; slash-command reports keep their original destination.
 
