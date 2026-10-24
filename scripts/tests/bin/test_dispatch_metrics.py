@@ -966,7 +966,7 @@ def test_claude_dashboard_column_panels_projection_and_layout():
     override = next(o for o in per_spec["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Claude ≈")
     props = {p["id"]: p["value"] for p in override["properties"]}
     assert props["unit"] == "currencyUSD" and props["decimals"] == 2
-    assert props["description"] == "Claude usage between dispatch and land, split across tasks that overlap. Excludes spec writing before dispatch."
+    assert "between dispatch and land" in props["description"] and "not measured spend" in props["description"]  # agent-audit: allow assert-removed whole-string match replaced by key phrases after the attribution caveat was added
     assert "Value #G" in per_spec["options"]["footer"]["fields"]
     assert {"Claude at API prices", "Claude per landed spec", "Claude data since",
             "Claude tokens per landed spec", "Claude tokens per day"} <= panels.keys()
