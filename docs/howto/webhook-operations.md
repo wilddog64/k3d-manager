@@ -11,6 +11,7 @@ K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack
 The setting applies to reports with no slash-command response URL or incoming thread;
 slash-command replies continue in their originating conversation. When the variable is
 not exported, `update-webhook-slack` preserves any existing plist value.
+`make restart-webhook` reloads the LaunchAgent plist, so updated environment variables apply.
 
 `k3dm-webhook` and `k3dm-cloud-bridge` write structured UTC log lines to their
 LaunchAgent log. The default `K3DM_LOG_LEVEL=info` records requests and job

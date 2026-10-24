@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- `make restart-webhook` reloads the webhook LaunchAgent definition from its plist so environment changes take effect.
+
 - Slack bot post failures now log the rejected channel and Slack error code, or the transport exception class.
 
 - The status smoke check now reports ArgoCD's HTTP rejection code instead of calling a rejected

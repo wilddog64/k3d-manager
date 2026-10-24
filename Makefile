@@ -453,11 +453,17 @@ install-sudoers:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
-	@if ! launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.webhook"; then \
-		echo "[restart-webhook] service is not loaded; bootstrapping LaunchAgent" >&2; \
-		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
-		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
-	fi
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
+	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
+		if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; then \
+			echo "[restart-webhook] reloaded LaunchAgent definition"; \
+			exit 0; \
+		fi; \
+		if [ "$$_attempt" -lt 5 ]; then sleep 1; fi; \
+		_attempt=$$((_attempt + 1)); \
+	done; \
+	echo "[restart-webhook] ERROR: bootstrap failed after 5 attempts" >&2; \
+	exit 1
 	@$(MAKE) --no-print-directory restart-cloud-bridge
 
 ## Set webhook/cloud-bridge log level (LEVEL=error|warn|info|debug) and restart both agents
