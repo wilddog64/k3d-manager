@@ -191,3 +191,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-23: P3 By model landed `5d3bc140`; cloud-bridge at-most-once landed `744847f6` (needs `make restart-cloud-bridge` + E2); windowing P2 dispatched; Per spec totals footer proposed (pending go).
 - Status-channel E3: job c4b35b3c delivered via bot_fallback to C4CAEH8HX at 19:55 PDT; operator visual confirm pending.
 - Status-channel E3 PASSED (operator saw the 19:55 report in #grafana-notification). New P3 `2026-10-23-status-argocd-login-reports-http-unavailable` filed: dispatch go pending (hub webhook); operator to confirm the stale note via show-service-passwords.
+- ArgoCD login misreport P3 DISPATCHED to Luna 2026-10-23 ~20:10 PDT ("go ahead"); slug 2026-10-23-status-argocd-login-reports-http-unavailable.
