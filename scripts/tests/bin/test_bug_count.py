@@ -45,6 +45,30 @@ def test_state_reply_names_the_total_it_is_part_of(monkeypatch):
     assert "v1.43.5: 75 closed bug docs of 81 — 75 fixed, 6 open" in answer
 
 
+def _tally_and_rev_parse(payload, sha_rc, sha):
+    def spawn(cmd, **_kwargs):
+        if cmd[:2] == ["git", "rev-parse"]:
+            return sha_rc, sha, False
+        return 0, payload, False
+    return spawn
+
+
+def test_footer_names_the_commit_it_counted_at(monkeypatch):
+    payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text",
+                        _tally_and_rev_parse(payload, 0, "5a31cf25" + "0" * 32 + "\n"))
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, None))
+    assert "_Counted from docs/bugs/ at HEAD `5a31cf25`;" in answer
+
+
+def test_footer_omits_the_commit_when_rev_parse_fails(monkeypatch):
+    payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", _tally_and_rev_parse(payload, 128, "fatal: bad ref"))
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, None))
+    assert "_Counted from docs/bugs/ at HEAD;" in answer
+    assert "fatal" not in answer
+
+
 def test_failed_tally_never_calls_model(monkeypatch):
     called = []
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (1, "", False))
