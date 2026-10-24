@@ -9,6 +9,7 @@ import sys
 import time
 from pathlib import Path
 import pytest
+# agent-audit: allow assert-removed per-spec series gained an agent label; every removed assert is re-added with agent="codex" and the same value
 
 SCRIPT = Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"
 SPEC = importlib.util.spec_from_loader("dispatch_metrics", importlib.machinery.SourceFileLoader("dispatch_metrics", str(SCRIPT)))
@@ -139,15 +140,51 @@ def test_slug_only_in_task_series():
                for line in output.splitlines())
 
 
+def test_legacy_task_gets_codex_agent_label_and_keeps_values():
+    output = dispatch_metrics.render([
+        event(1, "start", spec="docs/plans/v1.43.6-example.md"),
+        event(5, "codex_exit", tokens=123), event(10, "land"),
+    ], 0, 10)
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 123' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 4' in output
+
+
+def test_agy_usage_never_enters_codex_token_series():
+    output = dispatch_metrics.render([
+        event(1, "start", agent="agy", model="gemini-4-argon-medium", spec="docs/plans/v1.43.6-example.md"),
+        event(5, "agent_exit", exit=0, usage={"input_tokens": 999, "output_tokens": 100}),
+        event(10, "land"),
+    ], 0, 10)
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="agy"} 9' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="agy"}' not in output
+    assert "k3dm_dispatch_task_codex_tokens{" not in output
+    assert "k3dm_dispatch_codex_tokens_by_model" not in output
+
+
+def test_unknown_agent_is_bounded_as_other():
+    output = dispatch_metrics.render([
+        event(1, "start", agent="mystery"), event(2, "agent_exit", exit=0), event(3, "land"),
+    ], 0, 3)
+    assert 'slug="one",agent="other"' in output
+
+
+def test_agy_exit_counts_as_finished_dispatch():
+    output = dispatch_metrics.render([
+        event(1, "start", agent="agy"), event(2, "agent_exit", exit=0),
+    ], 0, 3)
+    assert "k3dm_dispatch_running 0\n" in output
+    assert "k3dm_dispatch_awaiting_land 1\n" in output
+
+
 def test_per_task_values():
     output = dispatch_metrics.render([
         event(0, "start"), event(100, "codex_exit", tokens=10),
         event(150, "resume"), event(250, "codex_exit", tokens=30), event(400, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 30' in output
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 200' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 400' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 30' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 200' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 400' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 6.666666666666667' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 3.3333333333333335' in output
 
@@ -158,7 +195,7 @@ def test_task_spec_uses_latest_start_and_is_emitted_for_each_scope():
         event(3, "codex_exit", tokens=1), event(4, "land"),
     ], 0, 10)
     for window in ("1d", "7d", "30d", "v9.9.9"):
-        assert (f'k3dm_dispatch_task_spec{{window="{window}",version="9.9.9",slug="one",'
+        assert (f'k3dm_dispatch_task_spec{{window="{window}",version="9.9.9",slug="one",agent="codex",'
                 'spec="docs/bugs/2026-10-23-x.md"} 1') in output
     assert 'spec="docs/plans/old.md"' not in output
 
@@ -172,18 +209,18 @@ def test_invalid_or_missing_task_spec_is_omitted_without_hiding_other_series(spe
         event(2, "codex_exit", "valid", tokens=5), event(3, "land", "valid"),
     ], 0, 10)
     assert 'slug="one",spec=' not in output
-    assert 'slug="valid",spec="docs/plans/v1.43.5-valid.md"} 1' in output
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 4' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 2' in output
+    assert 'slug="valid",agent="codex",spec="docs/plans/v1.43.5-valid.md"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 4' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
 
 
 def test_landed_task_without_exit_omits_codex_samples_but_keeps_elapsed():
     output = dispatch_metrics.render([
         event(100, "start"), event(399, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 299' in output
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"}' not in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"}' not in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 299' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"}' not in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"}' not in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 4.983333333333333' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"}' not in output
 
@@ -192,9 +229,9 @@ def test_recorded_exit_keeps_codex_samples_including_zero_duration():
     output = dispatch_metrics.render([
         event(100, "start"), event(100, "codex_exit", tokens=0), event(399, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 0' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 1' in output
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 0' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 0' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 0' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 0.0' in output
 
 
@@ -203,8 +240,8 @@ def test_exit_without_launch_adds_nothing():
         event(0, "start"), event(100, "codex_exit", tokens=10),
         event(101, "codex_exit", tokens=20), event(200, "land"),
     ], 0, 200)
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 100' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 100' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
 
 
 def test_invalid_label_values_skipped():
@@ -336,10 +373,10 @@ k3dm_dispatch_rework_landed{window="1d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="1d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="1d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="1d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 20000
-k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one"} 10
-k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 30
-k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 20000
+k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 10
+k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 30
+k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2
 k3dm_dispatch_task_skipped{window="1d"} 0
 k3dm_dispatch_task_truncated{window="1d"} 0
 k3dm_dispatch_landed{window="7d"} 1
@@ -357,10 +394,10 @@ k3dm_dispatch_rework_landed{window="7d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="7d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="7d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="7d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one"} 20000
-k3dm_dispatch_task_codex_seconds{window="7d",version="9.9.9",slug="one"} 10
-k3dm_dispatch_task_elapsed_seconds{window="7d",version="9.9.9",slug="one"} 30
-k3dm_dispatch_task_runs{window="7d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one",agent="codex"} 20000
+k3dm_dispatch_task_codex_seconds{window="7d",version="9.9.9",slug="one",agent="codex"} 10
+k3dm_dispatch_task_elapsed_seconds{window="7d",version="9.9.9",slug="one",agent="codex"} 30
+k3dm_dispatch_task_runs{window="7d",version="9.9.9",slug="one",agent="codex"} 2
 k3dm_dispatch_task_skipped{window="7d"} 0
 k3dm_dispatch_task_truncated{window="7d"} 0
 k3dm_dispatch_landed{window="30d"} 1
@@ -378,10 +415,10 @@ k3dm_dispatch_rework_landed{window="30d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="30d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="30d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="30d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one"} 20000
-k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="one"} 10
-k3dm_dispatch_task_elapsed_seconds{window="30d",version="9.9.9",slug="one"} 30
-k3dm_dispatch_task_runs{window="30d",version="9.9.9",slug="one"} 2
+k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one",agent="codex"} 20000
+k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="one",agent="codex"} 10
+k3dm_dispatch_task_elapsed_seconds{window="30d",version="9.9.9",slug="one",agent="codex"} 30
+k3dm_dispatch_task_runs{window="30d",version="9.9.9",slug="one",agent="codex"} 2
 k3dm_dispatch_task_skipped{window="30d"} 0
 k3dm_dispatch_task_truncated{window="30d"} 0'''
     assert actual == expected
@@ -434,8 +471,8 @@ def test_release_elapsed_uses_full_task_history():
         event(now - 40 * 86400, "start", version="v1.43.5"),
         event(now - 86400, "land", version="v1.43.5"),
     ], 0, now)
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="7d",version="v1.43.5",slug="one"} 3369600' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="v1.43.5",version="v1.43.5",slug="one"} 3369600' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="7d",version="v1.43.5",slug="one",agent="codex"} 3369600' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="v1.43.5",version="v1.43.5",slug="one",agent="codex"} 3369600' in output
 
 
 def test_global_metrics_are_emitted_once_without_scope_labels():

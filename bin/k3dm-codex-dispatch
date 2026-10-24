@@ -131,6 +131,22 @@ _dispatch_codex_exit() {
   _dispatch_schedule_metrics
 }
 
+_dispatch_agy_exit() {
+  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tree json usage conversation
+  tree="$(git -C "$worktree" write-tree 2>/dev/null || true)"
+  [[ -n "$tree" ]] && printf '%s\n' "$tree" >"$run/codex-tree"
+  json="$(tail -n 1 "$log" 2>/dev/null || true)"
+  conversation="$(jq -r '.conversation_id // .conversationId // .session_id // empty' <<<"$json" 2>/dev/null || true)"
+  [[ -z "$conversation" ]] || printf '%s\n' "$conversation" >"$run/session"
+  usage="$(jq -c '.usage // .result.usage // empty' <<<"$json" 2>/dev/null || true)"
+  _dispatch_ledger_event_best_effort agent_exit "$version" "$slug" --argjson exit "$exit_code" \
+    --argjson usage "${usage:-null}" --arg tree "${tree:-}" \
+    '.exit=$exit|.usage=$usage|.tree=$tree'
+  [[ -z "$usage" ]] || _dispatch_ledger_event_best_effort agent_usage "$version" "$slug" \
+    --argjson usage "$usage" '.usage=$usage'
+  _dispatch_schedule_metrics
+}
+
 _dispatch_codex_usage() {
   local log="$1" version="$2" slug="$3" session_id codex_home file usage model input cached output
   local -a matches=()
@@ -166,7 +182,7 @@ _dispatch_codex_usage() {
 }
 
 _dispatch_worker() {
-  local operation="$1" worktree="$2" run="$3" version="$4" slug="$5" network="$6" n="${7:-}" session_id="${8:-}"
+  local operation="$1" worktree="$2" run="$3" version="$4" slug="$5" network="$6" n="${7:-}" session_id="${8:-}" agent="${9:-codex}" model="${10:-}" model_source="${11:-inherited}"
   local -a state_vars
   _dispatch_write_start_marker "$run" || { _dispatch_log "$run" "could not write worker start marker"; return 125; }
   state_vars=(
@@ -176,11 +192,19 @@ _dispatch_worker() {
   )
   cd "$worktree" || { _dispatch_log "$run" "could not enter worker worktree"; return 125; }
   set +e
-  if [[ "$operation" == start ]]; then
-    if (( network )); then
-      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
+  if [[ "$agent" == agy ]]; then
+    if [[ "$operation" == resume ]]; then
+      env "${state_vars[@]}" "${K3DM_AGY_BIN:-agy}" --print "$(<"$run/prompt-$n.md")" --output-format json --model "$model" --sandbox --add-dir "$worktree" --add-dir "$run/state" --dangerously-skip-permissions --conversation "$session_id" >"$run/agy-$n.log" 2>&1
     else
-      env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
+      env "${state_vars[@]}" "${K3DM_AGY_BIN:-agy}" --print "$(<"$run/prompt.md")" --output-format json --model "$model" --sandbox --add-dir "$worktree" --add-dir "$run/state" --dangerously-skip-permissions >"$run/agy.log" 2>&1
+    fi
+  elif [[ "$operation" == start ]]; then
+    if (( network )); then
+      if [[ -n "$model" ]]; then env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec -m "$model" --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1
+      else env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" -c sandbox_workspace_write.network_access=true - <"$run/prompt.md" >"$run/codex.log" 2>&1; fi
+    else
+      if [[ -n "$model" ]]; then env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec -m "$model" --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1
+      else env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1; fi
     fi
   elif (( network )); then
     env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
@@ -188,12 +212,23 @@ _dispatch_worker() {
     env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
   fi
   local exit_code="$?" log="$run/codex.log"
+  [[ "$agent" == agy ]] && log="$run/agy.log"
   [[ "$operation" == start ]] || log="$run/codex-$n.log"
-  _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write Codex exit marker"
-  if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"; then
-    _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
+  if [[ "$agent" == agy ]]; then
+    [[ "$operation" == start ]] || log="$run/agy-$n.log"
+    _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write agent exit marker"
+    if [[ "$(git -C "$worktree" rev-parse HEAD)" != "$(<"$run/base")" ]]; then
+      : >"$run/violation"
+      _dispatch_ledger_event_best_effort scope_violation "$version" "$slug" --arg reason 'agent committed' '.reason=$reason'
+    fi
+    _dispatch_agy_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"
+  else
+    _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write Codex exit marker"
+    if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"; then
+      _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
+    fi
+    _dispatch_codex_usage "$log" "$version" "$slug" || true
   fi
-  _dispatch_codex_usage "$log" "$version" "$slug" || true
   return "$exit_code"
 }
 
@@ -216,7 +251,7 @@ _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
 _dispatch_usage() {
   cat <<'EOF'
 Usage:
-  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--network]
+  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--network]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
@@ -325,17 +360,30 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug
+  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --agent) (($# >= 2)) || _dispatch_error "--agent requires a value"; agent="$2"; shift 2 ;;
+      --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; model_source=explicit; shift 2 ;;
       --network) network=1; shift ;;
       -h|--help) _dispatch_usage; return 0 ;;
       *) _dispatch_error "unknown start option: $1" ;;
     esac
   done
   [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  [[ "$agent" == codex || "$agent" == agy ]] || _dispatch_error "unknown agent: $agent"
+  if [[ "$agent" == agy ]]; then
+    (( network == 0 )) || _dispatch_error "--network is not supported with --agent agy"
+    [[ -n "$model" ]] || { model=gemini-4-argon-medium; model_source=default; }
+    available_models="$("${K3DM_AGY_BIN:-agy}" models 2>&1)" || _dispatch_error "agy models failed: $available_models"
+    if ! awk -F '\t' -v wanted="$model" 'NF && $1 == wanted {found=1} END {exit !found}' <<<"$available_models"; then
+      echo "[codex-dispatch] ERROR: unknown agy model: $model" >&2
+      printf '%s\n' "$available_models" >&2
+      exit 2
+    fi
+  fi
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
   git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1 || _dispatch_error "spec is not tracked: $spec"
@@ -365,7 +413,13 @@ _dispatch_start() {
   fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
-  _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" '.["network"]=$network | .["spec"]=$spec'
+  printf '%s\n' "$agent" >"$run/agent"
+  printf '%s\n' "$model" >"$run/model"
+  if [[ "$agent" == codex && -n "$model" ]]; then
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" '.network=$network|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+  else
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" '.network=$network|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+  fi
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
 Run the spec's Rules gates and paste their output.
@@ -374,7 +428,7 @@ Do not touch memory-bank/.
 Do not unset or override the K3DM_* and TMPDIR variables you were given. They keep this task's state away from the live webhook and from other tasks.
 Your last message must list every file you changed.
 EOF
-  _dispatch_detach_worker "$run" start "$worktree" "$run" "$version" "$slug" "$network" </dev/null
+  _dispatch_detach_worker "$run" start "$worktree" "$run" "$version" "$slug" "$network" "" "" "$agent" "$model" "$model_source" </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "worker did not acknowledge startup"
   echo "worktree: $worktree"; echo "run: $run"; echo "status: bin/k3dm-codex-dispatch status $slug"
 }
@@ -390,7 +444,8 @@ _dispatch_status() {
       state=landed
     elif [[ -f "$run/exit" ]]; then
       exit_code="$(head -n 1 "$run/exit")"
-      if [[ "$exit_code" == 0 ]]; then state="exited successfully"; else state="exited nonzero ($exit_code)"; fi
+      if [[ -f "$run/violation" ]]; then state="VIOLATION: agent committed"
+      elif [[ "$exit_code" == 0 ]]; then state="exited successfully"; else state="exited nonzero ($exit_code)"; fi
     elif _dispatch_worker_matches_start "$run"; then
       state=running
     elif [[ -s "$run/start" ]]; then
@@ -411,10 +466,11 @@ _dispatch_status() {
 }
 
 _dispatch_land() {
-  local slug="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts
+  local slug="" superseding="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --superseding) (($# >= 2)) || _dispatch_error "--superseding requires a slug"; superseding="$2"; shift 2 ;;
       --test) (($# >= 2)) || _dispatch_error "--test requires a command"; test_set=1; test_cmd="$2"; shift 2 ;;
       --no-test) no_test=1; shift ;;
       --allow-out-of-scope) allow=1; shift ;;
@@ -425,12 +481,22 @@ _dispatch_land() {
   (( test_set + no_test == 1 )) || _dispatch_error "land requires exactly one of --test CMD or --no-test"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
+  [[ ! -f "$run/violation" ]] || _dispatch_error "VIOLATION: agent committed"
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
   [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
   [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
+  local prior_slug prior_run
+  for prior_run in "$_dispatch_worktree_root/$version"/*.run; do
+    [[ -f "$prior_run/landed" ]] || continue
+    prior_slug="$(basename "$prior_run" .run)"
+    [[ "$prior_slug" == "$slug" ]] && continue
+    if [[ -f "$prior_run/spec" && "$(<"$prior_run/spec")" == "$spec" ]]; then
+      [[ "$superseding" == "$prior_slug" ]] || _dispatch_error "spec already landed by $prior_slug; use --superseding $prior_slug"
+    fi
+  done
   if ! _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow"; then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
     _dispatch_schedule_metrics
@@ -478,7 +544,7 @@ _dispatch_land() {
     codex_ts="$(<"$run/codex-exit-ts")"; wait_seconds=$((land_ts - codex_ts))
   fi
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
-    --argjson wait_seconds "$wait_seconds" '.["verifier_lines"]=$verifier_lines|.["wait_seconds"]=$wait_seconds'
+    --argjson wait_seconds "$wait_seconds" '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.chosen=true'
   _dispatch_schedule_metrics
   git -C "$_dispatch_repo_root" worktree remove "$task"
   git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
@@ -493,7 +559,7 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run session_id n network_slug
+  local slug="" prompt_file="" rel version task run session_id n network_slug agent model
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -510,8 +576,17 @@ _dispatch_resume() {
   if [[ ! -f "$run/exit" ]] && _dispatch_worker_matches_start "$run"; then
     _dispatch_error "Codex is still running"
   fi
-  session_id="$(sed -n 's/^session id: //p' "$run/codex.log" 2>/dev/null | head -n 1)"
-  [[ "$session_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || _dispatch_error "no valid session id in $run/codex.log"
+  agent="$(cat "$run/agent" 2>/dev/null || echo codex)"
+  model="$(cat "$run/model" 2>/dev/null || true)"
+  if [[ "$agent" == agy ]]; then
+    [[ -s "$run/session" ]] || _dispatch_error "agy run returned no conversation id; start a new task"
+    session_id="$(<"$run/session")"
+  else
+    session_id="$(sed -n 's/^session id: //p' "$run/codex.log" 2>/dev/null | head -n 1)"
+  fi
+  if [[ "$agent" != agy ]]; then
+    [[ "$session_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || _dispatch_error "no valid session id in $run/codex.log"
+  fi
   n=2
   while [[ -e "$run/prompt-$n.md" ]]; do ((n++)); done
   if [[ -f "$run/network" ]] && network_slug="$(_dispatch_network_task_running "$version")" && [[ "$network_slug" != "$slug" ]]; then
@@ -519,7 +594,7 @@ _dispatch_resume() {
   fi
   cp "$prompt_file" "$run/prompt-$n.md"
   rm -f "$run/exit" "$run/start"
-  _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" </dev/null
+  _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
   _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
   _dispatch_schedule_metrics

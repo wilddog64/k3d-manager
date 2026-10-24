@@ -243,7 +243,7 @@ def _task_state(task_events):
     if names & {"land", "abandon"}:
         return None
     launches = [e["ts"] for e in task_events if e.get("event") in {"start", "resume"}]
-    exits = [e["ts"] for e in task_events if e.get("event") == "codex_exit"]
+    exits = [e["ts"] for e in task_events if e.get("event") in {"codex_exit", "agent_exit"}]
     if not launches:
         return None
     if not exits or max(exits) < max(launches):
@@ -258,7 +258,7 @@ def _dispatch_state(task_events):
         return "landed"
     if last == "abandon":
         return "abandoned"
-    last_exit = max((e.get("ts", 0) for _, e in ordered if e.get("event") == "codex_exit"), default=None)
+    last_exit = max((e.get("ts", 0) for _, e in ordered if e.get("event") in {"codex_exit", "agent_exit"}), default=None)
     later_launch = any(e.get("event") in {"start", "resume"} and
                        (last_exit is None or e.get("ts", 0) > last_exit) for _, e in ordered)
     if later_launch:
@@ -268,18 +268,19 @@ def _dispatch_state(task_events):
         return "refused"
     if last_exit is not None:
         exit_event = next(e for _, e in reversed(ordered)
-                          if e.get("event") == "codex_exit" and e.get("ts", 0) == last_exit)
+                          if e.get("event") in {"codex_exit", "agent_exit"} and e.get("ts", 0) == last_exit)
         return "awaiting_land" if exit_event.get("exit") == 0 else "codex_failed"
     return "running" if any(e.get("event") in {"start", "resume"} for _, e in ordered) else "unknown"
 
 
 def _task_metrics(task_events, land_event, prices=None):
     ordered = sorted(enumerate(task_events), key=lambda item: (item[1]["ts"], item[0]))
-    exits = [event for _, event in ordered if event.get("event") == "codex_exit"]
+    exits = [event for _, event in ordered if event.get("event") in {"codex_exit", "agent_exit"}]
+    codex_exits = [event for event in exits if event.get("event") == "codex_exit"]
     launches = [event for _, event in ordered if event.get("event") in {"start", "resume"}]
     codex_seconds = 0
     previous_exit = None
-    for exit_event in exits:
+    for exit_event in codex_exits:
         candidates = [
             launch for launch in launches
             if launch["ts"] <= exit_event["ts"]
@@ -289,7 +290,7 @@ def _task_metrics(task_events, land_event, prices=None):
             codex_seconds += exit_event["ts"] - max(candidates, key=lambda event: event["ts"])["ts"]
         previous_exit = exit_event["ts"]
 
-    token_events = [event for event in exits if isinstance(event.get("tokens"), int)]
+    token_events = [event for event in codex_exits if isinstance(event.get("tokens"), int)]
     start_events = [event for event in task_events if event.get("event") == "start"]
     latest_start = max(enumerate(start_events), key=lambda item: (item[1].get("ts", 0), item[0]))[1] if start_events else {}
     elapsed = None
@@ -304,6 +305,7 @@ def _task_metrics(task_events, land_event, prices=None):
         "runs": len(exits),
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
         "spec": latest_start.get("spec"),
+        "agent": latest_start.get("agent") if latest_start.get("agent") in {"codex", "agy"} else ("codex" if "agent" not in latest_start else "other"),
     }
 
 
@@ -351,7 +353,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None):
         if task["runs"]:
             codex_values.append(task["codex_seconds"] / 60)
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
-                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"]))
+                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"]))
 
     return {
         "landed": len(landed),
@@ -442,17 +444,17 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             skipped += 1
             continue
         valid_tasks.append(task)
-    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec in valid_tasks[:TASK_CAP]:
-        labels = f'window="{window}",version="{version}",slug="{slug}"'
+    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent in valid_tasks[:TASK_CAP]:
+        labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}"'
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
-        if tokens is not None:
+        if agent == "codex" and tokens is not None:
             lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
-        if runs:
+        if agent == "codex" and runs:
             lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
         if elapsed_seconds is not None:
             lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
-        if runs:
+        if agent == "codex" and runs:
             lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
         if api_cost is not None:
             lines.append(f"k3dm_dispatch_task_api_cost_usd{{{labels}}} {api_cost}")

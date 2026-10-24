@@ -100,3 +100,12 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.
+# agy (Gemini 4 Argon)
+
+Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.
+
+agy runs inside the task worktree and can write its `.git` directory. The dispatcher compares the task branch with its recorded base when the worker exits. A commit creates a `scope_violation`, which status reports as `VIOLATION: agent committed` and land refuses. Leave changes uncommitted for review and landing.
+
+Resume an agy task with `bin/k3dm-codex-dispatch resume --slug <slug> --prompt-file <path>`. The dispatcher resumes only with the conversation ID stored from that task's JSON output; if agy did not return one, start a new task. It never selects the latest conversation implicitly. `--network` is unavailable for agy.
+
+For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace an already landed implementation, name that slug with `land --superseding <landed-slug>`.

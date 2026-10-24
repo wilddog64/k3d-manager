@@ -400,7 +400,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)'
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',)
 
 ## Show Codex worktree task status
 codex-status:
