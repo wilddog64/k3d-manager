@@ -5,7 +5,7 @@
 **Severity:** high — one `usage-backfill` run put the laptop at load 101 and made every Grafana panel error
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude after the operator reported every Bug Tracking panel in error
-**Approval:** pending
+**Approval:** explicit 2026-10-23. The operator said: "can you dispatch P1 bug".
 
 **Component:** `bin/k3dm-codex-dispatch` (`_dispatch_schedule_metrics`, `_dispatch_codex_usage`,
 `_dispatch_usage_backfill`)
