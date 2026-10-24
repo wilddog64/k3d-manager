@@ -1,6 +1,6 @@
 # Bug: `make restart-webhook` keeps launchd's cached environment, so `update-webhook-slack` changes never reach the webhook
 
-**Status:** LANDED `0f2f1f54` + `f916f44f` 2026-10-24 — was DISPATCHED 2026-10-24. E1 green (bats 5/5, also under a temp path containing the slug); tests 1, 2, 4 and 5 red on the pre-fix Makefile. Bootstrap now retries 5x (1s apart). Pending E2: operator runs `make restart-webhook`; Claude confirms `launchctl print` lists `K3DM_STATUS_CHANNEL_ID`.
+**Status:** VERIFIED 2026-10-24 06:00 PDT — E2: operator ran `make restart-webhook` ("reloaded LaunchAgent definition"); `launchctl print` now lists `K3DM_STATUS_CHANNEL_ID` (webhook pid 8544, cloud-bridge pid 8556 running). The status-channel post on this plist was already proven by job `ded5d015` (thread_ts, no delivery.jsonl), so no new cloud request was filed. Was LANDED `0f2f1f54` + `f916f44f` 2026-10-24 — was DISPATCHED 2026-10-24. E1 green (bats 5/5, also under a temp path containing the slug); tests 1, 2, 4 and 5 red on the pre-fix Makefile. Bootstrap now retries 5x (1s apart).
 **Priority:** P2
 **Severity:** medium — a plist environment change is silently inert; the status channel never took effect
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
