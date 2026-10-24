@@ -33,7 +33,36 @@ _dispatch_ledger_event_best_effort() {
 
 _dispatch_schedule_metrics() {
   mkdir -p "$_dispatch_worktree_root" 2>/dev/null || true
-  "$_dispatch_script_dir/k3dm-dispatch-metrics" >>"$_dispatch_worktree_root/metrics.log" 2>&1 &
+  local lock="$_dispatch_worktree_root/metrics.lock" pending="$_dispatch_worktree_root/metrics.pending"
+  if ! mkdir "$lock" 2>/dev/null; then
+    if [[ -d "$lock" ]] && find "$lock" -maxdepth 0 -mmin +10 -print -quit 2>/dev/null | grep -q .; then
+      rm -rf "$lock"
+      mkdir "$lock" 2>/dev/null || { touch "$pending"; return 0; }
+    else
+      touch "$pending"
+      # Close the release race: if the lock disappeared after our failed mkdir,
+      # become the next lock holder instead of leaving a pending request behind.
+      [[ -d "$lock" ]] || { _dispatch_schedule_metrics; return 0; }
+      return 0
+    fi
+  fi
+  (
+    _dispatch_metrics_cleanup() {
+      if (( owns_lock )); then rmdir "$lock" 2>/dev/null || true; fi
+    }
+    owns_lock=1
+    trap _dispatch_metrics_cleanup EXIT
+    trap 'exit 1' HUP INT TERM
+    while :; do
+      rm -f "$pending"
+      "${K3DM_DISPATCH_METRICS_BIN:-$_dispatch_script_dir/k3dm-dispatch-metrics}" >>"$_dispatch_worktree_root/metrics.log" 2>&1 || true
+      [[ -e "$pending" ]] && continue
+      rmdir "$lock" 2>/dev/null || break
+      owns_lock=0
+      if [[ -e "$pending" ]] && mkdir "$lock" 2>/dev/null; then owns_lock=1; continue; fi
+      break
+    done
+  ) &
 }
 
 _dispatch_log() {
@@ -133,7 +162,7 @@ _dispatch_codex_usage() {
       --argjson cached_input "$cached" --argjson output "$output" \
       '.session=$session|.model=null|.input=$input|.cached_input=$cached_input|.output=$output'
   fi
-  _dispatch_schedule_metrics
+  [[ "${_DISPATCH_SKIP_METRICS:-0}" == 1 ]] || _dispatch_schedule_metrics
 }
 
 _dispatch_worker() {
@@ -209,7 +238,7 @@ _dispatch_usage_backfill() {
       if jq -se --arg v "$version" --arg s "$slug" --arg id "$session" \
         'any(.[]; .event == "codex_usage" and .version == $v and .slug == $s and .session == $id)' \
         "$ledger" >/dev/null 2>&1; then continue; fi
-      if _dispatch_codex_usage "$log" "$version" "$slug"; then ((backfilled += 1)); else
+      if _DISPATCH_SKIP_METRICS=1 _dispatch_codex_usage "$log" "$version" "$slug"; then ((backfilled += 1)); else
         if ! find "${CODEX_HOME:-${HOME}/.codex}/sessions" -type f \
           -name "rollout-*-${session}.jsonl" -print -quit 2>/dev/null | grep -q .; then
           ((missing += 1))
@@ -219,6 +248,7 @@ _dispatch_usage_backfill() {
   done < <(find "$_dispatch_worktree_root" -mindepth 2 -maxdepth 2 -type d -name '*.run' -print0 2>/dev/null)
   echo "backfilled: $backfilled"
   echo "missing: $missing"
+  ((backfilled == 0)) || _dispatch_schedule_metrics
 }
 
 _dispatch_release_branch() {

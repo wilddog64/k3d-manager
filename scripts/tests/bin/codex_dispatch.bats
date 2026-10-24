@@ -6,6 +6,18 @@ setup() {
   export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9" CODEX_HOME="$BATS_TEST_TMPDIR/codex-home"
   export K3DM_CODEX_BIN="$BATS_TEST_TMPDIR/codex-stub"
   mkdir -p "$FIXTURE" "$HOME" "$K3DM_WORKTREE_ROOT"
+  export K3DM_DISPATCH_METRICS_BIN="$BATS_TEST_TMPDIR/metrics-stub"
+  cat >"$K3DM_DISPATCH_METRICS_BIN" <<'METRICS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'start\n' >>"$METRICS_STARTS"
+mkdir "$METRICS_ACTIVE" 2>/dev/null || : >"$METRICS_OVERLAP"
+sleep 1
+rmdir "$METRICS_ACTIVE" 2>/dev/null || true
+METRICS
+  chmod +x "$K3DM_DISPATCH_METRICS_BIN"
+  export METRICS_STARTS="$BATS_TEST_TMPDIR/metrics-starts"
+  export METRICS_ACTIVE="$BATS_TEST_TMPDIR/metrics-active" METRICS_OVERLAP="$BATS_TEST_TMPDIR/metrics-overlap"
   git init --bare "$ORIGIN" >/dev/null
   git clone "$ORIGIN" "$FIXTURE" >/dev/null
   git -C "$FIXTURE" checkout -b k3d-manager-v9.9.9 >/dev/null
@@ -160,8 +172,7 @@ EOF
 
 @test "codex dispatch: records nonzero Codex exit before bookkeeping" {
   export STUB_RC=42 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
-  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
-  sleep 1
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 42 ]
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-exit-ts" ]
   run dispatch status one
@@ -235,7 +246,8 @@ EOF
 
 @test "codex dispatch: argv has sandbox worktree and state dir" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/argv" STUB_ENV="$BATS_TEST_TMPDIR/env"
-  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
   argv="$(<"$BATS_TEST_TMPDIR/argv")"
   [[ "$argv" == *"exec --sandbox workspace-write -C $K3DM_WORKTREE_ROOT/v9.9.9/one --add-dir $K3DM_WORKTREE_ROOT/v9.9.9/one.run/state"* ]]
   [[ "$argv" != *"network_access=true"* ]]
@@ -650,7 +662,11 @@ EOF
 
 @test "codex dispatch: usage-backfill is idempotent" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
-  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  for _ in {1..50}; do [[ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]] && break; sleep 0.1; done
+  for _ in {1..50}; do [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]] && break; sleep 0.1; done
+  : >"$METRICS_STARTS"
   mkdir -p "$CODEX_HOME/sessions/2026/10/23"
   cat >"$CODEX_HOME/sessions/2026/10/23/rollout-test-01a122dd-71c3-7763-87f0-3de505f10168.jsonl" <<'EOF'
 {"type":"session_meta","payload":{"id":"01a122dd-71c3-7763-87f0-3de505f10168","timestamp":"2026-10-23T10:00:00Z"}}
@@ -659,7 +675,33 @@ EOF
 EOF
   run dispatch usage-backfill
   [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 1"* ]]; [[ "$output" == *"missing: 0"* ]]
+  sleep 1.2
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
   run dispatch usage-backfill
   [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 0"* ]]
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
   [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
+@test "codex dispatch: metrics scheduling coalesces concurrent requests and preserves the last request" {
+  local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
+  sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
+  run bash -c 'source "$1"; for _ in {1..20}; do _dispatch_schedule_metrics; done' _ "$source_file"
+  [ "$status" -eq 0 ]
+  for _ in {1..50}; do [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]] && break; sleep 0.1; done
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -ge 2 ]
+  [ ! -e "$METRICS_OVERLAP" ]
+}
+
+@test "codex dispatch: metrics scheduling takes stale lock and respects fresh lock" {
+  local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
+  sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
+  mkdir "$K3DM_WORKTREE_ROOT/metrics.lock"
+  touch -t 202001010000 "$K3DM_WORKTREE_ROOT/metrics.lock"
+  run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
+  [ "$status" -eq 0 ]; sleep 1.2
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
+  rm -f "$METRICS_STARTS"; mkdir "$K3DM_WORKTREE_ROOT/metrics.lock"
+  run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
+  [ "$status" -eq 0 ]; [ ! -e "$METRICS_STARTS" ]
 }

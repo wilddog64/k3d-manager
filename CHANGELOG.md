@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- Codex usage backfills now schedule one metrics export, and dispatch metrics exports run single-flight with a pending rerun for events received during an export.
+
 - Updated cluster teardown regression tests for the confirmed-teardown-first contract: failed or
   unverified AWS teardown preserves hub registration, and provider tests cover teardown ordering
   and unreachable hub behavior.
