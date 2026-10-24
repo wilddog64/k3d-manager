@@ -416,3 +416,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Per spec links E3 live-verified by operator ("spec link works").
 - [ ] Windowing bug `docs/bugs/2026-10-23-dispatch-api-cost-windowed-by-ledger-write-time.md` (P2) filed `972e6595`, approved ("go as you suggested"), dispatched 2026-10-23.
 - [ ] Operator asked for per-release totals on the Per spec table (tokens, Codex time, time to land, API equiv) — proposed table footer; pending go.
+- [x] Cloud-bridge at-most-once E2 live-verified 2026-10-24 01:16 UTC: 4 ids, 4 webhook calls, overlapping health + cluster-status both answered, outbox empty. Side note: `bin/k3dm-cloud-request` fails (stale-info push reject) when two filings race; not retried.
