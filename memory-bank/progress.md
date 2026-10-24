@@ -411,3 +411,8 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] Bug filed `docs/bugs/2026-10-23-dispatch-cost-row-by-model-no-data-and-raw-coverage-label.md` (P3, approval pending): By model No data (target not instant — unproven), coverage legend raw labels.
 - [ ] By model / coverage label P3 approved + dispatched 2026-10-23.
 - [ ] Cloud-bridge fix review: rework 1 sent (R1 unscrubbed job-status output stored to outbox pre-scrub; R2 outbox loses watch_add+artifacts; R3 restart reason field).
+- [x] By model / coverage label P3 LANDED `5d3bc140` 2026-10-23 (rework 1: promtool Docker entrypoint + window label). E3 awaits Argo hard refresh.
+- [x] Cloud-bridge at-most-once fix LANDED `744847f6` 2026-10-23 (rework 1 R1-R3 verified; 93 pytest, 6 new red pre-fix). E2 awaits `make restart-cloud-bridge` + live two-request check.
+- [x] Per spec links E3 live-verified by operator ("spec link works").
+- [ ] Windowing bug `docs/bugs/2026-10-23-dispatch-api-cost-windowed-by-ledger-write-time.md` (P2) filed `972e6595`, approved ("go as you suggested"), dispatched 2026-10-23.
+- [ ] Operator asked for per-release totals on the Per spec table (tokens, Codex time, time to land, API equiv) — proposed table footer; pending go.

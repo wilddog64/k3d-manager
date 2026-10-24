@@ -1,6 +1,6 @@
 # Bug: Agent dispatch "By model" shows No data, and "Ledger coverage" is titled with raw labels
 
-**Status:** OPEN
+**Status:** LANDED `5d3bc140` 2026-10-23 — E1 green (40 pytest; tests 1-2 red on the pre-fix dashboard). E2: promtool (quay.io prometheus v3.1.0, --entrypoint=promtool) returns one series per model; it does so for the pre-fix expression too, so the range query is not proven to be the cause. Rework 1 fixed the Docker fallback entrypoint and the expected `window` label. E3 pending the Argo hard refresh.
 **Priority:** P3
 **Severity:** low — the totals are correct on the same row; one panel is blank, one is mislabelled
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

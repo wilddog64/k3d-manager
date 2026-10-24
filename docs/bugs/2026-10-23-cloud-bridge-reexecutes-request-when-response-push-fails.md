@@ -1,6 +1,6 @@
 # Bug: the cloud bridge re-executes a request when its response push fails
 
-**Status:** OPEN
+**Status:** LANDED `744847f6` 2026-10-23 — E1 green (93 pytest; the 6 new tests red on the pre-fix bridge). Rework 1 fixed: outbox written before the job-status credential scrub (R1), outbox dropped watch entry and artifacts (R2), restart error used a body not a reason (R3). One existing test's `_processed` stub now records writes, which the claim journal needs. E2 pending: `make restart-cloud-bridge`, then a live two-request check.
 **Priority:** P2
 **Severity:** medium — a `make-*` request can start a second job; reads are only repeated
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
