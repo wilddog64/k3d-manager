@@ -19,7 +19,7 @@ if [[ -r "${PLUGINS_DIR}/hub_recovery.sh" ]] && ! declare -f _hub_recovery_recor
 fi
 
 function _hub_snapshot_ssh() {
-  _run_command -- ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
+  _run_command -- ssh -n -o BatchMode=yes -o ConnectTimeout=10 -- "$K3DM_SNAPSHOT_HOST" "$*"
 }
 
 function _hub_snapshot_node_container() {
