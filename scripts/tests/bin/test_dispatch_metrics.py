@@ -2,6 +2,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -12,6 +14,14 @@ SPEC = importlib.util.spec_from_loader("dispatch_metrics", importlib.machinery.S
 dispatch_metrics = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = dispatch_metrics
 SPEC.loader.exec_module(dispatch_metrics)
+
+DASHBOARD_PATH = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
+
+
+def load_dispatch_dashboard():
+    dashboard_path = Path(os.environ.get("DISPATCH_DASHBOARD_PATH", DASHBOARD_PATH))
+    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
+    return json.loads("\n".join(line[4:] for line in raw.splitlines()))
 
 
 def event(ts, name, slug="one", **extra):
@@ -504,9 +514,7 @@ def test_subscriptions_are_global_and_unlabelled_by_window():
 
 
 def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
-    dashboard_path = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
-    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
-    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    dashboard = load_dispatch_dashboard()
     by_title = {panel["title"]: panel for panel in dashboard["panels"]}
     titles = {"Codex at API prices", "Per landed spec", "Cached input", "Subscriptions / month",
               "Ledger coverage", "By model", "Projected / month"}
@@ -527,3 +535,59 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
         for prior in boxes:
             assert rect[2] <= prior[0] or prior[2] <= rect[0] or rect[3] <= prior[1] or prior[3] <= rect[1]
         boxes.append(rect)
+
+
+def test_by_model_target_is_instant_and_uses_model_legend():
+    panel = next(panel for panel in load_dispatch_dashboard()["panels"] if panel["id"] == 27)
+    target = panel["targets"][0]
+    assert target["instant"] is True
+    assert target["legendFormat"] == "{{model}}"
+
+
+def test_ledger_coverage_targets_have_named_legends():
+    panel = next(panel for panel in load_dispatch_dashboard()["panels"] if panel["id"] == 24)
+    assert panel["targets"][0]["legendFormat"] == "in the ledger"
+    assert panel["targets"][1]["legendFormat"] == "outside the ledger"
+
+
+@pytest.mark.external
+def test_by_model_promql_returns_one_series_per_model(tmp_path):
+    dashboard = load_dispatch_dashboard()
+    panel = next(panel for panel in dashboard["panels"] if panel["id"] == 27)
+    expression = panel["targets"][0]["expr"].replace('$window', '7d')
+    promtool = shutil.which("promtool")
+    docker = shutil.which("docker")
+    if not promtool and not docker:
+        pytest.skip("promtool unavailable and Docker not installed; cannot evaluate PromQL")
+
+    rules = tmp_path / "rules.yml"
+    tests = tmp_path / "tests.yml"
+    rules.write_text(
+        "groups:\n- name: dashboard\n  rules:\n"
+        f"  - record: dashboard_by_model\n    expr: {json.dumps(expression)}\n"
+    )
+    tests.write_text(
+        "rule_files:\n- rules.yml\nevaluation_interval: 1m\ntests:\n"
+        "- interval: 1m\n  input_series:\n"
+        "  - series: 'k3dm_dispatch_api_cost_by_model_usd{window=\"7d\",model=\"gpt-5.6-luna\"}'\n"
+        "    values: '1'\n"
+        "  - series: 'k3dm_dispatch_api_cost_by_model_usd{window=\"7d\",model=\"gpt-6-luna\"}'\n"
+        "    values: '2'\n"
+        "  promql_expr_test:\n  - expr: dashboard_by_model\n    eval_time: 0m\n"
+        "    exp_samples:\n"
+        "    - labels: '{__name__=\"dashboard_by_model\", model=\"gpt-5.6-luna\", window=\"7d\"}'\n      value: 1\n"
+        "    - labels: '{__name__=\"dashboard_by_model\", model=\"gpt-6-luna\", window=\"7d\"}'\n      value: 2\n"
+    )
+    if promtool:
+        command = [promtool, "test", "rules", str(tests)]
+        result = subprocess.run(command, cwd=tmp_path, text=True, capture_output=True)
+    else:
+        result = subprocess.run(
+            [docker, "run", "--rm", "-v", f"{tmp_path}:/work", "-w", "/work",
+             "--entrypoint=promtool", "quay.io/prometheus/prometheus:v3.1.0",
+             "test", "rules", "tests.yml"],
+            text=True, capture_output=True,
+        )
+        if result.returncode and "permission denied" in result.stderr.lower():
+            pytest.skip("promtool unavailable; Docker daemon socket permission denied")
+    assert result.returncode == 0, result.stdout + result.stderr

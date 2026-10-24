@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- The Agent dispatch dashboard's By model panel now uses an instant query, and Ledger coverage names its percentage "in the ledger".
+
 - Codex usage backfills now schedule one metrics export, and dispatch metrics exports run single-flight with a pending rerun for events received during an export.
 
 - Updated cluster teardown regression tests for the confirmed-teardown-first contract: failed or
