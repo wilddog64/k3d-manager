@@ -236,3 +236,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: PR #148 CI 40124898903 GREEN on eae158cc (lint ubuntu-24.04, ok 356, dashboard-queries ran, pytest 1202, ruff clean, kubeconform 81/81). Copilot 0 unresolved, MERGEABLE. enforce_admins DELETE blocked by auto-mode classifier — operator to run it. Evidence commit kept local (unpushed) to avoid re-triggering CI.
 - 2026-10-24: PR #148 MERGED 12:34 PDT, squash 401e4eca; enforce_admins re-enabled (true). Next: operator appsets-reapply/appsets-check/platform-ops, then /post-merge (tag v1.43.5).
 - 2026-10-24: appsets-reapply (hub 5 + app-cluster 8 on k3d-manager-v1.43.5), appsets-check all on branch, platform-ops done, vulnerability-inventory-exporter rolled out. Starting /post-merge.
+- 2026-10-24: /post-merge v1.43.5 — tag v1.43.5 on 401e4eca, GitHub release created, branch k3d-manager-v1.43.6 cut, retro docs/retro/2026-10-24-v1.43.5-retrospective.md.
