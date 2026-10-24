@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.5] - 2026-10-24
+
 ### Fixed
 
 - `hub_snapshot_list` now lists every verified and incomplete snapshot, and pruning removes all verified snapshots older than the newest configured keep count. SSH calls no longer consume the remote-name loop's standard input.
@@ -13,47 +15,6 @@
   `platform-ops-notifications` Secret when `SLACK_WEBHOOK_URL` is unset, without exposing the URL
   in curl arguments.
 
-### Added
-
-- Offline Bug Tracking dashboard query coverage against producer-shaped metrics using real PromQL.
-
-- API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
-  configurable `K3DM_STATUS_CHANNEL_ID`; slash-command reports keep their original destination.
-
-- Agent dispatch's Per spec table has a totals row: Codex tokens, Codex time, Codex runs and API
-  equiv. are summed over the selected window or release. Time to land is left out, since the Time
-  to land stat already shows its mean. By model bars now start at zero, so the smaller model's bar
-  is no longer drawn empty.
-
-- Agent dispatch's Per spec table links each task name to its plan or bug document on the task's release branch.
-
-- The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.
-
-- The Agent dispatch ledger records cumulative Codex session input, cached-input and output tokens;
-  its dashboard estimates API-equivalent costs by task, scope and model, plus ledger coverage and
-  subscription costs. Prices are explicitly maintained in `scripts/etc/agent/codex-model-prices.json`.
-
-- The k3dm Agent dispatch dashboard's Window selector now lists each release from v1.43.0 (the start of the
-  dispatch ledger) after 1d, 7d and 30d. A release scope counts that release's lands and refusals whenever
-  they happened, so a release's totals stop shifting as time windows roll over; the time-window output is
-  unchanged. The Bug Tracking Plans table's Dispatch cell opens Agent dispatch on that release, Agent
-  dispatch's Release cell opens Bug Tracking on it, and each dashboard links to the other at the top.
-
-- The cloud bridge accepts `diagnose-pods-all` (`provider` only), the bridge form of `/cluster-diagnose <provider>`: it sends the webhook's fixed `get-pods-all` action and returns `kubectl get pods --all-namespaces -o wide` through `job-status`.
-
-- `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.
-
-- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory. The forecast sits between the plan tiles and the Plans table; its Remaining releases table lists only unshipped milestones (the plan count no longer adds rows for shipped releases) and hides the `job` and `instance` labels. The table follows the dashboard's Release selector; the tiles stay whole-path.
-
-- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed; hidden metadata columns use `custom.hidden`, because `hideFrom` does not hide a table column.
-
-### Changed
-
-- E2E failure tables now expose source run dates and current matching-run status, with shared
-  service/tier/runner filters and exact Run ID selection. The guide clarifies instant-query,
-  retention, and row-cap semantics.
-
-### Fixed
 
 - `make restart-webhook` reloads the webhook LaunchAgent definition from its plist so environment changes take effect.
 
@@ -137,6 +98,46 @@
 - **Bug Tracking now requires live proof to name its fix commit.** Newly LIVE-VERIFIED bug
   documents must include a **Fix commit:** header, and at least one evidence commit must contain
   that fix; this prevents valid pre-squash release-branch proof from being reported as stale.
+
+### Added
+
+- Offline Bug Tracking dashboard query coverage against producer-shaped metrics using real PromQL.
+
+- API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
+  configurable `K3DM_STATUS_CHANNEL_ID`; slash-command reports keep their original destination.
+
+- Agent dispatch's Per spec table has a totals row: Codex tokens, Codex time, Codex runs and API
+  equiv. are summed over the selected window or release. Time to land is left out, since the Time
+  to land stat already shows its mean. By model bars now start at zero, so the smaller model's bar
+  is no longer drawn empty.
+
+- Agent dispatch's Per spec table links each task name to its plan or bug document on the task's release branch.
+
+- The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.
+
+- The Agent dispatch ledger records cumulative Codex session input, cached-input and output tokens;
+  its dashboard estimates API-equivalent costs by task, scope and model, plus ledger coverage and
+  subscription costs. Prices are explicitly maintained in `scripts/etc/agent/codex-model-prices.json`.
+
+- The k3dm Agent dispatch dashboard's Window selector now lists each release from v1.43.0 (the start of the
+  dispatch ledger) after 1d, 7d and 30d. A release scope counts that release's lands and refusals whenever
+  they happened, so a release's totals stop shifting as time windows roll over; the time-window output is
+  unchanged. The Bug Tracking Plans table's Dispatch cell opens Agent dispatch on that release, Agent
+  dispatch's Release cell opens Bug Tracking on it, and each dashboard links to the other at the top.
+
+- The cloud bridge accepts `diagnose-pods-all` (`provider` only), the bridge form of `/cluster-diagnose <provider>`: it sends the webhook's fixed `get-pods-all` action and returns `kubectl get pods --all-namespaces -o wide` through `job-status`.
+
+- `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.
+
+- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory. The forecast sits between the plan tiles and the Plans table; its Remaining releases table lists only unshipped milestones (the plan count no longer adds rows for shipped releases) and hides the `job` and `instance` labels. The table follows the dashboard's Release selector; the tiles stay whole-path.
+
+- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed; hidden metadata columns use `custom.hidden`, because `hideFrom` does not hide a table column.
+
+### Changed
+
+- E2E failure tables now expose source run dates and current matching-run status, with shared
+  service/tier/runner filters and exact Run ID selection. The guide clarifies instant-query,
+  retention, and row-cap semantics.
 
 ## [1.43.4] - 2026-10-18
 
