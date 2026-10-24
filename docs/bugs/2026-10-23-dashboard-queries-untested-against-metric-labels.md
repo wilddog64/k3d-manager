@@ -1,7 +1,7 @@
 # Bug: Bug Tracking dashboard tests check panel structure, never whether a query matches the metrics
 
 **Filed:** 2026-10-23 (Claude, found during live E3 of `release-plan-tracking`)
-**Status:** OPEN
+**Status:** FIXED offline — `baa2d055` (Luna, two rework fixes by Claude); E1, E3 and the E2 local skip verified 2026-10-24; E2's "not skipped in CI" check waits for the v1.43.5 PR run
 **Priority:** P2 — a wrong query ships green and shows "No data" or duplicate rows; the only check is a person looking at the live dashboard
 **Severity:** medium
 **Approval:** approved to file — operator, 2026-10-23: "file a bug (maybe P2) for what you discovered"
@@ -9,6 +9,8 @@
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `scripts/tests/plugins/grafana_dashboard_bugs.bats`, `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
 **Related:** `docs/plans/v1.43.5-release-plan-tracking.md`, `docs/bugs/2026-10-18-dispatch-dashboard-window-variable-confused-with-time-picker.md`
+**Fix commit:** `baa2d055`
+**Offline evidence (2026-10-24, Claude):** real promtool via Docker `prom/prometheus:v3.1.0`, 1 passed. Red on two mutated dashboard copies: `release_order=~"$release"` (queries 18 and 26 return nothing) and a bare `or` instead of `or on(plan)` (the undispatched-plan row disappears). With no promtool or Docker on PATH, the test reports SKIP with its reason. Claude's fixes on top of Luna's rework: the fixture now passes a real `fixed_in`, and the table-column check ignores Grafana's `Time`/`Value #X` fields.
 
 ## Symptom
 
