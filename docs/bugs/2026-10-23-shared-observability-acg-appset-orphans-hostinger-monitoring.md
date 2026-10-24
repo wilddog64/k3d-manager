@@ -1,6 +1,6 @@
 # Bug: one shared `observability-acg` ApplicationSet serves Hostinger and the ACG sandbox, so each sandbox lifecycle takes Hostinger's monitoring out of Argo
 
-**Status:** OPEN — dispatch after `2026-10-23-api-cluster-status-posts-to-command-channel` lands
+**Status:** DISPATCHED 2026-10-23
 **Priority:** P2
 **Severity:** medium — Hostinger's Prometheus, Alertmanager, Loki and Trivy keep running, but Argo stops managing them (no sync, no drift repair, no upgrades) until the next Hostinger refresh
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

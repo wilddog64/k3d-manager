@@ -1,6 +1,6 @@
 # Bug: API-origin cluster status reports land in #acg-automation with the slash-command traffic
 
-**Status:** OPEN — dispatch after the P2 tunnel and P3 snapshot-age fixes land and are verified
+**Status:** LANDED `7016f6d0` 2026-10-23 — E1/E2 green (pytest 28, bats 12); 6 pytest tests and bats test 7 red on the pre-fix code. E3 pending: operator invites the bot to #grafana-notification and runs `K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack`.
 **Priority:** P3
 **Severity:** low — reports arrive, but in the command channel; alert-style status is mixed with operator commands
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

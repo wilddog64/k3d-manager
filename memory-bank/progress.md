@@ -3,7 +3,7 @@
 ## 2026-10-23 API status channel bug filed
 
 - [x] P2 tunnel E2 PASSED 18:58 PDT (agents → Hostinger host, store Ready, 20/20 synced). Hostinger ESO outage over.
-- [ ] NEW P2 `2026-10-23-shared-observability-acg-appset-orphans-hostinger-monitoring.md` — exact spec written + APPROVED ("yes, go ahead"); dispatch after status-channel lands. Matrix clusters×list, releaseName kept, finalizers stripped before new template. Operator started a sandbox `make up` 19:10 PDT on old code → Hostinger monitoring apps repointed to ubuntu-k3s until fixed; no Hostinger refresh while sandbox is up. Shared single-destination set; sandbox up repoints it, teardown deletes it.
+- [ ] NEW P2 `2026-10-23-shared-observability-acg-appset-orphans-hostinger-monitoring.md` — exact spec written + APPROVED ("yes, go ahead"); DISPATCHED 2026-10-23 ~19:30 PDT. Matrix clusters×list, releaseName kept, finalizers stripped before new template. Operator started a sandbox `make up` 19:10 PDT on old code → Hostinger monitoring apps repointed to ubuntu-k3s until fixed; no Hostinger refresh while sandbox is up. Shared single-destination set; sandbox up repoints it, teardown deletes it.
 - [ ] Hostinger `make status` from operator tmux (Claude's `!` shell has no keychain → UNKNOWN) to recheck ArgoCD/Alertmanager login failures; also P3 snapshot E2.
 - [x] P3 snapshot-age unit LANDED `ea043dfb` (E1 green, test 1 red pre-fix); E2 = operator `make status` before `make snapshot`.
 - [x] P2 bare-tunnel-start LANDED `8ca5668f` (E1 green; E2 = operator `make refresh CLUSTER_PROVIDER=k3s-hostinger`, then Claude verifies). Earlier: review found F2 would block the Hostinger reconcile (`tunnel_stop` leaves wrappers at `ubuntu`); spec amended with F3 (`37a2d879`, reconcile sets `TUNNEL_FORCE_HOST=1`), rework resume 2 running. Hold `make refresh CLUSTER_PROVIDER=k3s-hostinger` until it lands.
@@ -432,3 +432,5 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Complexity plan filed: `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5 of 5, now full; operator: "that's fine. we go as planned"). Spec size at dispatch, change size at land, separate columns, no score, no backfill. Dispatch waits for the v1.43.7 branch.
 - [ ] P2 bare `tunnel_start` repoints Hostinger tunnels (DISPATCHED 2026-10-23, operator: "go ahead to dispatch P2 and P3 to Codex"); Hostinger recovery via `make refresh CLUSTER_PROVIDER=k3s-hostinger` pending operator.
 - [ ] P3 status snapshot age missing unit (DISPATCHED 2026-10-23).
+
+- [x] Status-channel P3 LANDED `7016f6d0` 2026-10-23; E3 (bot invite + `K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack`) pending.
