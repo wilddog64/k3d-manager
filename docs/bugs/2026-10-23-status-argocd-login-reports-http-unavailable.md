@@ -1,6 +1,6 @@
 # Bug: the status ArgoCD login check reports "HTTP unavailable" for a rejected password, and nothing outside hub recovery repairs the stale Vault copy
 
-**Status:** DISPATCHED — 2026-10-23
+**Status:** LANDED `9f48d5f0` 2026-10-23 — E1 green (pytest test_smoke_logins.py 18, bats hub_recovery.bats 58, shellcheck clean); the 401 and non-JSON-200 tests red on the pre-fix `smoke.py`. Pending E2: the operator runs `make argocd-admin-resync` from tmux, then a status report shows ArgoCD login HTTP 200.
 **Priority:** P3 — ArgoCD itself and ArgoCD SSO are healthy; only the admin-password check fails, and the operator can read `argocd-initial-admin-secret`
 **Severity:** low
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
