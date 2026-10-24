@@ -93,6 +93,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - e2e sandbox settle-wait fix is LIVE-VERIFIED by run `1792355973-27075`; the later `8417cf04` failure is a distinct startup-order race.
 
 ## Open / pending
+- 2026-10-24: placed the two coordinator caveats as v1.44.2 plans 3–4 (roadmap only; specs unwritten). Analysis spec after Claude's coordinator week; Codex-coordinator spec before Codex's week.
+- 2026-10-24: operator: plan the two coordinator-trial caveats (measuring the bug-sweep quota impression; Codex-as-coordinator interactive-session rules) in a later proper release; v1.44.1 plans stand as written.
 - 2026-10-24: filed v1.44.1 plan 4 docs/plans/v1.44.1-dispatch-agy-agent.md (agy/Gemini 4 Argon via dispatcher, gemini.sh model drift) and plan 5 docs/plans/v1.44.1-coordinator-rotation-trial.md (each agent as coordinator; quota per activity kind on dashboard). v1.44.1 now at cap 5 (plan 2 Slack spec still unwritten). Dispatch when v1.44.1 is cut. Full make test + pytest green after 73b5ece9 (BATS 1815/1815, tripwire clean on tunnel.bats; pytest 1212 passed, 1 skipped).
 - 2026-10-24 frontend-login P2: live partial. Two postgres-keycloak restarts (outages 10:05:51–10:06:44, 10:12:32–10:12:46 PDT). Operator login during the 2nd: short spinner, then success, no hang. Click time not captured and the 15 s retry screen not exercised, so it stays PARTIAL; operator approved moving it and the Kine P2 to v1.43.6 (verification-only; Release lines updated). P3 filed: docs/bugs/2026-10-24-postgres-keycloak-one-second-probe-timeouts.md. make test: 1815/1815 ok but tripwire FAIL — three tunnel.bats tunnel_start tests (from 8ca5668f) didn't stub launchctl; stubbed, rerun pending once pytest finishes.
 

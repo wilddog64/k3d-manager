@@ -477,6 +477,16 @@ a lost job is `lost`, not `failed`), and a read-only per-cluster desired/observe
 stale signals and drift. No auto-repair in this slice. It follows the 2026-10-23 tunnel, shared
 `observability-acg` and snapshot-age bugs. Design review pending before dispatch.
 
+Plans 3 and 4 (operator, 2026-10-24: "plan those two caveats with proper release"; specs to be
+written). Both depend on v1.44.1's coordinator rotation trial, so this is the first release they can
+go in:
+- **Coordinator activity analysis.** Use at least one week of the trial's per-activity data to test
+  the 2026-10-24 impression that a Claude bug sweep uses the weekly quota slowly. Fill any
+  instrumentation gaps the first week shows. Write the spec after Claude's coordinator week.
+- **Codex as coordinator.** The rules and session setup for an interactive Codex coordinator period:
+  how it starts, which instruction file it follows, and how it hands live checks to the operator.
+  Write the spec before Codex's period starts.
+
 ### Candidate milestone — v1.44.3 (patch)
 
 **Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
