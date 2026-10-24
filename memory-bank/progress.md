@@ -471,3 +471,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-24: v1.43.5 release prep committed (CHANGELOG promoted to [1.43.5] - 2026-10-24 with duplicate Fixed merged; README/releases rows). PR opened at operator request.
 - [ ] 2026-10-24: v1.43.5 PR #148 opened (71d42046); Copilot requested; CI run 40119374541 in progress. Then: Copilot fixes, confirm test_dashboard_queries ran (not skipped) in CI, enforce_admins off, operator merges.
 - [ ] 2026-10-24: PR #148 CI lint failed — ubuntu-latest is now 26.04 (sudo-rs visudo rejects chmod wildcard). Filed P1 docs/bugs/2026-10-24-ci-lint-visudo-rejects-sudoers-on-ubuntu-26-04.md; lint pinned to ubuntu-24.04. Awaiting rerun.
+- [ ] 2026-10-24: PR #148 rerun: BATS green (visudo fix works); 2 pytest fails = tripwire blocks docker-run promtool. Filed P1 docs/bugs/2026-10-24-ci-promql-tests-blocked-by-tripwire-docker.md; lint installs pinned promtool 3.1.0 (sha256).

@@ -6,6 +6,7 @@
 
 ### Fixed
 
+- CI: the `lint` job installs a checksum-verified `promtool` 3.1.0, so the Bug Tracking and Agent Dispatch PromQL tests run against real promtool instead of falling back to `docker run`, which the tripwire blocks.
 - CI: the `lint` job is pinned to `ubuntu-24.04`. `ubuntu-latest` moved to Ubuntu 26.04, whose sudo-rs `visudo` rejects the wildcard argument in the macOS `chmod` sudoers rule, so the `install-sudoers.sh --dry-run` syntax check failed on every PR. The rules target classic sudo, which 24.04 still ships, so the check now runs against it.
 - `hub_snapshot_list` now lists every verified and incomplete snapshot, and pruning removes all verified snapshots older than the newest configured keep count. SSH calls no longer consume the remote-name loop's standard input.
 - `ask-docs` bug counts: a question about one state ("how many bugs fixed") led with that state's count and then the full breakdown, so the reply read "75 closed bug docs — 75 fixed, 6 open", as if 75 were the whole release. It now names the total it is part of: "75 closed bug docs of 81 — 75 fixed, 6 open". Counted answers also ended with `Sources: none` although they come from `scripts/bug-tally.py` over `docs/bugs/`; they now cite the tally script. The footer "Counted from docs/bugs/ at HEAD" now also names the commit it counted at ("at HEAD `5a31cf25`"), so a reply can be matched to the tree it describes; when `git rev-parse` fails the SHA is left out rather than printing the error.
