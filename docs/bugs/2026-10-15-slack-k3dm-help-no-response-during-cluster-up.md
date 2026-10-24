@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — missing response observed; delivery root cause not yet established
+**Status:** LIVE-VERIFIED — 2026-10-21: operator Slack screenshot shows the `/k3dm targets` help response arriving while `cluster-up (aws)` is still running. The separate cluster-up progress notification remains top-level; that is tracked by `2026-10-15-cluster-up-progress-slack-thread-missing.md` and is not covered by this fix.
+**Live evidence:** 2026-10-21 · run 2b6e4f97 · env slack/k3d-manager · scenario k3dm-help-during-cluster-up · commit 61230daa · proves fix
+**Fix commit:** 61230daa
 **Priority:** P2 — ChatOps command reliability
 **Reported incident:** AWS `cluster-up` job `f58814c3`, Oct 15 around 10:52–10:54 local time
 
@@ -40,4 +42,74 @@ Operator screenshot shows `cluster-up (aws)` started at 10:52 (job `f58814c3`), 
 - Verify unauthorized actors get explicit feedback, authorized actors are not dropped by dedupe/role handling, and Slack event HTTP acknowledgment isn't conflated with successful command execution.
 - Use mocked Slack calls; no live cluster provision or destructive operation in tests.
 
-**Implementation:** not started. No Slack command or live infrastructure was invoked to file this report.
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_stale_cleanup.py`
+- `scripts/tests/lib/webhook.bats`
+
+**Implementation:** landed as `61230daa` on `k3d-manager-v1.43.5`. The help response now uses bounded chunk delivery; delivery attempts and command-handler exceptions are correlated to the Slack event and recorded without secrets. Thread-targeted replies do not fall back to non-thread-capable incoming webhooks.
+
+## Offline verification — 2026-10-20
+
+The dispatched implementation is **not verified for landing**. Focused tests passed:
+
+```text
+python3 -m pytest -q scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_stale_cleanup.py
+29 passed
+```
+
+The broader required suite did not pass:
+
+```text
+bats scripts/tests/lib/webhook.bats
+59 passed, 6 skipped, 3 failed
+not ok 25 Slack cluster parser accepts tokens in any order and dry-run isolates execution
+not ok 66 webhook role helpers preserve token admin and fail closed
+not ok 67 webhook fix mode requires operator+ role, not question phrasing
+```
+
+The changes remained in the isolated dispatch worktree and were not landed at that point. No live
+Slack command was sent. The three failures were later diagnosed and corrected as described below.
+
+## Follow-up offline verification — 2026-10-21
+
+The three BATS failures were caused by the test harness calling
+`SourceFileLoader.load_module()`, which is unavailable in the active Python 3.15.0 runtime. They
+failed before reaching the webhook assertions. The test snippets now use `SourceFileLoader` with
+`importlib.util`'s spec/module/`exec_module` APIs; production behavior was not changed to address
+these interpreter-compatibility failures.
+
+Independent verification in the isolated dispatch worktree:
+
+```text
+bats --filter 'Slack cluster parser accepts tokens in any order and dry-run isolates execution' scripts/tests/lib/webhook.bats
+1..1
+ok 1 Slack cluster parser accepts tokens in any order and dry-run isolates execution
+
+bats --filter 'webhook role helpers preserve token admin and fail closed' scripts/tests/lib/webhook.bats
+1..1
+ok 1 webhook role helpers preserve token admin and fail closed
+
+bats --filter 'fix mode requires operator' scripts/tests/lib/webhook.bats
+1..1
+ok 1 webhook fix mode requires operator+ role, not question phrasing
+
+bats scripts/tests/lib/webhook.bats
+1..68
+68 passed, 5 skipped
+
+python3 -m pytest -p no:cacheprovider -q scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_stale_cleanup.py
+29 passed in 0.32s
+
+shellcheck scripts/tests/lib/webhook.bats
+git diff --check
+_agent_lint exit=0
+_agent_audit exit=0
+```
+
+The operator's 2026-10-21 screenshot shows the `/k3dm targets` response during an active AWS
+`cluster-up`, confirming the responsive help path in live Slack. The same screenshot shows the
+cluster-up progress update as a separate top-level message; that distinct thread-context defect
+remains open under `2026-10-15-cluster-up-progress-slack-thread-missing.md`.

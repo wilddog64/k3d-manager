@@ -26,44 +26,13 @@ Deploy SMB CSI driver to enable shared storage for Jenkins agents using Mac M2/M
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Mac M2/M4 (10.211.55.1)                                 │
-│ - macOS File Sharing (SMB/Samba)                        │
-│ - Shared folder: ~/jenkins-shared                       │
-│ - Credentials: Mac username/password                    │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          │ SMB Protocol (port 445/139)
-                          │
-┌─────────────────────────▼─────────────────────────────┐
-│ k3s Cluster (Ubuntu VM - 10.211.55.14)                │
-│                                                        │
-│  ┌──────────────────────────────────────────────┐    │
-│  │ SMB CSI Driver (kube-system namespace)       │    │
-│  │ - csi-smb-controller                         │    │
-│  │ - csi-smb-node (DaemonSet on all nodes)     │    │
-│  └──────────────────────────────────────────────┘    │
-│                          │                             │
-│  ┌──────────────────────▼───────────────────────┐    │
-│  │ StorageClass: smb                            │    │
-│  │ - provisioner: smb.csi.k8s.io                │    │
-│  │ - source: //10.211.55.1/jenkins-shared       │    │
-│  └──────────────────────────────────────────────┘    │
-│                          │                             │
-│  ┌──────────────────────▼───────────────────────┐    │
-│  │ PersistentVolumeClaim: jenkins-smb-workspace │    │
-│  │ - accessModes: ReadWriteMany                 │    │
-│  │ - storage: 10Gi                              │    │
-│  └──────────────────────────────────────────────┘    │
-│                          │                             │
-│         ┌────────────────┴────────────────┐           │
-│         │                                  │           │
-│  ┌──────▼──────┐                  ┌───────▼──────┐   │
-│  │ Jenkins Pod │                  │ Agent Pod 1  │   │
-│  │ /mnt/shared │                  │ /mnt/shared  │   │
-│  └─────────────┘                  └──────────────┘   │
-└────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    MAC[Mac M2/M4\nmacOS SMB share\n~/jenkins-shared] -->|SMB 445/139| CSI[SMB CSI Driver\nkube-system\ncontroller + node DaemonSet]
+    CSI --> SC[StorageClass smb\nsmb.csi.k8s.io\n//10.211.55.1/jenkins-shared]
+    SC --> PVC[PVC jenkins-smb-workspace\nReadWriteMany\n10Gi]
+    PVC --> J[Jenkins Pod\n/mnt/shared]
+    PVC --> A[Agent Pod 1\n/mnt/shared]
 ```
 
 ---

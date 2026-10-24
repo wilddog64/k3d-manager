@@ -112,7 +112,7 @@ _BOLD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.*)$", re.MULTILINE)
 _BARE_STATUS_RE = re.compile(r"^Status:\s*(.*)$", re.MULTILINE)
 _STATUS_HEADING_RE = re.compile(r"^## Status\s*$", re.IGNORECASE | re.MULTILINE)
 _CLOSED_RE = re.compile(
-    r"^(?:FIXED|CLOSED|RESOLVED|DONE|WONTFIX|WON'T FIX|SUPERSEDED|DUPLICATE|VERIFIED|LIVE-VERIFIED)\b"
+    r"^(?:FIXED|CLOSED|RESOLVED|DONE|WONTFIX|WON'T FIX|SUPERSEDED|DUPLICATE|VERIFIED|LIVE-VERIFIED|IMPLEMENTED|LANDED)\b"
     r"|^Fixed (?:on|in)\b", re.IGNORECASE
 )
 _BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTILINE)

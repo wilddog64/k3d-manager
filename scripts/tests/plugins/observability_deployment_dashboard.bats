@@ -23,3 +23,25 @@ PY
   run grep -F -- 'export K3DM_PUSHGATEWAY_URL=""' "${HARNESS}"
   [ "${status}" -eq 0 ]
 }
+
+@test "stat tiles read current values in stacked rows; the graph keeps history" {
+  run python3 - "${DASHBOARD}" <<'PY'
+import json, sys
+text = open(sys.argv[1]).read()
+dash = json.loads(text.split(".json: |\n", 1)[1].replace("\n    ", "\n"))
+stats = [p for p in dash["panels"] if p["type"] == "stat"]
+assert len(stats) == 4, f"expected 4 stat panels, found {len(stats)}"
+for p in stats:
+    t = p["targets"][0]
+    assert t.get("instant") is True and t.get("range") is False, f"{p['title']}: not an instant query"
+    assert p["options"]["orientation"] == "horizontal", f"{p['title']}: values not stacked in rows"
+    assert p["options"]["textMode"] == "value_and_name", f"{p['title']}: name hidden"
+    if "duration" in t["expr"]:
+        assert "status" not in t["expr"] and "status" not in t["legendFormat"], f"{p['title']}: still split by status"
+series = [p for p in dash["panels"] if p["type"] == "timeseries"]
+assert len(series) == 1 and not series[0]["targets"][0].get("instant"), "graph lost its history"
+print("OK")
+PY
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"OK"* ]]
+}

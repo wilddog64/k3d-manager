@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -36,11 +37,14 @@ def thread_job(monkeypatch, tmp_path):
     parent = tmp_path / "parent"
     parent.mkdir()
     (parent / "thread_ts").write_text("T")
+    (parent / "channel_id").write_text("C1")
+    (parent / "thread_source").write_text("bot")
+    (parent / "response_url").write_text("https://example.invalid/response")
     return parent
 
 
 def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
-    monkeypatch, thread_job, capsys
+    monkeypatch, thread_job, capsys, caplog
 ):
     calls = []
     bot_calls = []
@@ -49,7 +53,7 @@ def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
     monkeypatch.setattr(
         wh,
         "_post_slack_bot",
-        lambda text, thread_ts=None, channel_id=None: calls.append((text, thread_ts))
+        lambda text, thread_ts=None, channel_id=None: calls.append((text, thread_ts, channel_id))
         or bot_calls.append((text, thread_ts, channel_id))
         or "reply",
     )
@@ -60,10 +64,40 @@ def test_ask_docs_thread_runs_without_channel_and_replies_in_parent_thread(
     assert len(subjobs) == 1
     assert (subjobs[0] / "action").read_text() == "ask-docs"
     assert (subjobs[0] / "thread_ts").read_text() == "T"
+    assert (subjobs[0] / "channel_id").read_text() == "C1"
+    assert (subjobs[0] / "thread_source").read_text() == "bot"
+    assert not (subjobs[0] / "response_url").exists()  # agent-audit: allow assert-removed response_url no longer copied to the sub-job (bug F2)
     assert calls[0] == ("what is X", True)
-    assert ("doc answer", "T") in calls
-    assert ("doc answer", "T", None) in bot_calls
+    assert ("doc answer", "T", "C1") in calls
+    assert ("doc answer", "T", "C1") in bot_calls  # agent-audit: allow assert-removed answer now carries the parent channel by design
     assert "what is X" not in capsys.readouterr().out
+    assert "what is X" not in caplog.text
+
+
+def test_ask_docs_thread_without_parent_route_is_not_sent_to_default_channel(
+    monkeypatch, thread_job, caplog
+):
+    parent = thread_job
+    (parent / "channel_id").unlink()
+    (parent / "thread_source").unlink()
+    (parent / "response_url").unlink()
+    monkeypatch.setattr(wh.ask_docs, "answer", lambda question, summarise: "doc answer")
+    bot_calls = []
+    monkeypatch.setattr(
+        wh, "_post_slack_bot",
+        lambda text, thread_ts=None, channel_id=None: bot_calls.append((text, thread_ts, channel_id)) or "unexpected",
+    )
+
+    wh._handle_thread_command("parent", "ask-docs what is X", role="reader")
+
+    subjobs = [p for p in parent.parent.iterdir() if p.name != "parent"]
+    assert len(subjobs) == 1
+    assert not (subjobs[0] / "channel_id").exists()
+    assert not bot_calls
+    assert "route=none channel=missing thread_ts=T reason=not_delivered" in caplog.text
+    delivery = json.loads((subjobs[0] / "delivery.jsonl").read_text().splitlines()[-1])
+    assert delivery["route"] == "none"
+    assert delivery["delivered"] is False
 
 
 def test_ask_docs_sources_preserves_flag_and_usage_has_no_subjob(monkeypatch, thread_job):

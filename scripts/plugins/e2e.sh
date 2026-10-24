@@ -190,7 +190,7 @@ function _e2e_sandbox_preflight_hub() {
 
 function _e2e_sandbox_hub_apps_ready() {
   local ns="${E2E_HUB_ARGOCD_NAMESPACE:-cicd}" listing bad
-  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline
+  local timeout="${E2E_HUB_APPS_TIMEOUT:-420}" interval="${E2E_HUB_APPS_INTERVAL:-10}" deadline frontend_recovery_attempted=0
   deadline=$(( SECONDS + timeout ))
   while :; do
     listing="$(_e2e_hub_kc -n "$ns" get applications.argoproj.io \
@@ -201,6 +201,14 @@ function _e2e_sandbox_hub_apps_ready() {
     fi
     bad="$(awk '$2 != "Synced" || $3 != "Healthy"' <<< "$listing")"
     [[ -z "$bad" ]] && break
+    if (( frontend_recovery_attempted == 0 )) \
+      && awk '$1 == "ubuntu-k3s-shopping-cart-frontend" && $2 == "Synced" && $3 == "Degraded" {f=1} END {exit !f}' <<< "$listing" \
+      && awk '$1 == "ubuntu-k3s-shopping-cart-product-catalog" && $2 == "Synced" && $3 == "Healthy" {f=1} END {exit !f}' <<< "$listing"; then
+      frontend_recovery_attempted=1
+      _warn "[e2e] frontend upstream recovery: product-catalog is healthy but frontend is degraded; restarting deployment/frontend once"
+      _e2e_sandbox_kc -n shopping-cart-apps rollout restart deployment/frontend || \
+        _warn "[e2e] frontend upstream recovery: rollout restart deployment/frontend failed; continuing to wait for hub Applications"
+    fi
     if (( SECONDS >= deadline )); then
       _err "[e2e] hub Applications for ubuntu-k3s are not all Synced and Healthy after ${timeout}s: $(tr '\n' ';' <<< "$bad")"
       return 1
@@ -432,6 +440,50 @@ function _e2e_sandbox_preflight_auth() {
   fi
   _err "[e2e] ACG preflight: service=${service} credentials_loadable=false unreadable=${unreadable}; this is the same loader the session check uses, so a value it cannot read is a value unattended login will never see — the entry is absent, the login keychain is locked (security reports 'User interaction is not allowed' on reads), or the value was stored empty; add the personal no-MFA account under the accounts username and password via the ACG auto-login enablement guide (profile_dir=${profile_dir} exists but proves nothing about session validity); markers: ACG_SESSION_OK=authenticated, ACG_LOGIN_MFA_REQUIRED=MFA refused, ACG_SESSION_EXPIRED=not authenticated, ACG_CREDENTIALS_REQUIRED=fail-closed credential gate"
   return 1
+}
+
+function e2e_sandbox_preview() {
+  local candidate_digest="${1:-}" output line
+
+  _e2e_load_deps
+  if ! declare -f acg_extend_playwright >/dev/null 2>&1 && [[ -r "${PLUGINS_DIR}/acg.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${PLUGINS_DIR}/acg.sh"
+  fi
+  if output="$(_e2e_sandbox_preflight_auth 2>&1)"; then
+    printf '%s\n' '[e2e-preview] acg login: ok'
+  else
+    if [[ -n "$output" ]]; then
+      while IFS= read -r line; do
+        printf '[e2e-preview] %s\n' "$line"
+      done <<< "$output"
+    fi
+    return 1
+  fi
+
+  if _e2e_sandbox_cluster_ready; then
+    printf '%s\n' '[e2e-preview] ubuntu-k3s: ready — would reuse it'
+  else
+    printf '%s\n' '[e2e-preview] ubuntu-k3s: absent or not ready — would run make up CLUSTER_PROVIDER=k3s-aws'
+  fi
+
+  if output="$(_e2e_sandbox_preflight_hub 2>&1)"; then
+    printf '%s\n' '[e2e-preview] hub: ok'
+  else
+    if [[ -n "$output" ]]; then
+      while IFS= read -r line; do
+        printf '[e2e-preview] %s\n' "$line"
+      done <<< "$output"
+    fi
+    return 1
+  fi
+
+  if [[ -n "$candidate_digest" ]]; then
+    printf '[e2e-preview] digest: %s\n' "$candidate_digest"
+  else
+    printf '%s\n' '[e2e-preview] digest: default (none given)'
+  fi
+  printf '%s\n' '[e2e-preview] no changes made; rerun with confirm to run Tier 2'
 }
 
 function e2e_verify_sandbox() {

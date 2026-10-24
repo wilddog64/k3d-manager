@@ -197,8 +197,10 @@ Change 1 fixes today's exit site. Change 2 makes the trap survive the next one. 
 `_e2e_exit_trap` so the only step that frees a shared, contended resource runs before any
 step that talks to the network:
 
-```
-summary (local file write)  →  teardown (frees the namespace)  →  result event (network)
+```mermaid
+flowchart LR
+    S[Summary\nlocal file write] --> T[Teardown\nfrees the namespace]
+    T --> E[Result event\nnetwork]
 ```
 
 Teardown removes the per-run log and kubeconfig; it does not touch the summary JSON that

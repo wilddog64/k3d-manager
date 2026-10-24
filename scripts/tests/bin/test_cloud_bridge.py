@@ -29,6 +29,11 @@ REQUEST_SPEC.loader.exec_module(helper)
 NOW = datetime(2026, 9, 25, 20, 14, 3, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def isolated_bridge_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "STATE_DIR", tmp_path / "bridge-state", raising=False)
+
+
 def request(action="cluster-status", args=None, expires=None):
     return {
         "schema": 1,
@@ -192,6 +197,220 @@ def test_process_tick_fetches_once_and_returns_pushed_tip(monkeypatch):
     assert calls == ["fetch", "write"]
 
 
+def _configure_push_failure_tick(monkeypatch, requests, webhook, write):
+    remote_tip = ["a" * 40]
+    processed = set()
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: remote_tip[0])
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set(processed))
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: list(requests))
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, request_id: (requests[request_id], None))
+    monkeypatch.setattr(bridge, "_call_webhook", webhook)
+
+    def commit(repo, parent, request_id, response, *args, **kwargs):
+        result = write(request_id, response)
+        processed.add(request_id)
+        return result
+
+    monkeypatch.setattr(bridge, "_write_commit", commit)
+    return processed
+
+
+def test_response_push_failure_retries_outbox_without_recalling_webhook(monkeypatch):
+    request_id = "20260925T201403Z-cluster-status"
+    calls = []
+    attempts = []
+    requests = {request_id: request()}
+
+    def webhook(value):
+        calls.append(value["action"])
+        return bridge._response("", value["action"], "ok", 200, body={"answer": 42})
+
+    def write(_request_id, response):
+        attempts.append(response)
+        if len(attempts) == 1:
+            raise RuntimeError("lost lease")
+        return "b" * 40
+
+    processed = _configure_push_failure_tick(monkeypatch, requests, webhook, write)
+    with pytest.raises(RuntimeError, match="lost lease"):
+        bridge.process_tick(Path("/nonexistent"), ROOT)
+    tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert calls == ["cluster-status"]
+    assert count == 1
+    assert tip == "b" * 40
+    assert len(attempts) == 2
+    assert attempts[0] == attempts[1]
+    assert request_id in processed
+    assert not (bridge.STATE_DIR / "outbox" / f"{request_id}.json").exists()
+
+
+def test_job_status_outbox_and_retry_never_contain_credentials(monkeypatch):
+    request_id = "20260925T201403Z-job-status"
+    credential = "Bearer ghp_sensitiveExample123"
+    requests = {request_id: request("job-status", {"job_id": "a" * 8})}
+    published = []
+    disk_snapshots = []
+    attempts = []
+
+    def webhook(value):
+        return bridge._response("", value["action"], "ok", 200,
+                                body={"status": "success", "output": f"Authorization: {credential}"})
+
+    def store(request_id, response, *args, **kwargs):
+        original_store(request_id, response, *args, **kwargs)
+        disk_snapshots.append((bridge.STATE_DIR / "outbox" / f"{request_id}.json").read_text())
+
+    def write(_request_id, response):
+        attempts.append(response)
+        published.append(json.dumps(response))
+        if len(attempts) == 1:
+            raise RuntimeError("push failed")
+        return "b" * 40
+
+    original_store = bridge._store_outbox
+    monkeypatch.setattr(bridge, "_store_outbox", store)
+    _configure_push_failure_tick(monkeypatch, requests, webhook, write)
+    with pytest.raises(RuntimeError, match="push failed"):
+        bridge.process_tick(Path("/nonexistent"), ROOT)
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert disk_snapshots
+    assert all(credential not in snapshot for snapshot in disk_snapshots)
+    assert all(credential not in record for record in published)
+
+
+def test_outbox_retry_preserves_watch_entry_and_artifacts(monkeypatch):
+    request_id = "20260925T201403Z-make-test-pytest"
+    requests = {request_id: request("make-test-pytest")}
+    webhook_calls = []
+    commits = []
+    branch = {}
+    processed = set()
+    artifact_path = f"artifacts/{request_id}/summary.json"
+    artifact_bytes = b'{"job_status":"success"}\n'
+
+    def webhook(value):
+        webhook_calls.append(value["action"])
+        return bridge._response("", value["action"], "ok", 202,
+                                body={"status": "queued", "job_id": "a" * 8})
+
+    def write(repo, parent, rid, response, artifacts=None, watch_add=None, **kwargs):
+        commits.append((response, artifacts or {}, watch_add))
+        if len(commits) == 1:
+            raise RuntimeError("push failed")
+        branch[f"responses/{rid}.json"] = response
+        branch.update(artifacts or {})
+        if watch_add:
+            branch.setdefault("watching", []).append(watch_add)
+        processed.add(rid)
+        return "b" * 40
+
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_now", lambda: NOW)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set(processed))
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: [request_id])
+    monkeypatch.setattr(bridge, "_read_request", lambda repo, ref, rid: (requests[rid], None))
+    monkeypatch.setattr(bridge, "_call_webhook", webhook)
+    monkeypatch.setattr(bridge, "job_artifacts", lambda *args: ({artifact_path: artifact_bytes}, [artifact_path]))
+    monkeypatch.setattr(bridge, "_write_commit", write)
+
+    with pytest.raises(RuntimeError, match="push failed"):
+        bridge.process_tick(Path("/nonexistent"), ROOT)
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert webhook_calls == ["make-test-pytest"]
+    assert branch[f"responses/{request_id}.json"]["body"]["status"] == "queued"
+    assert branch["watching"][0]["request_id"] == request_id
+    assert branch[artifact_path] == artifact_bytes
+    assert commits[1][1] == {artifact_path: artifact_bytes}
+    assert commits[1][2]["request_id"] == request_id
+
+
+def test_lost_lease_new_request_publishes_both_without_repeating_first(monkeypatch):
+    first_id = "20260925T201403Z-cluster-status"
+    second_id = "20260925T201404Z-cluster-status"
+    requests = {first_id: request(), second_id: request()}
+    calls = []
+    attempts = []
+
+    def webhook(value):
+        calls.append(value["action"])
+        return bridge._response("", value["action"], "ok", 200, body={"id": len(calls)})
+
+    def write(request_id, response):
+        attempts.append(request_id)
+        if request_id == first_id and attempts.count(first_id) == 1:
+            raise RuntimeError("lost lease")
+        return "b" * 40
+
+    _configure_push_failure_tick(monkeypatch, requests, webhook, write)
+    with pytest.raises(RuntimeError, match="lost lease"):
+        bridge.process_tick(Path("/nonexistent"), ROOT)
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert calls == ["cluster-status", "cluster-status"]
+    assert attempts == [first_id, first_id, second_id]
+    assert count == 2
+
+
+def test_claim_without_outbox_publishes_restart_error_without_webhook(monkeypatch):
+    request_id = "20260925T201403Z-cluster-status"
+    bridge.STATE_DIR.mkdir(parents=True)
+    (bridge.STATE_DIR / "claimed.txt").write_text(request_id + "\n")
+    writes = []
+    monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
+    monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_request_ids", lambda repo, ref: [request_id])
+    monkeypatch.setattr(bridge, "_call_webhook", lambda value: pytest.fail("must not call webhook"))
+    monkeypatch.setattr(bridge, "_git", lambda repo, args, **kwargs: (_ for _ in ()).throw(RuntimeError("missing")))
+    monkeypatch.setattr(bridge, "_write_commit", lambda repo, ref, rid, response: writes.append(response) or "b" * 40)
+
+    _tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
+    assert count == 1
+    assert writes[0]["status"] == "error"
+    assert writes[0]["reason"] == (
+        "bridge restarted before the request completed; outcome unknown — file a new request")
+    assert "body" not in writes[0]
+
+
+def test_slow_request_push_failure_does_not_queue_webhook_twice(monkeypatch):
+    request_id = "20260925T201403Z-health"
+    calls = []
+    attempts = []
+    requests = {request_id: request("health")}
+    gate = threading.Event()
+
+    def webhook(value):
+        calls.append(value["action"])
+        gate.wait(2)
+        return bridge._response("", value["action"], "ok", 200, body={"healthy": True})
+
+    def write(_request_id, response):
+        attempts.append(response)
+        if len(attempts) == 1:
+            raise RuntimeError("lost lease")
+        return "b" * 40
+
+    _configure_push_failure_tick(monkeypatch, requests, webhook, write)
+    bridge._slow_pending.clear()
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+    gate.set()
+    deadline = time.monotonic() + 2
+    while not (bridge.STATE_DIR / "outbox" / f"{request_id}.json").exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    with pytest.raises(RuntimeError, match="lost lease"):
+        bridge.process_tick(Path("/nonexistent"), ROOT)
+    bridge.process_tick(Path("/nonexistent"), ROOT)
+
+    assert calls == ["health"]
+    assert len(attempts) == 2
+
+
 def test_process_tick_refetches_after_hitting_max_per_tick(monkeypatch):
     request_ids = [f"20260925T2014{index:02d}Z-cluster-status" for index in range(11)]
     processed = set()
@@ -233,11 +452,12 @@ def test_slow_health_runs_off_loop_and_main_thread_commits(monkeypatch):
         "20260925T201400Z-health": request("health"),
         "20260925T201401Z-cluster-status": request("cluster-status"),
     }
+    processed = set()
 
     monkeypatch.setattr(bridge, "_remote_tip", lambda repo: "a" * 40)
     monkeypatch.setattr(bridge, "_now", lambda: NOW)
     monkeypatch.setattr(bridge, "_fetch", lambda repo: "parent")
-    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set())
+    monkeypatch.setattr(bridge, "_processed", lambda repo, ref: set(processed))
     request_id_calls = [0]
     def request_ids(_repo, _ref):
         request_id_calls[0] += 1
@@ -252,8 +472,11 @@ def test_slow_health_runs_off_loop_and_main_thread_commits(monkeypatch):
         return bridge._response("", value["action"], "ok", 200, body={})
 
     monkeypatch.setattr(bridge, "_call_webhook", fake_call)
-    monkeypatch.setattr(bridge, "_write_commit", lambda *args, **kwargs: writes.append(
-        (args[2], threading.get_ident())) or pushed)
+    def fake_write(*args, **kwargs):
+        writes.append((args[2], threading.get_ident()))
+        processed.add(args[2])
+        return pushed
+    monkeypatch.setattr(bridge, "_write_commit", fake_write)
     bridge._slow_pending.clear()
     first_tip, count = bridge.process_tick(Path("/nonexistent"), ROOT)
     assert health_started.wait(1)
@@ -469,7 +692,7 @@ def test_request_helper_actions_and_arguments_match_bridge():
 
 @pytest.mark.parametrize("action, argument", [
     ("make-fix-status", "NS=bad;ns"),
-    ("make-find-similar-docs", "Q=$(x)"),
+    ("make-find-similar-docs", "Q=" + "x" * 201),
 ])
 def test_request_helper_rejects_invalid_action_arguments_without_filing(action, argument):
     with pytest.raises(SystemExit) as error:
@@ -574,6 +797,23 @@ def test_make_vuln_scan_rejects_arguments():
         request("make-vuln-scan", {"NS": "identity"}), now=NOW)
     assert value is None
     assert reason == "unexpected argument"
+
+
+def test_vulnerability_report_cloud_actions_keep_reader_routes_and_no_arguments():
+    assert bridge.ACTION_ALLOWLIST["make-vuln-scan-report"] == (
+        "POST", "/api/v1/make", {}, "vuln-scan-report")
+    assert bridge.ACTION_ALLOWLIST["make-vuln-scan"] == (
+        "POST", "/api/v1/make", {}, "vuln-scan")
+    for action in ("make-vuln-scan-report", "make-vuln-scan"):
+        value, reason = bridge.validate_request(request(action), now=NOW)
+        assert reason is None
+        assert value["action"] == action
+        target = bridge.ACTION_ALLOWLIST[value["action"]][3]
+        assert make_targets.MAKE_TARGETS[target]["min_role"] == "reader"
+        value, reason = bridge.validate_request(
+            request(action, {"NS": "identity"}), now=NOW)
+        assert value is None
+        assert reason == "unexpected argument"
 
 
 def test_make_fix_status_requires_ns():
@@ -694,6 +934,7 @@ def test_test_suite_actions_post_their_target():
 
 DIAGNOSE_ACTIONS = {
     "diagnose-pods": ("get-pods", {"provider": "hostinger", "namespace": "identity"}),
+    "diagnose-pods-all": ("get-pods-all", {"provider": "hub"}),
     "diagnose-describe-pod": ("describe-pod", {"provider": "hub", "namespace": "identity", "name": "keycloak-0"}),
     "diagnose-logs": ("logs", {"provider": "aws", "namespace": "shopping-cart-payment", "name": "payment-0"}),
     "diagnose-apps": ("get-apps", {}),

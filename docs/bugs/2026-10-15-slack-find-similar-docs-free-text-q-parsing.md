@@ -3,8 +3,11 @@
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P3 — Slack command usability / argument parsing
-**Status:** OPEN — observed in Slack and parser confirmed; implementation not started
-**Approval:** operator explicitly requested P3 bug filing; no implementation authorized
+**Status:** LIVE-VERIFIED — operator Slack job `08ae7d06` succeeded on 2026-10-21
+**Live evidence:** 2026-10-21 · run 08ae7d06 · env Slack/thread · scenario find-similar-docs-free-text-Q · commit 997587d6 · proves fix
+**Fix commit:** `997587d6`
+**Fix commits:** `74d79eac`, `997587d6`
+**Approval:** operator explicitly requested review and dispatch on 2026-10-21; implementation is authorized within the scoped files below
 
 ## Observed failure
 
@@ -66,7 +69,24 @@ should pass the full string as a single `Q` value to the existing validated exec
 - `scripts/lib/webhook/make_targets.py` — `find-similar-docs` `Q` contract.
 - Intent-driven / natural-language command goals of k3d-manager.
 
-**Implementation:** not started. Filing this report does not change application code or live infrastructure.
+## Verification — 2026-10-21
+
+The fix landed on `k3d-manager-v1.43.5` in `74d79eac` and `997587d6`. Offline verification passed:
+
+- `python3 -m pytest -q -p no:cacheprovider scripts/tests/bin/test_cloud_bridge.py scripts/tests/bin/webhook_make_targets.py` — 124 passed, 97 subtests passed.
+- `node --test workers/slack-relay/test/relay.test.mjs` — 47 passed.
+- `bats scripts/tests/lib/webhook.bats scripts/tests/plugins/slack_slash_commands.bats` — 76 tests, 6 environment-gated skips, no failures.
+- Python AST parsing, `_agent_audit`, `_agent_lint`, and `git diff --check` passed.
+
+At the time of the failed attempts, the offline gates established that the landed release-branch code accepted and safely transported the query, but live verification was pending. The later successful operator run below supersedes that pending status.
+
+### Live verification — 2026-10-21
+
+Operator screenshot shows Slack job `08ae7d06` succeeded for the exact query `what's recent e2e-remote issues`. The output begins `Prior art for: "what's recent e2e-remote issues"` and returns matching prior-art documents, including E2E remote-runner and harness items. This confirms the natural-language query, including its apostrophe and spaces, passed through the live command and produced retrieval results. Status advanced to **LIVE-VERIFIED**. The screenshot does not independently establish which deployment revision served the request.
+
+### Live verification failure — 2026-10-21
+
+The operator tried the slash command twice; both returned `⚠️ invalid value for Q` after a `Queuing make find-similar-docs…` acknowledgment. This does not pass the live gate. The landed relay source uses a different immediate acknowledgment, but the screenshot text alone does not prove the relay is stale: Slack may show a response from another stage, and the acknowledgment does not identify the responding component. The repository's operating model deploys from the checked-out release branch; verify that the webhook was restarted and the relay deployed from that branch after `74d79eac`/`997587d6`, then retry the exact natural-language query and confirm successful retrieval.
 
 
 ## Additional reproduction: slash command returns `invalid value for Q`
@@ -92,3 +112,19 @@ This is a **distinct second-stage validation failure**, not the thread-parser us
 3. Support a query with an apostrophe, e.g. `what's recent e2e-remote issues`, in both paths after end-to-end hardening; verify the **exact unchanged string** reaches the retrieval command.
 4. On invalid `Q`, surface a precise validation reason and distinguish `request received` from `accepted/queued` or `started`; do not tell the user it is queued before successful validation.
 5. Add separate regression tests for the Cloudflare relay parser, `/api/v1/make` backend validation, thread parser, and complete valid/invalid acknowledgment sequences, including malicious input cases.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/lib/webhook/make_targets.py`
+- `scripts/lib/webhook/cloud_actions.py`
+- `scripts/lib/webhook/lifecycle.py` — encode validated free-text before Make's shell boundary and restore it as argv in the retrieval command
+- `Makefile`
+- `workers/slack-relay/index.js`
+- `workers/slack-relay/test/relay.test.mjs`
+- `scripts/tests/lib/webhook.bats`
+- `scripts/tests/plugins/slack_slash_commands.bats`
+- `scripts/tests/bin/webhook_make_targets.py`
+- `scripts/tests/bin/test_cloud_bridge.py`
+- `scripts/lib/help/utils.sh`
+- `docs/howto/find-prior-art.md`

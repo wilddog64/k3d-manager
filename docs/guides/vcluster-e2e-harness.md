@@ -189,6 +189,7 @@ Playwright project with `OAUTH2_ENABLED=true` and `STRIPE_E2E=true`.
 
 ```bash
 make e2e-sandbox                          # DIGEST=sha256:... optional
+make e2e-sandbox-provision-preview         # read-only: show auth, hub and sandbox provisioning checks
 make e2e-sandbox-provision                 # admin-authorized: provision if ubuntu-k3s is missing or dead
 ./scripts/k3d-manager e2e_verify_sandbox  # equivalent, direct dispatch
 ```
@@ -206,8 +207,9 @@ an ACG sandbox expires after 4h and takes its node addresses with it: a context
 left over from an earlier sandbox is still in your kubeconfig but points at a dead
 endpoint. If the sandbox itself is gone, `acg_restart` is the recovery path.
 
-Use `make e2e-sandbox-provision` for the single workflow that may create the disposable ACG
-sandbox. It runs the same Tier 2 checks, provisions only when `ubuntu-k3s` is absent or not
+Use `make e2e-sandbox-provision-preview` to inspect the read-only auth, hub and sandbox readiness
+checks first. Use `make e2e-sandbox-provision` for the single workflow that may create the disposable
+ACG sandbox. It runs the same Tier 2 checks, provisions only when `ubuntu-k3s` is absent or not
 answering `/readyz`, and reuses the sandbox when it is healthy. The provisioning command is
 admin-authorized because it can incur sandbox cost; plain `make e2e-sandbox` never provisions.
 

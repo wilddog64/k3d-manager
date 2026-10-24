@@ -4,6 +4,7 @@ ACG="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-ac
 HUB="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-cve-autopatch.yaml"
+BUGS_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"
 OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/grafana-overview-readable-configmap.yaml"
 HUB_OVERVIEW="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-overview-readable.yaml"
 PLATFORM_OPS_DIR="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops"
@@ -92,6 +93,18 @@ _assert_build_info_contract() {
   jq -e 'all(.fieldConfig.overrides[]?; (.matcher.id == "byName" and .matcher.options == "Pod") | not)' <<<"$panel" >/dev/null || return 1
 }
 
+_bugs_panel() {
+  local dashboard_file="$1"
+  yq -r '.data["k3dm-bugs.json"]' "$dashboard_file" | jq -c '.panels[] | select(.title == "Bugs")'
+}
+
+_assert_bugs_table_filter_contract() {
+  local dashboard_file="$1"
+  local panel
+  panel="$(_bugs_panel "$dashboard_file")" || return 1
+  jq -e '([.fieldConfig.overrides[] | select(.matcher.id == "byName" and .matcher.options == "Bug") | .properties[] | select(.id == "custom.filterable" and .value == true)] | length == 1) and (.targets[0].expr | contains("repo=\"$repo\"")) and (.targets[0].expr | contains("release=~\"$release\"")) and (.targets[0].expr | contains("live_verified=~\"$verified\""))' <<<"$panel" >/dev/null || return 1
+}
+
 _assert_query_contract() {
   local dashboard_file="$1"
   local dashboard_json firing request
@@ -108,6 +121,14 @@ _assert_category_contract() {
   dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
   category="$(jq -c '.panels[] | select(.id == 12)' <<<"$dashboard_json")" || return 1
   jq -e '(.type == "table") and (.targets[0].expr | contains("ALERTS{alertstate=\"firing\"")) and (.targets[0].expr | contains("Watchdog|InfoInhibitor")) and (.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Image vulnerabilities")) and (.targets[0].expr | contains("Trivy.*")) and (.targets[0].expr | contains("\"cluster\", \"hub\", \"cluster\", \"\"")) and (.targets[0].format == "table") and (.targets[0].instant == true) and ([.transformations[] | select(.id == "organize") | .options.renameByName.Value] | index("Count") != null)' <<<"$category" >/dev/null || return 1
+}
+
+_assert_active_alert_empty_cell_contract() {
+  local dashboard_file="$1"
+  local dashboard_json panel
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  panel="$(jq -c '.panels[] | select(.id == 13)' <<<"$dashboard_json")" || return 1
+  jq -e '(.fieldConfig.defaults.noValue == "—") and ((.fieldConfig.defaults.noValue | contains("No firing")) | not) and (.description | contains("An empty table means no firing instance has an active-state timestamp."))' <<<"$panel" >/dev/null
 }
 
 _assert_no_panel_overlap() {
@@ -334,6 +355,25 @@ _assert_no_panel_overlap() {
   _assert_build_info_contract "${HUB_OVERVIEW}"
 }
 
+@test "Grafana Bugs table title is filterable and preserves query selectors" {
+  _assert_bugs_table_filter_contract "${BUGS_DASHBOARD}"
+}
+
+@test "Grafana Bugs table contract rejects an unfilterable title and missing selector" {
+  local snapshot="${BATS_TEST_TMPDIR}/grafana-bugs-mutated.yaml"
+  cp "${BUGS_DASHBOARD}" "$snapshot"
+  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .fieldConfig.overrides[] | select(.matcher.options == "Bug") | .properties) |= map(select(.id != "custom.filterable")) | tojson))' "$snapshot"
+  run _assert_bugs_table_filter_contract "$snapshot"
+  printf 'pre-fix representation (title filter missing): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+
+  cp "${BUGS_DASHBOARD}" "$snapshot"
+  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .targets[0].expr) |= sub("repo=\\\"\\$repo\\\","; "") | tojson))' "$snapshot"
+  run _assert_bugs_table_filter_contract "$snapshot"
+  printf 'mutation (query missing repo matcher): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
+}
+
 @test "Grafana Overview Build Info panels stay byte-identical" {
   local app_panel hub_panel
   app_panel="$(_build_info_panel "${OVERVIEW}")"
@@ -347,12 +387,127 @@ _assert_no_panel_overlap() {
 }
 
 @test "Grafana Overview Firing Alerts and Request Rate panels stay byte-identical" {
-  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
+  [ "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12 or .id == 13 or .id == 14)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))" = "$(jq -S '[.panels[] | select(.id == 6 or .id == 2 or .id == 12 or .id == 13 or .id == 14)]' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))" ]
 }
 
 @test "Grafana Overview Firing Alerts by Category panels satisfy the table contract" {
   _assert_category_contract "${OVERVIEW}"
   _assert_category_contract "${HUB_OVERVIEW}"
+}
+
+@test "active alert instances use a dash for missing labels in both dashboards" {
+  _assert_active_alert_empty_cell_contract "${OVERVIEW}"
+  _assert_active_alert_empty_cell_contract "${HUB_OVERVIEW}"
+}
+
+_assert_firing_instance_contract() {
+  local dashboard_file="$1"
+  local dashboard_json detail category
+  dashboard_json="$(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file")" || return 1
+  detail="$(jq -c '.panels[] | select(.id == 13)' <<<"$dashboard_json")" || return 1
+  category="$(jq -c '.panels[] | select(.id == 12)' <<<"$dashboard_json")" || return 1
+  jq -e '(.type == "table") and (.title | contains("Active Since (local; pending included)")) and (.description | contains("not a firing start or CVE detection time")) and (.description | contains("for: 15m")) and (.description | contains("elapsed alert active-state duration calculated from ALERTS_FOR_STATE")) and (.description | contains("not CVE age, time unpatched, first detection, or exact firing-start time")) and (.title | contains("Elapsed time since active")) and (.targets[1].legendFormat == "Elapsed time since active") and ([.targets[].expr | contains("bottomk(200") ] | all) and (.targets[0].expr | endswith("* 1000")) and ([.targets[].expr | contains("ALERTS_FOR_STATE") ] | all) and ([.targets[].expr | contains("alertstate=\"firing\"") ] | all) and (.targets | length == 2) and ([.transformations[].id] | index("merge") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("alertname") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("app") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("pod") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("instance") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("severity") != null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("__name__") == null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("group") == null) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("tier") == null) and ([.transformations[] | select(.id == "organize") | .options.renameByName["Value #B"]] | index("Elapsed time since active") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("dateTimeAsIso") != null) and ([.fieldConfig.overrides[].properties[] | select(.id == "unit") | .value] | index("s") != null)' <<<"$detail" >/dev/null || return 1
+  jq -e '([.transformations[] | select(.id == "organize") | .options.indexByName] | any(.namespace == 0 and .cluster == 1 and .alertname == 2 and .category == 3 and .app == 4 and .pod == 5 and .instance == 6 and .severity == 7 and .["Value #A"] == 8 and .["Value #B"] == 9))' <<<"$detail" >/dev/null || return 1
+  jq -e '(.targets[0].expr | contains("count by (category, alertname, severity, cluster)")) and (.targets[0].expr | contains("Trivy.*")) and (.targets[0].expr | contains("category"))' <<<"$category" >/dev/null || return 1
+  jq -e '(.panels[] | select(.id == 14) | .title == "CVE Findings — Report Created at (local)") and (.panels[] | select(.id == 14) | .targets[0].expr | contains("topk(200, trivy_vulnerability_report_created_timestamp_seconds) * 1000")) and (.panels[] | select(.id == 14) | .description | contains("not when the vulnerability was first detected")) and ([.panels[] | select(.id == 14) | .transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("vulnerability_id") != null) and ([.panels[] | select(.id == 14) | .transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("resource_name") != null) and ([.panels[] | select(.id == 14) | .transformations[] | select(.id == "organize") | .options.renameByName.resource_name] | index("Workload/report owner") != null)' <<<"$dashboard_json" >/dev/null || return 1
+  jq -e '.timezone == "browser"' <<<"$dashboard_json" >/dev/null || return 1
+}
+
+_assert_dashboard_promql_parentheses() {
+  local dashboard_file="$1"
+  local expr
+  while IFS= read -r expr; do
+    python3 -c 'import sys
+s=sys.argv[1]
+depth=0; quoted=False; escaped=False; calls=[]; i=0
+while i < len(s):
+    c=s[i]
+    if quoted:
+        if escaped: escaped=False
+        elif c == "\\": escaped=True
+        elif c == "\"": quoted=False
+    elif c == "\"": quoted=True
+    elif s.startswith("label_replace(", i):
+        calls.append(i + len("label_replace"))
+    elif c == "(": depth += 1
+    elif c == ")":
+        depth -= 1
+        if depth < 0: sys.exit(1)
+    i += 1
+if quoted or depth != 0: sys.exit(1)
+# Each call position must have a matching closing delimiter, accounting for nesting.
+for start in calls:
+    depth=0; braces=0; brackets=0; quoted=False; escaped=False; commas=0
+    for c in s[start:]:
+        if quoted:
+            if escaped: escaped=False
+            elif c == "\\": escaped=True
+            elif c == "\"": quoted=False
+        elif c == "\"": quoted=True
+        elif c == "(": depth += 1
+        elif c == "{": braces += 1
+        elif c == "}": braces -= 1
+        elif c == "[": brackets += 1
+        elif c == "]": brackets -= 1
+        elif c == "," and depth == 1 and braces == 0 and brackets == 0: commas += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0: break
+    if depth != 0 or commas != 4: sys.exit(1)
+if len(calls) != s.count("label_replace("): sys.exit(1)' "$expr" || return 1
+    if command -v promtool >/dev/null 2>&1; then
+      local rules_file="${BATS_TEST_TMPDIR}/panel-13-rules.yml"
+      python3 -c 'import json,re,sys
+expr=sys.argv[1].replace("$__rate_interval","5m")
+expr=re.sub(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?",".*",expr)
+print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryParse","expr":expr}]}]}))' "$expr" >"$rules_file" || return 1
+      promtool check rules "$rules_file" >/dev/null || return 1
+    fi
+  done < <(yq -r '.data["grafana-overview-readable.json"]' "$dashboard_file" | jq -r '.panels[].targets[]?.expr // empty')
+}
+
+@test "Grafana Overview panel expressions have balanced PromQL parentheses" {
+  _assert_dashboard_promql_parentheses "${OVERVIEW}"
+  _assert_dashboard_promql_parentheses "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview expression guard rejects an unbalanced mutation" {
+  local snapshot="${BATS_TEST_TMPDIR}/overview-unbalanced-expression.yaml"
+  cp "${OVERVIEW}" "${snapshot}"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | (.panels[] | select(.id == 13) | .targets[0].expr) |= ("(" + .) | tojson))' "${snapshot}"
+  if _assert_dashboard_promql_parentheses "${snapshot}"; then
+    return 1
+  fi
+}
+
+@test "Grafana Overview firing instance detail contract is safe and preserves category counts" {
+  _assert_firing_instance_contract "${OVERVIEW}"
+  _assert_firing_instance_contract "${HUB_OVERVIEW}"
+}
+
+@test "Grafana Overview CVE report-time panels stay synchronized and bounded" {
+  local app_cve hub_cve
+  app_cve="$(jq -S '.panels[] | select(.id == 14)' < <(yq -r '.data["grafana-overview-readable.json"]' "${OVERVIEW}"))"
+  hub_cve="$(jq -S '.panels[] | select(.id == 14)' < <(yq -r '.data["grafana-overview-readable.json"]' "${HUB_OVERVIEW}"))"
+  [ -n "$app_cve" ] && [ "$app_cve" = "$hub_cve" ]
+  jq -e '(.targets[0].expr | startswith("topk(200,")) and (.targets[0].expr | endswith("* 1000")) and ([.transformations[] | select(.id == "filterFieldsByName") | .options.include.names] | flatten | index("Value") != null) and ([.transformations[] | select(.id == "organize") | .options.indexByName] | any(.vulnerability_id == 0 and .severity == 1 and .cluster == 2 and .namespace == 3 and .image_repository == 4 and .resource_name == 5 and .package == 6 and .installed_version == 7 and .fixed_version == 8 and .Value == 9))' <<<"$app_cve" >/dev/null
+}
+
+@test "Grafana Overview firing instance fixtures preserve per-instance context and safe fallbacks" {
+  local fixture result
+  fixture='[{"alertname":"TrivyCriticalVulnerabilityDetected","category":"Image vulnerabilities","severity":"critical","cluster":"hub","instance":"cve-a","active_since":1761070000,"pending_for_seconds":0},{"alertname":"TrivyCriticalVulnerabilityDetected","category":"Image vulnerabilities","severity":"critical","cluster":"ubuntu-hostinger","instance":"cve-b","active_since":1761073600,"pending_for_seconds":300},{"alertname":"TargetDown","category":"Monitoring stack","severity":"warning","cluster":"acg","instance":"node-exporter","active_since":1761075000,"pending_for_seconds":60},{"alertname":"HostDiskMetricsStale","cluster":"hub","instance":"node-exporter","active_since":null,"pending_for_seconds":0}]'
+  result="$(jq -c '[.[] | select(.active_since != null) | {alertname, category, severity, cluster, instance, active_since, active_duration: (1761075600 - .active_since), label: "Active since (UTC; pending included)"}]' <<<"$fixture")"
+  jq -e 'length == 3 and .[0].active_since != .[1].active_since and .[0].instance != .[1].instance and .[1].active_duration == 2000 and all(.[]; .label == "Active since (UTC; pending included)" and .category != null and .severity != null)' <<<"$result" >/dev/null
+  [ "$(jq 'length' <<<'[]')" = '0' ]
+}
+
+@test "Grafana Overview firing instance regression rejects the pre-fix missing detail panel" {
+  local snapshot="${BATS_TEST_TMPDIR}/overview-no-instance-panel.yaml"
+  cp "${OVERVIEW}" "$snapshot"
+  yq -i '(.data["grafana-overview-readable.json"] |= (fromjson | .panels |= map(select(.id != 13)) | tojson))' "$snapshot"
+  run _assert_firing_instance_contract "$snapshot"
+  printf 'pre-fix representation (detail panel absent): status=%s output=%s\n' "$status" "$output"
+  [ "$status" -ne 0 ]
 }
 
 @test "Grafana Overview panels do not overlap" {

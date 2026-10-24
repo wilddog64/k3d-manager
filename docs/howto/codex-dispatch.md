@@ -18,7 +18,11 @@ Use `NO_TEST=1` for a docs-only task; otherwise exactly one of `TEST` or `NO_TES
 
 Codex never commits: Claude or the operator verifies the diff, gates, and scope before creating the one commit. Landing refuses any changed path not listed in the spec's `## Files` table, and always refuses `memory-bank/**`, even when the spec lists it. The scope comes from the spec as dispatched, and editing the spec itself is out of scope. For an intentional scope exception, run `bin/k3dm-codex-dispatch land --slug <slug> --allow-out-of-scope` only after review; otherwise fix or remove the extra change in the worktree and retry.
 
-Everything for a task lives under `~/.local/share/k3d-manager/worktrees/<version>/` (override with `K3DM_WORKTREE_ROOT`): the worktree `<slug>/` on branch `task/<version>/<slug>`, and the run folder `<slug>.run/` holding `prompt.md`, `codex.log`, `last-message.md`, `pid`, `exit` and a private `state/` directory. Codex gets `K3DM_REPO_ROOT`, `K3DM_JOB_DIR`, `K3DM_RUN_DIR`, `K3DM_STATE_DIR`, `K3DM_LOG_DIR`, `K3DM_TMP_ROOT`, `K3DM_PORT_CACHE_DIR` and `TMPDIR` pointed into that folder, so it never touches the live webhook's state.
+Everything for a task lives under `~/.local/share/k3d-manager/worktrees/<version>/` (override with `K3DM_WORKTREE_ROOT`): the worktree `<slug>/` on branch `task/<version>/<slug>`, and the run folder `<slug>.run/` holding `prompt.md`, `codex.log`, `supervisor.log`, `last-message.md`, `start`, `pid`, `exit`, `codex-exit-ts` and a private `state/` directory. The worker is launched in a detached session, so an agent-launched dispatch no longer requires the launching command to stay alive. `start` is written by the worker itself and records its PID and process start identity; `exit` and `codex-exit-ts` are written before Git, ledger or metrics bookkeeping. Startup and bookkeeping diagnostics go to `supervisor.log`; Codex's own output remains in `codex.log`.
+
+`codex-status` reports `starting` while the detached worker has not acknowledged startup, `running` after the start marker is verified, `exited successfully` for exit code 0, and `exited nonzero (<code>)` for another Codex result. A worker with a start marker but no terminal marker is reported as `terminated unexpectedly (see .../supervisor.log)`, rather than remaining indefinitely `unknown`. `unknown` is reserved for runs that never produced a worker start marker.
+
+Codex gets `K3DM_REPO_ROOT`, `K3DM_JOB_DIR`, `K3DM_RUN_DIR`, `K3DM_STATE_DIR`, `K3DM_LOG_DIR`, `K3DM_TMP_ROOT`, `K3DM_PORT_CACHE_DIR` and `TMPDIR` pointed into that folder, so it never touches the live webhook's state.
 
 Two tasks can run in parallel with different slugs. Each has its own worktree and state directory, though two full suites compete for CPU. If Codex finishes without implementing the spec, use `make codex-resume SLUG=example PROMPT=/path/follow-up.md` to continue the same session. Use `abandon` and re-dispatch only when the task should be discarded or its session cannot be resumed; resume does not change the recorded scope.
 
@@ -27,6 +31,46 @@ To remove an abandoned task, preview first and then confirm:
 ```bash
 make codex-abandon SLUG=example
 make codex-abandon SLUG=example YES=1
+```
+
+## Landing while Claude is away
+
+When Codex finishes a task and Claude is not available to review it, the operator can land it
+with one command:
+
+```bash
+make codex-land-pending SLUG=example TEST="bats scripts/tests/plugins/example.bats"
+```
+
+It refuses unless the main checkout is on a clean release branch that is not behind `origin` and
+the task's state is `exited successfully`. Then it:
+
+1. commits the worktree with the message from the spec's `- [ ] Commit: \`...\`` line;
+2. runs `codex-land` with `TEST` and pushes the release branch;
+3. rewrites the spec's `**Status:**` line to `LANDED — Claude review pending (<sha>, <time>)`,
+   appends a pending line to `memory-bank/progress.md`, commits that and pushes.
+
+It never marks a task verified or fixed. Claude's review (tests shown red on the pre-fix code,
+small fixes as new commits) and any live evidence follow when Claude is back, and only then does
+the status change to FIXED. If the change touches dashboards, ApplicationSets, `platform-ops` or
+the webhook, landing is safe, but hold `make appsets-reapply`, `make platform-ops` and
+`make restart-webhook` until that review.
+
+`land` tests the rebased commit before it is pushed, so a test that requires HEAD to be on
+`origin` fails there. The four `e2e_remote.bats` dispatch tests do: give `TEST` a `bats -f`
+filter that excludes them, and run the full suite after the push.
+
+## Pruning old task worktrees
+
+`make codex-prune` previews landed task worktrees and leftover task branches across every release
+under `K3DM_WORKTREE_ROOT`. It keeps tasks with unapplied commits, uncommitted work, a live worker,
+or no matching remote release branch. Run the preview first, then add `YES=1` to remove eligible
+worktrees and branches. The command leaves every `.run` directory and its logs, plus the dispatch
+ledger and metrics, untouched.
+
+```bash
+make codex-prune
+make codex-prune YES=1
 ```
 
 Worktree caveats:

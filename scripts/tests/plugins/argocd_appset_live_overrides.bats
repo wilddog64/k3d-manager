@@ -39,8 +39,16 @@ _stub_appset_kubectl() {
       esac
       return 0
     fi
+    if [[ "${1:-}" == "get" && "${2:-}" == "application" ]]; then
+      printf '%s\n' 'Error from server (NotFound)' >&2
+      return 1
+    fi
     if [[ "${1:-}" == "apply" && "${2:-}" == "-f" && "${3:-}" == "-" ]]; then
-      cat > "$(mktemp "${BATS_TEST_TMPDIR}/applied.XXXX")"
+      local applied name
+      applied="$(mktemp "${BATS_TEST_TMPDIR}/applied.XXXX")"
+      cat > "${applied}"
+      name="$(yq -r '.metadata.name' "${applied}")"
+      printf 'APPLY:%s\n' "${name}" >> "${KUBECTL_LOG}"
       return 0
     fi
     return 1
@@ -55,8 +63,16 @@ _stub_no_live_appsets() {
       printf '%s\n' 'Error from server (NotFound)' >&2
       return 1
     fi
+    if [[ "${1:-}" == "get" && "${2:-}" == "application" ]]; then
+      printf '%s\n' 'Error from server (NotFound)' >&2
+      return 1
+    fi
     if [[ "${1:-}" == "apply" && "${2:-}" == "-f" && "${3:-}" == "-" ]]; then
-      cat > "$(mktemp "${BATS_TEST_TMPDIR}/applied.XXXX")"
+      local applied name
+      applied="$(mktemp "${BATS_TEST_TMPDIR}/applied.XXXX")"
+      cat > "${applied}"
+      name="$(yq -r '.metadata.name' "${applied}")"
+      printf 'APPLY:%s\n' "${name}" >> "${KUBECTL_LOG}"
       return 0
     fi
     return 1
@@ -87,7 +103,7 @@ _applied_for() {
   local acg istio
   acg="$(_applied_for observability-acg)"
   istio="$(_applied_for istio-ambient)"
-  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "ubuntu-hostinger" ]
+  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "{{.name}}" ]
   [ "$(yq -r '.spec.template.spec.destination.name' "${istio}")" = "ubuntu-k3s" ]
   [[ "$(yq -r '.spec.template.metadata.name' "${istio}")" == *"-ubuntu-k3s" ]]
   [[ "$(yq -r '.spec.generators[0].list.elements[] | select(.name == "istio-cni") | .values' "${istio}")" == *"cniBinDir: /bin"* ]]
@@ -103,7 +119,7 @@ _applied_for() {
   local acg istio
   acg="$(_applied_for observability-acg)"
   istio="$(_applied_for istio-ambient)"
-  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "ubuntu-k3s" ]
+  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "{{.name}}" ]
   [[ "$(yq -r '.spec.generators[0].list.elements[] | select(.name == "istio-cni") | .values' "${istio}")" == *"cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d"* ]]
   [[ "$(yq -r '.spec.generators[0].list.elements[] | select(.name == "istio-cni") | .values' "${istio}")" == *"cniBinDir: /bin"* ]]
 }
@@ -131,7 +147,7 @@ _applied_for() {
 
   local acg
   acg="$(_applied_for observability-acg)"
-  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "ubuntu-k3s" ]
+  [ "$(yq -r '.spec.template.spec.destination.name' "${acg}")" = "{{.name}}" ]
 }
 
 @test "ApplicationSet reapply leaves sets without live overrides untouched" {
@@ -146,4 +162,47 @@ _applied_for() {
   run _argocd_appset_live_overrides "${ARGOCD_CONFIG_DIR}/applicationsets/observability.yaml"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+@test "observability ACG set targets provider-limited app clusters and preserves release names" {
+  local file="${ARGOCD_CONFIG_DIR}/applicationsets/observability-acg.yaml"
+  run grep -F '    - matrix:' "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'k3d-manager/role: app-cluster' "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F '                      - k3s-hostinger' "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F '                      - k3s-aws' "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F "name: '{{.name}}-{{.app}}'" "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F "name: '{{.name}}'" "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F "releaseName: '{{.app}}'" "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'preserveResourcesOnDeletion: true' "${file}"
+  [ "${status}" -eq 0 ]
+  run yq -e '.spec.syncPolicy.preserveResourcesOnDeletion == true and .spec.template.spec.syncPolicy.preserveResourcesOnDeletion == null' "${file}"
+  [ "${status}" -eq 0 ]
+  run grep -F '${APP_CLUSTER_NAME}' "${file}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "appsets reapply retires legacy ACG Applications immediately before only that set" {
+  _stub_no_live_appsets
+  KUBECTL_LOG="${BATS_TEST_TMPDIR}/reapply-retirement.log"
+  export KUBECTL_LOG
+  : > "${KUBECTL_LOG}"
+  run _argocd_retire_legacy_observability_acg_apps istio-ambient.yaml
+  [ "${status}" -eq 0 ]
+  [ ! -s "${KUBECTL_LOG}" ]
+
+  run _argocd_deploy_applicationsets
+  [ "${status}" -eq 0 ]
+  local retire_line acg_apply_line
+  retire_line="$(grep -n 'get application acg-kube-prometheus-stack' "${KUBECTL_LOG}" | cut -d: -f1)"
+  acg_apply_line="$(grep -n '^APPLY:observability-acg$' "${KUBECTL_LOG}" | cut -d: -f1)"
+  [ -n "${retire_line}" ]
+  [ -n "${acg_apply_line}" ] && [ "${retire_line}" -lt "${acg_apply_line}" ]
+  [ "$(grep -c 'get application acg-kube-prometheus-stack' "${KUBECTL_LOG}")" -eq 1 ]
 }

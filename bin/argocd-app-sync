@@ -86,34 +86,51 @@ if _probe_output="$(argocd account get-user-info --server "${ARGOCD_SERVER}" \
 fi
 
 if [[ ${_session_valid} -eq 0 ]]; then
-  _pw="${ARGOCD_ADMIN_PASSWORD:-}"
-  if [[ -z "${_pw}" ]]; then
+  _session_token=""
+  _tried_sources=()
+  _login_candidate() {
+    local _candidate="$1"
+    local _response
+    _response="$(printf '%s\n' "${_candidate}" | \
+      python3 -c 'import json,sys; print(json.dumps({"username":"admin","password":sys.stdin.read().rstrip("\n")}))' | \
+      curl -sf --max-time 30 -H 'Content-Type: application/json' --data-binary @- \
+      "${ARGOCD_SCHEME}://${ARGOCD_SERVER}/api/v1/session" 2>/dev/null)" || return 1
+    _session_token="$(printf '%s\n' "${_response}" | \
+      python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])' 2>/dev/null)" || return 1
+    [[ -n "${_session_token}" ]]
+  }
+
+  if [[ -n "${ARGOCD_ADMIN_PASSWORD:-}" ]]; then
+    _tried_sources+=(env)
+    _login_candidate "${ARGOCD_ADMIN_PASSWORD}" && _session_valid=1
+  fi
+  if [[ ${_session_valid} -eq 0 ]]; then
     _vault_token="$(_kubectl --no-exit --context "${INFRA_CONTEXT}" -n secrets get secret vault-root \
       -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
     if [[ -n "${_vault_token}" ]]; then
       printf 'X-Vault-Token: %s\n' "${_vault_token}" >"${_vault_hdr}"
-      _pw="$(curl -sf -H "@${_vault_hdr}" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
+      _vault_pw="$(curl -sf -H "@${_vault_hdr}" "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
         python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true)"
+      if [[ -n "${_vault_pw}" ]]; then
+        _tried_sources+=(vault)
+        _login_candidate "${_vault_pw}" && _session_valid=1
+      fi
     fi
   fi
-  if [[ -z "${_pw}" ]]; then
-    _pw="$(_kubectl --no-exit --context "${INFRA_CONTEXT}" -n "${ARGOCD_NS}" get secret \
+  if [[ ${_session_valid} -eq 0 ]]; then
+    _initial_pw="$(_kubectl --no-exit --context "${INFRA_CONTEXT}" -n "${ARGOCD_NS}" get secret \
       argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)"
+    if [[ -n "${_initial_pw}" ]]; then
+      _tried_sources+=(argocd-initial-admin-secret)
+      _login_candidate "${_initial_pw}" && _session_valid=1
+    fi
   fi
-  if [[ -z "${_pw}" ]]; then
+  if [[ ${_session_valid} -eq 0 ]]; then
     _keep_log=1
-    echo "Could not resolve ArgoCD admin password from ARGOCD_ADMIN_PASSWORD, Vault, or ${INFRA_CONTEXT}/${ARGOCD_NS}" >&2
+    _tried="${_tried_sources[*]:-none}"
+    echo "ArgoCD API login failed for ${ARGOCD_SERVER} (tried: ${_tried})" >&2
     exit 1
   fi
-  _session_token="$(printf '%s\n' "${_pw}" | \
-    python3 -c 'import json,sys; print(json.dumps({"username":"admin","password":sys.stdin.read().rstrip("\n")}))' | \
-    curl -sf --max-time 30 -H 'Content-Type: application/json' --data-binary @- \
-    "${ARGOCD_SCHEME}://${ARGOCD_SERVER}/api/v1/session" | \
-    python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')" || {
-      _keep_log=1
-      echo "ArgoCD API login failed for ${ARGOCD_SERVER}" >&2
-      exit 1
-    }
   export ARGOCD_AUTH_TOKEN="${_session_token}"
 fi
 

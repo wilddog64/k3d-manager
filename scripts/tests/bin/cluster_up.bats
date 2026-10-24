@@ -83,6 +83,13 @@ function _run_sandbox_ttl_helper() {
   [ "${status}" -ne 0 ]
 }
 
+@test "ACG sandbox registration carries the provider label used by observability selection" {
+  run grep -nF '_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  run grep -nF 'ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+}
+
 @test "acg-up identity Application uses server-side apply with server-side diff" {
   local manifest="scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 
@@ -225,6 +232,18 @@ function _run_acg_repair_hub_host_alias_test() {
   run bash -c "awk '/register_app_cluster/{print NR; found=1} found && /argocd_reconcile_app_cluster_registrations/{print NR; exit}' bin/cluster-up"
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
+}
+
+@test "acg-up verifies exact ACG registration before deploying observability" {
+  local verify_line deploy_line
+  verify_line="$(grep -nF 'argocd_require_app_cluster_registration' bin/cluster-up | cut -d: -f1)"
+  deploy_line="$(grep -nF 'deploy_observability_acg "${_acg_observability_context}"' bin/cluster-up | cut -d: -f1)"
+  [ -n "$verify_line" ]
+  [ "$verify_line" -lt "$deploy_line" ]
+  run grep -A4 -F 'argocd_require_app_cluster_registration' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}"'* ]]
+  [[ "$output" == *'"${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"'* ]]
 }
 
 @test "acg-up does not capture the dry-run wrapper as its own base" {

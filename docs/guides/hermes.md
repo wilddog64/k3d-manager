@@ -16,6 +16,23 @@ and [`docs/architecture/hermes-phase2-repair-scope.md`](../architecture/hermes-p
 [`docs/plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md`](../plans/v1.29.0-hermes-ws1-ws2-sensors-correlator.md),
 [`docs/plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md`](../plans/v1.29.0-hermes-ws0-ws3-access-and-installer.md).
 
+The operating cycle is read-only sensing, deterministic correlation, Slack reporting, and a
+closed repair proposal. A human approves an exact action only after Hermes revalidates its
+precondition; Hermes then samples again to report the result.
+
+```mermaid
+flowchart LR
+    S[Read-only sensors\nESO · ArgoCD · reachability\nnode pressure · CI · app health]
+    C[Deterministic correlator\nsustained multi-signal incident]
+    R[Slack report\nevidence + possible prior art]
+    P[Allowlisted repair proposal\nexact command + action ID]
+    A[Human approval\nprecondition re-validated]
+    X[Scoped repair + post-repair sample]
+
+    S --> C --> R --> P --> A --> X
+    X -.-> S
+```
+
 ---
 
 ## The pieces
@@ -350,9 +367,9 @@ Three behaviours of the target are deliberate:
   result means the sensor will work, not merely that an item exists.
 
 The admin password resolves from `ARGOCD_ADMIN_PASSWORD`, else the `argocd-initial-admin-secret`
-Secret in `cicd`. Prefer that Secret over `make show-service-passwords`, which reads the Vault copy
-at `secret/data/argocd/admin` first — after a rebuild the Vault copy can predate the new install and
-hand you a password that no longer works. Override the endpoint with `ARGOCD_HOST`.
+Secret in `cicd`. `make show-service-passwords` checks the Vault and initial-secret candidates against
+ArgoCD, preferring Vault; it prints a stale-Vault note when the initial secret is accepted instead.
+Override the endpoint with `ARGOCD_HOST`.
 
 Old tokens signed by a retired key remain listed on the account. `argocd account get --account
 hermes` shows the token IDs and `argocd account delete-token --account hermes <id>` clears the

@@ -342,6 +342,52 @@ planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`
 before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
 2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
 
+### Candidate milestone — v1.43.7 (patch)
+
+**Cross-repo Codex dispatch** (operator, 2026-10-18). Branch `k3d-manager-v1.43.7`, cut from `main`
+after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap. Plan 1 of 5 is
+[`codex-dispatch-cross-repo`](plans/v1.43.7-codex-dispatch-cross-repo.md). Fixes in `shopping-cart-*`,
+`lib-foundation` and other repos currently go through a bare `codex exec` and never reach the dispatch
+ledger. This adds `--repo`/`--branch` to `bin/k3dm-codex-dispatch`, a `repo` field on every ledger event,
+and a `repo` label on the per-task series. The operator needs that data for research.
+
+Plan 2 of 5 is [`dispatch-vendor-coordinator-model-telemetry`](plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md) (operator, 2026-10-21): record the actual agent and coordinator models on dispatch events, never inferred from a default.
+
+Plan 3 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
+
+Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashboard-auto-release-selection.md)
+(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
+hard-coded version. Moved from v1.43.5 on 2026-10-23, because that release already had five plans and v1.43.6 is full.
+
+Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
+(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
+per release on Agent Dispatch, as separate columns with no combined score. v1.43.7 is now full.
+
+### Candidate milestone — v1.43.8 (patch)
+
+**Release duration on Agent Dispatch** (operator, 2026-10-24). Branch `k3d-manager-v1.43.8`, cut from
+`main` after v1.43.7 merges. Opened by Claude because v1.43.5, v1.43.6 and v1.43.7 are each at the
+five-plan cap. Plan 1 of 5 is [`dispatch-release-duration`](plans/v1.43.8-dispatch-release-duration.md):
+per release, the span from first dispatch to PR merge (recorded once in the ledger by `/post-merge`,
+so the exporter stays offline) and the active time with overlapping specs counted once.
+Plan 2 of 5 is [`slack-route-system-notices-to-status-channel`](plans/v1.43.8-slack-route-system-notices-to-status-channel.md)
+(operator, 2026-10-24): Slack posts are routed by who started them. Alert analyses go to the status
+channel (#grafana-notification), and operator- and agent-started posts stay in #acg-automation. The
+operator swaps the CronJob incoming webhook so ACG expiry and rotator notices follow.
+
+Plan 3 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.8-dispatch-claude-cost-by-reference.md)
+(operator, 2026-10-24): each spec is charged with the Claude turns whose tool calls name it (spec file,
+worktree, `SLUG=`), including spec writing, instead of all Claude usage while it was dispatched.
+
+Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md)
+(operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
+"newest three" to "purge verified snapshots older than 30 days, never the newest three". Dispatch go recorded 2026-10-24.
+
+Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-path-on-node.md)
+(operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
+directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
+10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
@@ -386,6 +432,73 @@ their five-plan caps, and this plan depends on v1.44.0's submitter authenticatio
 under the `cloud-runner` token, with a sandbox lock on every Tier 2 entry path, no lifecycle
 overlap, pattern redaction of job output, and a Slack notice per run. It reverses v1.41.0's
 explicit exclusion of `e2e-sandbox`.
+
+Plan 2 (operator, 2026-10-23: "let's do v1.44.0"; placed in v1.44.1 because v1.44.0 is at its cap and
+this depends on its submitter authentication): **agents in Slack threads, first slice.**
+`@codex dispatch <spec>` and `@gemini review <task>` from the operator's Slack identity run through
+the relay, the webhook allowlist and `make codex-dispatch`, and each agent replies in the thread when
+its step finishes. Design and limits: [agents working together in Slack
+threads](#candidate-theme--v2x-agents-working-together-in-slack-threads). Spec to be written.
+
+Plan 3 (operator, 2026-10-24: "we should also track each agent's 5-hour session comsuption in agent
+dispatch dashboard in a proper rlease"): [`dispatch-agent-five-hour-window-usage`](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md).
+A **Session windows** row on the agent dispatch dashboard shows each agent's 5-hour and 7-day used
+percent, from Codex rollout files and the statusline's usage cache (no API call, no credential),
+and how much of the 5-hour window each Codex dispatch used. agy shows "no source" until it has
+one. Depends on v1.43.8's Claude cost-by-reference plan.
+
+Plan 4 (operator, 2026-10-24: add Gemini 4 Argon "into current workflow"): [`dispatch-agy-agent`](plans/v1.44.1-dispatch-agy-agent.md).
+`make codex-dispatch AGENT=agy` runs a spec on `agy` (default `gemini-4-argon-medium`, validated
+against `agy models`) through the same worktree, ledger and land flow as Codex. A commit by the agent
+makes the task unlandable, and side-by-side runs of one spec land only one. `gemini.sh` reads its
+models from `agy models` instead of a stale hardcoded list.
+
+Plan 5 (operator, 2026-10-24: "try each agent as a primar coorindator"): [`coordinator-rotation-trial`](plans/v1.44.1-coordinator-rotation-trial.md).
+Claude, Codex and agy each take the coordinator role for a period. `bin/k3dm-coord` records each
+activity (bug sweep, spec writing, review, land, live check) with the agent's 5-hour and weekly used
+percent at its start and end. A **Coordinator** row shows quota used per activity kind per agent,
+alongside the outcomes: specs landed, bugs closed, rework rounds and defects found later. Live checks
+stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
+**v1.44.1 is now at its five-plan cap.**
+
+### Candidate milestone — v1.44.2 (patch)
+
+**Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
+their specs"). Branch `k3d-manager-v1.44.2`, cut from `main` after v1.44.1 merges. Plan 1 of 5 is
+[`cloud-bridge-offline-test-run-diagnostics`](plans/v1.44.2-cloud-bridge-offline-test-run-diagnostics.md):
+a reader-scoped cloud action returns the most recent recorded offline test run, with its failing
+suites, missing stages and bounded, redacted failure reasons. No test runs remotely, and no raw log
+leaves the laptop. It follows the 2026-10-20 `test-all` alerts the operator could not triage while away.
+
+Plan 2 (operator, 2026-10-23: "go ahead") is
+[`command-ledger-and-cluster-reconciliation`](plans/v1.44.2-command-ledger-and-cluster-reconciliation.md):
+every webhook job gets a command id, an explicit target and a lease (retries return the first job;
+a lost job is `lost`, not `failed`), and a read-only per-cluster desired/observed record reports
+stale signals and drift. No auto-repair in this slice. It follows the 2026-10-23 tunnel, shared
+`observability-acg` and snapshot-age bugs. Design review pending before dispatch.
+
+Plans 3 and 4 (operator, 2026-10-24: "plan those two caveats with proper release"; specs to be
+written). Both depend on v1.44.1's coordinator rotation trial, so this is the first release they can
+go in:
+- **Coordinator activity analysis.** Use at least one week of the trial's per-activity data to test
+  the 2026-10-24 impression that a Claude bug sweep uses the weekly quota slowly. Fill any
+  instrumentation gaps the first week shows. Write the spec after Claude's coordinator week.
+- **Codex as coordinator.** The rules and session setup for an interactive Codex coordinator period:
+  how it starts, which instruction file it follows, and how it hands live checks to the operator.
+  Write the spec before Codex's period starts.
+
+### Candidate milestone — v1.44.3 (patch)
+
+**Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
+from `main` after v1.44.2 merges. Plan 1 of 5 is
+[`cloud-bridge-vault-health`](plans/v1.44.3-cloud-bridge-vault-health.md): one fixed reader-scoped
+action, `vault-status`, for `hub` or `hostinger` only. It separates sealed, unreachable, Kubernetes
+API down and ESO failing, with no token and no unseal. It follows the 2026-10-20 Hostinger 502 incident.
+
+Plan 2 is [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md) (operator,
+2026-10-23: "go for it"): flagd on the ACG sandbox only (stage 1; Hostinger is a later, gated one-line stage), one `basket-cart-summary` flag in
+`shopping-cart-basket`, per-variant metrics and a rollout-health dashboard, and `make flag-set` recording
+each flip on the v1.44.2 command ledger. Depends on v1.44.2 and on v1.43.7's cross-repo dispatch.
 
 ### Candidate milestone — v1.45.0
 
@@ -445,6 +558,35 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 **Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.45.2-memory-bank-selective-vector-indexing.md`](plans/v1.45.2-memory-bank-selective-vector-indexing.md). v1.45.2 is now **4 of 5 plans**; scheduling remains subject to operator triage.
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
+
+### Candidate milestone — v1.45.3 (patch)
+
+**Mac workstation protection for the two operator MacBooks** (operator, 2026-10-23). Everything
+security-related so far watches the cluster: Trivy, cosign and Kyverno at admission, and Falco
+(v1.51.0) on Linux nodes only. The laptops get nothing beyond Apple's built-ins. Yet they hold the
+login Keychain, the SSH keys and the GitHub tokens, and they run agents that execute code. Malware
+that rewrites itself defeats signature checks such as XProtect, so this release relies on allowlists
+and watching behaviour instead. It needs no cluster changes and nothing from v1.44.x or v1.45.x.
+
+| Piece | What it does | Rollout |
+|---|---|---|
+| Santa allowlist | Blocks any program that is not allowed. A changed binary gets a new fingerprint, so code that rewrites itself is blocked, not missed. | Monitor-only for two weeks on both Macs, then review what it logged. Switch to blocking only after the operator approves. |
+| BlockBlock | Alerts when anything installs itself to run at startup, the step almost every info-stealer needs. | Alert only. |
+| LuLu | Outbound firewall that asks before a new program connects out, to catch data being sent away. | Allow the agents, Homebrew, git and kubectl first; alert on anything else. |
+| osquery | Reports startup items, Keychain access and newly allowed binaries to the hub, so the v2.6.4 triage loop also covers the laptops. | Read-only queries on a schedule, small volume. |
+| Keychain hygiene | The login Keychain locks when the laptop is idle; no "Always Allow" on token items. | Checklist in the guide. |
+
+Constraints:
+- Installing and configuring the tools is the operator's job. Claude writes the spec, the
+  configuration and the guide, and runs no privileged or system-extension change on either Mac.
+- Santa stays monitor-only until the operator approves blocking.
+- The osquery output must never carry secret values, Keychain item contents or full command lines.
+  It sends only names, paths and counts, under the same label rules as the Falco plan.
+- Agent sandboxes (the Codex seatbelt and the ssh-config guard) are kept, not replaced.
+
+Deliverables: a `docs/guides/` page for Mac workstation protection, and one plan doc. v1.45.3
+holds **1 of 5 plans** (spec not yet written). Branch `k3d-manager-v1.45.3` is cut from `main`
+after v1.45.2 merges.
 
 ### Candidate milestone — v1.46.0
 
@@ -508,6 +650,12 @@ unreachable, the Worker returns a small static maintenance page.
 
 Check whether Cloudflare's own custom error pages are available on this plan before choosing the
 Worker.
+
+**One E2E command with runner selection** (operator, 2026-10-23). Plan 1 of 5 is
+[`e2e-unified-runner-command`](plans/v1.46.1-e2e-unified-runner-command.md): `k3dm e2e-remote
+RUNNER=m2|m4|aws` with a validated runner per execution environment, replacing the three separate
+E2E commands, with a deprecation path for `e2e-sandbox`. Split out of a v1.43.5 P3 bug, which keeps
+only the error-message fix. Design spec; Files and Acceptance are written when v1.46.1 starts.
 
 ### Candidate milestone — v1.47.0
 
@@ -625,6 +773,8 @@ by editing lists, not code.
 | v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
+Release splits, new patches, and dropped milestones must update `docs/release-milestones.json` in the same commit as the roadmap change.
+
 **Unfamiliar-app onboarding (proposed 2026-10-11).** Before TwinkleAI is onboarded by hand, test the
 platform against an app it has never seen: a Bolt.new-generated app, exported to its own repo and
 onboarded cold. The headline metric is manual interventions (target 0 long-term), with 100%
@@ -709,11 +859,13 @@ be validated by deterministic code and existing policy gates before any executio
   (natural language to a validated bug-count query object); do not duplicate it. Build on
   /ask-docs retrieval improvements and the established Git-backed spec/memory-bank conventions.
 
-**Placement / dependencies:** Candidate **after the v2.0.0 TwinkleAI reference workload is stable**,
-alongside the v2.x diagnostics/healing gateway; exact v2.x minor release is **TBD**. Do not
-reassign the already proposed v2.1–v2.4 gateway sequence or consume a v1.x spec slot merely by
-recording this theme. Sequence a scoped proposal after the gateway's read-only interface and
-policy boundaries are defined.
+**Placement / dependencies (2026-10-22 update):** The initial **read-only conversational
+operations** slice is now scoped as **proposed v2.5.0**, after the stable v2.0.0 reference workload
+and the existing v2.1–v2.4 gateway/policy/execution-contract/provider-adapter sequence.
+Scope: [`v2.5.0-conversational-operations-assistant.md`](plans/v2.5.0-conversational-operations-assistant.md).
+This consumes no v1.x spec slot and authorizes no implementation. The broader **engineering
+intent-to-contract** planner remains a separate later v2.x candidate (minor version TBD);
+v2.5.0 may propose read-only operational plans, not launch application builds.
 
 **v3.0.0 dependency:** The multi-agent product team must consume **validated engineering intent
 contracts**, not raw prompts that directly launch builds. Its future customer-facing application
@@ -728,6 +880,176 @@ date/release/status constraints, an ambiguous request requiring clarification, a
 unauthorized operation, and an engineering request that results in a reviewable spec without
 executing it. Later end-to-end application delivery requires deployment, functional/security
 tests, handoff, and independent customer-agent continuation evidence.
+
+### Candidate milestone — v2.5.0: Conversational Operations Assistant
+
+**Proposed 2026-10-22 (operator requested formal roadmap/spec; implementation not yet
+authorized).** Build the first stateful, evidence-grounded Slack conversational
+operations assistant on top of the gateway, model adapter and policy boundaries
+already proposed for v2.1–v2.4. Unlike `/k3dm` typed commands or standalone
+Gemini failure analysis, it understands multi-turn context, resolves an exact
+job/thread/cluster, issues bounded read-only tool plans validated by code,
+and replies with current source evidence, uncertainty and safe next steps.
+
+- **Scope:** [`v2.5.0-conversational-operations-assistant.md`](plans/v2.5.0-conversational-operations-assistant.md) — proposed plan **1 of up to 5** for v2.5.0.
+- **Authority:** Slack is the initial interface; model output never grants
+  action approval. Existing Make/webhook/cloud-bridge/Hermes remain authoritative.
+  No unrestricted shell, autonomous recovery or cluster mutation in this release.
+- **Core evidence:** provider-independent context/intent schema, thread-safe
+  persistence, deterministic RBAC/tool validation, cited diagnostics and RAG,
+  negative/ambiguous-input fixtures, privacy-safe audit and measurable
+  correctness/outcome-per-token. A live Slack thread and a real read-only job
+  investigation must pass operator verification before closing.
+- **Dependencies:** v2.0.0 stable reference app; v2.1 read-only gateway;
+  v2.2 policy; v2.3 action contracts (not executable by this feature);
+  v2.4 provider adapter. No v1.x slot displacement.
+- **Later:** validated engineering intent-to-contract authoring remains a
+  future v2.x capability; v3.0.0 multi-agent product team consumes that
+  interface. Do not advertise v2.5.0 as a general-purpose app-building agent.
+
+### Candidate milestone — v2.6.0: Autonomous Ticket & Incident Investigation
+
+**Proposed 2026-10-22 (operator requested roadmap placement; not yet an implementation spec).**
+Extend the v2.5.0 conversational assistant with a **bounded, evidence-driven investigation
+loop** for engineering tickets, runtime alerts and repeatable operational incidents. The
+purpose is to reduce operator-led diagnostic prompting, **not** to grant an LLM unrestricted
+execution privileges or conflate a plausible explanation with a verified root cause.
+
+**Dependencies / ordering:** v2.0.0 stable reference workload; v2.1 read-only gateway;
+v2.2 deterministic policy/RBAC; v2.4 swappable provider adapter; v2.5.0 authenticated,
+thread-safe conversational context and cited read-only diagnostics. Reuse v2.3's action
+contracts as policy references, but do **not** execute remediation in v2.6.0. Hermes
+alert-driven triage, cloud-bridge allowlisted tools, RAG + Git history, and the existing
+issue/bug/spec lifecycle are predecessors, not features to rebuild.
+
+**Phased delivery within the v2.6.x series** (each patch/minor slice gets an independent
+task spec and follows the maximum-five-plan-docs-per-release rule):
+
+| Slice | Deliverable | Acceptance boundary |
+|---|---|---|
+| v2.6.0 | Ticket/alert intake and **structured investigation case** with source identity, severity, evidence links, deduplication, missing-context detection and ownership | Ingest a known incident and preserve provenance; no automatic bug-file mutation or alert acknowledgement |
+| v2.6.1 | **Bounded hypothesize → read-only diagnostic → evaluate** loop, with competing hypotheses, deterministic allowlisted tool selection, iteration/time/token limits and escalation on inconclusive evidence | Replay incidents from frozen fixtures; unsupported claims and out-of-allowlist actions fail tests |
+| v2.6.2 | Evidence-backed findings report with confidence calibration, alternatives considered, safe next actions and draft bug/spec handoff for human review | Independent evaluator checks findings against held-out ground truth; no self-certified root cause |
+| v2.6.3 | Operational evaluation and Grafana dashboard: root-cause correctness, abstention quality, investigation completeness, latency, tool budget, human corrections and cost per accepted diagnosis | Operator-approved live *read-only* investigations plus correlated evidence; synthetic replay cannot be labeled live-verified |
+
+**Investigation contract (design requirements):**
+1. Input: authenticated Slack ticket/thread, GitHub issue or Hermes alert; normalize a
+   stable case ID, incident window, affected cluster/repo and source provenance. Preserve
+   existing permissions and refrain from assuming all channels are enabled.
+2. Gather: read-only Prometheus/Alertmanager/ArgoCD state, approved log summaries,
+   Git commits, past `docs/{bugs,issues,plans}` and RAG excerpts with source references
+   and freshness. Retrieval text and tool outputs are untrusted evidence, never instructions.
+3. Reason: explicit hypotheses, evidence-for/evidence-against, and unknowns; a model may
+   select from **deterministically validated** read-only tools, but cannot expand its tool
+   allowlist, issue arbitrary shell/SSH, bypass cloud-request authentication or grant roles.
+4. Control: finite iteration/tool/time/token budgets, circuit breakers, loop detection,
+   no-evidence/contradictory-evidence exits, resumable audit state and dedupe across Slack
+   retries. Protect secrets, redact logs and avoid high-cardinality metric labels.
+5. Report: separate `observed`, `inferred`, `hypothesis`, `unknown` and
+   `independently verified`. Record timestamps, evidence links, requests, tool outcomes,
+   hypothesis revisions and why investigation stopped. Never report resolved from silence,
+   missing telemetry, or a healthy Argo CD status alone.
+6. Human boundary: diagnosis/report only. Draft a bug or suggested repair for review,
+   but **no autonomous code changes, merges, syncs, pod restarts, secret reads, permission
+   grants or write-side cloud-bridge calls**. Existing v2.3 approval-and-retest workflow
+   remains separately authorized.
+7. Evaluation: frozen historical incident replay with held-out root causes, injected
+   missing/stale/contradictory evidence, duplicate alerts, prompt injection, denial of
+   permissions, unreachable tools and runaway-loop attempts. Independent tests are authored
+   from acceptance contracts rather than agent implementation; track confidence calibration,
+   correct abstentions, human escalation and outcome/token, not just ticket throughput.
+
+**Exit criteria before calling v2.6.x autonomous investigation mature:** measurable
+improvement over an operator-directed baseline on the *same* blinded incident corpus;
+stable security/authorization boundaries; reproducible independent offline evaluation;
+operator-reviewed real incident evidence; and calibrated abstention when evidence is
+insufficient. Define numeric quality thresholds after a baseline and sample-size review,
+rather than inventing accuracy or cost targets now.
+
+**Not in this milestone:** autonomous remediation, broad network IDS, unattended release
+management, arbitrary repository writes, generalized product development or unbounded
+multi-agent orchestration. Integrate the separate proposed Falco IDS work from v1.51.0
+only if it has actually shipped and exposes approved read-only signals; it is not a hard
+dependency. This milestone feeds v3.0.0's multi-agent product team with more trustworthy
+incident investigation, but does not itself implement the product team.
+
+**Candidate slice — v2.6.4: security triage of runtime detections** (operator, 2026-10-23, after a
+public design exercise on agent-based detection over streaming telemetry; design here is our own).
+Deterministic rules see every event; the agent sees only what they flag. Falco (v1.51.0) and the
+existing Alertmanager rules are the detection stage. The v2.6.0–v2.6.3 investigation loop becomes
+the triage stage for their findings, with these additions:
+
+- **Event fields are attacker-controlled.** A command line, file path or container name in a Falco
+  event can carry text aimed at the agent. Fields reach the model as quoted data with length limits,
+  never as instructions, and the replay corpus includes injected events (contract item 7).
+- **Volume budget, not throughput engineering.** The hub emits megabytes a day, not a terabyte: no
+  streaming bus. A per-hour cap on cases sent to the model, dedupe by rule and workload, and a counter
+  of findings that went untriaged because the cap was hit.
+- **Our own agents are in scope.** Codex and Gemini runs (devbox and Slack-thread candidates) are a
+  telemetry source: an agent task that spawns a shell outside its worktree, or reaches a host outside
+  its egress list, is a finding like any other.
+- **Reproducible verdicts.** Each triage records the rule version, the event, the evidence it read and
+  the model and prompt version, so a verdict can be replayed later.
+- **Report only.** A verdict drafts a `docs/bugs/` entry or a Slack notice; no quarantine, pod
+  deletion or network change (the v1.51.0 non-goals hold).
+
+Depends on v1.51.0 actually shipping Falco with read-only signals, and on v2.6.0–v2.6.3.
+
+**Scheduling:** roadmap candidate only; no `docs/plans/v2.6.x-*.md` files, new
+branch, live action, or dispatch is authorized by this entry. Scope each slice only
+when predecessor releases are ready and the operator approves implementation.
+
+---
+
+### Candidate milestone — v2.7.x: Account Abuse & Fraud Risk Detection (application-level)
+
+**Proposed 2026-10-22 (operator suggested placement in v2.0.x; roadmap candidate only).**
+Explore reusable **account-abuse detection** for an account-based e-commerce or marketplace
+reference application. This is application-security and data-science work, **not** Falco
+runtime IDS, Istio network security or automatic blocking by k3d-manager. The platform
+provides GitOps, policy gates, observability, isolated E2E and rollback; the application
+owns identities, event semantics, labels, risk decisions and consent/privacy rules.
+
+**Placement and preconditions:** Tentatively **v2.7.x**, after the planned v2.0.0
+TwinkleAI reference-app replacement and v2.5–v2.6 conversational/investigation work.
+**Do not resurrect the shopping-cart application** solely to justify this feature:
+it is slated for retirement at v2.0.0. TwinkleAI's currently proposed real-estate
+research workload may not have registration, payments, reviews or transactions. The
+first gate is to select a real account-based service/use case; otherwise defer this
+milestone or build a small, explicitly isolated synthetic fixture in a separate
+application repository. It should not expand k3d-manager's core infrastructure scope.
+
+| Candidate slice | Capability | Acceptance gate |
+|---|---|---|
+| v2.7.0 | Threat model and events contract: signup/login/session/review/promotion patterns where supported; account/device/IP velocity with privacy constraints | Explicit app ownership, schema, consent/retention policy and reproducible synthetic fixtures; no real-person data |
+| v2.7.1 | Deterministic configurable risk rules, audit trail and human review; no hard denial by default | Offline positive/negative tests, documented false-positive cases (shared IPs, families, VPNs), safe feature flags and rollback |
+| v2.7.2 | Optional statistically calibrated classifier using held-out, time-split labeled data, with uncertainty and base-rate-aware evaluation | Compare precision/recall, PR-AUC, calibration, base rates and review workload against rules-only baseline; do not ship ML without sufficient defensible labels |
+| v2.7.3 | End-to-end application integration and observability: risk decision API, review/challenge workflow, Grafana, alerting and E2E | Operator-reviewed disposable-environment tests and drift/latency/false-positive dashboards; no production account suspension until separately approved |
+
+**Non-negotiable safeguards:** Risk score is not proof of fraud; enforce minimization,
+hash/pseudonymization where applicable, scoped access, bounded storage/retention, audit
+of reviewer overrides, and meaningful recourse for legitimate users. Never send raw
+credentials, authentication secrets, full payment details or personal identifiers to
+an LLM. Do not train on synthetic labels and present the result as real fraud-detection
+accuracy; avoid leakage via random train/test splits of correlated events. Start with
+shadow scoring and review/challenge rather than irreversible automated bans. Challenge
+accessibility, operational cost, class imbalance and adversarial adaptation must be
+tested. No claim that high overall accuracy proves good fraud detection.
+
+**Success metrics:** precision at constrained review capacity, recall, false-positive
+rate for legitimate accounts, precision-recall curve, probability calibration, challenge
+completion, review burden, p95 decision latency, feature drift and rollback reliability.
+Compare performance with a rules-only baseline, stratified by relevant non-sensitive
+operational cohorts; choose numerical thresholds after collecting credible labeled
+data and assessing harms.
+
+**Release discipline:** This is a roadmap entry, not an implementation spec, branch
+creation, model deployment or authorization to process personal data. Each future
+release follows the maximum-five-plan-documents rule. Application code/specs belong
+to the chosen app repository; k3d-manager should accept only narrowly scoped GitOps,
+policy, monitoring and integration work after separate approval.
+
+---
 
 ### Candidate theme — v2.x: model economics
 
@@ -771,6 +1093,97 @@ Next steps, smallest first:
 | Release evidence record | v1.48.0, second item | Each release keeps a machine-written record of the evidence present when it shipped: CI run, offline suite counts, `appsets-check`, the v1.47.0 gate result, open P0/P1 bugs. |
 | One authorization path, inventoried | v1.44.0 | Ship `v1.44.0-cloud-request-submitter-authentication.md`, and add a how-to that lists every channel (Slack, cloud bridge, Hermes, CLI, local agents) with how it is authorized today. The v2.x gateway closes the gaps it records. |
 
+### Candidate theme — v2.x: agents working together in Slack threads
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Mention an agent
+in Slack (`@codex`, `@gemini`, `@claude`) and it works in that thread, and the other agents reply to it
+there: Codex implements, Gemini reviews, Codex fixes, Claude verifies and asks the operator to approve.
+
+- **Our bot identities, not vendor Slack apps.** A mention goes Slack relay → webhook allowlist →
+  `make codex-dispatch`, so every run lands in the dispatch ledger and metrics. A vendor integration
+  would run outside the dispatcher and lose the research data.
+- **Mentions name a spec or bug doc.** Channel text is untrusted input. A free-form request goes to
+  Claude, who turns it into a spec first (the intent engine above). Only allowlisted actions run:
+  dispatch, review, fix findings, status.
+- **The ledger drives turns.** Each agent posts when its step finishes, and that post hands the next
+  step to the next agent. Git, specs, memory-bank and the ledger stay authoritative; a thread links
+  to commits, test output and dashboards.
+- **Bounded exchanges.** Each thread has a turn cap and a token budget, and Claude's verdict closes the
+  loop, so two agents cannot ping-pong a disagreement.
+- **Current roles hold.** Gemini never runs live-cluster verification; one agent per worktree; no
+  agent approves another's work. Land and merge need the operator's MFA approval
+  (`project_hermes_slack_approval`).
+
+**Placement:** the first slice (`@codex dispatch <spec>`, `@gemini review <task>`, threaded replies)
+is v1.44.1 plan 2 (operator, 2026-10-23), after v1.44.0's submitter authentication, because a chat
+message must not start a dispatch until its sender is authenticated. The full multi-agent
+conversation stays v2.x and is the interface of v3.0.0 below.
+
+### Candidate theme — v2.x: feature flags, progressive rollout and feedback
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Turn the
+platform's staged deploys into a rollout platform: ship a change dark, expose it in steps, measure
+each step, and promote or roll back on evidence. Prompted by a public system-design exercise
+("design a feedback and feature rollout platform"); the design here is our own.
+
+| Concern | Today | Gap |
+|---|---|---|
+| Staged rollout | `make appsets-reapply` rolls out hub first, then app clusters (`APPSETS_STAGE=hub` to soak) | Stages are per cluster, never per user, request or percentage |
+| Policy rollout | Kyverno Audit → Enforce for image signing | Done by hand; no record of who promoted it or why |
+| Gates | CI, e2e Tier 1 (vCluster) and Tier 2 (ACG sandbox), Grafana alerts | Gates run before deploy only; nothing watches a rollout after it starts |
+| Feature switches | none | No way to turn a feature on or off without a deploy |
+| Feedback | Metrics and logs per service | No signal tied to a flag variant or release step; no user feedback channel |
+
+- **Flags in git.** OpenFeature SDKs in the shopping-cart services, flagd in-cluster, flag
+  definitions synced by Argo. A flag change is a reviewed commit; nothing flips a flag outside git.
+- **Canary with analysis.** Argo Rollouts on one service first (payment or order), with Prometheus
+  analysis on error rate and latency; a failed step aborts and rolls back by itself.
+- **Feedback tied to the change.** Per-variant and per-step metrics, a Grafana rollout-health row, and
+  a small feedback endpoint whose records carry the flag variant and release.
+- **Promotion record.** Each flag flip and canary promotion is a command with an id, target, actor and
+  reason, on the command ledger of `v1.44.2-command-ledger-and-cluster-reconciliation`.
+- **Read-only first.** As with the healing gateway: report and recommend before any automatic
+  promotion; automatic rollback on a failed analysis is the one exception.
+
+**Placement:** first slice (flagd on the ACG sandbox first, then Hostinger, one `shopping-cart-basket` flag, per-variant
+metrics, flag-change record) is v1.44.3 plan 2 (operator, 2026-10-23: "go for it"):
+[`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.md). Basket is already Go, so
+it does not wait for the order/payment rewrite. Canaries, feedback endpoint and targeting are later
+slices.
+
+### Candidate theme — v2.x: agent devbox service
+
+**Proposed 2026-10-23 (operator; roadmap candidate only, not scoped, no spec slot).** Give each
+dispatched agent task its own on-demand, isolated development environment instead of a worktree on
+the operator's laptop. The intent engine above decides *what* to build; the devbox is *where* an agent
+builds it. Prompted by two public system-design exercises (remote devboxes, a browser IDE platform); the
+design here is our own.
+
+| Concern | Today | Gap |
+|---|---|---|
+| Lifecycle state machine | Dispatch ledger: start, running, exited, land or refuse | No stop/resume; no idle reaping beyond the ACG sandbox expiry |
+| Disposable compute, durable work | Worktree and `.run/` dir per task; the branch is the durable state | One shared laptop, hence the one-agent-per-sandbox and no-edit-mid-run rules |
+| Egress and secrets | Codex sandbox, Vault/ESO, the webhook allowlist | Credentials are not scoped per task; the sandbox is the agent tool's, not ours |
+| Access gateway | Webhook, Cloudflare tunnel, cloud-bridge requests | No short-lived, per-session access |
+| Fast start | vCluster per PR, prebuilt images | No warm pool, no snapshots |
+| Cost and productivity | Agent dispatch dashboard, v1.43.5 cost plans | Not attributed per environment |
+
+A second exercise, on a browser-IDE style platform, adds three requirements that matter more for
+agents than for people:
+
+- **Agent code is untrusted.** Isolation is the core of the design, not an add-on: one task cannot
+  reach another task's workspace, the hub, or internal networks beyond an explicit egress list.
+- **Per-repo prepared environments.** Build each repo's toolchain image ahead of time (TwinkleAI,
+  shopping-cart, k3d-manager), so a dispatch starts in seconds rather than after a fresh install.
+- **Forwarded ports for review.** A server the agent starts is reachable through the authenticated
+  gateway, so the operator or the QA agent can test a running preview before anything lands.
+
+Durability follows from our model: the branch is the work product, so a lost machine costs at most
+the uncommitted diff, and snapshots can stay infrequent.
+
+**Placement:** after v2.5.0, before v3.0.0, and a v3.0.0 dependency alongside the intent engine.
+Likely gated on the Mac Mini M5 as the first compute pool. Nothing moves into v1.4x.
+
 ### Candidate major — v3.0.0: multi-agent product team
 
 **Proposed 2026-10-12 (operator; scheduled for v3.0.0, not yet scoped).** A product team made of
@@ -803,10 +1216,65 @@ validated intent contracts rather than unreviewed prompts or hand-written specs.
 On 2026-10-12, eight finished Codex worktrees were waiting on Claude's verify-and-land step. That
 step is the known bottleneck the experiment must test.
 
+### Post-v3.0.0 candidate — Intent-to-Verified-Software benchmark
+
+**Roadmap placement corrected 2026-10-22 (operator): after v3.0.0, not in v2.x.**
+Use external, unfamiliar engineering/system-design interview-style prompts (including
+automated ticket investigation and fake-account risk classification) as a **benchmark
+corpus**, not as automatic product-feature requests. This is an evaluation of the
+v3.0.0 multi-agent product team's ability to translate natural-language intent into
+validated requirements, architecture, implementation, deployment and independently
+verified outcomes. It must follow, not block or enlarge, the v2.x gateway/conversation/
+investigation milestones.
+
+- **Input integrity:** Freeze original prompts, version their source/rights metadata,
+  classify domain and difficulty, and keep held-out tasks unseen by development
+  agents. Do not assume an interview solution's intended scope equals production requirements.
+- **Independent oracle:** A separate human-reviewed evaluator derives acceptance
+  criteria from the original prompt, without reading the implementer's generated
+  spec or code. Ambiguities, missing requirements and justified clarification or
+  abstention are scored explicitly.
+- **Experimental controls:** Compare Claude-only, coordinated Claude/Codex and
+  multi-agent/independent-QA variants using equivalent starting repositories,
+  tools, time/token budgets and infrastructure. Repeat enough trials to expose
+  variance; do not conflate model selection with extra time or privileged tools.
+- **Outcome measurement:** Intent fidelity, externally validated acceptance pass
+  rate, functional and security correctness, deployability, architecture review,
+  clarification burden, human corrections, rework, wall-clock latency and cost
+  per *independently verified* delivery. Distinguish spec-only, simulated test,
+  isolated live E2E and customer/operator acceptance.
+- **Safety:** Run unfamiliar application builds in disposable vCluster/ACG
+  environments; no production credentials, live customer data, silent cloud
+  spending, automatic promotion or release authorization. ML/fraud exercises
+  use synthetic or appropriately consented, governed data.
+- **Sequence:** First establish a stable v3.0.0 multi-agent delivery baseline;
+  next implement the benchmark harness and blind oracle; then compare workflows
+  and publish results with failure cases and uncertainty. Decide the exact
+  post-v3 release number only when v3.0.0 proves stable and a scope doc is approved.
+
+**Status:** Future research/evaluation theme only. No v2.x spec slot, no new
+implementation spec or dispatch, and no commitment to deliver this in v3.0.0.
+
+**Calibration corpus (operator, 2026-10-22).** Classic interview coding problems with one known
+correct answer (for example: simplify a Unix path, shortest clear path in an 8-directional grid,
+sum of BST values in a range), drawn from the categories on the PracHub Meta interview list
+(`https://prachub.com/companies/meta`). Their purpose is calibration: a known answer measures how
+often the intent → Acceptance → implementer → blind-verifier loop delivers correct code, which a
+real bug cannot. Write our own problem statements and record source and rights metadata; never
+copy third-party question text or paywalled content.
+
 ## Forward themes (unversioned until scoped)
 
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
 milestone only when it gets a scope doc.
+
+- **Vendor-neutral AI engineering collaboration (future enhancement; P1-blocked).** Separate the agent
+  coordinator from the worker backend in a proposed `k3dm-agent-dispatch`, with shared task identity,
+  lifecycle, scoped permissions, Git/test evidence, independent acceptance, and backward-compatible
+  Codex dispatch history. Any authorized Claude, Codex, Gemini, Hermes or human coordinator may
+  dispatch a supported backend; optional MCP/A2A transport is deferred. **Do not start or schedule
+  implementation until the dispatcher worker-lifecycle P1 is fixed and verified.** Proposal:
+  [`future-vendor-neutral-agent-collaboration-contract.md`](plans/future-vendor-neutral-agent-collaboration-contract.md).
 
 - **Re-home the hub's ESO off the app-cluster ApplicationSet** — the hub's External Secrets
   Operator install (`ubuntu-k3s-eso`: 3 Deployments, 21 CRDs, 5 ClusterRoles, 2 webhook configs) is
@@ -850,6 +1318,23 @@ milestone only when it gets a scope doc.
   exposes the operator's credentials, so this starts as a read-only go/no-go evaluation in a separate
   OS user. Not before v1.43.5. Plan: `docs/plans/claude-self-hosted-runner-evaluation.md`
   (operator, 2026-10-15).
+- **Hardening ideas from interview design questions (operator, 2026-10-22)** — three of the
+  PracHub Meta questions (`https://prachub.com/companies/meta`) describe problems this repo hit the
+  same week. Each needs a scope doc or bug spec before it gets a version.
+  - *Notification delivery (Q7: notification system at scale).* `_notify_job` in
+    `bin/k3dm-webhook` logs `route=none` and drops a reply it cannot route (recurrence in
+    `docs/bugs/2026-10-01-ask-docs-thread-follow-up-silently-dropped.md`). An undeliverable reply
+    should go to a dead-letter record and raise an alert instead of disappearing.
+  - *Evidence before diagnosis (Q8: diagnose a server crash with concrete Linux evidence).* The
+    `~/.ssh/config` wipe (`docs/bugs/2026-10-22-ssh-config-lost-operator-host-aliases.md`) has no
+    root cause because nothing recorded the write. Back up or audit-log writes to operator-owned
+    files, so the next incident starts with evidence.
+  - *Validate a reporting repair (Q16).* The bug-tally fix
+    (`docs/bugs/2026-10-22-bug-tally-counts-implemented-and-deferred-as-open.md`) was proven by
+    hand. Add a reconciliation check that the Slack bug count and the dashboard's per-bug rows
+    agree for every release.
+  - *Path canonicalization (Q17)* doubles as a calibration problem (see the benchmark entry above)
+    and as input validation for directory traversal (`../`) in webhook and cloud-request arguments.
 - **Distribution packages** — deb/rpm/brew. Long-standing vision item, never scoped.
 - **Home lab** — `CLUSTER_PROVIDER=k3s-local-arm64` on a Mac Mini M5 (hardware target ~Oct 2026),
   bare-metal ingress via **MetalLB + Envoy Gateway (Gateway API)** replacing the Istio

@@ -6,6 +6,7 @@ import sys
 from email.message import Message
 from pathlib import Path
 from urllib.error import HTTPError
+from urllib.error import URLError
 
 import pytest
 
@@ -107,6 +108,37 @@ def test_argocd_uses_public_url_for_every_provider(monkeypatch, provider):
     monkeypatch.setattr(WEBHOOK, "_smoke_post", fake_post)
     WEBHOOK._smoke_argocd_login(None)
     assert seen == ["https://argocd.3ai-talk.org/api/v1/session"]
+
+
+def test_smoke_post_returns_http_error_status(monkeypatch):
+    def rejected(*args, **kwargs):
+        raise HTTPError("https://argocd.test/api/v1/session", 401, "Unauthorized", Message(), io.BytesIO(b"rejected"))
+
+    monkeypatch.setattr(WEBHOOK.urllib.request, "urlopen", rejected)
+    assert WEBHOOK._smoke_post(None, "https://argocd.test/api/v1/session", b"{}") == (401, b"rejected")
+
+
+def test_argocd_rejection_reports_http_status_and_transport_error_is_unavailable(monkeypatch):
+    monkeypatch.setenv("K3DM_SMOKE_ARGOCD_PASS", SENTINEL)
+    monkeypatch.setattr(WEBHOOK, "_smoke_post", lambda *args, **kwargs: (401, b""))
+    name, ok, detail = WEBHOOK._smoke_argocd_login(None)
+    assert (name, ok) == ("ArgoCD login", False)
+    assert detail.endswith("HTTP 401")
+    assert SENTINEL not in detail
+
+    def unavailable(*args, **kwargs):
+        raise URLError("connection refused")
+
+    monkeypatch.setattr(WEBHOOK, "_smoke_post", unavailable)
+    assert WEBHOOK._smoke_argocd_login(None)[2].endswith("HTTP unavailable")
+
+
+def test_argocd_non_json_200_reports_no_token(monkeypatch):
+    monkeypatch.setenv("K3DM_SMOKE_ARGOCD_PASS", SENTINEL)
+    monkeypatch.setattr(WEBHOOK, "_smoke_post", lambda *args, **kwargs: (200, b"not json"))
+    name, ok, detail = WEBHOOK._smoke_argocd_login(None)
+    assert (name, ok) == ("ArgoCD login", False)
+    assert detail.endswith("HTTP 200, no token")
 
 
 def test_prometheus_rejects_an_unauthenticated_success(monkeypatch):

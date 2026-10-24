@@ -8,36 +8,51 @@ metadata:
     app-type: observability
     k3dm.k3d.io/rollout-stage: app-cluster
 spec:
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   generators:
-    - list:
-        elements:
-          - name: acg-kube-prometheus-stack
-            namespace: monitoring
-            chart: kube-prometheus-stack
-            repoURL: https://prometheus-community.github.io/helm-charts
-            targetRevision: 67.9.0
-            valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml
-            clusterLabel: ${APP_CLUSTER_NAME}
-          - name: loki
-            namespace: monitoring
-            chart: loki
-            repoURL: https://grafana-community.github.io/helm-charts
-            targetRevision: 18.2.0
-            valuesFile: scripts/etc/helm/observability/loki-values.yaml
-          - name: acg-trivy-operator
-            namespace: trivy-system
-            chart: trivy-operator
-            repoURL: https://aquasecurity.github.io/helm-charts
-            targetRevision: 0.34.0
-            valuesFile: scripts/etc/helm/observability/trivy-operator-acg-values.yaml
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  k3d-manager/role: app-cluster
+                matchExpressions:
+                  - key: k3d-manager/provider
+                    operator: In
+                    values:
+                      - k3s-hostinger
+                      - k3s-aws
+          - list:
+              elements:
+                - app: acg-kube-prometheus-stack
+                  namespace: monitoring
+                  chart: kube-prometheus-stack
+                  repoURL: https://prometheus-community.github.io/helm-charts
+                  targetRevision: 67.9.0
+                  valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml
+                - app: loki
+                  namespace: monitoring
+                  chart: loki
+                  repoURL: https://grafana-community.github.io/helm-charts
+                  targetRevision: 18.2.0
+                  valuesFile: scripts/etc/helm/observability/loki-values.yaml
+                - app: acg-trivy-operator
+                  namespace: trivy-system
+                  chart: trivy-operator
+                  repoURL: https://aquasecurity.github.io/helm-charts
+                  targetRevision: 0.34.0
+                  valuesFile: scripts/etc/helm/observability/trivy-operator-acg-values.yaml
   goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
   template:
     metadata:
-      name: '{{.name}}'
+      name: '{{.name}}-{{.app}}'
     spec:
       project: platform
       destination:
-        name: ${APP_CLUSTER_NAME}
+        name: '{{.name}}'
         namespace: '{{.namespace}}'
       sources:
         - repoURL: https://github.com/wilddog64/k3d-manager
@@ -47,11 +62,12 @@ spec:
           chart: '{{.chart}}'
           targetRevision: '{{.targetRevision}}'
           helm:
+            releaseName: '{{.app}}'
             valueFiles:
               - '$values/{{.valuesFile}}'
             parameters:
               - name: prometheus.prometheusSpec.externalLabels.cluster
-                value: '{{.clusterLabel}}'
+                value: '{{.name}}'
       syncPolicy:
         automated:
           prune: true

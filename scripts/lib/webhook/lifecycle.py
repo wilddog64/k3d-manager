@@ -2,7 +2,9 @@
 """Long-running cluster orchestration for k3dm-webhook."""
 
 import datetime
+import base64
 import os
+import re
 import signal
 import threading
 import time
@@ -10,9 +12,9 @@ import traceback
 
 from webhook.config import JOB_DIR, REPO_ROOT
 from webhook.proc import _spawn_capture_text
-from webhook.render import _slack_post
 from webhook.log import get_logger
 from webhook.failure_notes import write_failure_note
+from webhook.redact import mask_env_values, scrub_credentials
 
 __all__ = [
     "_run_cleanup", "_run_make_target", "_run_upgrade", "_run_cluster",
@@ -29,6 +31,21 @@ _redact_secrets = lambda text: text
 _spawn_job = None
 _helpers = {}
 _LOG = get_logger("webhook.lifecycle")
+
+
+def _make_target_argv(argv_tail):
+    """Encode free-text Q before it crosses GNU Make's shell recipe boundary."""
+    make_args = list(argv_tail)
+    if make_args and make_args[0] == "find-similar-docs":
+        transported = []
+        for value in make_args[1:]:
+            if value.startswith("Q="):
+                encoded = base64.b64encode(value[2:].encode("ascii")).decode("ascii")
+                transported.append(f"Q_B64={encoded}")
+            else:
+                transported.append(value)
+        return [make_args[0], *transported]
+    return make_args
 
 
 def configure_runtime(log, notify_job, push_metrics, analyze_stall, analyze_failure,
@@ -64,11 +81,60 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
 
 def _read_job_tail(output_path, n=3):
     try:
-        with open(output_path, errors="replace") as _f:
-            _lines = _f.readlines()
+        with open(output_path, "rb") as _f:
+            _f.seek(0, os.SEEK_END)
+            _size = _f.tell()
+            _f.seek(max(0, _size - 16384))
+            _text = _f.read(16384).decode("utf-8", errors="replace")
+        _lines = _text.splitlines()
         return [line.rstrip() for line in _lines[-n:] if line.strip()]
     except OSError:
         return []
+
+
+_CLUSTER_OUTPUT_MAX_CHARS = 1400
+_SLACK_RESPONSE_URL_RE = re.compile(r"https?://hooks\.slack\.com/\S+", re.IGNORECASE)
+
+
+def _sanitize_cluster_output(text, redact):
+    """Apply registered-secret and credential-shape scrubbing to command output."""
+    text = scrub_credentials(redact(text))
+    text = mask_env_values(text)
+    return _SLACK_RESPONSE_URL_RE.sub("[SLACK_RESPONSE_URL_REDACTED]", text)
+
+
+def _cluster_output_excerpt(output_path, redact):
+    """Return a short, credential-redacted tail suitable for Slack."""
+    tail = "\n".join(_read_job_tail(output_path, n=12))
+    if not tail:
+        return "(no command output)"
+    tail = _sanitize_cluster_output(tail, redact)
+    if len(tail) > _CLUSTER_OUTPUT_MAX_CHARS:
+        tail = "…\n" + tail[-(_CLUSTER_OUTPUT_MAX_CHARS - 2):]
+    return tail
+
+
+def _cluster_progress_excerpt(output_path, redact):
+    """Return a bounded, redacted progress tail."""
+    tail = "\n".join(_read_job_tail(output_path))
+    if not tail:
+        return "—"
+    tail = _sanitize_cluster_output(tail, redact)
+    if len(tail) > _CLUSTER_OUTPUT_MAX_CHARS:
+        tail = "…\n" + tail[-(_CLUSTER_OUTPUT_MAX_CHARS - 2):]
+    return tail
+
+
+def _without_progress_overlap(excerpt, progress_excerpt):
+    """Drop lines repeated from the latest progress tail."""
+    if not progress_excerpt:
+        return excerpt
+    _excerpt_lines = excerpt.splitlines()
+    _progress_lines = progress_excerpt.splitlines()
+    for _start in range(len(_excerpt_lines) - len(_progress_lines) + 1):
+        if _excerpt_lines[_start:_start + len(_progress_lines)] == _progress_lines:
+            return "\n".join(_excerpt_lines[:_start] + _excerpt_lines[_start + len(_progress_lines):])
+    return excerpt
 
 
 _STALL_TICKS_THRESHOLD = 3
@@ -103,7 +169,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     def _post_progress():
         elapsed = int((time.monotonic() - start) / 60)
         tail = "\n".join(_read_job_tail(log_file)) or "—"
-        _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed\n```{tail}```")
+        _notify_job(job_id, f"⏳ *make {label}* still running — {elapsed}m elapsed — job `{job_id}`\n```{tail}```")
 
     def _wait(pid):
         deadline = time.monotonic() + timeout
@@ -122,8 +188,8 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
     try:
         (job_dir / "status").write_text("running")
         log_file.touch()
-        _notify_job(job_id, f"🛠️ *make {label}* started by {actor}")
-        cmd = ["make", "--no-print-directory", *argv_tail]
+        _notify_job(job_id, f"🛠️ *make {label}* started by {actor} — job `{job_id}`")
+        cmd = ["make", "--no-print-directory", *_make_target_argv(argv_tail)]
         env = {**os.environ, "K3DM_JUNIT_XML": str(job_dir / "junit.xml")}
         _LOG.debug("make job %s argv=%r", job_id, cmd)
         progress_timer = threading.Timer(120, _post_progress)
@@ -156,7 +222,7 @@ def _run_make_target(job_id, argv_tail, timeout, actor):
         if status == "failed":
             write_failure_note(job_dir, job_id, f"make {label}", timeout if timed_out else rc,
                                timed_out=timed_out, redact=_redact_secrets)
-        _notify_job(job_id, f"{icon} *make {label}* {verdict}\n```{tail or '(no output)'}```")
+        _notify_job(job_id, f"{icon} *make {label}* {verdict} — job `{job_id}`\n```{tail or '(no output)'}```")
     finally:
         if progress_timer:
             progress_timer.cancel()
@@ -223,6 +289,8 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
     _last_line_count = 0
     _stall_tick_count = 0
     _stall_analyzed = False
+    _last_progress_tail = None
+    _exit_status = "unknown"
 
     def _write_log(msg):
         with open(_out_file, "a") as _f:
@@ -231,13 +299,14 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
     _notify_job(job_id, f"🚀 *cluster-{action}* ({provider}) started — job `{job_id}`")
 
     def _post_progress():
-        nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
+        nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed, _last_progress_tail
         elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
-        tail = _read_job_tail(_out_file)
-        tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        tail_text = _cluster_progress_excerpt(_out_file, _redact_secrets)
+        _last_progress_tail = tail_text
+        _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed — job `{job_id}`\n```{tail_text}```")
         try:
-            current_count = sum(1 for _ in open(_out_file))
+            with open(_out_file) as _output_stream:
+                current_count = sum(1 for _ in _output_stream)
         except OSError:
             current_count = 0
         if current_count == _last_line_count:
@@ -273,7 +342,17 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
         _dry_tag = " — DRY_RUN preview" if dry_run else ""
-        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag}"
+        summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m{_dry_tag} — job `{job_id}`"
+        summary += f"\nCommand exit: {_exit_status}."
+        excerpt = _cluster_output_excerpt(_out_file, _redact_secrets)
+        if action == "down" and status == "success":
+            if "cloud teardown: verified" in excerpt.lower():
+                summary += " CloudFormation teardown was verified by the command output."
+            else:
+                summary += " External teardown was not independently verified."
+        excerpt = _without_progress_overlap(excerpt, _last_progress_tail)
+        if excerpt:
+            summary += f"\n```{excerpt}```"
         _notify_job(job_id, summary)
         if not dry_run:
             _push_metrics(action, provider, status, elapsed_secs, job_id)
@@ -302,10 +381,12 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
             waited, _status = os.waitpid(pid, os.WNOHANG)
             if waited == pid:
                 _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+                _exit_status = str(_rc)
                 break
             time.sleep(0.1)
         else:
             timed_out = True
+            _exit_status = "timeout"
             try:
                 os.killpg(pid, signal.SIGTERM)
             except (ProcessLookupError, OSError):
@@ -338,6 +419,8 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
             ).start()
         _finish("success")
     except Exception as exc:
+        if _exit_status == "unknown":
+            _exit_status = "unavailable"
         tb = traceback.format_exc()
         _write_log(f"ERROR: {exc}\n{tb}")
         write_failure_note(job_dir, job_id, f"cluster-{action}", 1, redact=_redact_secrets)
@@ -362,6 +445,8 @@ def _run_cluster_resume(job_id, provider="aws"):
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.now(datetime.timezone.utc).timestamp()
     _progress_timer = None
+    _last_progress_tail = None
+    _exit_status = "unknown"
 
     def _write_log(msg):
         with open(_out_file, "a") as _f:
@@ -370,11 +455,11 @@ def _run_cluster_resume(job_id, provider="aws"):
     _notify_job(job_id, f"🔄 *cluster-resume* ({provider}) started — job `{job_id}`")
 
     def _post_progress():
-        nonlocal _progress_timer
+        nonlocal _progress_timer, _last_progress_tail
         elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
-        tail = _read_job_tail(_out_file)
-        tail_text = "\n".join(tail) if tail else "—"
-        _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        tail_text = _cluster_progress_excerpt(_out_file, _redact_secrets)
+        _last_progress_tail = tail_text
+        _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed — job `{job_id}`\n```{tail_text}```")
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
@@ -388,7 +473,12 @@ def _run_cluster_resume(job_id, provider="aws"):
         emoji = "✅" if status == "success" else "❌"
         elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
-        _notify_job(job_id, f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m")
+        summary = f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m — job `{job_id}`\nCommand exit: {_exit_status}."
+        excerpt = _cluster_output_excerpt(_out_file, _redact_secrets)
+        excerpt = _without_progress_overlap(excerpt, _last_progress_tail)
+        if excerpt:
+            summary += f"\n```{excerpt}```"
+        _notify_job(job_id, summary)
         _push_metrics("resume", provider, status, elapsed_secs, job_id)
 
     try:
@@ -402,6 +492,7 @@ def _run_cluster_resume(job_id, provider="aws"):
             _running_procs[job_id] = pid
         _, _status = os.waitpid(pid, 0)
         _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+        _exit_status = str(_rc)
         try:
             os.killpg(pid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
@@ -417,6 +508,8 @@ def _run_cluster_resume(job_id, provider="aws"):
         ).start()
         _finish("success")
     except Exception as exc:
+        if _exit_status == "unknown":
+            _exit_status = "unavailable"
         tb = traceback.format_exc()
         _write_log(f"ERROR: {exc}\n{tb}")
         try:
@@ -429,7 +522,7 @@ def _run_cluster_resume(job_id, provider="aws"):
 def _run_cluster_refresh(job_id, response_url, thread_ts=None):
     """Run bin/cluster-refresh --no-login-prompt; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
-    if thread_ts:
+    if thread_ts and not (job_dir / "thread_ts").exists():
         (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
@@ -443,12 +536,9 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
             report = (report[:1600]
                       + "\n… middle of report truncated …\n"
                       + report[-1800:])
-        output = report
+        output = f"{report.rstrip()}\n\n— job `{job_id}`\n"
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
+        _notify_job(job_id, output)
 
     try:
         _write_log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
@@ -479,7 +569,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
     """Run make refresh for k3s-hostinger (restore kubeconfig + ArgoCD); post result."""
     job_dir = JOB_DIR / job_id
-    if thread_ts:
+    if thread_ts and not (job_dir / "thread_ts").exists():
         (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
@@ -488,12 +578,9 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        output = _redact_secrets("".join(lines))
+        output = f"{_redact_secrets(''.join(lines)).rstrip()}\n\n— job `{job_id}`\n"
         (job_dir / "output").write_text(output)
-        if response_url:
-            _slack_post(response_url, output)
-        else:
-            _notify_job(job_id, output)
+        _notify_job(job_id, output)
 
     try:
         (job_dir / "status").write_text("running")

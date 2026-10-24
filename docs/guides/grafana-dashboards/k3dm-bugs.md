@@ -1,0 +1,137 @@
+# k3dm Bug Tracking (`k3dm-bugs`) — hub
+
+[← Grafana dashboards index](../grafana-dashboards.md)
+
+Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb-metrics`.
+`k3dm-bug-docs` is the whole inventory: `k3dm_bug_docs{priority,state}` and its scan time.
+`k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
+`**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
+indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
+Open for counts from filed until the bug is LIVE-VERIFIED.
+`k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
+counts open docs already scheduled for a later release, such as a patch release.
+
+Bug counts have two release meanings. **Filed in** is the doc's `**Branch:**` line or the first tag
+that contains its add commit. **Fixed in** is the first tag that contains the commit that changed
+its status to fixed, or the current release branch when no tag does yet. A bug fixed, reopened and
+fixed again counts once under its latest fix. A fixed bug with no detectable status change shows
+`unknown` and is not counted under any release. So does a doc whose first Status line was added
+already fixed to an existing doc, such as the 2026-10-09 status sweep: that commit records the
+sweep, not the fix; release comes from tag ancestry, never dates. Tile 4
+and panel 25 use fixed-in, while panels 7 and 8 and the `$release` row use filed-in. The table shows
+both.
+
+The top row shows the current release: bugs filed, open and fixed, open bugs scheduled later, and
+untriaged docs. The middle row has two stacked bar charts across the six releases: by priority, and
+open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Each priority and state has a
+fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
+zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
+where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
+scan age, a **Bugs** table, and open-by-priority over time. Each document is classified by status:
+
+| Status | Doc `**Status:**` value begins with |
+|---|---|
+| `deferred` | `DEFERRED` |
+| `fixed` | `IMPLEMENTED`, or a closed value such as `FIXED`, `VERIFIED`, or `CLOSED` |
+| `unknown` | there is no status line |
+| `open` | anything else |
+
+The verification ladder is `OPEN → IMPLEMENTED → VERIFIED → LIVE-VERIFIED`. VERIFIED means
+someone other than the implementer checked the fix offline: tests ran, the new tests were shown
+red on the old code, and mutations were red. LIVE-VERIFIED means the fix was proven on the real
+system (hub, cluster, Slack, or email). The ladder is cumulative, so LIVE-VERIFIED is also
+VERIFIED.
+
+Fixed documents also have a Verified and Live-verified label:
+
+| Verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, any other fixed status |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| `-` | not fixed (table series only; shown as —) |
+
+| Live-verified | When |
+|---|---|
+| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
+| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
+| `n/a` | fixed, release before v1.43.2 or unassigned |
+| `-` | not fixed (table series only; shown as —) |
+
+The table shows `verified_at` and `live_verified_at` from `k3dm_bug_info` as **Verified at** and
+**Live-verified at**, each next to its status column (`—` when not verified, `unknown` when no time
+was found). A verified or
+live-verified document gets `YYYY-MM-DD HH:MMZ` (UTC) or `YYYY-MM-DD`. The time comes from a date
+written directly after the keyword (`VERIFIED — <ISO date or time>: <evidence>` /
+`LIVE-VERIFIED — <ISO date or time>: <evidence>`); a date later in the Status text, such as a
+planned drill or a `Was:` history note, is ignored. Without one, it is the UTC committer time of the
+earliest commit that set that Status. A date-only Status date takes that commit's time when the
+commit is from the same UTC day; otherwise it stays `YYYY-MM-DD` — usually because the only commit
+that carries the Status is a release squash merge, whose time is the merge, not the verification.
+Write the time in the Status (`VERIFIED — 2026-10-17T19:41Z: …`) to always get one. A verified doc
+with neither is `true`; unverified values stay
+`false`, `n/a` or `-`. These are text labels, so Grafana shows them in UTC, not the browser's zone.
+
+The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verified commit**. They
+contain the first eight characters of the commit that marked the doc fixed (the commit used for
+**Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
+otherwise they are `-` and render as `—`.
+
+It also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
+fix commit:
+
+| Live evidence | Meaning |
+|---|---|
+| `ok` | `✓ current`: at least one evidence commit contains the fix |
+| `stale` | `stale proof`: git confirms no evidence commit contains the fix |
+| `missing` | no well-formed evidence line is recorded |
+| `unchecked` | evidence exists, but the fix commit is unknown, or git cannot resolve the fix or evidence commit (for example a squash-merged release branch that was deleted without an archive tag) |
+| `n/a` | LIVE-VERIFIED release predates v1.43.4 |
+| `-` | not fixed or not LIVE-VERIFIED |
+
+Each live proof uses one line in this form (multiple lines are allowed):
+`**Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>`.
+The separators may also be written as ` | `. `proves` contains comma-separated Acceptance IDs such
+as `E1,E3`, or `fix` for a doc with no Acceptance block. `commit` is the k3d-manager commit checked
+out when the proof ran (an e2e run records it in `~/.k3dm/e2e/<run>.json`); `run` is the e2e run ID,
+or a short name or log path for a proof that is not an e2e run. The check compares against the commit that first closed the doc's Status. When the doc was closed
+after the proof ran (for example straight to LIVE-VERIFIED), add `**Fix commit:** <sha>` naming the
+code fix; it overrides that proxy for this check only. Open for keeps counting from Filed
+for `missing` and `stale`; `ok`, `unchecked`, and historic `n/a` rows keep the live-verified value
+of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED without a
+well-formed line and now requires a **Fix commit:** header for a new LIVE-VERIFIED doc, checking
+that an evidence commit contains it (`make check-bug-evidence` sweeps every doc).
+
+`k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
+columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
+has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
+
+The summary strip follows the Release dropdown and shows open P0–P3 (titled P0 to P3), Fixed, Verified,
+Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
+Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
+document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
+other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
+live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to
+`LIVE-VERIFIED — <evidence>`.
+
+The dashboard opens on the release branch's own version, which is the saved Release value. When a
+new release branch is cut, bump that value; the BATS test fails until it matches. lib-foundation has
+no release branch value and falls back to All. Rows sort by release, then priority (P0 first and
+unset last), then status.
+
+The exporter publishes the table and status aggregate in the separate `k3dm-bug-open` Pushgateway
+group with `PUT`, so a changed or empty list is removed rather than lingering in Pushgateway.
+The Release dropdown filters the table and the Open P0–P3 stats by the release the bug was filed in:
+the doc's `**Branch:** k3d-manager-vX.Y.Z` line, otherwise the first tag containing the commit that
+added the file, otherwise the current release branch. Bugs without a valid release use the `unassigned`
+bucket. The table and dropdown list releases newest first, by version. The dropdown does not filter
+Open, any release or the history.
+On `main`, which is
+not a release branch, the current-release row is empty and the charts show the last five shipped
+releases. A tally failure skips only the release group, so the inventory keeps updating.
+
+The Repo selector chooses among the nine PR Checks repos listed above. lib-foundation is read from
+its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
+`~/src/gitrepo/personal/lib-foundation`), and its release labels are its own tags such as
+`v0.5.3`. The "Fixed this release" and "Open in later releases" tiles remain k3d-manager-only
+because lib-foundation has no release branch.

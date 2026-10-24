@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import sys
@@ -31,6 +32,7 @@ from webhook.config import (  # noqa: E402
     PUSHGATEWAY_URL,
     SLACK_BOT_TOKEN,
     SLACK_CHANNEL_ID,
+    STATUS_CHANNEL_ID,
     _PUSHGATEWAY_PUSH_RETRIES,
     _PUSHGATEWAY_PUSH_SLEEP_SECS,
     _ACTIVE_PROVIDER_FILE,
@@ -101,6 +103,16 @@ import webhook.policy as _policy  # noqa: E402
 
 _policy._slack_user_role = _slack_user_role
 _LOG = get_logger("webhook")
+
+
+def _slack_message_is_command_candidate(ev):
+    """Return whether a Slack message may contain a webhook command."""
+    return (
+        ev.get("type") == "message"
+        and not ev.get("bot_id")
+        and bool(ev.get("text", "").strip())
+        and ev.get("subtype", "") in ("", "thread_broadcast")
+    )
 
 
 def _provider_supports_pushgateway(provider):
@@ -504,7 +516,7 @@ def _run_stale_sandbox_cleanup(job_id, confirm=False, channel_id=""):
     (job_dir / "status").write_text("running")
     thread_ts_file = job_dir / "thread_ts"
     if not thread_ts_file.exists() and channel_id:
-        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'apply' if confirm else 'preview'}) queued"
+        _thread_header = f"🧹 *cleanup-stale-sandbox* ({'confirm' if confirm else 'preview'}) queued"
         _thread_ts = _start_bot_thread(_thread_header, channel_id=channel_id)
         if _thread_ts:
             thread_ts_file.write_text(_thread_ts)
@@ -621,20 +633,59 @@ def _record_acg_state(provider):
     )
 
 
-def _find_job_by_thread_ts(thread_ts):
-    """Return job_id whose thread_ts file matches, or None. Skips ask sub-jobs."""
+def _find_job_by_thread_ts(thread_ts, channel_id=""):
+    """Return a stable delivery context for a Slack thread; never infer its job."""
     if not JOB_DIR.exists():
         return None
+    candidates = []
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
             action_file = ts_file.parent / "action"
             if action_file.exists() and action_file.read_text().strip() in {"ask", "ask-docs"}:
                 continue
             if ts_file.read_text().strip() == thread_ts:
-                return ts_file.parent.name
+                channel_file = ts_file.parent / "channel_id"
+                if channel_id and channel_file.exists() and channel_file.read_text().strip() != channel_id:
+                    continue
+                candidates.append(ts_file.parent)
         except OSError:
             pass
-    return None
+    if not candidates:
+        return None
+    # Prefer the original anchor, then use immutable directory name ordering.
+    anchors = []
+    for path in candidates:
+        status_file = path / "status"
+        if status_file.exists() and status_file.read_text(errors="replace").strip() == "thread-anchor":
+            anchors.append(path)
+    return sorted(anchors or candidates, key=lambda path: path.name)[0].name
+
+
+def _resolve_thread_job_target(anchor_job_id, command, channel_id):
+    """Resolve a mandatory explicit job ID and enforce its thread/channel boundary."""
+    parts = command.strip().lstrip("/").split()
+    requested_id = parts[1] if len(parts) == 2 else ""
+    if requested_id.startswith("`") and requested_id.endswith("`"):
+        requested_id = requested_id[1:-1]
+    if len(parts) != 2 or not _JOB_ID_RE.fullmatch(requested_id):
+        command_name = parts[0].lower() if parts else "missing"
+        reason = "argument_count" if len(parts) != 2 else "invalid_job_id"
+        _LOG.warning("slack thread target rejected command=%s reason=%s token_count=%d",
+                     command_name, reason, len(parts))
+        return None, "Usage: `logs|status|diagnosis|kill <job-id>` — include the exact job ID"
+    requested_dir = JOB_DIR / requested_id
+    if not requested_dir.is_dir():
+        return None, f"⚠️ Job `{requested_id}` is unknown or its records have expired"
+    anchor_thread = _thread_ts_for_job(anchor_job_id)
+    requested_thread = _thread_ts_for_job(requested_id)
+    if anchor_thread and requested_thread != anchor_thread:
+        return None, f"⚠️ Job `{requested_id}` is not in this Slack thread"
+    requested_channel = _read_job_value(requested_id, "channel_id")
+    anchor_channel = _read_job_value(anchor_job_id, "channel_id")
+    expected_channel = channel_id or anchor_channel
+    if expected_channel and requested_channel and requested_channel != expected_channel:
+        return None, f"⚠️ Job `{requested_id}` is not in this Slack channel"
+    return requested_id, None
 
 
 _THREAD_COMMANDS = {
@@ -655,6 +706,27 @@ _STANDALONE_CMDS = {
 def _thread_ts_for_job(job_id):
     path = JOB_DIR / job_id / "thread_ts"
     return path.read_text().strip() if path.exists() else None
+
+
+def _copy_thread_context(parent_job_id, child_job_id, channel_id=""):
+    """Persist the parent's Slack delivery context on an async child job."""
+    child_dir = JOB_DIR / child_job_id
+    for name in ("channel_id", "thread_ts", "thread_source", "response_url"):
+        value = _read_job_value(parent_job_id, name)
+        if name == "channel_id" and not value:
+            value = (channel_id or "").strip()
+        if value:
+            (child_dir / name).write_text(value)
+
+
+def _persist_notification_context(job_id, *, channel_id="", thread_ts="",
+                                 thread_source="", response_url=""):
+    """Save only the Slack delivery fields supplied by a trusted route."""
+    job_dir = JOB_DIR / job_id
+    for name, value in (("channel_id", channel_id), ("thread_ts", thread_ts),
+                        ("thread_source", thread_source), ("response_url", response_url)):
+        if value:
+            (job_dir / name).write_text(str(value).strip())
 
 
 def _parse_thread_diagnose(command):
@@ -699,21 +771,30 @@ def _run_upgrade_thread_job(job_id, chart_version, stage):
         text += f"\n```{output}```"
     _notify_job(job_id, text)
 
-def _handle_thread_command(job_id, command, role="admin", channel_id=""):
+def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id=""):
     """Dispatch a thread command for job_id. Runs in a background thread."""
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
+    actor = f"slack-thread:{user_id}" if user_id else f"slack-thread:{role}"
     if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
         return
     if channel_id:
         (JOB_DIR / job_id / "channel_id").write_text(channel_id)
     required = _thread_command_min_role(command)
-    if not _role_allows(role, required):
+    if cmd != "k3dm" and not _role_allows(role, required):
         _audit_remote_action(
-            "/slack/events", f"thread-{cmd or 'unknown'}", "slack", role, False,
+            "/slack/events", f"thread-{cmd or 'unknown'}", actor, role, False,
             reason=f"requires {required}",
         )
         _notify_job(job_id, f"⛔ `{cmd or command.strip()}` requires role *{required}* — you have *{_normalize_actor_role(role)}*.")
         return
+    delivery_job_id = job_id
+    if cmd in {"kill", "diagnosis", "status", "logs"}:
+        target_id, error = _resolve_thread_job_target(delivery_job_id, command, channel_id)
+        if error:
+            _notify_job(delivery_job_id, error)
+            return
+        _copy_thread_context(delivery_job_id, target_id, channel_id)
+        job_id = target_id
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)
         command = f"ask {cmd} {_alias_parts[1]}" if len(_alias_parts) > 1 else f"ask {cmd}"
@@ -742,21 +823,29 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         _notify_job(job_id, f"🔎 *cluster-diagnose* queued — job `{new_job_id}`")
 
     elif cmd == "k3dm":
-        parts = command.strip().lstrip("/").split()
+        try:
+            parts = shlex.split(command.strip().lstrip("/"), posix=True)
+        except ValueError as exc:
+            _notify_job(job_id, f"Invalid k3dm quoting: {exc}. Use double quotes around multiword Q values.")
+            return
         target = parts[1].lower() if len(parts) > 1 else "help"
         args = {}
         confirm = False
         for part in parts[2:]:
             if part.lower() == "confirm":
+                if confirm:
+                    _notify_job(job_id, "Unexpected duplicate `confirm` token.")
+                    return
                 confirm = True
             elif "=" in part:
                 key, value = part.split("=", 1)
                 args[key] = value
             else:
-                _notify_job(job_id, "Usage: `k3dm <target> [KEY=value ...] [confirm]`")
+                _notify_job(job_id, "Unexpected argument. Use `Q=\"natural language query\"` for multiword searches.")
                 return
         if target == "help":
-            _notify_job(job_id, f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}")
+            help_text = f"*/k3dm targets for role {_normalize_actor_role(role)}*\n{make_target_help(_normalize_actor_role(role), _role_allows)}"
+            _notify_help(job_id, help_text)
             return
         argv_tail, error = parse_make_request(target, args, confirm)
         if error:
@@ -772,17 +861,18 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "target").write_text(target)
         thread_ts = _thread_ts_for_job(job_id)
         if thread_ts:
             (new_job_dir / "thread_ts").write_text(thread_ts)
         if channel_id:
             (new_job_dir / "channel_id").write_text(channel_id)
+        _notify_job(job_id, f"🛠️ *make {target}* queued — job `{new_job_id}`")
         threading.Thread(
             target=_run_make_target,
-            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), f"slack-thread:{role}"),
+            args=(new_job_id, argv_tail, MAKE_TARGETS[target].get("timeout", MAKE_JOB_TIMEOUT_DEFAULT), actor),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🛠️ *k3dm {target}* queued — job `{new_job_id}`")
 
     elif cmd == "argocd-upgrade":
         parts = command.strip().lstrip("/").split()
@@ -831,7 +921,9 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
             except Exception as exc:
                 _notify_job(job_id, f"⚠️ Diagnosis failed: {exc}")
         else:
-            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+            status = _read_job_value(job_id, "status") or "unknown"
+            reason = "output is not available yet" if status in {"queued", "running"} else "no persisted output is available"
+            _notify_job(job_id, f"⚠️ Job `{job_id}` has no output: {reason} (status `{status}`)")
 
     elif cmd == "status":
         status_file = JOB_DIR / job_id / "status"
@@ -839,12 +931,15 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
 
     elif cmd == "logs":
-        output = read_job_output(JOB_DIR / job_id, redact=_redact_secrets)
+        log_job_id = job_id
+        output = read_job_output(JOB_DIR / log_job_id, redact=_redact_secrets)
         if output:
             last = [line.rstrip() for line in output.splitlines() if line.strip()][-20:]
-            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{chr(10).join(last)}```")
+            _notify_job(job_id, f"📋 *Last 20 lines* (job `{log_job_id}`)\n```{chr(10).join(last)}```")
         else:
-            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+            status = _read_job_value(log_job_id, "status") or "unknown"
+            reason = "output is not available yet" if status in {"queued", "running"} else "no persisted output is available"
+            _notify_job(job_id, f"⚠️ Job `{log_job_id}` has no output: {reason} (status `{status}`)")
 
     elif cmd == "cluster-status":
         new_job_id = str(uuid.uuid4())[:8]
@@ -885,6 +980,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         (new_job_dir / "status").write_text("queued")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _copy_thread_context(job_id, new_job_id, channel_id)
         _refresh_parts = command.strip().split()
         _refresh_provider = _refresh_parts[1].lower() if len(_refresh_parts) >= 2 and _refresh_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         threading.Thread(
@@ -902,6 +998,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         (new_job_dir / "status").write_text("queued")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster_refresh,
             args=(new_job_id, ""),
@@ -923,8 +1020,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("resume")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster_resume,
             args=(new_job_id, _resume_provider),
@@ -944,8 +1040,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("down")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "down", _down_provider),
@@ -958,13 +1053,16 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
     elif cmd == "cleanup-stale-sandbox":
         _parts = command.strip().split()
         _cleanup_action = _parts[1].lower() if len(_parts) > 1 else "preview"
-        if _cleanup_action not in ("preview", "confirm", "apply"):
-            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm|apply]`")
+        if _cleanup_action == "apply":
+            _notify_job(job_id, "❌ `apply` is no longer accepted — use `cleanup-stale-sandbox confirm`.")
             return
-        _confirm = _cleanup_action in ("confirm", "apply")
+        if _cleanup_action not in ("preview", "confirm"):
+            _notify_job(job_id, "Usage: `cleanup-stale-sandbox [preview|confirm]`")
+            return
+        _confirm = _cleanup_action == "confirm"
         threading.Thread(target=_run_stale_sandbox_cleanup,
                          args=(job_id, _confirm, channel_id), daemon=True).start()
-        _tag = "apply" if _confirm else "dry-run"
+        _tag = "confirm" if _confirm else "preview"
         _notify_job(job_id, f"🧹 *cleanup-stale-sandbox* ({_tag}) queued")
 
     elif cmd in ("cluster-up", "up"):
@@ -979,8 +1077,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         (new_job_dir / "status").write_text("running")
         (new_job_dir / "action").write_text("up")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
-        if thread_ts_file.exists():
-            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        _copy_thread_context(job_id, new_job_id, channel_id)
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
@@ -1060,6 +1157,10 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
         (new_job_dir / "action").write_text("ask-docs")
+        for context_name in ("channel_id", "thread_source"):
+            context_file = JOB_DIR / job_id / context_name
+            if context_file.exists():
+                (new_job_dir / context_name).write_text(context_file.read_text())
         if thread_ts:
             (new_job_dir / "thread_ts").write_text(thread_ts)
         threading.Thread(
@@ -1075,6 +1176,19 @@ def _handle_thread_command(job_id, command, role="admin", channel_id=""):
             job_id,
             f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `ask-docs`, `/claude`, `/gemini`, `/codex`, `cluster-up [provider] [dry-run]`, `cluster-down [provider] [dry-run]`, `cluster-status`, `cluster-refresh`, `cluster-resume`, `cleanup-stale-sandbox [confirm]` (admin)",
         )
+
+
+def _run_thread_command_guarded(job_id, command, role, channel_id, user_id=""):
+    """Keep daemon worker exceptions correlated with the acknowledged Slack event."""
+    try:
+        _handle_thread_command(job_id, command, role, channel_id, user_id=user_id)
+    except Exception as exc:
+        thread_ts = _read_job_value(job_id, "thread_ts") or None
+        _LOG.exception("slack command worker failed job=%s channel=%s thread_ts=%s reason=%s",
+                       job_id, _read_job_value(job_id, "channel_id") or channel_id or "missing",
+                       thread_ts or "missing", type(exc).__name__)
+        _record_notification_delivery(job_id, "handler", channel_id, thread_ts, False,
+                                      f"handler_{type(exc).__name__}")
 
 
 def _archive_acg_screenshot(screenshot_path):
@@ -1158,22 +1272,106 @@ def _notify_job(job_id, text):
     thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
     channel_id_file = JOB_DIR / job_id / "channel_id"
     channel_id = channel_id_file.read_text().strip() if channel_id_file.exists() else None
-    thread_source_file = JOB_DIR / job_id / "thread_source"
-    thread_source = thread_source_file.read_text().strip() if thread_source_file.exists() else ""
     response_url_file = JOB_DIR / job_id / "response_url"
     response_url = response_url_file.read_text().strip() if response_url_file.exists() else ""
     posted = False
-    if thread_source == "bot" and SLACK_BOT_TOKEN and channel_id and thread_ts:
-        posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
-    if not posted and response_url:
-        posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
-    if not posted and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
-        ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
-        if ts and not thread_ts:
-            thread_ts_file.write_text(ts)
-        posted = bool(ts)
-    if not posted and SLACK_WEBHOOK_URL:
-        _slack_post(SLACK_WEBHOOK_URL, text)
+    route = "none"
+    intended_channel = channel_id or ""
+    failure = "not_delivered"
+    try:
+        if SLACK_BOT_TOKEN and channel_id and thread_ts:
+            route = "bot_thread"
+            posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+            if not posted:
+                failure = "thread_post_rejected"
+        if not posted and response_url:
+            route = "response_url"
+            posted = bool(_slack_post(response_url, text, thread_ts=thread_ts))
+            if not posted:
+                failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
+        # A configured default channel cannot safely receive a reply whose
+        # originating Slack channel is unknown. Preserve the requested thread.
+        # A response_url without channel_id belongs to its originating
+        # conversation, which may be a channel thread or an ephemeral route.
+        # Starting a thread in the configured default channel would create an
+        # unrelated parent timestamp that later response_url posts cannot use.
+        if not posted and SLACK_BOT_TOKEN and (
+            channel_id or (not thread_ts and not response_url and SLACK_CHANNEL_ID)
+        ):
+            route = "bot_fallback"
+            ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id or SLACK_CHANNEL_ID)
+            if not ts:
+                failure = "thread_post_rejected" if thread_ts else "delivery_rejected"
+            if ts and not thread_ts:
+                thread_ts_file.write_text(ts)
+            posted = bool(ts)
+        # Incoming webhooks cannot preserve a reply thread, so they are only a
+        # fallback for notifications that were not addressed to a thread.
+        if not posted and SLACK_WEBHOOK_URL and not thread_ts:
+            route = "webhook_fallback"
+            posted = bool(_slack_post(SLACK_WEBHOOK_URL, text))
+            if not posted:
+                failure = "delivery_rejected"
+    except Exception as exc:
+        failure = type(exc).__name__
+        _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
+                     job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
+        _record_notification_delivery(job_id, route, intended_channel, thread_ts, False, failure)
+        return False
+    if not posted:
+        _LOG.warning("slack notification failed job=%s route=%s channel=%s thread_ts=%s reason=%s",
+                     job_id, route, intended_channel or "missing", thread_ts or "missing", failure)
+    _record_notification_delivery(
+        job_id, route, intended_channel, thread_ts, posted,
+        failure if failure != "not_delivered" else "",
+    )
+    return posted
+
+
+def _record_notification_delivery(job_id, route, channel_id, thread_ts, delivered, reason):
+    """Persist redacted delivery metadata so event acknowledgment is not mistaken for delivery."""
+    record = {
+        "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "job_id": job_id,
+        "event_id": _read_job_value(job_id, "event_id") or None,
+        "route": route,
+        "channel_id": channel_id or None,
+        "thread_ts": thread_ts or None,
+        "delivered": delivered,
+        "reason": reason or None,
+    }
+    try:
+        job_dir = JOB_DIR / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        with (job_dir / "delivery.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError as exc:
+        _LOG.error("slack delivery record failed job=%s reason=%s", job_id, type(exc).__name__)
+
+
+def _read_job_value(job_id, name):
+    try:
+        return (JOB_DIR / job_id / name).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _notify_help(job_id, text):
+    """Deliver long help output in bounded chunks and stop after a failed chunk."""
+    limit = 39000
+    remaining = text
+    while remaining:
+        if len(remaining) <= limit:
+            chunk, remaining = remaining, ""
+        else:
+            boundary = remaining.rfind("\n", 0, limit)
+            if boundary <= 0:
+                boundary = limit
+            chunk, remaining = remaining[:boundary], remaining[boundary:].lstrip("\n")
+        if not _notify_job(job_id, chunk):
+            _LOG.error("slack help delivery incomplete job=%s", job_id)
+            return False
+    return True
 
 
 def _analyze_stall(lines):
@@ -1352,6 +1550,9 @@ def _analyze_failure(lines):
         "ArgoCD GitOps sync. It failed — make up exited non-zero.\n\n"
         f"Last 50 lines of output:\n\n{last_output}\n\n"
         f"{cluster_section}"
+        "Diagnose the failure using only observed evidence. Treat absent state as unknown;\n"
+        "do not infer that an EC2 instance finished booting, that sshd is running, or that\n"
+        "the instance later became ready unless logs or collected state prove it.\n"
         "Diagnose the failure:\n"
         "1. Failure mode — choose exactly one:\n"
         "   CLUSTER_FAILURE = remote cluster nodes are UNREACHABLE or NotReady — "
@@ -1359,14 +1560,17 @@ def _analyze_failure(lines):
         "   APP_FAILURE = remote cluster nodes are Ready but ArgoCD sync timed out "
         "or pods are CrashLooping — cluster exists, only app deployment failed.\n"
         "2. TRANSIENT or PERMANENT?\n"
-        "   TRANSIENT = a retry of cluster-up is likely to fix it (e.g. ArgoCD sync lag, "
+        "   TRANSIENT = a retry may fix it (e.g. ArgoCD sync lag, "
         "pod not ready yet, API server briefly unreachable).\n"
         "   PERMANENT = human action is required before a retry will work (e.g. "
         "misconfigured manifest, missing secret, quota exceeded, SSH key rejected, "
         "CloudFormation stack in ROLLBACK state).\n"
-        "3. Root cause: exactly what component failed and why (name the StatefulSet, "
-        "pod, ArgoCD app, or AWS resource if visible in the logs).\n"
-        "4. Fix: the single most actionable next step — e.g. 'Retry by sending /cluster-resume in Slack', "
+        "3. Root cause: state the observed failure first, then label possible explanations "
+        "as hypotheses. Name a component/resource only when visible in logs or collected state.\n"
+        "4. Fix: give the safest next step. For SSH readiness timeouts, inspect the existing "
+        "CloudFormation stack and EC2 state/status checks before retrying; reuse a healthy "
+        "stack and do not recommend duplicate provisioning or teardown. For other failures, "
+        "e.g. 'Retry by sending /cluster-resume in Slack', "
         "or 'Check ArgoCD app: kubectl get application data-layer -n cicd --context k3d-k3d-cluster', "
         "or 'Inspect the CloudFormation stack events in the AWS console'.\n\n"
         "Reply in exactly this format:\n"
@@ -1800,6 +2004,7 @@ _configure_status_runtime(
 )
 _status._slack_bot_token = lambda: SLACK_BOT_TOKEN
 _status._slack_channel_id = lambda: SLACK_CHANNEL_ID
+_status._status_channel_id = lambda: STATUS_CHANNEL_ID
 _status._start_bot_thread = _start_bot_thread
 _status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT
@@ -2027,40 +2232,40 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ev_subtype = ev.get("subtype", "")
             ev_text = ev.get("text", "").strip()
             ev_user = ev.get("user", "")
+            if ev_type == "message" and ev_subtype not in ("", "thread_broadcast"):
+                _LOG.info("slack message ignored subtype=%s", ev_subtype)
             if not _slack_user_is_allowlisted(ev_user):
                 _LOG.warning("slack event ignored type=%r user=%r reason=unallowlisted", ev_type, ev_user)
-                if ev_type == "message" and not ev_bot_id and not ev_subtype and ev_text:
+                if _slack_message_is_command_candidate(ev):
                     _event_command = ev_text.lstrip("/").lower().split()[0]
                     if _event_command in (_THREAD_COMMANDS | _STANDALONE_CMDS):
-                        _post_slack_bot(
+                        feedback = _post_slack_bot(
                             "⛔ This Slack account is not authorized for webhook commands. "
                             "Ask an admin to add it to the webhook role map.",
                             thread_ts=ev_thread_ts or None,
                             channel_id=ev.get("channel", ""),
                         )
+                        _LOG.warning("slack authorization feedback delivered=%s channel=%s thread_ts=%s",
+                                     bool(feedback), ev.get("channel") or "missing", ev_thread_ts or "missing")
                 self._json(200, {"ok": True})
                 return
             slack_role = _slack_user_role(ev_user)
             _LOG.debug("slack event type=%r thread_ts=%r ts=%r bot_id=%r subtype=%r user=%r role=%r",
                        ev_type, ev_thread_ts, ev_ts, ev_bot_id, ev_subtype, ev_user, slack_role)
-            if (
-                ev_type == "message"
-                and not ev_bot_id
-                and not ev_subtype
-                and ev_text
-            ):
+            if _slack_message_is_command_candidate(ev):
                 ev_channel_id = ev.get("channel", "")
                 is_thread_reply = bool(ev_thread_ts and ev_thread_ts != ev_ts)
                 thread_ts = ev_thread_ts if is_thread_reply else None
                 text = ev_text
                 cmd = text.lstrip("/").lower().split()[0] if text else ""
                 if is_thread_reply:
-                    job_id = _find_job_by_thread_ts(thread_ts)
+                    job_id = _find_job_by_thread_ts(thread_ts, ev_channel_id)
                     _LOG.debug("slack thread reply thread_ts=%r job_id=%r cmd=%r", thread_ts, job_id, cmd)
                     if job_id:
                         threading.Thread(
-                            target=_handle_thread_command,
+                            target=_run_thread_command_guarded,
                             args=(job_id, text, slack_role, ev_channel_id),
+                            kwargs={"user_id": ev_user},
                             daemon=True,
                         ).start()
                     elif cmd in _STANDALONE_CMDS:
@@ -2068,13 +2273,16 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         anchor_dir = JOB_DIR / anchor_id
                         anchor_dir.mkdir(parents=True, exist_ok=True)
                         (anchor_dir / "status").write_text("thread-anchor")
+                        if event_id:
+                            (anchor_dir / "event_id").write_text(event_id)
                         if ev_channel_id:
                             (anchor_dir / "channel_id").write_text(ev_channel_id)
                         (anchor_dir / "thread_ts").write_text(thread_ts)
                         _LOG.warning("slack orphan thread anchor_id=%r cmd=%r", anchor_id, cmd)
                         threading.Thread(
-                            target=_handle_thread_command,
+                            target=_run_thread_command_guarded,
                             args=(anchor_id, text, slack_role, ev_channel_id),
+                            kwargs={"user_id": ev_user},
                             daemon=True,
                         ).start()
                 elif cmd in _STANDALONE_CMDS:
@@ -2083,13 +2291,16 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     anchor_dir = JOB_DIR / anchor_id
                     anchor_dir.mkdir(parents=True, exist_ok=True)
                     (anchor_dir / "status").write_text("thread-anchor")
+                    if event_id:
+                        (anchor_dir / "event_id").write_text(event_id)
                     if ev_channel_id:
                         (anchor_dir / "channel_id").write_text(ev_channel_id)
                     if ev_ts:
                         (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
-                        target=_handle_thread_command,
+                        target=_run_thread_command_guarded,
                         args=(anchor_id, text, slack_role, ev_channel_id),
+                        kwargs={"user_id": ev_user},
                         daemon=True,
                     ).start()
             self._json(200, {"ok": True})
@@ -2250,6 +2461,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text(action)
+            _persist_notification_context(
+                job_id, channel_id=body.get("channel_id", ""),
+                thread_ts=body.get("thread_ts", ""), response_url=response_url,
+            )
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(
@@ -2316,9 +2531,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
+            channel_id = body.get("channel_id", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            _persist_notification_context(job_id, channel_id=channel_id,
+                                         thread_ts=thread_ts or "", response_url=response_url)
             threading.Thread(
                 target=_run_hostinger_refresh if provider == "hostinger" else _run_cluster_refresh,
                 args=(job_id, response_url),
@@ -2337,12 +2555,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
+            channel_id = body.get("channel_id", "")
+            thread_ts = body.get("thread_ts", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text("resume")
-            if response_url:
-                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            _persist_notification_context(job_id, channel_id=channel_id,
+                                         thread_ts=thread_ts, response_url=response_url)
             threading.Thread(
                 target=_run_cluster_resume,
                 args=(job_id, provider),
@@ -2389,11 +2609,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             thread_ts = str(body.get("thread_ts", "")).strip()
             channel_id = str(body.get("channel_id", "")).strip()
             thread_source = ""
+            job_id = str(uuid.uuid4())[:8]
             if not thread_ts and channel_id and SLACK_BOT_TOKEN:
-                thread_ts = _start_bot_thread(f"🛠️ *make {target}* queued", channel_id=channel_id)
+                thread_ts = _start_bot_thread(
+                    f"🛠️ *make {target}* queued — job `{job_id}`", channel_id=channel_id
+                )
                 if thread_ts:
                     thread_source = "bot"
-            job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             (JOB_DIR / job_id / "target").write_text(target)

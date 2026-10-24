@@ -72,6 +72,10 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 `/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
 
+### Confirming a mutating command
+
+`confirm` is the only confirmation keyword on Slack. The HTTP API uses `"confirm": true`, and Make uses `CONFIRM=1`. `/cluster-up` and `/cluster-down` are out of scope: they run by default and take `dry-run`.
+
 Every relayed command is capped at the caller's mapped Slack role; unmapped users receive the `reader` role.
 
 The relay forwards these metadata headers to the webhook:
@@ -352,9 +356,30 @@ bin/k3dm-webhook-setup --uninstall
 | `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
+### Selecting a job in a Slack thread
+
+A thread may contain several independent jobs. Job-scoped replies therefore require an exact
+job ID: `logs <job-id>`, `status <job-id>`, `diagnosis <job-id>`, or `kill <job-id>`.
+The webhook rejects a bare form with usage guidance instead of guessing from whichever job
+directory was touched most recently. The requested job must belong to the same Slack thread
+and channel. `kill` remains subject to its normal operator role gate. For `logs` and
+`diagnosis`, an empty result reports whether output is still pending or no persisted output
+is available; it does not imply that an output existed and was lost. Use the job ID from that
+operation's queued/started/terminal notice. `cluster-status` remains an independent operation
+and posts its result in the request's parent thread. Bare `check` and `echo` are not webhook
+commands; they are ignored, so a nearby asynchronous report is not attributed to either text.
+
 `/ask-docs` source paths are links to GitHub at the webhook's checked-out branch; set `K3DM_ASK_DOCS_LINK_REF` to override the branch.
 
 ### /k3dm targets
+
+#### Which E2E command?
+
+| Command | Where it runs | Tier | Example |
+|---|---|---|---|
+| `e2e` | Disposable vCluster on this host | Tier 1 | `/k3dm e2e` |
+| `e2e-remote` | Remote runner (currently `m2`) | Tier 1 | `/k3dm e2e-remote RUNNER=m2` |
+| `e2e-sandbox` | ACG sandbox | Tier 2 | `/k3dm e2e-sandbox` |
 
 | Target | Role | Required | Optional | Confirm | Timeout |
 |---|---|---|---|---|---|
@@ -362,14 +387,16 @@ bin/k3dm-webhook-setup --uninstall
 | `fix-status` | reader | `NS` | `FIX_CONTEXT` | | 300 |
 | `status-public` | reader | | | | 300 |
 | `observability-status` | reader | | | | 300 |
-| `vuln-scan` | reader | | | | 300 |
+| `vuln-scan-report` | reader | | | | 300 |
+| `vuln-scan` | reader | deprecated alias for `vuln-scan-report` | | | 300 |
 | `e2e-runner-health` | reader | | `RUNNER` | | 300 |
 | `e2e-remote` | operator | `RUNNER` | `DIGEST` | | 3600 |
 | `e2e-sandbox` | operator | | `DIGEST` | | 3600 |
-| `e2e-sandbox-provision` | admin | | `DIGEST` | yes | 7200 |
+| `e2e-sandbox-provision` | admin | | `DIGEST` | [confirm] | 7200 |
+| `e2e-sandbox-provision-preview` | admin | | `DIGEST` | | 300 |
 | `e2e-replay` | operator | `RUNNER` | | | 900 |
 | `sync-apps` | operator | | | | 600 |
-| `smoke` | operator | | `SMOKE_ONLY` | | 900 |
+| `smoke` | operator | | `SMOKE_ONLY`, `ARGOCD_APP_PREFIX` | | 900 |
 | `monitoring-pause` | operator | | | | 600 |
 | `monitoring-resume` | operator | | | | 600 |
 | `fix-restart` | operator | `APP`, `NS` | `FIX_CONTEXT` | | 300 |
@@ -379,6 +406,8 @@ bin/k3dm-webhook-setup --uninstall
 | `fix-delete-pod` | admin | `APP`, `NS` | `FIX_CONTEXT` | yes | 300 |
 | `fix-force-sync` | admin | `APP` | | yes | 300 |
 
+`/k3dm vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources; it does not start a scan. `/k3dm vuln-scan` remains a deprecated, read-only compatibility alias. The separate `app-cve-scan` command is operator-only and triggers the app-cluster CVE scan CronJob.
+
 `e2e-replay` republishes only `publication_pending` files left by a failed original publish. After a hub rebuild, use `make e2e-republish RUNNER=m2` to select and republish the newest retained summary for each service and tier from the runner. It is not a slash command: run it from a terminal on the M4.
 
 All commands respond immediately with an acknowledgement, then post results back to the
@@ -386,7 +415,10 @@ channel via `response_url` when the job completes.
 
 `smoke` runs the same gate as `make smoke`: the offline sweep always, and the cluster sweep
 when the cluster is reachable. `SMOKE_ONLY` narrows it to one half — `SMOKE_ONLY=offline` skips
-everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. It is `operator`
+everything that needs a cluster, `SMOKE_ONLY=cluster` skips the offline suites. When multiple
+shopping-cart ArgoCD applications are eligible, `ARGOCD_APP_PREFIX` selects the intended target;
+for example, `ARGOCD_APP_PREFIX=ubuntu-hostinger-`. The smoke check still fails closed if more than
+one target matches the supplied prefix. Both selectors are validated by the webhook. It is `operator`
 rather than `reader` because the cluster half reads Vault secrets and performs real Keycloak,
 ArgoCD and frontend logins, and its 900s timeout replaces the 300s default because the Vault, ESO
 and login stages run serially with retries.
@@ -395,6 +427,7 @@ Examples:
 
 - `/k3dm smoke`
 - `/k3dm smoke SMOKE_ONLY=offline`
+- `/k3dm smoke ARGOCD_APP_PREFIX=ubuntu-hostinger-`
 
 `e2e-sandbox` runs unattended, so it can only use an **already valid** ACG session: its
 preflight refuses `K3DM_ACG_SKIP_SESSION_CHECK=1` and the interactive login path needs a
@@ -402,8 +435,10 @@ TTY, which Slack jobs do not have. If the stored session has expired the job fai
 with `ACG_SESSION_EXPIRED` — sign in once from a real terminal (or run `make e2e-sandbox`
 there) and retry.
 
-Use `e2e-sandbox-provision` with `confirm` when the disposable ACG sandbox may be missing or
-dead; it provisions only through the approved `k3s-aws` lifecycle and reuses a healthy sandbox.
+Use `e2e-sandbox-provision` without `confirm` to preview whether the disposable ACG sandbox would
+be reused or provisioned, and whether the ACG login and hub are ready. Add `confirm` when the
+preview is clear to run Tier 2; it provisions only through the approved `k3s-aws` lifecycle and
+reuses a healthy sandbox.
 
 ### `/cluster-diagnose` usage
 
@@ -502,6 +537,8 @@ When replying in a thread, use the bare command name `claude`, `gemini`, or `cod
 fetched via `conversations.replies` and prepended to the agent's prompt. This lets agents
 see the full conversation history — error messages, prior agent responses, prior diagnoses —
 without the user having to paste them manually.
+
+Thread replies work whether or not Slack's **Also send to channel** option is selected.
 
 Bot status and ANSI control sequences are stripped before injection.
 

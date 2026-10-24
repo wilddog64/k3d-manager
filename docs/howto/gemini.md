@@ -69,10 +69,11 @@ Polls the task URL every 30 seconds until complete (default timeout: 300s). Prin
 
 ## How It Works
 
-```
-k3d-manager function
-    → agy CLI (--model gemini-2.5-flash, fallback to 2.0/1.5)
-        → Playwright MCP over CDP → Google Chrome (port 9222)
+```mermaid
+flowchart LR
+    K[k3d-manager function] --> A[agy CLI\nGemini 2.5 Flash\nfallback 2.0/1.5]
+    A --> P[Playwright MCP over CDP]
+    P --> C[Google Chrome\nport 9222]
 ```
 
 agy generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/k3d-manager/`, and executes it. The script connects to the running Chrome instance via CDP — it does not launch a new headless browser.

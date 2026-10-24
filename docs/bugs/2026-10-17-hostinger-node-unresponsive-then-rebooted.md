@@ -1,7 +1,9 @@
 # Bug: Hostinger node went unresponsive for ~25 minutes, then rebooted
 
-**Status:** OPEN — previous-boot journal read 2026-10-17: the outage was a hypervisor-initiated power-off, not a hang; who triggered it is unconfirmed
+**Status:** LIVE-VERIFIED — Hostinger support's control-plane review attributes the shutdown to emergency security-patch maintenance. The audit did not identify an internal actor or job ID.
 **Priority:** P2
+**Verification type:** investigation
+**Live investigation evidence:** 2026-10-20 · source hostinger-support · reference hpanel-response-2026-10-20 · env hostinger/srv1754834 · scenario emergency-security-patch-restart · proves shutdown-cause
 **Branch:** `k3d-manager-v1.43.5` (moved from v1.43.4 by the operator, 2026-10-17: "move 3, and 4 to next release")
 **Approval:** pending
 **Found:** 2026-10-17, operator paged by `PublicEndpointDown` for `https://frontend.3ai-talk.org/`
@@ -38,14 +40,38 @@ it starts before DNS or the upstream Service is ready. Same class as the 2026-05
 failure in `docs/issues/2026-05-26-acg-sandbox-expiry-remote-cluster-rebuild-shopping-cart-bootstrap-gap.md`.
 It added about a minute here; it did not cause the outage.
 
+## Live verification — 2026-10-20
+
+The operator supplied Hostinger support's hPanel AI response. Hostinger reported that its
+control-plane action history showed no customer-initiated stop/reboot at **2026-10-17 17:46:15
+UTC**; the next recorded operation was the scheduled weekly backup at **22:53:39 UTC**. Support
+said the shutdown occurred during Hostinger VPS security-patch activity between **October 16,
+2026 11:00 UTC** and **October 18, 2026 00:00 UTC**, and attributed it to a platform-initiated
+maintenance restart for an emergency security patch. The response did not expose a specific
+internal actor or job ID.
+
+This is consistent with the guest journal's `qemu-ga: guest-shutdown called` at 17:46:15 UTC,
+followed by an orderly systemd poweroff, and live-verifies the outage-cause classification.
+Memory pressure remains an observed condition before the outage, but is not established as its
+cause. No claim is made about preventing future provider maintenance restarts.
+
 ## Next steps
 
-1. Operator: confirm the Hostinger host key, then read the end of the previous boot:
-   `sudo journalctl -b -1 -k` and `sudo journalctl -b -1 -n 200` — look for OOM kills, hung-task
-   warnings, or a clean shutdown (which would point to a Hostinger-side restart).
-2. Check the Hostinger panel for a maintenance or auto-recovery event at 17:45–18:11 UTC.
-3. If memory pressure is confirmed: compare summed memory limits against 7.9 GiB, and decide
-   between swap, lower limits, or moving workloads.
+No further live-verification step is pending for this incident. If Hostinger later provides the
+internal maintenance job or actor, append it as additional evidence; the current support response
+does not include that detail.
+
+## Dispatch scope — read-only offline review
+
+Review the evidence already recorded in this bug and the repository for related incident records.
+Do not SSH to the node, access the Hostinger panel or APIs, query live clusters, or change
+infrastructure. Do not claim the cause is confirmed beyond the previous-boot journal evidence.
+Produce a bounded report that distinguishes established facts from hypotheses and lists the exact
+operator-provided evidence still needed to resolve who initiated the power-off.
+
+## Files
+
+- `docs/issues/2026-10-20-hostinger-node-outage-evidence-review.md`
 
 ## Previous-boot journal — 2026-10-17 (Claude, read via SSH; host key matched `known_hosts`)
 

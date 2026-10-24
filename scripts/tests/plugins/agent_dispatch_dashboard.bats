@@ -80,26 +80,26 @@ panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
 panel5 = next(panel for panel in panels if panel["id"] == 5)
 assert panel5["fieldConfig"]["defaults"]["unit"] == "short"
 panel12 = next(panel for panel in panels if panel["id"] == 12)
-assert len(panel12["targets"]) == 4
-assert all(target["expr"].startswith("sum by (version, slug)") for target in panel12["targets"])
+assert len(panel12["targets"]) >= 4
+assert all(target["expr"].startswith(("sum by (version, slug)", "max by (version, slug, spec)"))
+           for target in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
 
-@test "agent dispatch dashboard: spec window defaults to 30d and says the time picker does not apply" {
+@test "agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d" {
   run python3 - "$DASH" <<'PY'
 import json, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 body = text.split("agent-dispatch.json: |\n", 1)[1]
 dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
 var = next(item for item in dashboard["templating"]["list"] if item["name"] == "window")
-assert var["current"]["value"] == "30d", var["current"]
-assert [o["value"] for o in var["options"] if o["selected"]] == ["30d"]
-assert [o["value"] for o in var["options"]] == ["1d", "7d", "30d"]
-assert var["label"] == "Spec window"
-assert "time picker" in var["description"]
+assert var["type"] == "query"
+assert var["definition"] == "label_values(k3dm_dispatch_landed, window)"
+assert var["current"]["value"] == "7d", var["current"]
+assert var["label"] == "Window"
 PY
   [ "$status" -eq 0 ]
 }
@@ -117,4 +117,38 @@ assert panel["fieldConfig"]["defaults"]["unit"] == "percentunit"
 assert "independent verifier" in panel["description"]
 PY
   [ "$status" -eq 0 ]
+}
+
+@test "agent dispatch dashboard: stat and bar gauge panels use explicit colours" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+by_id = {panel["id"]: panel for panel in panels}
+for panel in panels:
+    if panel["type"] not in ("stat", "bargauge"):
+        continue
+    defaults = panel["fieldConfig"]["defaults"]
+    assert "thresholds" in defaults or defaults.get("color", {}).get("mode") == "fixed", panel["id"]
+land = by_id[8]
+assert land["options"]["displayMode"] == "basic"
+overrides = {item["matcher"].get("options"): item["properties"] for item in land["fieldConfig"]["overrides"]}
+def fixed_color(series):
+    prop = next(item for item in overrides[series] if item["id"] == "color")
+    assert prop["value"]["mode"] == "fixed"
+    return prop["value"]["fixedColor"]
+assert fixed_color("landed") == "green"
+for series in ("rebase", "scope", "tests"):
+    assert fixed_color(series) != "green", series
+for panel_id, expected in {
+    2: {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 0.8}]},
+    9: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 86400}]},
+    13: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 0.5}]},
+}.items():
+    assert by_id[panel_id]["fieldConfig"]["defaults"]["thresholds"] == expected, panel_id
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
 }

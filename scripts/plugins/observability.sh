@@ -633,10 +633,18 @@ function deploy_observability_acg() {
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
-  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_app_context}}"
-  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE APP_CLUSTER_NAME
+  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
+  if ! declare -f _argocd_retire_legacy_observability_acg_apps >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    source "${SCRIPT_DIR}/plugins/argocd.sh" || return 1
+  fi
+  if ! declare -f _argocd_retire_legacy_observability_acg_apps >/dev/null 2>&1; then
+    _err "[observability] Cannot load legacy observability Application retirement helper"
+    return 1
+  fi
+  _argocd_retire_legacy_observability_acg_apps || return 1
   # shellcheck disable=SC2016
-  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${_appset}" | _kubectl apply -f -; then
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ${_app_context}"
   else
     _err "[observability] Failed to apply ACG observability ApplicationSet"
@@ -925,12 +933,32 @@ function observability_rotate_prometheus_basic_auth() {
   rm -f "${_vault_hdr}"
   _prometheus_acg_web_config_secret "${1:-}" || return 1
   _observability_refresh_prometheus_auth_proxy
-  if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
-    curl -sf --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
-      -H 'Content-Type: application/json' \
-      -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
-  fi
+  _observability_notify_rotation
   _info "[observability] Prometheus basic-auth rotated and ACG web config reapplied"
+}
+
+function _observability_notify_rotation() {
+  local _wasx=0 _webhook_url
+  case $- in *x*) _wasx=1; set +x ;; esac
+  _webhook_url="${SLACK_WEBHOOK_URL:-}"
+
+  if [[ -z "${_webhook_url}" ]]; then
+    _webhook_url=$(_kubectl get secret platform-ops-notifications -n platform-ops \
+      --context k3d-k3d-cluster -o jsonpath='{.data.slack-incoming-webhook-url}' 2>/dev/null \
+      | base64 --decode 2>/dev/null) || _webhook_url=""
+  fi
+  if [[ -z "${_webhook_url}" ]]; then
+    _warn "[observability] no Slack incoming webhook — rotation notice not sent"
+    (( _wasx )) && set -x
+    return 0
+  fi
+
+  curl -sf --max-time 10 --config - \
+    <<<"url = \"${_webhook_url}\"" \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{"text":"🔐 Monthly service password rotation completed: Prometheus. Password values are not included."}' >/dev/null || true
+  (( _wasx )) && set -x
+  return 0
 }
 
 function _prometheus_acg_web_config_secret() {

@@ -3,6 +3,8 @@
 **Branch:** `k3d-manager-v1.5.0` (deferred to v1.7.0+)
 **Severity:** P3 — UI loads but product catalog is empty; app functional otherwise
 **Status:** DEFERRED — intentionally not fixed here; see rationale below
+**Priority:** P3 — deferred by design; see rationale (backlog triage, Claude, 2026-10-22)
+**Release:** deferred (backlog triage, Claude, 2026-10-22)
 
 ---
 

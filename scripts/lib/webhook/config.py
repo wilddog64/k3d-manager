@@ -34,6 +34,7 @@ SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
+STATUS_CHANNEL_ID = os.environ.get("K3DM_STATUS_CHANNEL_ID", "")
 _PUSHGATEWAY_PUSH_RETRIES = 6
 _PUSHGATEWAY_PUSH_SLEEP_SECS = 5
 _ACTIVE_PROVIDER_FILE = Path.home() / ".local" / "share" / "k3d-manager" / "active-provider"

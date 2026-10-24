@@ -74,9 +74,16 @@ assert_no_bare_verified() {
   run !  grep -qi 'verified' <<<"${stripped}"
 }
 
+assert_local_cleanup_ran() {
+  assert_cleanup_ran
+}
+
 assert_cleanup_ran() {
-  grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
   [ ! -e "${STATE}/run/vault-pf.pid" ]
+}
+
+assert_hub_cleanup_ran() {
+  grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
 }
 
 @test "M1: rc0 (stack present, delete+wait ok) exits 0 and prints verified naming stack and region" {
@@ -88,6 +95,7 @@ assert_cleanup_ran() {
   [[ "$line" == *"us-west-2"* ]]
   grep -q 'cloudformation delete-stack' "${STUB_LOG}/aws.log"
   grep -q 'cloudformation wait stack-delete-complete' "${STUB_LOG}/aws.log"
+  assert_hub_cleanup_ran
 }
 
 @test "M1: absent stack ('does not exist') is rc0 and verified, exit 0" {
@@ -109,6 +117,9 @@ assert_cleanup_ran() {
   [[ "$(summary_line "$out")" == *"cloud teardown: UNVERIFIED"* ]]
   output="$out"; assert_no_bare_verified "$out"
   assert_cleanup_ran
+  assert_local_cleanup_ran
+  run ! grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
+  [[ "$out" == *"Preserving hub registration and observability-acg because AWS teardown was not confirmed."* ]]
   run !  grep -q 'delete-stack' "${STUB_LOG}/aws.log"
 }
 
@@ -119,6 +130,9 @@ assert_cleanup_ran() {
   [[ "$(summary_line "$out")" == *"cloud teardown: UNVERIFIED"* ]]
   assert_no_bare_verified "$out"
   assert_cleanup_ran
+  assert_local_cleanup_ran
+  run ! grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
+  [[ "$out" == *"Preserving hub registration and observability-acg because AWS teardown was not confirmed."* ]]
 }
 
 @test "M2/N1/N2: acg_teardown rc3 (wait fails) exits 1, UNVERIFIED, cleanup still ran" {
@@ -128,6 +142,9 @@ assert_cleanup_ran() {
   [[ "$(summary_line "$out")" == *"cloud teardown: UNVERIFIED"* ]]
   assert_no_bare_verified "$out"
   assert_cleanup_ran
+  assert_local_cleanup_ran
+  run ! grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
+  [[ "$out" == *"Preserving hub registration and observability-acg because AWS teardown was not confirmed."* ]]
 }
 
 @test "M2: UNVERIFIED summary carries a cause (non-empty text after the label)" {
@@ -137,15 +154,19 @@ assert_cleanup_ran() {
   [ -n "$(printf '%s' "$rest" | tr -d '[:space:]')" ]
 }
 
-@test "M3/N2: invalid credentials: acg_teardown not called, warning, UNVERIFIED (credentials invalid), exit 0" {
+@test "M3/N2: invalid credentials: acg_teardown not called, warning, UNVERIFIED (credentials invalid), exit 1" {
   AWS_STS_FAIL=1 run "${REAL_BASH}" "${REPO}/bin/cluster-down" --confirm
   st="$status"; out="$output"
-  [ "$st" -eq 0 ]
+  [ "$st" -eq 1 ]
   [[ "$(summary_line "$out")" == *"cloud teardown: UNVERIFIED"* ]]
   [[ "$(summary_line "$out")" == *"credentials invalid"* ]]
   assert_no_bare_verified "$out"
   grep -qi 'NOT verified' <<<"$out"
   grep -qi 'skipped' <<<"$out"
+  assert_cleanup_ran
+  assert_local_cleanup_ran
+  run ! grep -q 'delete secret cluster-ubuntu-k3s' "${STUB_LOG}/kubectl.log"
+  [[ "$out" == *"Preserving hub registration and observability-acg because AWS teardown was not confirmed."* ]]
   run !  grep -q 'cloudformation' "${STUB_LOG}/aws.log"
   grep -q 'sts get-caller-identity' "${STUB_LOG}/aws.log"
 }

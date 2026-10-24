@@ -179,25 +179,35 @@ function _hub_recovery_retry_failed_identity_sync() {
 }
 
 function _hub_recovery_mirror_argocd_admin() {
-  local hub_context="$1" root_token password payload_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
+  local hub_context="$1" root_token payload_file password_file argocd_url="${HUB_RECOVERY_ARGOCD_URL:-https://argocd.3ai-talk.org}" code
   local __attempt
   root_token=$(_kubectl -- --context "$hub_context" -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true)
   [[ -n "$root_token" ]] || { _err "[hub-recovery] Vault root token unavailable for ArgoCD admin mirror"; return 1; }
-  if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin >/dev/null 2>&1'; then
-    return 0
+  password_file=$(mktemp)
+  payload_file=$(mktemp)
+  trap 'trap - RETURN; rm -f "'"${password_file}"'" "'"${payload_file}"'" 2>/dev/null || true' RETURN
+  if printf '%s\n' "$root_token" | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv get -mount=secret -field=password argocd/admin' > "$password_file" 2>/dev/null && [[ -s "$password_file" ]]; then
+    jq -n --arg username admin --rawfile password "$password_file" '{username:$username,password:($password|rtrimstr("\n"))}' > "$payload_file"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-hub-recovery/1' -H 'Content-Type: application/json' --data @"$payload_file" "${argocd_url}/api/v1/session" || true)
+    if [[ "$code" == "200" ]]; then
+      return 0
+    fi
+    if [[ "$code" == "000" || "$code" =~ ^5[0-9][0-9]$ ]]; then
+      _warn "[hub-recovery] ArgoCD unreachable while checking Vault ArgoCD admin password (HTTP ${code:-000}); keeping Vault value"
+      return 0
+    fi
+    _info "[hub-recovery] Vault ArgoCD admin password rejected by ArgoCD; replacing it from argocd-initial-admin-secret"
   fi
   for __attempt in $(seq 1 10); do
-    password=$(_kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
-    [[ -n "$password" ]] && break
+    _kubectl -- --context "$hub_context" -n cicd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null > "$password_file" || true
+    [[ -s "$password_file" ]] && break
     sleep "${HUB_RECOVERY_MIRROR_RETRY_DELAY:-6}"
   done
-  if [[ -z "$password" ]]; then
+  if [[ ! -s "$password_file" ]]; then
     _warn "[hub-recovery] argocd-initial-admin-secret unavailable; cannot mirror ArgoCD admin password into Vault"
     return 0
   fi
-  payload_file=$(mktemp)
-  trap 'trap - RETURN; rm -f "'"${payload_file}"'" 2>/dev/null || true' RETURN
-  jq -n --arg username admin --arg password "$password" '{username:$username,password:$password}' > "$payload_file"
+  jq -n --arg username admin --rawfile password "$password_file" '{username:$username,password:($password|rtrimstr("\n"))}' > "$payload_file"
   code=$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-hub-recovery/1' -H 'Content-Type: application/json' --data @"$payload_file" "${argocd_url}/api/v1/session" || true)
   if [[ "$code" != "200" ]]; then
     _warn "[hub-recovery] argocd-initial-admin-secret password rejected by ArgoCD (HTTP ${code:-000}); not mirroring into Vault"
@@ -205,6 +215,11 @@ function _hub_recovery_mirror_argocd_admin() {
   fi
   { printf '%s\n' "$root_token"; cat "$payload_file"; } | _no_trace _kubectl -- --context "$hub_context" -n secrets exec -i vault-0 -- sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; vault kv put -mount=secret argocd/admin -' >/dev/null || return 1
   _info "[hub-recovery] ArgoCD admin password mirrored into Vault secret/argocd/admin"
+}
+
+function hub_recovery_argocd_admin_resync() {
+  local hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}"
+  _hub_recovery_mirror_argocd_admin "$hub_context"
 }
 
 function _hub_recovery_install_cloudflared_config() {

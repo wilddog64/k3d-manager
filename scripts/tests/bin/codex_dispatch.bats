@@ -1,11 +1,25 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   export FIXTURE="$BATS_TEST_TMPDIR/fixture" ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   export K3DM_WORKTREE_ROOT="$BATS_TEST_TMPDIR/worktrees" HOME="$BATS_TEST_TMPDIR/home"
-  export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9"
+  export K3DM_DISPATCH_PUSHGATEWAY_URL="http://127.0.0.1:9" CODEX_HOME="$BATS_TEST_TMPDIR/codex-home"
   export K3DM_CODEX_BIN="$BATS_TEST_TMPDIR/codex-stub"
   mkdir -p "$FIXTURE" "$HOME" "$K3DM_WORKTREE_ROOT"
+  export K3DM_DISPATCH_METRICS_BIN="$BATS_TEST_TMPDIR/metrics-stub"
+  cat >"$K3DM_DISPATCH_METRICS_BIN" <<'METRICS'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'start\n' >>"$METRICS_STARTS"
+mkdir "$METRICS_ACTIVE" 2>/dev/null || : >"$METRICS_OVERLAP"
+sleep 1
+rmdir "$METRICS_ACTIVE" 2>/dev/null || true
+METRICS
+  chmod +x "$K3DM_DISPATCH_METRICS_BIN"
+  export METRICS_STARTS="$BATS_TEST_TMPDIR/metrics-starts"
+  export METRICS_ACTIVE="$BATS_TEST_TMPDIR/metrics-active" METRICS_OVERLAP="$BATS_TEST_TMPDIR/metrics-overlap"
   git init --bare "$ORIGIN" >/dev/null
   git clone "$ORIGIN" "$FIXTURE" >/dev/null
   git -C "$FIXTURE" checkout -b k3d-manager-v9.9.9 >/dev/null
@@ -47,6 +61,7 @@ if [[ "$*" != *"exec resume"* ]]; then
   for edit in "${edits[@]}"; do printf 'edited\n' >"$codex_dir/$edit"; done
 fi
 [[ "${STUB_TOKENS:-}" == none ]] || printf 'tokens used\n%s\n' "${STUB_TOKENS:-12,345}"
+exit "${STUB_RC:-0}"
 STUB
   chmod +x "$K3DM_CODEX_BIN"
 }
@@ -77,6 +92,12 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
 }
 
+@test "codex dispatch: start records the spec path in the ledger" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/one.argv" STUB_ENV="$BATS_TEST_TMPDIR/one.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  [ "$(jq -r -s '.[0].spec' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "docs/plans/v9.9.9-demo.md" ]
+}
+
 @test "codex dispatch: piped start returns before Codex exits" {
   export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/one.argv" STUB_ENV="$BATS_TEST_TMPDIR/one.env"
   timeout_bin=timeout
@@ -88,6 +109,131 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
   sleep 6
   [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+}
+
+@test "codex dispatch: detached worker survives launcher SIGHUP" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 is unavailable"
+  export STUB_SLEEP=3 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  helper="$BATS_TEST_TMPDIR/grouped-start.sh"
+  cat >"$helper" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$FIXTURE"
+"$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+EOF
+  chmod +x "$helper"
+  python3 -c 'import os, sys; os.setpgrp(); os.execv(sys.argv[1], sys.argv[1:])' "$helper" & launcher_pid=$!
+  wait "$launcher_pid"
+  kill -HUP -"$launcher_pid" 2>/dev/null || true
+  sleep 1
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  sleep 4
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+  run dispatch status one
+  [[ "$output" == *"state: exited successfully"* ]]
+}
+
+@test "codex dispatch: detached worker survives launcher process-group SIGKILL" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 is unavailable"
+  export STUB_SLEEP=3 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  helper="$BATS_TEST_TMPDIR/grouped-start.sh"
+  cat >"$helper" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$FIXTURE"
+"$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+EOF
+  chmod +x "$helper"
+  python3 -c 'import os, sys; os.setpgrp(); os.execv(sys.argv[1], sys.argv[1:])' "$helper" & launcher_pid=$!
+  wait "$launcher_pid"
+  kill -KILL -"$launcher_pid" 2>/dev/null || true
+  sleep 1
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
+  sleep 4
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+  run dispatch status one
+  [[ "$output" == *"state: exited successfully"* ]]
+}
+
+@test "codex dispatch: plain background worker is killed by launcher group" {
+  command -v python3 >/dev/null 2>&1 || skip "python3 is unavailable"
+  helper="$BATS_TEST_TMPDIR/plain-background.sh"
+  marker="$BATS_TEST_TMPDIR/plain-background.done"
+  cat >"$helper" <<EOF
+#!/usr/bin/env bash
+( sleep 3; : >"$marker" ) &
+EOF
+  chmod +x "$helper"
+  # Negative control for the pre-fix `( ... ) &` launcher: its worker remains in this group.
+  python3 -c 'import os, sys; os.setpgrp(); os.execv(sys.argv[1], sys.argv[1:])' "$helper" & launcher_pid=$!
+  wait "$launcher_pid"
+  kill -KILL -"$launcher_pid" 2>/dev/null || true
+  sleep 1
+  [ ! -e "$marker" ]
+}
+
+@test "codex dispatch: records nonzero Codex exit before bookkeeping" {
+  export STUB_RC=42 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 42 ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-exit-ts" ]
+  run dispatch status one
+  [[ "$output" == *"state: exited nonzero (42)"* ]]
+}
+
+@test "codex dispatch: missing Codex is a terminal nonzero exit" {
+  export K3DM_CODEX_BIN="$BATS_TEST_TMPDIR/does-not-exist" STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 127 ]
+  run dispatch status one
+  [[ "$output" == *"state: exited nonzero (127)"* ]]
+}
+
+@test "codex dispatch: bookkeeping failure does not hide the exit" {
+  export STUB_SLEEP=1 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  rm "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  mkdir "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  sleep 2
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+  grep -q 'Codex bookkeeping failed after exit code 0 was recorded' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/supervisor.log"
+}
+
+@test "codex dispatch: land completes when the ledger is unwritable" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  printf 'edited\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/one/a.txt"
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
+  rm "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  mkdir "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch land --slug one --no-test
+  [ "$status" -eq 0 ]
+  [ ! -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
+  [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/landed" ]
+}
+
+@test "codex dispatch: a killed worker is unexpectedly terminated" {
+  export STUB_SLEEP=30 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  worker_pid="$(awk -F= '$1 == "pid" {print $2}' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start")"
+  kill -KILL "$worker_pid"
+  sleep 1
+  run dispatch status one
+  [[ "$output" == *"state: terminated unexpectedly"* ]]
+  [[ "$output" == *"supervisor.log"* ]]
+}
+
+@test "codex dispatch: a reused PID identity is not reported running" {
+  export STUB_SLEEP=5 STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sed -i.bak 's/^process_start=.*/process_start=not-the-worker/' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
+  run dispatch status one
+  [[ "$output" == *"state: terminated unexpectedly"* ]]
+  worker_pid="$(awk -F= '$1 == "pid" {print $2}' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start")"
+  kill "$worker_pid" 2>/dev/null || true
 }
 
 @test "codex dispatch: parallel starts isolate each edit" {
@@ -102,7 +248,8 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
 
 @test "codex dispatch: argv has sandbox worktree and state dir" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/argv" STUB_ENV="$BATS_TEST_TMPDIR/env"
-  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
   argv="$(<"$BATS_TEST_TMPDIR/argv")"
   [[ "$argv" == *"exec --sandbox workspace-write -C $K3DM_WORKTREE_ROOT/v9.9.9/one --add-dir $K3DM_WORKTREE_ROOT/v9.9.9/one.run/state"* ]]
   [[ "$argv" != *"network_access=true"* ]]
@@ -173,6 +320,59 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; run dispatch abandon --slug one
   [ "$status" -eq 2 ]; [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/one" ]
   git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/one
+}
+
+@test "codex dispatch: prune removes landed current and earlier release tasks and branch-only leftovers" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.8"
+  git -C "$FIXTURE" branch task/v9.9.9/current
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/current" task/v9.9.9/current >/dev/null
+  git -C "$FIXTURE" checkout -b k3d-manager-v9.9.8 >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.8
+  git -C "$FIXTURE" checkout k3d-manager-v9.9.9 >/dev/null
+  git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.8:refs/remotes/origin/k3d-manager-v9.9.8
+  git -C "$FIXTURE" branch task/v9.9.8/older origin/k3d-manager-v9.9.8
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.8/older" task/v9.9.8/older >/dev/null
+  git -C "$FIXTURE" branch task/v9.9.9/orphan
+  run dispatch prune
+  [ "$status" -eq 0 ]; [[ "$output" == *"would prune: v9.9.9/current"* ]]; [[ "$output" == *"would prune: v9.9.8/older"* ]]; [[ "$output" == *"would prune: v9.9.9/orphan"* ]]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/current" ]; [ -d "$K3DM_WORKTREE_ROOT/v9.9.8/older" ]
+  git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan
+  run dispatch prune --yes
+  [ "$status" -eq 0 ]; [[ "$output" == *"pruned: 3 kept: 0"* ]]
+  [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/current" ]; [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.8/older" ]
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/current
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.8/older
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan
+}
+
+@test "codex dispatch: prune keeps unsafe tasks and preserves run research data" {
+  git -C "$FIXTURE" branch task/v9.9.9/dirty
+  git -C "$FIXTURE" worktree add "$K3DM_WORKTREE_ROOT/v9.9.9/dirty" task/v9.9.9/dirty >/dev/null
+  printf 'dirty\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/dirty/a.txt"
+  git -C "$FIXTURE" checkout -b task/v9.9.9/ahead
+  printf 'ahead\n' >"$FIXTURE/ahead.txt"; git -C "$FIXTURE" add ahead.txt; git -C "$FIXTURE" commit -m ahead >/dev/null
+  git -C "$FIXTURE" checkout k3d-manager-v9.9.9 >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  git -C "$FIXTURE" branch task/v9.9.9/running
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/ahead.run" "$K3DM_WORKTREE_ROOT/v9.9.9/running.run"
+  printf 'not-json\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  printf 'metrics\n' >"$K3DM_WORKTREE_ROOT/metrics.log"
+  printf 'research\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/ahead.run/codex.log"
+  printf '%s\n' "$$" >"$K3DM_WORKTREE_ROOT/v9.9.9/running.run/pid"
+  before="$(find "$K3DM_WORKTREE_ROOT" -name '*.run' -type f -print | sort | xargs shasum)"
+  run dispatch prune
+  [ "$status" -eq 0 ]; [[ "$output" == *"keep: v9.9.9/ahead (unapplied commits)"* ]]; [[ "$output" == *"keep: v9.9.9/dirty (uncommitted changes)"* ]]; [[ "$output" == *"keep: v9.9.9/running (worker running)"* ]]
+  [[ "$output" == *"pruned: 0 kept: 3"* ]]
+  run dispatch prune --yes
+  [ "$status" -eq 0 ]; [[ "$output" == *"pruned: 0 kept: 3"* ]]
+  [ -d "$K3DM_WORKTREE_ROOT/v9.9.9/dirty" ]; git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/ahead
+  [ "$before" = "$(find "$K3DM_WORKTREE_ROOT" -name '*.run' -type f -print | sort | xargs shasum)" ]
+  [ "$(<"$K3DM_WORKTREE_ROOT/ledger.jsonl")" = not-json ]; [ "$(<"$K3DM_WORKTREE_ROOT/metrics.log")" = metrics ]
+}
+
+@test "codex dispatch: prune rejects unknown options" {
+  run dispatch prune --force
+  [ "$status" -eq 2 ]; [[ "$output" == *"unknown prune option"* ]]
 }
 
 @test "codex dispatch: scope uses the recorded spec, not a root markdown file" {
@@ -327,6 +527,20 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-3.log" ]
 }
 
+@test "codex dispatch: resume accepts a dead worker whose PID identity is stale" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit"
+  sed -i.bak 's/^process_start=.*/process_start=not-the-worker/' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-2.log" ]
+}
+
 @test "codex dispatch: resume passes the state root and runs in the worktree" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
@@ -421,4 +635,75 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   ledger="$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tokens' "$ledger")" = null ]
   [[ "$(jq -r -s 'map(select(.event == "codex_exit"))[0].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
+}
+
+@test "codex dispatch: start records session token usage from CODEX_HOME" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  mkdir -p "$CODEX_HOME/sessions/2026/10/23"
+  cat >"$CODEX_HOME/sessions/2026/10/23/rollout-test-01a122dd-71c3-7763-87f0-3de505f10168.jsonl" <<'EOF'
+{"type":"session_meta","payload":{"id":"01a122dd-71c3-7763-87f0-3de505f10168","timestamp":"2026-10-23T10:00:00Z"}}
+{"type":"turn_context","payload":{"model":"gpt-5.6-luna"}}
+{"type":"event_msg","payload":{"info":{"total_token_usage":{"input_tokens":611180,"cached_input_tokens":561408,"output_tokens":5912,"reasoning_output_tokens":10}}}}
+EOF
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
+  usage="$(jq -s 'map(select(.event == "codex_usage")) | .[0]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$(jq -r '.session' <<<"$usage")" = 01a122dd-71c3-7763-87f0-3de505f10168 ]
+  [ "$(jq -r '.model' <<<"$usage")" = gpt-5.6-luna ]
+  [ "$(jq -r '.input' <<<"$usage")" = 611180 ]
+  [ "$(jq -r '.cached_input' <<<"$usage")" = 561408 ]
+  [ "$(jq -r '.output' <<<"$usage")" = 5912 ]
+}
+
+@test "codex dispatch: missing session usage warns but start succeeds" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug one
+  [ "$status" -eq 0 ]; sleep 1
+  grep -q 'WARNING: expected one session file' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/supervisor.log"
+  [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+}
+
+@test "codex dispatch: usage-backfill is idempotent" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
+  sleep 1
+  for _ in {1..50}; do [[ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]] && break; sleep 0.1; done
+  for _ in {1..50}; do [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]] && break; sleep 0.1; done
+  : >"$METRICS_STARTS"
+  mkdir -p "$CODEX_HOME/sessions/2026/10/23"
+  cat >"$CODEX_HOME/sessions/2026/10/23/rollout-test-01a122dd-71c3-7763-87f0-3de505f10168.jsonl" <<'EOF'
+{"type":"session_meta","payload":{"id":"01a122dd-71c3-7763-87f0-3de505f10168","timestamp":"2026-10-23T10:00:00Z"}}
+{"type":"turn_context","payload":{"model":"gpt-5.6-luna"}}
+{"type":"event_msg","payload":{"info":{"total_token_usage":{"input_tokens":10,"cached_input_tokens":2,"output_tokens":3}}}}
+EOF
+  run dispatch usage-backfill
+  [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 1"* ]]; [[ "$output" == *"missing: 0"* ]]
+  sleep 1.2
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
+  run dispatch usage-backfill
+  [ "$status" -eq 0 ]; [[ "$output" == *"backfilled: 0"* ]]
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
+  [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
+@test "codex dispatch: metrics scheduling coalesces concurrent requests and preserves the last request" {
+  local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
+  sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
+  run bash -c 'source "$1"; for _ in {1..20}; do _dispatch_schedule_metrics; done' _ "$source_file"
+  [ "$status" -eq 0 ]
+  for _ in {1..50}; do [[ ! -d "$K3DM_WORKTREE_ROOT/metrics.lock" ]] && break; sleep 0.1; done
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -ge 2 ]
+  [ ! -e "$METRICS_OVERLAP" ]
+}
+
+@test "codex dispatch: metrics scheduling takes stale lock and respects fresh lock" {
+  local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
+  sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
+  mkdir "$K3DM_WORKTREE_ROOT/metrics.lock"
+  touch -t 202001010000 "$K3DM_WORKTREE_ROOT/metrics.lock"
+  run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
+  [ "$status" -eq 0 ]; sleep 1.2
+  [ "$(wc -l <"$METRICS_STARTS" | tr -d ' ')" -eq 1 ]
+  rm -f "$METRICS_STARTS"; mkdir "$K3DM_WORKTREE_ROOT/metrics.lock"
+  run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
+  [ "$status" -eq 0 ]; [ ! -e "$METRICS_STARTS" ]
 }

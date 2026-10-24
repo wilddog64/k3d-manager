@@ -4,6 +4,7 @@
 set -euo pipefail
 
 _TUNNEL_VARS="${SCRIPT_DIR}/etc/tunnel/vars.sh"
+_TUNNEL_SSH_HOST_EXPLICIT="${TUNNEL_SSH_HOST+x}"
 if [[ -r "$_TUNNEL_VARS" ]]; then
   # shellcheck disable=SC1090
   source "$_TUNNEL_VARS"
@@ -27,6 +28,7 @@ _tunnel_resolve_scope() {
   _TUNNEL_VAULT_LAUNCHD_LABEL="${TUNNEL_VAULT_LAUNCHD_LABEL:-${prefix}.ssh-tunnel-vault}"
   _TUNNEL_VAULT_PLIST_PATH="${TUNNEL_VAULT_PLIST_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_VAULT_LAUNCHD_LABEL}.plist}"
   _TUNNEL_VAULT_WRAPPER_PATH="${TUNNEL_VAULT_WRAPPER_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_VAULT_LAUNCHD_LABEL}.sh}"
+  _TUNNEL_FORWARD_WRAPPER_PATH="${TUNNEL_FORWARD_WRAPPER_PATH:-${HOME}/Library/LaunchAgents/${_TUNNEL_LAUNCHD_LABEL}.sh}"
   _TUNNEL_LOCAL_PORT="${TUNNEL_LOCAL_PORT:-${port}}"
   _TUNNEL_LOG_BASE="${log_base}"
 }
@@ -71,7 +73,32 @@ _tunnel_plist_has_reverse() {
 
 _tunnel_remove_agent_files() {
   _tunnel_resolve_scope
-  rm -f -- "${_TUNNEL_PLIST_PATH}" "${_TUNNEL_VAULT_PLIST_PATH}" "${_TUNNEL_VAULT_WRAPPER_PATH}"
+  rm -f -- "${_TUNNEL_PLIST_PATH}" "${_TUNNEL_VAULT_PLIST_PATH}" "${_TUNNEL_VAULT_WRAPPER_PATH}" "${_TUNNEL_FORWARD_WRAPPER_PATH}"
+}
+
+_tunnel_rotate_logs() {
+  _tunnel_resolve_scope
+  local log
+  for log in "${_TUNNEL_LOG_BASE}.err" "${_TUNNEL_LOG_BASE}-vault.err"; do
+    if [[ -f "$log" && "$(wc -c < "$log")" -gt 5242880 ]]; then
+      mv -f -- "$log" "${log}.1"
+    fi
+  done
+}
+
+_tunnel_write_forward_agent() {
+  _tunnel_resolve_scope
+  local autossh_bin
+  autossh_bin="$(_tunnel_autossh_path)"
+  mkdir -p "$(dirname "${_TUNNEL_FORWARD_WRAPPER_PATH}")"
+  cat > "${_TUNNEL_FORWARD_WRAPPER_PATH}" <<WRAPPER
+#!/bin/bash
+exec 2> >(while IFS= read -r line; do printf '[%s] %s\n' "\$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "\$line" >&2; done)
+exec "${autossh_bin}" -M 0 -o ConnectTimeout=10 -o ServerAliveInterval=30 \\
+  -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \\
+  -L ${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT}:localhost:${TUNNEL_REMOTE_PORT} -N "${TUNNEL_SSH_HOST}"
+WRAPPER
+  chmod 0755 "${_TUNNEL_FORWARD_WRAPPER_PATH}"
 }
 
 _tunnel_autossh_path() {
@@ -80,9 +107,8 @@ _tunnel_autossh_path() {
 
 _tunnel_write_plist() {
   _tunnel_resolve_scope
-  local autossh_bin
-  autossh_bin="$(_tunnel_autossh_path)"
   mkdir -p "$(dirname "${_TUNNEL_PLIST_PATH}")"
+  _tunnel_write_forward_agent
   cat > "${_TUNNEL_PLIST_PATH}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -92,19 +118,8 @@ _tunnel_write_plist() {
   <string>${_TUNNEL_LAUNCHD_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${autossh_bin}</string>
-    <string>-M</string>
-    <string>0</string>
-    <string>-o</string>
-    <string>ServerAliveInterval=30</string>
-    <string>-o</string>
-    <string>ServerAliveCountMax=3</string>
-    <string>-o</string>
-    <string>ExitOnForwardFailure=yes</string>
-    <string>-L</string>
-    <string>${TUNNEL_BIND_ADDR}:${_TUNNEL_LOCAL_PORT}:localhost:${TUNNEL_REMOTE_PORT}</string>
-    <string>-N</string>
-    <string>${TUNNEL_SSH_HOST}</string>
+    <string>/bin/bash</string>
+    <string>${_TUNNEL_FORWARD_WRAPPER_PATH}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -126,10 +141,11 @@ _tunnel_write_vault_agent() {
   mkdir -p "$(dirname "${_TUNNEL_VAULT_WRAPPER_PATH}")" "$(dirname "${_TUNNEL_VAULT_PLIST_PATH}")"
   cat > "${_TUNNEL_VAULT_WRAPPER_PATH}" <<WRAPPER
 #!/bin/bash
+exec 2> >(while IFS= read -r line; do printf '[%s] %s\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\$line" >&2; done)
 "${ssh_bin}" -o BatchMode=yes -o ConnectTimeout=10 "${TUNNEL_SSH_HOST}" \
   "sudo fuser -k -n tcp ${TUNNEL_VAULT_REMOTE_PORT} >/dev/null 2>&1 || true" >/dev/null 2>&1 || true # agent-audit: remote-sudo
 exec "${ssh_bin}" -N -o BatchMode=yes -o ExitOnForwardFailure=yes \
-  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+  -o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
   -R ${TUNNEL_VAULT_REMOTE_PORT}:127.0.0.1:${TUNNEL_VAULT_LOCAL_PORT} "${TUNNEL_SSH_HOST}"
 WRAPPER
   chmod 0755 "${_TUNNEL_VAULT_WRAPPER_PATH}"
@@ -183,6 +199,23 @@ EOF
     return 0
   fi
 
+  if [[ "${TUNNEL_SCOPE:-}" != "sandbox" ]]; then
+    if [[ -z "${_TUNNEL_SSH_HOST_EXPLICIT}" && "${TUNNEL_SSH_HOST}" == "ubuntu" ]]; then
+      echo "[tunnel] TUNNEL_SSH_HOST must be set explicitly for unscoped agents; use make refresh CLUSTER_PROVIDER=k3s-hostinger to restart the Hostinger tunnels" >&2
+      return 1
+    fi
+    local existing_host
+    for existing_host in "${_TUNNEL_FORWARD_WRAPPER_PATH}" "${_TUNNEL_VAULT_WRAPPER_PATH}"; do
+      if [[ -f "${existing_host}" ]]; then
+        existing_host="$(sed -nE 's/.* -N "([^"]+)".*/\1/p' "${existing_host}" | tail -n 1)"
+        if [[ -n "${existing_host}" && "${existing_host}" != "${TUNNEL_SSH_HOST}" && "${TUNNEL_FORCE_HOST:-}" != "1" ]]; then
+          echo "[tunnel] refusing to repoint unscoped agents from ${existing_host} to ${TUNNEL_SSH_HOST}; set TUNNEL_FORCE_HOST=1 to override" >&2
+          return 1
+        fi
+      fi
+    done
+  fi
+
   if [[ -z "$(_tunnel_autossh_path)" ]]; then
     echo "[tunnel] autossh not found — install with: brew install autossh" >&2
     return 1
@@ -195,6 +228,7 @@ EOF
 
   _tunnel_write_plist
   _tunnel_write_vault_agent
+  _tunnel_rotate_logs
   if [[ "$(uname)" == "Darwin" ]]; then
     launchctl unload -w "${_TUNNEL_PLIST_PATH}" 2>/dev/null || true
     launchctl load -w "${_TUNNEL_PLIST_PATH}"

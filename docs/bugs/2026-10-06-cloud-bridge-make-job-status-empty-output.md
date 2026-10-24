@@ -1,10 +1,23 @@
 # Cloud-bridge Make job-status returns empty output, hiding test failure diagnostics
 
 **Filed:** 2026-10-06
-**Release / branch:** v1.42.0 / `k3d-manager-v1.42.0`
-**Status:** FIXED in branch; live cloud/Slack verification pending — canonical bug: [September 28 report](2026-09-28-make-jobs-never-write-output-file.md)
+**Release / branch:** v1.43.5 / `k3d-manager-v1.43.5` (original report: v1.42.0)
+**Status:** LIVE-VERIFIED — 2026-10-22: Slack `logs fb7db078` and cloud-bridge `job-status fb7db078` both returned the same failed Make job's output.
 **Severity:** Medium — cloud agents see terminal failure but cannot diagnose it
 **Component:** webhook job-status log selection / cloud-bridge response
+**Fix commit:** `d5e7b7f5`
+**Live evidence:** 2026-10-22 · run 20261022T003217Z-job-status · env cloud-bridge · scenario job-status-fb7db078 · commit d5e7b7f5 · proves fix
+
+## Files
+
+| File | Scope |
+|---|---|
+| `bin/k3dm-webhook` | Ensure Slack-thread Make jobs record their target metadata so shared log selection recognizes `make.log`. |
+| `scripts/lib/webhook/job_output.py` | Keep bounded, redacted Make-log selection deterministic for Slack and HTTP consumers. |
+| `scripts/tests/bin/test_job_output.py` | Add regression coverage for Make-log selection when the job metadata is present or absent. |
+| `scripts/tests/bin/test_webhook_thread_dispatch.py` | Verify Slack-thread Make job creation records the target marker used by log retrieval. |
+
+Do not broaden Slack authorization, expose raw logs, or modify unrelated job producers.
 
 ## Reproduction and observed result
 
@@ -144,8 +157,8 @@ make job-log ID=033ceddc
 - [x] Slack log tails remain bounded and redacted, with readable line breaks.
 - [x] Tests cover Make-log-only, legacy logs, absent logs, and multiple-file precedence
   for both Slack retrieval and cloud status; removing Make-log selection must turn them red.
-- [ ] Operator verifies `logs` in the actual E2E job's Slack thread retrieves the correct
-  bounded output, and cloud job-status returns the same job's useful tail.
+- [x] Operator verifies `logs` in the failed Make job's Slack thread retrieves its bounded
+  output, and cloud job-status returns the same job's useful tail.
 
 The original report now covers both retrieval interfaces. Automatic notification delivery is
 not itself broken based on the operator's report. No runtime code changed in this update.
@@ -158,3 +171,76 @@ reader still expected `output`. The same commit changed producer tests to assert
 `make.log` exists and `output` does not, leaving external retrieval uncovered. Full
 history and fix direction are recorded in the reopened September canonical bug.
 The repository cause is established; the deployed host revision is not independently verified.
+
+## Live evidence — 2026-10-20 (partial; terminal check pending)
+
+The operator authorized a read-only cloud-bridge investigation while away from the M4. Through the `cloud-requests` orphan branch:
+
+- `20261020T205644Z-hostinger-status` queued webhook job `5a80b6ca` (HTTP 202). A subsequent `job-status` response at `20261020T205950Z-job-status-hostinger` reported `status=success` with a **nonempty, redacted** Hostinger status report, including the failed ArgoCD login probe. This proves live HTTP retrieval for a completed status job.
+- `20261020T205644Z-make-test-all` queued webhook job `a3ec539d` (HTTP 202). The `job-status` response `20261020T205950Z-job-status-test-all` returned `status=running`, `result_classification=in_progress`, and a **nonempty, redacted** tail of Make BATS test output (through case 582), confirming the previously empty Make-log selection now works for an actively running Make job.
+- The `make-test-all` terminal response and live Slack `logs` thread retrieval had **not** been observed at this point. The screenshot showing a Slack start notification does not establish thread completion or successful `logs` retrieval.
+
+At the time of this 2026-10-20 entry, verification remained `VERIFIED` with partial LIVE evidence; the missing terminal Make and Slack retrieval checks were completed on 2026-10-22 as recorded below.
+
+Evidence URLs:
+- https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-hostinger.json
+- https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
+
+## Live Slack log-retrieval check — 2026-10-21
+
+The operator ran the read-only Slack thread target `k3dm fix-list`, which completed as job
+`013fdfe9`. The first visible `logs 013fdfe9` attempt received the generic usage response;
+the operator repeated the same visible command and Slack then returned:
+
+```text
+📋 Last 20 lines (job 013fdfe9)
+make fix-delete-pod       APP and NS are required
+make fix-eso-refresh      No arguments needed
+make fix-force-sync       APP is required
+make fix-list             List all fix targets with descriptions
+make fix-restart          APP and NS are required
+make fix-status           NS is required
+make fix-sync             APP is required
+```
+
+This is positive live evidence that a thread-originated Make job can return its own
+`make.log` through explicit `logs <job-id>`. It does **not** exercise cloud-bridge
+`job-status` for a failed Make job, so that separate acceptance criterion remains pending.
+The initial usage response is tracked separately in
+`docs/bugs/2026-10-21-slack-find-similar-docs-job-logs-rejected.md`; the identical visible
+retry succeeding leaves an intermittent command-input/routing discrepancy unresolved.
+
+## Terminal cloud-bridge verification — 2026-10-22
+
+The operator ran:
+
+```text
+bin/k3dm-cloud-request --wait job-status --arg job_id=fb7db078
+```
+
+The terminal response identified job `fb7db078`, `status=failed`, `exit_code=2`, and returned
+nonempty output including `[Final output tail]`, the test-all summary (`1751 cases, 53 failed`),
+and `make: *** [test-all] Error 2`. No credential values are visible in the supplied output.
+Earlier Slack evidence for the same job showed `logs fb7db078` returning its last 20 log lines.
+Together these verify the Make transcript through Slack and the terminal failure tail through
+cloud-bridge for the same job. The separate `agent@cloud` screenshot says that session could
+not directly access the endpoint and contains no second request result; it does not contradict
+the successful tmux request. The bug is now LIVE-VERIFIED.
+
+The operator later supplied the structured `agent@cloud` response, confirming that it did not
+execute the request:
+
+```json
+{
+  "job_id": "fb7db078",
+  "request": "job-status",
+  "request_executed": false,
+  "response_received": false,
+  "status": "unknown",
+  "output": null,
+  "error": "Cloud-bridge endpoint unavailable from this session"
+}
+```
+
+This is a session-access limitation, not a negative cloud-bridge result. The successful tmux
+response above remains the live verification evidence.

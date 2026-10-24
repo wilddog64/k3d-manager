@@ -32,7 +32,7 @@ jobs:
   lint:
     if: >-
       ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,6 +83,27 @@ jobs:
         run: |
           set -euo pipefail
           yamllint .github/workflows/*.yml
+
+      - name: Install promtool
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=3.1.0
+          sha256="9a9d1e115d1745826b13aec3f1409780"
+          sha256+="b9fcf1d4206746cb4faee46ca5add70c"
+          tmp_dir="$(mktemp -d)"
+          tarball="prometheus-${version}.linux-amd64.tar.gz"
+          base=https://github.com/prometheus/prometheus/releases/download
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "${base}/v${version}/${tarball}" -o "${tmp_dir}/${tarball}"
+          echo "${sha256}  ${tmp_dir}/${tarball}" | sha256sum -c -
+          tar -xzf "${tmp_dir}/${tarball}" -C "$tmp_dir"
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 \
+            "${tmp_dir}/prometheus-${version}.linux-amd64/promtool" \
+            "$HOME/.local/bin/promtool"
+          rm -rf "$tmp_dir"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run the full offline suite (BATS + Python)
         shell: bash

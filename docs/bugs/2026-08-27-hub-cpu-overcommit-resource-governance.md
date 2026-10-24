@@ -5,6 +5,7 @@
 CoreDNS, repo-server in restart storms.
 **Status:** SPEC
 **Priority:** P2 — the hub control plane can stall under CPU overcommit; the load-shed changes are the workaround
+**Release:** unscheduled — revisit after the 2026-10-29 hub rebuild drill; candidate v1.46.1 (monthly hub rebuilds) (backlog triage, Claude, 2026-10-22)
 
 ## Symptom
 

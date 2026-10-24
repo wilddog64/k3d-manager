@@ -12,9 +12,11 @@ import urllib.parse
 import urllib.request
 
 from webhook.config import SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
+from webhook.log import get_logger
 from webhook.redact import scrub_credentials
 
 
+logger = get_logger(__name__)
 _SLACK_POST_ALLOWED_HOSTS = frozenset({"hooks.slack.com", "slack.com"})
 
 
@@ -70,8 +72,20 @@ def _post_slack_bot(text, thread_ts=None, channel_id=None):
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read())
-            return result.get("ts", "") if result.get("ok") else ""
-    except Exception:
+            if not result.get("ok"):
+                error = result.get("error", "unknown")
+                detail = f" needed={result['needed']}" if "needed" in result else ""
+                logger.warning(
+                    "slack chat.postMessage rejected channel=%s error=%s%s",
+                    channel, error, detail,
+                )
+                return ""
+            return result.get("ts", "")
+    except Exception as exc:
+        logger.warning(
+            "slack chat.postMessage failed channel=%s error=%s",
+            channel, type(exc).__name__,
+        )
         return ""
 
 

@@ -154,7 +154,7 @@ def _scan(ref):
         pb["total"] += 1
         pb[state] += 1
         if state == "open":
-            item = {"path": path, "priority": priority}
+            item = {"path": path, "priority": priority, "status": doc_status(raw)[1]}
             bucket["open_paths"].append(item)
         elif state == "unknown":
             item = {"path": path, "priority": priority}

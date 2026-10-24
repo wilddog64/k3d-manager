@@ -12,6 +12,47 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "release forecast panels align by version and map dates and states" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d["panels"]
+new=[p for p in panels if 26 <= p["id"] <= 32]
+tiles={p["id"]:p for p in new}
+table=tiles[32]
+assert len(new)==7
+names=[p.get("title","") for p in new]
+names += list(next(t for t in table["transformations"] if t["id"]=="organize")["options"].get("renameByName",{}).values())
+assert all(not re.search(r"ship|release date", name, re.I) for name in names)
+assert all(tiles[i]["fieldConfig"]["defaults"].get("noValue") for i in (28,29,30,31))
+for field in ("Value #B","Value #C","Value #D"):
+ override=next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"]==field)
+ assert {p["id"]:p["value"] for p in override["properties"]}.get("noValue")=="-"
+ assert "custom.noValue" not in {p["id"] for p in override["properties"]}
+exprs={t["refId"]:t["expr"] for t in table["targets"]}
+assert all(f"by (version)" in exprs[k] for k in "BCDE")
+assert all(re.fullmatch(r"version", label) for label in re.findall(r"(?:sum|max) by \(([^)]+)\)", " ".join(exprs[k] for k in "BCDE")))
+assert "sum by (release)" not in exprs["E"]
+assert all(f'bound="{bound}"' in exprs[ref] for ref,bound in zip("BCD",("low","mid","high")))
+assert [t["id"] for t in table["transformations"]]==["merge","convertFieldType","organize"]
+assert table["transformations"][-1]["options"]["excludeByName"].get("Value #A") is True
+conversion=table["transformations"][1]["options"]["conversions"]
+assert any(c["targetField"]=="position" and c["destinationType"]=="number" for c in conversion)
+state_expr=tiles[31]["targets"][0]["expr"]
+assert all(f"({code} * k3dm_release_milestone_info" in state_expr for code in range(1,5))
+mapping=tiles[31]["fieldConfig"]["defaults"]["mappings"]
+assert set(mapping[0]["options"])=={"1","2","3","4"}
+assert {k:v["text"] for k,v in mapping[0]["options"].items()}=={"1":"blocked upstream","2":"insufficient history","3":"forecast","4":"shipped"}
+for panel in new:
+ a=panel["gridPos"]
+ for other in panels:
+  if other["id"]==panel["id"]: continue
+  b=other["gridPos"]
+  assert a["x"]+a["w"]<=b["x"] or b["x"]+b["w"]<=a["x"] or a["y"]+a["h"]<=b["y"] or b["y"]+b["h"]<=a["y"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bug dashboard has a release variable" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
@@ -117,9 +158,9 @@ assert "k3dm_bug_fixed_in_release_docs" in panels[4]["targets"][0]["expr"]
 assert panels[8]["title"] == "Bugs filed per release, open vs fixed"
 assert panels[25]["targets"][0]["expr"] == 'sum by (release, order, priority) (k3dm_bug_fixed_in_release_docs{repo="$repo"}) > 0'
 assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
-    {"x": 0, "y": 6, "w": 8, "h": 9},
-    {"x": 8, "y": 6, "w": 8, "h": 9},
-    {"x": 16, "y": 6, "w": 8, "h": 9},
+    {"x": 0, "y": 37, "w": 8, "h": 9},
+    {"x": 8, "y": 37, "w": 8, "h": 9},
+    {"x": 16, "y": 37, "w": 8, "h": 9},
 ]
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
 assert organize["indexByName"]["fixed_in"] == 6
@@ -173,6 +214,100 @@ for panel in data["panels"]:
         for y in range(pos["y"], pos["y"] + pos["h"]):
             assert (x, y) not in cells, panel["title"]
             cells.add((x, y))
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release forecast sits between the plan tiles and the Plans table, and lists only unshipped milestones for the selected release" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+by_title={p["title"]: p for p in d["panels"]}
+tiles=by_title["Plans in release"]["gridPos"]
+forecast=by_title["Release forecast"]["gridPos"]["y"]
+assert tiles["y"]+tiles["h"] <= forecast < by_title["Plans"]["gridPos"]["y"]
+table=by_title["Remaining releases"]
+plans_expr=next(t["expr"] for t in table["targets"] if t["refId"]=="E")
+head=plans_expr.split(" or on(version) ",1)[0]
+assert 'and on(version) k3dm_release_milestone_info{repo="$repo",version=~"$release",state!="shipped"}' in head, head
+for target in table["targets"]:
+    assert 'version=~"$release"' in target["expr"], (target["refId"], target["expr"])
+assert 'k3dm_plan_release_docs{repo="$repo",release=~"$release"}' in plans_expr
+excluded=next(t for t in table["transformations"] if t["id"]=="organize")["options"]["excludeByName"]
+assert excluded.get("job") and excluded.get("instance")
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "plan names link to the plan doc on the scanned branch, and bug tiles say bugs" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["id"]: p for p in d["panels"]}
+overrides={o["matcher"]["options"]: o["properties"] for o in panels[107]["fieldConfig"]["overrides"]}
+links=next(p["value"] for p in overrides["Plan"] if p["id"]=="links")
+assert links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md"
+assert links[0]["targetBlank"] is True
+assert next(p["value"] for p in overrides["branch"] if p["id"]=="custom.hidden") is True
+bug_overrides={o["matcher"]["options"]: o["properties"] for o in panels[23]["fieldConfig"]["overrides"]}
+assert next(p["value"] for p in bug_overrides["branch"] if p["id"]=="custom.hidden") is True
+width=lambda n: [p["value"] for o in panels[107]["fieldConfig"]["overrides"] if o["matcher"]["options"]==n for p in o["properties"] if p["id"]=="custom.width"]
+assert width("Plan") and width("Title")
+organize=next(t for t in panels[107]["transformations"] if t["id"]=="organize")
+assert "branch" not in organize["options"]["excludeByName"]
+assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed","Bugs open","Bugs fixed"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard release plans row shows joined plan state without not-started inference" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels=d['panels']; row=next(p for p in panels if p['title']=='Release plans — $release')
+added=[p for p in panels if p['id'] >= 100]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27]
+assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
+table=next(p for p in added if p['title']=='Plans')
+expr=table['targets'][0]['expr']
+assert 'group_left(dispatch_state, slug)' in expr and ' or on(plan) ' in expr
+tiles={p['title']:p for p in added if p['type']=='stat'}
+steps=tiles['Plans in release']['fieldConfig']['defaults']['thresholds']['steps']
+assert any(s.get('value')==6 and s['color']=='red' for s in steps)
+assert not any('not started' in (p['title']+' '+str(p.get('fieldConfig',{}).get('defaults',{}).get('mappings',[]))).lower() for p in added)
+assert 'no record' in json.dumps(table).lower()
+assert 'label_replace(' in expr and '"dispatch_state", "none"' in expr
+assert table['fieldConfig']['overrides'] and any('none' in str(o.get('properties')) and 'no record' in str(o.get('properties')) for o in table['fieldConfig']['overrides'])
+exprs=[t['expr'] for p in added for t in p.get('targets',[])]
+assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard Plans table orders plans numerically and shows dependencies" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+table=next(p for p in data['panels'] if p['id']==107)
+assert table['description']=="Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line."
+transforms=table['transformations']
+convert=next(i for i,t in enumerate(transforms) if t['id']=='convertFieldType')
+organize=next(i for i,t in enumerate(transforms) if t['id']=='organize')
+assert convert < organize
+assert transforms[convert]['options']['conversions']==[{'targetField':'order','destinationType':'number'}]
+options=transforms[organize]['options']
+assert options['indexByName']['order']==1
+assert options['renameByName']['order']=='Order'
+assert options['renameByName']['depends_on']=='Depends on'
+assert table['options']['sortBy']==[{'displayName':'Order','desc':False}]
+overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
+order_props={p['id']:p['value'] for p in overrides['Order']}
+assert order_props['custom.width']==70 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==160 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -242,6 +377,35 @@ if check == "link":
     url = links[0][0]["url"]
     assert "${__data.fields.branch}" in url and "${__data.fields.bug}" in url, url
     assert links[0][0]["targetBlank"] is True
+    # Model the post-organize frame: excludeByName removes columns, while
+    # hideFrom.viz keeps metadata available to data-link interpolation.
+    organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+    assert not organize["excludeByName"].get("branch") and not organize["excludeByName"].get("bug")
+    hidden = {}
+    for override in table["fieldConfig"]["overrides"]:
+        for prop in override["properties"]:
+            if prop["id"] == "hideFrom":
+                hidden[override["matcher"]["options"]] = prop["value"]
+    assert hidden["bug"]["viz"] and hidden["branch"]["viz"]
+    rows = [
+        {"branch": "release/v1.43.5", "bug": "2026-10-18-register-app-cluster-role-lookup-exits-silently", "title": "App cluster role lookup"},
+        {"branch": "feature/dashboard-fix", "bug": "2026-10-19-grafana-bug-dashboard-links-empty-branch-and-stem", "title": "Dashboard links"},
+    ]
+    def render_link(row, excluded):
+        post_transform = {key: value for key, value in row.items() if key not in excluded}
+        resolved = url.replace("${__data.fields.branch}", post_transform.get("branch", ""))
+        resolved = resolved.replace("${__data.fields.bug}", post_transform.get("bug", ""))
+        return resolved
+
+    for row in rows:
+        resolved = render_link(row, organize["excludeByName"])
+        assert "/blob//" not in resolved and "/docs/bugs/.md" not in resolved, resolved
+        assert f"/blob/{row['branch']}/docs/bugs/{row['bug']}.md" in resolved, resolved
+    # Run the same post-transform resolver against the original exclusion
+    # configuration. It must reproduce the empty-ref/stem URL from the bug.
+    original_exclusions = {**organize["excludeByName"], "branch": True, "bug": True}
+    original_result = render_link(rows[0], original_exclusions)
+    assert "/blob//" in original_result and "/docs/bugs/.md" in original_result, original_result
 elif check == "sort":
     transforms = [t["id"] for t in table["transformations"]]
     assert transforms.index("sortBy") < transforms.index("organize"), transforms
@@ -249,16 +413,17 @@ elif check == "sort":
     assert sort == [{"field": "sort_key", "desc": False}], sort
 elif check == "layout":
     assert panels[22]["type"] == "row"
-    assert table["gridPos"] == {"x": 0, "y": 20, "w": 24, "h": 12}, table["gridPos"]
-    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 20 for i in (9, 10, 11, 12, 13, 14, 16, 17))
-    assert panels[15]["gridPos"]["y"] == 32
+    assert table["gridPos"] == {"x": 0, "y": 51, "w": 24, "h": 12}, table["gridPos"]
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 51 for i in (9, 10, 11, 12, 13, 14, 16, 17))
+    assert panels[15]["gridPos"]["y"] == 63
     rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
     owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
     assert owner == 22, owner
 elif check == "columns":
     organize = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
     hidden = {name for name, flag in organize["excludeByName"].items() if flag}
-    assert {"bug", "sort_key", "branch", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
+    assert {"sort_key", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
+    assert not {"bug", "branch"} & hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
     assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
     assert organize["indexByName"]["fixed_in"] == 6
@@ -290,9 +455,11 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 live = panels[24]
 assert live["title"] == "Live-verified"
 assert 'live_verified="true"' in live["targets"][0]["expr"]
-assert panels[16]["gridPos"] == {"x": 15, "y": 16, "w": 2, "h": 4}
-assert live["gridPos"] == {"x": 17, "y": 16, "w": 2, "h": 4}
-assert panels[17]["gridPos"] == {"x": 19, "y": 16, "w": 2, "h": 4}
+assert panels[13]["gridPos"] == {"x": 8, "y": 47, "w": 3, "h": 4}
+assert panels[16]["gridPos"] == {"x": 11, "y": 47, "w": 3, "h": 4}
+assert live["gridPos"] == {"x": 14, "y": 47, "w": 4, "h": 4}
+assert panels[17]["gridPos"] == {"x": 18, "y": 47, "w": 3, "h": 4}
+assert panels[14]["gridPos"] == {"x": 21, "y": 47, "w": 3, "h": 4}
 table = panels[23]
 assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
 PY
@@ -387,6 +554,24 @@ for column in ("Fix commit", "Verified commit", "Verified at", "Live-verified at
 for column in ("Verified", "Live-verified"):
     mappings = next(p["value"] for p in overrides[column]["properties"] if p["id"] == "mappings")
     assert not any(m["type"] == "regex" for m in mappings), column
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "Plans Dispatch links to the release in Agent dispatch" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in d["panels"] if p["id"] == 107)
+organize=next(t for t in panel["transformations"] if t["id"]=="organize")
+exclude=organize["options"]["excludeByName"]
+assert "release" not in exclude
+links=next(prop["value"] for override in panel["fieldConfig"]["overrides"]
+           if override["matcher"]["options"] == "Dispatch"
+           for prop in override["properties"] if prop["id"] == "links")
+assert links[0]["url"] == "/d/k3dm-agent-dispatch?var-window=${__data.fields.release}"
+assert any(item.get("url") == "/d/k3dm-agent-dispatch" for item in d["links"])
 PY
   [ "${status}" -eq 0 ]
 }

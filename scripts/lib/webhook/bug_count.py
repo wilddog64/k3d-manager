@@ -20,6 +20,7 @@ _LAST_N_RE = re.compile(r"\b(?:last|past|previous|recent)\s+(\d+|" + "|".join(_N
 _CURRENT_RE = re.compile(r"\b(?:this|current|latest)\s+release\b", re.IGNORECASE)
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 _BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALL_RELEASES_SHOWN = 10
 
 
@@ -64,6 +65,13 @@ def _current_release(ref, root):
         branch = output.strip() if rc == 0 and not timed_out else ""
     match = _BRANCH_RE.search(branch)
     return match.group(1) if match else None
+
+
+def _commit(ref, root):
+    rc, output, timed_out = proc._spawn_capture_text(["git", "rev-parse", "--verify", f"{ref}^{{commit}}"], cwd=root,
+                                                     timeout=10)
+    sha = output.strip() if rc == 0 and not timed_out else ""
+    return sha[:8] if _SHA_RE.match(sha) else ""
 
 
 def _select(releases, release, ref, root):
@@ -134,22 +142,30 @@ def reply(query):
         lead = lead_of(data)
         noun = f" {query.priority}" if query.priority else ""
         state_lead = f" {query.state}" if query.state else ""
-        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs — {counts.get('closed', 0)} fixed, "
+        of_total = f" of {counts.get('total', 0)}" if query.state else ""
+        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs{of_total} — {counts.get('closed', 0)} fixed, "
                      f"{counts.get('open', 0)} open, {counts.get('unknown', 0)} with no Status line.")
         open_items = data.get("open_paths", []) if query.priority else counts.get("open_paths", [])
         unknown_items = data.get("unknown_paths", []) if query.priority else counts.get("unknown_paths", [])
         if query.priority:
             open_items = [item for item in open_items if item.get("priority") == query.priority]
             unknown_items = [item for item in unknown_items if item.get("priority") == query.priority]
+        deferred_count = sum(isinstance(item, dict) and item.get("status") == "deferred" for item in open_items)
+        if deferred_count:
+            lines[-1] = lines[-1].replace(f"{counts.get('open', 0)} open,",
+                                          f"{counts.get('open', 0)} open ({deferred_count} deferred),")
         for item in open_items[:10]:
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
-            lines.append(f"Open: {_doc_link(path)}")
+            label = "Deferred" if isinstance(item, dict) and item.get("status") == "deferred" else "Open"
+            lines.append(f"{label}: {_doc_link(path)}")
         for item in unknown_items[:10]:
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
             lines.append(f"Unknown: {_doc_link(path)}")
     if unset_total:
         lines.append(f"{unset_total} docs in these releases have no Priority line, so they are not counted here.")
-    lines.append(f"_Counted from docs/bugs/ at {ref}; release = Branch: line, else the release the doc was added in._")
+    commit = _commit(ref, root)
+    at = f"{ref} `{commit}`" if commit else ref
+    lines.append(f"_Counted from docs/bugs/ at {at}; release = Branch: line, else the release the doc was added in._")
     return "\n".join(lines)

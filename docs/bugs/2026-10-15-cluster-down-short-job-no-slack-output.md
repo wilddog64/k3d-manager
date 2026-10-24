@@ -2,10 +2,11 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — implementation not started
+**Status:** VERIFIED — offline tests passed; live Slack verification pending
 **Priority:** P3 — ChatOps observability / operator feedback
 **Severity:** low
 **Approval:** explicit operator request to file this bug, 2026-10-15
+**Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
 **Evidence:** Slack screenshot of AWS ACG sandbox teardown job `b0e9616d`, which reported `cluster-down (aws) — success in 1m` with no execution details.
 
 ## Symptom
@@ -40,4 +41,10 @@ This is a **confirmed short-job notification coverage gap**, distinct from the s
 - The completion summary correctly labels **command success** versus **verified external teardown**, where separate verification is unavailable.
 - No real AWS lifecycle operation is run in automated tests.
 
-**Implementation:** not started. No AWS resources or live job were modified when this bug was filed.
+## Files
+
+- `scripts/lib/webhook/lifecycle.py`
+- `scripts/tests/bin/webhook_lifecycle.py`
+- `scripts/tests/lib/webhook.bats`
+
+**Verification (2026-10-22):** Landed as `870831a4`. `python3 scripts/tests/bin/webhook_lifecycle.py` passed 21/21; `bats scripts/tests/lib/webhook.bats` passed 68 tests with 6 environment-gated skips. `_agent_lint`, `_agent_audit`, and `git diff --check` passed. No AWS lifecycle operation was run. Live Slack verification remains pending; this is not LIVE-VERIFIED.

@@ -39,8 +39,16 @@ for arg in "$@"; do
   fi
 done
 if [[ "$*" == */api/v1/session* ]]; then
-  cat >/dev/null
+  payload="$(cat)"
+  password="$(printf '%s' "$payload" | sed -n 's/.*"password": "\([^"]*\)".*/\1/p')"
+  if [[ -n "${password}" && -n "${REJECT_PASSWORDS:-}" && "${REJECT_PASSWORDS}" == *"${password}"* ]]; then
+    exit 22
+  fi
   printf '%s\n' '{"token":"fake-token"}'
+fi
+if [[ "$*" == */v1/secret/data/argocd/admin* ]]; then
+  printf '{"data":{"data":{"password":"%s"}}}\n' "${VAULT_PASSWORD:-}"
+  exit 0
 fi
 exit 0
 STUB
@@ -51,6 +59,14 @@ if [[ "$*" == *"port-forward"* ]]; then
   echo "$$" > "${BATS_TEST_TMPDIR}/pf.pid"
   trap 'rm -f "${BATS_TEST_TMPDIR}/pf.pid"; exit 0' TERM INT
   while true; do sleep 1; done
+fi
+if [[ "$*" == *"get secret vault-root"* && -n "${VAULT_ROOT_B64:-}" ]]; then
+  printf '%s\n' "${VAULT_ROOT_B64}"
+  exit 0
+fi
+if [[ "$*" == *"get secret argocd-initial-admin-secret"* && -n "${INITIAL_PASSWORD_B64:-}" ]]; then
+  printf '%s\n' "${INITIAL_PASSWORD_B64}"
+  exit 0
 fi
 exit 1
 STUB
@@ -112,6 +128,38 @@ run_sync() {
   [ "${status}" -eq 0 ]
   run grep -q kubectl "${BATS_TEST_TMPDIR}/calls.log"
   [ "$status" -ne 0 ]
+}
+
+@test "rejected environment password falls back to Vault" {
+  run env ARGOCD_ADMIN_PASSWORD=env-pass REJECT_PASSWORDS=env-pass \
+    VAULT_ROOT_B64=dmF1bHQtdG9rZW4= VAULT_PASSWORD=vault-pass \
+    "${REPO_ROOT}/bin/argocd-app-sync" demo
+  [ "${status}" -eq 0 ]
+  grep -q 'token-set' "${BATS_TEST_TMPDIR}/calls.log"
+}
+
+@test "rejected Vault password falls back to the initial admin secret" {
+  run env ARGOCD_ADMIN_PASSWORD=env-pass REJECT_PASSWORDS='env-pass vault-pass' \
+    VAULT_ROOT_B64=dmF1bHQtdG9rZW4= VAULT_PASSWORD=vault-pass \
+    INITIAL_PASSWORD_B64=aW5pdC1wYXNz \
+    "${REPO_ROOT}/bin/argocd-app-sync" demo
+  [ "${status}" -eq 0 ]
+  grep -q 'token-set' "${BATS_TEST_TMPDIR}/calls.log"
+}
+
+@test "all rejected passwords produce one safe login error" {
+  run env ARGOCD_ADMIN_PASSWORD=env-pass REJECT_PASSWORDS='env-pass vault-pass init-pass' \
+    VAULT_ROOT_B64=dmF1bHQtdG9rZW4= VAULT_PASSWORD=vault-pass \
+    INITIAL_PASSWORD_B64=aW5pdC1wYXNz \
+    "${REPO_ROOT}/bin/argocd-app-sync" demo
+  [ "${status}" -ne 0 ]
+  [[ "${output}" == *"ArgoCD API login failed for localhost:8080 (tried: env vault argocd-initial-admin-secret)"* ]]
+  [[ "${output}" != *"Traceback"* ]]
+  [[ "${output}" != *"env-pass"* ]]
+  [[ "${output}" != *"vault-pass"* ]]
+  [[ "${output}" != *"init-pass"* ]]
+  run grep -qE 'env-pass|vault-pass|init-pass' "${BATS_TEST_TMPDIR}/calls.log"
+  [ "${status}" -ne 0 ]
 }
 
 @test "missing app prints usage and makes no ArgoCD call" {

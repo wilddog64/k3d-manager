@@ -15,6 +15,8 @@
 
 set -euo pipefail
 
+_k3dm_deployment_start_epoch="$(date +%s)"
+
 # launchd starts this script with the plist's minimal PATH, which omits
 # ~/.local/bin where k3d and istioctl live. Without this, the hub teardown below
 # silently no-ops and reports that no hub cluster exists.
@@ -27,6 +29,7 @@ SCRIPT_DIR="${REPO_ROOT}/scripts"
 export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   export DRY_RUN=1
@@ -72,6 +75,17 @@ if [[ "${_confirm}" -eq 0 ]]; then
   echo "  --discard-hub-data  Explicitly delete Hub data without a verified snapshot."
   exit 1
 fi
+
+function _k3dm_down_metrics_exit() {
+  local _exit_code=$?
+  local _duration_secs=$(( $(date +%s) - _k3dm_deployment_start_epoch ))
+  _k3dm_push_deployment_metrics "down" "${_cluster_provider}" \
+    "$([[ "${_exit_code}" -eq 0 ]] && printf 'success' || printf 'failed')" \
+    "${_duration_secs}" "cli-${_k3dm_deployment_start_epoch}-$$" || true
+  return "${_exit_code}"
+}
+
+trap _k3dm_down_metrics_exit EXIT
 
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 if [[ "${_keep_hub}" -eq 0 ]] && _command_exist k3d && k3d cluster list 2>/dev/null | grep "^${_HUB_CLUSTER}[[:space:]]" >/dev/null; then
@@ -132,14 +146,21 @@ case "${_cluster_provider}" in
       [[ "${_cloud_teardown_failed}" -eq 1 ]] && _warn "[acg-down] CloudFormation teardown ${_cloud_teardown} — continuing local teardown; check the AWS console before the sandbox is reused."
     else
       _cloud_teardown="UNVERIFIED (AWS credentials invalid — sandbox presumed expired, not checked)"
+      _cloud_teardown_failed=1
       _warn "[acg-down] AWS credentials invalid or expired — CloudFormation teardown skipped and NOT verified. An expired ACG sandbox takes its account with it; a wrong profile or region does not."
     fi
-    _info "[acg-down] Deregistering sandbox from hub ArgoCD..."
-    if _dry_run_active; then
-      _info "[acg-down] DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"
-    elif declare -f _k3s_aws_deregister_cluster >/dev/null 2>&1; then
-      _k3s_aws_deregister_cluster || _warn "[acg-down] hub deregister reported an issue"
+    if [[ "${_cloud_teardown_failed}" -eq 1 ]]; then
+      _warn "[acg-down] Preserving hub registration and observability-acg because AWS teardown was not confirmed."
+    elif _dry_run_active; then
+      _info "[acg-down] DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications and retire ApplicationSet/observability-acg from hub"
     else
+      _info "[acg-down] AWS stack deletion confirmed; deregistering sandbox from hub ArgoCD..."
+    fi
+    if [[ "${_cloud_teardown_failed}" -eq 0 ]] && _dry_run_active; then
+      : # The dry-run preview was logged above.
+    elif [[ "${_cloud_teardown_failed}" -eq 0 ]] && declare -f _k3s_aws_deregister_cluster >/dev/null 2>&1; then
+      _k3s_aws_deregister_cluster || _warn "[acg-down] hub deregister reported an issue"
+    elif [[ "${_cloud_teardown_failed}" -eq 0 ]]; then
       # shellcheck source=/dev/null
       source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh" 2>/dev/null \
         && _k3s_aws_deregister_cluster || _warn "[acg-down] hub deregister unavailable"
@@ -463,8 +484,6 @@ else
   rm -f /tmp/argocd-*.sock
   rm -f /tmp/k3d-config-tmp-*.yaml
   rm -f /tmp/k3d-hostsfile-*
-  rm -f /tmp/k3d-manager-tunnel.out
-  rm -f /tmp/k3d-manager-tunnel.err
   rm -f /tmp/k3d-manager-acg-watch.out
   rm -f /tmp/k3d-manager-acg-watch.err
   rm -f /tmp/k3dm-acg-screenshot-*.png

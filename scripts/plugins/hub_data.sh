@@ -14,6 +14,11 @@ K3DM_HUB_DATA_ARGOCD_PARENT="${K3DM_HUB_DATA_ARGOCD_PARENT:-shopping-cart-apps}"
 K3DM_HUB_DATA_ARGOCD_APP="${K3DM_HUB_DATA_ARGOCD_APP:-shopping-cart-identity}"
 K3DM_HUB_DATA_RECOVER_RUN_ROOT="${K3DM_HUB_DATA_RECOVER_RUN_ROOT:-${HOME}/.k3dm/hub-recover}"
 
+if [[ -r "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/ssh_config_guard.sh" ]] && ! declare -f _ssh_config_guard >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/ssh_config_guard.sh"
+fi
+
 if [[ -r "${PLUGINS_DIR}/hub_snapshot.sh" ]] && ! declare -f _hub_snapshot_copy >/dev/null 2>&1; then
   # shellcheck source=/dev/null
   source "${PLUGINS_DIR}/hub_snapshot.sh"
@@ -494,7 +499,8 @@ function hub_data_export_scheduled() { (
   _hub_data_take_lock || return 0
   trap '_hub_data_release_lock' EXIT
   export GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=15'
-  HUB_DATA_LOCK_HELD=1 hub_data_export || rc=$?
+  if declare -f _ssh_config_guard >/dev/null 2>&1; then _ssh_config_guard --repair github-k3dm-hub-data || rc=$?; fi
+  if (( rc == 0 )); then HUB_DATA_LOCK_HELD=1 hub_data_export || rc=$?; fi
   bytes=0; kept=0
   [[ -r "$K3DM_HUB_DATA_DIR/last-bytes" ]] && bytes="$(<"$K3DM_HUB_DATA_DIR/last-bytes")"
   [[ -r "$K3DM_HUB_DATA_DIR/last-kept" ]] && kept="$(<"$K3DM_HUB_DATA_DIR/last-kept")"

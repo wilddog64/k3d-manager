@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Poll the cloud-requests branch and execute its read-only requests."""
 
+import base64
 import json
 import os
 import queue
@@ -37,6 +38,8 @@ ID_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}")
 FETCH_REFSPEC = "+refs/heads/cloud-requests:refs/heads/cloud-requests"
 REQUIRED_FIELDS = {"schema", "action", "args", "requested_by", "requested_at", "expires_at"}
 ARTIFACT_KEEP = max(1, int(os.environ.get("K3DM_CLOUD_ARTIFACT_KEEP", "50")))
+STATE_DIR = Path(os.environ.get(
+    "K3DM_CLOUD_BRIDGE_STATE", str(Path.home() / ".k3d-manager" / "cloud-bridge")))
 TERMINAL_JOB_STATES = ("success", "failed", "killed")
 MAX_JUNIT_BYTES = 512 * 1024
 SLOW_ACTIONS = frozenset({"health"})
@@ -132,11 +135,122 @@ def _response(request_id, action, status, http_status, body=None, reason=None):
         "http_status": http_status,
         "completed_at": _now().isoformat().replace("+00:00", "Z"),
     }
-    if status == "rejected":
+    if status == "rejected" or reason is not None:
         result["reason"] = reason or "request rejected"
     else:
         result["body"] = body
     return result
+
+
+def _fsync_directory(path):
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _claimed_ids():
+    path = STATE_DIR / "claimed.txt"
+    try:
+        return set(path.read_text().splitlines())
+    except FileNotFoundError:
+        return set()
+
+
+def _claim(request_id):
+    created = not STATE_DIR.exists()
+    STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if created:
+        _fsync_directory(STATE_DIR.parent)
+    path = STATE_DIR / "claimed.txt"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(request_id + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _outbox_dir():
+    path = STATE_DIR / "outbox"
+    created = not path.exists()
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if created:
+        _fsync_directory(STATE_DIR)
+    return path
+
+
+def _store_outbox(request_id, response, watch_add=None, artifacts=None):
+    directory = _outbox_dir()
+    target = directory / f"{request_id}.json"
+    temporary = directory / f".{request_id}.{os.getpid()}.tmp"
+    record = {
+        "response": response,
+        "watch_add": watch_add,
+        "artifacts": {path: base64.b64encode(blob).decode("ascii")
+                      for path, blob in (artifacts or {}).items()},
+    }
+    with temporary.open("w", encoding="utf-8") as handle:
+        json.dump(record, handle, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, target)
+    _fsync_directory(directory)
+
+
+def _outbox_entries():
+    directory = _outbox_dir()
+    for path in sorted(directory.glob("*.json")):
+        if not ID_RE.fullmatch(path.stem):
+            continue
+        yield path.stem, json.loads(path.read_text(encoding="utf-8"))
+
+
+def _remove_outbox(request_id):
+    path = _outbox_dir() / f"{request_id}.json"
+    path.unlink(missing_ok=True)
+    _fsync_directory(path.parent)
+
+
+def _publish_outbox(repo, ref, processed):
+    count = 0
+    for request_id, record in _outbox_entries():
+        if request_id in processed:
+            _remove_outbox(request_id)
+            continue
+        # Accept response-only entries left by an earlier bridge build.
+        if isinstance(record.get("response"), dict):
+            response = record["response"]
+            watch_add = record.get("watch_add")
+            artifacts = {path: base64.b64decode(blob, validate=True)
+                         for path, blob in record.get("artifacts", {}).items()}
+        else:
+            response, watch_add, artifacts = record, None, {}
+        ref = _write_commit(repo, ref, request_id, response, artifacts, watch_add=watch_add)
+        processed.add(request_id)
+        _remove_outbox(request_id)
+        count += 1
+    return ref, count
+
+
+def _recover_orphaned_claims(repo, ref, processed, claims):
+    count = 0
+    for request_id in sorted(claims - processed):
+        if request_id in _slow_pending:
+            continue
+        if (STATE_DIR / "outbox" / f"{request_id}.json").exists():
+            continue
+        try:
+            _git(repo, ["cat-file", "-e", f"{ref}:responses/{request_id}.json"])
+        except RuntimeError:
+            response = _response(request_id, "", "error", 0,
+                                 reason="bridge restarted before the request completed; outcome unknown — file a new request")
+            _store_outbox(request_id, response)
+            ref = _write_commit(repo, ref, request_id, response)
+            _remove_outbox(request_id)
+            processed.add(request_id)
+            count += 1
+    return ref, count
 
 
 def _git(repo, args, env=None, timeout=30):
@@ -243,10 +357,16 @@ def _slow_worker():
     while True:
         request_id, request = _slow_requests.get()
         try:
-            _slow_responses.put((request_id, _call_webhook(request)))
+            response = _call_webhook(request)
         except Exception as error:  # pragma: no cover - defensive boundary around worker code
-            _slow_responses.put((request_id, _response("", request["action"], "error", 0,
-                                                       body={"error": str(error)})))
+            response = _response(request_id, request["action"], "error", 0,
+                                 body={"error": str(error)})
+        try:
+            response["id"] = request_id
+            _store_outbox(request_id, response)
+            _slow_responses.put((request_id, response))
+        except Exception as error:  # pragma: no cover - retried as an orphaned claim after restart
+            _LOG.error("could not store slow response for %s: %s", request_id, error)
         finally:
             _slow_requests.task_done()
 
@@ -462,12 +582,17 @@ def process_tick(repo, root, last_tip=None):
     changed = last_tip is None or remote_tip != last_tip
     ref = _fetch(repo) if changed else last_tip
     processed = _processed(repo, ref)
-    processed_this_tick = 0
+    claims = _claimed_ids()
+    ref, processed_this_tick = _publish_outbox(repo, ref, processed)
+    ref, recovered_count = _recover_orphaned_claims(repo, ref, processed, claims)
+    processed_this_tick += recovered_count
     for request_id, response in _completed_slow_requests():
         if request_id in processed:
             continue
         response["id"] = request_id
+        _store_outbox(request_id, response)
         ref = _write_commit(repo, ref, request_id, response)
+        _remove_outbox(request_id)
         processed.add(request_id)
         processed_this_tick += 1
     for entry in _read_watching(repo, ref)[:MAX_PER_TICK]:
@@ -495,8 +620,10 @@ def process_tick(repo, root, last_tip=None):
     if not changed:
         return ref, processed_this_tick
     for request_id in _request_ids(repo, ref):
-        if request_id in processed:
+        if request_id in processed or request_id in claims:
             continue
+        _claim(request_id)
+        claims.add(request_id)
         artifacts = {}
         raw, read_error = _read_request(repo, ref, request_id)
         if read_error:
@@ -517,17 +644,21 @@ def process_tick(repo, root, last_tip=None):
                 if paths:
                     response["artifacts"] = paths
                 watch_add = _watch_entry(request_id, request, response)
+                _store_outbox(request_id, response, watch_add=watch_add, artifacts=artifacts)
                 if watch_add:
                     ref = _write_commit(repo, ref, request_id, response, artifacts, watch_add=watch_add)
                 else:
                     ref = _write_commit(repo, ref, request_id, response, artifacts)
+                _remove_outbox(request_id)
                 processed.add(request_id)
                 processed_this_tick += 1
                 if processed_this_tick >= MAX_PER_TICK:
                     return None, processed_this_tick
                 continue
         processed.add(request_id)
+        _store_outbox(request_id, response)
         ref = _write_commit(repo, ref, request_id, response, artifacts)
+        _remove_outbox(request_id)
         processed.add(request_id)
         processed_this_tick += 1
         if processed_this_tick >= MAX_PER_TICK:

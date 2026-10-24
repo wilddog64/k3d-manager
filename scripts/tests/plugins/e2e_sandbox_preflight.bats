@@ -205,6 +205,7 @@ FAKE
 
 _stub_kubectl() {
   kubectl() {
+    printf 'kubectl %s\n' "$*" >> "$CALL_LOG"
     if [[ "$1" == "config" ]]; then
       printf '%s\n' ${KUBECTL_CONTEXTS:-}
       return 0
@@ -214,6 +215,88 @@ _stub_kubectl() {
     fi
     return 0
   }
+}
+
+_stub_preview_mutations() {
+  make() { printf 'make %s\n' "$*" >> "$CALL_LOG"; }
+  acg_extend_playwright() { printf 'acg_extend_playwright\n' >> "$CALL_LOG"; }
+  _e2e_sandbox_provision_cluster() { printf '_e2e_sandbox_provision_cluster\n' >> "$CALL_LOG"; }
+  _e2e_sandbox_provision_secrets() { printf '_e2e_sandbox_provision_secrets\n' >> "$CALL_LOG"; }
+  _e2e_sandbox_provision_keycloak_credentials() { printf '_e2e_sandbox_provision_keycloak_credentials\n' >> "$CALL_LOG"; }
+  _e2e_sandbox_enable_stripe() { printf '_e2e_sandbox_enable_stripe\n' >> "$CALL_LOG"; }
+}
+
+@test "sandbox preview reports a ready cluster without making changes" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  KUBECTL_CONTEXTS="ubuntu-k3s k3d-k3d-cluster"
+  KUBECTL_READYZ_RC=0
+  run e2e_sandbox_preview "sha256:$(printf 'a%.0s' {1..64})"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[e2e-preview] acg login: ok"* ]]
+  [[ "$output" == *"ubuntu-k3s: ready — would reuse it"* ]]
+  [[ "$output" == *"[e2e-preview] hub: ok"* ]]
+  [[ "$output" == *"digest: sha256:"* ]]
+  [[ "$output" == *"no changes made"* ]]
+  [ ! -s "$CALL_LOG" ] || ! grep -Eq '(^| )make |acg_extend_playwright|_e2e_sandbox_provision|_e2e_sandbox_enable_stripe| kubectl .* (apply|patch|delete)( |$)' "$CALL_LOG"
+}
+
+@test "sandbox preview reports an absent cluster without making changes" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  KUBECTL_CONTEXTS="k3d-k3d-cluster"
+  KUBECTL_READYZ_RC=0
+  run e2e_sandbox_preview
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ubuntu-k3s: absent or not ready — would run make up CLUSTER_PROVIDER=k3s-aws"* ]]
+  [[ "$output" == *"digest: default (none given)"* ]]
+  [[ "$output" == *"no changes made"* ]]
+  [ ! -s "$CALL_LOG" ] || ! grep -Eq '(^| )make |acg_extend_playwright|_e2e_sandbox_provision|_e2e_sandbox_enable_stripe| kubectl .* (apply|patch|delete)( |$)' "$CALL_LOG"
+}
+
+@test "sandbox preview loads the ACG plugin for the sandbox URL" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=0
+  unset _ACG_SANDBOX_URL
+  unset -f acg_extend_playwright
+  PLUGINS_DIR="$BATS_TEST_TMPDIR/plugins"
+  mkdir -p "$PLUGINS_DIR"
+  printf '%s\n' '_ACG_SANDBOX_URL="https://example.test/from-plugin"' 'acg_extend_playwright() { :; }' > "$PLUGINS_DIR/acg.sh"
+  run e2e_sandbox_preview
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[e2e-preview] acg login: ok"* ]]
+  [[ "$output" != *"_ACG_SANDBOX_URL is empty"* ]]
+}
+
+@test "sandbox preview stops on ACG auth failure" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  export ACG_SECURITY_MODE=absent
+  run e2e_sandbox_preview
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"[e2e-preview]"*"ACG preflight"* ]]
+  [[ "$output" != *"hub: ok"* ]]
+  [ ! -s "$CALL_LOG" ]
+}
+
+@test "sandbox preview stops on hub failure" {
+  install_security
+  _stub_kubectl
+  _stub_preview_mutations
+  KUBECTL_CONTEXTS="ubuntu-k3s"
+  KUBECTL_READYZ_RC=1
+  run e2e_sandbox_preview
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"[e2e-preview] acg login: ok"* ]]
+  [[ "$output" == *"hub preflight"* ]]
+  [[ "$output" != *"no changes made"* ]]
+  [ ! -s "$CALL_LOG" ] || ! grep -Eq '(^| )make |acg_extend_playwright|_e2e_sandbox_provision|_e2e_sandbox_enable_stripe| kubectl .* (apply|patch|delete)( |$)' "$CALL_LOG"
 }
 
 @test "cluster preflight fails when the sandbox kubecontext is absent" {
@@ -286,7 +369,7 @@ _stub_kubectl() {
   KUBECTL_READYZ_RC=0
   run _e2e_sandbox_cluster_ready
   [ "$status" -eq 0 ]
-  [ ! -s "$CALL_LOG" ]
+  run ! grep -Eq '(^| )make ' "$CALL_LOG"
 }
 
 @test "provisioning calls make up only for the k3s-aws provider" {
@@ -363,4 +446,40 @@ _stub_kubectl_slow_context_list() {
   _stub_kubectl_slow_context_list
   run _e2e_sandbox_cluster_ready
   [ "$status" -eq 0 ]
+}
+
+@test "hub app convergence recovers frontend after product-catalog becomes healthy" {
+  local listing_state="$BATS_TEST_TMPDIR/hub-listing.calls"
+  printf '0\n' > "$listing_state"
+  _e2e_hub_kc() {
+    local listing_calls
+    listing_calls=$(( $(<"$listing_state") + 1 ))
+    printf '%s\n' "$listing_calls" > "$listing_state"
+    case "$listing_calls" in
+      1)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Degraded' \
+          'ubuntu-k3s-shopping-cart-product-catalog OutOfSync Healthy'
+        ;;
+      2)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Degraded' \
+          'ubuntu-k3s-shopping-cart-product-catalog Synced Healthy'
+        ;;
+      *)
+        printf '%s\n' \
+          'ubuntu-k3s-shopping-cart-frontend Synced Healthy' \
+          'ubuntu-k3s-shopping-cart-product-catalog Synced Healthy'
+        ;;
+    esac
+  }
+  _e2e_sandbox_kc() {
+    printf 'sandbox kubectl %s\n' "$*" >> "$CALL_LOG"
+  }
+  export E2E_HUB_APPS_TIMEOUT=5 E2E_HUB_APPS_INTERVAL=0
+
+  run _e2e_sandbox_hub_apps_ready
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"frontend upstream recovery"* ]]
+  [ "$(grep -c -- 'rollout restart deployment/frontend' "$CALL_LOG")" -eq 1 ]
 }

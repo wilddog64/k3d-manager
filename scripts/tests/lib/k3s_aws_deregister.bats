@@ -79,6 +79,13 @@ STUB
   run ! grep -q 'delete application/k3d-cluster-eso' "${CALL_LOG}"
 }
 
+@test "deregister never deletes the shared observability ApplicationSet" {
+  run _run_deregister
+  [ "${status}" -eq 0 ]
+  run grep -E 'delete applicationset|retired ApplicationSet' "${CALL_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
 @test "cluster-down keep-hub guard protects the Vault LaunchAgent" {
   vault_line="$(grep -n '_vault_pf_label="com.k3d-manager.vault-port-forward"' "${REPO_ROOT}/bin/cluster-down" | cut -d: -f1)"
   [ -n "${vault_line}" ]

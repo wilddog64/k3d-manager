@@ -241,6 +241,55 @@ _healthy_blob() {
   [[ "$output" == *"not in allowlist"* ]]
 }
 
+@test "denied runners get the right redirect at every allowlist entry point before work starts" {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export RUN_LOG="$BATS_TEST_TMPDIR/work.log"
+  : > "$RUN_LOG"
+  ssh() { echo ssh >> "$RUN_LOG"; }
+  _e2e_remote_ssh() { echo remote-ssh >> "$RUN_LOG"; }
+  e2e_runner_preflight() { echo preflight >> "$RUN_LOG"; }
+  _e2e_remote_load_conf() { :; }
+
+  local fn runner expected output
+  for fn in e2e_runner_dispatch e2e_runner_replay e2e_runner_republish e2e_runner_unlock; do
+    for runner in aws acg sandbox m4 local hub; do
+      run "$fn" "$runner"
+      [ "$status" -ne 0 ]
+      if [[ "$runner" == aws || "$runner" == acg || "$runner" == sandbox ]]; then
+        expected="[e2e-remote] runner '${runner}' is not an e2e-remote runner; for Tier 2 E2E on the ACG sandbox use 'e2e-sandbox' (Slack: k3dm e2e-sandbox)"
+      else
+        expected="[e2e-remote] runner '${runner}' is not an e2e-remote runner; for Tier 1 E2E on this host use 'e2e' (Slack: k3dm e2e)"
+      fi
+      [[ "$output" == *"$expected"* ]]
+      [ ! -s "$RUN_LOG" ]
+    done
+  done
+}
+
+@test "unknown denied runner keeps allowlist error and allowlisted names stay permitted" {
+  export E2E_RUNNER_ALLOWLIST="m2 aws"
+  run _e2e_runner_denied_message nonsense
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"runner 'nonsense' not in allowlist (m2 aws)"* ]]
+  run _e2e_runner_allowed m2; [ "$status" -eq 0 ]
+  run _e2e_runner_allowed aws; [ "$status" -eq 0 ]
+  run _e2e_runner_allowed AWS; [ "$status" -ne 0 ]
+
+  _e2e_remote_load_conf() { :; }
+  _e2e_remote_preflight_with_retry() { printf 'status=busy\n'; return 1; }
+  git() {
+    case "$*" in
+      *"rev-parse HEAD"*) printf 'deadbeef\n' ;;
+      *"branch -r --contains"*) printf 'origin/task\n' ;;
+    esac
+  }
+  run e2e_runner_dispatch aws
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"status=busy"* ]]
+  [[ "$output" != *"e2e-sandbox"* ]]
+  [[ "$output" != *"not in allowlist"* ]]
+}
+
 @test "dispatch rejects an invalid digest" {
   export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
   run e2e_runner_dispatch "m2" "not-a-digest"

@@ -10,13 +10,14 @@ _ARG_PATTERNS = {
     "DIGEST": re.compile(r"sha256:[0-9a-f]{64}"),
     "FIX_CONTEXT": re.compile(r"ubuntu-k3s|ubuntu-hostinger|k3d-k3d-cluster"),
     "CRONJOB": re.compile(r"app-cve-scan|argocd-cve-scan"),
-    # Q reaches a Makefile recipe, where $(Q) expands unquoted into a shell command
-    # line. Every shell metacharacter is excluded so the recipe's "$(Q)" cannot be
-    # broken out of: no quote, backslash, dollar, backtick, semicolon, pipe,
-    # ampersand, redirect, parenthesis, newline or "#".
-    "Q": re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._,:/?!-]{0,199}"),
+    # Q is base64 transported across Make's recipe boundary before decoding to argv.
+    # Restrict it to printable ASCII so it is safe for logs and the retrieval CLI.
+    "Q": re.compile(r"[!-~][\x20-\x7e]{0,199}"),
     "K": re.compile(r"[1-9]|[1-4][0-9]|50"),
     "SMOKE_ONLY": re.compile(r"offline|cluster"),
+    # A DNS-style ArgoCD application prefix, including the separator before
+    # the application name (for example, ubuntu-hostinger-).
+    "ARGOCD_APP_PREFIX": re.compile(r"(?=.{2,64}\Z)[a-z0-9]+(?:-[a-z0-9]+)*-"),
 }
 
 MAKE_TARGETS = {
@@ -24,7 +25,8 @@ MAKE_TARGETS = {
     "fix-status": {"min_role": "reader", "required": ("NS",), "optional": ("FIX_CONTEXT",), "summary": "node + pod status for a namespace"},
     "status-public": {"min_role": "reader", "summary": "probe public Cloudflare hostnames"},
     "observability-status": {"min_role": "reader", "summary": "monitoring/trivy-system pods on both clusters"},
-    "vuln-scan": {"min_role": "reader", "summary": "VulnerabilityReport summary"},
+    "vuln-scan-report": {"min_role": "reader", "summary": "read existing VulnerabilityReports; no scan triggered"},
+    "vuln-scan": {"min_role": "reader", "summary": "deprecated read-only alias for vuln-scan-report"},
     "e2e-runner-health": {"min_role": "reader", "optional": ("RUNNER",), "summary": "hub vs remote-runner health"},
     "test": {"min_role": "reader", "timeout": 1200, "summary": "offline BATS dispatcher suites"},
     "test-bin": {"min_role": "reader", "timeout": 300, "summary": "offline BATS suites under scripts/tests/bin"},
@@ -34,13 +36,14 @@ MAKE_TARGETS = {
     "test-all": {"min_role": "reader", "timeout": 1800, "summary": "every offline suite (BATS + Python)"},
     "find-similar-docs": {"min_role": "reader", "required": ("Q",), "optional": ("K",), "timeout": 120, "summary": "search docs/ for prior art by similarity"},
     "index-docs": {"min_role": "operator", "timeout": 1800, "summary": "re-embed changed docs into the vector store"},
-    "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner"},
-    "e2e": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e in a disposable vCluster"},
+    "e2e-remote": {"min_role": "operator", "required": ("RUNNER",), "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e on a remote runner (RUNNER=m2); ACG sandbox: e2e-sandbox; this host: e2e"},
+    "e2e": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 1 e2e in a disposable vCluster on this host"},
     "e2e-sandbox": {"min_role": "operator", "optional": ("DIGEST",), "timeout": 3600, "summary": "Tier 2 e2e on the live ACG sandbox"},
-    "e2e-sandbox-provision": {"min_role": "admin", "confirm": True, "optional": ("DIGEST",), "timeout": 7200, "summary": "Tier 2 e2e; provisions the ACG sandbox first if it is missing"},
+    "e2e-sandbox-provision": {"min_role": "admin", "confirm": True, "preview": "e2e-sandbox-provision-preview", "optional": ("DIGEST",), "timeout": 7200, "summary": "Tier 2 e2e; provisions the ACG sandbox first if it is missing"},
+    "e2e-sandbox-provision-preview": {"min_role": "admin", "optional": ("DIGEST",), "timeout": 300, "summary": "read-only preview of e2e-sandbox-provision"},
     "e2e-replay": {"min_role": "operator", "required": ("RUNNER",), "timeout": 900, "summary": "replay retained runner results"},
     "sync-apps": {"min_role": "operator", "timeout": 600, "summary": "sync data-layer apps"},
-    "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY",), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},
+    "smoke": {"min_role": "operator", "optional": ("SMOKE_ONLY", "ARGOCD_APP_PREFIX"), "timeout": 900, "summary": "run the smoke gate (offline always; cluster when reachable)"},
     "app-cve-scan": {"min_role": "operator", "timeout": 900, "optional": ("CRONJOB",), "summary": "trigger the app-cluster CVE scan now"},
     "monitoring-pause": {"min_role": "operator", "timeout": 600, "summary": "scale hub observability to zero"},
     "monitoring-resume": {"min_role": "operator", "timeout": 600, "summary": "restore paused hub observability"},
@@ -92,6 +95,8 @@ def parse_make_request(target, args, confirm):
             return None, f"invalid value for {key}"
         assignments.append(f"{key}={value}")
     if spec.get("confirm") and confirm is not True:
+        if spec.get("preview"):
+            return [spec["preview"], *assignments], None
         return None, f"`{target}` is destructive — rerun with `confirm`"
     return [target, *assignments], None
 
@@ -106,7 +111,7 @@ def make_target_help(role, role_allows):
         parts += [f"{key}=…" for key in spec.get("required", ())]
         parts += [f"[{key}=…]" for key in spec.get("optional", ())]
         if spec.get("confirm"):
-            parts.append("confirm")
+            parts.append("[confirm]" if spec.get("preview") else "confirm")
         lines.append(f"• `{' '.join(parts)}` — {spec['summary']} ({spec['min_role']})")
     cluster_lines = [
         f"• `{name}` — {summary} ({min_role})"
@@ -117,4 +122,5 @@ def make_target_help(role, role_allows):
         lines.append("")
         lines.append("*Cluster lifecycle* — separate slash commands, not `/k3dm` targets:")
         lines.extend(cluster_lines)
+    lines.append('Use `find-similar-docs Q="what\'s recent e2e-remote issues" [K=5]` for a natural-language search.')
     return "\n".join(lines)

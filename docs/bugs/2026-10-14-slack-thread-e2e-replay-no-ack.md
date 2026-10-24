@@ -1,6 +1,8 @@
 # Bug: Slack thread k3dm e2e-replay command receives no acknowledgment
 
-**Status:** OPEN — response failure observed; underlying cause requires investigation
+**Status:** LIVE-VERIFIED — operator confirmed queued acknowledgment and successful no-pending replay in the Slack thread on 2026-10-21
+**Fix commit:** `fd1b40b0`
+**Live evidence:** 2026-10-21 · run 3198fa72 · env Slack/thread · scenario k3dm-e2e-replay-no-pending · commit 740abbbe · proves fix
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 — ChatOps execution visibility
 **Filed:** 2026-10-14, operator request
@@ -45,3 +47,35 @@ No live webhook logs or runner replay outcome were provided; the command may hav
 - [ ] Live acceptance uses a controlled pending/no-pending replay in Slack and records whether reports were actually published; distinguish no pending reports from command failure.
 
 **Scope:** File/report only. No webhook/runtime code or remote E2E results modified.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_thread_dispatch.py`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_thread_actor.py`
+- `scripts/tests/lib/webhook.bats`
+
+## Verification gates
+
+- `python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/test_webhook_thread_broadcast.py scripts/tests/bin/test_webhook_thread_actor.py`
+- `bats scripts/tests/lib/webhook.bats`
+- `shellcheck bin/k3dm-webhook`
+
+## Offline verification — 2026-10-20
+
+- Landed on `k3d-manager-v1.43.5` as commit `fd1b40b0`.
+- Focused pytest suites: 34/34 passed.
+- `bats scripts/tests/lib/webhook.bats`: 68/68 passed using Python 3.14. The test-only HTTP server must bind to localhost, so the suite required running outside the network-restricted sandbox.
+- Python AST syntax parse: passed. `shellcheck bin/k3dm-webhook` is not applicable because this file is Python; ShellCheck reports `SC1071` (“only supports sh/bash/dash/ksh”).
+- `_agent_audit`: passed in the commit hook, including the explicitly annotated role-expectation change.
+- No live `e2e-replay` was triggered; live verification remains operator-controlled.
+
+An initial screenshot showed `/make e2e-replay RUNNER=m2`, which exercises the direct Make route
+and did not verify this bug. The operator then sent the exact bare `k3dm e2e-replay RUNNER=m2`
+message in the E2E Slack thread. Slack posted queued, started, and succeeded notices, all with job
+ID `3198fa72`; the terminal output reported `published=0 still_pending=0`. This is a successful
+no-pending replay, distinct from a command failure. The bug is LIVE-VERIFIED. Evidence:
+`docs/issues/2026-10-21-slack-live-verification-results.md`.
+
+Do not dispatch a live replay or publish reports during implementation; live acceptance remains operator-controlled.

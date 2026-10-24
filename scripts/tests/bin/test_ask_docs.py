@@ -142,6 +142,14 @@ def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
     assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
+def test_bug_count_reply_cites_the_tally(monkeypatch):
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _query: "v1.43.5: 81 bug docs")
+    reply = ask_docs.answer("how many bugs in v1.43.5", retrieve=lambda _q, k=5: pytest.fail("retrieved"),
+                            model=lambda _p: pytest.fail("model"))
+    assert "Sources: none" not in reply
+    assert f"Sources:\n{ask_docs._doc_link('scripts/bug-tally.py')}" in reply
+
+
 def test_retrieval_unavailable_does_not_call_model():
     calls = []
 
@@ -287,6 +295,25 @@ def test_long_reply_keeps_every_source_link_intact(monkeypatch):
     assert reply.count("<") == reply.count(">")
     for path in paths:
         assert ask_docs._doc_link(path) in reply
+
+
+def test_long_prose_truncates_on_line_boundary_before_sources(monkeypatch):
+    monkeypatch.setenv("K3DM_ASK_DOCS_LINK_REF", "main")
+    links = [ask_docs._doc_link(f"docs/bugs/{index}-{'x' * 90}.md") for index in range(40)]
+    prose = "\n".join(links)
+    reply = ask_docs._reply(prose, ["docs/bugs/source.md"])
+    prose_part, sources = reply.split("\n\nSources:", 1)
+    assert len(reply) <= ask_docs.MAX_REPLY_CHARS
+    assert prose_part.endswith(ask_docs.TRUNCATION_MARKER)
+    assert prose_part.count("<") == prose_part.count(">")
+    assert prose_part[: -len(ask_docs.TRUNCATION_MARKER)].rstrip().endswith(">")
+    assert ask_docs._doc_link("docs/bugs/source.md") in sources
+
+
+def test_short_prose_is_returned_unchanged():
+    prose = "A short answer."
+    result = ask_docs._reply(prose, [])
+    assert result == prose + "\n\nSources: none"
 
 
 def test_unsafe_source_path_is_plain_text(monkeypatch):

@@ -1454,6 +1454,57 @@ function _argocd_appset_live_overrides() {
    return 0
 }
 
+function _argocd_retire_legacy_observability_acg_apps() {
+   local ns="${ARGOCD_NAMESPACE:-cicd}" app json owned=0
+   local -a legacy_apps=(acg-kube-prometheus-stack loki acg-trivy-operator)
+
+   if [[ -n "${1:-}" && "${1}" != "observability-acg.yaml" ]]; then
+      return 0
+   fi
+
+   for app in "${legacy_apps[@]}"; do
+      json="$(_kubectl --no-exit get application "${app}" -n "${ns}" -o json 2>&1)" || {
+         [[ "${json}" == *NotFound* ]] && continue
+         _err "[argocd] Failed to inspect legacy observability Application ${app}: ${json}"
+         return 1
+      }
+      if printf '%s' "${json}" | jq -e '.metadata.ownerReferences[]? | select(.kind == "ApplicationSet" and .name == "observability-acg")' >/dev/null 2>&1; then
+         owned=1
+      fi
+   done
+   (( owned == 1 )) || return 0
+
+   json="$(_kubectl --no-exit get applicationset observability-acg -n "${ns}" -o name 2>&1)" || {
+      if [[ "${json}" != *NotFound* ]]; then
+         _err "[argocd] Failed to inspect ApplicationSet observability-acg: ${json}"
+         return 1
+      fi
+      json=""
+   }
+   if [[ -n "${json}" ]]; then
+      _kubectl patch applicationset observability-acg -n "${ns}" --type=merge \
+         -p '{"spec":{"syncPolicy":{"preserveResourcesOnDeletion":true}}}' >/dev/null || {
+         _err "[argocd] Failed to preserve resources before retiring legacy observability-acg Applications"
+         return 1
+      }
+   fi
+
+   for app in "${legacy_apps[@]}"; do
+      json="$(_kubectl --no-exit get application "${app}" -n "${ns}" -o json 2>&1)" || {
+         [[ "${json}" == *NotFound* ]] && continue
+         _err "[argocd] Failed to inspect legacy observability Application ${app}: ${json}"
+         return 1
+      }
+      if printf '%s' "${json}" | jq -e '.metadata.ownerReferences[]? | select(.kind == "ApplicationSet" and .name == "observability-acg")' >/dev/null 2>&1; then
+         if ! _kubectl patch "application/${app}" -n "${ns}" --type=merge \
+            -p '{"metadata":{"finalizers":null}}' >/dev/null; then
+            _err "[argocd] Failed to remove finalizer from legacy Application ${app}; refusing to apply observability-acg"
+            return 1
+         fi
+      fi
+   done
+}
+
 function _argocd_deploy_applicationsets() {
    local stage="${1:-all}" prepared="${2:-}"
    if [[ "$prepared" != prepared ]]; then
@@ -1492,6 +1543,8 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _argocd_appset_in_stage "$file" "$stage" || continue
       _info "[argocd] Deploying ApplicationSet: $filename"
+
+      _argocd_retire_legacy_observability_acg_apps "${filename}" || return 1
 
       local _vars _v _name _unset=""
       _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
@@ -1630,6 +1683,13 @@ HELP
     _err "[argocd] ARGOCD_APP_CLUSTER_SHOPPING_CART must be 'true' or 'false'"
     return 1
   fi
+  local _role_label=""
+  local _existing_role
+  _existing_role="$(_kubectl --no-exit --quiet get secret "${ARGOCD_APP_CLUSTER_SECRET_NAME}" -n "${ARGOCD_NAMESPACE}" \
+    -o jsonpath='{.metadata.labels.k3d-manager/role}' 2>/dev/null || true)"
+  case "${_existing_role}" in
+    app-cluster) _role_label='    k3d-manager/role: "app-cluster"' ;;
+  esac
   local _managed="${ARGOCD_APP_CLUSTER_MANAGED:-false}"
   if [[ "${_managed}" == "true" ]] && {
     [[ -z "${ARGOCD_APP_CLUSTER_PROVIDER:-}" || -z "${ARGOCD_APP_CLUSTER_SANDBOX_ID:-}" ||
@@ -1662,7 +1722,8 @@ metadata:
   labels:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
-${_platform_labels}    k3d-manager/managed: "${_managed}"
+${_platform_labels}${_role_label:+${_role_label}
+}    k3d-manager/managed: "${_managed}"
     k3d-manager/shopping-cart: "${_shopping_cart}"
     k3d-manager/provider: "${ARGOCD_APP_CLUSTER_PROVIDER:-unknown}"
     k3d-manager/release: "${_release_label}"
@@ -1685,6 +1746,22 @@ EOF
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
   _argocd_set_active_app_cluster "${ARGOCD_APP_CLUSTER_NAME}"
+}
+
+function argocd_require_app_cluster_registration() {
+  local _secret="${1:?secret name required}"
+  local _name="${2:?cluster name required}"
+  local _provider="${3:?provider required}"
+  local _server="${4:?server required}"
+  local _actual
+  _actual="$(_kubectl --no-exit --quiet -n "${ARGOCD_NAMESPACE}" get secret "${_secret}" -o json 2>/dev/null \
+    | jq -r '[.metadata.labels["argocd.argoproj.io/cluster-name"] // "", .metadata.labels["k3d-manager/provider"] // "", (.data.name // "" | @base64d), (.data.server // "" | @base64d)] | join("\t")' 2>/dev/null || true)"
+  if [[ "${_actual}" != "${_name}"$'\t'"${_provider}"$'\t'"${_name}"$'\t'"${_server}" ]]; then
+    _err "[argocd] required app-cluster registration ${ARGOCD_NAMESPACE}/${_secret} is missing or mismatched"
+    _err "[argocd] expected name=${_name}, provider=${_provider}, server=${_server}; observed '${_actual:-unavailable}'"
+    return 1
+  fi
+  _info "[argocd] verified app-cluster registration ${ARGOCD_NAMESPACE}/${_secret}: ${_name} (${_provider})"
 }
 
 function _argocd_apply_secret_from_stdin() {

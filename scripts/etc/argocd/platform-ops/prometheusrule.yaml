@@ -61,6 +61,15 @@ spec:
             description: "App {{ $labels.name }} has synced at least 5 times in the last 30 minutes, which usually means Image Updater is writing a change that another controller keeps reverting"
     - name: trivy-operator.alerts
       rules:
+        - alert: TrivyImageNotScanned
+          expr: trivy_image_scan_coverage{scanned="false"} == 1
+          for: 6h
+          labels:
+            group: trivy-operator
+            severity: warning
+          annotations:
+            summary: "Trivy report missing for {{ $labels.image_repository }} in {{ $labels.exported_namespace }}"
+            description: "Running image {{ $labels.image_repository }} in namespace {{ $labels.exported_namespace }} (workload {{ $labels.workload }}) has no VulnerabilityReport; the critical-CVE table cannot vouch for it."
         - alert: TrivyOperatorScanJobFailures
           expr: |
             sum(increase(kube_job_status_failed{namespace="trivy-system",job_name=~"scan-.*"}[10m])) > 0

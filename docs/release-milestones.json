@@ -1,0 +1,24 @@
+{
+  "target_reason": "platform proofs re-pointed from shopping-cart to the TwinkleAI app",
+  "milestones": [
+    {"version": "v1.43.5", "kind": "patch"},
+    {"version": "v1.43.6", "kind": "patch"},
+    {"version": "v1.43.7", "kind": "patch"},
+    {"version": "v1.43.8", "kind": "patch"},
+    {"version": "v1.44.0", "kind": "minor"},
+    {"version": "v1.44.1", "kind": "patch"},
+    {"version": "v1.44.2", "kind": "patch"},
+    {"version": "v1.44.3", "kind": "patch"},
+    {"version": "v1.45.0", "kind": "minor"},
+    {"version": "v1.45.1", "kind": "patch"},
+    {"version": "v1.45.2", "kind": "patch"},
+    {"version": "v1.45.3", "kind": "patch"},
+    {"version": "v1.46.0", "kind": "minor"},
+    {"version": "v1.46.1", "kind": "patch"},
+    {"version": "v1.47.0", "kind": "minor"},
+    {"version": "v1.48.0", "kind": "minor"},
+    {"version": "v1.48.1", "kind": "patch"},
+    {"version": "v1.49.0", "kind": "minor", "blocked_by": "TwinkleAI app M1 near done (app repo)", "blocked_done": false},
+    {"version": "v1.50.0", "kind": "minor", "target": true}
+  ]
+}

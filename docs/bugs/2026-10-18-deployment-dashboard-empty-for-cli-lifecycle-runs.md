@@ -1,7 +1,8 @@
 # Bug: k3dm Deployment Metrics dashboard is empty: hub datasource uid missing, CLI runs never publish
 
 **Filed:** 2026-10-18 (Claude, from the operator's screenshot after four `make up` / `make down` runs)
-**Status:** OPEN — spec written; dispatch on `k3d-manager-v1.43.5` once that branch is cut
+**Status:** LIVE-VERIFIED 2026-10-18 — the operator's real `make up` and `make down` (k3s-aws, KEEP_LOCAL=1) show on the hub dashboard as `up/aws` SUCCESS 12.3 min and `down/aws` SUCCESS 2.12 min; fixed in `47b4903a`, test-leak guard `e37bd31a`
+**Fix commit:** `47b4903a`
 **Priority:** P2 — lifecycle runs are invisible on the dashboard; the workaround is to read the run logs
 **Severity:** medium
 **Approval:** approved — operator, 2026-10-18: "go ahead" (to "file it as a bug for v1.43.5 and dispatch it to Codex")
@@ -148,3 +149,50 @@ interface:
 - Do NOT modify files outside the Component list, including `bin/k3dm-webhook` and `scripts/lib/foundation/`.
 - Do NOT commit to `main`.
 - Do NOT push to the live hub Pushgateway from tests.
+
+## Verification (Claude, 2026-10-18)
+
+- `bats scripts/tests/bin/deployment_metrics.bats`: 5/5. `cluster_down_acceptance.bats` 11/11, `cluster_up.bats` 66/66.
+- N1 red: Codex ran the N1 case against the pre-fix scripts and recorded no curl call. Claude confirmed independently: `git show 47b4903a^:bin/cluster-{up,down}` contains no push code (0 matches for `deployment_metrics`, `metrics/job` or `k3dm_deployment`).
+- Scope: only the six Component files changed; `bin/k3dm-webhook` untouched.
+- Deviation, accepted: the push uses POST, not the PUT the Fix text names. `_push_metrics` in
+  `bin/k3dm-webhook` also POSTs, and the spec asks for parity with it. POST replaces only the pushed
+  series within the `k3dm-cli/<action>-<provider>` group, which is all the dashboard reads.
+- Remaining: E3 live, on the operator's next `make up` then `make down KEEP_LOCAL=1`.
+
+## N5 gap and fix (Claude, 2026-10-18)
+
+N5 held only inside `deployment_metrics.bats`. Other suites run the real `bin/cluster-down` or
+`bin/cluster-up` with no URL override, and when `curl` resolves to the real binary
+(`cluster_down_acceptance.bats` puts `/usr/bin` on PATH) the push reached the live hub. Claude's run
+of that suite pushed `down/aws (failed)` and `down/somethingelse (success)`; the operator deleted both
+groups.
+
+Fix: `_k3dm_push_deployment_metrics` returns before pushing when `BATS_TEST_FILENAME` is set and
+`K3DM_DEPLOYMENT_PUSHGATEWAY_URL` is not, so every suite is covered, including future ones. Suites that
+test the push set the URL explicitly and still reach their curl stub.
+
+- New test `N5: under BATS with no explicit URL the publisher never calls curl`: green on the fix, red
+  on a pre-fix copy of the library.
+- `cluster_down_acceptance.bats` with a recording `curl` stub: 10 `k3dm-cli` push attempts on the
+  pre-fix tree, 0 on the fix.
+- `cluster_down_acceptance`, `cluster_down`, `cluster_up`, `deployment_metrics`, `hub_pushgateway`:
+  123 ok, 0 failures.
+
+## E3 progress (2026-10-18)
+
+The operator's `make up` and `make down CLUSTER_PROVIDER=k3s-aws KEEP_LOCAL=1` (`cloud teardown:
+verified`) both reached the hub: the "Deployment Duration Over Time" graph shows `up/aws (success)`
+at 12.3 min and `down/aws (success)` at about 2.1 min, with no datasource error. The stat tiles also
+showed the leaked test series; that display is fixed separately in
+`docs/bugs/2026-10-18-deployment-stat-tiles-cramped-and-show-stale-runs.md`. Marking LIVE-VERIFIED
+waits for the tiles after `make platform-ops`.
+
+## Live verification (Claude, from the operator's screenshot, 2026-10-18 ~14:10 PDT)
+
+After `make platform-ops`, the hub's **k3dm Deployment Metrics** tiles read `up/aws` 12.3 mins and
+SUCCESS, `down/aws` 2.12 mins and SUCCESS, with no datasource error. Both runs came from the
+operator's working tree on `k3d-manager-v1.43.5` after `47b4903a`. The evidence line cites the fix
+commit, because the exact HEAD each run used was not recorded.
+
+**Live evidence:** 2026-10-18 · run operator-make-up-then-make-down · env k3d-k3d-cluster · scenario cli-up-down-k3s-aws-keep-local · commit 47b4903a · proves E3

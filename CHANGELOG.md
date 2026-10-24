@@ -2,6 +2,148 @@
 
 ## [Unreleased]
 
+## [1.43.5] - 2026-10-24
+
+### Fixed
+
+- CI: the `lint` job installs a checksum-verified `promtool` 3.1.0, so the Bug Tracking and Agent Dispatch PromQL tests run against real promtool instead of falling back to `docker run`, which the tripwire blocks.
+- Tests: the Grafana Overview PromQL parse guard expands `$__rate_interval` and template variables before `promtool check rules`; with promtool installed, it had rejected every valid rate panel.
+- Tests: the cluster-up thread-dispatch test stubs `_analyze_failure`, so its failing-exit case no longer calls the real `agy`/`gemini` CLIs, which the tripwire blocks and fails the pytest run on.
+- Lint: cleared 8 Ruff errors that CI reached once the earlier steps went green — a dead `thread_source` read in `_notify_job`, plus unused imports and placeholder-free f-strings in four test files.
+- CI: the `lint` job is pinned to `ubuntu-24.04`. `ubuntu-latest` moved to Ubuntu 26.04, whose sudo-rs `visudo` rejects the wildcard argument in the macOS `chmod` sudoers rule, so the `install-sudoers.sh --dry-run` syntax check failed on every PR. The rules target classic sudo, which 24.04 still ships, so the check now runs against it.
+- `hub_snapshot_list` now lists every verified and incomplete snapshot, and pruning removes all verified snapshots older than the newest configured keep count. SSH calls no longer consume the remote-name loop's standard input.
+- `ask-docs` bug counts: a question about one state ("how many bugs fixed") led with that state's count and then the full breakdown, so the reply read "75 closed bug docs — 75 fixed, 6 open", as if 75 were the whole release. It now names the total it is part of: "75 closed bug docs of 81 — 75 fixed, 6 open". Counted answers also ended with `Sources: none` although they come from `scripts/bug-tally.py` over `docs/bugs/`; they now cite the tally script. The footer "Counted from docs/bugs/ at HEAD" now also names the commit it counted at ("at HEAD `5a31cf25`"), so a reply can be matched to the tree it describes; when `git rev-parse` fails the SHA is left out rather than printing the error.
+- Bug Tracking: a bug doc whose Status starts with `LANDED` now counts as fixed. The status parser in `scripts/lib/hermes/prior_art.py` knew `FIXED`, `VERIFIED` and `IMPLEMENTED` but not `LANDED`, the word Claude's reviews write after landing Luna's fix, so those bugs showed as Open with no fix commit, and `make bug-tally` counted them open (plans already accepted `LANDED`). The usage-backfill P1 also records its fix commit and the 2026-10-23 live E2 in the `**Fix commit:**` / `**Live evidence:**` form the dashboard reads, so it now shows as live-verified.
+- Agent Dispatch: the Claude panels now sit second from the top, under the first row of stats, so they show without scrolling. Three of them were broken. **Claude tokens per landed spec** always showed No data: `sum()` dropped the Pushgateway's `job`/`instance` labels, so the division matched nothing. It now uses `sum by (window)` and `on(window)`. **Claude data since**, **Claude at API prices** and **Claude per landed spec** used Grafana's default thresholds, which turn red at 80 (an epoch value, or any total over $80); they are now a fixed colour. **Claude tokens per day** plotted one bar against a numeric axis, because `groupingToMatrix` names its first column `date\model`, not `date`; it is renamed back so `xField` finds it, and a `merge` runs first, because an instant table query returns one frame per series and `groupingToMatrix` only reshaped the first one. Its options were also misnamed (`row`/`column`/`value` instead of `rowField`/`columnField`/`valueField`), so Grafana fell back to grouping by `Time` and plotted one bar against an epoch axis. The Claude panel descriptions and the dashboard reference now say the per-spec figures are time-overlap attribution, not what Claude spent on each Codex dispatch. `k3dm_dispatch_claude_api_cost_per_landed_usd` and the new `k3dm_dispatch_claude_tokens_per_landed` are published for releases only: in a time window they divided all Claude work, including spec writing and discussion, by landed specs.
+- `bin/k3dm-dispatch-metrics`: a release's Claude cost counted only its 50 oldest landed specs, because the 50-row display cap also limited which specs were attributed. v1.43.5 has 92, so it showed $5.31 instead of $72.50. The total now counts every spec. The per-spec Claude rows stay capped at 50, but they are now the newest 50, the same specs the Per spec table shows. Claude rates for Opus, Sonnet and Haiku 5.5 come from Anthropic's pricing page (2026-10-24). Haiku uses its rate for prompts up to 100k tokens.
+- `scripts/plugins/observability.sh`: post Prometheus rotation notices using the hub's
+  `platform-ops-notifications` Secret when `SLACK_WEBHOOK_URL` is unset, without exposing the URL
+  in curl arguments.
+
+
+- `make restart-webhook` reloads the webhook LaunchAgent definition from its plist so environment changes take effect.
+
+- Slack bot post failures now log the rejected channel and Slack error code, or the transport exception class.
+
+- The status smoke check now reports ArgoCD's HTTP rejection code instead of calling a rejected
+  password "HTTP unavailable"; `make argocd-admin-resync` revalidates the Vault copy and repairs
+  it only when ArgoCD rejects it.
+
+- The shared `observability-acg` ApplicationSet now generates per-cluster monitoring Applications for Hostinger and the ACG sandbox, preserving Helm release names and other clusters during sandbox teardown.
+
+- Unscoped `tunnel_start` now requires an explicit SSH host and refuses to repoint existing tunnel agents without `TUNNEL_FORCE_HOST=1`; Hostinger reconcile sets that override for its recovery path.
+
+- `make status` now shows stale hub snapshot age in hours, explains the seven-day threshold and
+  snapshot command, and labels an unparseable timestamp as `age unknown`.
+
+- Agent dispatch API cost time windows now use Codex session start time, and Projected / month
+  scales by the days covered by the ledger rather than assuming a full seven days.
+
+- The Agent dispatch dashboard's By model panel now uses an instant query, and Ledger coverage names its percentage "in the ledger".
+
+- The cloud bridge journals request claims before execution and retries saved responses from a
+  local outbox after push failures, so failed publication or a bridge restart never repeats an action.
+
+- Codex usage backfills now schedule one metrics export, and dispatch metrics exports run single-flight with a pending rerun for events received during an export.
+
+- Updated cluster teardown regression tests for the confirmed-teardown-first contract: failed or
+  unverified AWS teardown preserves hub registration, and provider tests cover teardown ordering
+  and unreachable hub behavior.
+
+- Denied `e2e-remote` runners now point operators to `e2e-sandbox` or `e2e` as appropriate, and Slack help and the slash-command guide explain where each E2E command runs.
+
+- Hostinger and sandbox SSH tunnel logs now prefix stderr lines with UTC timestamps, rotate above 5 MB, and use a 10-second SSH connect timeout. `cluster-down` preserves the running Hostinger tunnel logs.
+
+- **Bug dashboard summary strip no longer truncates Fixed, Deferred and Scan age.** Nine stat
+  panels shared 24 grid columns, so three were 2 columns wide and showed `Fix...`, `De...` and
+  `Sc...`. The four open-priority panels, which only show a small number, are now 2 columns wide
+  and titled `P0` to `P3`; every other panel is at least 3 columns.
+
+- The CVE Auto-Patch dashboard now exposes running `wilddog64/*` images without VulnerabilityReports, alerts after six hours, and removes the ACG scan-job TTL that starved the single scan slot.
+
+- Added `make codex-prune` to preview and remove landed task worktrees and branches across releases while preserving dispatch run data.
+
+- Slack notifications for thread commands now reply in the originating thread before falling back to a slash-command response URL.
+
+- `ask-docs` truncates long replies at a safe line boundary with a marker, and bug tallies omit zero deferred counts.
+- Agent Dispatch dashboard panels now use explicit neutral colours, with green landed outcomes and orange refusal reasons.
+
+- Bug counts now treat IMPLEMENTED documents as closed and label DEFERRED documents separately in Slack.
+
+- Active Alert Instances now show a dash for missing alert labels; the empty-table explanation is in the panel description.
+
+- The k3dm Bug Tracking table's **Bug** title column can now be filtered from its header while preserving the existing repository, release, and verification query selections.
+
+- Fixed unbalanced PromQL parentheses in the Active Alert Instances dashboard queries and added
+  offline validation for dashboard query expressions.
+
+- Cloud-request diagnostic reports now include the webhook job ID so operators can match Slack
+  results to the HTTP 202 response.
+
+- `ask-docs` thread follow-ups now inherit the parent job's Slack routing context, so answers
+  stay in the originating channel thread.
+
+- App-cluster registration now continues when the existing Secret role-label lookup fails,
+  applying the Secret without a role label instead of exiting silently.
+
+- Slack thread-started jobs now record the Slack user ID in the actor field instead of only the
+  user's role.
+
+- Slack thread replies sent with **Also send to channel** are now routed to the webhook
+  instead of being silently ignored.
+
+- Slack `cleanup-stale-sandbox` now accepts only `confirm` for mutating runs and labels queued
+  cleanup work as `confirm` or `preview`.
+- Added a read-only preview for `e2e-sandbox-provision`; without `confirm`, the Slack target now
+  reports ACG auth, hub readiness, and whether `ubuntu-k3s` would be reused or provisioned.
+
+- Hermes PR Checks now cover the seven shopping-cart repositories in addition to k3d-manager and
+  lib-foundation.
+
+- **Bug Tracking now requires live proof to name its fix commit.** Newly LIVE-VERIFIED bug
+  documents must include a **Fix commit:** header, and at least one evidence commit must contain
+  that fix; this prevents valid pre-squash release-branch proof from being reported as stale.
+
+### Added
+
+- Offline Bug Tracking dashboard query coverage against producer-shaped metrics using real PromQL.
+
+- API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
+  configurable `K3DM_STATUS_CHANNEL_ID`; slash-command reports keep their original destination.
+
+- Agent dispatch's Per spec table has a totals row: Codex tokens, Codex time, Codex runs and API
+  equiv. are summed over the selected window or release. Time to land is left out, since the Time
+  to land stat already shows its mean. By model bars now start at zero, so the smaller model's bar
+  is no longer drawn empty.
+
+- Agent dispatch's Per spec table links each task name to its plan or bug document on the task's release branch.
+
+- The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.
+
+- The Agent dispatch ledger records cumulative Codex session input, cached-input and output tokens;
+  its dashboard estimates API-equivalent costs by task, scope and model, plus ledger coverage and
+  subscription costs. Prices are explicitly maintained in `scripts/etc/agent/codex-model-prices.json`.
+
+- The k3dm Agent dispatch dashboard's Window selector now lists each release from v1.43.0 (the start of the
+  dispatch ledger) after 1d, 7d and 30d. A release scope counts that release's lands and refusals whenever
+  they happened, so a release's totals stop shifting as time windows roll over; the time-window output is
+  unchanged. The Bug Tracking Plans table's Dispatch cell opens Agent dispatch on that release, Agent
+  dispatch's Release cell opens Bug Tracking on it, and each dashboard links to the other at the top.
+
+- The cloud bridge accepts `diagnose-pods-all` (`provider` only), the bridge form of `/cluster-diagnose <provider>`: it sends the webhook's fixed `get-pods-all` action and returns `kubectl get pods --all-namespaces -o wide` through `job-status`.
+
+- `make codex-land-pending SLUG=... TEST=...` lands a finished Codex task while Claude is away. It commits with the spec's commit message, lands and pushes, then marks the spec `LANDED — Claude review pending`; it refuses a task that has not exited successfully and never marks anything verified.
+
+- The k3dm Bug Tracking dashboard forecasts remaining release ranges from tagged release cadence and an explicit milestone inventory. The forecast sits between the plan tiles and the Plans table; its Remaining releases table lists only unshipped milestones (the plan count no longer adds rows for shipped releases) and hides the `job` and `instance` labels. The table follows the dashboard's Release selector; the tiles stay whole-path.
+
+- The k3dm Bug Tracking dashboard now inventories release plan documents with separate execution, verification, approval, and dispatch states. Each plan name links to its document, and the top tiles now read Bugs filed / open / fixed; hidden metadata columns use `custom.hidden`, because `hideFrom` does not hide a table column.
+
+### Changed
+
+- E2E failure tables now expose source run dates and current matching-run status, with shared
+  service/tier/runner filters and exact Run ID selection. The guide clarifies instant-query,
+  retention, and row-cap semantics.
+
 ## [1.43.4] - 2026-10-18
 
 ### Added
@@ -2369,3 +2511,8 @@
 
 ### Added
 - Initial release
+### Fixed
+- Restore operator SSH host aliases from a protected config fragment before hub data export and
+  cluster bring-up, with timestamped config backups.
+
+- Dispatch metrics now roll up Claude Code transcript usage incrementally, report API-equivalent costs and token coverage, and show approximate per-spec Claude attribution plus daily tokens in Grafana. Shipped Claude rates are intentionally null pending confirmation.

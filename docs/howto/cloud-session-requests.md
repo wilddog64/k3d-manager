@@ -68,7 +68,8 @@ is rejected by the bridge without being executed.
 | `make-fix-status` | `NS` | node + pod status for a namespace |
 | `make-status-public` | none | probe results for the public Cloudflare hostnames |
 | `make-observability-status` | none | monitoring/trivy-system pods, both clusters |
-| `make-vuln-scan` | none | VulnerabilityReport summary |
+| `make-vuln-scan-report` | none | Read existing VulnerabilityReports; no scan triggered |
+| `make-vuln-scan` | none | Deprecated read-only alias for `make-vuln-scan-report` |
 | `make-e2e-runner-health` | none | hub vs remote-runner health |
 | `make-e2e-remote` | `RUNNER` | Tier 1 e2e on the named remote runner |
 | `make-e2e` | none | Tier 1 e2e in a disposable vCluster |
@@ -79,6 +80,8 @@ is rejected by the bridge without being executed.
 | `make-test-python` | none | both Python groups above |
 | `make-test-all` | none | every offline suite (BATS + Python), ~20 min |
 | `make-find-similar-docs` | `Q` (required) | similarity search over `docs/` for prior art before filing a bug or issue doc |
+
+`make-vuln-scan-report` reads existing Kubernetes/Trivy `VulnerabilityReport` resources without triggering a scan; `make-vuln-scan` remains a deprecated read-only alias. The actual `app-cve-scan` trigger is not exposed as a reader action and remains operator-only.
 
 `job_id` must match `[0-9a-f]{8,64}`. Anything else is rejected. `sandbox-up` and `sandbox-down`
 always use the ACG sandbox provider; they cannot accept a provider or other argument. They never
@@ -135,6 +138,7 @@ cannot choose it, and an `action` key in `args` is rejected as an unexpected arg
 | action | args | what you get back (via `job-status`) |
 |---|---|---|
 | `diagnose-pods` | `provider`, `namespace` | pods in one namespace |
+| `diagnose-pods-all` | `provider` | pods in every namespace (`kubectl get pods --all-namespaces -o wide`) |
 | `diagnose-describe-pod` | `provider`, `namespace`, `name` | `kubectl describe pod`, sensitive env values masked |
 | `diagnose-logs` | `provider`, `namespace`, `name` | the last 120 log lines of the pod's default container |
 | `diagnose-apps` | none | hub ArgoCD Applications |
@@ -228,8 +232,11 @@ branch of that name, and the helper does not create one.
 ```
 
 `status` is `ok`, `rejected` or `error`. On `rejected`, `reason` says which validation failed and
-`body` is absent — the request was never executed. There is **no retry**: an id is consumed
-whether it succeeded, was rejected, or expired. To ask again, file a new request with a new id.
+`body` is absent — the request was never executed. An id is claimed before execution and is never
+sent to the webhook twice. If the bridge restarts after claiming an id but before saving its
+response, it publishes `status: "error"` with reason `bridge restarted before the request
+completed; outcome unknown — file a new request`; file a new request with a new id. A failed
+response push delays publication until a later tick, but never repeats the action.
 
 ### Diagnostic artifacts on a finished job
 

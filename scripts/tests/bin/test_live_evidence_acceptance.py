@@ -90,13 +90,63 @@ def test_M6_flip_without_evidence_fails(repo):
     assert res.returncode == 1 and "2026-10-10-x.md" in res.stderr
 
 def test_M6_flip_with_evidence_passes(repo):
-    r, _, _, later = repo
-    res = _lint(r, "docs/bugs/2026-10-10-x.md", _doc([_ev(later)]), head_text=_doc([]).replace("LIVE-VERIFIED — 2026-10-17", "FIXED"))
+    r, _, fix, later = repo
+    res = _lint(r, "docs/bugs/2026-10-10-x.md", _doc([f"**Fix commit:** `{fix}`", _ev(later)]), head_text=_doc([]).replace("LIVE-VERIFIED — 2026-10-17", "FIXED"))
     assert res.returncode == 0, res.stderr
 
 def test_M6_new_file_live_without_evidence_fails(repo):
     r, *_ = repo
     assert _lint(r, "docs/bugs/2026-10-11-y.md", _doc([])).returncode == 1
+
+def _investigation_doc(verification_type="investigation", evidence=None):
+    line = evidence or (
+        "**Live investigation evidence:** 2026-10-20 · source hostinger-support · "
+        "reference hpanel-response-2026-10-20 · env hostinger/srv1754834 · "
+        "scenario emergency-security-patch-restart · proves shutdown-cause"
+    )
+    return "\n".join([
+        "# Bug: provider-confirmed outage cause",
+        "",
+        "**Status:** LIVE-VERIFIED — provider confirmed the cause",
+        "**Priority:** P2",
+        f"**Verification type:** {verification_type}",
+        line,
+        "",
+    ])
+
+def test_investigation_live_evidence_passes_without_fix_commit(repo):
+    r, *_ = repo
+    res = _lint(r, "docs/bugs/2026-10-11-investigation.md", _investigation_doc())
+    assert res.returncode == 0, res.stderr
+
+def test_investigation_evidence_requires_investigation_type(repo):
+    r, *_ = repo
+    res = _lint(
+        r,
+        "docs/bugs/2026-10-11-investigation.md",
+        _investigation_doc(verification_type="implementation"),
+    )
+    assert res.returncode == 1
+    assert "requires **Verification type:** investigation" in res.stderr
+
+def test_malformed_investigation_evidence_fails(repo):
+    r, *_ = repo
+    res = _lint(
+        r,
+        "docs/bugs/2026-10-11-investigation.md",
+        _investigation_doc(evidence="**Live investigation evidence:** insufficient detail"),
+    )
+    assert res.returncode == 1
+    assert "typed **Live investigation evidence:** line" in res.stderr
+
+def test_investigation_evidence_cannot_replace_fix_evidence(repo):
+    r, _, fix, _ = repo
+    text = _investigation_doc().replace(
+        "**Priority:** P2", f"**Priority:** P2\n**Fix commit:** `{fix}`"
+    )
+    res = _lint(r, "docs/bugs/2026-10-11-investigation.md", text)
+    assert res.returncode == 1
+    assert "only for bugs without a **Fix commit:**" in res.stderr
 
 def test_N2_already_live_at_head_passes(repo):
     r, *_ = repo

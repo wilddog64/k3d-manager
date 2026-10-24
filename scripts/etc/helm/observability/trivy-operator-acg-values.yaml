@@ -31,7 +31,6 @@ trivy:
         memory: 1Gi
 
 operator:
-  scanJobTTL: 1h
   scanJobsConcurrentLimit: 1
   builtInTrivyServer: true
   vulnerabilityReportsPlugin: Trivy

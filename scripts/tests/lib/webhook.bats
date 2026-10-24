@@ -412,11 +412,16 @@ assert not _verify_slack_signature(b"\xff", "0", "v0=x")
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     run env K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 - <<'PY'
 import importlib.machinery
+import importlib.util
 import os
 import tempfile
 from pathlib import Path
 
-webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+webhook_path = os.environ["K3DM_WEBHOOK_PATH"]
+webhook_loader = importlib.machinery.SourceFileLoader("k3dm_webhook", webhook_path)
+webhook_spec = importlib.util.spec_from_file_location("k3dm_webhook", webhook_path, loader=webhook_loader)
+webhook = importlib.util.module_from_spec(webhook_spec)
+webhook_spec.loader.exec_module(webhook)
 life = webhook._run_cluster.__globals__
 assert webhook._parse_cluster_args("cluster-up --dry-run aws") == ("aws", True)
 assert webhook._parse_cluster_args("cluster-down hostinger dry") == ("hostinger", True)
@@ -999,9 +1004,14 @@ PY
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     run env PYTHONPATH="${repo_root}/scripts/lib" K3DM_WEBHOOK_TOKEN="" K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 -c '
 import importlib.machinery
+import importlib.util
 import os
 from webhook.auth import _slack_user_role
-webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
+webhook_path = os.environ["K3DM_WEBHOOK_PATH"]
+webhook_loader = importlib.machinery.SourceFileLoader("k3dm_webhook", webhook_path)
+webhook_spec = importlib.util.spec_from_file_location("k3dm_webhook", webhook_path, loader=webhook_loader)
+webhook = importlib.util.module_from_spec(webhook_spec)
+webhook_spec.loader.exec_module(webhook)
 assert webhook._request_role({}) == "admin"
 assert webhook._request_role({"X-K3DM-Role": "bogus"}) == "reader"
 assert webhook._thread_command_min_role("cluster-up hostinger") == "admin"
@@ -1016,9 +1026,17 @@ assert _slack_user_role("Uunknown") == "reader"
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     run env PYTHONPATH="${repo_root}/scripts/lib" K3DM_WEBHOOK_TOKEN="" K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 -c '
 import importlib.machinery
+import importlib.util
 import os
-webhook = importlib.machinery.SourceFileLoader("k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]).load_module()
-agent = importlib.machinery.SourceFileLoader("webhook_agent", os.path.join(os.path.dirname(os.environ["K3DM_WEBHOOK_PATH"]), "../scripts/lib/webhook/agent.py")).load_module()
+webhook_path = os.environ["K3DM_WEBHOOK_PATH"]
+webhook_loader = importlib.machinery.SourceFileLoader("k3dm_webhook", webhook_path)
+webhook_spec = importlib.util.spec_from_file_location("k3dm_webhook", webhook_path, loader=webhook_loader)
+webhook = importlib.util.module_from_spec(webhook_spec)
+webhook_spec.loader.exec_module(webhook)
+agent_path = os.path.join(os.path.dirname(os.environ["K3DM_WEBHOOK_PATH"]), "../scripts/lib/webhook/agent.py")
+agent_spec = importlib.util.spec_from_file_location("webhook_agent", agent_path)
+agent = importlib.util.module_from_spec(agent_spec)
+agent_spec.loader.exec_module(agent)
 assert agent._fix_mode_enabled("restart the crashlooping pod", "reader") is False
 assert agent._fix_mode_enabled("resync app foo", "reader") is False
 assert agent._fix_mode_enabled("restart the crashlooping pod", "operator") is True

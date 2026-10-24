@@ -17,6 +17,8 @@
 
 set -euo pipefail
 
+_k3dm_deployment_start_epoch="$(date +%s)"
+
 # launchd starts this script with the plist's minimal PATH, which omits
 # ~/.local/bin where k3d and istioctl live. Without this, every Slack-driven
 # run dies at the Step 3.5 hub preflight while the same command succeeds from a
@@ -28,6 +30,8 @@ fi
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/ssh_config_guard.sh"
+source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
 # shellcheck source=scripts/lib/cloudflared_keychain.sh
 source "${REPO_ROOT}/scripts/lib/cloudflared_keychain.sh"
@@ -205,6 +209,12 @@ function _acg_keycloak_ldap_provider_id() {
 
 function _acg_up_cleanup() {
   local _exit_code=$?
+  if declare -f _k3dm_push_deployment_metrics >/dev/null 2>&1; then
+    local _duration_secs=$(( $(date +%s) - _k3dm_deployment_start_epoch ))
+    _k3dm_push_deployment_metrics "up" "${_cluster_provider}" \
+      "$([[ "${_exit_code}" -eq 0 ]] && printf 'success' || printf 'failed')" \
+      "${_duration_secs}" "cli-${_k3dm_deployment_start_epoch}-$$" || true
+  fi
   [[ "${_exit_code}" -eq 0 ]] && return
   _warn "[acg-up] failed (exit ${_exit_code}) — cleaning up local processes..."
   for _pid_file in vault-pf frontend-pf acg-prom-pf; do
@@ -386,6 +396,12 @@ if [[ "${K3DM_RESUME:-0}" != "1" ]]; then
 fi
 
 _info "[acg-up] Step 0/12 — Pruning stale public IPs from ~/.ssh/known_hosts..."
+read -r -a _ssh_required_aliases <<< "${K3DM_SSH_REQUIRED_ALIASES:-github-k3dm-hub-data m2jump}"
+if _dry_run_active; then
+  _ssh_config_guard "${_ssh_required_aliases[@]}" || _warn "[acg-up] DRY_RUN: operator SSH alias(es) missing; would repair"
+elif ! _ssh_config_guard --repair "${_ssh_required_aliases[@]}"; then
+  _warn "[acg-up] operator SSH alias repair did not complete; continuing sandbox bring-up"
+fi
 _kh="${HOME}/.ssh/known_hosts"
 if _dry_run_active; then
   _info "[acg-up] DRY_RUN: would prune stale public IPs from known_hosts"
@@ -941,6 +957,11 @@ ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
   ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
   ARGOCD_APP_CLUSTER_SHOPPING_CART="${ARGOCD_APP_CLUSTER_SHOPPING_CART:-true}" \
   register_app_cluster
+argocd_require_app_cluster_registration \
+  "${ARGOCD_APP_CLUSTER_SECRET_NAME:-cluster-ubuntu-k3s}" \
+  "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" \
+  "${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}" \
+  "${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:${TUNNEL_SANDBOX_LOCAL_PORT:-16443}}"
 if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
   configure_vault_app_auth_for_context "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" || true
 fi

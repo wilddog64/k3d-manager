@@ -8,9 +8,10 @@ admission policy that verifies them. The staged rollout is **Audit → Enforce**
 
 ## The three latches
 
-```
- BUILD (shopping-cart CI)      PROMOTE (k3d-manager)        ADMIT (app cluster)
-   cosign sign --by-digest  ->  cosign verify before pin ->  Kyverno verifyImages
+```mermaid
+flowchart LR
+    B[Build\nshopping-cart CI\ncosign sign by digest] --> P[Promote\nk3d-manager\ncosign verify before pin]
+    P --> A[Admit\napp cluster\nKyverno verifyImages]
 ```
 
 - **Build** — each first-party image is signed by digest with the Vault-held

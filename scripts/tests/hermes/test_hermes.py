@@ -294,6 +294,13 @@ def test_publish_pr_checks_isolated_by_repo_and_preserves_token(monkeypatch, cap
     assert [request.full_url for request, _ in requests] == [
         "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/k3d-manager",
         "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/lib-foundation",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-basket",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-e2e-tests",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-frontend",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-infra",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-order",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-payment",
+        "http://pushgateway.test/metrics/job/k3dm-pr-checks/instance/shopping-cart-product-catalog",
     ]
     assert all(request.method == "PUT" for request, _ in requests)
     assert b'wilddog64/k3d-manager' in requests[0][0].data
@@ -325,7 +332,10 @@ def test_publish_pr_checks_posts_failure_and_continues(monkeypatch):
 
     monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen", urlopen)
     assert k3dm_hermes._publish_pr_checks(now=100) is False
-    assert [request.method for request in calls] == ["PUT", "POST"]
+    # agent-audit: allow assert-removed widened from two repos to the nine PR Checks repos
+    assert [request.method for request in calls] == [
+        "PUT", "POST", "PUT", "PUT", "PUT", "PUT", "PUT", "PUT", "PUT"
+    ]
     assert b"k3dm_pr_info" not in calls[1].data
     assert b"scrape_success" in calls[1].data and b" 0" in calls[1].data
 
@@ -370,7 +380,17 @@ def test_publish_pr_checks_fetches_github_and_survives_push_failure(monkeypatch,
     assert k3dm_hermes._publish_pr_checks(now=100) is False
     assert fetched[0] == "https://api.github.com/repos/wilddog64/k3d-manager/pulls?state=open&per_page=20"
     assert any(url.startswith("https://api.github.com/repos/wilddog64/lib-foundation/") for url in fetched)
-    assert [request.full_url.rsplit("/", 1)[1] for request in pushed] == ["k3d-manager", "lib-foundation"]
+    assert [request.full_url.rsplit("/", 1)[1] for request in pushed] == [
+        "k3d-manager",
+        "lib-foundation",
+        "shopping-cart-basket",
+        "shopping-cart-e2e-tests",
+        "shopping-cart-frontend",
+        "shopping-cart-infra",
+        "shopping-cart-order",
+        "shopping-cart-payment",
+        "shopping-cart-product-catalog",
+    ]
     assert b'pr="7"' in pushed[0].data and pushed[1].method == "POST"
     captured = capsys.readouterr()
     assert "github_pat_TESTSENTINEL0123" not in captured.out + captured.err

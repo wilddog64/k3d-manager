@@ -48,12 +48,10 @@ that isn't the one it scanned.
 
 ## The design — three latches
 
-```
- BUILD (app CI)               PROMOTE (k3d-manager)          ADMIT (cluster)
- cosign sign   (by digest) ─sig──▶ promoter runs             Kyverno verifyImages
- cosign attest (Trivy vuln ─att──▶ cosign verify +           • signature by our key
-   + SBOM predicate)              verify-attestation         • valid vuln attestation
-                                  BEFORE it pins    ──ok──▶   → Audit, then Enforce
+```mermaid
+flowchart LR
+    B[Build\napp CI\ncosign sign + Trivy attestation] -->|signed image + attestation| P[Promote\nk3d-manager\nverify before pinning]
+    P -->|verified candidate| A[Admit\ncluster\nKyverno signature + vuln attestation\nAudit then Enforce]
 ```
 
 1. **Sign at build** — cosign signs each image **by digest** in the publish workflow.

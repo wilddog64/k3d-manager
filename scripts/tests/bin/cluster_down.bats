@@ -32,16 +32,25 @@ bats_require_minimum_version 1.5.0
 @test "cluster-down k3s-aws deregister block has real and dry-run paths" {
   run grep -nF '_k3s_aws_deregister_cluster || _warn' bin/cluster-down
   [ "$status" -eq 0 ]
-  run grep -nF 'DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub' bin/cluster-down
+  run grep -nF 'DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications and retire ApplicationSet/observability-acg from hub' bin/cluster-down
   [ "$status" -eq 0 ]
   run grep -nF 'source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"' bin/cluster-down
   [ "$status" -eq 0 ]
 }
 
+@test "k3s-aws destroy confirms stack deletion before hub deregistration" {
+  local delete_line deregister_line
+  delete_line="$(grep -nF '_dry_guard "tear down CloudFormation stack" acg_teardown --confirm || return 1' scripts/lib/providers/k3s-aws.sh | cut -d: -f1)"
+  deregister_line="$(grep -nF '_k3s_aws_deregister_cluster \' scripts/lib/providers/k3s-aws.sh | cut -d: -f1)"
+  [ -n "$delete_line" ]
+  [ -n "$deregister_line" ]
+  [ "$delete_line" -lt "$deregister_line" ]
+}
+
 @test "acg-down dry-run k3s-aws previews hub deregistration" {
   run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
+  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications and retire ApplicationSet/observability-acg from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
 }
 
@@ -295,7 +304,7 @@ STUB
   [ "$status" -eq 1 ]
   [[ "$output" == *"cloud teardown: UNVERIFIED (stack lookup failed in us-west-2)"* ]]
   [[ "$output" == *"Stopping Vault port-forward"* ]]
-  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
   [[ "$output" != *"cloud teardown: verified"* ]]
   run grep -F "describe-stacks" "${BATS_TEST_TMPDIR}/aws.log"
   [ "$status" -eq 0 ]
@@ -309,7 +318,7 @@ STUB
   [ "$status" -eq 1 ]
   [[ "$output" == *"cloud teardown: UNVERIFIED (stack delete failed in us-west-2)"* ]]
   [[ "$output" == *"Stopping Vault port-forward"* ]]
-  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
   [[ "$output" != *"cloud teardown: verified"* ]]
 }
 
@@ -319,21 +328,23 @@ STUB
   [ "$status" -eq 1 ]
   [[ "$output" == *"cloud teardown: UNVERIFIED (stack delete failed in us-west-2)"* ]]
   [[ "$output" == *"Stopping Vault port-forward"* ]]
-  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [[ "$output" == *"Preserving hub registration and observability-acg"* ]]
   [[ "$output" != *"cloud teardown: verified"* ]]
 }
 
-@test "acg-down reports invalid credentials without cloud calls and stays green" {
+@test "acg-down preserves hub state when credentials cannot verify teardown" {
   run env -u DRY_RUN -u K3DM_DEPLOY_DRY_RUN CLUSTER_PROVIDER=k3s-aws STUB_AWS_STS_FAIL=1 \
     bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [[ "$output" == *"NOT verified."* ]]
   [[ "$output" == *"cloud teardown: UNVERIFIED (AWS credentials invalid"* ]]
   [[ "$output" != *"cloud teardown: verified"* ]]
   [[ "$output" == *"Stopping Vault port-forward"* ]]
+  [[ "$output" == *"Preserving hub registration and observability-acg"* ]]
   run grep -E "describe-stacks|delete-stack" "${BATS_TEST_TMPDIR}/aws.log"
   [ "$status" -ne 0 ]
-  [ -s "${BATS_TEST_TMPDIR}/deregister.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
 }
 
 @test "acg-down dry-run summarizes without CloudFormation delete" {
@@ -347,7 +358,7 @@ STUB
 @test "acg-down dry-run k3s-aws does not invoke hub deregistration" {
   run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications from hub"* ]]
+  [[ "$output" == *"DRY_RUN: would deregister cluster-ubuntu-k3s + generated Applications and retire ApplicationSet/observability-acg from hub"* ]]
   [ ! -e "${BATS_TEST_TMPDIR}/deregister.log" ]
 }
 

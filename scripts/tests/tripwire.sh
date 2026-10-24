@@ -4,7 +4,7 @@
 # Usage: scripts/tests/tripwire.sh <command> [args...]
 #
 # Every tool in TRIPWIRE_TOOLS resolves to a shim for the duration of the command. A shim passes a
-# short list of offline subcommands (`kubectl kustomize`, `helm template`, `* version`) through to
+# short list of offline subcommands (`kubectl kustomize`, `helm template`, `ssh -G`, `* version`) through to
 # the real binary; any other call is logged, never executed, and returns 97. A test that stubs a
 # tool itself still wins, because its stub directory is prepended after this one.
 #
@@ -61,7 +61,7 @@ for _tool in "${TRIPWIRE_TOOLS[@]}"; do
   cat > "$_tripwire_bin/$_tool" <<SHIM
 #!/usr/bin/env bash
 case "$_tool \${1:-} \${2:-}" in
-  "kubectl kustomize "*|"kubectl version "*|"helm template "*|"helm version "*|"helm lint "*|"$_tool version "*|"$_tool --version "*)
+  "kubectl kustomize "*|"kubectl version "*|"helm template "*|"helm version "*|"helm lint "*|"ssh -G "*|"$_tool version "*|"$_tool --version "*)
     PATH=$(printf '%q' "$PATH") exec $_tool "\$@" ;;
 esac
 printf '%s\t%s\n' "$_tool" "\$*" >> $(printf '%q' "$_tripwire_log")

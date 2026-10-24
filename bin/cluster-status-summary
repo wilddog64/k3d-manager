@@ -107,8 +107,10 @@ except (IndexError,ValueError):
  raise SystemExit(1)' "${_snapshot_name}" 2>/dev/null || true)"
   if [[ -n "${_snapshot_age}" ]] && [[ "${_snapshot_age}" -le 168 ]]; then
     printf '%s\n' "  $(_color 32 '✓') Hub snapshot: ${_snapshot_name} (${_snapshot_age}h old)"
+  elif [[ -n "${_snapshot_age}" ]]; then
+    printf '%s\n' "  $(_color 33 '!') Hub snapshot: ${_snapshot_name} (${_snapshot_age}h old, over 7 days; run make snapshot)"
   else
-    printf '%s\n' "  $(_color 33 '!') Hub snapshot: ${_snapshot_name} (${_snapshot_age:-unknown} old)"
+    printf '%s\n' "  $(_color 33 '!') Hub snapshot: ${_snapshot_name} (age unknown)"
   fi
 else
   printf '%s\n' "  $(_color 33 '!') Hub snapshot: none recorded — run make snapshot"

@@ -23,43 +23,12 @@ Implement automated Jenkins job creation using the Job DSL plugin. This will all
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Git Repository (k3d-manager)                                │
-│                                                               │
-│  scripts/etc/jenkins/job-dsl/                                │
-│  ├── seed-job.groovy          (Bootstrap seed job)           │
-│  ├── simple/                  (Simple pipeline examples)     │
-│  │   ├── 01-linux-agent.groovy                               │
-│  │   └── 02-kaniko-agent.groovy                              │
-│  ├── multibranch/             (Multi-branch pipelines)       │
-│  │   ├── example-repo.groovy                                 │
-│  │   └── github-org.groovy                                   │
-│  └── folders/                 (Folder organization)          │
-│      └── team-structure.groovy                               │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ JCasC deploys seed job
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Jenkins Controller                                           │
-│                                                               │
-│  Seed Job (deployed via JCasC)                              │
-│  ├── Reads DSL scripts from ConfigMap                       │
-│  ├── Executes Job DSL plugin                                │
-│  └── Creates/Updates jobs                                    │
-│                                                               │
-│  Generated Jobs:                                             │
-│  ├── Tests/                   (folder)                       │
-│  │   ├── 01-linux-agent-test                                │
-│  │   └── 02-kaniko-agent-test                               │
-│  ├── Projects/                (folder)                       │
-│  │   └── example-multibranch                                │
-│  └── Teams/                   (folder)                       │
-│      ├── TeamA/                                              │
-│      └── TeamB/                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    G[Git repository\nscripts/etc/jenkins/job-dsl/] -->|ConfigMap| S[JCasC seed job]
+    S -->|executes| D[Job DSL plugin]
+    D --> J[Jenkins Controller]
+    J --> T[Generated jobs\nTests / Projects / Teams]
 ```
 
 **Deployment Flow:**

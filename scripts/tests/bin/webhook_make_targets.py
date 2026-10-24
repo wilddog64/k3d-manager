@@ -13,12 +13,59 @@ _spec = importlib.util.spec_from_file_location(
 wh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(wh)
 from webhook import policy
+from webhook.lifecycle import _make_target_argv
 from webhook.make_targets import CLUSTER_COMMANDS
 
 wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_e2e_help_summaries_change_without_changing_target_contracts(self):
+        expected = {
+            "e2e-remote": {
+                "min_role": "operator", "required": ("RUNNER",),
+                "optional": ("DIGEST",), "timeout": 3600,
+                "summary": "Tier 1 e2e on a remote runner (RUNNER=m2); ACG sandbox: e2e-sandbox; this host: e2e",
+            },
+            "e2e": {
+                "min_role": "operator", "optional": ("DIGEST",),
+                "timeout": 3600,
+                "summary": "Tier 1 e2e in a disposable vCluster on this host",
+            },
+        }
+        for target, contract in expected.items():
+            with self.subTest(target=target):
+                self.assertEqual(wh.MAKE_TARGETS[target], contract)
+        help_text = wh.make_target_help("operator", wh._role_allows)
+        self.assertIn("`e2e-remote RUNNER=… [DIGEST=…]` — " + expected["e2e-remote"]["summary"] + " (operator)", help_text)
+        self.assertIn("`e2e [DIGEST=…]` — " + expected["e2e"]["summary"] + " (operator)", help_text)
+
+    def test_vulnerability_report_command_is_reader_read_only_and_aliased(self):
+        targets = wh.MAKE_TARGETS
+        self.assertEqual(targets["vuln-scan-report"]["min_role"], "reader")
+        self.assertIn("existing VulnerabilityReports", targets["vuln-scan-report"]["summary"])
+        self.assertIn("no scan", targets["vuln-scan-report"]["summary"])
+        self.assertEqual(targets["vuln-scan"]["min_role"], "reader")
+        self.assertIn("deprecated read-only alias", targets["vuln-scan"]["summary"])
+        reader_help = wh.make_target_help("reader", wh._role_allows)
+        self.assertIn("vuln-scan-report", reader_help)
+        self.assertIn("`vuln-scan` — deprecated read-only alias", reader_help)
+        self.assertNotIn("app-cve-scan", reader_help)
+        self.assertIn("app-cve-scan", wh.make_target_help("operator", wh._role_allows))
+
+    def test_vulnerability_report_make_targets_share_read_only_renderer(self):
+        makefile = Path(__file__).resolve().parents[3] / "Makefile"
+        text = makefile.read_text()
+        for target in ("vuln-scan-report", "vuln-scan", "trivy-scan-report"):
+            with self.subTest(target=target):
+                blocks = re.finditer(
+                    r"(?ms)^([a-z0-9][a-z0-9 -]*):\n((?:\t[^\n]*\n?)+)", text)
+                recipe = next((block.group(2) for block in blocks
+                               if target in block.group(1).split()), None)
+                self.assertIsNotNone(recipe)
+                self.assertIn("./scripts/k3d-manager trivy_scan_report", recipe)
+        self.assertNotRegex(text, r"(?m)^vuln-scan-report:\n\t.*app_cve_scan_trigger")
+
     def test_find_similar_docs_is_reader_tier(self):
         self.assertEqual(wh.MAKE_TARGETS["find-similar-docs"]["min_role"], "reader")
 
@@ -32,14 +79,26 @@ class MakeTargetTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(argv, ["find-similar-docs", "Q=eso 403 on a vault path"])
 
+    def test_find_similar_docs_accepts_natural_language_apostrophe(self):
+        query = "what's recent e2e-remote issues"
+        argv, error = wh.parse_make_request("find-similar-docs", {"Q": query, "K": "5"}, False)
+        self.assertIsNone(error)
+        # agent-audit: allow assert-removed Ruff F541 dropped a placeholder-free f prefix; same strings
+        self.assertEqual(argv, ["find-similar-docs", "K=5", f"Q={query}"])
+
     def test_find_similar_docs_requires_a_query(self):
         _, error = wh.parse_make_request("find-similar-docs", {}, False)
         self.assertIn("requires Q", error)
 
-    def test_query_rejects_every_shell_metacharacter(self):
-        """Q reaches a Makefile recipe, where $(Q) expands into a shell command line."""
-        for bad in ('a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
-                    "a>f", "a<f", "a#c", "a\\b", "a\nb", "a'q"):
+    def test_query_shell_metacharacters_are_validated_then_transported_out_of_shell(self):
+        """The bounded printable query is base64 transported across the Make recipe."""
+        for safe in ('what\'s recent', 'a"; id', "a`id`", "a$(id)", "a;id", "a|id", "a&&id",
+                     "a>f", "a<f", "a#c", "a\\b"):
+            with self.subTest(value=safe):
+                argv, error = wh.parse_make_request("find-similar-docs", {"Q": safe}, False)
+                self.assertIsNone(error)
+                self.assertEqual(argv[-1], f"Q={safe}")
+        for bad in ("a\nb", "\nabc"):
             with self.subTest(value=bad):
                 _, error = wh.parse_make_request("find-similar-docs", {"Q": bad}, False)
                 self.assertIsNotNone(error, f"{bad!r} was accepted")
@@ -47,6 +106,15 @@ class MakeTargetTests(unittest.TestCase):
     def test_query_length_is_bounded(self):
         _, error = wh.parse_make_request("find-similar-docs", {"Q": "a" * 500}, False)
         self.assertIsNotNone(error)
+
+    def test_query_is_base64_encoded_before_make_recipe(self):
+        import base64
+        query = "what's recent; $(id)"
+        argv = _make_target_argv(["find-similar-docs", f"Q={query}", "K=5"])
+        self.assertEqual(argv[0], "find-similar-docs")
+        self.assertEqual(base64.b64decode(argv[1].split("=", 1)[1], validate=True).decode(), query)
+        self.assertEqual(argv[2], "K=5")
+        self.assertEqual(_make_target_argv(["fix-sync", "APP=frontend"]), ["fix-sync", "APP=frontend"])
 
     def test_result_count_must_be_a_small_integer(self):
         for bad in ("0", "51", "999", "5x", "-1"):
@@ -210,12 +278,34 @@ class MakeTargetTests(unittest.TestCase):
         self.assertTrue(spec["confirm"])
         self.assertNotIn("e2e-sandbox-provision", wh.make_target_help("operator", wh._role_allows))
         self.assertIn("e2e-sandbox-provision", wh.make_target_help("admin", wh._role_allows))
-        _, error = wh.parse_make_request("e2e-sandbox-provision", {}, None)
-        self.assertIn("rerun with `confirm`", error)
+        self.assertIn("e2e-sandbox-provision [DIGEST=…] [confirm]", wh.make_target_help("admin", wh._role_allows))
+        self.assertNotIn("e2e-sandbox-provision-preview", wh.make_target_help("operator", wh._role_allows))
+        self.assertIn("e2e-sandbox-provision-preview", wh.make_target_help("admin", wh._role_allows))
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox-provision", {}, None),
+            (["e2e-sandbox-provision-preview"], None),
+        )
+        digest = "sha256:" + "a" * 64
+        self.assertEqual(
+            wh.parse_make_request("e2e-sandbox-provision", {"DIGEST": digest}, None),
+            (["e2e-sandbox-provision-preview", f"DIGEST={digest}"], None),
+        )
         self.assertEqual(
             wh.parse_make_request("e2e-sandbox-provision", {}, True),
             (["e2e-sandbox-provision"], None),
         )
+
+    def test_confirm_targets_without_preview_still_require_confirmation(self):
+        for target, args in (
+            ("fix-delete-pod", {"APP": "frontend", "NS": "shopping-cart-apps"}),
+            ("fix-force-sync", {"APP": "shopping-cart"}),
+            ("e2e-runner-unlock", {"RUNNER": "m2"}),
+        ):
+            with self.subTest(target=target):
+                argv, error = wh.parse_make_request(target, args, None)
+                self.assertIsNone(argv)
+                # agent-audit: allow assert-removed refusal now asserted for confirm targets without a preview
+                self.assertIn("rerun with `confirm`", error)
 
     def test_smoke_is_operator_tier_and_hidden_from_readers(self):
         """The cluster half performs real Vault reads and live logins."""
@@ -241,6 +331,38 @@ class MakeTargetTests(unittest.TestCase):
                 argv, error = wh.parse_make_request("smoke", {"SMOKE_ONLY": value}, None)
                 self.assertIsNone(argv)
                 self.assertIn("invalid value for SMOKE_ONLY", error)
+
+    def test_smoke_accepts_a_valid_argocd_app_prefix(self):
+        for prefix in ("ubuntu-hostinger-", "ubuntu-k3s-"):
+            with self.subTest(prefix=prefix):
+                self.assertEqual(
+                    wh.parse_make_request("smoke", {"ARGOCD_APP_PREFIX": prefix}, None),
+                    (["smoke", f"ARGOCD_APP_PREFIX={prefix}"], None),
+                )
+
+    def test_smoke_accepts_both_selector_arguments(self):
+        self.assertEqual(
+            wh.parse_make_request(
+                "smoke",
+                {"SMOKE_ONLY": "cluster", "ARGOCD_APP_PREFIX": "ubuntu-hostinger-"},
+                None,
+            ),
+            (["smoke", "ARGOCD_APP_PREFIX=ubuntu-hostinger-", "SMOKE_ONLY=cluster"], None),
+        )
+
+    def test_smoke_argocd_app_prefix_rejects_unsafe_or_incomplete_values(self):
+        for value in (
+            "", "ubuntu-hostinger", "-ubuntu-", "ubuntu--hostinger-", "Ubuntu-hostinger-",
+            "ubuntu-hostinger-;id", "ubuntu-hostinger-$(id)", "a" * 64 + "-",
+        ):
+            with self.subTest(value=value):
+                argv, error = wh.parse_make_request("smoke", {"ARGOCD_APP_PREFIX": value}, None)
+                self.assertIsNone(argv)
+                self.assertIn("invalid value for ARGOCD_APP_PREFIX", error)
+
+    def test_smoke_help_documents_argocd_app_prefix(self):
+        help_text = wh.make_target_help("operator", wh._role_allows)
+        self.assertIn("[ARGOCD_APP_PREFIX=…]", help_text)
 
     def test_smoke_rejects_arguments_it_does_not_declare(self):
         _, error = wh.parse_make_request("smoke", {"APP": "x"}, None)

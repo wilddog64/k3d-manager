@@ -1168,16 +1168,54 @@ function _ubuntu_k3s_trust_host() {
 
 function _ubuntu_k3s_wait_ssh_ready() {
   local host="$1" ssh_user="$2" ssh_key="$3"
-  local budget="${K3DM_SSH_READY_TIMEOUT:-180}" waited=0
-  until ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o BatchMode=yes -o ConnectTimeout=10 "${ssh_user}@${host}" true >/dev/null 2>&1; do
-    if (( waited >= budget )); then
-      _err "[shopping_cart] ${ssh_user}@${host} did not answer SSH within ${budget}s — node unresponsive; not starting k3sup"
+  local budget="${K3DM_SSH_READY_TIMEOUT:-180}" started="${SECONDS}" elapsed remaining classification
+  local ssh_stderr ssh_stderr_lower
+  if [[ ! "${budget}" =~ ^[1-9][0-9]*$ ]]; then
+    _err "[shopping_cart] K3DM_SSH_READY_TIMEOUT must be a positive integer"
+    return 1
+  fi
+  while :; do
+    elapsed=$(_ubuntu_k3s_elapsed_seconds "${started}")
+    if (( elapsed >= budget )); then
+      _err "[shopping_cart] SSH readiness failed for ${ssh_user}@${host} after ${elapsed}s (budget ${budget}s): ${classification:-no SSH probe completed}; not starting k3sup"
       return 1
     fi
-    sleep 10
-    (( waited += 10 ))
+    remaining=$((budget - elapsed))
+    if ssh_stderr=$(ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o BatchMode=yes -o "ConnectTimeout=${remaining}" "${ssh_user}@${host}" true 2>&1 >/dev/null); then
+      return 0
+    fi
+    elapsed=$(_ubuntu_k3s_elapsed_seconds "${started}")
+    classification="other SSH failure"
+    ssh_stderr_lower=$(printf '%s' "${ssh_stderr}" | tr '[:upper:]' '[:lower:]')
+    case "${ssh_stderr_lower}" in
+      *"connection refused"*) classification="connection refused" ;;
+      *"connection timed out"*|*"operation timed out"*|*"connect timeout"*) classification="connection timed out" ;;
+      *"permission denied"*|*"authentication failed"*|*"no more authentication methods"*) classification="authentication rejected" ;;
+      *"could not resolve hostname"*|*"name or service not known"*|*"temporary failure in name resolution"*) classification="hostname resolution failed" ;;
+    esac
+    if [[ "${classification}" == "hostname resolution failed" ]]; then
+      _err "[shopping_cart] SSH readiness failed for ${ssh_user}@${host} after ${elapsed}s (budget ${budget}s): ${classification}; not starting k3sup"
+      return 1
+    fi
+    if (( elapsed >= budget )); then
+      _err "[shopping_cart] SSH readiness failed for ${ssh_user}@${host} after ${elapsed}s (budget ${budget}s): ${classification}; not starting k3sup"
+      return 1
+    fi
+    remaining=$((budget - elapsed))
+    if (( remaining > 10 )); then
+      remaining=10
+    fi
+    _ubuntu_k3s_wait_sleep "${remaining}"
   done
+}
+
+function _ubuntu_k3s_elapsed_seconds() {
+  printf '%s' "$((SECONDS - $1))"
+}
+
+function _ubuntu_k3s_wait_sleep() {
+  sleep "$1"
 }
 
 function _k3sup_join_agent() {
@@ -1402,7 +1440,7 @@ Then run: ./scripts/k3d-manager register_app_cluster
 Config (override via env or scripts/etc/k3s/vars.sh):
   UBUNTU_K3S_SSH_HOST          SSH host alias (default: ubuntu)
   UBUNTU_K3S_SSH_USER          SSH user       (default: ubuntu)
-  UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: UBUNTU_K3S_SSH_HOST)
+  UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: SSH config HostName, then UBUNTU_K3S_SSH_HOST)
   UBUNTU_K3S_SSH_KEY           SSH key path   (default: ~/.ssh/k3d-manager-key.pem)
   UBUNTU_K3S_LOCAL_KUBECONFIG  Local kubeconfig path (default: ~/.kube/k3s-ubuntu.yaml)
 HELP

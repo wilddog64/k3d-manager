@@ -30,10 +30,13 @@ GH_REPO          ?= wilddog64/k3d-manager
 GH_WORKFLOWS_DIR ?= .github/workflows
 RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
+K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-resume codex-abandon dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: e2e-sandbox-provision-preview
+.PHONY: vuln-scan-report
 
-.PHONY: up hub-up hub-restore hub-recover down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -64,6 +67,10 @@ hub-recover:
 	@bin/hub-restore --preflight-only
 	@$(MAKE) --no-print-directory hub-up
 	@bin/hub-restore
+
+## Revalidate Vault's ArgoCD admin password against the hub and repair it only if rejected.
+argocd-admin-resync:
+	$(K3DM_MANAGER_BIN) hub_recovery_argocd_admin_resync
 
 vault-dr-shards-save:
 	@./scripts/k3d-manager vault_dr_shards_save
@@ -403,6 +410,10 @@ codex-status:
 codex-land:
 	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,)
 
+## Land a finished Codex task while Claude is away; marks it review pending (SLUG=slug, TEST=cmd)
+codex-land-pending:
+	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)'
+
 ## Resume a Codex task (SLUG=slug, PROMPT=path)
 codex-resume:
 	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)'
@@ -410,6 +421,10 @@ codex-resume:
 ## Abandon a Codex task (SLUG=slug, YES=1 to remove)
 codex-abandon:
 	@if [ "$(YES)" = 1 ]; then bin/k3dm-codex-dispatch abandon --slug '$(SLUG)' --yes; else bin/k3dm-codex-dispatch abandon --slug '$(SLUG)'; fi
+
+## Prune landed task worktrees across releases (YES=1 to remove)
+codex-prune:
+	@bin/k3dm-codex-dispatch prune $(if $(filter 1,$(YES)),--yes,)
 
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
@@ -438,11 +453,17 @@ install-sudoers:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
-	@if ! launchctl kickstart -k "gui/$$(id -u)/com.k3d-manager.webhook"; then \
-		echo "[restart-webhook] service is not loaded; bootstrapping LaunchAgent" >&2; \
-		launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true; \
-		launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
-	fi
+	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
+	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
+		if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; then \
+			echo "[restart-webhook] reloaded LaunchAgent definition"; \
+			exit 0; \
+		fi; \
+		if [ "$$_attempt" -lt 5 ]; then sleep 1; fi; \
+		_attempt=$$((_attempt + 1)); \
+	done; \
+	echo "[restart-webhook] ERROR: bootstrap failed after 5 attempts" >&2; \
+	exit 1
 	@$(MAKE) --no-print-directory restart-cloud-bridge
 
 ## Set webhook/cloud-bridge log level (LEVEL=error|warn|info|debug) and restart both agents
@@ -675,7 +696,7 @@ update-webhook-slack:
 	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
 	[ -f "$$_plist" ] || { echo "[update-webhook-slack] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
 	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
-	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
+	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" K3DM_STATUS_CHAN="$${K3DM_STATUS_CHANNEL_ID:-}" STATUS_CHAN_EXPORTED="$${K3DM_STATUS_CHANNEL_ID+x}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; status=os.environ["K3DM_STATUS_CHAN"]; os.environ["STATUS_CHAN_EXPORTED"] and e.__setitem__("K3DM_STATUS_CHANNEL_ID",status); plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
 	@$(MAKE) --no-print-directory restart-webhook
 	@echo "[update-webhook-slack] webhook restarted"
 
@@ -847,15 +868,29 @@ show-service-passwords:
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode); \
 	_vault_hdr=$$(mktemp); printf 'X-Vault-Token: %s\n' "$$_vault_tok" > "$$_vault_hdr"; \
-	_argocd=$$(curl -sf -H "@$$_vault_hdr" \
+	_argocd_vault_file=$$(mktemp); _argocd_initial_file=$$(mktemp); _argocd_payload=$$(mktemp); \
+	curl -sf -H "@$$_vault_hdr" \
 	  "http://127.0.0.1:18200/v1/secret/data/argocd/admin" 2>/dev/null | \
-	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password","N/A"))' 2>/dev/null || true); \
-	rm -f "$$_vault_hdr"; \
-	[ -n "$$_argocd" ] || _argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+	  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password",""))' 2>/dev/null >"$$_argocd_vault_file" || true; \
+	kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null >"$$_argocd_initial_file" || true; \
+	_argocd_url="$${SHOW_SERVICE_PASSWORDS_ARGOCD_URL:-https://argocd.3ai-talk.org}"; _argocd_vault_code=000; _argocd_initial_code=000; _argocd_vault_rejected=0; \
+	for _argocd_candidate in vault initial; do \
+	  if [ "$$_argocd_candidate" = vault ]; then _argocd_candidate_file="$$_argocd_vault_file"; else _argocd_candidate_file="$$_argocd_initial_file"; fi; \
+	  if [ -s "$$_argocd_candidate_file" ]; then \
+	    jq -n --arg username admin --rawfile password "$$_argocd_candidate_file" '{username:$$username,password:($$password|rtrimstr("\n"))}' >"$$_argocd_payload"; \
+	    _argocd_code=$$(curl -s -o /dev/null -w '%{http_code}' -H 'User-Agent: k3dm-show-service-passwords/1' -H 'Content-Type: application/json' --data @"$$_argocd_payload" "$$_argocd_url/api/v1/session" || true); \
+	    if [ "$$_argocd_candidate" = vault ]; then _argocd_vault_code="$$_argocd_code"; else _argocd_initial_code="$$_argocd_code"; fi; \
+	    if [ "$$_argocd_code" = 200 ]; then _argocd="$$(cat "$$_argocd_candidate_file")"; break; fi; \
+	    if [ "$$_argocd_candidate" = vault ] && [ "$$_argocd_code" != 000 ] && [ "$${_argocd_code#5}" = "$$_argocd_code" ]; then _argocd_vault_rejected=1; fi; \
+	  fi; \
+	done; \
+	if [ -z "$$_argocd" ]; then _argocd="$$(cat "$$_argocd_vault_file" 2>/dev/null || true)"; [ -n "$$_argocd" ] || _argocd="$$(cat "$$_argocd_initial_file" 2>/dev/null || true)"; fi; \
+	rm -f "$$_vault_hdr" "$$_argocd_vault_file" "$$_argocd_initial_file" "$$_argocd_payload"; \
 	echo "  ArgoCD      https://argocd.3ai-talk.org";\
 	echo "    user:     admin";\
 	echo "    password: $${_argocd:-N/A}";\
+	if [ "$$_argocd_vault_rejected" -eq 1 ] && [ "$$_argocd_initial_code" = 200 ]; then echo "    note:     Vault secret/argocd/admin is stale (rejected by ArgoCD)"; elif [ "$$_argocd_vault_code" != 200 ] && [ "$$_argocd_initial_code" != 200 ]; then echo "    note:     not verified against ArgoCD"; fi;\
 	echo ""
 	@_vault_tok=$$(kubectl get secret vault-root -n secrets \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
@@ -1166,7 +1201,11 @@ monitoring-pause:
 monitoring-resume:
 	./scripts/k3d-manager observability_resume $(LAYER)
 
-## Print VulnerabilityReport summary for both clusters
+## Read existing VulnerabilityReports for both clusters; no scan is triggered
+vuln-scan-report:
+	./scripts/k3d-manager trivy_scan_report
+
+## Deprecated read-only alias for vuln-scan-report
 vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
 
@@ -1322,7 +1361,7 @@ embed-cache-restore:
 
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
-	@python3 scripts/find-similar-docs.py $(if $(K),--k $(K),) -- "$(Q)"
+	@python3 -c 'import base64, os, sys; q = base64.b64decode(sys.argv[1], validate=True).decode("ascii") if sys.argv[1] else os.environ.get("Q", ""); os.execv(sys.executable, [sys.executable, "scripts/find-similar-docs.py", $(if $(K),"--k",) $(if $(K),"$(K)",) "--", q])' "$(Q_B64)"
 
 ## Compare services/*/kustomization.yaml image digests with :latest in GHCR (read-only; needs gh read:packages)
 image-pin-drift:
@@ -1410,6 +1449,10 @@ e2e-sandbox:
 e2e-sandbox-provision:
 	@$(call _e2e_recorded,e2e-sandbox-provision,env E2E_SANDBOX_PROVISION=1 ./scripts/k3d-manager e2e_verify_sandbox $(DIGEST))
 
+## Preview the Tier 2 sandbox provisioning checks without making changes. DIGEST optional.
+e2e-sandbox-provision-preview:
+	./scripts/k3d-manager e2e_sandbox_preview $(DIGEST)
+
 ## Run the smoke gate (offline checks always; cluster checks when reachable). SMOKE_ONLY=offline|cluster optional.
 smoke:
 	./scripts/k3d-manager smoke_run $(SMOKE_ONLY)
@@ -1464,6 +1507,7 @@ help:
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
+	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
@@ -1524,7 +1568,8 @@ help:
 	@echo "    make observability-status       Show monitoring pod status on both clusters"
 	@echo "    make monitoring-pause           Scale hub monitoring to zero, keep Grafana up (~1 core back)"
 	@echo "    make monitoring-resume [LAYER=1|2]  Resume hub monitoring: 1=Grafana+Prometheus, 2=full (default)"
-	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
+	@echo "    make vuln-scan-report          Read existing VulnerabilityReports (no scan triggered)"
+	@echo "    make vuln-scan                  Deprecated read-only alias for vuln-scan-report"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
 	@echo "    make restore-google-app-password   Restore Gmail App Password from Keychain → Vault → Alertmanager"

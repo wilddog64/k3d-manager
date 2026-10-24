@@ -9,18 +9,31 @@ setup() {
   cat > "$STUB_BIN/git" <<'STUB'
 #!/usr/bin/env bash
 printf 'git %q\n' "$*" >> "$CALL_LOG"
-if [[ "$*" == *clone* ]]; then dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/"; fi
-if [[ "$*" == *commit* ]]; then rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots"; fi
-if [[ "$*" == *rev-parse* ]]; then printf 'SHA-SENTINEL\n'; fi
-if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" != 1 ]]; then printf 'SHA-SENTINEL\trefs/heads/snapshots\n'; fi
-if [[ "$*" == *ls-tree* ]]; then printf 'results/20261010T182508Z.json\n'; fi
-if [[ "$*" == *show* ]]; then printf '{"success":true,"export":"%s"}\n' "${DR_TEST_RESULT_EXPORT:-20261009T120000Z}"; fi
-if [[ "$*" == *config* ]]; then printf 'apiVersion: v1\nkind: Config\n' ; fi
-if [[ "$*" == *fetch* && "${DR_TEST_FETCH_FAIL:-0}" == 1 ]]; then exit 1; fi
-if [[ "$*" == *ls-remote* && "${DR_TEST_REMOTE_MISMATCH:-0}" == 1 ]]; then printf 'OTHER-SHA\trefs/heads/snapshots\n'; fi
-if [[ "$*" == *push* ]]; then printf 'push %s\n' "$*" >> "$TEST_ROOT/push.log"; fi
-if [[ "$*" == *rm\ * ]]; then printf 'rm %s\n' "$*" >> "$TEST_ROOT/git.log"; fi
-if [[ "$*" == *write-tree* || "$*" == *commit-tree* ]]; then printf 'NEW-SHA\n'; fi
+args=("$@")
+index=0
+while (( index < ${#args[@]} )); do
+  if [[ "${args[index]}" == -C ]]; then
+    index=$((index + 2))
+    continue
+  fi
+  git_subcommand="${args[index]}"
+  break
+done
+case "$git_subcommand" in
+  clone) dest="${@: -1}"; mkdir -p "$dest"; cp -R "$DR_TEST_REPO_FIXTURE/snapshots" "$dest/" ;;
+  commit) rm -rf "$TEST_ROOT/last-snapshots"; cp -R snapshots "$TEST_ROOT/last-snapshots" ;;
+  rev-parse) printf 'SHA-SENTINEL\n' ;;
+  ls-remote)
+    if [[ "${DR_TEST_REMOTE_MISMATCH:-0}" != 1 ]]; then printf 'SHA-SENTINEL\trefs/heads/snapshots\n'; else printf 'OTHER-SHA\trefs/heads/snapshots\n'; fi
+    ;;
+  ls-tree) printf 'results/20261010T182508Z.json\n' ;;
+  show) printf '{"success":true,"export":"%s"}\n' "${DR_TEST_RESULT_EXPORT:-20261009T120000Z}" ;;
+  config) printf 'apiVersion: v1\nkind: Config\n' ;;
+  fetch) [[ "${DR_TEST_FETCH_FAIL:-0}" != 1 ]] || exit 1 ;;
+  push) printf 'push %s\n' "$*" >> "$TEST_ROOT/push.log" ;;
+  rm) printf 'rm %s\n' "$*" >> "$TEST_ROOT/git.log" ;;
+  write-tree|commit-tree) printf 'NEW-SHA\n' ;;
+esac
 STUB
   cat > "$STUB_BIN/vault" <<'STUB'
 #!/usr/bin/env bash
@@ -123,7 +136,58 @@ spec:
 YAML
   printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$root/inventory.json"
   printf 'age-encryption.org/v1\nencrypted\n' > "$root/secrets-data-vault-0.tar.age"; printf 'age-encryption.org/v1\nencrypted\n' > "$root/identity-postgres-keycloak-pvc.tar.age"; printf 'age-encryption.org/v1\nencrypted\n' > "$root/identity-data-openldap-0.tar.age"
-  (cd "$root" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  # shellcheck disable=SC2035 # Fixture archive names are fixed and cannot be options.
+  (cd "$root" && write_sha256_manifest *.age pv-pvc.yaml inventory.json)
+}
+
+write_sha256_manifest() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$@" > SHA256SUMS
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$@" > SHA256SUMS
+  else
+    printf 'hub_data.bats: neither sha256sum nor shasum is available to write SHA256SUMS\n' >&2
+    return 127
+  fi
+}
+
+@test "fixture checksum writer fails clearly when no SHA-256 tool is available" {
+  # shellcheck disable=SC2329 # command is called indirectly by write_sha256_manifest.
+  command() { return 1; }
+  run -127 write_sha256_manifest missing.age
+  [ "$status" -eq 127 ]
+  [[ "$output" == *"neither sha256sum nor shasum is available"* ]]
+  [ ! -e SHA256SUMS ]
+}
+
+@test "fixture checksum writer uses shasum and writes a verifiable manifest" {
+  local dir="$TEST_ROOT/shasum-fixture"
+  mkdir -p "$dir"
+  printf alpha > "$dir/alpha.age"
+  printf beta > "$dir/inventory.json"
+  command() {
+    if [[ "$1" == -v && "$2" == sha256sum ]]; then return 1; fi
+    builtin command "$@"
+  }
+  (cd "$dir" && write_sha256_manifest alpha.age inventory.json)
+  [ "$(wc -l < "$dir/SHA256SUMS" | tr -d ' ')" -eq 2 ]
+  run bash -c 'cd "$1" && shasum -a 256 -c SHA256SUMS' _ "$dir"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"alpha.age: OK"* && "$output" == *"inventory.json: OK"* ]]
+}
+
+@test "git stub dispatches on subcommand when -C paths contain git words" {
+  run "$STUB_BIN/git" -C "$TEST_ROOT/ssh-config-guard" status
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  run "$STUB_BIN/git" -C "$TEST_ROOT/commit-show-push" status
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -e "$TEST_ROOT/last-snapshots" ]
+  [ ! -e "$TEST_ROOT/push.log" ]
+  run "$STUB_BIN/git" -C "$TEST_ROOT/ssh-config-guard" config
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'apiVersion: v1\nkind: Config' ]]
 }
 
 source_plugin() {
@@ -133,6 +197,7 @@ source_plugin() {
   _warn() { printf '%s\n' "$*" >&2; }
   _no_trace() { "$@"; }
   source "$PLUGINS_DIR/hub_data.sh"
+  _ssh_config_guard() { :; }
   _kubectl() { kubectl "$@"; }
   export K3DM_HUB_DATA_CONTEXT=ctx
   export K3DM_HUB_DATA_DIR="$TEST_ROOT/hub-data"
@@ -172,9 +237,9 @@ make_export_dir() {
   printf '{}\n' > "$dir/inventory.json"
   printf 'metadata\n' > "$dir/pv-pvc.yaml"
   if [[ "$mode" == legacy ]]; then
-    (cd "$dir" && sha256sum x.tar.age > SHA256SUMS)
+    (cd "$dir" && write_sha256_manifest x.tar.age)
   else
-    (cd "$dir" && sha256sum x.tar.age pv-pvc.yaml inventory.json > SHA256SUMS)
+    (cd "$dir" && write_sha256_manifest x.tar.age pv-pvc.yaml inventory.json)
   fi
 }
 
@@ -494,7 +559,7 @@ _fake_vault_tree() {
   source_plugin; local dir="$TEST_ROOT/export"; make_export_dir "$dir"; printf changed > "$dir/pv-pvc.yaml"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
   make_export_dir "$dir"; printf 'age-encryption.org/v1\nextra\n' > "$dir/extra.age"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
   make_export_dir "$dir"; sed -i.bak '/inventory.json/d' "$dir/SHA256SUMS"; run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
-  make_export_dir "$dir"; printf not-age > "$dir/x.tar.age"; (cd "$dir" && sha256sum x.tar.age pv-pvc.yaml inventory.json > SHA256SUMS); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+  make_export_dir "$dir"; printf not-age > "$dir/x.tar.age"; (cd "$dir" && write_sha256_manifest x.tar.age pv-pvc.yaml inventory.json); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
 }
 
 @test "9b remote mismatch writes no success metric and does not prune" {
@@ -522,11 +587,11 @@ _fake_vault_tree() {
 
 @test "13 legacy export verifies and one-sided metadata listing fails" {
   source_plugin; local dir="$TEST_ROOT/export"; make_export_dir "$dir" legacy; run _hub_data_verify_export "$dir"; [ "$status" -eq 0 ]; [[ "$output" == *'legacy export'* ]]
-  (cd "$dir" && sha256sum x.tar.age inventory.json > SHA256SUMS); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
+  (cd "$dir" && write_sha256_manifest x.tar.age inventory.json); run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
 }
 
 @test "14 split export first part must have an age header" {
-  source_plugin; local dir="$TEST_ROOT/export"; mkdir -p "$dir"; printf bad > "$dir/x.tar.age.part-aa"; printf 'age-encryption.org/v1\nrest' > "$dir/x.tar.age.part-ab"; printf '{}\n' > "$dir/inventory.json"; printf metadata > "$dir/pv-pvc.yaml"; (cd "$dir" && sha256sum x.tar.age.part-aa x.tar.age.part-ab pv-pvc.yaml inventory.json > SHA256SUMS)
+  source_plugin; local dir="$TEST_ROOT/export"; mkdir -p "$dir"; printf bad > "$dir/x.tar.age.part-aa"; printf 'age-encryption.org/v1\nrest' > "$dir/x.tar.age.part-ab"; printf '{}\n' > "$dir/inventory.json"; printf metadata > "$dir/pv-pvc.yaml"; (cd "$dir" && write_sha256_manifest x.tar.age.part-aa x.tar.age.part-ab pv-pvc.yaml inventory.json)
   run _hub_data_verify_export "$dir"; [ "$status" -ne 0 ]
 }
 
@@ -880,7 +945,7 @@ STUB
 @test "recover preflight: present hub is marked and approval warns before deletion" {
   make_fixture; source_plugin
   jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
-  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && write_sha256_manifest *.age pv-pvc.yaml inventory.json)
   export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
   printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
   cat > "$STUB_BIN/k3d" <<'STUB'
@@ -897,7 +962,7 @@ STUB
 @test "recover preflight: absent hub skips validation and still asks approval" {
   make_fixture; source_plugin
   jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
-  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && write_sha256_manifest *.age pv-pvc.yaml inventory.json)
   export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
   printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
   cat > "$STUB_BIN/k3d" <<'STUB'
@@ -966,7 +1031,7 @@ STUB
 @test "recover preflight: a failed k3d listing refuses instead of treating the hub as absent" {
   make_fixture; source_plugin
   jq '. + {format:2,images:{}}' "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json" > "$TEST_ROOT/inventory.json"; mv "$TEST_ROOT/inventory.json" "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z/inventory.json"
-  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && sha256sum *.age pv-pvc.yaml inventory.json > SHA256SUMS)
+  (cd "$DR_TEST_REPO_FIXTURE/snapshots/20261009T120000Z" && write_sha256_manifest *.age pv-pvc.yaml inventory.json)
   export K3DM_HUB_DATA_RECOVER_RUN_ROOT="$TEST_ROOT/run" K3DM_HUB_DATA_TEST_TTY=1 K3DM_HUB_DATA_TTY_DEVICE="$TEST_ROOT/approval"
   printf '20261009T120000Z\n' > "$TEST_ROOT/approval"
   k3d() { return 1; }
@@ -1378,4 +1443,20 @@ _shim_env() {
   HUB_DATA_RESTORE_TARGET=drill run _hub_data_restore_one identity c "$TEST_ROOT/claim.tar.age" agent-0 /data
   [ "$status" -eq 0 ]
   grep -q keychain "$CALL_LOG"
+}
+
+@test "scheduled export: SSH guard runs first and a failed guard prevents export" {
+  source_plugin
+  export K3DM_HUB_DATA_PUSHGATEWAY_URL=http://push
+  _hub_data_push_metrics() { :; }
+  _ssh_config_guard() { printf 'guard %s\n' "$*" >> "$CALL_LOG"; return "${GUARD_FAIL:-0}"; }
+  hub_data_export() { printf 'export\n' >> "$CALL_LOG"; }
+  GUARD_FAIL=0 run hub_data_export_scheduled
+  [ "$status" -eq 0 ]
+  [ "$(sed -n '1p' "$CALL_LOG")" = 'guard --repair github-k3dm-hub-data' ]
+  [ "$(sed -n '2p' "$CALL_LOG")" = export ]
+  : > "$CALL_LOG"
+  GUARD_FAIL=1 run hub_data_export_scheduled
+  [ "$status" -ne 0 ]
+  [ "$(cat "$CALL_LOG")" = 'guard --repair github-k3dm-hub-data' ]
 }

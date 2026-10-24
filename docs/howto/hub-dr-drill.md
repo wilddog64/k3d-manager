@@ -88,11 +88,18 @@ restore finishes.
 
 ### 4. Freshness workflow
 
-Copy `scripts/etc/dr/drill-freshness.yml` to `.github/workflows/` and
+After review, synchronize the authoritative
+`scripts/etc/dr/drill-freshness.yml` to `.github/workflows/` and
 `scripts/etc/dr/drill-freshness.sh` to the root of the data repository's
-**`main`** branch. Scheduled workflows run only from the default branch; the
-workflow checks out `results` itself. It fails, and GitHub emails you, when the
-newest result is older than 8 days or reports `success: false`.
+**`main`** branch. The installed script is a deployment copy; keep it aligned
+with the k3d-manager source when deploying an update. Scheduled workflows run
+only from the default branch; the workflow checks out `results` itself. It
+fails, and GitHub emails you, when no valid result exists, the newest result
+reports `success: false`, or the newest successful result is older than 8 days.
+The failure log distinguishes these cases and gives the next steps: run
+`make dr-drill` on M2, then `make dr-drill-publish` on M4. A stale successful
+result means the evidence needs refreshing; it does not mean the recovery drill
+itself failed.
 
 ## Daily export
 
@@ -285,3 +292,17 @@ Add a row after each notable drill. RTO here is the data-services RTO.
 | Date | RTO | RPO | Notes |
 |---|---|---|---|
 | 2026-10-10 | 499 s (8 min 19 s) | 459 s (7 min 39 s) | First passing live drill (run `20261010T182508Z`, export `20261010T180910Z`), V0–V7 all true. V2 checked 15 Vault paths; the export held 6 Keycloak users and 12 LDAP entries. Kept with `DR_DRILL_KEEP=1`. RPO is small because the export was taken just before the drill. |
+# SSH aliases
+
+Keep operator-owned SSH aliases in `~/.ssh/config.d/operator`, which provisioning tools only read.
+Move the `github-k3dm-hub-data` and `m2jump` host blocks there by hand, then put this at the top
+of `~/.ssh/config`:
+
+```sshconfig
+Include ~/.ssh/config.d/operator
+```
+
+Confirm both aliases with `ssh -G github-k3dm-hub-data` and `ssh -G m2jump`. The SSH config guard
+checks these aliases before scheduled hub exports and cluster bring-up. If the Include was lost,
+it restores it from the operator fragment and saves a mode-600 timestamped backup beside
+`~/.ssh/config`, retaining the newest five. The guard never edits the fragment.

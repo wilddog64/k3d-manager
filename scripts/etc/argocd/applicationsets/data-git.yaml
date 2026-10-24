@@ -17,6 +17,8 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   template:
     metadata:
       name: '{{.name}}-data-layer'

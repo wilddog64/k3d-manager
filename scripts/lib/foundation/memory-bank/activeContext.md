@@ -1,5 +1,7 @@
 # Active Context — lib-foundation
 
+**2026-10-21 Copilot review on PR #72 addressed:** `_run_command` hard-fails through `_err`/`exit` unless called with `--soft`/`--no-exit`, making the trailing `|| return 1` unreachable. Removed that dead guard and kept the existing fail-fast behavior. Copilot had pushed the equivalent one-line fix as `b2b769a`; local validation passed (clean-env `bats scripts/tests/lib/acg.bats` 28/28, `shellcheck scripts/lib/acg/acg.sh`, `AGENT_AUDIT_MAX_IF=8` audit, and `git diff --check`). The PR branch includes the fix and merge commit `14532f6`; the review thread is replied to and resolved. GitHub checks are rerunning after the branch update.
+
 **2026-08-20 fleet lifecycle Phase A COMPLETE (Codex, `8148e33`):** on `feat/v0.4.12`,
 `scripts/lib/acg/acg.sh` now validates `ACG_AGENT_COUNT` before any AWS call, renders an N-agent
 CloudFormation template into a temporary deploy file, and discovers ordered `Agent*PublicIP`

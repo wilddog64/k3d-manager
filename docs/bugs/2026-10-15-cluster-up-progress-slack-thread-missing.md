@@ -2,11 +2,110 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.43.5` (triage 2026-10-15, operator-approved placement)
-**Status:** OPEN — reproduce and trace timestamp propagation; root cause unconfirmed
-**Priority:** P3 (ChatOps UX); raise to P2 if correlation or completion notification is lost, particularly for terminal cluster lifecycle outcomes
+**Status:** VERIFIED — P2 offline fix landed 2026-10-22 as `85722ce3`; operator live verification of failure-analysis/cleanup replies remains pending. Historical Slack-rendered placement for `aeeeb11f` remains unverified.
+**Fix commits:** `6b324441`, `85722ce3`
+**Priority:** P2 — terminal cluster-up failure-analysis thread correlation suspected lost (raised from P3 2026-10-21).
+**Recurred:** 2026-10-21 — job `aeeeb11f` failure analysis appeared outside the originating Slack thread; P2 suspected recurrence after fix `6b324441` (live thread metadata verification pending).
+**Investigation:** Read-only triage report landed at `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md` (`8b70f1a4`). Safe local delivery records support a routing/context failure, but do not identify the failure-analysis event or prove Slack-rendered placement. Newer safe fields and delivery summaries below provide a concrete regression target; no fix was implemented by the triage.
 **Severity:** low
-**Approval:** explicit operator request 2026-10-15 to file bug; no implementation approved
+**Approval:** operator explicitly requested dispatch on 2026-10-21
+
 **Evidence:** operator Slack screenshot 2026-10-15 approximately 07:35 PDT, AWS ACG sandbox `cluster-up` job `5f5cff23`
+
+**Additional live evidence:** operator Slack screenshots 2026-10-21 show the `/k3dm targets` response while AWS `cluster-up` job `2b6e4f97` is still running, followed by its progress update as a separate top-level message rather than a visible reply in the originating thread. The screenshot establishes the placement symptom, not the underlying Slack timestamps or root cause.
+
+## Recurrence — 2026-10-21: AWS cluster-up failure analysis appears outside job thread (P2)
+
+**Status:** REOPENED — suspected live recurrence after fix `6b324441`; original `cluster-resume` live verification remains valid.
+**Priority:** P2 — terminal cluster-up failure analysis loses intended ChatOps thread correlation.
+**Branch:** `k3d-manager-v1.43.5`
+**Evidence:** operator Slack screenshot of `🔍 Failure analysis (job aeeeb11f)` at 13:36 PDT, 2026-10-21. The message appeared as a separate top-level notification according to the operator, rather than within the parent cluster-up job thread.
+**Source path:** `scripts/lib/webhook/lifecycle.py`: `_run_cluster` calls `_analyze_failure(_all_lines)` then `_notify_job(job_id, ...)`; `bin/k3dm-webhook`: `_notify_job` reads job-local `channel_id`, `thread_ts`, `thread_source`, and `response_url`, chooses bot-thread, response_url, or other permitted delivery. The threading helper has no Gemini-specific routing logic.
+
+### Scope and uncertainty
+
+This is evidence of misplaced **failure-analysis notification**, not evidence that the LLM caused the thread loss or that all lifecycle notifications are broken. The screenshot alone does not contain Slack message `ts` or `thread_ts`. Safe persisted metadata is now available, but it does not identify which delivery record corresponds to failure analysis or expose Slack's returned message metadata. The source-level context-propagation fix already landed and a different `cluster-resume` job was live-verified in thread, so do **not** assume the former missing-context defect is still the cause. Investigate possible entry-route differences, job-local metadata, first-message anchoring, response_url posting, Slack API replies, or fallback behavior; distinguish them with evidence. A `response_url` post may succeed without persisting a new parent `ts`; check that hypothesis, but do not present it as proven.
+
+### Safe delivery-record findings (2026-10-21 follow-up)
+
+The read-only follow-up in `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md`
+found safe job metadata for `aeeeb11f`: `action=up`, `status=failed`, and
+`thread_ts=1792615012.460159`. The sanitized delivery record showed five
+successful `response_url` deliveries without a thread timestamp, one successful
+bot fallback without a thread timestamp, and three later response-URL attempts
+with the parent timestamp rejected as `thread_post_rejected`; `channel_id` was
+null in all records. The records contain neither returned Slack message
+timestamps nor per-notification event labels. This supports a delivery-context
+failure mode, but does not identify which delivery was failure analysis or prove
+the screenshot's rendered placement. No response URL, token, or message output
+was inspected or copied into the record.
+
+**Dispatch authorization — 2026-10-22:** operator requested review and dispatch
+of this P2 bug. Scope is offline source audit, deterministic regression tests,
+and a bounded code fix for async lifecycle delivery if the tests establish a
+defect. Do not call Slack, inspect credentials, run AWS/cluster lifecycle
+commands, or claim the historical message's placement is proven. Preserve live
+verification as a separate operator check.
+
+**Offline verification and landing — 2026-10-22:** Fix `85722ce3` prevents a failed `response_url` delivery with unknown channel/thread context from falling back to the configured default channel and persisting that unrelated message timestamp as the job's thread parent. A regression test confirms the next failure-analysis notification retries the original response URL without an unrelated bot-channel anchor, records the route/delivery state, and keeps the private URL redacted. The existing failed-cluster-up notification test now asserts failure-analysis content and child job correlation.
+
+**Safe live-test design:** There is no current safe operator command to deliberately trigger this failure path; real `cluster-up` failure also starts cleanup. An operator-only synthetic Slack test route, gated off by default and guaranteed not to call lifecycle/cleanup code, is specified for v1.43.7 in `docs/issues/2026-10-22-cluster-failure-analysis-live-test-spec.md`. This is a separate testability follow-up, not a known defect in the landed fix. Until that route is separately authorized/implemented or a natural failure occurs, live placement remains unverified.
+
+Independent verification passed:
+
+```text
+$ python3 -m pytest -q -p no:cacheprovider scripts/tests/bin/test_webhook_thread_dispatch.py scripts/tests/bin/test_webhook_stale_cleanup.py scripts/tests/bin/test_webhook_cluster_status_thread.py
+78 passed in 0.51s
+
+$ bats scripts/tests/lib/webhook.bats
+68 cases passed; 6 expected live/environment skips. Full output: `docs/issues/2026-10-22-cluster-thread-verification-loopback-sandbox.md`.
+```
+
+The first sandboxed BATS invocation could not connect to its local HTTP test server; rerunning with approved loopback access passed all 68 cases (six expected live/environment skips). Python AST parsing and `git diff --check` passed; ShellCheck does not apply to the Python webhook entrypoint. The dispatcher landing gate passed and pushed `85722ce3` to `origin/k3d-manager-v1.43.5`. No Slack, AWS, Kubernetes, or lifecycle operation was run. This is offline VERIFIED only; operator live verification remains required before LIVE-VERIFIED.
+
+### Investigation and acceptance
+
+```yaml
+must:
+  - id: M1
+    text: Correlate job aeeeb11f's originating command/channel, parent Slack ts, persisted job thread context, and the failure-analysis post's returned Slack ts/thread_ts (redacted records only).
+  - id: M2
+    text: For cluster-up failures, started/progress/terminal failure/failure-analysis/cleanup notifications use one intended parent thread, or any unavoidable top-level fallback explicitly identifies the parent and reason.
+  - id: M3
+    text: Test both existing-thread and initial-parent creation paths, including response_url and bot posting, successful threaded routing and rejected-thread fallback.
+  - id: M4
+    text: Preserve the passing cluster-resume routing contract from fix 6b324441, and keep secrets and response URLs out of diagnostic records.
+must_not:
+  - id: N1
+    text: Do not infer root cause or Slack thread_ts values from the screenshot alone.
+  - id: N2
+    text: Do not fix Gemini prompt formatting, AWS provisioning, or other unrelated command logic to address Slack routing.
+  - id: N3
+    text: Do not silently post a terminal result as a new top-level message while claiming that original-thread delivery succeeded.
+evidence:
+  - id: E1
+    kind: offline
+    proves: [M2, M3, M4, N2, N3]
+    text: Stub outgoing Slack API calls, simulate cluster-up success and failure with persisted and missing thread context, assert channel/thread_ts and fallback records; demonstrate failure against a pre-fix fixture.
+  - id: E2
+    kind: live
+    proves: [M1, M2, M4, N1, N3]
+    text: Inspect sanitized job aeeeb11f delivery records and Slack parent/reply metadata; after a separately approved fix, validate one disposable or simulated failed job's analysis and cleanup reply under the intended parent.
+interface:
+  - bin/k3dm-webhook (_notify_job, job context persistence/dispatch)
+  - scripts/lib/webhook/lifecycle.py (_run_cluster failure analysis, cleanup)
+  - scripts/lib/webhook/render.py (bot and response_url posting)
+  - existing webhook lifecycle/thread tests
+```
+
+**Definition of Done:**
+- [ ] Establish whether `aeeeb11f` was genuinely top-level using Slack metadata, or mark it unverified if metadata unavailable.
+- [ ] Record the exact delivery branch and root cause; classify true recurrence versus a distinct defect.
+- [ ] Offline tests cover terminal failure analysis, not only progress and resume.
+- [ ] Live-verify parent threading for failure analysis and cleanup before restoring LIVE-VERIFIED status.
+- [ ] Record any fix SHA and verification evidence here.
+
+**Do not:** create a PR, merge to main, execute cluster-up, or change production code during triage.
 
 ## Symptom
 
@@ -36,7 +135,41 @@ Trace the **actual async `cluster-up` notification path**, not only `cluster-sta
 - When threading is unavailable, fallback to top-level message is explicit, records a reason, and retains job correlation.
 - No change to cluster provisioning, execution permissions, or AWS resources is required to correct message routing.
 
-**Implementation:** not started.
+## Offline implementation and verification — 2026-10-21
+
+The async lifecycle dispatcher previously copied only `thread_ts` into `cluster-up`, `cluster-down`, and `cluster-resume` child jobs. It did not preserve the parent `channel_id`, `thread_source`, or allowed `response_url`. The shared notifier consequently lacked enough persisted context to reliably address the original channel/thread. The refresh workers also posted directly to `response_url` without passing the saved `thread_ts`.
+
+The implementation now copies the persisted Slack delivery context to lifecycle child jobs and persists request context for direct cluster, refresh, and resume API jobs. Cluster and resume progress and terminal notifications carry the child job ID. Refresh reports use the shared notifier and retain the ID. If a threaded attempt fails, a fallback remains addressed to the saved thread and its delivery record carries a safe reason code; delivery records do not contain response URLs.
+
+Deterministic regression coverage now exercises parent-to-child context for up/down/resume and both refresh variants, actual `chat.postMessage` channel/thread payloads for successive cluster-up start/progress/success and failure notifications, refresh routing when a response URL is present, and redacted fallback diagnostics. The existing status and diagnostics suites remain covered. No AWS or cluster lifecycle operation was run.
+
+Offline source/tests confirm the metadata-loss risk and that the fixed paths retain the intended payload destination. They do not expose raw Slack message metadata, establish the screenshot's exact Slack `thread_ts` placement, verify workspace scopes or channel membership, or prove Slack's rendered response-URL reply behavior. Keep this bug OPEN until the operator confirms a real lifecycle notification remains in the originating Slack thread.
+
+## Dispatch scope (2026-10-21)
+
+Implement and test outbound thread-context preservation for asynchronous lifecycle notifications, anchored on the observed `cluster-up` progress path. Audit the shared `cluster-down`, `cluster-resume`, `cluster-refresh`, and Hostinger-refresh routes only where they use the same lifecycle notification path. Keep all notifications for a job on the original intended parent; failures to thread must be visible and correlated without exposing secrets. Add deterministic tests that assert actual channel and `thread_ts` payloads, including successive progress notifications and fallbacks. Do not run real AWS or cluster lifecycle operations.
+
+For the `aeeeb11f` recurrence, correlate only the safe persisted summary fields
+already recorded in `docs/issues/2026-10-21-cluster-up-thread-recurrence-investigation.md`;
+do not access Slack credentials or raw `response_url` values. Implement only a
+reproducible source-level failure with regression coverage. Keep the historical
+Slack-rendered placement unverified unless actual Slack message metadata is
+available through an explicitly authorized safe source.
+
+This dispatch does not include the separate cloud-bridge `make test-all` incident below or incoming Slack `thread_broadcast` handling; those require their own scoped work. Do not expand into unrelated Slack commands or provisioning behavior.
+
+## Files
+
+- `bin/k3dm-webhook`
+- `scripts/lib/webhook/agent.py`
+- `scripts/lib/webhook/lifecycle.py`
+- `scripts/lib/webhook/render.py`
+- `scripts/lib/webhook/status.py`
+- `scripts/tests/bin/test_webhook_thread_broadcast.py`
+- `scripts/tests/bin/test_webhook_stale_cleanup.py`
+- `scripts/tests/bin/test_webhook_cluster_status_thread.py`
+- `scripts/tests/bin/webhook_lifecycle.py`
+- `scripts/tests/lib/webhook.bats`
 
 
 ## Expanded source audit — 2026-10-15 (operator-requested)
@@ -95,3 +228,32 @@ The fallback to `SLACK_WEBHOOK_URL` calls `_slack_post(SLACK_WEBHOOK_URL, text)`
 **Investigation focus:** Obtain the actual Slack message `ts`, `thread_ts`, and `channel` for the initial announcement, the 2/4/6/8/10-minute updates, and later replies. Compare these to job-local `thread_ts`, `thread_source`, `channel_id`, and `response_url` values as persisted over time (redact response URL). Determine whether the bot starts a new thread after an earlier fallback fails, or whether child-job metadata is introduced or overwritten mid-execution. Account for the code's `_notify_job` branch ordering and thread-parent creation behavior. Do not assert a root cause without these timestamps or a deterministic reproduction.
 
 **Additional regression requirement:** Exercise successive 120-second timer callbacks with the same child job, including empty/partial thread metadata and changes in posting backend. Verify that *every* notification uses the **original intended thread parent**, and that a failure to post in-thread never silently switches later notifications to a different parent. The test must fail before fixing this observed behavior.
+
+## Additional incident — 2026-10-20 (cloud-bridge Make job notification)
+
+Operator screenshot at approximately 13:58 PDT shows the `k3d-manager` Slack app announcing a cloud-bridge initiated `make test-all` job. The operator reported that the call **did not return its result within the expected Slack thread**. This resembles the existing asynchronous job lifecycle / thread-correlation failure mode, but is a **different entry path** than the original `cluster-up (aws)` incident.
+
+The same invocation is corroborated by GitHub-backed bridge responses: request `20261020T205644Z-make-test-all` queued job `a3ec539d` at 20:58:08 UTC. A subsequent `job-status` response at 21:00:15 UTC showed `running` and a nonempty redacted Make test tail. **Do not classify absence of a terminal Slack reply as a failure until the job is actually terminal.** Determine whether later completion/failure messages are posted as thread replies, separate top-level messages, or not delivered.
+
+**Status: OPEN — live verification=false.** Reopened/investigation expanded for async Make notifications; no verified fix or confirmed regression yet. Retain P3 initially; consider P2 if a completed job lacks notification or loses important completion status. The `2026-10-18-slack-thread-broadcast-reply-silently-ignored.md` issue is about incoming human `thread_broadcast` commands, so it should **not** be marked regressed solely on the basis of outbound job notifications.
+
+### Additional checks / evidence
+
+- Confirm terminal status for `a3ec539d` via `job-status` / `.final.json` before evaluating missing final Slack notifications.
+- Inspect recorded `channel_id`, parent `thread_ts`, job metadata, and Slack post responses for the cloud-bridge `make-test-all` path (without exposing tokens or private content).
+- Verify that queued, started, progress and terminal notifications attach to the same Slack thread, or surface an explicit, diagnosable fallback.
+- Capture actual Slack `ts` and `thread_ts` for the sent messages; do not infer them from the screenshot alone.
+- Add regression coverage specifically for externally queued Make jobs, distinct from the existing `cluster-up` assertions; do not run another large test suite only to exercise Slack notification formatting.
+
+Evidence: https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T205950Z-job-status-test-all.json
+
+## Verification log — 2026-10-21
+
+- Commit `c681227d` added the lifecycle context propagation fix and regression tests; dispatcher land gate rebased and landed it as `6b324441` on `k3d-manager-v1.43.5`, then pushed the branch to origin.
+- Independent focused pytest: 74 passed across thread dispatch, cluster status thread, thread broadcast, and stale cleanup suites.
+- Webhook BATS: all 68 cases passed, including 6 expected environment-gated skips.
+- Python AST parsing passed for `bin/k3dm-webhook` and `scripts/lib/webhook/lifecycle.py`; `git diff --check` clean; `_agent_audit` passed.
+- ShellCheck is not applicable to `bin/k3dm-webhook` because it is a Python entrypoint.
+- Offline coverage verifies intended channel/thread payloads and lifecycle notification fallback. Live Slack evidence is recorded below.
+- Operator live evidence: Slack screenshots show Hostinger `cluster-resume` job `6cb1f04b` queued, started, and succeeded in the same thread, with the same job ID on each lifecycle notification. This verifies the deployed async lifecycle thread-context behavior. The job completed in 0 minutes, so no timed progress notification was exercised live; the progress timer path is covered by the offline `cluster-up` regression test.
+**Live evidence:** 2026-10-21 · run 6cb1f04b · env hostinger/slack · scenario cluster-resume-threaded-start-and-success · commit 6b324441 · proves fix

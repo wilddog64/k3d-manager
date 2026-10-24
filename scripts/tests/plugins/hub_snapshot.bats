@@ -97,6 +97,9 @@ EOF
   cat > "$BATS_TEST_TMPDIR/bin/ssh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$SSH_LOG"
+if [[ " $* " != *" -n "* ]]; then
+  cat >/dev/null
+fi
 command_text="${@: -1}"
 [[ "${SSH_RC:-0}" == 1 ]] && exit 1
 [[ "$command_text" == true ]] && exit 0
@@ -323,6 +326,25 @@ PY
   [ "$status" -eq 0 ]
   for name in 20260920T000000Z 20260921T000000Z 20260922T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
   [ ! -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z" ]
+}
+
+@test "hub snapshot: list prints every verified and incomplete snapshot" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/20260920T000000Z" "$K3DM_SNAPSHOT_DIR/20260921T000000Z" "$K3DM_SNAPSHOT_DIR/20260922T000000Z.INCOMPLETE"
+  run hub_snapshot_list
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]
+  [[ "$output" == *$'20260920T000000Z\t'*$'\tverified'* ]]
+  [[ "$output" == *$'20260921T000000Z\t'*$'\tverified'* ]]
+  [[ "$output" == *$'20260922T000000Z\t'*$'\tincomplete'* ]]
+}
+
+@test "hub snapshot: prune removes all verified snapshots older than newest keep" {
+  for name in 20260919T000000Z 20260920T000000Z 20260921T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  run _hub_snapshot_prune_verified 1
+  [ "$status" -eq 0 ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z" ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260920T000000Z" ]
+  [ -d "$K3DM_SNAPSHOT_DIR/20260921T000000Z" ]
 }
 
 @test "hub snapshot: capture auto-prunes to newest verified snapshots" {

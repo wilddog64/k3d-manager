@@ -1,0 +1,296 @@
+# Hostinger multi-service outage — frontend 502, Kubernetes API timeouts, data-layer and ESO degradation
+
+**Filed:** 2026-10-20 (operator-approved live incident triage)
+**Branch:** `k3d-manager-v1.43.5`
+**Release:** v1.43.5 (bug; no new plan slot)
+**Status:** FIXED — closed 2026-10-24 (operator: "go as you suggested"). Fault domain confirmed: the public frontend reaches Hostinger only through a port-forward on the M4, so any M4→Hostinger path drop is a public outage; the 10-22 drop was on the M4/ISP side. Shipped: diagnostic classification `6be25c92` (LIVE-VERIFIED), tunnel logging and reconnect `5f9fb209`. The next-drop log check carries in `2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`; the architectural fix is `docs/plans/v1.43.8-hostinger-public-path-on-node.md`. The ArgoCD direct-login failure was `2026-10-23-status-argocd-login-reports-http-unavailable.md`, fixed and live-checked 2026-10-23.
+**Previous status:** MONITORING — 2026-10-23: the 10-22 recurrence is explained (M4→Hostinger tunnel down on an M4/ISP path outage; Hostinger k3s and uplink healthy). Tunnel logging and reconnect fix `5f9fb209`. Close once a recurrence leaves timestamped tunnel logs that confirm the same fault domain. ArgoCD direct-login endpoint still unavailable (SSO workaround).
+**Diagnostic-result classification sub-defect:** LIVE-VERIFIED at `6be25c92`. Operator-provided cloud-agent Slack evidence on 2026-10-22 shows the deployed read-only `describe-pod` diagnostic returning Kubernetes `NotFound` for the deliberately nonexistent pod. This verifies the diagnostic failure path only, not the historical outage or its cause.
+**Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
+**Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
+**Approval:** operator, 2026-10-20 ~14:29 PDT: "go ahead to file P1 bug"
+**Dispatch approval:** operator requested review and dispatch on 2026-10-21 and 2026-10-22. The original outage attribution remains read-only; on 2026-10-22 the operator separately authorized a bounded offline fix for the confirmed diagnostic exit-status reporting defect. No outage recovery or live changes are authorized.
+**Component:** `k3s-hostinger` node/control plane, public frontend ingress/port-forward, shopping-cart data layer, Vault/ESO; precise fault domain TBD
+**Affected:** `ubuntu-hostinger`, `https://frontend.3ai-talk.org/`, `shopping-cart-apps`, `shopping-cart-data`, Hostinger `ClusterSecretStore/vault-backend`
+## Files
+
+- `docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md`
+- `docs/issues/2026-10-21-hostinger-multi-service-incident-investigation.md`
+- `docs/issues/2026-10-21-hostinger-multi-service-incident-triage-spec.md`
+- `docs/issues/2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md`
+**Related:**
+- `docs/bugs/2026-10-17-hostinger-node-unresponsive-then-rebooted.md` (earlier 25-minute hypervisor-initiated Hostinger shutdown; **not proven to recur**)
+- `docs/bugs/2026-10-17-hostinger-vault-sealed-after-reboot-no-unseal-watchdog.md` (prior sealed-Vault defect fixed and LIVE-VERIFIED Oct 18; **do not assume same root cause**)
+- `docs/bugs/2026-10-17-hostinger-pod-ip-pool-exhausted-leaked-cni-reservations.md` (previous CNI IPAM exhaustion and remediation)
+- `docs/issues/2026-09-02-hub-control-plane-saturation-causing-public-502.md` (distinct historical fault domain)
+
+## Operator impact / incident summary
+
+At about 14:18 PDT on 2026-10-20, the operator received the critical `PublicEndpointDown` notification: `https://frontend.3ai-talk.org/` failed the hub blackbox probe for five minutes, last HTTP status **502**. While the operator was away from the M4, ChatGPT used the existing **read-only cloud-bridge `cloud-requests`** transport to trigger allowed probes and diagnostics. No runtime changes were requested or performed. Later checks show the public frontend and core Hostinger workloads recovered without intervention; the original fault domain is still unconfirmed, and a separate ArgoCD direct-login endpoint failure persists.
+
+The scope expanded from one failing frontend to a Hostinger app-cluster incident: Kubernetes API requests timed out, several data components were not ready, Hostinger Pushgateway refused connections, and app-cluster ExternalSecrets showed degraded state. An ArgoCD global view initially showed 30 Healthy/Synced apps, but two *Hostinger-specific* Application tiles subsequently showed **Degraded/Synced**, illustrating that global/cached status and application-specific health differ.
+
+## Evidence and timeline (2026-10-20, UTC)
+
+| UTC (approx.) | Source | Observation |
+|---|---|---|
+| 21:18:24 | Alertmanager warning email / critical SMS | `PublicEndpointDown`, `instance=https://frontend.3ai-talk.org/`, `job=blackbox-public-ui`, last status HTTP **502** for 5 min. |
+| 21:21:24 | Bridge request `20261020T212043Z-make-status-public` | `make-status-public` queued as webhook job `98ec31a9`. |
+| 21:21:54 | Bridge final job result | Five samples: frontend **0/5**, status `[502,502,502,502,502]`. Other endpoints (ArgoCD, Keycloak, Prometheus, Alertmanager, Grafana, webhook) **5/5** each. Verdict `SINGLE-SERVICE` at probe time; this is *not* proof that the Hostinger Kubernetes API or data plane is healthy. |
+| 21:21–21:23 | Cloud pod diagnostic | Initial `namespace=frontend` request rejected (not approved namespace). Corrected to `provider=hostinger, namespace=shopping-cart-apps`: queued job `88461022`. Returned `Unable to connect to the server: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)`. Webhook job reported `success` despite underlying kubectl failure text — a **diagnostic success-classification gap**. A 2026-10-22 source review confirmed `_run_cluster_diagnostics` marks every non-timeout command successful without checking its process exit code; see the scoped fix spec. |
+| ~21:23 | Operator Slack `hostinger-status` screenshot | Cluster status **FAIL (13 OK / 0 warn / 8 fail)**; frontend 502, product images 502, Pushgateway connection refused, ClusterSecretStore kubectl timed out, ExternalSecrets kubectl timed out, data layer **4 not ready** (including `postgres-orders` and `postgresql-payment`), ArgoCD password login HTTP unavailable. Public ArgoCD/Keycloak/Grafana/Prometheus remained reachable through their exposed endpoints. |
+| ~21:25–21:26 | Operator ArgoCD screenshots | `ubuntu-hostinger-data-layer` and `ubuntu-hostinger-shopping-cart-namespace` both **Degraded / Synced**, destination `ubuntu-hostinger`. Last Sync Oct 18 is **not** last successful health refresh. Aggregate UI had previously displayed 30 Healthy/Synced; compare freshness and scope before interpreting. |
+| ~21:27 | Operator ArgoCD resource/event screenshot | Multiple data-layer ExternalSecrets appear Degraded/Synced. One `UpdateFailed` message: `error processing spec.data[0] (key: secret/data/redis/orders-cache), err: ClusterSecretStore "vault-backend" is not ready`. Event counter **35**, first occurrence around **3 days ago**; this may predate today's public outage. |
+
+## Investigation findings — 2026-10-20 (read-only)
+
+| UTC (approx.) | Source | Observation |
+|---|---|---|
+| 21:09–21:26 | M4 frontend port-forward log | Repeated `dial tcp 2.25.146.252:6443: i/o timeout` errors; forwarding resumed at about 21:26 UTC (`Forwarding from 127.0.0.2:80 -> 8080`). Pushgateway port-forward logged retries/timeouts around 21:23–21:25 UTC, then resumed. The log contained 105 Kubernetes API timeout matches. |
+| 21:00–21:40 | Hostinger SSH / system journal | VPS boot time was `2026-10-17 18:10:52` and k3s was active, ruling out a reboot during this incident window. Kernel journal search found no OOM, link transition, conntrack, or disk/I/O error matches. k3s logged WebSocket EOF and connection-reset errors on API proxy connections; these support an interrupted API path but do not identify which network segment caused it. |
+| 23:02–23:09 | Read-only Kubernetes checks | `/readyz` returned `ok`; the single node was Ready; shopping-cart app pods and all seven data StatefulSets were ready; Vault pod was Running and `ClusterSecretStore/vault-backend` was `Ready=True`. No ExternalSecret with a non-Ready condition was returned. |
+| 23:07–23:09 | Public and local endpoint probes | Five public frontend requests returned HTTP 200; a fresh frontend request and `/api/products` also returned HTTP 200. Local frontend and Pushgateway port-forward probes returned HTTP 200. |
+| 23:11:57 | Fresh cloud-bridge `hostinger-status` job `dc9e4089` | 20 OK / 0 warn / 1 fail. ArgoCD, frontend, Keycloak, Grafana, Pushgateway, products, ESO, all four data-layer checks, and authenticated app flows passed. Prometheus returned expected HTTP 401 without auth. The sole failure was ArgoCD direct password login (`HTTP unavailable`); ArgoCD SSO login passed. Job wrapper returned `status=success` / `result_classification=passed`, which indicates the diagnostic completed, not that every probe passed. |
+| 2026-10-20, operator screenshot (time not embedded) | `make status CLUSTER_PROVIDER=k3s-hostinger` | ArgoCD, frontend, Keycloak, Grafana, and Pushgateway returned HTTP 200; Prometheus returned expected HTTP 401; overall `HEALTHY`. Hub snapshot `20261009T170742Z` was reported 270 old, a stale snapshot separate from live endpoint health. |
+
+**Assessment:** The best-supported explanation is a transient interruption of the M4-to-Hostinger Kubernetes API reachability used by the frontend and Pushgateway port-forwards. It matches the API timeouts, frontend 502s, Pushgateway refusal, subsequent forwarding recovery, and healthy current workloads. Evidence does **not** establish whether the interruption originated in Hostinger networking/API service or on the M4-side path. No evidence found for a Hostinger reboot, OOM, disk fault, or current database/Vault/ESO degradation. The remaining ArgoCD direct-login failure needs separate diagnosis; SSO works, and it was not the original public frontend 502.
+
+No restart, sync, deletion, or other runtime remediation was performed. Keep this incident OPEN until the API-path cause is established and the ArgoCD direct-login failure is triaged or split into its own issue. Do not mark it VERIFIED or LIVE-VERIFIED based only on self-recovery.
+
+**Evidence retained in GitHub cloud-requests branch:**
+
+- [Public probe final response](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T212043Z-make-status-public.final.json) — five consecutive frontend 502s vs six healthy public endpoints.
+- [Hostinger pod diagnostic result](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T212245Z-job-status-frontend-pods.json) — Kubernetes API timeout.
+- [Hostinger-status initial request](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T212043Z-hostinger-status.json) — queued job `8a78c34d`; read its terminal response when available.
+- [Hostinger-status recheck](https://github.com/wilddog64/k3d-manager/blob/cloud-requests/responses/20261020T212310Z-job-status-hostinger-recheck.json) — still running at last check.
+
+## Known facts vs hypotheses
+
+## Confirmed diagnostic-result classification defect — 2026-10-22
+
+The API-path fault domain remains unknown; no infrastructure remediation is justified. Separate from that unresolved incident cause, source inspection confirmed a narrow webhook diagnostic defect related to the incident's pod check:
+
+- `scripts/lib/webhook/status.py::_posix_spawn_capture` receives `_rc, output, timed_out` from `_spawn_capture_text` but returns only `(output.strip(), timed_out)`.
+- `_run_cluster_diagnostics` marks a command `failed` when it times out, but otherwise writes `status=success` after including any output. A `kubectl` command that exits nonzero promptly—such as the recorded API timeout—can therefore leave a failed diagnostic presented as a successful job.
+- This is a reporting/classification defect, not evidence that the status caused the 2026-10-20 outage. The captured text still showed the timeout, but consumers that rely on the job status can be misled.
+
+**Dispatch authorization — 2026-10-22:** operator requested investigation, bug-detail update, and dispatch. Implement only return-code-aware classification for `/api/v1/diagnostics`, with focused regression coverage. Do not broaden into Hostinger network/control-plane remediation, Argo CD login, status-probe semantics, or infrastructure changes. The incident stays OPEN with its root cause unassigned.
+
+Implementation scope and acceptance are in [`2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md`](../issues/2026-10-22-hostinger-diagnostic-exit-status-fix-spec.md).
+
+**Offline fix verification — 2026-10-22:** `hostinger-diagnostic-exit-status-fix` landed as `6be25c92` on `k3d-manager-v1.43.5`. The change preserves existing `_posix_spawn_capture` callers while exposing subprocess exit status to explicit diagnostics; promptly failing commands now persist `status=failed`, successful commands remain `success`, and timeouts preserve the timeout failure path. Focused pytest passed 22/22; webhook BATS passed all 68 cases with six expected environment-gated skips. Python AST parsing, `git diff --check`, and the dispatcher landing/audit gate passed. Full test output is recorded in [`2026-10-22-hostinger-diagnostic-exit-status-verification.md`](../issues/2026-10-22-hostinger-diagnostic-exit-status-verification.md). This verifies only diagnostic job classification. It does not establish the historical Hostinger outage's root cause or the direct Argo CD login cause; the incident remains OPEN, and no live infrastructure operation was performed.
+
+**Live verification — 2026-10-22:** Operator-provided cloud-agent Slack screenshot shows the deployed read-only diagnostic's `NotFound` result for `codex-verify-nonexistent-diagnostic-pod-20261022` on Hostinger. The operator designated this as the live verification evidence for the classification sub-defect. The overall outage incident remains OPEN; the screenshot does not identify its historical cause.
+
+**Operator live-check procedure:** From the release checkout, issue a deliberately failing but read-only `describe-pod` diagnostic through the existing cloud-request route:
+
+```bash
+bin/k3dm-cloud-request diagnose-describe-pod \
+  --arg provider=hostinger \
+  --arg namespace=shopping-cart-apps \
+  --arg name=codex-verify-nonexistent-diagnostic-pod-20261022 \
+  --wait-final
+```
+
+The unique pod name should produce a Kubernetes `NotFound` response without changing cluster state. Verify the returned job status is `failed` and its redacted output contains the diagnostic error. This checks the deployed diagnostic-result classification only; it does not reproduce or explain the 2026-10-20 outage. Do not mark the overall incident resolved from this check.
+
+**Established at incident time:**
+
+- Critical frontend blackbox 502 is real and reproducible across five fresh samples.
+- Several Hostinger *application/data health checks* fail together; this is not solely an nginx symptom.
+- An approved Kubernetes pod diagnostic timed out waiting for API headers during the incident.
+- At least one data-layer ExternalSecret reports `vault-backend` not ready, and Hostinger ArgoCD apps are Degraded while Synced.
+
+**Established at the last read-only check:**
+
+- Public frontend and `/api/products` returned HTTP 200; frontend and Pushgateway local port-forwards responded HTTP 200.
+- Hostinger API `/readyz` returned `ok`; node and app/data workloads were Ready; Vault and `vault-backend` were Ready.
+- Fresh status had one remaining failure: ArgoCD direct password login unavailable; ArgoCD SSO login succeeded.
+
+**Not established:**
+
+- What happened inside the initial short-lived API/Kubernetes diagnostic timeout window; later node uptime establishes that the VPS did not reboot during the incident.
+- Whether k3s API server is down, saturated, blocked by networking, or inaccessible only from M4's kubeconfig/tunnel.
+- Whether Vault `secrets/vault-0` is *currently sealed*, or whether ESO `vault-backend` is degraded because of API/Vault network/auth errors; do **not** label this as a proven recurrence of the 2026-10-17 Vault watchdog bug.
+- Whether previous Hostinger hypervisor poweroff, flannel/CNI IP exhaustion, exhausted disk, or resource pressure caused the present incident.
+- Whether ESO's `UpdateFailed` event originated today; UI indicates first occurrence about 3 days earlier.
+- Which network/API segment caused the transient TCP/6443 reachability loss, and why ArgoCD direct password login was unavailable in the fresh status job.
+
+## Investigation plan (read-only evidence first)
+
+1. **Establish node/control-plane availability:** On the operator's machine or approved Hostinger management interface, check VPS state/uptime, recent reboot/maintenance history, ping/SSH/TCP reachability, `kubectl --context ubuntu-hostinger --request-timeout=5s get --raw=/readyz`, and k3s/kubelet status. Do not bypass SSH host-key validation.
+2. **Differentiate M4 access-layer vs Hostinger outage:** Correlate a direct, authorized Hostinger-local API probe with the failing M4 `kubectl` access path and the live app/public checks. Examine tunnel/port-forward logs read-only. All other public endpoints remaining healthy makes global Cloudflare failure less likely, not impossible.
+3. **Check node health and workload scope:** Current boot timestamp, k3s and kernel journals, CPU/memory/swap/disk pressure, node Ready status, recent pod restarts, `shopping-cart-data` StatefulSets, and shopping-cart app pods. Do not conclude OOM/reboot without evidence.
+4. **Check Vault and ESO chain after restoring API reachability:** `secrets/vault-0` readiness/sealed state, last `vault-unseal-watchdog` Job (installed fix from Oct 18), `ClusterSecretStore/vault-backend` conditions and observed generation, ESO events' precise timestamps. Do not expose Secret values, tokens, Vault unseal shards, or sensitive logs.
+5. **Correlate timeline:** Match 502 start/recovery with `node_boot_time_seconds`, probe history, Prometheus scrape gaps, frontend proxy and nginx logs, pod readiness, and ESO condition transition times. An older ESO warning may be a *separate persistent defect*, not the trigger of today's outage.
+6. **Recover only with operator approval:** After confirming fault domain, propose the smallest safe action and verify 5/5 public probes, Hostinger API `/readyz`, databases, Vault/ESO, and frontend path. Never blindly SYNC/DELETE ArgoCD apps, restart databases, reinitialize Vault, unseal using exposed credentials, or wipe data.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: Identify the validated primary fault domain and record time-correlated evidence for Hostinger VM, Kubernetes API, network access, and frontend origin.
+  - id: M2
+    text: Restore and verify https://frontend.3ai-talk.org/ successful public probes and accessible Hostinger Kubernetes API.
+  - id: M3
+    text: Verify shopping-cart data workloads, Vault state, ClusterSecretStore/vault-backend and dependent ExternalSecrets recover, or split independently persistent failures into tracked follow-ups.
+  - id: M4
+    text: Compare this incident with 2026-10-17 VPS poweroff, Vault unseal watchdog and CNI IPAM fixes without falsely attributing a regression.
+  - id: M5
+    text: Record the incident timeline, exact live checks, verified resolution and prevention test/alert evidence; only set LIVE-VERIFIED after actual recovery observations.
+must_not:
+  - id: N1
+    text: No destructive remediation, forced ArgoCD sync/delete, Vault initialization, credential publication, or host restart without approved, evidence-based recovery plan.
+  - id: N2
+    text: Do not claim that sealed Vault, hypervisor poweroff, or IPAM exhaustion was the root cause until independently demonstrated.
+  - id: N3
+    text: Do not count cached ArgoCD Synced/Healthy or unrelated healthy hub public endpoints as proof of Hostinger recovery.
+evidence:
+  - id: E1
+    kind: live
+    proves: [M1, M4, N2, N3]
+    text: Time-aligned node/API, gateway/tunnel, pod, Vault and ESO read-only evidence, with source and timestamps.
+  - id: E2
+    kind: live
+    proves: [M2, M3, M5, N1, N3]
+    text: Hostinger API ready, data-layer recovered, ClusterSecretStore and ExternalSecrets conditions checked, public frontend >=3/5 passing and no critical blackbox alert; record evidence and operator approval for any recovery step.
+  - id: E3
+    kind: offline
+    proves: [M4, M5]
+    text: If a software regression is found, focused regression tests and negative/mutation checks prevent recurrence.
+interface:
+  - scripts/etc/prometheus/rules*/**/*
+  - docs/bugs/2026-10-20-hostinger-multi-service-502-kubernetes-api-timeouts.md
+```
+
+## Definition of Done
+
+- [ ] Root cause established from evidence; avoid a guessed fix.
+- [ ] Frontend and Hostinger API availability independently live-verified.
+- [ ] Databases, Vault/ESO and dependent ExternalSecrets evaluated and repaired if necessary.
+- [ ] Historical related fixes checked for genuine regression or ruled out.
+- [ ] If remediation code is needed, implement/verify on the release branch with tests and operator-approved live recovery evidence.
+
+## What NOT to Do
+
+- Do not open a PR simply to file this incident.
+- Do not commit this documentation to `main`; use `k3d-manager-v1.43.5`.
+- Do not classify an unresponsive diagnostic as a healthy cluster merely because the webhook job status was `success`.
+- Do not change live infrastructure in the course of filing this bug.
+
+## Recurrence — 2026-10-22 03:42–03:50 PDT (Claude, read-only)
+
+- `~/.local/share/k3d-manager/logs/pushgateway-pf.log` and `frontend-browser-http.log` both log
+  `dial tcp 2.25.146.252:6443: i/o timeout` on every restart from 03:42:41 to 03:49:49 PDT
+  (14 and 15 lines). Forwarding resumed at 03:50:22. The public frontend was very likely 502 for
+  about 8 minutes; check for a `PublicEndpointDown` firing around 03:47.
+- The Hostinger node stayed `Ready` (last transition 2026-07-22). No pod restarted in that window:
+  the newest restarts are 37h and 5d8h old. Workloads did not fail; only the M4 path to the
+  API server dropped.
+- The M4 did not sleep: `pmset -g log` shows no Sleep/Wake events in either window, with
+  `caffeinate` holding PreventSystemSleep.
+- The M4 → `:6443` timeouts in the PF logs, bucketed by PDT hour: Oct 12 01h (5), Oct 17 10–11h (45,
+  the known hypervisor shutdown), Oct 17 20h (5), Oct 18 22h (1), **Oct 20 14h (32, this incident)**,
+  **Oct 22 03h (29)**. Dropouts of several minutes are recurring, not a one-off.
+
+**What this establishes:** the public frontend and the Hostinger Pushgateway reach Hostinger only
+through `kubectl port-forward` from the M4, which goes through the Hostinger API server. Any loss of
+M4 → `2.25.146.252:6443` is a public outage, even when every workload is healthy. That design
+dependency is the confirmed **fault domain**. The **cause** of the drops (Hostinger-side firewall or
+k3s, provider network, or the M4's ISP path) is still unknown.
+
+**Next evidence (operator, needs SSH):** the Hostinger k3s journal and kernel log for
+2026-10-22 10:40–10:52 UTC, and whether the node itself had outbound connectivity in that window.
+If Hostinger saw no API disruption, the drop is in the network path and the remedy is
+architectural. The candidate is serving the public path from Hostinger itself (cloudflared on the
+node) instead of a laptop port-forward. That is a plan for a release, not a bug fix.
+
+## Evidence 2026-10-23: Hostinger journal for 2026-10-22 10:35–10:55 UTC
+
+The operator ran `journalctl` in the Hostinger browser terminal: 401 lines in the window, read through
+screenshots. Claude read the Mac side read-only.
+
+- **Line count by source:**
+
+| Source | Lines |
+|---|---|
+| systemd | 147 |
+| k3s | 92 |
+| kernel | 60 |
+| systemd-networkd | 30 |
+| socat | 27 |
+| sshd | 16 |
+| systemd-logind | 12 |
+| `k3dm-cni-ipam-sweep` | 4 |
+
+- **k3s:** no slow-request warnings ("apply request took too long"), no leader-election loss, no
+  request timeouts, so the API server was not saturated. Errors seen:
+  - `upgradeaware.go:428 "Error proxying data from client to backend"` at 10:42:39 and 10:44:05
+    (once local, once from an external client to `:6443`): broken port-forward or exec streams.
+  - Cgroup read errors while pods were torn down (10:35, 10:51): noise.
+  - A `vault-unseal-watch` CronJob sync error (10:35).
+- **socat:** `connect(... 127.0.0.1:8200): Connection refused` at 10:46:19–10:48:35. Hostinger `:8200`
+  is the reverse end of the Mac's `com.k3d-manager.ssh-tunnel` (`-R 8200:127.0.0.1:18200`, the Vault
+  path ESO uses), so that tunnel was down.
+- **sshd:** `Accepted publickey for ubuntu` from the Mac's public IP at 10:50:44, with two connections:
+  the tunnel reconnecting. Recovery matches the end of the incident.
+- **kernel:** a veth created at :00 and removed by :03 every five minutes (a routine CronJob pod). No
+  other kernel events.
+- **systemd:** routine units (sysstat, two successful `k3dm-cni-ipam-sweep` runs). User 1000's SSH
+  sessions closed. Volumes for four pods were unmounted.
+- **Mac side:**
+  - `pmset -g log` shows no Sleep or Wake between 03:35 and 03:55 PDT.
+  - `/tmp/k3d-manager-tunnel.{out,err}` were recreated empty on 2026-10-23 04:31, so they hold
+    nothing for the incident.
+
+**Working conclusion:** the Mac→Hostinger SSH tunnel (`-L 6443` plus `-R 8200`) was down from about
+10:40 to 10:50:44 UTC. Every Mac-side port-forward to Hostinger depends on `-L 6443`, so this accounts
+for the broken proxy streams and the multi-service 502s. Kubernetes on Hostinger stayed healthy. Why
+the tunnel dropped is still open: an ISP or Hostinger network blip is the next thing to check, using
+the 30 `systemd-networkd` lines.
+
+**`systemd-networkd` (30 lines):** every line is a pod veth on `cni0`. There are pairs at :00 and :03 every
+five minutes (the CronJob pod), plus two veths at 10:50:51 (pods restarted after the tunnel came back).
+Hostinger's own uplink logged no link, carrier or DHCP change, so its network stayed up. The drop was
+on the Mac/ISP side of the route, or in the SSH session itself.
+
+**Recovery gap:** about 10 minutes from the drop (~10:40) to the reconnect (10:50:44). The tunnel runs
+`autossh -M 0` with `ServerAliveInterval=30`, `ServerAliveCountMax=3` and `ExitOnForwardFailure=yes`,
+so the drop should have been detected in about 90 seconds. The remaining ~8 minutes are unexplained.
+Two candidates:
+- autossh backing off between failed restarts.
+- A reconnect refused while Hostinger's sshd still held `:8200` from the stale session (no
+  server-side `ClientAlive*`), which `ExitOnForwardFailure` turns into an exit and another restart.
+
+The tunnel logs for the window are gone (recreated 2026-10-23 04:31), so neither can be confirmed
+from this incident.
+
+**Next:** the fix is about recovery speed, not Kubernetes.
+- Keep the tunnel's stderr across restarts so the next drop shows its exit reason.
+- Consider server-side `ClientAliveInterval`/`ClientAliveCountMax` on Hostinger so a stale `-R 8200`
+  is released quickly.
+
+**Correction and M4-side evidence (2026-10-23):** the hub `com.k3d-manager.ssh-tunnel` agent carries
+only `-L 6443`. The reverse `:8200` path is the separate `com.k3d-manager.ssh-tunnel-vault` agent, whose
+wrapper frees a stale `:8200` with `fuser` before it reconnects, so the stale-port explanation above
+does not hold. That agent's `/tmp/k3d-manager-tunnel-vault.err` was last written at 03:49 PDT
+(10:49 UTC). It ends with a keepalive timeout (`Timeout, server … not responding`) followed by repeated
+`connect to host … port 22: Operation timed out`. The M4 could not open TCP to Hostinger:22, which
+confirms an M4/ISP path outage. The log has no timestamps, so the sequence can't be placed more
+precisely. Follow-up fix: `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`.
+
+## Closure — 2026-10-24
+
+Closed as FIXED on the operator's go. What this bug was filed to find is found: the fault domain is
+the M4 → Hostinger path, because the public frontend is served by `kubectl port-forward` on the M4
+(`_hostinger_write_frontend_browser_wrapper`) behind the M4's cloudflared. Port-forward logs show
+six such drops between 2026-10-12 and 2026-10-22. They are outside our code to prevent while the
+public path runs through the M4.
+
+- Remaining verification (the first timestamped tunnel log line at the next drop) carries in
+  `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`.
+- Prevention is a release plan, not a bug fix: `docs/plans/v1.43.8-hostinger-public-path-on-node.md`
+  serves `frontend.3ai-talk.org` from cloudflared on the Hostinger node.
+- The ArgoCD direct-login failure noted in the status line was a separate defect,
+  `docs/bugs/2026-10-23-status-argocd-login-reports-http-unavailable.md` (VERIFIED, E2 passed 2026-10-23).

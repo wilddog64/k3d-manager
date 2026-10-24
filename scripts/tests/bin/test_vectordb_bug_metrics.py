@@ -1,4 +1,6 @@
 import os
+import json
+import re
 import runpy
 import subprocess
 import sys
@@ -48,6 +50,108 @@ def _commit(root, message, date):
     subprocess.run(["git", "add", "docs/bugs"], cwd=root, check=True)
     env = {**os.environ, "GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date}
     subprocess.run(["git", "commit", "-qm", message], cwd=root, env=env, check=True)
+
+
+@pytest.mark.parametrize(("status", "expected"), [
+    ("LIVE-VERIFIED — live", ("implemented", "live_verified")),
+    ("VERIFIED — tests", ("implemented", "verified")),
+    ("IMPLEMENTED BY Codex", ("implemented", "unknown")),
+    ("DONE", ("implemented", "unknown")), ("LANDED", ("implemented", "unknown")),
+    ("MERGED", ("implemented", "unknown")), ("SHIPPED", ("implemented", "unknown")),
+    ("IN PROGRESS", ("in_progress", "n/a")), ("IN-PROGRESS", ("in_progress", "n/a")),
+    ("DISPATCHED", ("in_progress", "n/a")), ("PENDING CODEX", ("in_progress", "n/a")),
+    ("READY", ("ready", "n/a")), ("APPROVED", ("ready", "n/a")),
+    ("PROPOSED", ("proposed", "n/a")), ("SPEC", ("proposed", "n/a")),
+    ("DRAFT", ("proposed", "n/a")), ("PLAN", ("proposed", "n/a")),
+    ("PLANNED", ("proposed", "n/a")), ("SCOPED", ("proposed", "n/a")),
+    ("QUEUED FOR v1.50.0", ("proposed", "n/a")),
+    ("DEFERRED", ("deferred", "n/a")), ("MOVED", ("deferred", "n/a")),
+    ("SPLIT", ("deferred", "n/a")), ("SUPERSEDED", ("cancelled", "n/a")),
+    ("CANCELLED", ("cancelled", "n/a")), ("CANCELED", ("cancelled", "n/a")),
+    ("DROPPED", ("cancelled", "n/a")), ("WITHDRAWN", ("cancelled", "n/a")),
+    ("IMPLEMENTED — Claude-verified: pytest 106/106; live proof pending", ("implemented", "unknown")),
+    ("Garbage", ("unknown", "unknown")), (None, ("unknown", "unknown")),
+])
+def test_plan_state_leading_status_only(metrics, status, expected):
+    assert metrics._plan_state(status) == expected
+
+
+def test_plan_approval_and_plan_metrics(metrics, tmp_path):
+    assert metrics._plan_approval("**Approval:** explicit by operator", "v1.43.5") == "explicit"
+    assert metrics._plan_approval("**Approval:** pending — review", "v1.43.5") == "pending"
+    assert metrics._plan_approval("", "v1.43.5") == "none"
+    assert metrics._plan_approval("", "v1.43.1") == "n/a"
+    docs = {
+        "docs/plans/v1.43.5-a.md": '# v1.43.5 — Foo\n**Status:** READY\n**Approval:** explicit\n',
+        "docs/plans/v1.43.5-b.md": '# A "quoted" `title`\n**Status:** IMPLEMENTED\n',
+        "docs/plans/v1.42.0-old.md": '# Old\n**Status:** VERIFIED\n',
+        "docs/plans/roadmap-v1.md": '# Skip\n',
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = [line for line in output.splitlines() if line.startswith("k3dm_plan_info{")]
+    assert len(rows) == 3
+    assert 'plan="v1.43.5-a",title="Foo",execution="ready",verification="n/a",approval="explicit"' in rows[0]
+    assert 'title="A quoted title"' in rows[1]
+    assert metrics._release_order("v1.43.5") in rows[0]
+    assert 'k3dm_plan_info_skipped{repo="k3d-manager"} 1' in output
+    assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
+
+
+def test_plan_info_carries_the_scanned_branch_for_doc_links(metrics, tmp_path):
+    docs = {"docs/plans/v1.44.0-next.md": "# Next\n**Status:** READY\n"}
+    output = metrics._plan_metrics(tmp_path, "origin/k3d-manager-v1.43.5", texts=docs)
+    row = next(line for line in output.splitlines() if line.startswith("k3dm_plan_info{"))
+    assert 'branch="k3d-manager-v1.43.5"' in row
+    assert 'release="v1.44.0"' in row
+
+
+def test_plan_metrics_emits_order_and_resolves_dependencies_in_second_pass(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.43.5-a.md": "# A\n**Release:** v1.43.5 (plan 2 of 5)\n**Depends on:** `docs/plans/v1.43.5-z.md` (plan 4)\n",
+        "docs/plans/v1.43.5-z.md": "# Z\n**Release:** v1.43.5 (plan 4 of 5)\n",
+        "docs/plans/v1.43.5-ten.md": "# Ten\n**Release:** v1.43.5 (plan 10 of 12)\n",
+        "docs/plans/v1.43.5-none.md": "# None\n",
+        "docs/plans/v1.43.5-mixed.md": "# Mixed\n**Release:** v1.43.5 (plan 3 of 5)\n**Depends on:** `docs/plans/v1.43.5-z.md`, `docs/plans/v1.43.4-foo.md`, `docs/plans/v1.43.5-z.md`\n",
+        "docs/plans/v1.43.5-empty.md": "# Empty\n**Depends on:** no path here\n",
+        "docs/plans/v1.43.4-other-release.md": "# Other\n**Release:** v1.43.4 (plan 1 of 4)\n",
+        "docs/plans/v1.43.5-cross.md": "# Cross\n**Release:** v1.43.5 (plan 5 of 5)\n**Depends on:** `docs/plans/v1.43.4-other-release.md`\n",
+        "docs/plans/v1.43.5-no-order-dependency.md": "# No order\n",
+        "docs/plans/v1.43.5-no-order-user.md": "# User\n**Release:** v1.43.5 (plan 1 of 5)\n**Depends on:** `docs/plans/v1.43.5-no-order-dependency.md`\n",
+    }
+    rows = [line for line in metrics._plan_metrics(tmp_path, texts=docs).splitlines()
+            if line.startswith("k3dm_plan_info{")]
+    by_plan = {re.search(r'plan="([^"]+)"', row).group(1): row for row in rows}
+    assert 'order="2",depends_on="plan 4"' in by_plan["v1.43.5-a"]
+    assert 'order="10"' in by_plan["v1.43.5-ten"]
+    assert 'order="",depends_on="-"' in by_plan["v1.43.5-none"]
+    assert 'depends_on="plan 4, v1.43.4-foo"' in by_plan["v1.43.5-mixed"]
+    assert 'depends_on="-"' in by_plan["v1.43.5-empty"]
+    assert 'depends_on="v1.43.4-other-release"' in by_plan["v1.43.5-cross"]
+    assert 'depends_on="v1.43.5-no-order-dependency"' in by_plan["v1.43.5-no-order-user"]
+
+def test_plan_metrics_reads_worktree_top_level_only(metrics, tmp_path):
+    plans=tmp_path / "docs/plans"
+    plans.mkdir(parents=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** READY\n")
+    (plans / "sub").mkdir()
+    (plans / "sub/v1.43.5-nested.md").write_text("# Nested")
+    out = metrics._plan_metrics(tmp_path)
+    assert 'plan="v1.43.5-one"' in out
+    assert "nested" not in out
+
+
+def test_plan_metrics_reads_git_ref_top_level_only(metrics, tmp_path):
+    _git_repo(tmp_path, {"2026-10-23-seed.md": "# Seed\n"})
+    plans = tmp_path / "docs/plans"
+    (plans / "sub").mkdir(parents=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** READY\n")
+    (plans / "sub/v1.43.5-nested.md").write_text("# Nested")
+    subprocess.run(["git", "add", "docs/plans"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "plans"], cwd=tmp_path, check=True)
+    (plans / "v1.43.5-one.md").write_text("# One\n**Status:** PROPOSED\n")
+    out = metrics._plan_metrics(tmp_path, "HEAD")
+    assert 'plan="v1.43.5-one"' in out and 'execution="ready"' in out
+    assert "nested" not in out
 
 
 def test_status_date_formats_status_dates(metrics):
@@ -187,6 +291,141 @@ def test_bug_metrics_pushes_separate_group(metrics, monkeypatch, tmp_path):
     monkeypatch.setattr(metrics, "PUSH_RETRIES", 1)
     assert metrics.publish_bug_metrics(_repo(tmp_path)) is True
     assert any("/metrics/job/k3dm-bug-docs" in str(getattr(url, "full_url", url)) for url in urls)
+
+
+def test_release_cadence_nearest_rank_and_minimum(metrics):
+    tags = [(f"v1.0.{i}", i * (i + 1) // 2) for i in range(13)]
+    assert metrics._cadence(tags) == {"p25": 3, "p50": 6, "p75": 9, "gaps": 12, "last_ts": 78}
+    assert metrics._cadence(tags[:6]) is None
+    assert metrics._cadence([(f"v1.0.{i}", i // 2 * 100) for i in range(13)]) ["p25"] == 0
+
+
+def test_release_tags_ignore_non_semver_and_cadence_uses_date_order(metrics, tmp_path):
+    _git_repo(tmp_path, {"seed.md": "seed\n"})
+    dates = [
+        ("v1.1.0", "2026-01-01T00:00:00Z"),
+        ("v1.2.0", "2026-01-03T00:00:00Z"),
+        ("v1.1.1", "2026-01-13T00:00:00Z"),
+        ("v1.3.0", "2026-01-07T00:00:00Z"),
+        ("v1.4.0", "2026-01-21T00:00:00Z"),
+        ("v1.5.0", "2026-01-31T00:00:00Z"),
+        ("v1.6.0", "2026-03-02T00:00:00Z"),
+    ]
+    for name, date in dates + [("v1.2", "2026-01-03T00:00:00Z"),
+                               ("lib-v0.5.2", "2026-01-03T00:00:00Z")]:
+        env = {**os.environ, "GIT_COMMITTER_DATE": date, "GIT_AUTHOR_DATE": date}
+        subprocess.run(["git", "tag", "-a", name, "-m", name], cwd=tmp_path,
+                       env=env, check=True)
+    tags = metrics._release_tags(tmp_path)
+    expected = sorted((name for name, _ in dates), key=lambda v: tuple(map(int, v[1:].split("."))))
+    assert [version for version, _ in tags] == expected
+    cadence = metrics._cadence(tags)
+    assert cadence and cadence["gaps"] == 6
+    assert (cadence["p25"], cadence["p50"], cadence["p75"]) == (
+        4 * 86400, 6 * 86400, 10 * 86400)
+    assert cadence["last_ts"] == max(stamp for _, stamp in tags)
+
+
+def test_release_forecast_blocking_and_overdue(metrics):
+    items = [{"version": "v1.0.1"}, {"version": "v1.0.2"},
+             {"version": "v1.0.3", "blocked_by": "external"}, {"version": "v1.0.4"}]
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 100}
+    rows = metrics._forecast(items, [("v1.0.0", 1)], cadence, 105)
+    assert rows[0]["low"] == 110 and rows[1]["mid"] == 140
+    assert rows[0]["overdue"] is False
+    assert [row["state"] for row in rows[2:]] == ["blocked", "after_blocked"]
+    assert all("low" not in row for row in rows[2:])
+    rows = metrics._forecast([{"version": f"v1.0.{i}"} for i in range(1, 5)], [], None, 105)
+    assert [row["state"] for row in rows] == ["insufficient"] * 4
+
+
+def test_release_forecast_unblocked_shipped_and_overdue_positions(metrics):
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 100}
+    items = [
+        {"version": "v1.0.1"},
+        {"version": "v1.0.2"},
+        {"version": "v1.0.3", "blocked_by": "external", "blocked_done": True},
+        {"version": "v1.0.4", "target": True},
+    ]
+    rows = metrics._forecast(items, [], cadence, 105)
+    assert [(row["low"], row["mid"], row["high"]) for row in rows] == [
+        (110, 120, 130), (120, 140, 160), (130, 160, 190), (140, 180, 220)]
+    rows = metrics._forecast(items, [("v1.0.1", 1)], cadence, 105)
+    assert rows[0]["state"] == "shipped" and "low" not in rows[0]
+    assert (rows[1]["low"], rows[1]["mid"], rows[1]["high"]) == (110, 120, 130)
+    overdue = metrics._forecast([{"version": "v1.0.5"}], [],
+                                {"p25": 10, "p50": 20, "p75": 30, "last_ts": 0}, 11)[0]
+    assert overdue["low"] == 11 and overdue["overdue"] is True
+
+
+def _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path):
+    _git_repo(root, {"bug.md": "# Bug\n**Priority:** P2\n**Status:** OPEN\n"})
+    (root / "docs/plans").mkdir(parents=True, exist_ok=True)
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": [
+        {"version": "v1.0.7"},
+        {"version": "v1.0.8", "blocked_by": "outside work"},
+        {"version": "v1.0.9", "target": True},
+    ]}))
+    for index in range(7):
+        date = f"2026-01-{index + 1:02d}T00:00:00Z"
+        env = {**os.environ, "GIT_COMMITTER_DATE": date, "GIT_AUTHOR_DATE": date}
+        subprocess.run(["git", "tag", "-a", f"v1.0.{index}", "-m", "release"],
+                       cwd=root, env=env, check=True)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__,
+                        "_tally", lambda *_a, **_k: {"releases": {}, "fixed_in": {}})
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_verification_times",
+                        lambda *_a, **_k: {})
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_bug_status_metrics",
+                        lambda *_a, **_k: "open metrics\n")
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_release_metrics",
+                        lambda *_a, **_k: "release metrics\n")
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__,
+                        "_publish_lib_foundation_bugs", lambda: None)
+    pushed = []
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_push_bug_group",
+                        lambda job, payload, method="POST", **_k: pushed.append((job, method, payload)) or True)
+    return pushed
+
+
+def test_forecast_metrics_and_publish_put_and_blocking(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    pushed = _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path)
+    out = metrics._forecast_metrics(root, now=2_000_000_000)
+    assert 'version="v1.0.8"' in out and 'state="blocked"' in out
+    assert 'version="v1.0.9"' in out and 'state="after_blocked"' in out
+    assert all(f'k3dm_release_milestone_forecast_seconds{{repo="k3d-manager",version="{version}"' not in out
+               for version in ("v1.0.8", "v1.0.9"))
+    info = [line for line in out.splitlines() if line.startswith("k3dm_release_milestone_info{")]
+    assert info and all('overdue="true"' in line or 'overdue="false"' in line for line in info)
+    assert metrics.publish_bug_metrics(root) is True
+    forecast = next(entry for entry in pushed if entry[0] == "k3dm-release-forecast")
+    assert forecast[1] == "PUT"
+
+
+def test_malformed_forecast_is_nonfatal_to_other_groups(metrics, monkeypatch, tmp_path, capsys):
+    root = tmp_path / "repo"
+    root.mkdir()
+    pushed = _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path)
+    (root / "docs/release-milestones.json").write_text("{")
+    assert metrics.publish_bug_metrics(root) is True
+    captured = capsys.readouterr()
+    assert "release forecast skipped (non-fatal)" in captured.err
+    jobs = [job for job, _, _ in pushed]
+    assert "k3dm-bug-docs" in jobs and "k3dm-plan-docs" in jobs
+    assert "k3dm-bug-open" in jobs and "k3dm-bug-releases" in jobs
+
+
+def test_load_milestones_validates_target_and_versions(metrics, tmp_path):
+    path = tmp_path / "docs/release-milestones.json"
+    path.parent.mkdir()
+    for milestones in ([{"version": "v1.0.0", "target": True}, {"version": "v1.0.0"}],
+                       [{"version": "v1.0.0"}],
+                       [{"version": "v1.0.0", "target": True}, {"version": "v1.0.1", "target": True}],
+                       [{"version": "1.44", "target": True}]):
+        path.write_text(json.dumps({"milestones": milestones}))
+        with pytest.raises(ValueError):
+            metrics._load_milestones(tmp_path)
 
 
 def test_bug_metrics_read_failure_does_not_push(metrics, monkeypatch, tmp_path):
@@ -378,7 +617,7 @@ def test_acceptance_M1_M2_M3_M4_N1_N2_N3_open_for_until_live_verified(metrics, t
 
 
 def test_acceptance_M5_grafana_guide_defines_open_for_until_live_verified():
-    guide = (ROOT / "docs/guides/grafana-dashboards.md").read_text(encoding="utf-8")
+    guide = (ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md").read_text(encoding="utf-8")
     assert "Open for counts from filed until the bug is LIVE-VERIFIED." in guide
 
 
@@ -474,7 +713,7 @@ def test_publish_bug_metrics_tallies_once_and_pushes_groups(metrics, monkeypatch
     assert metrics.publish_bug_metrics(tmp_path) is True
     assert len(calls) == 1
     methods = {r.full_url.rsplit("/", 1)[-1]: r.method for r in requests if getattr(r, "data", None)}
-    assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST"}
+    assert methods == {"k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST", "k3dm-plan-docs": "PUT"}
     open_body = next(r.data.decode() for r in requests
                      if getattr(r, "full_url", "").endswith("/metrics/job/k3dm-bug-open"))
     assert "k3dm_bug_open_info" not in open_body
@@ -577,6 +816,7 @@ def test_bug_status_metrics_push_is_put_and_release_inventory_stays_post(metrics
     assert methods["k3dm-bug-docs"] == "POST"
     assert methods["k3dm-bug-open"] == "PUT"
     assert methods["k3dm-bug-releases"] == "POST"
+    assert methods["k3dm-plan-docs"] == "PUT"
 
 
 def test_bug_status_metrics_failure_does_not_block_other_groups(metrics, monkeypatch, tmp_path):
@@ -787,11 +1027,15 @@ def test_lib_foundation_series_carry_repo_and_push_to_their_own_instance(metrics
     assert result is True
     assert {job: method for job, (method, _body) in pushes.items()} == {
         "k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST",
+        "k3dm-plan-docs": "PUT",
         "k3dm-bug-docs/instance/lib-foundation": "POST",
         "k3dm-bug-open/instance/lib-foundation": "PUT",
         "k3dm-bug-releases/instance/lib-foundation": "POST",
     }
     for job, (_method, body) in pushes.items():
+        if job == "k3dm-plan-docs":
+            assert 'k3dm_plan_info_skipped{repo="k3d-manager"}' in body
+            continue
         repo = "lib-foundation" if job.endswith("/instance/lib-foundation") else "k3d-manager"
         series = [line for line in body.splitlines() if line.startswith("k3dm_bug")]
         assert series
@@ -827,7 +1071,7 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
                                    lf_tally_error=breakage == "tally_fails")
     assert result is True
     km_jobs = {job for job in pushes if "/instance/" not in job}
-    assert km_jobs == {"k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases"}
+    assert km_jobs == {"k3dm-bug-docs", "k3dm-bug-open", "k3dm-bug-releases", "k3dm-plan-docs"}  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-plan-docs
     lf_jobs = {job for job in pushes if job.endswith("/instance/lib-foundation")}
     assert lf_jobs == {
         "missing_dir": set(), "no_origin_main": set(),
@@ -836,3 +1080,19 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
                         "k3dm-bug-releases/instance/lib-foundation"},
     }[breakage]
     assert "lib-foundation" in capsys.readouterr().err
+
+
+def test_plan_push_failure_is_nonfatal(metrics, monkeypatch, tmp_path, capsys):
+    pushed=[]
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_push_bug_group",
+                        lambda job, payload, method="POST": pushed.append((job, method)) or True)
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_publish_lib_foundation_bugs", lambda: None)
+    _fake_git(monkeypatch, metrics, {"v1.43.0": _bucket()}, ["v1.42.0"])
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert ("k3dm-plan-docs", "PUT") in pushed
+    pushed.clear()
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_plan_metrics",
+                        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("plan parse")))
+    assert metrics.publish_bug_metrics(tmp_path) is True
+    assert any(job == "k3dm-bug-docs" for job, _method in pushed)
+    assert "plan metrics skipped (non-fatal): plan parse" in capsys.readouterr().err

@@ -1,7 +1,8 @@
 # Bug: Hostinger Vault stays sealed after a node reboot — no unseal watchdog there
 
-**Status:** FIXED — 2026-10-17: Codex `a1c2f800`; Claude-verified offline (Codex BATS 24/24, independent verifier `scripts/tests/lib/hostinger_vault_watchdog_acceptance.bats` 9/9, N1/N3 red on pre-fix, shellcheck clean). E3 live pending: operator `make refresh CLUSTER_PROVIDER=k3s-hostinger`, then delete `secrets/vault-0` and confirm `Sealed false` within 10 min
+**Status:** LIVE-VERIFIED — 2026-10-18: E3 passed on ubuntu-hostinger. After `make refresh CLUSTER_PROVIDER=k3s-hostinger`, the operator deleted `secrets/vault-0` at 19:12:54Z; it came back sealed and the next watchdog run (`vault-unseal-watchdog-29872515`, 19:15:00Z) logged `vault sealed — replaying shard` / `unseal succeeded`; `vault-sealed=false` and ready at 19:15:04Z, 2m10s after the restart (limit 10 min). Fixed by Codex `a1c2f800`; offline: Codex BATS 24/24, independent verifier 9/9, N1/N3 red on pre-fix
 **Priority:** P1
+**Fix commit:** `a1c2f800`
 **Approval:** approved — operator, 2026-10-17: "apporve the fix"
 **Found:** 2026-10-17, Claude, while `make appsets-reapply` failed its final check
 **Branch:** `k3d-manager-v1.43.4`
@@ -213,3 +214,17 @@ interface:
   - make appsets-reapply / the values-branch confirmation it runs
   - CronJob secrets/vault-unseal-watchdog, Secret secrets/vault-unseal
 ```
+
+## Live evidence
+
+**Live evidence:** 2026-10-18 · run vault-unseal-watchdog-29872515 · env ubuntu-hostinger · scenario vault-0-pod-delete · commit a1c2f800 · proves E3
+
+2026-10-18, run by the operator, observed read-only by Claude:
+
+- `kubectl --context ubuntu-hostinger -n secrets delete pod vault-0`; new pod `startTime`
+  19:12:54Z, labelled `vault-sealed=true`, container not ready.
+- CronJob `vault-unseal-watchdog` (`*/5 * * * *`, not suspended) ran job
+  `vault-unseal-watchdog-29872515` at 19:15:00Z, which completed in 4s. Log:
+  `[unseal-watchdog] vault sealed — replaying shard`, `[unseal-watchdog] unseal succeeded`.
+- 19:15:04Z: `vault-sealed=false`, container ready. Total sealed time 2m10s, inside the 10-minute
+  bound in E3.

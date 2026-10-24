@@ -26,12 +26,15 @@ Argo CD is deployed as a GitOps continuous delivery tool with the following inte
 - **TLS**: Vault PKI-issued certificates for CLI access
 
 **Architecture:**
-```
-User → Istio IngressGateway → Argo CD Server
-                                    ↓
-                         Dex → OpenLDAP (authentication)
-                                    ↓
-                              Vault → ESO → Admin Password
+```mermaid
+flowchart TD
+    U[User] --> I[Istio IngressGateway]
+    I --> A[Argo CD Server]
+    A --> D[Dex]
+    D --> L[OpenLDAP\nauthentication]
+    A --> E[External Secrets Operator]
+    V[Vault] --> E
+    E --> P[Admin password Secret]
 ```
 
 ## Prerequisites
