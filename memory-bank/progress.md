@@ -482,3 +482,5 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-24: /post-merge v1.43.5 — tag v1.43.5 on 401e4eca, GitHub release created, branch k3d-manager-v1.43.6 cut, retro docs/retro/2026-10-24-v1.43.5-retrospective.md.
 - [x] 2026-10-24: v1.43.5 standing-docs audit fixes landed on k3d-manager-v1.43.6 (`51b9b12d`).
 - [x] v1.43.6 plan 1 dispatch-agy-agent-ledger — landed `2040d546` 2026-10-24; E1 verified (63 bats, 67 pytest, real agy models match checked). E2 live pending (agy vs Codex on one small spec).
+
+- **E2 live side-by-side (agy-ledger spec), started 2026-10-24:** v1.43.6 plan 4 `claude-context-compaction-metrics` dispatched to Codex (slug `claude-context-compaction-metrics`, ledger start agent=codex model=null source=inherited) and agy (slug `claude-context-compaction-metrics-agy`, agent=agy model=gemini-4-argon-medium source=default). Both running. Next: verify both, land one, record E2 in `docs/plans/v1.43.6-dispatch-agy-agent-ledger.md`.
