@@ -1,6 +1,6 @@
 # Bug: dispatch API cost is windowed by when the ledger event was written, so Projected / month is inflated
 
-**Status:** VERIFIED 2026-10-24 (E2, Claude half) — `bin/k3dm-dispatch-metrics --dry-run` at `1e80a6d3`: 7d API cost $3.65 < 30d $9.97; observed_days printed (7d = 7.00). Operator screenshot of Projected / month pending. Was LANDED `f8dbf7b6` 2026-10-24 — E1 green (43 pytest; the 3 new tests and the dashboard test red on the pre-fix code). E2 dry run: 1d $0.79, 7d $3.48, 30d $9.61 (were all $9.61); observed days 1.00 / 7.00 / 14.12; Projected ≈ $14.89 (was $41.2). Dashboard part pending the Argo hard refresh.
+**Status:** VERIFIED 2026-10-24 (E2, Claude half) — `bin/k3dm-dispatch-metrics --dry-run` at `1e80a6d3`: 7d API cost $3.65 < 30d $9.97; observed_days printed (7d = 7.00). Deployed ConfigMap `monitoring/grafana-dashboard-agent-dispatch` Projected / month expression matches the repo (7d cost ÷ observed_days × 30, Luna + Claude); expected ≈ $1,073 from the dry run (Luna $3.56 + Claude $246.81 over 7.00 days). Operator screenshot of Projected / month pending. Was LANDED `f8dbf7b6` 2026-10-24 — E1 green (43 pytest; the 3 new tests and the dashboard test red on the pre-fix code). E2 dry run: 1d $0.79, 7d $3.48, 30d $9.61 (were all $9.61); observed days 1.00 / 7.00 / 14.12; Projected ≈ $14.89 (was $41.2). Dashboard part pending the Argo hard refresh.
 **Priority:** P2
 **Fix commit:** `f8dbf7b6`
 **Severity:** medium — the cost totals are right, but the 1d/7d windows and Projected / month overstate recent spend
