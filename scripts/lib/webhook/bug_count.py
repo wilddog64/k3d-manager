@@ -134,7 +134,8 @@ def reply(query):
         lead = lead_of(data)
         noun = f" {query.priority}" if query.priority else ""
         state_lead = f" {query.state}" if query.state else ""
-        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs — {counts.get('closed', 0)} fixed, "
+        of_total = f" of {counts.get('total', 0)}" if query.state else ""
+        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs{of_total} — {counts.get('closed', 0)} fixed, "
                      f"{counts.get('open', 0)} open, {counts.get('unknown', 0)} with no Status line.")
         open_items = data.get("open_paths", []) if query.priority else counts.get("open_paths", [])
         unknown_items = data.get("unknown_paths", []) if query.priority else counts.get("unknown_paths", [])

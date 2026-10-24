@@ -38,6 +38,13 @@ def test_reply_formats_counts_and_links(monkeypatch):
     assert "Could not count" not in answer
 
 
+def test_state_reply_names_the_total_it_is_part_of(monkeypatch):
+    payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, "closed"))
+    assert "v1.43.5: 75 closed bug docs of 81 — 75 fixed, 6 open" in answer
+
+
 def test_failed_tally_never_calls_model(monkeypatch):
     called = []
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (1, "", False))

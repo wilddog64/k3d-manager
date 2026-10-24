@@ -142,6 +142,14 @@ def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
     assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
+def test_bug_count_reply_cites_the_tally(monkeypatch):
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _query: "v1.43.5: 81 bug docs")
+    reply = ask_docs.answer("how many bugs in v1.43.5", retrieve=lambda _q, k=5: pytest.fail("retrieved"),
+                            model=lambda _p: pytest.fail("model"))
+    assert "Sources: none" not in reply
+    assert f"Sources:\n{ask_docs._doc_link('scripts/bug-tally.py')}" in reply
+
+
 def test_retrieval_unavailable_does_not_call_model():
     calls = []
 
