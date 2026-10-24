@@ -1,6 +1,6 @@
 # Bug: usage-backfill starts one metrics export per event and starves the hub
 
-**Status:** OPEN
+**Status:** FIXED `5a96ef60` — E1 green (52 bats, shellcheck clean). E2 live 2026-10-23 17:44 PDT: 20 rapid `_dispatch_schedule_metrics` calls ran at most one real export at a time (one sampler reading of 2 was a transient process gone before `ps`), load stayed below 10, no lock left behind; `usage-backfill` with nothing to do started no export.
 **Priority:** P1
 **Severity:** high — one `usage-backfill` run put the laptop at load 101 and made every Grafana panel error
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
