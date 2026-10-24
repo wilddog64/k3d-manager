@@ -5,6 +5,7 @@ This file was compressed on 2026-10-19 because the active memory-bank exceeded 7
 ## Current branch and operating rules
 
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
+- 2026-10-24 `69dc063b`: Bug Tracking showed LANDED bugs as Open (parser lacked LANDED); fixed. usage-backfill P1 now LIVE-VERIFIED with evidence lines. Operator chose to wait for the v1.43.8 branch before dispatching.
 - Latest relevant release commits: `63d604dd` (dispatch missing-telemetry exporter), `611bc1f8` (Slack smoke target selector), and `4a8aeaae` (dispatch telemetry LIVE-VERIFIED evidence). Both dispatch bugs are LIVE-VERIFIED from operator screenshots/jobs on 2026-10-20; Slack selector job `c4a9465f` passed 2/2 with `ARGOCD_APP_PREFIX=ubuntu-hostinger-`. Replay fix live-verified from job `3198fa72`.
 - Do not create PRs; finish scoped work at commit + push + memory-bank update.
 - Live verification is operator/Claude-owned; Codex may perform read-only diagnostics when explicitly requested.

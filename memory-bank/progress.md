@@ -453,3 +453,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Claude per-landed figures release-only `559e9a07` (2026-10-24).
 - [ ] v1.43.8 plan 3 dispatch-claude-cost-by-reference: SPEC WRITTEN 2026-10-24; dispatch after the branch is cut.
 - [x] claude-cost E2 VERIFIED 2026-10-24 (operator screenshots).
+- [x] Bug Tracking: LANDED bug docs now count as fixed (`prior_art._CLOSED_RE`); usage-backfill P1 gets Fix commit + Live evidence lines `69dc063b` (2026-10-24). Live: shows after the bug exporter next runs on the hub. Open P2s left: Hostinger 502 (MONITORING), dashboard-queries-untested (OPEN). Many landed P2s still await live E2.
