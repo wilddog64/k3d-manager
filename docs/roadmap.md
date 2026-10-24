@@ -359,6 +359,10 @@ Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashbo
 (operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
 hard-coded version. Moved from v1.43.5 on 2026-10-23, because that release already had five plans and v1.43.6 is full.
 
+Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
+(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
+per release on Agent Dispatch, as separate columns with no combined score. v1.43.7 is now full.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the

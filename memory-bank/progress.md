@@ -420,4 +420,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] P3 By model E3 live-verified 2026-10-24 (both models shown; coverage titled). Leftover: By model needs fieldConfig min 0 — fold into the Per spec totals change.
 - [x] Windowing P2 LANDED `f8dbf7b6` 2026-10-24: cost windows by session start; 7d $3.48 vs 30d $9.61; Projected ≈ $14.89 (was $41.2). Awaiting Argo hard refresh.
 - [x] Per spec totals row `74dbdcfb` (Claude, operator: "time to land can be an average but total for all others"): footer sums tokens/Codex time/runs/API equiv; mean time to land already the top-row stat; By model min 0. Awaiting Argo hard refresh + screenshot.
-- [ ] Operator asked for complexity per spec + per release — proposal pending go; v1.43.5 at 5-plan cap, so a plan goes to a later release.
+- [x] Complexity plan filed: `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5 of 5, now full; operator: "that's fine. we go as planned"). Spec size at dispatch, change size at land, separate columns, no score, no backfill. Dispatch waits for the v1.43.7 branch.

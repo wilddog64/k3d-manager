@@ -93,6 +93,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
+- 2026-10-23: Complexity plan filed `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5/5, full; approved "that's fine. we go as planned"); dispatch waits for the v1.43.7 branch. Still awaiting operator Argo hard refresh + screenshot for `f8dbf7b6` (Projected ≈ $14.9) and `74dbdcfb` (Per spec footer, By model min 0).
+
 - 2026-10-23: `ssh-config-guard` LANDED `f3002d12` (live E2 waits on the operator moving aliases to `~/.ssh/config.d/operator`). `cve-scan-coverage` LANDED `8124c08f` (operator ran `--allow-out-of-scope`); live E2/E3 pending `make platform-ops`. New P3: hub_data.bats TMPDIR path sensitivity.
 
 - Slack help task `2026-10-15-slack-k3dm-help-no-response-during-cluster-up` landed as `61230daa` and is LIVE-VERIFIED by the operator's 2026-10-21 Slack screenshot showing `/k3dm targets` responding while AWS `cluster-up` remained running. Webhook BATS passed 68 cases (6 expected skips), focused pytest passed 29/29, ShellCheck/diff-check and `_agent_lint`/`_agent_audit` passed. Separate lifecycle thread-context bug is fixed and VERIFIED offline at `6b324441`; awaiting operator live verification.
