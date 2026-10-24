@@ -1,6 +1,6 @@
 # Bug: a bare `tunnel_start` repoints the Hostinger tunnels at the `ubuntu` sandbox alias, and Hostinger loses Vault
 
-**Status:** OPEN — workaround: `make refresh CLUSTER_PROVIDER=k3s-hostinger`
+**Status:** LANDED `8ca5668f` 2026-10-23 — E1 green (tunnel.bats 23; 115 across the suites that load k3s-hostinger.sh); tests 1 and 3 red on the pre-fix plugin, test 5 red without the F3 reconcile line. Landed with `--allow-out-of-scope` because the task's base spec predates the F3 amendment. E2 (operator `make refresh CLUSTER_PROVIDER=k3s-hostinger`, Claude verifies) pending.
 **Priority:** P2
 **Severity:** high — every Hostinger ExternalSecret stops syncing; running pods keep the last synced Secrets
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
