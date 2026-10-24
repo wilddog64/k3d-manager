@@ -94,7 +94,7 @@ def _claude_cost(record, prices):
 
 
 def _render_claude(lines, window, records, rates, landed, now, cutoff=None, tasks=None,
-                   all_tasks=None, time_scope=False):
+                   all_tasks=None, time_scope=False, shown_keys=None):
     task_scoped = not time_scope
     selected_tasks = tasks or []
     overlap_tasks = all_tasks or selected_tasks
@@ -143,6 +143,8 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
     if selected_tasks:
         for task in selected_tasks:
             _, _, version, slug = task
+            if shown_keys is not None and (version, slug) not in shown_keys:
+                continue
             if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
                     and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
                 continue
@@ -491,11 +493,15 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
                 interval = (min(starts), max(lands), task_version or key[0], key[1])
                 all_tasks.append(interval)
                 normalized_key = (_normalize_version(key[0]) or key[0], key[1])
-                if (key in scoped_keys or normalized_key in scoped_keys) and len(scoped_tasks) < TASK_CAP:
+                if key in scoped_keys or normalized_key in scoped_keys:
                     scoped_tasks.append(interval)
+        shown_keys = set()
+        for task in valid_tasks[:TASK_CAP]:
+            shown_keys.add((task[1], task[2]))
+            shown_keys.add((_normalize_version(task[1]) or task[1], task[2]))
         _render_claude(lines, window, claude_records, claude_prices or {}, metrics["landed"], now,
                        cutoff=cutoff, tasks=scoped_tasks, all_tasks=all_tasks,
-                       time_scope=time_scope)
+                       time_scope=time_scope, shown_keys=shown_keys)
 
 
 def _timestamp(value):

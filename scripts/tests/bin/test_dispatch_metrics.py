@@ -876,6 +876,23 @@ def test_claude_release_sums_same_release_overlapping_task_shares():
     assert 'k3dm_dispatch_claude_tokens{window="v1.0.0",model="m",kind="input"} 2000000.0' in output
 
 
+def test_claude_release_total_counts_specs_beyond_task_cap():
+    count = dispatch_metrics.TASK_CAP + 5
+    rows = []
+    for index in range(count):
+        rows += [event(index * 100, "start", f"s{index}", version="v1.0.0"),
+                 event(index * 100 + 10, "land", f"s{index}", version="v1.0.0")]
+    records = [_claude_message(f"m{index}", index * 100 + 5, input=1_000_000) for index in range(count)]
+    output = dispatch_metrics.render(rows, 0, count * 100, claude_records=records, claude_prices=_claude_rates())
+    assert _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0") == count
+    newest = f"s{count - 1}"
+    assert _task_metric(output, "v1.0.0", "v1.0.0", newest) == 1
+    shown = [line for line in output.splitlines()
+             if line.startswith('k3dm_dispatch_task_claude_api_cost_usd{window="v1.0.0",')]
+    assert len(shown) == dispatch_metrics.TASK_CAP
+    assert not any('slug="s0"' in line for line in shown)
+
+
 def test_claude_privacy_keeps_only_allowed_rollup_data(tmp_path):
     projects = tmp_path / "projects"; projects.mkdir()
     transcript = projects / "s.jsonl"
