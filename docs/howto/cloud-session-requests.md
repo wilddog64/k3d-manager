@@ -232,8 +232,11 @@ branch of that name, and the helper does not create one.
 ```
 
 `status` is `ok`, `rejected` or `error`. On `rejected`, `reason` says which validation failed and
-`body` is absent — the request was never executed. There is **no retry**: an id is consumed
-whether it succeeded, was rejected, or expired. To ask again, file a new request with a new id.
+`body` is absent — the request was never executed. An id is claimed before execution and is never
+sent to the webhook twice. If the bridge restarts after claiming an id but before saving its
+response, it publishes `status: "error"` with reason `bridge restarted before the request
+completed; outcome unknown — file a new request`; file a new request with a new id. A failed
+response push delays publication until a later tick, but never repeats the action.
 
 ### Diagnostic artifacts on a finished job
 

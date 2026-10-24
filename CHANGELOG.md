@@ -36,6 +36,9 @@
 
 - The Agent dispatch dashboard's By model panel now uses an instant query, and Ledger coverage names its percentage "in the ledger".
 
+- The cloud bridge journals request claims before execution and retries saved responses from a
+  local outbox after push failures, so failed publication or a bridge restart never repeats an action.
+
 - Codex usage backfills now schedule one metrics export, and dispatch metrics exports run single-flight with a pending rerun for events received during an export.
 
 - Updated cluster teardown regression tests for the confirmed-teardown-first contract: failed or
