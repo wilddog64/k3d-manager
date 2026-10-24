@@ -4,6 +4,8 @@
 
 ### Added
 
+- Agent dispatch's Per spec table links each task name to its plan or bug document on the task's release branch.
+
 - The Bug Tracking Release plans table shows each plan's implementation order and prerequisite plans, with rows sorted numerically by order.
 
 - The Agent dispatch ledger records cumulative Codex session input, cached-input and output tokens;

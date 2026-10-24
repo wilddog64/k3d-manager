@@ -55,6 +55,9 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 
 ## Agent dispatch costs
 
+The Agent dispatch **Per spec** table links each Spec name to its plan or bug document on the
+task's release branch; the link opens in a new tab.
+
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
 Rates live in `scripts/etc/agent/codex-model-prices.json`; update a model's input, cached-input and

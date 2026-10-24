@@ -18,6 +18,7 @@ TASK_CAP = 50
 VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
+SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 
 
 def _repo_root():
@@ -169,6 +170,7 @@ def _task_metrics(task_events, land_event, prices=None):
 
     token_events = [event for event in exits if isinstance(event.get("tokens"), int)]
     start_events = [event for event in task_events if event.get("event") == "start"]
+    latest_start = max(enumerate(start_events), key=lambda item: (item[1].get("ts", 0), item[0]))[1] if start_events else {}
     elapsed = None
     if start_events:
         elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
@@ -180,6 +182,7 @@ def _task_metrics(task_events, land_event, prices=None):
         "elapsed_seconds": elapsed,
         "runs": len(exits),
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
+        "spec": latest_start.get("spec"),
     }
 
 
@@ -227,7 +230,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None):
         if task["runs"]:
             codex_values.append(task["codex_seconds"] / 60)
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
-                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"]))
+                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"]))
 
     return {
         "landed": len(landed),
@@ -317,8 +320,10 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             skipped += 1
             continue
         valid_tasks.append(task)
-    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost in valid_tasks[:TASK_CAP]:
+    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}"'
+        if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
+            lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
         if tokens is not None:
             lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
         if runs:

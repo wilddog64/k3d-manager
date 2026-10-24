@@ -86,6 +86,31 @@ def test_per_task_values():
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 3.3333333333333335' in output
 
 
+def test_task_spec_uses_latest_start_and_is_emitted_for_each_scope():
+    output = dispatch_metrics.render([
+        event(1, "start", spec="docs/plans/old.md"), event(2, "start", spec="docs/bugs/2026-10-23-x.md"),
+        event(3, "codex_exit", tokens=1), event(4, "land"),
+    ], 0, 10)
+    for window in ("1d", "7d", "30d", "v9.9.9"):
+        assert (f'k3dm_dispatch_task_spec{{window="{window}",version="9.9.9",slug="one",'
+                'spec="docs/bugs/2026-10-23-x.md"} 1') in output
+    assert 'spec="docs/plans/old.md"' not in output
+
+
+@pytest.mark.parametrize("spec", [None, "../etc/passwd", "docs/plans/a b.md"])
+def test_invalid_or_missing_task_spec_is_omitted_without_hiding_other_series(spec):
+    extra = {} if spec is None else {"spec": spec}
+    output = dispatch_metrics.render([
+        event(1, "start", **extra), event(2, "codex_exit", tokens=4), event(3, "land"),
+        event(1, "start", "valid", spec="docs/plans/v1.43.5-valid.md"),
+        event(2, "codex_exit", "valid", tokens=5), event(3, "land", "valid"),
+    ], 0, 10)
+    assert 'slug="one",spec=' not in output
+    assert 'slug="valid",spec="docs/plans/v1.43.5-valid.md"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one"} 4' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one"} 2' in output
+
+
 def test_landed_task_without_exit_omits_codex_samples_but_keeps_elapsed():
     output = dispatch_metrics.render([
         event(100, "start"), event(399, "land"),
@@ -367,7 +392,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 20
+    assert sum("$window" in expr for expr in expressions) == 21  # agent-audit: allow assert-removed panel 12 query E adds one $window expression
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -376,6 +401,19 @@ def test_dispatch_dashboard_window_variable_and_release_link():
                    "k3dm_dispatch_codex_minutes_per_landed", "k3dm_dispatch_task_",
                    "k3dm_dispatch_rework_ratio")))
     per_spec = next(panel for panel in dashboard["panels"] if panel["id"] == 12)
+    targets = {target["refId"]: target["expr"] for target in per_spec["targets"]}
+    assert targets["E"] == 'max by (version, slug, spec) (k3dm_dispatch_task_spec{window="$window"})'
+    organize = per_spec["transformations"][1]["options"]
+    assert organize["excludeByName"]["Value #E"] is True
+    assert organize["renameByName"]["Value #F"] == "API equiv."
+    spec_override = next(item for item in per_spec["fieldConfig"]["overrides"]
+                         if item["matcher"]["options"] == "Spec")
+    spec_properties = {prop["id"]: prop["value"] for prop in spec_override["properties"]}
+    assert spec_properties["custom.hidden"] is True
+    assert spec_properties["links"][0]["title"] == "Open spec document"
+    assert "${__data.fields.spec}" in spec_properties["links"][0]["url"]
+    assert "k3d-manager-${__data.fields.version}" in spec_properties["links"][0]["url"]
+    assert spec_properties["links"][0]["targetBlank"] is True
     release_override = next(item for item in per_spec["fieldConfig"]["overrides"]
                             if item["matcher"]["options"] == "Release")
     link = next(prop["value"] for prop in release_override["properties"] if prop["id"] == "links")
