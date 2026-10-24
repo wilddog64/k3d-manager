@@ -459,3 +459,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-24: Hostinger 502 closed FIXED; plan v1.43.8-hostinger-public-path-on-node written (v1.43.8 full). New P2 hub-snapshot-list-shows-only-first-snapshot filed (blocks cut; dispatch go pending).
 - [ ] 2026-10-24: snapshot-list P2 dispatched to Luna; v1.43.8 dispatch queue now 5 plans (+ hostinger-public-path-on-node, go recorded).
 - [x] ask-docs bug-count wording ("N closed bug docs of TOTAL") and Sources now cite scripts/bug-tally.py (2026-10-24, operator report). LIVE-VERIFIED 2026-10-24 08:05 PDT (operator Slack screenshot: "75 closed bug docs of 81", Sources: scripts/bug-tally.py).
+- [ ] 2026-10-24: 10 verified bugs promoted to LIVE-VERIFIED; 21 remain (offline/rebuild-only). P3 filed for an offline verification type. make test reds under triage (blocks the cut).

@@ -1,7 +1,8 @@
 # Bug: Firing Alerts by Category omits when alerts started firing and how long they have been active
 
 **Filed:** 2026-10-21 (operator screenshot)
-**Status:** VERIFIED — live 2026-10-22 PDT after `c993c5df`: Active Alert Instances Inspect → Stats shows 41 rows, matching Firing Alerts (Prometheus) = 41 (25 hub + 15 ubuntu-hostinger Trivy + 1 acg TargetDown); Active since and Elapsed render; CVE Findings shows Report Created. Follow-up: `2026-10-22-active-alert-instances-novalue-fills-missing-labels.md`
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — live 2026-10-22 PDT after `c993c5df`: Active Alert Instances Inspect → Stats shows 41 rows, matching Firing Alerts (Prometheus) = 41 (25 hub + 15 ubuntu-hostinger Trivy + 1 acg TargetDown); Active since and Elapsed render; CVE Findings shows Report Created. Follow-up: `2026-10-22-active-alert-instances-novalue-fills-missing-labels.md`
+**Fix commit:** `28e74901`
 **Priority:** P3 — observability usability; alert detection and delivery not shown to be broken
 **Severity:** low
 **Approval:** operator approved follow-up investigation, bug update, and fix dispatch on 2026-10-22
@@ -307,3 +308,5 @@ showed 41; the screenshot shows the first 7 rows). The bug stays REOPENED until 
 
 Operator Inspect → Stats on Active Alert Instances: Total number rows = 41, equal to the Firing Alerts
 (Prometheus) stat and to Firing Alerts by Category (25 + 15 + 1). Every firing instance has a row.
+
+**Live evidence:** 2026-10-22 · run grafana-inspect-active-alert-instances · env hub-grafana · scenario 41-rows-match-firing-count · commit c993c5df · proves E2

@@ -1,7 +1,8 @@
 # Bug: ask-docs reply is cut mid Slack link, and the bug count repeats "(0 deferred)"
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshots during the ask-docs thread live check)
-**Status:** VERIFIED — `ee456c83` (Luna; Claude review: N1 and N2 red on pre-fix, existing '(1 deferred)' test still green, 53 tests green); live E2 2026-10-22 ~18:11 PDT: after make restart-webhook, `/ask-docs what is the bug tally` ended on a complete link plus "…(truncated; name a release to see the full list)", release lines read "N open," with no "(0 deferred)", Sources line intact
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `ee456c83` (Luna; Claude review: N1 and N2 red on pre-fix, existing '(1 deferred)' test still green, 53 tests green); live E2 2026-10-22 ~18:11 PDT: after make restart-webhook, `/ask-docs what is the bug tally` ended on a complete link plus "…(truncated; name a release to see the full list)", release lines read "N open," with no "(0 deferred)", Sources line intact
+**Fix commit:** `ee456c83`
 **Priority:** P3 — cosmetic; the last listed doc renders as raw markup, every other line is correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" to filing and dispatching to Luna
@@ -89,3 +90,5 @@ interface:
 - Do NOT raise `MAX_REPLY_CHARS` instead of fixing the cut.
 - Do NOT change `_doc_link` output or the link format.
 - Do NOT edit this bug doc, create a PR, commit to `main`, or use `--no-verify`.
+
+**Live evidence:** 2026-10-22 · run slack-ask-docs-bug-tally · env slack · scenario truncated-on-line-boundary · commit ee456c83 · proves E2

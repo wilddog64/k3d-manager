@@ -1,7 +1,8 @@
 # Cloud-request diagnostic reports omit the job ID
 
 **Filed:** 2026-10-22
-**Status:** VERIFIED — `ec81caa3`; live E2 2026-10-22 17:19 PDT: `diagnose-pods` (hub, platform-ops) returned 202 job `9f369739`; the posted report line 2 is `_Job: \`9f369739\`_`, delivered (route `bot_fallback`, unchanged); operator Slack screenshot at 17:18 PDT shows `Job: 9f369739` under the title
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `ec81caa3`; live E2 2026-10-22 17:19 PDT: `diagnose-pods` (hub, platform-ops) returned 202 job `9f369739`; the posted report line 2 is `_Job: \`9f369739\`_`, delivered (route `bot_fallback`, unchanged); operator Slack screenshot at 17:18 PDT shows `Job: 9f369739` under the title
+**Fix commit:** `ec81caa3`
 **Priority:** P3
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching to Luna
@@ -96,3 +97,5 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT add `channel_id`/`thread_ts` to cloud-request payloads or change Slack routing; that is the v1.44.0 plan.
 - Do NOT post to Slack or run real diagnostics in tests.
+
+**Live evidence:** 2026-10-22 · run job-9f369739 · env hub · scenario diagnose-pods-report-shows-job-id · commit ec81caa3 · proves E2

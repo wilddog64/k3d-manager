@@ -1,7 +1,8 @@
 # Bug: Active Alert Instances shows "No firing instances…" in cells of a firing alert
 
 **Filed:** 2026-10-22 (Claude, from the operator's Inspect → Data screenshot)
-**Status:** VERIFIED — `ad4c91dd` (Luna; Claude review: N1 red on pre-fix, PromQL unchanged, bats green); live E2 2026-10-22 17:49 PDT: hub app k3d-cluster-grafana-dashboards Synced at a1e2578f, operator Inspect → Data shows "—" in the TargetDown (acg) row app and group cells
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `ad4c91dd` (Luna; Claude review: N1 red on pre-fix, PromQL unchanged, bats green); live E2 2026-10-22 17:49 PDT: hub app k3d-cluster-grafana-dashboards Synced at a1e2578f, operator Inspect → Data shows "—" in the TargetDown (acg) row app and group cells
+**Fix commit:** `ad4c91dd`
 **Priority:** P3 — misleading cell text; the row, count and timestamps are correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna after bug-tally-implemented-deferred
@@ -73,3 +74,5 @@ interface:
 
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT edit the panel PromQL.
+
+**Live evidence:** 2026-10-22 · run grafana-inspect-data-targetdown-row · env hub-grafana · scenario empty-label-cells-show-dash · commit a1e2578f · proves E2

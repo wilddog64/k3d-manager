@@ -1,7 +1,8 @@
 # Bug: Active Alert Instances panel query has an unbalanced parenthesis
 
 **Filed:** 2026-10-22 (Claude, from the operator's Grafana screenshot)
-**Status:** VERIFIED — `c993c5df` (Luna; Claude review: N1 red on pre-fix, 47/47 bats green); live E2 2026-10-22 PDT: operator screenshot shows panel 13 rendering rows (Active since, Elapsed) with no error icon
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `c993c5df` (Luna; Claude review: N1 red on pre-fix, 47/47 bats green); live E2 2026-10-22 PDT: operator screenshot shows panel 13 rendering rows (Active since, Elapsed) with no error icon
+**Fix commit:** `c993c5df`
 **Priority:** P3 — one dashboard panel shows an error; alert detection and delivery are unaffected
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatching the panel-13 fix to Luna
@@ -95,3 +96,5 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT run `make platform-ops` or touch the cluster.
 - Do NOT restructure the query or the category rules; remove the extra `label_replace(` only.
+
+**Live evidence:** 2026-10-22 · run operator-grafana-screenshot-panel-13 · env hub-grafana · scenario panel-13-renders-without-error · commit c993c5df · proves E2

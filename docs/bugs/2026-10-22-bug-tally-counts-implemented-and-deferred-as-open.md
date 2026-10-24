@@ -1,7 +1,8 @@
 # Bug: bug tally counts IMPLEMENTED and DEFERRED bugs as open
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshot at 18:11 PDT)
-**Status:** VERIFIED — `aba93fc0` (Luna; Claude review: N1/N2 red on pre-fix, updated stale test_prior_art.py expectations); live E2 2026-10-22 PDT: after make restart-webhook, `/ask-docs how many open bugs in v1.43.0` replied "17 fixed, 1 open (1 deferred)", listing only the hub-recovery doc as Deferred
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `aba93fc0` (Luna; Claude review: N1/N2 red on pre-fix, updated stale test_prior_art.py expectations); live E2 2026-10-22 PDT: after make restart-webhook, `/ask-docs how many open bugs in v1.43.0` replied "17 fixed, 1 open (1 deferred)", listing only the hub-recovery doc as Deferred
+**Fix commit:** `aba93fc0`
 **Priority:** P3 — wrong counts in Slack and one dashboard metric; the per-bug dashboard rows are correct
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "yes" to dispatching to Luna after bugs-table-title-filter
@@ -104,3 +105,5 @@ interface:
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
 - Do NOT edit any bug doc's Status line to make the count right.
 - Do NOT change `doc_status` behaviour or the dashboard row logic.
+
+**Live evidence:** 2026-10-22 · run slack-ask-docs-v1.43.0-count · env slack · scenario v1.43.0-tally-1-open-1-deferred · commit aba93fc0 · proves E2

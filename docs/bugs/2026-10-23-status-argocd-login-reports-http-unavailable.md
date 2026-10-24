@@ -1,6 +1,7 @@
 # Bug: the status ArgoCD login check reports "HTTP unavailable" for a rejected password, and nothing outside hub recovery repairs the stale Vault copy
 
-**Status:** VERIFIED — LANDED `9f48d5f0` 2026-10-23 — E1 green (pytest test_smoke_logins.py 18, bats hub_recovery.bats 58, shellcheck clean); the 401 and non-JSON-200 tests red on the pre-fix `smoke.py`. E2 PASSED 2026-10-23 ~20:17 PDT: `make argocd-admin-resync` reported the Vault copy rejected by ArgoCD and replaced it from `argocd-initial-admin-secret` (confirming the stale-copy cause); cloud request `20261024T031558Z-cluster-status` (job `9d61dfe4`) then showed ArgoCD login HTTP 200, 21 ok / 0 warn / 0 fail.
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — LANDED `9f48d5f0` 2026-10-23 — E1 green (pytest test_smoke_logins.py 18, bats hub_recovery.bats 58, shellcheck clean); the 401 and non-JSON-200 tests red on the pre-fix `smoke.py`. E2 PASSED 2026-10-23 ~20:17 PDT: `make argocd-admin-resync` reported the Vault copy rejected by ArgoCD and replaced it from `argocd-initial-admin-secret` (confirming the stale-copy cause); cloud request `20261024T031558Z-cluster-status` (job `9d61dfe4`) then showed ArgoCD login HTTP 200, 21 ok / 0 warn / 0 fail.
+**Fix commit:** `9f48d5f0`
 **Priority:** P3 — ArgoCD itself and ArgoCD SSO are healthy; only the admin-password check fails, and the operator can read `argocd-initial-admin-secret`
 **Severity:** low
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
@@ -99,3 +100,5 @@ interface:
 - Do NOT print, log or compare the password outside the existing redaction path.
 - Do NOT modify files outside the Files list.
 - Do NOT run `hub_recovery_reconcile`, `kubectl` or the real webhook from tests.
+
+**Live evidence:** 2026-10-23 · run job-9d61dfe4 · env hub · scenario cluster-status-after-argocd-admin-resync · commit 9f48d5f0 · proves E2

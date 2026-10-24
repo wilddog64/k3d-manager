@@ -1,7 +1,8 @@
 # Bug: codex dispatcher has no way to prune stale task worktrees from earlier releases
 
 **Filed:** 2026-10-22 (Claude, during M4 disk cleanup)
-**Status:** VERIFIED — `5069b758` (Luna; Claude review fixed `git cherry | grep -q` under pipefail and three no-op negated asserts; pre-fix red + 4 guard mutations caught); live E2 2026-10-22 PDT: operator ran `make codex-prune` (13 would prune, 7 kept as unapplied commits) then `YES=1` (pruned 13, kept 7); 7 task branches remain, 24,933 `.run` files byte-identical (shasum manifest), ledger.jsonl 52,204 bytes unchanged
+**Status:** LIVE-VERIFIED (promoted 2026-10-24; the live check below already passed) — was VERIFIED — `5069b758` (Luna; Claude review fixed `git cherry | grep -q` under pipefail and three no-op negated asserts; pre-fix red + 4 guard mutations caught); live E2 2026-10-22 PDT: operator ran `make codex-prune` (13 would prune, 7 kept as unapplied commits) then `YES=1` (pruned 13, kept 7); 7 task branches remain, 24,933 `.run` files byte-identical (shasum manifest), ledger.jsonl 52,204 bytes unchanged
+**Fix commit:** `5069b758`
 **Priority:** P3 — hygiene; disk and clutter only, no failing workflow
 **Severity:** low
 **Approval:** approved — operator, 2026-10-22: "that prune command seems to be a good idea. go for it"
@@ -117,3 +118,5 @@ interface:
 - Do NOT use `git worktree remove --force` or delete a branch with unapplied commits.
 - Do NOT touch `*.run` directories, `ledger.jsonl`, `metrics.log`, or change `land`/`abandon`.
 - Do NOT run `prune` against the real `~/.local/share/k3d-manager/worktrees` in tests; use the fixture root.
+
+**Live evidence:** 2026-10-22 · run operator-make-codex-prune · env m4 · scenario prune-13-keep-7-run-dir-unchanged · commit 5069b758 · proves E2
