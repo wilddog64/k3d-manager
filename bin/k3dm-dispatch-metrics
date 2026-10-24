@@ -130,8 +130,10 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
                 if task[0] <= timestamp <= task[1]:
                     task_costs[(task[2], task[3])] += amount / len(overlaps)
     lines.append(f'k3dm_dispatch_claude_api_cost_usd{{window="{window}"}} {cost}')
-    if landed:
+    if landed and task_scoped:
         lines.append(f'k3dm_dispatch_claude_api_cost_per_landed_usd{{window="{window}"}} {cost / landed}')
+        tokens = sum(value for kinds in totals.values() for value in kinds.values())
+        lines.append(f'k3dm_dispatch_claude_tokens_per_landed{{window="{window}"}} {tokens / landed}')
     for model, kinds in totals.items():
         for kind, value in kinds.items():
             lines.append(f'k3dm_dispatch_claude_tokens{{window="{window}",model="{model}",kind="{kind}"}} {value}')

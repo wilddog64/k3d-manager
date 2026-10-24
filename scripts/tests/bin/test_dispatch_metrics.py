@@ -982,3 +982,16 @@ def test_claude_dashboard_column_panels_projection_and_layout():
         for previous in boxes:
             assert box[2] <= previous[0] or previous[2] <= box[0] or box[3] <= previous[1] or previous[3] <= box[1]
         boxes.append(box)
+
+
+def test_claude_per_landed_only_in_release_scope():
+    now = 30
+    rows = [event(0, "start", "A", version="v1.0.0"), event(10, "land", "A", version="v1.0.0")]
+    records = [_claude_message("in", 5, input=2_000_000), _claude_message("outside", 20, input=2_000_000)]
+    output = dispatch_metrics.render(rows, 0, now, claude_records=records, claude_prices=_claude_rates())
+    for window in ("1d", "7d", "30d"):
+        assert f'k3dm_dispatch_claude_api_cost_per_landed_usd{{window="{window}"}}' not in output
+        assert f'k3dm_dispatch_claude_tokens_per_landed{{window="{window}"}}' not in output
+        assert _metric(output, "k3dm_dispatch_claude_api_cost_usd", window) > 0
+    assert _metric(output, "k3dm_dispatch_claude_tokens_per_landed", "v1.0.0") == 2_000_000
+    assert _metric(output, "k3dm_dispatch_claude_api_cost_per_landed_usd", "v1.0.0") == _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")
