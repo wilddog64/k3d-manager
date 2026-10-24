@@ -1,6 +1,6 @@
 # Bug: API-origin cluster status reports land in #acg-automation with the slash-command traffic
 
-**Status:** LANDED `7016f6d0` 2026-10-23 — E1/E2 green (pytest 28, bats 12); 6 pytest tests and bats test 7 red on the pre-fix code. E3 pending: operator invites the bot to #grafana-notification and runs `K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack`.
+**Status:** LANDED `7016f6d0` 2026-10-23 — E1/E2 green (pytest 28, bats 12); 6 pytest tests and bats test 7 red on the pre-fix code. E3 delivered 2026-10-23 19:55 PDT: the operator set `K3DM_STATUS_CHANNEL_ID=C4CAEH8HX` (plist confirmed, webhook restarted 19:54); cloud request `20261024T025455Z-cluster-status` → job `c4b35b3c` success, delivery `route=bot_fallback delivered=true`, a new thread was started (`thread_ts` 1792810533.194619) instead of a post in the command channel. Operator to confirm the thread appears in #grafana-notification.
 **Priority:** P3
 **Severity:** low — reports arrive, but in the command channel; alert-style status is mixed with operator commands
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

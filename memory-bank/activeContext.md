@@ -189,3 +189,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 
 - 2026-10-23: Per spec links landed `33a1b841`; awaiting operator Argo hard refresh for plan 4 E3 + Per spec E3. Cloud-bridge re-execution bug filed (P2, approval pending).
 - 2026-10-23: P3 By model landed `5d3bc140`; cloud-bridge at-most-once landed `744847f6` (needs `make restart-cloud-bridge` + E2); windowing P2 dispatched; Per spec totals footer proposed (pending go).
+- Status-channel E3: job c4b35b3c delivered via bot_fallback to C4CAEH8HX at 19:55 PDT; operator visual confirm pending.
