@@ -1,6 +1,6 @@
 # Bug: `make status` prints a stale hub snapshot's age without a unit
 
-**Status:** OPEN
+**Status:** LANDED `ea043dfb` 2026-10-23 — E1 green (15 bats; test 1 red on the pre-fix script). E2 (operator `make status` before the next `make snapshot`) pending.
 **Priority:** P3
 **Severity:** low — cosmetic; the warning is right, but "344 old" reads as a bare number
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

@@ -2,6 +2,8 @@
 
 ## 2026-10-23 API status channel bug filed
 
+- [x] P3 snapshot-age unit LANDED `ea043dfb` (E1 green, test 1 red pre-fix); E2 = operator `make status` before `make snapshot`.
+- [ ] P2 bare-tunnel-start: review found F2 would block the Hostinger reconcile (`tunnel_stop` leaves wrappers at `ubuntu`); spec amended with F3 (`37a2d879`, reconcile sets `TUNNEL_FORCE_HOST=1`), rework resume 2 running. Hold `make refresh CLUSTER_PROVIDER=k3s-hostinger` until it lands.
 - [ ] P3 `docs/bugs/2026-10-23-api-cluster-status-posts-to-command-channel.md` — FILED + approved; dispatch waits for the P2 tunnel and P3 snapshot-age fixes to land and verify.
 
 ## 2026-10-23 cloud bridge `diagnose-pods-all`
