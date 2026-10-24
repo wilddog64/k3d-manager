@@ -481,3 +481,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] 2026-10-24: appsets-reapply (hub 5 + app-cluster 8 on k3d-manager-v1.43.5), appsets-check all on branch, platform-ops done, vulnerability-inventory-exporter rolled out. Starting /post-merge.
 - [x] 2026-10-24: /post-merge v1.43.5 — tag v1.43.5 on 401e4eca, GitHub release created, branch k3d-manager-v1.43.6 cut, retro docs/retro/2026-10-24-v1.43.5-retrospective.md.
 - [x] 2026-10-24: v1.43.5 standing-docs audit fixes landed on k3d-manager-v1.43.6 (`51b9b12d`).
+- [ ] v1.43.6 plan 1 dispatch-agy-agent-ledger — spec written 2026-10-24; dispatch to Luna (not critical).

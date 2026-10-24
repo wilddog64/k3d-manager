@@ -313,12 +313,11 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
 
 ### Candidate milestone — v1.43.6 (patch)
 
-**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.6`, cut from
-`main` after v1.43.5 merges. Opened because v1.43.4 is bug-fix-only and v1.43.5 is at its five-plan
-cap. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.6-cni-ipam-reclaim-visibility.md).
-It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod
-sandbox. It adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live
-needs `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+**Per-agent dispatch data** (operator, 2026-10-18; re-themed 2026-10-24). Branch `k3d-manager-v1.43.6`, cut from
+`main` after v1.43.5 merges. Plan 1 of 5 is [`dispatch-agy-agent-ledger`](plans/v1.43.6-dispatch-agy-agent-ledger.md)
+(operator, 2026-10-24): the dispatcher runs specs on agy (Gemini 4 Argon) as well as Codex, and the ledger records agent and
+model for both, so per-vendor data accrues before Claude's weekly quota runs out. Split from v1.44.1's agy plan, which keeps
+the dashboard. The Pod IP pool cleanup plan that was plan 1 moved to v1.43.9 to make room (Claude's call, operator-approved).
 
 Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verified-delivery-cost.md)
 (operator, 2026-10-18). It records the independent verifier's verdict in the dispatch ledger and
@@ -387,6 +386,14 @@ Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-
 (operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
 directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
 10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+
+### Candidate milestone — v1.43.9 (patch)
+
+**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.9`, cut from `main` after v1.43.8
+merges. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.9-cni-ipam-reclaim-visibility.md), moved from v1.43.6
+on 2026-10-24. It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod sandbox,
+adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live needs
+`make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
 
 ### Candidate milestone — v1.44.0
 

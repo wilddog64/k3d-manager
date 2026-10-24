@@ -238,3 +238,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: appsets-reapply (hub 5 + app-cluster 8 on k3d-manager-v1.43.5), appsets-check all on branch, platform-ops done, vulnerability-inventory-exporter rolled out. Starting /post-merge.
 - 2026-10-24: /post-merge v1.43.5 — tag v1.43.5 on 401e4eca, GitHub release created, branch k3d-manager-v1.43.6 cut, retro docs/retro/2026-10-24-v1.43.5-retrospective.md.
 - 2026-10-24: standing-docs fixes from the v1.43.5 audit — `tunnel_start` row in docs/api/functions.md (explicit host + TUNNEL_FORCE_HOST), projectbrief scope OCI→Hostinger (`51b9b12d`).
+- 2026-10-24: operator-approved reorder — split dispatcher/ledger half of v1.44.1 agy plan into docs/plans/v1.43.6-dispatch-agy-agent-ledger.md (v1.43.6 plan 1, Codex+agy agent/model in ledger, side-by-side land guard); cni-ipam-reclaim-visibility moved to v1.43.9; roadmap updated. Dispatching to Luna next.
