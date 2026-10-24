@@ -15,6 +15,7 @@
 | date | auto_compact_tokens | note |
 |---|---|---|
 | 2026-10-18 | 200000 | Baseline auto-compaction threshold |
+| 2026-10-22 | 400000 | Raised to 400K as a trial (`autoCompactWindow` in `.claude/settings.json`); the 200K baseline ran 4 days, not 2 weeks |
 
 ## Incidents
 

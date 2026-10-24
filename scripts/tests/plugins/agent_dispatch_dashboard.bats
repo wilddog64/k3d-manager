@@ -59,7 +59,7 @@ for title, (ptype, unit) in expected.items():
     assert panel["type"] == ptype, (title, panel["type"])
     assert panel["fieldConfig"]["defaults"]["unit"] == unit, (title, panel["fieldConfig"]["defaults"]["unit"])
     assert panel["gridPos"]["y"] > row["gridPos"]["y"]
-assert by_title["Compactions per verified spec"]["targets"][0]["expr"] == 'sum(k3dm_claude_compactions{window="$window"}) / k3dm_claude_verified_specs{window="$window"}'
+assert by_title["Compactions per verified spec"]["targets"][0]["expr"] == 'sum(k3dm_claude_compactions{window="$window"}) / sum(k3dm_claude_verified_specs{window="$window"} > 0)'  # agent-audit: allow assert-removed sum() drops window/job/instance, so the old one-sided division never matched
 print("ok")
 PY
   [ "$status" -eq 0 ]
