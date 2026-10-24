@@ -460,3 +460,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] 2026-10-24: snapshot-list P2 dispatched to Luna; v1.43.8 dispatch queue now 5 plans (+ hostinger-public-path-on-node, go recorded).
 - [x] ask-docs bug-count wording ("N closed bug docs of TOTAL") and Sources now cite scripts/bug-tally.py (2026-10-24, operator report). LIVE-VERIFIED 2026-10-24 08:05 PDT (operator Slack screenshot: "75 closed bug docs of 81", Sources: scripts/bug-tally.py).
 - [ ] 2026-10-24: 10 verified bugs promoted to LIVE-VERIFIED; 21 remain (offline/rebuild-only). P3 filed for an offline verification type. make test reds under triage (blocks the cut).
+- [x] 2026-10-24 make-test red triage committed 7cf93882; bug docs cloud-artifacts-tests-use-live-bridge-state, find-similar-docs-make-target-ignores-q (both FIXED). [ ] v1.44.1 plan 3 dispatch-agent-five-hour-window-usage filed (dispatch when v1.44.1 cut).

@@ -440,6 +440,13 @@ the relay, the webhook allowlist and `make codex-dispatch`, and each agent repli
 its step finishes. Design and limits: [agents working together in Slack
 threads](#candidate-theme--v2x-agents-working-together-in-slack-threads). Spec to be written.
 
+Plan 3 (operator, 2026-10-24: "we should also track each agent's 5-hour session comsuption in agent
+dispatch dashboard in a proper rlease"): [`dispatch-agent-five-hour-window-usage`](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md).
+A **Session windows** row on the agent dispatch dashboard shows each agent's 5-hour and 7-day used
+percent, from Codex rollout files and the statusline's usage cache (no API call, no credential),
+and how much of the 5-hour window each Codex dispatch used. agy shows "no source" until it has
+one. Depends on v1.43.8's Claude cost-by-reference plan.
+
 ### Candidate milestone — v1.44.2 (patch)
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
