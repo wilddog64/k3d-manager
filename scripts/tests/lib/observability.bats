@@ -95,11 +95,13 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-@test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {
+@test "deploy_observability_acg retires legacy Applications before applying the cluster matrix" {
   local envsubst_log kubectl_log
   envsubst_log="${BATS_TEST_TMPDIR}/envsubst-acg.log"
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg.log"
   export ENVSTUB_LOG="${envsubst_log}" KUBE_STUB_LOG="${kubectl_log}"
+  source scripts/plugins/argocd.sh
+  _argocd_retire_legacy_observability_acg_apps() { printf 'retire\n' >> "${KUBE_STUB_LOG}"; }
   _acg_resolve_provider() {
     printf "%s\n" "k3s-hostinger"
   }
@@ -177,13 +179,16 @@ EOF
   [[ "$output" == *"Alertmanager auth proxy installed"* ]]
   run cat "${envsubst_log}"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME"* ]]
+  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"--context ubuntu-hostinger -n monitoring get configmap grafana-dashboard-argocd"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n monitoring delete configmap grafana-dashboard-argocd"* ]]
   [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]
   [[ "$output" == *"apply -f -"* ]]
+  retire_line="$(grep -n '^retire$' "${kubectl_log}" | cut -d: -f1)"
+  apply_line="$(grep -n 'apply -f -' "${kubectl_log}" | head -1 | cut -d: -f1)"
+  [ -n "${retire_line}" ] && [ "${retire_line}" -lt "${apply_line}" ]
 }
 
 @test "deploy_observability_acg falls back to generated Prometheus config when Vault bootstrap write fails" {
@@ -263,6 +268,68 @@ EOF
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"create secret generic prometheus-web-config --context ubuntu-hostinger -n monitoring"* ]]
+}
+
+@test "legacy ACG retirement preserves the set before stripping each owned finalizer" {
+  source scripts/plugins/argocd.sh
+  local calls="${BATS_TEST_TMPDIR}/legacy-retirement.log"
+  export LEGACY_CALLS="${calls}"
+  _kubectl() {
+    printf '%s\n' "$*" >> "${LEGACY_CALLS}"
+    case "$*" in
+      *'get application '*'-o json')
+        printf '{"metadata":{"ownerReferences":[{"kind":"ApplicationSet","name":"observability-acg"}]}}\n'
+        ;;
+      *'get applicationset '*) printf 'applicationset/observability-acg\n' ;;
+    esac
+  }
+  run _argocd_retire_legacy_observability_acg_apps
+  [ "${status}" -eq 0 ]
+  patch_line="$(grep -n 'patch applicationset observability-acg' "${calls}" | cut -d: -f1)"
+  first_finalizer="$(grep -n 'patch application/acg-kube-prometheus-stack' "${calls}" | cut -d: -f1)"
+  last_finalizer="$(grep -n 'patch application/acg-trivy-operator' "${calls}" | cut -d: -f1)"
+  [ "${patch_line}" -lt "${first_finalizer}" ]
+  [ "${first_finalizer}" -lt "${last_finalizer}" ]
+}
+
+@test "legacy ACG finalizer failure returns nonzero" {
+  source scripts/plugins/argocd.sh
+  _kubectl() {
+    case "$*" in
+      *'get application '*'-o json') printf '{"metadata":{"ownerReferences":[{"kind":"ApplicationSet","name":"observability-acg"}]}}\n' ;;
+      *'get applicationset '*) return 0 ;;
+      *'patch application/acg-kube-prometheus-stack'*) return 1 ;;
+      *) return 0 ;;
+    esac
+  }
+  run _argocd_retire_legacy_observability_acg_apps
+  [ "${status}" -ne 0 ]
+}
+
+@test "legacy ACG retirement is a no-op when no owned Applications exist" {
+  source scripts/plugins/argocd.sh
+  export LEGACY_CALLS="${BATS_TEST_TMPDIR}/legacy-none.log"
+  _kubectl() {
+    printf '%s\n' "$*" >> "${LEGACY_CALLS}"
+    printf '%s\n' 'Error from server (NotFound)' >&2
+    return 1
+  }
+  run _argocd_retire_legacy_observability_acg_apps
+  [ "${status}" -eq 0 ]
+  run grep -E 'patch application(set)?' "${LEGACY_CALLS}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "deploy_observability_acg does not apply the set after retirement fails" {
+  source scripts/plugins/argocd.sh
+  export APPLY_MARKER="${BATS_TEST_TMPDIR}/acg-apply-marker"
+  _observability_acg_context() { printf 'ubuntu-hostinger\n'; }
+  _argocd_retire_legacy_observability_acg_apps() { return 1; }
+  envsubst() { touch "${APPLY_MARKER}"; cat; }
+  _kubectl() { touch "${APPLY_MARKER}"; return 0; }
+  run deploy_observability_acg
+  [ "${status}" -ne 0 ]
+  [ ! -e "${APPLY_MARKER}" ]
 }
 
 @test "observability exposes alertmanager login proxy and make targets" {

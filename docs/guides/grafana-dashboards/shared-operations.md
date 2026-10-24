@@ -142,6 +142,11 @@ The deployment metrics live in the **app-cluster** Prometheus, not the hub's. Th
 Pushgateway (`hub-pushgateway`, port-forwarded to `localhost:19094`) carries only host-side
 gauges such as vector-DB health and host disk.
 
+The shared `observability-acg` ApplicationSet generates one monitoring Application per registered
+Hostinger or ACG sandbox app cluster, named `<cluster>-<app>`. Its provider selector excludes the
+hub. Removing a sandbox registration retires only that cluster's generated Applications; the set
+and Applications for other clusters remain managed.
+
 ---
 
 ## Adding or changing a dashboard

@@ -83,6 +83,13 @@ function _run_sandbox_ttl_helper() {
   [ "${status}" -ne 0 ]
 }
 
+@test "ACG sandbox registration carries the provider label used by observability selection" {
+  run grep -nF '_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  run grep -nF 'ARGOCD_APP_CLUSTER_PROVIDER="${ARGOCD_APP_CLUSTER_PROVIDER:-${_cluster_provider}}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+}
+
 @test "acg-up identity Application uses server-side apply with server-side diff" {
   local manifest="scripts/etc/argocd/identity/shopping-cart-identity-application.yaml"
 

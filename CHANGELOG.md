@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- The shared `observability-acg` ApplicationSet now generates per-cluster monitoring Applications for Hostinger and the ACG sandbox, preserving Helm release names and other clusters during sandbox teardown.
+
 - Unscoped `tunnel_start` now requires an explicit SSH host and refuses to repoint existing tunnel agents without `TUNNEL_FORCE_HOST=1`; Hostinger reconcile sets that override for its recovery path.
 
 - `make status` now shows stale hub snapshot age in hours, explains the seven-day threshold and

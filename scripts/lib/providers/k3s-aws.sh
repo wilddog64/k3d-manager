@@ -344,13 +344,7 @@ function _k3s_aws_deregister_cluster() {
         2>/dev/null
   )
 
-  # This fixed-name ApplicationSet is directly applied by the ACG lifecycle;
-  # it has no parent owner that would remove it when the destination vanishes.
-  # Generated Applications targeting this cluster were retired above first.
-  "${hub_kubectl[@]}" -n "${argocd_ns}" delete applicationset observability-acg \
-    --ignore-not-found >/dev/null 2>&1 || return 1
-
-  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications and retired ApplicationSet/observability-acg from hub ArgoCD (${argocd_ns})"
+  _info "[k3s-aws] Deregistered ${secret_name} + generated Applications targeting ${ctx} from hub ArgoCD (${argocd_ns})"
 }
 
 function _k3s_aws_retire_shell_watcher() {

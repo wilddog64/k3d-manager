@@ -1454,6 +1454,57 @@ function _argocd_appset_live_overrides() {
    return 0
 }
 
+function _argocd_retire_legacy_observability_acg_apps() {
+   local ns="${ARGOCD_NAMESPACE:-cicd}" app json owned=0
+   local -a legacy_apps=(acg-kube-prometheus-stack loki acg-trivy-operator)
+
+   if [[ -n "${1:-}" && "${1}" != "observability-acg.yaml" ]]; then
+      return 0
+   fi
+
+   for app in "${legacy_apps[@]}"; do
+      json="$(_kubectl --no-exit get application "${app}" -n "${ns}" -o json 2>&1)" || {
+         [[ "${json}" == *NotFound* ]] && continue
+         _err "[argocd] Failed to inspect legacy observability Application ${app}: ${json}"
+         return 1
+      }
+      if printf '%s' "${json}" | jq -e '.metadata.ownerReferences[]? | select(.kind == "ApplicationSet" and .name == "observability-acg")' >/dev/null 2>&1; then
+         owned=1
+      fi
+   done
+   (( owned == 1 )) || return 0
+
+   json="$(_kubectl --no-exit get applicationset observability-acg -n "${ns}" -o name 2>&1)" || {
+      if [[ "${json}" != *NotFound* ]]; then
+         _err "[argocd] Failed to inspect ApplicationSet observability-acg: ${json}"
+         return 1
+      fi
+      json=""
+   }
+   if [[ -n "${json}" ]]; then
+      _kubectl patch applicationset observability-acg -n "${ns}" --type=merge \
+         -p '{"spec":{"syncPolicy":{"preserveResourcesOnDeletion":true}}}' >/dev/null || {
+         _err "[argocd] Failed to preserve resources before retiring legacy observability-acg Applications"
+         return 1
+      }
+   fi
+
+   for app in "${legacy_apps[@]}"; do
+      json="$(_kubectl --no-exit get application "${app}" -n "${ns}" -o json 2>&1)" || {
+         [[ "${json}" == *NotFound* ]] && continue
+         _err "[argocd] Failed to inspect legacy observability Application ${app}: ${json}"
+         return 1
+      }
+      if printf '%s' "${json}" | jq -e '.metadata.ownerReferences[]? | select(.kind == "ApplicationSet" and .name == "observability-acg")' >/dev/null 2>&1; then
+         if ! _kubectl patch "application/${app}" -n "${ns}" --type=merge \
+            -p '{"metadata":{"finalizers":null}}' >/dev/null; then
+            _err "[argocd] Failed to remove finalizer from legacy Application ${app}; refusing to apply observability-acg"
+            return 1
+         fi
+      fi
+   done
+}
+
 function _argocd_deploy_applicationsets() {
    local stage="${1:-all}" prepared="${2:-}"
    if [[ "$prepared" != prepared ]]; then
@@ -1492,6 +1543,8 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _argocd_appset_in_stage "$file" "$stage" || continue
       _info "[argocd] Deploying ApplicationSet: $filename"
+
+      _argocd_retire_legacy_observability_acg_apps "${filename}" || return 1
 
       local _vars _v _name _unset=""
       _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
