@@ -3,8 +3,9 @@
 **Filed:** 2026-10-09, Claude (operator saw the spinner on `frontend.3ai-talk.org`)
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
 **Status:** PARTIAL — fix A merged as shopping-cart-frontend #115 (`3623e5b2`). It went **live 2026-10-09**: k3d-manager `ce21efda` repinned Hostinger to `sha-05ec17e` (`sha256:17f46a0d…`), and the rollout completed. The public bundle contains "Login took too long". The hung-login retry screen still needs a browser check while Keycloak's Postgres restarts. Fix C merged as shopping-cart-infra #108 (`03c6206f`) and was verified live 2026-10-09: the hub probe runs `sh -c 'pg_isready -U "$POSTGRES_USER" ...'`, with 0 `role "root"` log lines in 1h. B is deferred because the PV is pinned to agent-0.
+**Live evidence (partial, 2026-10-24, operator + Claude):** two `rollout restart deployment/postgres-keycloak` runs on the hub (Recreate). Keycloak logged `Connection ... refused` 10:05:51–10:06:44 PDT and 10:12:32–10:12:46 PDT. During the second outage the operator signed in, saw a short spinner, then landed logged in. The callback did not hang. The click time was not captured: the ingress keeps no access log and Keycloak logs no login events. The spinner lasted less than `CALLBACK_TIMEOUT_MS` (15 s), so the retry screen was not exercised. Still open: the retry screen during an outage longer than 15 s, at the 2026-10-29 drill.
 **Priority:** P2 — login recovers on its own once the DB is back, but the page never tells the user
-**Release:** v1.43.5 — remaining browser check during the 2026-10-29 hub rebuild drill, when the Keycloak DB restarts (backlog triage, Claude, 2026-10-22)
+**Release:** v1.43.6 — verification-only; the retry screen still needs a browser check during an outage longer than 15 s (the 2026-10-29 hub rebuild drill). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 **Severity:** Medium
 **Component:**
 - `shopping-cart-frontend`: `src/pages/LoginCallback.tsx`

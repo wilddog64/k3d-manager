@@ -2,7 +2,7 @@
 
 **Status:** MONITORING 2026-10-15 — compaction resumed by itself at 2026-10-12T11:40:07Z, 5 min after the OrbStack upgrade restarted the server container (11:35:01Z); 651 catch-up events that day, then 288/day on 10-13 and 10-14, 0 `Compact failed` in 72h, `state.db` 2.12 GiB. Close after 14 clean days (2026-10-26). No hub rebuild needed now; earlier stall history below
 **Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
-**Release:** v1.43.5 — close-out check 2026-10-26 (14 clean days) (backlog triage, Claude, 2026-10-22)
+**Release:** v1.43.6 — verification-only; close-out check 2026-10-26 (14 clean days). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 
 ## What was observed
 

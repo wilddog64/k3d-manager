@@ -93,6 +93,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - e2e sandbox settle-wait fix is LIVE-VERIFIED by run `1792355973-27075`; the later `8417cf04` failure is a distinct startup-order race.
 
 ## Open / pending
+- 2026-10-24 frontend-login P2: live partial. Two postgres-keycloak restarts (outages 10:05:51–10:06:44, 10:12:32–10:12:46 PDT). Operator login during the 2nd: short spinner, then success, no hang. Click time not captured and the 15 s retry screen not exercised, so it stays PARTIAL; operator approved moving it and the Kine P2 to v1.43.6 (verification-only; Release lines updated). P3 filed: docs/bugs/2026-10-24-postgres-keycloak-one-second-probe-timeouts.md. make test: 1815/1815 ok but tripwire FAIL — three tunnel.bats tunnel_start tests (from 8ca5668f) didn't stub launchctl; stubbed, rerun pending once pytest finishes.
 
 - 2026-10-23 18:15 PDT: Hostinger ESO down since 07:58 PDT — the tunnel-logs E2's bare `tunnel_start` repointed both Hostinger tunnel agents at `ubuntu` (dead sandbox 44.247.81.210). Filed P2 `2026-10-23-bare-tunnel-start-repoints-hostinger-tunnel.md` (DISPATCHED); workaround `make refresh CLUSTER_PROVIDER=k3s-hostinger`. P3 `2026-10-23-status-snapshot-age-missing-unit.md` DISPATCHED. Hub snapshot 14 days old; suggested `make snapshot`.
 - 2026-10-23 PDT: filed P3 `2026-10-23-api-cluster-status-posts-to-command-channel.md` (`K3DM_STATUS_CHANNEL_ID` for API-origin status posts → #grafana-notification). Approved; dispatch ONLY after the P2 tunnel and P3 snapshot fixes land + verify.

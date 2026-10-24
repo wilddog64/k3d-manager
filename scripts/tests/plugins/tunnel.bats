@@ -60,8 +60,9 @@ setup() {
 @test "unscoped tunnel_start refuses changing existing host unless forced" {
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   _tunnel_is_running() { return 1; }
+  launchctl() { :; }
   printf '#!/bin/bash\nexec /usr/bin/autossh -N "ubuntu@hostinger.example"\n' > "${TUNNEL_FORWARD_WRAPPER_PATH}"
-  export -f _tunnel_autossh_path _tunnel_is_running
+  export -f _tunnel_autossh_path _tunnel_is_running launchctl
   run tunnel_start
   [ "$status" -eq 1 ]
   [[ "$output" == *"ubuntu@hostinger.example"* && "$output" == *"ubuntu"* ]]
@@ -78,7 +79,8 @@ setup() {
   export TUNNEL_SCOPE=sandbox
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   _tunnel_is_running() { return 1; }
-  export -f _tunnel_autossh_path _tunnel_is_running
+  launchctl() { :; }
+  export -f _tunnel_autossh_path _tunnel_is_running launchctl
   run tunnel_start
   [ "$status" -eq 0 ]
   grep -q -- '-N "ubuntu"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
@@ -91,7 +93,8 @@ setup() {
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   _tunnel_is_running() { return 1; }
   _tunnel_vault_launchd_loaded() { return 1; }
-  export -f _tunnel_autossh_path _tunnel_is_running _tunnel_vault_launchd_loaded
+  launchctl() { :; }
+  export -f _tunnel_autossh_path _tunnel_is_running _tunnel_vault_launchd_loaded launchctl
   run tunnel_start
   [ "$status" -eq 0 ]
   grep -q -- '-N "ubuntu@hostinger.example"' "${TUNNEL_FORWARD_WRAPPER_PATH}"
