@@ -2,6 +2,9 @@
 
 ## 2026-10-23 API status channel bug filed
 
+- [x] P2 tunnel E2 PASSED 18:58 PDT (agents → Hostinger host, store Ready, 20/20 synced). Hostinger ESO outage over.
+- [ ] NEW P2 `2026-10-23-shared-observability-acg-appset-orphans-hostinger-monitoring.md` — FILED, approval pending. Shared single-destination set; sandbox up repoints it, teardown deletes it.
+- [ ] Hostinger `make status` from operator tmux (Claude's `!` shell has no keychain → UNKNOWN) to recheck ArgoCD/Alertmanager login failures; also P3 snapshot E2.
 - [x] P3 snapshot-age unit LANDED `ea043dfb` (E1 green, test 1 red pre-fix); E2 = operator `make status` before `make snapshot`.
 - [x] P2 bare-tunnel-start LANDED `8ca5668f` (E1 green; E2 = operator `make refresh CLUSTER_PROVIDER=k3s-hostinger`, then Claude verifies). Earlier: review found F2 would block the Hostinger reconcile (`tunnel_stop` leaves wrappers at `ubuntu`); spec amended with F3 (`37a2d879`, reconcile sets `TUNNEL_FORCE_HOST=1`), rework resume 2 running. Hold `make refresh CLUSTER_PROVIDER=k3s-hostinger` until it lands.
 - [ ] P3 `docs/bugs/2026-10-23-api-cluster-status-posts-to-command-channel.md` — FILED + approved; dispatch waits for the P2 tunnel and P3 snapshot-age fixes to land and verify.
