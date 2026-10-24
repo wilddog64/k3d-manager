@@ -8,7 +8,7 @@ PROMTAIL="${BATS_TEST_DIRNAME}/../../etc/observability/promtail.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 
 @test "loki: observability-acg includes a loki application" {
-  run grep -nF -- 'name: loki' "${APPSET}"
+  run grep -nF -- 'app: loki' "${APPSET}"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'chart: loki' "${APPSET}"

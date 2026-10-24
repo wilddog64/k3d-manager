@@ -329,7 +329,7 @@ function _k3s_aws_deregister_cluster() {
   [[ "${server}" == "https://kubernetes.default.svc" ]] && server=""
 
   "${hub_kubectl[@]}" -n "${argocd_ns}" delete secret "${secret_name}" \
-    --ignore-not-found >/dev/null 2>&1 || true
+    --ignore-not-found >/dev/null 2>&1 || return 1
 
   local app
   while IFS= read -r app; do

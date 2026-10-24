@@ -564,7 +564,8 @@ setup() {
     cat "$LOG"
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == *"delete applicationset observability-acg --ignore-not-found"* ]]
+  [[ "$output" == *"delete secret cluster-ubuntu-k3s --ignore-not-found"* ]]
+  [[ "$output" != *"delete applicationset"* ]]
 }
 
 @test "_k3s_aws_deregister_cluster fails when hub kubectl is unreachable" {

@@ -197,6 +197,7 @@ source_plugin() {
   _warn() { printf '%s\n' "$*" >&2; }
   _no_trace() { "$@"; }
   source "$PLUGINS_DIR/hub_data.sh"
+  _ssh_config_guard() { :; }
   _kubectl() { kubectl "$@"; }
   export K3DM_HUB_DATA_CONTEXT=ctx
   export K3DM_HUB_DATA_DIR="$TEST_ROOT/hub-data"

@@ -65,6 +65,11 @@ def repos(tmp_path):
     return {"origin": origin, "work": work, "repo": repo}
 
 
+@pytest.fixture(autouse=True)
+def isolated_bridge_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "STATE_DIR", tmp_path / "bridge-state", raising=False)
+
+
 @pytest.fixture
 def job_dir(tmp_path, monkeypatch):
     jobs = tmp_path / "jobs"

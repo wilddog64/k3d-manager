@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   export FIXTURE="$BATS_TEST_TMPDIR/fixture" ORIGIN="$BATS_TEST_TMPDIR/origin.git"
   export K3DM_WORKTREE_ROOT="$BATS_TEST_TMPDIR/worktrees" HOME="$BATS_TEST_TMPDIR/home"
@@ -338,9 +340,9 @@ EOF
   run dispatch prune --yes
   [ "$status" -eq 0 ]; [[ "$output" == *"pruned: 3 kept: 0"* ]]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/current" ]; [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.8/older" ]
-  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/current || false
-  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.8/older || false
-  ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan || false
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/current
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.8/older
+  run ! git -C "$FIXTURE" show-ref --verify --quiet refs/heads/task/v9.9.9/orphan
 }
 
 @test "codex dispatch: prune keeps unsafe tasks and preserves run research data" {

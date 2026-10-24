@@ -1361,7 +1361,7 @@ embed-cache-restore:
 
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
-	@python3 -c 'import base64, os, sys; q = base64.b64decode(sys.argv[1], validate=True).decode("ascii"); os.execv(sys.executable, [sys.executable, "scripts/find-similar-docs.py", $(if $(K),"--k",) $(if $(K),"$(K)",) "--", q])' "$(Q_B64)"
+	@python3 -c 'import base64, os, sys; q = base64.b64decode(sys.argv[1], validate=True).decode("ascii") if sys.argv[1] else os.environ.get("Q", ""); os.execv(sys.executable, [sys.executable, "scripts/find-similar-docs.py", $(if $(K),"--k",) $(if $(K),"$(K)",) "--", q])' "$(Q_B64)"
 
 ## Compare services/*/kustomization.yaml image digests with :latest in GHCR (read-only; needs gh read:packages)
 image-pin-drift:

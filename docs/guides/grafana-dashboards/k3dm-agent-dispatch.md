@@ -2,8 +2,8 @@
 
 [← Grafana dashboards index](../grafana-dashboards.md)
 
-The dispatch dashboard reads the shared Codex ledger export; the **Spec window** control (top left,
-default `30d`) selects 1d, 7d, or 30d. The Grafana time picker does not change these panels. It shows
+The dispatch dashboard reads the shared Codex ledger export; the **Window** control (top left,
+default `7d`) selects 1d, 7d, 30d, or a release (v1.43.0 onward). The Grafana time picker does not change these panels. It shows
 accepted specs, integration-test landing success, verifier lines changed, wait minutes, Codex
 tokens per accepted spec, running and awaiting-land tasks, outcome counts, and export age. Wait
 minutes are wall-clock waiting time rather than active human minutes; token cost is Codex tokens

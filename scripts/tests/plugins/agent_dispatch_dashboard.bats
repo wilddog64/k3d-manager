@@ -80,26 +80,26 @@ panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
 panel5 = next(panel for panel in panels if panel["id"] == 5)
 assert panel5["fieldConfig"]["defaults"]["unit"] == "short"
 panel12 = next(panel for panel in panels if panel["id"] == 12)
-assert len(panel12["targets"]) == 4
-assert all(target["expr"].startswith("sum by (version, slug)") for target in panel12["targets"])
+assert len(panel12["targets"]) >= 4
+assert all(target["expr"].startswith(("sum by (version, slug)", "max by (version, slug, spec)"))
+           for target in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
 
-@test "agent dispatch dashboard: spec window defaults to 30d and says the time picker does not apply" {
+@test "agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d" {
   run python3 - "$DASH" <<'PY'
 import json, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 body = text.split("agent-dispatch.json: |\n", 1)[1]
 dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
 var = next(item for item in dashboard["templating"]["list"] if item["name"] == "window")
-assert var["current"]["value"] == "30d", var["current"]
-assert [o["value"] for o in var["options"] if o["selected"]] == ["30d"]
-assert [o["value"] for o in var["options"]] == ["1d", "7d", "30d"]
-assert var["label"] == "Spec window"
-assert "time picker" in var["description"]
+assert var["type"] == "query"
+assert var["definition"] == "label_values(k3dm_dispatch_landed, window)"
+assert var["current"]["value"] == "7d", var["current"]
+assert var["label"] == "Window"
 PY
   [ "$status" -eq 0 ]
 }

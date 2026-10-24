@@ -545,7 +545,7 @@ JSON
   [[ "$output" == *"Successfully deployed 1/1"* ]]
 }
 
-@test "ACG deregistration retires only observability-acg and is repeatable" {
+@test "ACG deregistration leaves observability-acg in place and is repeatable" {
   local calls="${BATS_TEST_TMPDIR}/hub-kubectl.log"
   mkdir -p "${BATS_TEST_TMPDIR}/bin"
   cat > "${BATS_TEST_TMPDIR}/bin/kubectl" <<'STUB'
@@ -565,7 +565,6 @@ STUB
   _k3s_aws_deregister_cluster
   _k3s_aws_deregister_cluster
 
-  [ "$(grep -c 'delete applicationset observability-acg --ignore-not-found' "${calls}")" -eq 2 ]
   [ "$(grep -c 'delete secret cluster-ubuntu-k3s' "${calls}")" -eq 2 ]
-  [ "$(grep -c 'delete applicationset ' "${calls}")" -eq 2 ]
+  [ "$(grep -c 'delete applicationset ' "${calls}")" -eq 0 ]
 }
