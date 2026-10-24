@@ -42,7 +42,7 @@ _run_restart_webhook() {
   [ "${status}" -eq 0 ]
   [ "$(sed -n '1p' "${STUB_CALLS}")" = "bootout gui/$(id -u)/com.k3d-manager.webhook" ]
   [ "$(sed -n '2p' "${STUB_CALLS}")" = "bootstrap gui/$(id -u) ${STUB_HOME}/Library/LaunchAgents/com.k3d-manager.webhook.plist" ]
-  if grep -q 'kickstart.*com.k3d-manager.webhook' "${STUB_CALLS}"; then
+  if grep -q '^kickstart .*com.k3d-manager.webhook' "${STUB_CALLS}"; then
     return 1
   fi
   [[ "${output}" == *'[restart-webhook] reloaded LaunchAgent definition'* ]]
@@ -80,7 +80,7 @@ _run_restart_webhook() {
   [ "${status}" -ne 0 ]
   [ "$(grep -c '^bootstrap ' "${STUB_CALLS}")" -eq 5 ]
   [[ "${stderr}" == *'[restart-webhook] ERROR: bootstrap failed after 5 attempts'* ]]
-  if grep -q 'kickstart.*com.k3d-manager.cloud-bridge' "${STUB_CALLS}"; then
+  if grep -q '^kickstart .*com.k3d-manager.cloud-bridge' "${STUB_CALLS}"; then
     return 1
   fi
 }
