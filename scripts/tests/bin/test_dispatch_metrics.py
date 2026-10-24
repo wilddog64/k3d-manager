@@ -995,3 +995,13 @@ def test_claude_per_landed_only_in_release_scope():
         assert _metric(output, "k3dm_dispatch_claude_api_cost_usd", window) > 0
     assert _metric(output, "k3dm_dispatch_claude_tokens_per_landed", "v1.0.0") == 2_000_000
     assert _metric(output, "k3dm_dispatch_claude_api_cost_per_landed_usd", "v1.0.0") == _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")
+
+
+def test_claude_daily_chart_groups_by_date_and_model():
+    raw = DASHBOARD_PATH.read_text().split("  agent-dispatch.json: |\n", 1)[1]
+    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    panel = next(p for p in dashboard["panels"] if p.get("title") == "Claude tokens per day")
+    steps = {t["id"]: t.get("options", {}) for t in panel["transformations"]}
+    assert [t["id"] for t in panel["transformations"]][:2] == ["merge", "groupingToMatrix"]
+    assert steps["groupingToMatrix"] == {"rowField": "date", "columnField": "model", "valueField": "Value"}
+    assert panel["options"]["xField"] == "date"
