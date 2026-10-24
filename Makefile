@@ -685,7 +685,7 @@ update-webhook-slack:
 	_plist="$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; \
 	[ -f "$$_plist" ] || { echo "[update-webhook-slack] ERROR: $$_plist not found — run: make setup-worker" >&2; exit 1; }; \
 	cp -p "$$_plist" "$$_plist.bak-$$(date +%Y%m%d%H%M%S)"; \
-	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
+	SLACK_TOK="$$_tok" SLACK_CHAN="$${SLACK_CHANNEL_ID:-}" K3DM_STATUS_CHAN="$${K3DM_STATUS_CHANNEL_ID:-}" STATUS_CHAN_EXPORTED="$${K3DM_STATUS_CHANNEL_ID+x}" PLIST="$$_plist" python3 -c 'import os,plistlib,sys; p=os.environ["PLIST"]; d=plistlib.load(open(p,"rb")); e=d.setdefault("EnvironmentVariables",{}); c=os.environ["SLACK_CHAN"] or e.get("SLACK_CHANNEL_ID",""); c or sys.exit("[update-webhook-slack] ERROR: SLACK_CHANNEL_ID not set and not in plist - export SLACK_CHANNEL_ID first"); e["SLACK_BOT_TOKEN"]=os.environ["SLACK_TOK"]; e["SLACK_CHANNEL_ID"]=c; status=os.environ["K3DM_STATUS_CHAN"]; os.environ["STATUS_CHAN_EXPORTED"] and e.__setitem__("K3DM_STATUS_CHANNEL_ID",status); plistlib.dump(d,open(p,"wb")); print("[update-webhook-slack] plist updated (SLACK_BOT_TOKEN, SLACK_CHANNEL_ID)")'
 	@$(MAKE) --no-print-directory restart-webhook
 	@echo "[update-webhook-slack] webhook restarted"
 

@@ -1,5 +1,17 @@
 # Webhook operations
 
+API-origin cluster status, Hostinger status and diagnostics reports can be posted as
+threads in a dedicated Slack channel by setting `K3DM_STATUS_CHANNEL_ID`. Invite the
+webhook bot to the channel first, then install the setting with:
+
+```bash
+K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack
+```
+
+The setting applies to reports with no slash-command response URL or incoming thread;
+slash-command replies continue in their originating conversation. When the variable is
+not exported, `update-webhook-slack` preserves any existing plist value.
+
 `k3dm-webhook` and `k3dm-cloud-bridge` write structured UTC log lines to their
 LaunchAgent log. The default `K3DM_LOG_LEVEL=info` records requests and job
 boundaries. Set `K3DM_LOG_LEVEL=debug` when investigating a job; `warn` and

@@ -43,6 +43,39 @@ _target() {
   [[ "${output}" != *'xoxb-SENTINEL-DO-NOT-PRINT'* ]]
 }
 
+_slack_stubs() {
+  STUB_HOME="${BATS_TEST_TMPDIR}/home-slack"
+  STUB_BIN="${BATS_TEST_TMPDIR}/bin-slack"
+  mkdir -p "${STUB_HOME}/Library/LaunchAgents" "${STUB_BIN}"
+  printf '#!/bin/sh\necho TOKEN-SENTINEL\n' > "${STUB_BIN}/security"
+  printf '#!/bin/sh\nexit 0\n' > "${STUB_BIN}/launchctl"
+  chmod +x "${STUB_BIN}/security" "${STUB_BIN}/launchctl"
+  local plist="${STUB_HOME}/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  PLIST="${plist}" python3 -c 'import os,plistlib; plistlib.dump({"Label":"com.k3d-manager.webhook","EnvironmentVariables":{"SLACK_CHANNEL_ID":"CKEEP"}},open(os.environ["PLIST"],"wb"))'
+}
+
+@test "update-webhook-slack writes exported status channel and preserves it when unset" {
+  _slack_stubs
+  local plist="${STUB_HOME}/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run env HOME="${STUB_HOME}" PATH="${STUB_BIN}:${PATH}" SLACK_CHANNEL_ID=CCMD K3DM_STATUS_CHANNEL_ID=CSTATUS make --no-print-directory -f "${MAKEFILE}" update-webhook-slack
+  [ "${status}" -eq 0 ]
+  run env PLIST="${plist}" python3 -c 'import os,plistlib; e=plistlib.load(open(os.environ["PLIST"],"rb"))["EnvironmentVariables"]; print("MATCH" if e["K3DM_STATUS_CHANNEL_ID"]=="CSTATUS" else "MISMATCH")'
+  [ "${output}" = "MATCH" ]
+  run env HOME="${STUB_HOME}" PATH="${STUB_BIN}:${PATH}" SLACK_CHANNEL_ID=CCMD make --no-print-directory -f "${MAKEFILE}" update-webhook-slack
+  [ "${status}" -eq 0 ]
+  run env PLIST="${plist}" python3 -c 'import os,plistlib; e=plistlib.load(open(os.environ["PLIST"],"rb"))["EnvironmentVariables"]; print("MATCH" if e["K3DM_STATUS_CHANNEL_ID"]=="CSTATUS" else "MISMATCH")'
+  [ "${output}" = "MATCH" ]
+}
+
+@test "update-webhook-slack does not add absent status channel when unset" {
+  _slack_stubs
+  local plist="${STUB_HOME}/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+  run env HOME="${STUB_HOME}" PATH="${STUB_BIN}:${PATH}" SLACK_CHANNEL_ID=CCMD make --no-print-directory -f "${MAKEFILE}" update-webhook-slack
+  [ "${status}" -eq 0 ]
+  run env PLIST="${plist}" python3 -c 'import os,plistlib; e=plistlib.load(open(os.environ["PLIST"],"rb"))["EnvironmentVariables"]; print("ABSENT" if "K3DM_STATUS_CHANNEL_ID" not in e else "PRESENT")'
+  [ "${output}" = "ABSENT" ]
+}
+
 _secret_target() {
   awk '/^update-webhook-slack-secret:/{f=1} f&&/^$/{exit} f' "${MAKEFILE}"
 }

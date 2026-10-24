@@ -4,6 +4,9 @@
 
 ### Added
 
+- API-origin cluster status, Hostinger status and diagnostics reports can start a thread in the
+  configurable `K3DM_STATUS_CHANNEL_ID`; slash-command reports keep their original destination.
+
 - Agent dispatch's Per spec table has a totals row: Codex tokens, Codex time, Codex runs and API
   equiv. are summed over the selected window or release. Time to land is left out, since the Time
   to land stat already shows its mean. By model bars now start at zero, so the smaller model's bar

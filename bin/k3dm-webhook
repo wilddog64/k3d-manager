@@ -32,6 +32,7 @@ from webhook.config import (  # noqa: E402
     PUSHGATEWAY_URL,
     SLACK_BOT_TOKEN,
     SLACK_CHANNEL_ID,
+    STATUS_CHANNEL_ID,
     _PUSHGATEWAY_PUSH_RETRIES,
     _PUSHGATEWAY_PUSH_SLEEP_SECS,
     _ACTIVE_PROVIDER_FILE,
@@ -2005,6 +2006,7 @@ _configure_status_runtime(
 )
 _status._slack_bot_token = lambda: SLACK_BOT_TOKEN
 _status._slack_channel_id = lambda: SLACK_CHANNEL_ID
+_status._status_channel_id = lambda: STATUS_CHANNEL_ID
 _status._start_bot_thread = _start_bot_thread
 _status._post_slack_bot = _post_slack_bot
 _status._ARCH_CONTEXT = _ARCH_CONTEXT

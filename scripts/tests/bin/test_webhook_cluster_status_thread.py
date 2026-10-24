@@ -29,10 +29,10 @@ def status_env(monkeypatch, tmp_path):
     monkeypatch.setattr(wh._status, "_slack_bot_token", lambda: wh.SLACK_BOT_TOKEN)
     monkeypatch.setattr(wh._status, "_slack_channel_id", lambda: wh.SLACK_CHANNEL_ID)
     monkeypatch.setattr(wh, "_slack_post", lambda *args: None)
-    monkeypatch.setattr(wh, "_start_bot_thread", lambda header: "HEADER-TS")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header, channel_id=None: "HEADER-TS")
     monkeypatch.setattr(wh, "_post_slack_bot", lambda *args, **kwargs: "BODY-TS")
     monkeypatch.setattr(wh._status, "_slack_post", lambda *args: wh._slack_post(*args))
-    monkeypatch.setattr(wh._status, "_start_bot_thread", lambda header: wh._start_bot_thread(header))
+    monkeypatch.setattr(wh._status, "_start_bot_thread", lambda header, channel_id=None: wh._start_bot_thread(header) if channel_id is None else wh._start_bot_thread(header, channel_id=channel_id))
     monkeypatch.setattr(wh._status, "_post_slack_bot", lambda *args, **kwargs: wh._post_slack_bot(*args, **kwargs))
     monkeypatch.setattr(wh._status, "_redact_secrets", lambda text: text)
     monkeypatch.setattr(wh._status, "_notify_job", lambda *args: None)
@@ -221,7 +221,7 @@ def test_cluster_status_route_passes_channel_id(monkeypatch, tmp_path):
             return None
 
     monkeypatch.setattr(wh.threading, "Thread", Thread)
-    body = json.dumps({"provider": "hostinger", "response_url": "", "channel_id": "C1"}).encode()
+    body = json.dumps({"provider": "hostinger", "response_url": "", "channel_id": "C1", "status_channel_id": "CATTACKER"}).encode()
     fake = type("FakeHandler", (), {
         "path": "/api/v1/cluster-status",
         "headers": {"Content-Length": str(len(body))},
@@ -236,6 +236,7 @@ def test_cluster_status_route_passes_channel_id(monkeypatch, tmp_path):
     wh._Handler.do_POST(fake)
     assert started
     assert started[0][2]["channel_id"] == "C1"
+    assert "status_channel_id" not in started[0][2]
 
 
 def test_thread_command_passes_channel_id_to_status_worker(monkeypatch, tmp_path):
@@ -377,3 +378,60 @@ def test_audit_remote_action_uses_isolated_directory():
 
     assert Path(policy.AUDIT_DIR) != Path.home() / ".local/share/k3d-manager/audit"
     assert (policy.AUDIT_DIR / "remote-operator.jsonl").read_text()
+
+
+def test_api_status_report_uses_configured_status_channel(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "CSTATUS")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header, channel_id=None: calls.append(("header", header, channel_id)) or "STATUS-TS")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, thread_ts=None, channel_id=None: calls.append(("body", text, thread_ts, channel_id)) or "OK")
+    monkeypatch.setattr(wh._status, "_notify_job", lambda *args: calls.append(("notify", args)))
+    result = wh._status._post_status_report(tmp_path, "", "Header\n\nDetails", "", "")
+    assert result is True
+    assert calls == [("header", "Header", "CSTATUS"), ("body", "Details", "STATUS-TS", "CSTATUS")]
+    assert (tmp_path / "thread_ts").read_text() == "STATUS-TS"
+
+
+def test_api_status_report_without_status_channel_uses_default_fallback(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "")
+    monkeypatch.setattr(wh._status, "_notify_job", lambda *args: calls.append(args))
+    assert not wh._status._post_status_report(tmp_path, "", "Report", "", "")
+    wh._status._notify_job("job", "Report")
+    assert calls == [("job", "Report")]
+
+
+def test_slash_response_url_takes_precedence_over_status_channel(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "CSTATUS")
+    monkeypatch.setattr(wh._status, "_slack_post", lambda *args: calls.append(("response", args)))
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda *args, **kwargs: calls.append(("thread", args, kwargs)))
+    assert wh._status._post_status_report(tmp_path, "response-url", "Report", "", "")
+    assert calls == [("response", ("response-url", "Report"))]
+
+
+def test_incoming_thread_takes_precedence_over_status_channel(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "CSTATUS")
+    monkeypatch.setattr(wh._status, "_post_slack_bot", lambda *args, **kwargs: calls.append((args, kwargs)) or "OK")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda *args, **kwargs: calls.append(("thread", args, kwargs)))
+    assert wh._status._post_status_report(tmp_path, "", "Report", "CINCOMING", "INCOMING-TS")
+    assert calls == [(("Report",), {"thread_ts": "INCOMING-TS", "channel_id": "CINCOMING"})]
+
+
+def test_status_thread_start_failure_uses_default_fallback(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "CSTATUS")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda *args, **kwargs: "")
+    monkeypatch.setattr(wh._status, "_notify_job", lambda *args: calls.append(args))
+    assert not wh._status._post_status_report(tmp_path, "", "Report", "", "")
+    wh._status._notify_job("job", "Report")
+    assert calls == [("job", "Report")]
+
+
+def test_request_body_status_channel_cannot_override_configuration(monkeypatch, status_env, tmp_path):
+    calls = []
+    monkeypatch.setattr(wh._status, "_status_channel_id", lambda: "CSTATUS")
+    monkeypatch.setattr(wh, "_start_bot_thread", lambda header, channel_id=None: calls.append(channel_id) or "TS")
+    wh._status._post_status_report(tmp_path, "", "Report", "", "")
+    assert calls == ["CSTATUS"]
