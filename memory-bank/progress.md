@@ -405,3 +405,5 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] **Per spec links** (`2026-10-23-dispatch-per-spec-name-not-a-link`) landed `33a1b841` 2026-10-23 after rework 1 (audit marker). E3 (click opens GitHub in new tab) pending Argo hard refresh of `hub-grafana-dashboards` — covers plan 4 E3 too.
 - [ ] **Bug filed** `docs/bugs/2026-10-23-cloud-bridge-reexecutes-request-when-response-push-fails.md` (P2, approval pending) — bridge calls the webhook before recording the id; a failed `--force-with-lease` push re-executes next tick. Fix: local claim journal + outbox. Prompted by the operator's prachub idempotency link.
 - [ ] CLAUDE.md drift: `make find-similar-docs Q="…"` documented, target reads `Q_B64` only.
+- [x] Per spec links follow-up (Claude): hidden override was on "Spec" not raw `spec` (case-sensitive byName) — split it; Spec column now right after Release (operator ask). 37 pytest; new assert red on 33a1b841. E3 needs another hard refresh.
+- [ ] Cloud-bridge re-execution bug approved ("you can dispatch the bug fixing task") and dispatched.

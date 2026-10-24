@@ -6,7 +6,7 @@
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, after the operator shared a design note on duplicate request
 processing (https://prachub.com/interview-questions/prevent-duplicate-request-processing)
-**Approval:** pending — the operator shared the link; no fix has been requested yet.
+**Approval:** explicit 2026-10-23. The operator said: "you can dispatch the bug fixing task".
 
 **Component:** `bin/k3dm-cloud-bridge` (`process_tick`, `_write_commit`, the slow-request worker)
 

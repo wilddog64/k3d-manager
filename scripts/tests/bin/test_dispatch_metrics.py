@@ -406,10 +406,14 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #E"] is True
     assert organize["renameByName"]["Value #F"] == "API equiv."
+    assert (organize["indexByName"]["version"], organize["indexByName"]["slug"]) == (0, 1)
     spec_override = next(item for item in per_spec["fieldConfig"]["overrides"]
                          if item["matcher"]["options"] == "Spec")
     spec_properties = {prop["id"]: prop["value"] for prop in spec_override["properties"]}
-    assert spec_properties["custom.hidden"] is True
+    assert "custom.hidden" not in spec_properties  # agent-audit: allow assert-removed the visible Spec column carries the link; only raw spec is hidden
+    raw_spec_override = next(item for item in per_spec["fieldConfig"]["overrides"]
+                             if item["matcher"] == {"id": "byName", "options": "spec"})
+    assert raw_spec_override["properties"] == [{"id": "custom.hidden", "value": True}]
     assert spec_properties["links"][0]["title"] == "Open spec document"
     assert "${__data.fields.spec}" in spec_properties["links"][0]["url"]
     assert "k3d-manager-${__data.fields.version}" in spec_properties["links"][0]["url"]
