@@ -1,0 +1,1 @@
+{"action": "job-status", "artifacts": ["artifacts/20261001T000002Z-job-status/junit.xml", "artifacts/20261001T000002Z-job-status/summary.json"], "body": {"job_id": "abcd1234", "output": "tail", "status": "failed"}, "completed_at": "2026-10-24T15:48:03.320546Z", "http_status": 200, "id": "20261001T000002Z-job-status", "schema": 1, "status": "ok"}
