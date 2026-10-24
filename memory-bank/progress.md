@@ -438,6 +438,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Roadmap candidate theme added 2026-10-23: v2.x feature flags, progressive rollout and feedback (operator "yes"); no spec until a release is picked.
 - [ ] v1.44.3 plan 2 `feature-flags-first-slice` PROPOSED 2026-10-23 ("go for it"); review pending before dispatch; needs v1.44.2 ledger + v1.43.7 cross-repo dispatch.
 - [ ] v1.43.8 plan 1 `dispatch-release-duration` SPEC WRITTEN 2026-10-24.
+- [ ] v1.43.8 plan 2 `slack-route-system-notices-to-status-channel` SPEC WRITTEN 2026-10-24; awaiting dispatch go.
 - [x] Plan 4 `v1.43.5-dispatch-api-cost` VERIFIED 2026-10-24 (E3 operator screenshots, 7d + v1.43.4).
 - [ ] Plan 5 `v1.43.5-dispatch-claude-cost` DISPATCHED to Luna 2026-10-24 (amended: observed-days Projected/month, Acceptance, Files). Claude fills Claude rates before release PR.
 - [ ] v1.43.5 dispatch-claude-cost: rework 2 sent 2026-10-24 (same-release overlap undercount).

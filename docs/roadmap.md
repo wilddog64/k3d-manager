@@ -370,6 +370,10 @@ per release on Agent Dispatch, as separate columns with no combined score. v1.43
 five-plan cap. Plan 1 of 5 is [`dispatch-release-duration`](plans/v1.43.8-dispatch-release-duration.md):
 per release, the span from first dispatch to PR merge (recorded once in the ledger by `/post-merge`,
 so the exporter stays offline) and the active time with overlapping specs counted once.
+Plan 2 of 5 is [`slack-route-system-notices-to-status-channel`](plans/v1.43.8-slack-route-system-notices-to-status-channel.md)
+(operator, 2026-10-24): Slack posts are routed by who started them. Alert analyses go to the status
+channel (#grafana-notification), and operator- and agent-started posts stay in #acg-automation. The
+operator swaps the CronJob incoming webhook so ACG expiry and rotator notices follow.
 
 ### Candidate milestone — v1.44.0
 
