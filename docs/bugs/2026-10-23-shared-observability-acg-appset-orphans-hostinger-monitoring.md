@@ -1,6 +1,6 @@
 # Bug: one shared `observability-acg` ApplicationSet serves Hostinger and the ACG sandbox, so each sandbox lifecycle takes Hostinger's monitoring out of Argo
 
-**Status:** DISPATCHED 2026-10-23
+**Status:** LANDED `878ffae2` 2026-10-23 — E1 green (bats 22/5/7/68; shellcheck clean); tests 2, 3 and 6 red on the pre-fix code. Two reworks: `preserveResourcesOnDeletion` moved from the Application template to the set's `spec.syncPolicy`; the file-name check moved into the helper to clear the `_agent_audit` if-count gate. Live labels confirmed: Hostinger `k3s-hostinger`, sandbox `k3s-aws`, hub `k3d` (excluded). E2/E3 pending: operator `make refresh CLUSTER_PROVIDER=k3s-hostinger` with the sandbox up.
 **Priority:** P2
 **Severity:** medium — Hostinger's Prometheus, Alertmanager, Loki and Trivy keep running, but Argo stops managing them (no sync, no drift repair, no upgrades) until the next Hostinger refresh
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
