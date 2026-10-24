@@ -1,8 +1,10 @@
 # Bug: a rejected Slack bot post leaves no reason in the webhook log
 
-**Status:** LANDED `978b2414` 2026-10-23 — E1 green (pytest 33 incl. the existing status-thread tests); tests 1, 2 and 3 red on the pre-fix `render.py`. Pending E2: operator runs `make restart-webhook`, Claude reruns cluster-status and reads the Slack error from the webhook log. The channel ID `C4CAEH8HX` was confirmed correct by the operator (About tab screenshot).
+**Status:** LIVE-VERIFIED 2026-10-24 (E2, accepted-post path) — webhook restarted 12:47Z on code containing the fix; cluster-status request at 14:54:46Z (job `e86cabc8`) posted to the status channel (thread_ts recorded, status success) and the log has 0 `webhook.render` warnings, i.e. no rejection to report. The rejection path is proven by E1 only; a live not_in_channel would need breaking the bot's channel membership. Was LANDED `978b2414` 2026-10-23 — E1 green (pytest 33 incl. the existing status-thread tests); tests 1, 2 and 3 red on the pre-fix `render.py`. Pending E2: operator runs `make restart-webhook`, Claude reruns cluster-status and reads the Slack error from the webhook log. The channel ID `C4CAEH8HX` was confirmed correct by the operator (About tab screenshot).
 **Priority:** P3
 **Severity:** low — delivery falls back correctly; only the diagnosis is blind
+**Fix commit:** `978b2414`
+**Live evidence:** 2026-10-24 · run e86cabc8 · env hub · scenario status-channel-bot-post-accepted · commit 521c3a24 · proves E2
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, after status-channel E3 failed twice with no recorded cause
 **Approval:** explicit 2026-10-23. The operator said: "go for your suggestion".

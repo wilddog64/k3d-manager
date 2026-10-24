@@ -1,7 +1,7 @@
 # Bug: `hub_data.bats` fails when the `TMPDIR` path contains `config`
 
 **Filed:** 2026-10-23 (Claude, found while landing `ssh-config-guard`)
-**Status:** FIXED — `b470bfb1` 2026-10-23; E1 verified by Claude (pre-fix 6 failures with ssh-config-guard TMPDIR, 9 with commit-show-push; fixed 0 and 0)
+**Status:** VERIFIED 2026-10-24 (offline-only change; E1 is the whole proof) — FIXED — `b470bfb1` 2026-10-23; E1 verified by Claude (pre-fix 6 failures with ssh-config-guard TMPDIR, 9 with commit-show-push; fixed 0 and 0)
 **Priority:** P3 — test-only; it breaks `bin/k3dm-codex-dispatch land` for any task whose slug produces such a path
 **Severity:** low
 **Approval:** explicit 2026-10-23 "sounds good" (operator), in answer to Claude's offer to fix the doc so the operator can dispatch it

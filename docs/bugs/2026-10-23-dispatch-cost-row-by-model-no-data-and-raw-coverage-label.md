@@ -1,8 +1,10 @@
 # Bug: Agent dispatch "By model" shows No data, and "Ledger coverage" is titled with raw labels
 
-**Status:** LANDED `5d3bc140` 2026-10-23 — E1 green (40 pytest; tests 1-2 red on the pre-fix dashboard). E2: promtool (quay.io prometheus v3.1.0, --entrypoint=promtool) returns one series per model; it does so for the pre-fix expression too, so the range query is not proven to be the cause. Rework 1 fixed the Docker fallback entrypoint and the expected `window` label. E3 live-verified 2026-10-24 (operator screenshot at 7d after the Argo hard refresh to `92aa328f`): By model shows gpt-5.6-luna $7.41 and gpt-6-luna $2.20; coverage reads "in the ledger" 48.9%. Leftover: the gpt-6-luna bar renders almost empty because the panel has no `min: 0`, so Grafana scales from the smallest value.
+**Status:** LIVE-VERIFIED 2026-10-24 (E3) — LANDED `5d3bc140` 2026-10-23 — E1 green (40 pytest; tests 1-2 red on the pre-fix dashboard). E2: promtool (quay.io prometheus v3.1.0, --entrypoint=promtool) returns one series per model; it does so for the pre-fix expression too, so the range query is not proven to be the cause. Rework 1 fixed the Docker fallback entrypoint and the expected `window` label. E3 live-verified 2026-10-24 (operator screenshot at 7d after the Argo hard refresh to `92aa328f`): By model shows gpt-5.6-luna $7.41 and gpt-6-luna $2.20; coverage reads "in the ledger" 48.9%. Leftover: the gpt-6-luna bar renders almost empty because the panel has no `min: 0`, so Grafana scales from the smallest value.
 **Priority:** P3
 **Severity:** low — the totals are correct on the same row; one panel is blank, one is mislabelled
+**Fix commit:** `5d3bc140`
+**Live evidence:** 2026-10-24 · run operator-screenshot-cost-row-7d · env hub · scenario by-model-per-model-and-coverage-label · commit 92aa328f · proves E3
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, from the operator's screenshot of the Cost (API-equivalent) row
 **Approval:** explicit 2026-10-23. The operator said: "go ahead to dispatch P3".

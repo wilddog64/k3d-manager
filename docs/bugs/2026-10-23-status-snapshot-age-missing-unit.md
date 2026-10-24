@@ -1,8 +1,10 @@
 # Bug: `make status` prints a stale hub snapshot's age without a unit
 
-**Status:** LANDED `ea043dfb` 2026-10-23 — E1 green (15 bats; test 1 red on the pre-fix script). E2 (operator `make status` before the next `make snapshot`) pending.
+**Status:** LIVE-VERIFIED 2026-10-24 (E2) — operator `make status CLUSTER_PROVIDER=k3s-hostinger` at 08:21 PDT printed `! Hub snapshot: 20261009T170742Z (358h old, over 7 days; run make snapshot)`. Was LANDED `ea043dfb` 2026-10-23 — E1 green (15 bats; test 1 red on the pre-fix script). E2 (operator `make status` before the next `make snapshot`) pending.
 **Priority:** P3
 **Severity:** low — cosmetic; the warning is right, but "344 old" reads as a bare number
+**Fix commit:** `ea043dfb`
+**Live evidence:** 2026-10-24 · run operator-make-status-0821 · env hub · scenario stale-snapshot-age-with-unit · commit 521c3a24 · proves E2
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, after the operator asked what "Hub snapshot: 20261009T170742Z (344 old)" meant
 **Approval:** explicit 2026-10-23. The operator said: "go ahead to file a P3". Dispatch: "go ahead to dispatch P2 and P3 to Codex".

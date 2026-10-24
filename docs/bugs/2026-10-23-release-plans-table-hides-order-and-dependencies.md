@@ -1,8 +1,10 @@
 # Bug: the Release plans table hides implementation order and dependencies
 
-**Status:** FIXED `62a06bb3` — E1/E2 green (91 pytest, 28 bats); E3 live-verified 2026-10-23 (operator screenshot: v1.43.5 rows in Order 1–5, plan 4 depends on plan 3, plan 5 on plan 4)
+**Status:** LIVE-VERIFIED 2026-10-23 (E3) — FIXED `62a06bb3` — E1/E2 green (91 pytest, 28 bats); E3 live-verified 2026-10-23 (operator screenshot: v1.43.5 rows in Order 1–5, plan 4 depends on plan 3, plan 5 on plan 4)
 **Priority:** P3
 **Severity:** low — the order and dependencies exist in the plan documents, but the dashboard does not show them
+**Fix commit:** `62a06bb3`
+**Live evidence:** 2026-10-23 · run operator-screenshot-release-plans-table · env hub · scenario v1435-rows-ordered-with-dependencies · commit 62a06bb3 · proves E3
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, at operator request
 **Approval:** explicit 2026-10-23. The operator asked that "the pane table should show the order you

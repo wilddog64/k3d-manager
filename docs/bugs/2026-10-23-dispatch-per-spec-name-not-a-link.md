@@ -1,8 +1,10 @@
 # Bug: the Per spec table's Spec names are not links to the spec
 
-**Status:** LANDED `33a1b841` 2026-10-23; link fixed `1c7eeb78`; E3 live-verified 2026-10-23 (operator: "spec link works") — E1/E2 green (37 pytest; 5 new tests red on pre-fix, path-validation mutation caught; rework 1 added the audit marker for the 20→21 count). Review miss: one override both hid and linked "Spec", so the linked column was hidden and raw `spec` showed; Claude fixed it (separate `spec` hide override, Spec ordered after Release). E3 pending a second hard refresh.
+**Status:** LIVE-VERIFIED 2026-10-23 (E3) — LANDED `33a1b841` 2026-10-23; link fixed `1c7eeb78`; E3 live-verified 2026-10-23 (operator: "spec link works") — E1/E2 green (37 pytest; 5 new tests red on pre-fix, path-validation mutation caught; rework 1 added the audit marker for the 20→21 count). Review miss: one override both hid and linked "Spec", so the linked column was hidden and raw `spec` showed; Claude fixed it (separate `spec` hide override, Spec ordered after Release). E3 pending a second hard refresh.
 **Priority:** P3
 **Severity:** low — the operator has to find the spec file by hand
+**Fix commit:** `1c7eeb78`
+**Live evidence:** 2026-10-23 · run operator-confirmed-spec-link · env hub · scenario per-spec-name-opens-spec · commit 1c7eeb78 · proves E3
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, at operator request
 **Approval:** explicit 2026-10-23. The operator asked: "can we turn this spec column into a hyperlink
