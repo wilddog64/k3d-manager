@@ -50,6 +50,14 @@ to restart the Hostinger tunnels. The sandbox scope keeps the `ubuntu` default.
 When the unscoped agents already exist and target a different host than `TUNNEL_SSH_HOST`,
 `tunnel_start` refuses unless `TUNNEL_FORCE_HOST=1` is set, and prints both hosts.
 
+### F3. The Hostinger reconcile path is authoritative
+
+`tunnel_stop` unloads the agents but leaves the wrapper scripts, so after a bad repoint the
+reconcile path finds the wrong host in them. `_hostinger_reconcile_vault_cluster_store` must
+be able to repoint: it sets `local TUNNEL_FORCE_HOST=1` alongside its `local TUNNEL_SCOPE=""`
+before calling `tunnel_start`. (Amended 2026-10-23 at review: without this, F2 blocks
+`make refresh CLUSTER_PROVIDER=k3s-hostinger`, the recovery path.)
+
 ## Tests
 
 `scripts/tests/plugins/tunnel.bats` (stub `launchctl`, temp `HOME`):
@@ -60,12 +68,16 @@ When the unscoped agents already exist and target a different host than `TUNNEL_
 3. Existing unscoped agents for `ubuntu@hostinger.example` and `TUNNEL_SSH_HOST=ubuntu` refuse; with
    `TUNNEL_FORCE_HOST=1` they are rewritten.
 4. The Hostinger reconcile path (explicit host, matching existing agents) still writes the agents.
+5. Existing unscoped wrappers for `ubuntu`, then the Hostinger reconcile path with
+   `ubuntu@hostinger.example`: the agents are rewritten to the Hostinger host (stub `kubectl`,
+   `launchctl` and `ssh`; or call the reconcile's tunnel block with the provider's own helpers stubbed).
 
 Show tests 1 and 3 red against the pre-fix plugin.
 
 ## Files
 
 - `scripts/plugins/tunnel.sh`
+- `scripts/lib/providers/k3s-hostinger.sh` (F3 only)
 - `scripts/tests/plugins/tunnel.bats`
 - `CHANGELOG.md`
 
@@ -78,7 +90,7 @@ must:
   - id: M2
     text: tunnel_start refuses to repoint existing unscoped agents at a different host unless TUNNEL_FORCE_HOST=1.
   - id: M3
-    text: The Hostinger reconcile path and the sandbox scope keep working unchanged.
+    text: The Hostinger reconcile path and the sandbox scope keep working, and the reconcile path can repoint agents left at a wrong host.
 must_not:
   - id: N1
     text: A bare tunnel_start must not write or reload the unscoped launchd agents.
@@ -100,7 +112,7 @@ interface:
 
 ## Definition of Done
 
-- [ ] F1–F2 and a CHANGELOG `[Unreleased]` `### Fixed` entry; only the Files above change.
+- [ ] F1–F3 and a CHANGELOG `[Unreleased]` `### Fixed` entry; only the Files above change.
 - [ ] `bats scripts/tests/plugins/tunnel.bats` green; `shellcheck -S warning scripts/plugins/tunnel.sh` clean.
 - [ ] Tests 1 and 3 shown red on a temp copy of the pre-fix plugin.
 - [ ] Commit: `fix(tunnel): refuse to repoint the Hostinger tunnels at a default host`
