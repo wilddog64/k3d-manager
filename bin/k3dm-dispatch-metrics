@@ -340,14 +340,20 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     usage = _session_records(events or [])
     now = time.time() if now is None else now
     if time_scope:
+        session_starts = {item["session"]: _timestamp(item["start"])
+                          for item in coverage or []}
         usage = {key: item for key, item in usage.items()
-                 if item.get("ts", 0) >= now - WINDOWS[window]}
+                 if key in session_starts and session_starts[key] >= now - WINDOWS[window]}
     else:
         usage = {key: item for key, item in usage.items() if item.get("version") == window}
     _render_cost(lines, window, usage, metrics["landed"], prices or {})
     if time_scope and coverage is not None:
         in_window = [item for item in coverage if _timestamp(item["start"]) >= now - WINDOWS[window]]
         ledgered = {item.get("session") for item in events if item.get("event") == "codex_usage"}
+        ledgered_starts = [session_starts[session] for session in ledgered if session in session_starts]
+        observed_days = min(WINDOWS[window] / 86400,
+                            max(0, (now - min(ledgered_starts)) / 86400)) if ledgered_starts else 0
+        lines.append(f'k3dm_dispatch_api_cost_observed_days{{window="{window}"}} {observed_days:.2f}')
         lines.append(f'k3dm_dispatch_codex_sessions{{window="{window}",ledgered="true"}} '
                      f'{sum(item["session"] in ledgered for item in in_window)}')
         lines.append(f'k3dm_dispatch_codex_sessions{{window="{window}",ledgered="false"}} '

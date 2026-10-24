@@ -28,6 +28,61 @@ def event(ts, name, slug="one", **extra):
     return {"ts": ts, "event": name, "version": "9.9.9", "slug": slug, **extra}
 
 
+def write_session(home, session, started, now):
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
+    folder = home / "sessions/2026/10/23"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"rollout-{session}.jsonl"
+    path.write_text(json.dumps({"type": "session_meta", "payload": {
+        "id": session, "timestamp": stamp}}) + "\n")
+    os.utime(path, (now, now))
+
+
+def test_api_cost_windows_use_session_start_and_report_observed_days(tmp_path):
+    now = 1_800_000_000
+    home = tmp_path / "codex"
+    prices = {"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
+    write_session(home, "old", now - 20 * 86400, now)
+    write_session(home, "recent", now - 2 * 86400, now)
+    ledger = [event(now, "codex_usage", session="old", model="gpt-5.6-luna",
+                    input=1_000_000, cached_input=0, output=0),
+              event(now - 2 * 86400, "codex_usage", session="recent", model="gpt-5.6-luna",
+                    input=1_000_000, cached_input=0, output=0)]
+    output = dispatch_metrics.render(ledger, 0, now, prices=prices, codex_home=home)
+    assert 'k3dm_dispatch_api_cost_usd{window="1d"} 0' in output
+    assert 'k3dm_dispatch_api_cost_usd{window="7d"} 0.2' in output
+    assert 'k3dm_dispatch_api_cost_usd{window="30d"} 0.4' in output
+    assert 'k3dm_dispatch_api_cost_observed_days{window="1d"} 1.00' in output
+    assert 'k3dm_dispatch_api_cost_observed_days{window="7d"} 7.00' in output
+    assert 'k3dm_dispatch_api_cost_observed_days{window="30d"} 20.00' in output
+
+
+def test_usage_without_scanned_session_is_excluded_from_time_but_kept_in_release(tmp_path):
+    now = 1_800_000_000
+    row = event(now, "codex_usage", version="v9.9.9", session="missing", model="gpt-5.6-luna",
+                input=1_000_000, cached_input=0, output=0)
+    output = dispatch_metrics.render([event(now - 2, "start", "one"),
+        event(now - 1, "land", "one"), row], 0, now, prices={
+        "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}},
+        codex_home=tmp_path / "empty-codex")
+    assert 'k3dm_dispatch_api_cost_usd{window="7d"} 0' in output
+    assert 'k3dm_dispatch_api_cost_observed_days{window="7d"} 0.00' in output
+    assert 'k3dm_dispatch_api_cost_usd{window="v9.9.9"} 0.2' in output
+
+
+def test_observed_span_is_capped_and_zero_without_ledgered_sessions(tmp_path):
+    now = 1_800_000_000
+    home = tmp_path / "codex"
+    write_session(home, "recent", now - 3 * 86400, now)
+    recent = dispatch_metrics.render([event(now, "codex_usage", session="recent",
+        model="unknown", input=1, cached_input=0, output=0)], 0, now, codex_home=home)
+    assert 'k3dm_dispatch_api_cost_observed_days{window="30d"} 3.00' in recent
+    empty = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_dispatch_api_cost_observed_days{window="1d"} 0.00' in empty
+    assert 'k3dm_dispatch_api_cost_observed_days{window="7d"} 0.00' in empty
+    assert 'k3dm_dispatch_api_cost_observed_days{window="30d"} 0.00' in empty
+
+
 def test_windows_latest_resume_and_malformed_lines(tmp_path):
     now = 1_000_000
     rows = [
@@ -437,7 +492,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])
 
 
-def test_api_cost_uses_last_session_event_and_counts_all_attempts():
+def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):
     rates = {"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
     rows = [
         event(10, "codex_usage", session="s1", model="gpt-5.6-luna", input=611180,
@@ -452,15 +507,20 @@ def test_api_cost_uses_last_session_event_and_counts_all_attempts():
     ]
     metrics = dispatch_metrics._task_metrics(rows[:3], rows[4], rates)
     assert abs(metrics["api_cost_usd"] - (0.02827696 + 0.2)) < 1e-9
-    output = dispatch_metrics.render(rows, 0, 20, prices=rates)
+    home = tmp_path / "codex"
+    for session in ("s1", "s2", "s3"):
+        write_session(home, session, 10, 20)
+    output = dispatch_metrics.render(rows, 0, 20, prices=rates, codex_home=home)
     assert 'k3dm_dispatch_api_cost_usd{window="1d"} 1.22827696' in output
     assert 'k3dm_dispatch_api_cost_per_landed_usd{window="1d"} 1.22827696' in output
 
 
-def test_unpriced_model_keeps_tokens_and_release_has_no_coverage():
+def test_unpriced_model_keeps_tokens_and_release_has_no_coverage(tmp_path):
     rows = [event(10, "codex_usage", model="other-model", session="u1", input=10,
                   cached_input=4, output=2, version="v9.9.9")]
-    output = dispatch_metrics.render(rows, 0, 20, prices={})
+    home = tmp_path / "codex"
+    write_session(home, "u1", 10, 20)
+    output = dispatch_metrics.render(rows, 0, 20, prices={}, codex_home=home)
     assert 'k3dm_dispatch_api_cost_unpriced_sessions{window="1d"} 1' in output
     assert 'kind="cached_input"} 4' in output
     assert 'model="other-model"' not in '\n'.join(line for line in output.splitlines()
@@ -520,6 +580,10 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
               "Ledger coverage", "By model", "Projected / month"}
     assert titles <= by_title.keys()
     assert 'window="7d"' in by_title["Projected / month"]["targets"][0]["expr"]
+    assert by_title["Projected / month"]["targets"][0]["expr"] == (
+        'k3dm_dispatch_api_cost_usd{window="7d"} / '
+        'k3dm_dispatch_api_cost_observed_days{window="7d"} * 30')
+    assert "by session start time" in by_title["Projected / month"]["description"]
     assert 'window="$window"' not in by_title["Projected / month"]["targets"][0]["expr"]
     outside_override = next(item for item in by_title["Ledger coverage"]["fieldConfig"]["overrides"]
                             if item["matcher"] == {"id": "byName", "options": "outside the ledger"})

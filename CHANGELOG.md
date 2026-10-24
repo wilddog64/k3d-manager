@@ -34,6 +34,9 @@
 
 ### Fixed
 
+- Agent dispatch API cost time windows now use Codex session start time, and Projected / month
+  scales by the days covered by the ledger rather than assuming a full seven days.
+
 - The Agent dispatch dashboard's By model panel now uses an instant query, and Ledger coverage names its percentage "in the ledger".
 
 - The cloud bridge journals request claims before execution and retries saved responses from a

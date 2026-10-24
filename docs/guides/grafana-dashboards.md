@@ -74,8 +74,8 @@ output rates there when pricing changes. Models without an explicit entry remain
 - **Ledger coverage** compares Codex sessions started in the selected time window with sessions
   present in the dispatch ledger. It has no release-scope value; “outside the ledger” estimates the
   cost of sessions missing from that ledger.
-- **By model** splits priced usage by model. **Projected / month** scales the last seven days of
-  Codex usage to 30 days and remains pinned to 7d regardless of the selected window.
+- **By model** splits priced usage by model. Time windows count a session by when it started;
+  **Projected / month** divides the 7d cost by the days actually observed, then scales to 30 days.
 
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
