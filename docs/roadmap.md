@@ -383,6 +383,11 @@ Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-
 (operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
 "newest three" to "purge verified snapshots older than 30 days, never the newest three". Dispatch go recorded 2026-10-24.
 
+Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-path-on-node.md)
+(operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
+directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
+10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the

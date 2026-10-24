@@ -3,7 +3,8 @@
 **Filed:** 2026-10-20 (operator-approved live incident triage)
 **Branch:** `k3d-manager-v1.43.5`
 **Release:** v1.43.5 (bug; no new plan slot)
-**Status:** MONITORING — 2026-10-23: the 10-22 recurrence is explained (M4→Hostinger tunnel down on an M4/ISP path outage; Hostinger k3s and uplink healthy). Tunnel logging and reconnect fix `5f9fb209`. Close once a recurrence leaves timestamped tunnel logs that confirm the same fault domain. ArgoCD direct-login endpoint still unavailable (SSO workaround).
+**Status:** FIXED — closed 2026-10-24 (operator: "go as you suggested"). Fault domain confirmed: the public frontend reaches Hostinger only through a port-forward on the M4, so any M4→Hostinger path drop is a public outage; the 10-22 drop was on the M4/ISP side. Shipped: diagnostic classification `6be25c92` (LIVE-VERIFIED), tunnel logging and reconnect `5f9fb209`. The next-drop log check carries in `2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`; the architectural fix is `docs/plans/v1.43.8-hostinger-public-path-on-node.md`. The ArgoCD direct-login failure was `2026-10-23-status-argocd-login-reports-http-unavailable.md`, fixed and live-checked 2026-10-23.
+**Previous status:** MONITORING — 2026-10-23: the 10-22 recurrence is explained (M4→Hostinger tunnel down on an M4/ISP path outage; Hostinger k3s and uplink healthy). Tunnel logging and reconnect fix `5f9fb209`. Close once a recurrence leaves timestamped tunnel logs that confirm the same fault domain. ArgoCD direct-login endpoint still unavailable (SSO workaround).
 **Diagnostic-result classification sub-defect:** LIVE-VERIFIED at `6be25c92`. Operator-provided cloud-agent Slack evidence on 2026-10-22 shows the deployed read-only `describe-pod` diagnostic returning Kubernetes `NotFound` for the deliberately nonexistent pod. This verifies the diagnostic failure path only, not the historical outage or its cause.
 **Priority:** P2 — downgraded from P1 on 2026-10-20 after service recovery; root cause remains unknown and ArgoCD direct password login has an SSO workaround
 **Incident severity:** high at occurrence — public frontend and multiple critical application/data services were degraded
@@ -278,3 +279,18 @@ does not hold. That agent's `/tmp/k3d-manager-tunnel-vault.err` was last written
 `connect to host … port 22: Operation timed out`. The M4 could not open TCP to Hostinger:22, which
 confirms an M4/ISP path outage. The log has no timestamps, so the sequence can't be placed more
 precisely. Follow-up fix: `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`.
+
+## Closure — 2026-10-24
+
+Closed as FIXED on the operator's go. What this bug was filed to find is found: the fault domain is
+the M4 → Hostinger path, because the public frontend is served by `kubectl port-forward` on the M4
+(`_hostinger_write_frontend_browser_wrapper`) behind the M4's cloudflared. Port-forward logs show
+six such drops between 2026-10-12 and 2026-10-22. They are outside our code to prevent while the
+public path runs through the M4.
+
+- Remaining verification (the first timestamped tunnel log line at the next drop) carries in
+  `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md`.
+- Prevention is a release plan, not a bug fix: `docs/plans/v1.43.8-hostinger-public-path-on-node.md`
+  serves `frontend.3ai-talk.org` from cloudflared on the Hostinger node.
+- The ArgoCD direct-login failure noted in the status line was a separate defect,
+  `docs/bugs/2026-10-23-status-argocd-login-reports-http-unavailable.md` (VERIFIED, E2 passed 2026-10-23).
