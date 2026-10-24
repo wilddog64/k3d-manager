@@ -447,6 +447,20 @@ percent, from Codex rollout files and the statusline's usage cache (no API call,
 and how much of the 5-hour window each Codex dispatch used. agy shows "no source" until it has
 one. Depends on v1.43.8's Claude cost-by-reference plan.
 
+Plan 4 (operator, 2026-10-24: add Gemini 4 Argon "into current workflow"): [`dispatch-agy-agent`](plans/v1.44.1-dispatch-agy-agent.md).
+`make codex-dispatch AGENT=agy` runs a spec on `agy` (default `gemini-4-argon-medium`, validated
+against `agy models`) through the same worktree, ledger and land flow as Codex. A commit by the agent
+makes the task unlandable, and side-by-side runs of one spec land only one. `gemini.sh` reads its
+models from `agy models` instead of a stale hardcoded list.
+
+Plan 5 (operator, 2026-10-24: "try each agent as a primar coorindator"): [`coordinator-rotation-trial`](plans/v1.44.1-coordinator-rotation-trial.md).
+Claude, Codex and agy each take the coordinator role for a period. `bin/k3dm-coord` records each
+activity (bug sweep, spec writing, review, land, live check) with the agent's 5-hour and weekly used
+percent at its start and end. A **Coordinator** row shows quota used per activity kind per agent,
+alongside the outcomes: specs landed, bugs closed, rework rounds and defects found later. Live checks
+stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
+**v1.44.1 is now at its five-plan cap.**
+
 ### Candidate milestone — v1.44.2 (patch)
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
