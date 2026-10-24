@@ -40,9 +40,9 @@ The same autouse `isolated_bridge_state` fixture as `test_cloud_bridge.py`, sett
 - `pytest -q scripts/tests/bin/test_cloud_artifacts.py`: 11 passed, 53.9 s.
 - With `webhook_make_targets.py` and `test_cloud_bridge.py`: 148 passed.
 
-## Leftovers (operator decision; not cleaned)
+## Cleanup
 
-- The 13 test IDs in the live `claimed.txt`. They are already in the real ledger as processed, so
-  the bridge does nothing further with them.
-- The fake responses and artifacts on `origin/cloud-requests`. Removing them is a push to a shared
-  branch, so it needs a go.
+- `origin/cloud-requests`: the 13 responses and 5 artifact files were removed in `218f4b9c`
+  (2026-10-24, operator go: "go ahead"). Their ledger lines stay, so the bridge never recovers
+  them as orphans again.
+- The 13 test IDs stay in the live `claimed.txt`. They are harmless while their ledger lines exist.
