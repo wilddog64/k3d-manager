@@ -5,7 +5,7 @@
 **Severity:** low — cosmetic; the warning is right, but "344 old" reads as a bare number
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, after the operator asked what "Hub snapshot: 20261009T170742Z (344 old)" meant
-**Approval:** explicit 2026-10-23. The operator said: "go ahead to file a P3".
+**Approval:** explicit 2026-10-23. The operator said: "go ahead to file a P3". Dispatch: "go ahead to dispatch P2 and P3 to Codex".
 
 **Component:** `bin/cluster-status-summary` (hub snapshot line)
 

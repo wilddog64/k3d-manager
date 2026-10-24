@@ -5,7 +5,7 @@
 **Severity:** high — every Hostinger ExternalSecret stops syncing; running pods keep the last synced Secrets
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, from the operator's 18:15 PDT Slack cluster status (Hostinger: 4 fail)
-**Approval:** pending — filed, not dispatched
+**Approval:** explicit 2026-10-23. The operator said: "go ahead to dispatch P2 and P3 to Codex".
 **Related:** `docs/bugs/2026-10-23-hostinger-tunnel-logs-unusable-and-reconnect-slow.md` (its E2 caused this),
 `docs/bugs/2026-10-18-sandbox-tunnel-start-mistakes-hostinger-tunnel-for-its-own.md`,
 `docs/issues/2026-04-28-vault-bridge-same-port-reverse-tunnel-reset.md`
