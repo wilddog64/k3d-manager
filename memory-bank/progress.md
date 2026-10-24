@@ -437,6 +437,7 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] v1.44.2 plan 2 `command-ledger-and-cluster-reconciliation` PROPOSED 2026-10-23 ("go ahead" to write); operator design review pending before dispatch.
 - [x] Roadmap candidate theme added 2026-10-23: v2.x feature flags, progressive rollout and feedback (operator "yes"); no spec until a release is picked.
 - [ ] v1.44.3 plan 2 `feature-flags-first-slice` PROPOSED 2026-10-23 ("go for it"); review pending before dispatch; needs v1.44.2 ledger + v1.43.7 cross-repo dispatch.
+- [x] Plan 4 `v1.43.5-dispatch-api-cost` VERIFIED 2026-10-24 (E3 operator screenshots, 7d + v1.43.4).
 - [ ] Plan 5 `v1.43.5-dispatch-claude-cost` DISPATCHED to Luna 2026-10-24 (amended: observed-days Projected/month, Acceptance, Files). Claude fills Claude rates before release PR.
 - [ ] P2 restart-webhook kickstart ignores plist env changes: dispatched 2026-10-24.
 - [ ] P3 Slack bot-post error logging: LANDED `978b2414` 2026-10-23; E2 (restart-webhook + read reason) pending. Channel ID C4CAEH8HX confirmed correct.
