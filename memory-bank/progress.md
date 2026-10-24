@@ -407,3 +407,5 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] CLAUDE.md drift: `make find-similar-docs Q="…"` documented, target reads `Q_B64` only.
 - [x] Per spec links follow-up (Claude): hidden override was on "Spec" not raw `spec` (case-sensitive byName) — split it; Spec column now right after Release (operator ask). 37 pytest; new assert red on 33a1b841. E3 needs another hard refresh.
 - [ ] Cloud-bridge re-execution bug approved ("you can dispatch the bug fixing task") and dispatched.
+- [x] Prices `613f79df` 2026-10-23: gpt-6-luna priced ($0.10/$0.01/$0.50, third-party trackers) — was ~1/3 of tokens at $0; subscriptions per operator: chatgpt/claude/gemini $20, github $4, hostinger $10.42 ($250/2y) = $74.42. 7d API-equiv $7.41 → $9.54, 0 unpriced sessions.
+- [ ] Bug filed `docs/bugs/2026-10-23-dispatch-cost-row-by-model-no-data-and-raw-coverage-label.md` (P3, approval pending): By model No data (target not instant — unproven), coverage legend raw labels.
