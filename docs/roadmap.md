@@ -381,7 +381,7 @@ worktree, `SLUG=`), including spec writing, instead of all Claude usage while it
 
 Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md)
 (operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
-"newest three" to "purge verified snapshots older than 30 days, never the newest three". Needs a dispatch go (hub).
+"newest three" to "purge verified snapshots older than 30 days, never the newest three". Dispatch go recorded 2026-10-24.
 
 ### Candidate milestone — v1.44.0
 
