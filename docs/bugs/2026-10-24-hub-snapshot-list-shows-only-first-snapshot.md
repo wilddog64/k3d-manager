@@ -1,6 +1,9 @@
 # Bug: `make snapshot-list` shows only the first snapshot, because `ssh` in the loop reads the loop's input
 
-**Status:** OPEN
+**Status:** LIVE-VERIFIED 2026-10-24 — Luna's fix landed by Claude after review; tests 39/39 under the tripwire, and both new tests red on the pre-fix code.
+**Fix commit:** `a602bfee`
+**Live evidence:** 2026-10-24 · run snapshot-list-20261024 · env hub/make · scenario snapshot-list-three-snapshots · commit a602bfee · proves E2
+**Live evidence detail:** Claude ran `make snapshot-list` from `k3d-manager-v1.43.5` at `a602bfee`. It listed `20261009T022625Z` (3.4G), `20261009T170742Z` (3.3G) and `20261024T152408Z` (3.3G), all verified. Before the fix it printed only the first.
 **Priority:** P2 — the list hides every snapshot after the first, so a successful capture looks lost; workaround is listing the store directly. Retention also under-prunes (at most one removal per run), which is the safe direction.
 **Severity:** medium
 **Release:** v1.43.5 (bug; exempt from the plan cap)
