@@ -1,9 +1,11 @@
 # Bug: thread commands under a slash-command message reply in the channel, not the thread
 
 **Filed:** 2026-10-22 (Claude, from the operator's Slack screenshots ~18:14 PDT)
-**Status:** FIXED offline — `94985769` (Luna; Claude review: N1/N3 red on pre-fix, 167 webhook tests green); live E2 pending make restart-webhook + thread reply
+**Status:** LIVE-VERIFIED 2026-10-24 (E2) — operator screenshot 07:50 PDT: `/ask-docs` then two `ask-docs` thread replies; "Searching docs…" and both answers landed in the thread; sub-jobs `1bf932ef` and `6afe6e66` recorded route `bot_thread`. Was FIXED offline — `94985769` (Luna; Claude review: N1/N3 red on pre-fix, 167 webhook tests green); live E2 pending make restart-webhook + thread reply
 **Priority:** P2 — answers land as top-level channel posts, detached from the question; workaround: ask with a new top-level `/ask-docs`
 **Severity:** medium
+**Fix commit:** `94985769`
+**Live evidence:** 2026-10-24 · run 6afe6e66 · env laptop-webhook+slack · scenario ask-docs-thread-reply-under-slash-command · commit 0c7d0faf · proves E2
 **Approval:** approved — operator, 2026-10-22: "go ahead" to dispatch to Luna
 **Release:** v1.43.5 (bug; exempt from the plan cap)
 **Component:** `bin/k3dm-webhook` (`_notify_job`, `_handle_thread_command` ask-docs branch)
