@@ -174,3 +174,5 @@ Use the bug docs for acceptance criteria and the archive for historical context;
 
 ## Workflow trial — week of 2026-10-26 (agreed with operator 2026-10-22)
 Claude spends its weekly quota on design and specs, dispatching to Luna, and working with Luna during runs. Luna drives bug fixing. When Claude finds a defect in review, it fixes it directly if small; otherwise it files a complete bug that the operator and Luna can work without Claude. Live verification is Claude plus the operator. Track per task: dispatches, review rounds, defects found, fixed-by-Claude vs filed, and when the quota ran out. Retro about 2026-10-31: keep it or tune it.
+
+- 2026-10-23: Per spec links landed `33a1b841`; awaiting operator Argo hard refresh for plan 4 E3 + Per spec E3. Cloud-bridge re-execution bug filed (P2, approval pending).

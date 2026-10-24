@@ -1,6 +1,6 @@
 # Bug: the Per spec table's Spec names are not links to the spec
 
-**Status:** OPEN — queued behind `v1.43.5-dispatch-api-cost` (same files)
+**Status:** LANDED `33a1b841` 2026-10-23 — E1/E2 green (37 pytest; 5 new tests red on pre-fix, path-validation mutation caught; rework 1 added the audit marker for the 20→21 count). E3 pending the Argo hard refresh.
 **Priority:** P3
 **Severity:** low — the operator has to find the spec file by hand
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)

@@ -402,3 +402,6 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] **dispatch-per-spec-name-not-a-link (P3)** dispatched 2026-10-23 after plan 4 landed.
 - [ ] **usage-backfill metrics-export storm (P1)** approved + dispatched 2026-10-23; runs alongside per-spec links (no shared files).
 - [x] **usage-backfill metrics-export storm (P1)** FIXED `5a96ef60` 2026-10-23; live: 20 requests → ≤1 export at a time, load <10, no stale lock.
+- [x] **Per spec links** (`2026-10-23-dispatch-per-spec-name-not-a-link`) landed `33a1b841` 2026-10-23 after rework 1 (audit marker). E3 (click opens GitHub in new tab) pending Argo hard refresh of `hub-grafana-dashboards` — covers plan 4 E3 too.
+- [ ] **Bug filed** `docs/bugs/2026-10-23-cloud-bridge-reexecutes-request-when-response-push-fails.md` (P2, approval pending) — bridge calls the webhook before recording the id; a failed `--force-with-lease` push re-executes next tick. Fix: local claim journal + outbox. Prompted by the operator's prachub idempotency link.
+- [ ] CLAUDE.md drift: `make find-similar-docs Q="…"` documented, target reads `Q_B64` only.
