@@ -23,3 +23,11 @@ guard. `k3dm_dispatch_rework_landed{cause=...}` gives the count per cause (`reru
 `claude_edit`, `any`); a spec can count under several. The independent verifier's verdict is not
 recorded in the ledger, so a correction it asks for shows up only through the re-run or Claude edit
 that follows.
+
+The **Claude** row, second from the top, prices this repo's Claude Code transcripts at Anthropic's
+API list rates (`scripts/etc/agent/codex-model-prices.json`). This is what the usage would cost on
+the API, not the subscription bill. A time window counts every message in it; a release counts only
+messages between each spec's first dispatch and its land, split across specs that overlap, so
+spec writing and live checks between dispatches are left out. **Claude data since** is the oldest
+transcript still on disk. **Claude tokens per day** covers the last 30 days and ignores the Spec
+window.

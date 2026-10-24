@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Agent Dispatch: the Claude panels now sit second from the top, under the first row of stats, so they show without scrolling. Three of them were broken. **Claude tokens per landed spec** always showed No data: `sum()` dropped the Pushgateway's `job`/`instance` labels, so the division matched nothing. It now uses `sum by (window)` and `on(window)`. **Claude data since** turned red only because Grafana's default thresholds read the epoch value as large; it is now a fixed colour. **Claude tokens per day** plotted one bar against a numeric axis, because `groupingToMatrix` names its first column `date\model`, not `date`; it is renamed back so `xField` finds it.
 - `bin/k3dm-dispatch-metrics`: a release's Claude cost counted only its 50 oldest landed specs, because the 50-row display cap also limited which specs were attributed. v1.43.5 has 92, so it showed $5.31 instead of $72.50. The total now counts every spec. The per-spec Claude rows stay capped at 50, but they are now the newest 50, the same specs the Per spec table shows. Claude rates for Opus, Sonnet and Haiku 5.5 come from Anthropic's pricing page (2026-10-24). Haiku uses its rate for prompts up to 100k tokens.
 - `scripts/plugins/observability.sh`: post Prometheus rotation notices using the hub's
   `platform-ops-notifications` Secret when `SLACK_WEBHOOK_URL` is unset, without exposing the URL
