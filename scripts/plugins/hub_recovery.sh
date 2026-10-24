@@ -217,6 +217,11 @@ function _hub_recovery_mirror_argocd_admin() {
   _info "[hub-recovery] ArgoCD admin password mirrored into Vault secret/argocd/admin"
 }
 
+function hub_recovery_argocd_admin_resync() {
+  local hub_context="${HUB_RECOVERY_HUB_CONTEXT:-k3d-k3d-cluster}"
+  _hub_recovery_mirror_argocd_admin "$hub_context"
+}
+
 function _hub_recovery_install_cloudflared_config() {
   local hub_context="$1" app_context="$2" provider config_dir="${HOME}/.cloudflared" config_file="${HOME}/.cloudflared/config.yml" source_file="$SCRIPT_DIR/etc/cloudflared/config.yml" table="$SCRIPT_DIR/etc/cloudflared/origins.tsv" rendered timestamp
   rendered=$(mktemp -t hub-recovery-cloudflared.XXXXXX)

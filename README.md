@@ -287,7 +287,7 @@ docs/
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
 - **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
-- **[Hub Rebuild & Recovery](docs/howto/hub-rebuild-from-gitops-vault.md)** — Rebuild the hub, `make hub-recover`, unstick the identity sync, and what is not restored; the weekly DR drill proves an export restores ([how-to](docs/howto/hub-dr-drill.md))
+- **[Hub Rebuild & Recovery](docs/howto/hub-rebuild-from-gitops-vault.md)** — Rebuild the hub, `make hub-recover`, unstick the identity sync, and what is not restored; use `make argocd-admin-resync` to revalidate and repair the Vault ArgoCD admin password without running full recovery; the weekly DR drill proves an export restores ([how-to](docs/howto/hub-dr-drill.md))
 - **[Weekly Hub DR Drill](docs/howto/hub-dr-drill.md)** — Export encrypted hub data, restore it on the M2, and publish the verification result; `make hub-data-recover` / `make hub-recover-all` restore a real hub from the same export
 
 | Script | Claude Skill | When to use |

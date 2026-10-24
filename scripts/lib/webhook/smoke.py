@@ -196,8 +196,11 @@ def _smoke_post(ctx, url, data, headers=None):
     if headers:
         request_headers.update(headers)
     req = urllib.request.Request(url, data=body, headers=request_headers, method="POST")
-    with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
-        return resp.status, resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
 
 
 def _smoke_http_code(ctx, request):
@@ -315,7 +318,14 @@ def _smoke_argocd_login(ctx):
         code, raw = _smoke_post(ctx, "https://argocd.3ai-talk.org/api/v1/session",
                                 json.dumps({"username": "admin", "password": password}).encode(),
                                 headers={"Content-Type": "application/json"})
-        return "ArgoCD login", bool(code == 200 and json.loads(raw).get("token")), f"admin via {source}: HTTP {code}"
+        if code != 200:
+            return "ArgoCD login", False, f"admin via {source}: HTTP {code}"
+        try:
+            has_token = bool(json.loads(raw).get("token"))
+        except (json.JSONDecodeError, AttributeError):
+            has_token = False
+        detail = f"admin via {source}: HTTP 200" if has_token else f"admin via {source}: HTTP 200, no token"
+        return "ArgoCD login", has_token, detail
     except Exception:
         return "ArgoCD login", False, f"admin via {source}: HTTP unavailable"
 

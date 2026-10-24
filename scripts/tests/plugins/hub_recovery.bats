@@ -746,6 +746,21 @@ function _stub_argocd_admin_mirror_dependencies() {
   _err() { printf 'err\n' >> "$MIRROR_CALLS"; }
 }
 
+@test "make argocd-admin-resync: invokes only the public mirror action" {
+  local manager_stub="${BATS_TEST_TMPDIR}/k3dm-manager-stub"
+  local calls="${BATS_TEST_TMPDIR}/manager-calls"
+  cat > "$manager_stub" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$MANAGER_CALLS"
+SH
+  chmod +x "$manager_stub"
+  export MANAGER_CALLS="$calls"
+  run make --no-print-directory -f "${BATS_TEST_DIRNAME}/../../../Makefile" \
+    K3DM_MANAGER_BIN="$manager_stub" argocd-admin-resync
+  [ "$status" -eq 0 ]
+  [ "$(cat "$calls")" = "hub_recovery_argocd_admin_resync" ]
+}
+
 @test "_hub_recovery_mirror_argocd_admin: keeps an ArgoCD-accepted Vault password" {
   _stub_argocd_admin_mirror_dependencies
   MIRROR_KV_GET_STATUS=0

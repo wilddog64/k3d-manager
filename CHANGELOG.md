@@ -42,6 +42,10 @@
 
 ### Fixed
 
+- The status smoke check now reports ArgoCD's HTTP rejection code instead of calling a rejected
+  password "HTTP unavailable"; `make argocd-admin-resync` revalidates the Vault copy and repairs
+  it only when ArgoCD rejects it.
+
 - The shared `observability-acg` ApplicationSet now generates per-cluster monitoring Applications for Hostinger and the ACG sandbox, preserving Helm release names and other clusters during sandbox teardown.
 
 - Unscoped `tunnel_start` now requires an explicit SSH host and refuses to repoint existing tunnel agents without `TUNNEL_FORCE_HOST=1`; Hostinger reconcile sets that override for its recovery path.
