@@ -1,6 +1,6 @@
 # Bug: CI `lint` fails on the `install-sudoers.sh --dry-run` syntax check after `ubuntu-latest` moved to Ubuntu 26.04
 
-**Status:** FIXED — pending the v1.43.5 PR CI run
+**Status:** FIXED — verified in CI run 40124898903 on `eae158cc` (2026-10-24, PR #148)
 **Priority:** P1 — every PR's `lint` job fails, so no release can pass the CI gate
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from the plan cap)
@@ -55,3 +55,5 @@ interface:
   - .github/workflows/ci.yml lint job
   - bin/install-sudoers.sh --dry-run
 ```
+
+**CI evidence (E1/E2):** CI run 40124898903 on `eae158cc` (2026-10-24, PR #148): the lint job ran on image `ubuntu-24.04`; `ok 356 install-sudoers.sh --dry-run validates sudoers syntax`.

@@ -1,6 +1,6 @@
 # Bug: CI's PromQL-evaluating pytest tests fail because the tripwire blocks `docker run`
 
-**Status:** FIXED — pending the v1.43.5 PR CI run
+**Status:** FIXED — verified in CI run 40124898903 on `eae158cc` (2026-10-24, PR #148)
 **Priority:** P1 — `lint` fails on every PR from this branch, so the release can't pass the CI gate
 **Severity:** high
 **Release:** v1.43.5 (bug; exempt from the plan cap)
@@ -65,3 +65,5 @@ evidence:
 interface:
   - .github/workflows/ci.yml lint job
 ```
+
+**CI evidence (E2):** CI run 40124898903 on `eae158cc` (2026-10-24, PR #148): `test_dashboard_queries.py .` passed; `test_dispatch_metrics.py` had no skips (the run's 3 skips are in `test_find_similar_docs.py` and `test_hermetic_guard.py`); BATS `ok 1081` balanced PromQL; pytest 1202 passed with no tripwire FAIL; `tripwire.sh` unchanged.
