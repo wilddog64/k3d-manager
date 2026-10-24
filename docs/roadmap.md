@@ -379,6 +379,10 @@ Plan 3 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.8-dispatch-clau
 (operator, 2026-10-24): each spec is charged with the Claude turns whose tool calls name it (spec file,
 worktree, `SLUG=`), including spec writing, instead of all Claude usage while it was dispatched.
 
+Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md)
+(operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
+"newest three" to "purge verified snapshots older than 30 days, never the newest three". Needs a dispatch go (hub).
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
