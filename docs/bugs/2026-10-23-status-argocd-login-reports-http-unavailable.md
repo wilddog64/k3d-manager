@@ -1,11 +1,11 @@
 # Bug: the status ArgoCD login check reports "HTTP unavailable" for a rejected password, and nothing outside hub recovery repairs the stale Vault copy
 
-**Status:** OPEN — 2026-10-23
+**Status:** DISPATCHED — 2026-10-23
 **Priority:** P3 — ArgoCD itself and ArgoCD SSO are healthy; only the admin-password check fails, and the operator can read `argocd-initial-admin-secret`
 **Severity:** low
 **Release:** v1.43.5 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-23, by Claude, from the 19:55 PDT status report in #grafana-notification (job `c4b35b3c`: 20 ok / 1 fail)
-**Approval:** pending — the fix changes the hub webhook, so it needs an explicit dispatch go
+**Approval:** explicit 2026-10-23. The operator said: "go ahead" (dispatch; critical because it changes the hub webhook)
 **Related:** `docs/bugs/2026-10-18-argocd-admin-vault-copy-never-revalidated-after-rebuild.md`, `docs/bugs/2026-10-18-argocd-app-sync-stale-vault-admin-password.md`
 **Component:** `scripts/lib/webhook/smoke.py` (`_smoke_post`, `_smoke_argocd_login`), `scripts/plugins/hub_recovery.sh` (`_hub_recovery_mirror_argocd_admin`)
 
@@ -40,9 +40,18 @@ cause 2 holds.
   `_hub_recovery_mirror_argocd_admin` against the hub context (revalidate; replace only when ArgoCD
   rejects it; keep the value when ArgoCD is unreachable). It prints no secret.
 
+## Files
+
+- `scripts/lib/webhook/smoke.py`
+- `scripts/plugins/hub_recovery.sh` (only if a thin public wrapper is needed for the make target)
+- `Makefile` (`argocd-admin-resync`, `.PHONY`)
+- `scripts/tests/bin/test_smoke_logins.py`
+- `scripts/tests/plugins/hub_recovery.bats`
+- `README.md` (make target list), `CHANGELOG.md`
+
 ## Tests
 
-- `scripts/tests/bin/test_webhook_smoke.py` (stub `urlopen`): a 401 on the session POST reports
+- `scripts/tests/bin/test_smoke_logins.py` (existing; stub `urlopen`): a 401 on the session POST reports
   `HTTP 401`, not "unavailable"; a connection error still reports "HTTP unavailable"; other
   `_smoke_post` callers (Keycloak token, Grafana login) see the same codes they do today.
 - `scripts/tests/plugins/hub_recovery.bats`: `make argocd-admin-resync` calls only the mirror (no
@@ -67,7 +76,7 @@ evidence:
   - id: E1
     kind: offline
     proves: [M1, M2, N1, N2]
-    text: pytest test_webhook_smoke.py and bats hub_recovery.bats green; the 401 test red on the pre-fix smoke.py.
+    text: pytest test_smoke_logins.py and bats hub_recovery.bats green; the 401 test red on the pre-fix smoke.py.
   - id: E2
     kind: live
     proves: [M1, M2]
@@ -88,4 +97,5 @@ interface:
 
 - Do NOT create a PR, commit to `main`, or skip hooks (`--no-verify`).
 - Do NOT print, log or compare the password outside the existing redaction path.
+- Do NOT modify files outside the Files list.
 - Do NOT run `hub_recovery_reconcile`, `kubectl` or the real webhook from tests.
