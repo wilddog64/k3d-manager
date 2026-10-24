@@ -100,7 +100,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - 2026-10-23 19:05 PDT: Hostinger refresh done, P2 E2 PASSED. Found + filed P2 shared `observability-acg` set (approval pending). Status-channel P3 DISPATCHED.
 - 2026-10-23 PDT: observability-acg P2 spec written + approved; LANDED `878ffae2`. Sandbox up (old code moved legacy observability apps to ubuntu-k3s); E2 PASSED after Hostinger refresh 19:29 PDT; E3: confirm at next sandbox teardown that only ubuntu-k3s-* apps go and the set stays.
 - v1.44.2 plan 2 command-ledger spec written (`4bcc2ed7`); awaiting operator design review before dispatch.
-- v1.44.3 plan 2 feature-flags first-slice spec written; awaiting operator review.
+- v1.44.3 plan 2 feature-flags first-slice spec written; flag `basket-cart-summary` confirmed. Dispatch gated (reaches Hostinger).
+- Rule from 2026-10-23: a separate dispatch approval is needed only for critical specs (Hostinger, hub or similar); others dispatch once writing is approved.
 
 - 2026-10-23: Complexity plan filed `docs/plans/v1.43.7-dispatch-spec-and-change-complexity.md` (v1.43.7 plan 5/5, full; approved "that's fine. we go as planned"); dispatch waits for the v1.43.7 branch. Still awaiting operator Argo hard refresh + screenshot for `f8dbf7b6` (Projected ≈ $14.9) and `74dbdcfb` (Per spec footer, By model min 0).
 
