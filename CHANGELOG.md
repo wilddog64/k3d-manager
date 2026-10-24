@@ -39,6 +39,9 @@
 
 ### Fixed
 
+- `make status` now shows stale hub snapshot age in hours, explains the seven-day threshold and
+  snapshot command, and labels an unparseable timestamp as `age unknown`.
+
 - Agent dispatch API cost time windows now use Codex session start time, and Projected / month
   scales by the days covered by the ledger rather than assuming a full seven days.
 

@@ -23,7 +23,7 @@ teardown() { rm -rf "${TMP_DIR}"; }
 stamp_hours_ago() {
   python3 - "$1" <<'PY'
 import datetime, sys
-print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=int(sys.argv[1]))).strftime("%Y%m%dT%H%M%SZ"))
+print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=int(sys.argv[1]), minutes=1)).strftime("%Y%m%dT%H%M%SZ"))
 PY
 }
 
@@ -56,13 +56,22 @@ PY
   run "${STATUS_SCRIPT}" --mode summary
   [ "$status" -eq 1 ]
   [[ "$output" == *"✓ Hub snapshot"* ]]
+  [[ "$output" == *"(2h old)"* ]]
 }
 
-@test "text status marks an old hub snapshot" {
-  printf '%s\n' "$(stamp_hours_ago 192)" > "$K3DM_SNAPSHOT_STAMP"
+@test "text status explains a hub snapshot older than seven days" {
+  printf '%s\n' "$(stamp_hours_ago 200)" > "$K3DM_SNAPSHOT_STAMP"
   run "${STATUS_SCRIPT}" --mode summary
   [ "$status" -eq 1 ]
+  [[ "$output" == *"200h old, over 7 days; run make snapshot"* ]]
   [[ "$output" == *"! Hub snapshot"* ]]
+}
+
+@test "text status reports an unknown age for an unparseable hub snapshot stamp" {
+  printf '%s\n' "not-a-timestamp" > "$K3DM_SNAPSHOT_STAMP"
+  run "${STATUS_SCRIPT}" --mode summary
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"(age unknown)"* ]]
 }
 
 @test "text status reports no recorded hub snapshot" {
