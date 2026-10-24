@@ -327,7 +327,8 @@ requires it. It also adds a `review` cause to the v1.43.4 rework rate.
 Plan 3 of 5 is [`dispatch-codex-solo-activity`](plans/v1.43.6-dispatch-codex-solo-activity.md)
 (operator, 2026-10-18). The dispatch dashboard sees only dispatcher-launched Codex runs; this adds a row for
 every Codex session (headless or interactive, by repo), and Codex's own 5-hour and weekly quota, read
-from the session files. Depends on v1.43.5 plan 4's session scan.
+from the session files. Depends on v1.43.5 plan 4's session scan. Widened 2026-10-24 (operator) to agy:
+a pass-through `bin/k3dm-agy` wrapper records every agy run, dispatched or not, without reading `~/.gemini`.
 
 Plan 4 of 5 is [`claude-context-compaction-metrics`](plans/v1.43.6-claude-context-compaction-metrics.md)
 (operator, 2026-10-18). It measures what context compaction costs: compactions, files re-read after a
