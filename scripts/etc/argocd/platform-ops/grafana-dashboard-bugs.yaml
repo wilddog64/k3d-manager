@@ -1162,25 +1162,25 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Verified at"},
                 "properties": [
-                  {"id": "custom.width", "value": 135},
+                  {"id": "custom.width", "value": 95},
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "true": {"text": "unknown", "color": "#8e8e8e", "index": 0},
                     "false": {"text": "—", "color": "#8e8e8e", "index": 1},
                     "n/a": {"text": "—", "color": "#8e8e8e", "index": 2},
                     "-": {"text": "—", "color": "#8e8e8e", "index": 3}
-                  }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                  }}, {"type": "regex", "options": {"pattern": "^(\\d{4}-\\d{2}-\\d{2})[ T].*$", "result": {"text": "$1", "index": 4}}}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
                 ]
               },
               {
                 "matcher": {"id": "byName", "options": "Live-verified at"},
                 "properties": [
-                  {"id": "custom.width", "value": 135},
+                  {"id": "custom.width", "value": 95},
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "true": {"text": "unknown", "color": "#8e8e8e", "index": 0},
                     "false": {"text": "—", "color": "#8e8e8e", "index": 1},
                     "n/a": {"text": "—", "color": "#8e8e8e", "index": 2},
                     "-": {"text": "—", "color": "#8e8e8e", "index": 3}
-                  }}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
+                  }}, {"type": "regex", "options": {"pattern": "^(\\d{4}-\\d{2}-\\d{2})[ T].*$", "result": {"text": "$1", "index": 4}}}, {"type": "special", "options": {"match": "empty", "result": {"text": ""}}}]}
                 ]
               },
               {
@@ -1947,7 +1947,8 @@ data:
                   "__name__": true,
                   "job": true,
                   "instance": true,
-                  "version": true
+                  "version": true,
+                  "slug": true
                 },
                 "indexByName": {
                   "release": 0,
@@ -2036,7 +2037,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 260
+                    "value": 360
                   }
                 ]
               },

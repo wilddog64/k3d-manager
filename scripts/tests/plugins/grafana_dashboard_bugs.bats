@@ -698,6 +698,11 @@ assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 assert "Bug" not in widths, widths
 assert widths["Fixed in"] and sum(widths.values()) + 150 <= 1350, sum(widths.values())
+for column in ("Verified at", "Live-verified at"):
+    assert widths[column] <= 100, column
+    regex = next(m["options"] for o in table["fieldConfig"]["overrides"] if o["matcher"].get("options") == column
+                 for p in o["properties"] if p["id"] == "mappings" for m in p["value"] if m["type"] == "regex")
+    assert regex["result"]["text"] == "$1" and regex["pattern"].startswith("^(\\d{4}-\\d{2}-\\d{2})"), regex
 PY
   [ "${status}" -eq 0 ]
 }
@@ -711,6 +716,8 @@ assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
+assert org["excludeByName"].get("slug") is True and "slug" not in visible
+assert widths["Title"] >= 350, widths
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
 assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)
