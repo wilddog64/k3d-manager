@@ -606,3 +606,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: telemetry plan live check found Worker model always unknown (codex.log reports gpt-6-luna, unread) and coordinator undeclarable; filed P3 docs/bugs/2026-10-25-dispatch-worker-model-unknown-despite-runtime-report.md; dispatching to Luna.
 - 2026-10-25: panel 85 correction→correct 15c09b4f (name column sizes to the longest label; all <=8 chars).
 - 2026-10-25: panel 85 names placed on top e98af9b3; full labels restored (clarification/continue/correction/other/tracked tasks).
+- 2026-10-25: panels 84/85 h 6->8 583d092c (values clipped with names on top).
