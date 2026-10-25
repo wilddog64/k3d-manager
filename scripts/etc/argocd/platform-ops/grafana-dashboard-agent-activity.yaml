@@ -680,7 +680,7 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "none",
+              "unit": "short",
               "color": {
                 "mode": "fixed",
                 "fixedColor": "blue"
@@ -1275,7 +1275,7 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "none",
+              "unit": "short",
               "color": {
                 "mode": "fixed",
                 "fixedColor": "blue"

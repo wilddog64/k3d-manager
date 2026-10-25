@@ -252,6 +252,8 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
+      if field=="fieldConfig" and panel["id"] in (56,71) and new["defaults"].get("unit")=="short":
+        new=json.loads(json.dumps(new)); new["defaults"]["unit"]=old_field["defaults"]["unit"]
       assert new==old_field,(panel["id"],field)
 print("ok")
 PY
@@ -335,6 +337,8 @@ for p in panels:
     assert text_sizes.get("titleSize") and text_sizes.get("valueSize"),p["id"]
     if want=="top":
       assert p["gridPos"]["h"]>=8,(p["id"],p["gridPos"])
+for i in (56,71):
+  assert by_id[i]["fieldConfig"]["defaults"]["unit"]=="short",i
 print("ok")
 PY
   [ "$status" -eq 0 ]
