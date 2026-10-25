@@ -1,8 +1,9 @@
 # Bug: Plans Dispatch shows `awaiting land` for a landed plan when bookkeeping follows the land
 
-**Status:** FIXED 2026-10-25 — fix commit below; pytest `test_dispatch_metrics.py` green, three new state-table cases red on a temp copy of the pre-fix exporter. Live E2 PASSED 2026-10-25 14:40 PDT: after `make dispatch-metrics` (work:4.0, 14:37), Bug Tracking → Plans shows landed (code in) for v1.43.7-dispatch-landing-latency-human-interventions (operator screenshot 330).
+**Status:** LIVE-VERIFIED 2026-10-25 (fixed 2026-10-25) — fix commit below; pytest `test_dispatch_metrics.py` green, three new state-table cases red on a temp copy of the pre-fix exporter. Live E2 PASSED 2026-10-25 14:40 PDT: after `make dispatch-metrics` (work:4.0, 14:37), Bug Tracking → Plans shows landed (code in) for v1.43.7-dispatch-landing-latency-human-interventions (operator screenshot 330).
 **Priority:** P3
 **Fix commit:** `6b847dd0`
+**Live evidence:** 2026-10-25 · run hub-grafana-plans-dispatch-landed-screenshot · env hub/k3d-k3d-cluster · scenario bug-tracking/plans-dispatch-v1.43.7 · commit 6b847dd0 · proves E2
 **Severity:** low — one dashboard cell reads a wrong state; no dispatch or landing behaviour is affected
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
 **Filed:** 2026-10-25, by Claude, from the operator's Bug Tracking screenshot 327
