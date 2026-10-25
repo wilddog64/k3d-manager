@@ -510,3 +510,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-24: API-cost P3 LANDED `b14dab86` (Luna commit 58afa132). E1 offline-verified; E2 pending hub refresh + Agent Activity 7d screenshot; then verify pass.
 - 2026-10-24: API-cost P3 LIVE-VERIFIED (operator screenshot: $12.1, 70 unpriced); verify pass recorded.
 - 2026-10-24: duplicate Codex run claude-context-compaction-metrics kept for operator inspection; codex-abandon without YES=1 is preview-only (no ledger event). Abandon YES=1 after operator looks.
+- 2026-10-24: interactive Codex trial set up: bug 2026-10-15-vectordb-corpus-axis-fractional-ticks (P3, was placed v1.45.2) in worktree ~/.local/share/k3d-manager/worktrees/manual/vectordb-ticks, branch task/v1.43.6/vectordb-ticks-interactive. Not via dispatcher (operator choice): no ledger events; shows only as an untracked interactive session. Claude reviews + merges by hand.
