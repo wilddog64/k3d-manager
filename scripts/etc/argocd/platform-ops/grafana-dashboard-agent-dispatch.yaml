@@ -632,7 +632,7 @@ data:
               "refId": "D"
             },
             {
-              "expr": "max by (version, slug, spec) (k3dm_dispatch_task_spec{window=\"$window\"})",
+              "expr": "max by (version, slug, spec, agent) (k3dm_dispatch_task_spec{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "E"
@@ -664,17 +664,19 @@ data:
                 "indexByName": {
                   "version": 0,
                   "slug": 1,
-                  "Value #A": 2,
-                  "Value #B": 3,
-                  "Value #C": 4,
-                  "Value #D": 5,
-                  "Value #F": 6,
-                  "Value #G": 7,
-                  "spec": 8
+                  "agent": 2,
+                  "Value #A": 3,
+                  "Value #B": 4,
+                  "Value #C": 5,
+                  "Value #D": 6,
+                  "Value #F": 7,
+                  "Value #G": 8,
+                  "spec": 9
                 },
                 "renameByName": {
                   "version": "Release",
                   "slug": "Spec",
+                  "agent": "Agent",
                   "Value #A": "Codex tokens",
                   "Value #B": "Codex time",
                   "Value #C": "Time to land",

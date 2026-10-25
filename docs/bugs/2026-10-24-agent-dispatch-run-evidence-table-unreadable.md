@@ -1,6 +1,10 @@
 # Bug: Agent Dispatch Run outcomes labels truncate, and Per run evidence shows plumbing instead of tokens
 
-**Status:** FIXED — offline-verified: dashboard BATS 18/18 (new test red on the pre-fix file), validate-manifests 83 valid. Live check pending the hub sync.
+**Status:** LIVE-VERIFIED 2026-10-25 — offline: dashboard BATS 18/18 (new test red on the pre-fix file), validate-manifests 83 valid
+**Fix commit:** `c5f5d898`
+**Fix commits (all):** `a4d98518`, `a3b05442`, `4d6654d2`, `c5f5d898` (v1.43.7)
+**Live evidence:** 2026-10-25 · run operator-screenshot-233 · env hub-grafana · scenario run-evidence-row-after-hub-sync · commit c5f5d898 · proves E2
+**Live note:** E2 covers M2, M3, M4, N1. First-pass live verification sits left of Per run evidence at the same height with `fail`/`pass` in full; the table shows linked slugs and Codex tokens with no plumbing columns. M1 (Run outcomes) was not in that frame.
 **Priority:** P3
 **Severity:** low — the numbers are correct; the operator cannot read the outcome names, cannot open the spec, and never sees per-run tokens
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)

@@ -117,7 +117,7 @@ import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
 panel12=next(p for p in panels if p["id"]==12); assert len(panel12["targets"])>=4
-assert all(t["expr"].startswith(("sum by (version, slug)","max by (version, slug, spec)")) for t in panel12["targets"])
+assert all(t["expr"].startswith(("sum by (version, slug)","max by (version, slug, spec)","max by (version, slug, spec, agent)")) for t in panel12["targets"])  # agent-audit: allow assert-removed same assert, adds the Agent column grouping
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -224,6 +224,8 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
+        continue
+      if field=="targets" and panel["id"]==12:
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
@@ -335,6 +337,26 @@ for hidden in ("Time","__name__","job","window","doc","Value #A"):
 assert org["renameByName"].get("Value #B")=="Codex tokens"
 links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
 assert len(links)==1 and links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch: per spec shows which agent landed each spec" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panel=next(p for p in d["panels"] if p["id"]==12)
+spec=[t for t in panel["targets"] if "k3dm_dispatch_task_spec" in t["expr"]]
+assert len(spec)==1 and spec[0]["expr"].startswith("max by (version, slug, spec, agent) "),spec
+org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
+assert org["renameByName"].get("agent")=="Agent",org
+idx=org["indexByName"]
+assert idx["version"]<idx["slug"]<idx["agent"]<idx["Value #A"],idx
+assert not org.get("excludeByName",{}).get("agent"),org
 print("ok")
 PY
   [ "$status" -eq 0 ]

@@ -70,7 +70,8 @@ Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant trans
 ### Agent dispatch cost details
 
 The Agent dispatch **Per spec** table links each Spec name to its plan or bug document on the
-task's release branch; the link opens in a new tab. Its totals row sums Codex tokens, Codex time, Codex runs and
+task's release branch; the link opens in a new tab. **Agent** names who landed the spec
+(`codex` or `agy`); the Codex columns stay empty for an agy row. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
 totals. Time to land is not summed: parallel dispatches overlap, so the useful number is the mean,
 which the **Time to land** stat shows. Codex tokens uses the cumulative session total from the last
