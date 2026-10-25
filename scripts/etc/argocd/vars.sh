@@ -6,7 +6,8 @@ export ARGOCD_HELM_RELEASE="argocd"
 export ARGOCD_HELM_REPO_NAME="argo"
 export ARGOCD_HELM_REPO_URL="https://argoproj.github.io/argo-helm"
 export ARGOCD_HELM_CHART_REF="argo/argo-cd"
-export ARGOCD_HELM_CHART_VERSION=""  # Empty = latest
+export ARGOCD_HELM_CHART_VERSION="10.10.5"  # pinned; bump via docs/howto/hub-argocd-upgrade.md
+export ARGOCD_UPGRADE_SETTLE_SECONDS="${ARGOCD_UPGRADE_SETTLE_SECONDS:-600}"
 
 # Deployment Feature Flags
 export ARGOCD_LDAP_ENABLED="${ARGOCD_LDAP_ENABLED:-0}"    # 0 = disabled by default, use --enable-ldap to deploy

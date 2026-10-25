@@ -44,7 +44,9 @@ EOF
 set -euo pipefail
 printf '%s\n' "$*" >>"${STUB_ARGV:?}"
 printf '%s\n' "$PWD" >>"${STUB_ARGV}.cwd"
+[[ -z "${STUB_MODEL_LINE+x}" ]] || printf '%s\n' "$STUB_MODEL_LINE"
 printf 'session id: 01a122dd-71c3-7763-87f0-3de505f10168\n'
+[[ -z "${STUB_LOG_MARKER:-}" ]] || printf '%s\n' "$STUB_LOG_MARKER"
 printf 'K3DM_REPO_ROOT=%s\nK3DM_JOB_DIR=%s\nK3DM_RUN_DIR=%s\nK3DM_STATE_DIR=%s\nK3DM_LOG_DIR=%s\nK3DM_TMP_ROOT=%s\nK3DM_PORT_CACHE_DIR=%s\nTMPDIR=%s\nHOME=%s\n' "$K3DM_REPO_ROOT" "$K3DM_JOB_DIR" "$K3DM_RUN_DIR" "$K3DM_STATE_DIR" "$K3DM_LOG_DIR" "$K3DM_TMP_ROOT" "$K3DM_PORT_CACHE_DIR" "$TMPDIR" "$HOME" >"${STUB_ENV:?}"
 codex_dir="${K3DM_REPO_ROOT:-}"
 out_file=""
@@ -101,6 +103,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   grep -q '^K3DM_DISPATCH_SLUG=agy$' "$BATS_TEST_TMPDIR/agy.argv.env"
   [ "$(cd "$(<"$BATS_TEST_TMPDIR/agy.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/agy" && pwd -P)" ]
   [ "$(jq -r 'select(.event=="start")|.agent+":"+.model_source+":"+.model' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "agy:default:gemini-4-argon-medium" ]
+  [ "$(jq -r 'select(.event=="start")|.worker_identity.vendor+":"+.worker_identity.model+":"+.worker_identity.status+":"+.coordinator_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "google:gemini-4-argon-medium:selected:unknown" ]
   [ "$(jq -r 'select(.event=="agent_exit")|(.run|tostring)+":"+.session' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "1:agy-conversation-1" ]
   grep -q '"event":"agent_usage"' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ ! -e "$BATS_TEST_TMPDIR/codex.argv" ]
@@ -174,7 +177,41 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug codex >/dev/null
   sleep 1
   [ "$(jq -r 'select(.event=="start")|.agent+":"+(.model|tostring)+":"+.model_source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "codex:null:inherited" ]
+  [ "$(jq -s '[.[]|select(.event=="identity")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
   [[ "$(<"$BATS_TEST_TMPDIR/default.argv")" == "exec --sandbox workspace-write -C $K3DM_WORKTREE_ROOT/v9.9.9/codex --add-dir $K3DM_WORKTREE_ROOT/v9.9.9/codex.run/state -o $K3DM_WORKTREE_ROOT/v9.9.9/codex.run/last-message.md -" ]]
+}
+
+@test "codex dispatch: runtime model is recorded for each attempt without copying other log text" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/runtime.argv" STUB_ENV="$BATS_TEST_TMPDIR/runtime.env"
+  export STUB_MODEL_LINE='model: gpt-test-1' STUB_LOG_MARKER='private-stub-marker'
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug runtime >/dev/null
+  sleep 1
+  [ "$(jq -r 'select(.event=="identity")|.worker_identity.model+":"+.worker_identity.source+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1:runtime:reported" ]
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/runtime-prompt.md"
+  export STUB_MODEL_LINE='model: gpt-test-2'
+  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --coordinator anthropic/claude-test >/dev/null
+  sleep 1
+  [ "$(jq -r -s '[.[]|select(.event=="identity")|.worker_identity.model]|join(",")' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1,gpt-test-2" ]
+  [ "$(jq -r 'select(.event=="resume" and .slug=="runtime")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
+  run ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/metrics.log"
+}
+
+@test "codex dispatch: invalid runtime model and coordinator are rejected safely" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/invalid.argv" STUB_ENV="$BATS_TEST_TMPDIR/invalid.env"
+  export STUB_MODEL_LINE='model: bad value!'
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-model >/dev/null
+  sleep 1
+  [ "$(jq -s '[.[]|select(.event=="identity" and .slug=="invalid-model")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug bad-coordinator --coordinator 'bad/x y'
+  [ "$status" -eq 2 ] && [[ "$output" == *'invalid coordinator'* ]]
+  [ "$(jq -s '[.[]|select(.event=="start" and .slug=="bad-coordinator")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+}
+
+@test "codex dispatch: declared coordinator is recorded on start" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/coordinator.argv" STUB_ENV="$BATS_TEST_TMPDIR/coordinator.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug coordinator --coordinator anthropic/claude-test >/dev/null
+  [ "$(jq -r 'select(.event=="start" and .slug=="coordinator")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
 }
 
 @test "codex dispatch: agy resume requires and uses its stored conversation" {
@@ -398,7 +435,7 @@ EOF
   [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one/docs/plans/v9.9.9-demo.md")" != edited ]
 }
 
-@test "codex dispatch: argv has sandbox worktree and state dir" {
+@test "codex dispatch: argv has sandbox worktree and run dir" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/argv" STUB_ENV="$BATS_TEST_TMPDIR/env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null
   sleep 1
@@ -571,6 +608,7 @@ EOF
   printf 'release change\n' >"$FIXTURE/release.txt"
   git -C "$FIXTURE" add release.txt; git -C "$FIXTURE" commit -m release-change >/dev/null
   git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
   git -C "$FIXTURE" fetch -q origin k3d-manager-v9.9.9:refs/remotes/origin/k3d-manager-v9.9.9
   run dispatch status one
   [[ "$output" != *"release.txt"* ]]
@@ -596,6 +634,7 @@ EOF
   printf '#!/usr/bin/env bash\ngrep -qx v2 a.txt\n' >"$FIXTURE/check.sh"
   chmod +x "$FIXTURE/check.sh"
   git -C "$FIXTURE" add check.sh; git -C "$FIXTURE" commit -m check >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
   before="$(git -C "$FIXTURE" rev-parse HEAD)"
   run dispatch land --slug one --test 'bash check.sh'
   [ "$status" -eq 2 ]; [[ "$output" == *"tests failed after rebase"* ]]
@@ -616,6 +655,158 @@ EOF
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
   run dispatch land --slug one --no-test
   [ "$status" -eq 0 ]; [[ "$output" == *"tests: skipped (--no-test)"* ]]
+}
+
+@test "codex dispatch: cross-repo start snapshots the spec and land targets only the named branch" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null
+  git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  printf 'original\n' >"$WORK_REPO/a.txt"
+  git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m work-base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  remote_before="$(git -C "$WORK_REPO" rev-parse origin/fix/cross-repo)"
+  manager_before="$(git -C "$FIXTURE" rev-parse HEAD)"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug cross --repo "$WORK_REPO" --branch fix/cross-repo
+  [ "$status" -eq 0 ]; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/cross"; run_dir="$K3DM_WORKTREE_ROOT/v9.9.9/cross.run"
+  [ "$(git -C "$task" branch --show-current)" = task/v9.9.9/cross ]
+  [ "$(cat "$run_dir/repo-name")" = work-origin ]
+  [ "$(cat "$run_dir/target")" = fix/cross-repo ]
+  grep -q "$run_dir/spec.md" "$run_dir/prompt.md"
+  [[ "$(<"$BATS_TEST_TMPDIR/cross.argv")" == *"--add-dir $run_dir/state -o"* ]]
+  [[ "$(<"$BATS_TEST_TMPDIR/cross.argv")" != *"--add-dir $run_dir -o"* ]]
+  [ "$(cat "$run_dir/spec-base")" = "$(git -C "$FIXTURE" rev-parse HEAD)" ]
+  [ "$(jq -r -s '.[0].repo' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = work-origin ]
+  printf 'edited\n' >"$task/a.txt"
+  git -C "$task" add a.txt; git -C "$task" commit -m task-edit >/dev/null
+  run dispatch land --slug cross --test true
+  [ "$status" -eq 0 ]; [[ "$output" == *"git -C $(git -C "$WORK_REPO" rev-parse --show-toplevel) push origin fix/cross-repo"* ]]
+  [ "$(git -C "$WORK_REPO" show fix/cross-repo:a.txt)" = edited ]
+  [ "$(git -C "$WORK_REPO" rev-parse origin/fix/cross-repo)" = "$remote_before" ]
+  [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$manager_before" ]
+  [ "$(jq -r -s 'map(select(.slug=="cross"))[-1].repo' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = work-origin ]
+  [ "$(jq -r -s '[.[]|select(.slug=="cross" and .repo=="work-origin")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 3 ]
+  jq -e -s 'map(select(.slug=="cross" and .event=="land"))[-1] | has("verifier_lines") and has("wait_seconds")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  [ "$(jq -r -s 'map(select(.slug=="cross" and .event=="land"))[-1].target_moved_commits' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 0 ]
+}
+
+@test "codex dispatch: cross-repo start rejects incomplete and protected targets" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  touch "$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --repo "$WORK_REPO"
+  [ "$status" -eq 2 ]; [[ "$output" == *"--repo and --branch must be used together"* ]]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --branch fix/cross-repo
+  [ "$status" -eq 2 ]; [[ "$output" == *"--repo and --branch must be used together"* ]]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --repo "$WORK_REPO" --branch main
+  [ "$status" -eq 2 ]; [[ "$output" == *"must not be main or master"* ]]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --repo "$WORK_REPO" --branch master
+  [ "$status" -eq 2 ]; [[ "$output" == *"must not be main or master"* ]]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --repo "$WORK_REPO" --branch absent
+  [ "$status" -eq 2 ]; [[ "$output" == *"branch does not exist on origin"* ]]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --repo "$FIXTURE" --branch k3d-manager-v9.9.9
+  [ "$status" -eq 2 ]; [[ "$output" == *"must not point at k3d-manager"* ]]
+}
+
+@test "codex dispatch: cross-repo scope uses the saved spec and refuses memory-bank" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug cross-scope --repo "$WORK_REPO" --branch fix/cross-repo >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/cross-scope"
+  [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/cross-scope.run/spec.md" ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/v9.9.9/cross-scope.run/spec-sha256")" = "$(shasum -a 256 "$K3DM_WORKTREE_ROOT/v9.9.9/cross-scope.run/spec.md" | awk '{print $1}')" ]
+  mkdir -p "$task/memory-bank"; printf 'out\n' >"$task/memory-bank/blocked.md"
+  git -C "$task" add a.txt memory-bank/blocked.md; git -C "$task" commit -m out-of-scope >/dev/null
+  run dispatch land --slug cross-scope --no-test
+  [ "$status" -eq 2 ]; [[ "$output" == *"task changes are out of scope"* ]]
+  [ "$(jq -r -s 'map(select(.event=="land_refused"))[-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = scope ]
+}
+
+@test "codex dispatch: cross-repo land refuses target rewritten since dispatch" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug rewritten --repo "$WORK_REPO" --branch fix/cross-repo >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/rewritten"
+  printf 'task\n' >"$task/a.txt"; git -C "$task" add a.txt; git -C "$task" commit -m task >/dev/null
+  git -C "$WORK_REPO" checkout --orphan rewrite >/dev/null
+  printf 'rewritten\n' >"$WORK_REPO/a.txt"
+  git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m rewritten >/dev/null
+  git -C "$WORK_REPO" branch -f fix/cross-repo HEAD; git -C "$WORK_REPO" checkout fix/cross-repo >/dev/null
+  git -C "$WORK_REPO" push --force origin fix/cross-repo >/dev/null
+  git -C "$WORK_REPO" fetch origin fix/cross-repo:refs/remotes/origin/fix/cross-repo >/dev/null 2>&1 || :
+  run dispatch land --slug rewritten --no-test
+  [ "$status" -eq 2 ]; [[ "$output" == *"rewritten since dispatch"* ]]
+  [ "$(jq -r -s 'map(select(.event=="land_refused"))[-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = target_rewritten ]
+  [ -d "$task" ]
+}
+
+@test "codex dispatch: cross-repo land refuses a different target checkout and local divergence" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug wrong-target --repo "$WORK_REPO" --branch fix/cross-repo >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/wrong-target"
+  printf 'task\n' >"$task/a.txt"; git -C "$task" add a.txt; git -C "$task" commit -m task >/dev/null
+  git -C "$WORK_REPO" checkout -b another-branch >/dev/null
+  run dispatch land --slug wrong-target --no-test
+  [ "$status" -eq 2 ]; [ "$(jq -r -s 'map(select(.event=="land_refused"))[-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = target_diverged ]
+  git -C "$WORK_REPO" checkout fix/cross-repo >/dev/null
+  printf 'dirty\n' >>"$WORK_REPO/a.txt"
+  run dispatch land --slug wrong-target --no-test
+  [ "$status" -eq 2 ]; [[ "$output" == *"target checkout is dirty"* ]]
+  git -C "$WORK_REPO" checkout -- a.txt
+  printf 'local\n' >"$WORK_REPO/local.txt"; git -C "$WORK_REPO" add local.txt; git -C "$WORK_REPO" commit -m local-ahead >/dev/null
+  run dispatch land --slug wrong-target --no-test
+  [ "$status" -eq 2 ]; [ "$(jq -r -s 'map(select(.event=="land_refused"))[-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = target_diverged ]
+  [ -d "$task" ]
+}
+
+@test "codex dispatch: cross-repo land records a forward target move and catches movement during tests" {
+  export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
+  git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
+  git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
+  printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
+  git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
+  export STUB_ARGV="$BATS_TEST_TMPDIR/cross.argv" STUB_ENV="$BATS_TEST_TMPDIR/cross.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug moved --repo "$WORK_REPO" --branch fix/cross-repo >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/moved"
+  printf 'task\n' >"$task/a.txt"; git -C "$task" add a.txt; git -C "$task" commit -m task >/dev/null
+  printf 'forward\n' >"$WORK_REPO/forward.txt"; git -C "$WORK_REPO" add forward.txt; git -C "$WORK_REPO" commit -m forward >/dev/null
+  git -C "$WORK_REPO" push origin fix/cross-repo >/dev/null
+  git -C "$WORK_REPO" fetch origin fix/cross-repo >/dev/null
+  run dispatch land --slug moved --test true
+  [ "$status" -eq 0 ]; [[ "$output" == *"target moved: +1 commits since dispatch"* ]]
+  [ "$(jq -r -s 'map(select(.event=="land"))[-1].target_moved_commits' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 1 ]
+  git -C "$WORK_REPO" push origin fix/cross-repo >/dev/null
+
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug moved-during --repo "$WORK_REPO" --branch fix/cross-repo >/dev/null; sleep 1
+  task="$K3DM_WORKTREE_ROOT/v9.9.9/moved-during"
+  printf 'next\n' >"$task/a.txt"; git -C "$task" add a.txt; git -C "$task" commit -m task >/dev/null
+  run dispatch land --slug moved-during --superseding moved --test 'printf x > "$WORK_REPO/during.txt"; git -C "$WORK_REPO" add during.txt; git -C "$WORK_REPO" commit -m during'
+  [ "$status" -eq 2 ]; [[ "$output" == *"moved during land"* ]]
+  [ "$(jq -r -s 'map(select(.slug=="moved-during" and .event=="land_refused"))[-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = target_moved_during_land ]
+  [ -d "$task" ]
 }
 
 @test "codex dispatch: land requires exactly one test selector" {
@@ -670,6 +861,9 @@ EOF
   [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"exec resume"* ]]
   [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"01a122dd-71c3-7763-87f0-3de505f10168"* ]]
   run dispatch status one; [[ "$output" == *"resumes: 1"* ]]
+  [ "$(jq -r -s 'map(select(.slug=="one" and .event=="start"))[0].worker_identity.vendor' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = openai ]
+  [ "$(jq -r -s 'map(select(.slug=="one" and .event=="resume"))[0] | (.run|tostring)+":"+.worker_identity.vendor+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "2:openai:unknown" ]
+  [ "$(jq -r -s '[.[]|select(.slug=="one" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
   export STUB_SLEEP=5
   dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
   run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
@@ -780,6 +974,7 @@ EOF
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" commit -m edit >/dev/null
   printf 'release\n' >"$FIXTURE/release.txt"
   git -C "$FIXTURE" add release.txt; git -C "$FIXTURE" commit -m release >/dev/null
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
   run dispatch land --slug one --no-test
   [ "$status" -eq 0 ]
   [ "$(jq -r -s '.[-1].event' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = land ]
@@ -864,6 +1059,36 @@ EOF
   [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
 }
 
+@test "codex dispatch: intervention records reason and starts explicit coverage once" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/known.run"
+  printf 'k3d-manager\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/known.run/repo-name"
+  printf '%s\n' '{"ts":1,"event":"start","version":"v9.9.9","slug":"known"}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch intervention --slug known --reason continue_prompt
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  run dispatch intervention --slug known --reason clarification
+  [ "$status" -eq 0 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention_coverage_start")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 2 ]
+  [ "$(jq -r -s '[.[] | select(.event == "intervention")][-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = clarification ]
+}
+
+@test "codex dispatch: intervention refuses unknown task invalid reason and worker self-report" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/known.run"
+  printf '%s\n' '{"ts":1,"event":"start","version":"v9.9.9","slug":"known"}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch intervention --slug missing --reason other
+  [ "$status" -ne 0 ]
+  run dispatch intervention --slug known --reason guess
+  [ "$status" -ne 0 ]
+  run env K3DM_WORKTREE_ROOT="$K3DM_WORKTREE_ROOT" K3DM_REPO_ROOT="$K3DM_WORKTREE_ROOT/v9.9.9/known" \
+    "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" intervention --slug known --reason other
+  [ "$status" -ne 0 ]
+  run env K3DM_WORKTREE_ROOT="$K3DM_WORKTREE_ROOT" \
+    K3DM_JOB_DIR="$K3DM_WORKTREE_ROOT/v9.9.9/known.run/state/jobs" \
+    "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" intervention --slug known --reason other
+  [ "$status" -ne 0 ]
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
 @test "codex dispatch: metrics scheduling coalesces concurrent requests and preserves the last request" {
   local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
   sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"
@@ -885,4 +1110,20 @@ EOF
   rm -f "$METRICS_STARTS"; mkdir "$K3DM_WORKTREE_ROOT/metrics.lock"
   run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
   [ "$status" -eq 0 ]; [ ! -e "$METRICS_STARTS" ]
+}
+
+@test "codex dispatch: make codex-dispatch passes --branch only when BRANCH is given" {
+  root="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  run env -u BRANCH -u REPO make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md
+  [ "$status" -eq 0 ]; [[ "$output" == *"--spec 'docs/plans/x.md'"* ]]; [[ "$output" != *"--branch"* ]]
+  run env -u BRANCH make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md REPO=/r BRANCH=fix/b
+  [ "$status" -eq 0 ]; [[ "$output" == *"--repo '/r' --branch 'fix/b'"* ]]
+}
+
+@test "codex dispatch: make targets pass a declared coordinator" {
+  local root="$BATS_TEST_DIRNAME/../../.."
+  run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
+  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }

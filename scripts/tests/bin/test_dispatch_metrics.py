@@ -10,6 +10,7 @@ import sys
 import time
 from pathlib import Path
 import pytest
+# agent-audit: allow assert-removed evidence_path drops the home directory; the absolute-path assert becomes a root-relative one plus a no-tmp-path assert
 # agent-audit: allow assert-removed per-spec series gained an agent label; every removed assert is re-added with agent="codex" and the same value
 
 SCRIPT = Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"
@@ -52,13 +53,16 @@ def event(ts, name, slug="one", **extra):
     return {"ts": ts, "event": name, "version": "9.9.9", "slug": slug, **extra}
 
 
-def write_session(home, session, started, now):
+def write_session(home, session, started, now, cwd=None, usage=None):
     stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
     folder = home / "sessions/2026/10/23"
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"rollout-{session}.jsonl"
-    path.write_text(json.dumps({"type": "session_meta", "payload": {
-        "id": session, "timestamp": stamp}}) + "\n")
+    rows = [{"type": "session_meta", "payload": {
+        "id": session, "timestamp": stamp, **({"cwd": str(cwd)} if cwd is not None else {})}}]
+    if usage is not None:
+        rows.append({"type": "event_msg", "payload": {"info": {"total_token_usage": usage}}})
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     os.utime(path, (now, now))
 
 
@@ -185,7 +189,7 @@ def test_slug_only_in_task_series():
     # agent-audit: allow assert-removed test_render_has_no_slug replaced per spec; both halves kept here
     assert "pending-slug" not in output
     assert 'slug="secret-slug"' in output
-    assert all("secret-slug" not in line or "k3dm_dispatch_task_" in line
+    assert all("secret-slug" not in line or "k3dm_dispatch_task_" in line or "k3dm_dispatch_model_identity" in line
                for line in output.splitlines())
 
 
@@ -194,8 +198,21 @@ def test_legacy_task_gets_codex_agent_label_and_keeps_values():
         event(1, "start", spec="docs/plans/v1.43.6-example.md"),
         event(5, "codex_exit", tokens=123), event(10, "land"),
     ], 0, 10)
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 123' in output
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 4' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 123' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 4' in output
+
+
+def test_task_repo_label_uses_valid_origin_name_and_defaults_invalid_events():
+    output = dispatch_metrics.render([
+        event(1, "start", "cart", repo="shopping-cart-frontend"),
+        event(2, "codex_exit", "cart", tokens=8), event(3, "land", "cart"),
+        event(4, "start", "legacy", repo="bad repo"),
+        event(5, "codex_exit", "legacy", tokens=4), event(6, "land", "legacy"),
+    ], 0, 10)
+    assert 'slug="cart",agent="codex",repo="shopping-cart-frontend"} 8' in output
+    assert 'slug="legacy",agent="codex",repo="k3d-manager"} 4' in output
+    assert 'k3dm_dispatch_landed{window="1d"} 2' in output
+    assert 'k3dm_dispatch_landed{window="1d",repo=' not in output
 
 
 def test_agy_usage_never_enters_codex_token_series():
@@ -204,8 +221,8 @@ def test_agy_usage_never_enters_codex_token_series():
         event(5, "agent_exit", exit=0, usage={"input_tokens": 999, "output_tokens": 100}),
         event(10, "land"),
     ], 0, 10)
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="agy"} 9' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="agy"}' not in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="agy",repo="k3d-manager"} 9' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="agy",repo="k3d-manager"}' not in output
     assert "k3dm_dispatch_task_codex_tokens{" not in output
     assert "k3dm_dispatch_codex_tokens_by_model" not in output
 
@@ -230,10 +247,10 @@ def test_per_task_values():
         event(0, "start"), event(100, "codex_exit", tokens=10),
         event(150, "resume"), event(250, "codex_exit", tokens=30), event(400, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 30' in output
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 200' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 400' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 30' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 200' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 400' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2' in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 6.666666666666667' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 3.3333333333333335' in output
 
@@ -244,7 +261,7 @@ def test_task_spec_uses_latest_start_and_is_emitted_for_each_scope():
         event(3, "codex_exit", tokens=1), event(4, "land"),
     ], 0, 10)
     for window in ("1d", "7d", "30d", "v9.9.9"):
-        assert (f'k3dm_dispatch_task_spec{{window="{window}",version="9.9.9",slug="one",agent="codex",'
+        assert (f'k3dm_dispatch_task_spec{{window="{window}",version="9.9.9",slug="one",agent="codex",repo="k3d-manager",'
                 'spec="docs/bugs/2026-10-23-x.md"} 1') in output
     assert 'spec="docs/plans/old.md"' not in output
 
@@ -258,29 +275,60 @@ def test_invalid_or_missing_task_spec_is_omitted_without_hiding_other_series(spe
         event(2, "codex_exit", "valid", tokens=5), event(3, "land", "valid"),
     ], 0, 10)
     assert 'slug="one",spec=' not in output
-    assert 'slug="valid",agent="codex",spec="docs/plans/v1.43.5-valid.md"} 1' in output
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 4' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
+    assert 'slug="valid",agent="codex",repo="k3d-manager",spec="docs/plans/v1.43.5-valid.md"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 4' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2' in output
 
 
 def test_landed_task_without_exit_omits_codex_samples_but_keeps_elapsed():
     output = dispatch_metrics.render([
         event(100, "start"), event(399, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 299' in output
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"}' not in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"}' not in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 299' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"}' not in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"}' not in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 4.983333333333333' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"}' not in output
+    assert 'k3dm_dispatch_task_post_exit_land_seconds{window="1d",version="9.9.9",slug="one",repo="k3d-manager"}' not in output
+
+
+def test_post_exit_land_uses_latest_exit_before_land_and_ignores_later_exit():
+    output = dispatch_metrics.render([
+        event(100, "start"), event(120, "codex_exit"), event(200, "resume"),
+        event(240, "codex_exit"), event(300, "land"), event(350, "codex_exit"),
+    ], 0, 400)
+    assert 'k3dm_dispatch_task_post_exit_land_seconds{window="1d",version="9.9.9",slug="one",repo="k3d-manager"} 60' in output
+    assert 'k3dm_dispatch_post_exit_land_minutes_per_landed{window="1d"} 1.0' in output
+
+
+def test_post_exit_land_invalid_exit_and_land_timestamps_are_omitted():
+    output = dispatch_metrics.render([
+        event(1, "start"), {"ts": float("nan"), "event": "codex_exit", "version": "9.9.9", "slug": "one"},
+        event(3, "land"),
+    ], 0, 10)
+    assert "k3dm_dispatch_task_post_exit_land_seconds" not in output
+
+
+def test_intervention_metrics_require_coverage_marker_and_count_reason():
+    legacy = dispatch_metrics.render([
+        event(1, "start"), event(2, "intervention", reason="correction"), event(3, "land"),
+    ], 0, 10)
+    assert "k3dm_dispatch_human_continuation_prompts" not in legacy
+    output = dispatch_metrics.render([
+        event(1, "start", "one"), event(2, "intervention_coverage_start", "one"),
+        event(3, "intervention", "one", reason="correction"), event(4, "land", "one"),
+    ], 0, 10)
+    assert 'k3dm_dispatch_intervention_tracking_tasks{window="1d"} 1' in output
+    assert 'k3dm_dispatch_human_continuation_prompts{window="1d",reason="correction"} 1' in output
 
 
 def test_recorded_exit_keeps_codex_samples_including_zero_duration():
     output = dispatch_metrics.render([
         event(100, "start"), event(100, "codex_exit", tokens=0), event(399, "land"),
     ], 0, 400)
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 0' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 1' in output
-    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 0' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 0' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 0' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"} 0.0' in output
 
 
@@ -289,8 +337,8 @@ def test_exit_without_launch_adds_nothing():
         event(0, "start"), event(100, "codex_exit", tokens=10),
         event(101, "codex_exit", tokens=20), event(200, "land"),
     ], 0, 200)
-    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 100' in output
-    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 100' in output
+    assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2' in output
 
 
 def test_invalid_label_values_skipped():
@@ -329,6 +377,10 @@ def test_per_plan_dispatch_state_uses_latest_started_task():
     ([event(1,"start"),event(2,"codex_exit",exit=1),event(3,"land_refused"),event(4,"resume")], "running"),
     ([event(1,"start"),event(2,"land")], "landed"),
     ([event(1,"start"),event(2,"abandon")], "abandoned"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"land"),event(4,"intervention_coverage_start"),event(5,"intervention")], "landed"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"land"),event(4,"verify")], "landed"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"intervention")], "awaiting_land"),
+    ([event(1,"start"),event(2,"abandon"),event(3,"codex_usage")], "abandoned"),
 ])
 def test_dispatch_state_table(events, expected):
     assert dispatch_metrics._dispatch_state(events) == expected
@@ -471,8 +523,122 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="rework"} 1' in output
     assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="accepted"} 1' in output
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 100' in output
-    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="attempt",run="2"} 60' in output
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="attempt",run="2",repo="k3d-manager"} 60' in output
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
+
+
+@pytest.mark.parametrize(("log_text", "expected"), [
+    ("ok 1 - first\nok 2 - second\nnot ok 3 - third\n", "2/3 ok"),
+    ("89 passed in 1.41s\n", "89 passed"),
+    ("ok 1 - first\n89 passed in 1.41s\n", "1/1 ok; 89 passed"),
+    ('ok 1 - quote " and newline\nname\n', "1/1 ok"),
+])
+def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, monkeypatch, log_text, expected):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    now = int(time.time())
+    run_dir = tmp_path / "worktrees" / "9.9.9" / "attempt.run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "land-test.log").write_text(log_text)
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "attempt", run=1),
+        event(now - 10, "codex_exit", "attempt", run=1, exit=0, tokens=10, tree="tree-a"),
+        event(now, "land", "attempt", test_result="passed", tree="tree-a"),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert f'evidence_summary="{expected}"' in line
+    assert 'evidence_path="9.9.9/attempt.run/land-test.log"' in line
+    assert str(tmp_path) not in line
+    assert 'evidence="land-test.log"' in line
+
+
+def test_run_outcome_missing_log_and_codex_exit_keep_metrics_valid(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "missing", run=1),
+        event(now - 10, "codex_exit", "missing", run=1, exit=7, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'evidence_summary="exit 7"' in line
+    assert line.split('evidence_path="', 1)[1].split('"', 1)[0].endswith("/missing.run/codex.log")
+    assert "\\n" not in line and "\\" not in line and line.count('"') % 2 == 0
+
+
+def test_accepted_missing_log_is_unknown_and_render_succeeds(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "missing", run=1),
+        event(now - 10, "codex_exit", "missing", run=1, exit=0, tokens=10, tree="tree-a"),
+        event(now, "land", "missing", test_result="passed", tree="tree-a"),
+    ], 0, now, repo_root=tmp_path)
+    assert 'evidence_summary="unknown"' in output
+
+
+def test_agent_neutral_metrics_include_agy_usage_without_codex_series():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "agy", agent="agy"),
+        event(now - 10, "agent_exit", "agy", exit=0, usage={"total_tokens": 500}),
+        event(now, "land", "agy"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="agy",agent="agy",repo="k3d-manager"} 500' in output
+    assert 'k3dm_dispatch_task_agent_seconds{window="30d",version="9.9.9",slug="agy",agent="agy",repo="k3d-manager"} 10' in output
+    assert 'k3dm_dispatch_task_agent_runs{window="30d",version="9.9.9",slug="agy",agent="agy",repo="k3d-manager"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{' not in output
+
+
+def test_agent_neutral_metrics_match_codex_series():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "codex", agent="codex"),
+        event(now - 10, "codex_exit", "codex", exit=0, tokens=500),
+        event(now, "land", "codex"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="codex",agent="codex",repo="k3d-manager"} 500' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="codex",agent="codex",repo="k3d-manager"} 500' in output
+    assert 'k3dm_dispatch_task_agent_seconds{window="30d",version="9.9.9",slug="codex",agent="codex",repo="k3d-manager"} 10' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="codex",agent="codex",repo="k3d-manager"} 10' in output
+
+
+def test_agent_neutral_tokens_sum_agy_runs_and_count_them():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 40, "start", "agy-many", agent="agy", run=1),
+        event(now - 30, "agent_exit", "agy-many", run=1, usage={"total_tokens": 300}),
+        event(now - 20, "resume", "agy-many", agent="agy", run=2),
+        event(now - 10, "agent_exit", "agy-many", run=2, usage={"total_tokens": 200}),
+        event(now, "land", "agy-many"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="agy-many",agent="agy",repo="k3d-manager"} 500' in output
+    assert 'k3dm_dispatch_task_agent_runs{window="30d",version="9.9.9",slug="agy-many",agent="agy",repo="k3d-manager"} 2' in output
+
+
+@pytest.mark.parametrize("usage", [None, {"total_tokens": "500"}, {"total_tokens": -1},
+                                   {"total_tokens": True}])
+def test_invalid_agy_usage_does_not_emit_agent_tokens(usage):
+    now = int(time.time())
+    usage_fields = {} if usage is None else {"usage": usage}
+    row = event(now - 10, "agent_exit", "invalid", **usage_fields)
+    output = dispatch_metrics.render([event(now - 20, "start", "invalid", agent="agy"), row,
+                                      event(now, "land", "invalid")], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{' not in output
+
+
+def test_agent_neutral_per_run_tokens_preserve_codex_series():
+    now = int(time.time())
+    agy = dispatch_metrics.render([
+        event(now - 20, "start", "agy-run", agent="agy", run=1),
+        event(now - 10, "agent_exit", "agy-run", run=1, usage={"total_tokens": 500}),
+        event(now, "land", "agy-run"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_run_agent_tokens{window="30d",version="9.9.9",slug="agy-run",run="1",repo="k3d-manager"} 500' in agy
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="agy-run",run="1",repo="k3d-manager"}' not in agy
+    codex = dispatch_metrics.render([
+        event(now - 20, "start", "codex-run", agent="codex", run=1),
+        event(now - 10, "codex_exit", "codex-run", run=1, exit=0, tokens=500),
+        event(now, "land", "codex-run"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_run_agent_tokens{window="30d",version="9.9.9",slug="codex-run",run="1",repo="k3d-manager"} 500' in codex
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="codex-run",run="1",repo="k3d-manager"} 500' in codex
 
 
 def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
@@ -484,7 +650,25 @@ def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
     assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="failed"} 1' in output
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
-    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="reset",run="2"}' not in output
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="reset",run="2",repo="k3d-manager"}' not in output
+
+
+def test_rejected_tokens_are_zero_when_counted_runs_have_no_objective_rejection(tmp_path):
+    now = int(time.time())
+    rows = [event(now - 20, "start", "accepted", run=1),
+            event(now - 15, "codex_exit", "accepted", run=1, exit=0, tokens=100, tree="tree-a"),
+            event(now - 10, "land", "accepted", test_result="passed", tree="tree-a"),
+            event(now - 8, "start", "abandoned", run=1),
+            event(now - 5, "codex_exit", "abandoned", run=1, exit=0, tokens=20),
+            event(now - 1, "abandon", "abandoned")]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 0' in output
+
+
+def test_rejected_tokens_are_absent_when_window_has_no_runs():
+    output = dispatch_metrics.render([], 0, int(time.time()))
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
+
 
 def test_rebase_and_scope_refusals_are_not_rework():
     output = dispatch_metrics.render([
@@ -551,7 +735,8 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_verifier_lines_per_landed", "k3dm_dispatch_wait_minutes_per_landed",
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
-    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and not line.startswith("k3dm_dispatch_task_run_") and
+    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
+                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_")) and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -569,10 +754,10 @@ k3dm_dispatch_rework_landed{window="1d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="1d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="1d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="1d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 20000
-k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 10
-k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex"} 30
-k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex"} 2
+k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 20000
+k3dm_dispatch_task_codex_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 10
+k3dm_dispatch_task_elapsed_seconds{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 30
+k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2
 k3dm_dispatch_task_skipped{window="1d"} 0
 k3dm_dispatch_task_truncated{window="1d"} 0
 k3dm_dispatch_landed{window="7d"} 1
@@ -591,10 +776,10 @@ k3dm_dispatch_rework_landed{window="7d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="7d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="7d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="7d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one",agent="codex"} 20000
-k3dm_dispatch_task_codex_seconds{window="7d",version="9.9.9",slug="one",agent="codex"} 10
-k3dm_dispatch_task_elapsed_seconds{window="7d",version="9.9.9",slug="one",agent="codex"} 30
-k3dm_dispatch_task_runs{window="7d",version="9.9.9",slug="one",agent="codex"} 2
+k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 20000
+k3dm_dispatch_task_codex_seconds{window="7d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 10
+k3dm_dispatch_task_elapsed_seconds{window="7d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 30
+k3dm_dispatch_task_runs{window="7d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2
 k3dm_dispatch_task_skipped{window="7d"} 0
 k3dm_dispatch_task_truncated{window="7d"} 0
 k3dm_dispatch_landed{window="30d"} 1
@@ -613,10 +798,10 @@ k3dm_dispatch_rework_landed{window="30d",cause="claude_edit"} 1
 k3dm_dispatch_rework_landed{window="30d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="30d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="30d"} 1.0
-k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one",agent="codex"} 20000
-k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="one",agent="codex"} 10
-k3dm_dispatch_task_elapsed_seconds{window="30d",version="9.9.9",slug="one",agent="codex"} 30
-k3dm_dispatch_task_runs{window="30d",version="9.9.9",slug="one",agent="codex"} 2
+k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 20000
+k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 10
+k3dm_dispatch_task_elapsed_seconds{window="30d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 30
+k3dm_dispatch_task_runs{window="30d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"} 2
 k3dm_dispatch_task_skipped{window="30d"} 0
 k3dm_dispatch_task_truncated{window="30d"} 0'''
     assert actual == expected
@@ -669,8 +854,8 @@ def test_release_elapsed_uses_full_task_history():
         event(now - 40 * 86400, "start", version="v1.43.5"),
         event(now - 86400, "land", version="v1.43.5"),
     ], 0, now)
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="7d",version="v1.43.5",slug="one",agent="codex"} 3369600' in output
-    assert 'k3dm_dispatch_task_elapsed_seconds{window="v1.43.5",version="v1.43.5",slug="one",agent="codex"} 3369600' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="7d",version="v1.43.5",slug="one",agent="codex",repo="k3d-manager"} 3369600' in output
+    assert 'k3dm_dispatch_task_elapsed_seconds{window="v1.43.5",version="v1.43.5",slug="one",agent="codex",repo="k3d-manager"} 3369600' in output
 
 
 def test_global_metrics_are_emitted_once_without_scope_labels():
@@ -691,7 +876,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 52  # agent-audit: allow assert-removed Codex and agy activity rows add thirteen $window expressions
+    assert sum("$window" in expr for expr in expressions) == 60  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -701,7 +886,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
                    "k3dm_dispatch_rework_ratio")))
     per_spec = next(panel for panel in dashboard["panels"] if panel["id"] == 12)
     targets = {target["refId"]: target["expr"] for target in per_spec["targets"]}
-    assert targets["E"] == 'max by (version, slug, spec) (k3dm_dispatch_task_spec{window="$window"})'
+    assert targets["E"] == 'max by (version, slug, spec, agent, repo) (k3dm_dispatch_task_spec{window="$window"})'  # agent-audit: allow assert-removed Per spec groups by agent since 210040d8
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #E"] is True
     assert organize["renameByName"]["Value #F"] == "API equiv."
@@ -906,6 +1091,20 @@ def test_per_spec_footer_totals_all_but_time_to_land_and_by_model_starts_at_zero
     assert panels[27]["fieldConfig"]["defaults"]["min"] == 0
 
 
+def test_per_spec_reads_agent_neutral_series_and_keeps_api_equiv_codex_only():
+    panel = {p["id"]: p for p in load_dispatch_dashboard()["panels"]}[12]
+    exprs = {t["refId"]: t["expr"] for t in panel["targets"]}
+    assert "k3dm_dispatch_task_agent_tokens{" in exprs["A"]
+    assert "k3dm_dispatch_task_agent_seconds{" in exprs["B"]
+    assert "k3dm_dispatch_task_agent_runs{" in exprs["D"]
+    assert "k3dm_dispatch_task_api_cost_usd{" in exprs["F"]
+    organize = next(t for t in panel["transformations"] if t["id"] == "organize")["options"]
+    assert {k: organize["renameByName"][k] for k in ("Value #A", "Value #B", "Value #D")} == {
+        "Value #A": "Tokens", "Value #B": "Agent time", "Value #D": "Runs"}
+    assert "Codex" not in " ".join(organize["renameByName"].values())
+    assert "API equiv. stays Codex-only" in panel["description"]
+
+
 def test_claude_rollup_deduplicates_and_discards_transcript_text(tmp_path):
     projects = tmp_path / "projects"
     projects.mkdir()
@@ -947,6 +1146,49 @@ def test_claude_rollup_incremental_append(tmp_path):
     transcript.write_text(record("c"))
     assert {r["model"] for r in dispatch_metrics._claude_rollup(projects, cache)} == {"m"}
     assert len(json.loads(cache.read_text())["records"]) == 3
+
+
+def test_claude_rollup_overlapping_saves_use_private_temp_files(tmp_path, monkeypatch):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "timestamp": "2026-10-24T12:00:00Z",
+        "message": {"id": "one", "model": "m", "usage": {"input_tokens": 1}}}) + "\n")
+    cache = tmp_path / "cache.json"
+    real_replace = os.replace
+    nested_results = []
+    triggered = False
+
+    def overlap_replace(source, target):
+        nonlocal triggered
+        if not triggered:
+            triggered = True
+            nested_results.append(dispatch_metrics._claude_rollup(projects, cache))
+        real_replace(source, target)
+
+    monkeypatch.setattr(dispatch_metrics.os, "replace", overlap_replace)
+    outer_records = dispatch_metrics._claude_rollup(projects, cache)
+    assert outer_records == nested_results[0]
+    assert json.loads(cache.read_text())["records"]["one"]["model"] == "m"
+
+
+def test_claude_rollup_save_failure_is_reported_and_cleaned(tmp_path, monkeypatch, capsys):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "timestamp": "2026-10-24T12:00:00Z",
+        "message": {"id": "one", "model": "m", "usage": {"input_tokens": 1}}}) + "\n")
+    cache = tmp_path / "cache.json"
+
+    def fail_replace(source, target):
+        raise FileNotFoundError("simulated rename race")
+
+    monkeypatch.setattr(dispatch_metrics.os, "replace", fail_replace)
+    records = dispatch_metrics._claude_rollup(projects, cache)
+    assert records == [{"ts": "2026-10-24T12:00:00Z", "model": "m", "speed": None,
+        "input": 1, "cache_5m": 0, "cache_1h": 0, "cache_read": 0, "output": 0}]
+    assert "claude rollup cache not saved: simulated rename race" in capsys.readouterr().err
+    assert list(tmp_path.glob("cache.json.*.tmp")) == []
 
 
 def test_claude_rollup_seeks_to_saved_byte_offset(tmp_path, monkeypatch):
@@ -997,7 +1239,7 @@ def _metric(output, name, window):
 
 
 def _task_metric(output, window, version, slug):
-    prefix = f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}"}} '
+    prefix = f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}",repo="k3d-manager"}} '
     return float(next(line[len(prefix):] for line in output.splitlines() if line.startswith(prefix)))
 
 
@@ -1164,7 +1406,7 @@ def test_claude_daily_tokens_use_local_timezone_and_dashboard_panel():
         for zone in ("America/Los_Angeles", "UTC"):
             os.environ["TZ"] = zone; time.tzset()
             output = dispatch_metrics.render([], 0, now, claude_records=records)
-            daily[zone] = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens")]
+            daily[zone] = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens{")]
             assert not any('model="m3"' in line for line in daily[zone])
         assert any('model="m1"' in line and line.endswith(" 15") for line in daily["UTC"])
         assert any('model="m1"' in line and "2026-01-01" in line for line in daily["America/Los_Angeles"])
@@ -1194,7 +1436,7 @@ def test_claude_dashboard_column_panels_projection_and_layout():
     panels = {panel["title"]: panel for panel in dashboard["panels"]}
     per_spec = panels["Per spec"]
     target = next(t for t in per_spec["targets"] if t.get("refId") == "G")
-    assert target["expr"] == 'sum by (version, slug) (k3dm_dispatch_task_claude_api_cost_usd{window="$window"})'
+    assert target["expr"] == 'sum by (version, slug, repo) (k3dm_dispatch_task_claude_api_cost_usd{window="$window"})'  # agent-audit: allow assert-removed Per spec groups by repo (cross-repo M5)
     organize = per_spec["transformations"][1]["options"]
     assert organize["renameByName"]["Value #G"] == "Claude ≈"
     override = next(o for o in per_spec["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Claude ≈")
@@ -1385,6 +1627,83 @@ def test_codex_activity_exports_sessions_tokens_quota_and_untracked(tmp_path):
     assert "secret" not in output
 
 
+def test_dispatch_worktree_activity_uses_latest_ledger_repo(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "some-slug"
+    write_session(home, "dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([
+        event(now - 2, "start", "some-slug", version="v1.43.7", repo="shopping-cart-order"),
+        event(now - 1, "start", "some-slug", version="v1.43.7", repo="shopping-cart-order"),
+    ], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="shopping-cart-order"} 1' in output
+    assert str(tmp_path) not in output
+
+
+def test_dispatch_worktree_without_ledger_repo_defaults_to_manager(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "legacy-slug"
+    write_session(home, "legacy-dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([
+        event(now - 1, "start", "legacy-slug", version="v1.43.7"),
+    ], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="k3d-manager"} 1' in output
+
+
+def test_dispatch_worktree_falls_back_to_gitdir_repo_and_nested_cwd(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "nested-slug"
+    (cwd / "subdir").mkdir(parents=True)
+    (cwd / ".git").write_text(f"gitdir: {tmp_path}/my-repo/.git/worktrees/s\n")
+    write_session(home, "nested-dispatch", now - 10, now, cwd / "subdir")
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="my-repo"} 1' in output
+
+
+def test_dispatch_worktree_without_match_or_gitdir_is_other(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "unknown-slug"
+    write_session(home, "unknown-dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="other"} 1' in output
+
+
+def test_dispatch_sessions_outside_worktree_keep_folder_label(tmp_path, monkeypatch):
+    now = time.time()
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
+    home = tmp_path / "codex"
+    write_session(home, "outside", now - 10, now, tmp_path / "my-project")
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="my-project"} 1' in output
+
+
+def test_eleven_dispatch_worktrees_fold_into_manager_not_other(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    starts = []
+    for index in range(11):
+        slug = f"dispatch-{index}"
+        write_session(home, slug, now - 10, now, root / "v1.43.7" / slug,
+                      {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 0})
+        starts.append(event(now - index, "start", slug, version="v1.43.7"))
+    output = dispatch_metrics.render(starts, 0, now, codex_home=home)
+    assert 'k3dm_codex_tokens{window="1d",mode="other",repo="k3d-manager",kind="uncached_input"} 110' in output
+    assert not any('repo="other"' in line for line in output.splitlines() if line.startswith("k3dm_codex_tokens{"))
+
+
 def test_agy_ledger_missing_or_corrupt_is_nonfatal(tmp_path):
     output = []
     dispatch_metrics._agy_metrics(output, tmp_path / "missing.jsonl", 100)
@@ -1421,3 +1740,190 @@ def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_pa
     dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 100)), {"secondary": {"used_percent": 26, "resets_at": 201}}), 100)
     assert "k3dm_codex_quota_efficiency_coverage 1" in lines
     assert "k3dm_codex_verified_outputs 1" in lines
+
+
+def test_run_outcome_keeps_a_long_evidence_path_whole(tmp_path, monkeypatch):
+    slug = "2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open"
+    root = tmp_path / ("worktrees-" + "x" * 40)
+    run_dir = root / "v1.43.7" / f"{slug}.run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "land-test.log").write_text("8 passed in 0.1s\n")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    summary, path = dispatch_metrics._evidence_details("v1.43.7", slug, "land-test.log")
+    assert len(path) > 120
+    assert path.startswith("~/worktrees-") and str(tmp_path) not in path
+    assert dispatch_metrics._label_value(path, limit=512) == path
+    assert summary == "8 passed"
+
+
+def _identity_lines(output, role):
+    return [line for line in output.splitlines()
+            if line.startswith('k3dm_dispatch_model_identity{window="1d",') and f'role="{role}"' in line]
+
+
+def test_model_identity_exports_worker_and_coordinator_from_latest_start():
+    output = dispatch_metrics.render([
+        event(1, "start", "mixed", agent="codex", model="gpt-5.6-luna",
+              worker_identity={"vendor": "openai", "model": "gpt-5.6-luna", "source": "explicit", "status": "selected"},
+              coordinator_identity={"vendor": "anthropic", "model": "claude-opus-5-5", "source": "runtime", "status": "runtime_reported"}),
+        event(2, "codex_exit", "mixed", tokens=10),
+        event(3, "land", "mixed"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    coordinator = _identity_lines(output, "coordinator")
+    assert len(worker) == 1 and len(coordinator) == 1
+    assert 'vendor="openai",model="gpt-5.6-luna",source="explicit",status="selected"' in worker[0]
+    assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
+
+
+def test_model_identity_is_unknown_for_a_legacy_start_with_a_model_field():
+    output = dispatch_metrics.render([
+        event(1, "start", "legacy", agent="codex", model="gpt-5.6-luna", model_source="inherited"),
+        event(2, "codex_exit", "legacy", tokens=10),
+        event(3, "land", "legacy"),
+    ], 0, 100)
+    for role in ("worker", "coordinator"):
+        lines = _identity_lines(output, role)
+        assert len(lines) == 1
+        assert 'vendor="unknown",model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+
+
+def test_model_identity_rejects_unbounded_label_values():
+    output = dispatch_metrics.render([
+        event(1, "start", "bad", agent="codex",
+              worker_identity={"vendor": "acme", "model": 'x"}\nevil', "source": "prompt", "status": "great"}),
+        event(2, "codex_exit", "bad", tokens=10),
+        event(3, "land", "bad"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1
+    assert 'vendor="unknown",model="unknown",source="unreported",status="unknown"' in worker[0]
+    assert "evil" not in output and "acme" not in output
+
+
+def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
+    output = dispatch_metrics.render([
+        event(1, "start", "runtime", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "runtime", run=1,
+              worker_identity={"vendor": "openai", "model": "gpt-test-1", "source": "runtime", "status": "reported"}),
+        event(3, "resume", "runtime", run=2, n=2,
+              coordinator_identity={"vendor": "anthropic", "model": "claude-test", "source": "declared", "status": "declared"}),
+        event(4, "identity", "runtime", run=2,
+              worker_identity={"vendor": "openai", "model": "gpt-test-2", "source": "runtime", "status": "reported"}),
+        event(5, "land", "runtime"),
+    ], 0, 100)
+    workers = _identity_lines(output, "worker")
+    worker_history = _identity_lines(output, "worker_history")
+    coordinators = _identity_lines(output, "coordinator")
+    assert len(workers) == 1 and 'model="gpt-test-2",source="runtime",status="reported"' in workers[0]
+    assert len(worker_history) == 1 and 'model="gpt-test-1",source="runtime",status="reported"' in worker_history[0]
+    assert len(coordinators) == 1
+    assert 'vendor="anthropic",model="claude-test",source="declared",status="declared"' in coordinators[0]
+
+
+def test_invalid_runtime_identity_does_not_replace_legacy_value():
+    output = dispatch_metrics.render([
+        event(1, "start", "invalid", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "invalid", worker_identity={
+            "vendor": "openai", "model": "bad value!", "source": "runtime", "status": "reported"}),
+        event(3, "land", "invalid"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1 and 'model="unknown",source="inherited",status="unknown"' in worker[0]
+    assert "bad value" not in output
+
+
+def test_per_spec_identity_queries_give_one_row_per_task():
+    panels = {panel["title"]: panel for panel in load_dispatch_dashboard()["panels"]}
+    per_spec = panels["Per spec"]
+    exprs = {t["refId"]: t["expr"] for t in per_spec["targets"]}
+    assert 'role="worker"' in exprs["H"] and exprs["H"].startswith("max by (version, slug, repo, worker)")
+    assert 'role="coordinator"' in exprs["I"] and exprs["I"].startswith("max by (version, slug, repo, coordinator)")
+    organize = per_spec["transformations"][1]["options"]
+    assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
+    assert organize["renameByName"]["worker"] == "Worker"
+    assert organize["renameByName"]["coordinator"] == "Coordinator"
+
+
+def test_claude_daily_tokens_by_kind_partition_local_dates_and_filter_records():
+    now = calendar.timegm(time.strptime("2026-01-10T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    before_tz = os.environ.get("TZ")
+    records = [
+        _claude_message("one", calendar.timegm(time.strptime("2026-01-01T23:59:00", "%Y-%m-%dT%H:%M:%S")),
+                        input=1, cache_5m=2, cache_1h=3, cache_read=4, output=5),
+        _claude_message("two", calendar.timegm(time.strptime("2026-01-02T00:01:00", "%Y-%m-%dT%H:%M:%S")),
+                        input=6, cache_5m=7, cache_1h=8, cache_read=9, output=10),
+        _claude_message("synthetic", now, model="<synthetic>", input=999),
+        _claude_message("old", now - 31 * 86400, input=999),
+    ]
+    try:
+        os.environ["TZ"] = "UTC"; time.tzset()
+        output = dispatch_metrics.render([], 0, now, claude_records=records)
+        rows = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens_by_kind{")]
+        assert len(rows) == 8
+        assert 'date="2026-01-01",kind="cache_write"} 5' in "\n".join(rows)
+        assert 'date="2026-01-02",kind="cache_write"} 15' in "\n".join(rows)
+        for day in ("2026-01-01", "2026-01-02"):
+            by_kind = sum(float(line.rsplit(" ", 1)[1]) for line in rows if f'date="{day}"' in line)
+            by_model = sum(float(line.rsplit(" ", 1)[1]) for line in output.splitlines()
+                           if line.startswith("k3dm_dispatch_claude_daily_tokens{") and f'date="{day}"' in line)
+            assert by_kind == by_model
+        assert not any('date="2026-01-10"' in line for line in rows)
+    finally:
+        if before_tz is None: os.environ.pop("TZ", None)
+        else: os.environ["TZ"] = before_tz
+        time.tzset()
+
+
+def test_claude_cost_by_kind_uses_rates_and_unpriced_record_is_excluded():
+    now = 30
+    rates = _claude_rates(input=2, cache_write_5m=3, cache_write_1h=5, cache_read=0.1, output=4)
+    tasks = [event(0, "start", "A", version="v1.0.0"), event(20, "land", "A", version="v1.0.0")]
+    records = [_claude_message("priced", 10, input=1_000_000, cache_5m=2_000_000,
+                               cache_1h=3_000_000, cache_read=4_000_000, output=5_000_000),
+               _claude_message("unpriced", 11, model="unknown", input=100)]
+    output = dispatch_metrics.render(tasks, 0, now, claude_records=records, claude_prices=rates)
+    expected = {"input": 2, "cache_write": 21, "cache_read": 0.4, "output": 20}
+    for kind, amount in expected.items():
+        line = next(row for row in output.splitlines()
+                    if row.startswith(f'k3dm_dispatch_claude_api_cost_by_kind_usd{{window="v1.0.0",kind="{kind}"}}'))
+        assert abs(float(line.rsplit(" ", 1)[1]) - amount) < 1e-6
+    assert abs(sum(expected.values()) - _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")) < 1e-6
+    time_output = dispatch_metrics.render([], 0, now, claude_records=records, claude_prices=rates)
+    for window in ("1d", "7d", "30d"):
+        values = [float(line.rsplit(" ", 1)[1]) for line in time_output.splitlines()
+                  if line.startswith(f'k3dm_dispatch_claude_api_cost_by_kind_usd{{window="{window}"')]
+        assert len(values) == 4
+        assert abs(sum(values) - _metric(time_output, "k3dm_dispatch_claude_api_cost_usd", window)) < 1e-6
+
+
+def test_claude_non_numeric_usage_does_not_break_render_or_emit_invalid_values():
+    now = 1_800_000_000
+    records = [_claude_message("bad", now, input="invalid", cache_read=None),
+               {"ts": "bad timestamp", "model": "m", "input": object()}]
+    output = dispatch_metrics.render([], 0, now, claude_records=records, claude_prices=_claude_rates())
+    assert "k3dm_dispatch_claude_api_cost_usd" in output
+    claude_lines = [line for line in output.splitlines()
+                    if line.startswith(("k3dm_dispatch_claude_api_cost", "k3dm_dispatch_claude_tokens",
+                                       "k3dm_dispatch_claude_daily_tokens"))]
+    assert all(not line.rstrip().endswith((" nan", " inf", " -inf")) for line in claude_lines)
+
+
+def test_claude_existing_series_keep_their_fixture_output():
+    now = 1_800_000_000
+    record = _claude_message("stable", now, input=11, cache_5m=13, cache_1h=17, cache_read=19, output=23)
+    output = dispatch_metrics.render([], 0, now, claude_records=[record], claude_prices=_claude_rates())
+    existing = [line for line in output.splitlines()
+                if line.startswith(("k3dm_dispatch_claude_api_cost_usd{", "k3dm_dispatch_claude_tokens{",
+                                    "k3dm_dispatch_claude_daily_tokens{"))]
+    expected = []
+    for window in ("1d", "7d", "30d"):
+        expected.append(f'k3dm_dispatch_claude_api_cost_usd{{window="{window}"}} 8.3e-05')
+        expected.extend(f'k3dm_dispatch_claude_tokens{{window="{window}",model="m",kind="{kind}"}} {value}'
+                        for kind, value in (("input", "11.0"), ("cache_write", "30.0"),
+                                            ("cache_read", "19.0"), ("output", "23.0")))
+    expected.append('k3dm_dispatch_claude_daily_tokens{date="2027-01-15",model="m"} 83')
+    assert existing == expected

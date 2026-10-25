@@ -364,12 +364,17 @@ Plan 2 of 5 is [`dispatch-vendor-coordinator-model-telemetry`](plans/v1.43.7-dis
 
 Plan 3 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
 
-Plan 4, `bug-dashboard-auto-release-selection`, moved to v1.43.9 on 2026-10-24 to make room for the hub ArgoCD
-upgrade.
+Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashboard-auto-release-selection.md)
+(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
+hard-coded version. Moved to v1.43.9 on 2026-10-24, and back on 2026-10-25 (Claude) when the operator asked for it
+now; it swapped places with `dispatch-spec-and-change-complexity`, which had not started. v1.43.7 is full.
 
-Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
-(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
-per release on Agent Dispatch, as separate columns with no combined score. v1.43.7 is now full.
+**Cut 2026-10-25, ahead of the 11-03 window** (operator, via `/create-pr`). All five plans are implemented and every
+bug is fixed; the live evidence still pending carries forward without holding the release: the Vault unseal-cache
+E3 and the Argo CD pin at the 10-29 rebuild, the `make argocd-upgrade` E-items in the 11-03 window (11-10
+fallback), which now run from `main` or the open release branch, the cross-repo dispatch E3 at the next
+shopping-cart fix, the worker/coordinator model E2 at the next `COORDINATOR=` dispatch, and the rollup-race E2
+through 11-01. The `not_before` floor was removed from `docs/release-milestones.json`.
 
 ### Candidate milestone — v1.43.8 (patch)
 
@@ -404,10 +409,10 @@ on 2026-10-24. It publishes the sweep's per-outcome counts and the age of the ol
 adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live needs
 `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
 
-Plan 2 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.9-bug-dashboard-auto-release-selection.md)
-(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
-hard-coded version. Moved from v1.43.5 on 2026-10-23 and again from v1.43.7 on 2026-10-24, to make room for the hub
-ArgoCD upgrade.
+Plan 2 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.9-dispatch-spec-and-change-complexity.md)
+(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
+per release on Agent Dispatch, as separate columns with no combined score. Moved from v1.43.7 on 2026-10-25
+(Claude), swapping with `bug-dashboard-auto-release-selection`.
 
 Plan 3 of 5 is [`vectordb-drift-kinds-and-age`](plans/v1.43.9-vectordb-drift-kinds-and-age.md) (operator,
 2026-10-24). It splits VectorDB drift into missing, stale-hash and deleted docs (the net count can read 0 while docs
@@ -416,6 +421,28 @@ are wrong) and publishes how long the oldest drift has lasted.
 Plan 4 of 5 is [`vectordb-retrieval-quality-probe`](plans/v1.43.9-vectordb-retrieval-quality-probe.md) (operator,
 2026-10-24). Hermes runs the v1.40.0 retrieval eval once a day against the live store and reports recall,
 intrusion and outdated results; the VectorDB dashboard is reorganised into health, consistency and retrieval rows.
+
+Plan 5 of 5 is [`orbstack-upgrade-coordinated`](plans/v1.43.9-orbstack-upgrade-coordinated.md) (operator,
+2026-10-25, after an OrbStack update stopped the hub). Hermes announces an available update;
+`make orbstack-upgrade` refuses while the hub is busy, updates OrbStack on a typed yes, then unseals Vault,
+fixes host-network drift, refills the Pushgateway and verifies against preflight counts. Its prerequisite,
+the 2026-10-12 OrbStack monitoring bug, moved from v1.44.0 to v1.43.9. v1.43.9 is now full.
+
+### Candidate milestone — v1.43.10 (patch)
+
+**Context threshold comparison** (operator, 2026-10-25). Branch `k3d-manager-v1.43.10`, cut from `main` after v1.43.9
+merges. Plan 1 of 5 is [`context-threshold-release-comparison`](plans/v1.43.10-context-threshold-release-comparison.md):
+per release, API-equivalent cost per live-verified spec (Claude, Codex and total), post-compaction re-read share with
+shell reads counted, compactions, first-pass verification and continuation prompts, in one Agent Cost table. It also
+fixes the verified-spec count (FIXED no longer counts; author time, not committer time). The operator asked for
+v1.43.9; v1.43.9 was full, so Claude split it here (2026-10-25). Read it before changing the compaction threshold.
+
+Plan 2 of 5 is [`claude-quota-exhaustion-availability-telemetry`](plans/v1.43.10-claude-quota-exhaustion-availability-telemetry.md)
+(operator, 2026-10-25): P3 enhancement recording Claude five-hour/seven-day quota-exhaustion,
+scheduled reset versus observed resumption, confirmed quota-induced wait and coordinator availability.
+A provider-neutral schema permits later Codex/Gemini adapters, but this plan does not add automatic
+failover. Filed after the first observed five-hour quota cap; v1.43.8 and v1.43.9 are both full.
+Implementation waits for v1.43.10 and operator dispatch approval. v1.43.10 has 2 of 5 plans.
 
 ### Candidate milestone — v1.44.0
 
@@ -428,7 +455,7 @@ turns the operator's manual acceptance checks into repeatable scenarios with evi
 Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack upgrade restarted the hub):
 - `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (P2): the watchdog retries for up to a minute while Vault boots.
 - `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (P3): a read-only `vault_seal` Hermes sensor; no repair.
-- `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
+- `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3; **moved to v1.43.7 on 2026-10-25**, prerequisite of v1.43.9 plan 5): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
 - Added 2026-10-15 (triage):
   - `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (P2): `alert_delivery`
     shows `unknown` with no reason. Two later docs about the same symptom were merged into it.

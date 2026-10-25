@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Ship redacted dispatch test logs to the hub's Loki."""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime, timezone
+import urllib.request
+from collections import defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from hermes.e2e_triage import redact  # noqa: E402
+
+CREDENTIAL_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    r"hvs\.[A-Za-z0-9]{20,}", r"gh[pousr]_[A-Za-z0-9]{30,}",
+    r"github_pat_[A-Za-z0-9_]{20,}", r"sk_(test|live)_[A-Za-z0-9]{10,}",
+    r"xox[abpr]-[A-Za-z0-9-]{6,}", r"hooks\.slack\.com/services/\S+",
+    r"AKIA[0-9A-Z]{16}", r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+))
+EVIDENCE = {"land-test.log", "land_refused.tests"}
+VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
+SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+KEEP_LINES = 4998
+
+
+def _root():
+    return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
+
+
+def _rows(ledger):
+    grouped = defaultdict(list)
+    try:
+        source = ledger.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for line in source:
+        try:
+            event = json.loads(line)
+            if isinstance(event, dict) and isinstance(event.get("ts"), (int, float)):
+                grouped[(event.get("version"), event.get("slug"))].append(event)
+        except (ValueError, TypeError):
+            continue
+    rows = []
+    for (version, slug), events in grouped.items():
+        if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
+            continue
+        if not isinstance(slug, str) or not SLUG_RE.fullmatch(slug):
+            continue
+        launches = sorted((e for e in events if e.get("event") in {"start", "resume"}), key=lambda e: e["ts"])
+        exits = sorted((e for e in events if e.get("event") in {"codex_exit", "agent_exit"}), key=lambda e: e["ts"])
+        seen = set()
+        for index, exit_event in enumerate(exits, 1):
+            run = exit_event.get("run")
+            if type(run) is not int or run < 1:
+                run = index
+            if run in seen:
+                continue
+            seen.add(run)
+            matching_launch = next((e for e in launches if e.get("run", e.get("n")) == run), None)
+            if matching_launch is None and index <= len(launches):
+                matching_launch = launches[index - 1]
+            if matching_launch is None:
+                continue
+            next_launch = next((e["ts"] for e in launches if e["ts"] > exit_event["ts"]), None)
+            refusals = [e for e in events if e.get("event") == "land_refused" and e.get("reason") == "tests"
+                        and e["ts"] > exit_event["ts"] and (next_launch is None or e["ts"] < next_launch)]
+            land = next((e for e in reversed(events) if e.get("event") == "land"), None)
+            if land and land.get("test_result") == "passed" and land.get("tree") and land.get("tree") == exit_event.get("tree"):
+                evidence = "land-test.log"
+            elif refusals:
+                evidence = "land_refused.tests"
+            elif exit_event.get("exit") not in (None, 0):
+                evidence = "codex_exit.exit"
+            else:
+                evidence = "none"
+            if evidence in EVIDENCE:
+                rows.append((version, slug, run))
+    latest = {}
+    for version, slug, run in rows:
+        latest[(version, slug)] = max(run, latest.get((version, slug), run))
+    return [(version, slug, str(run)) for (version, slug), run in latest.items()]
+
+
+def _clean_line(line):
+    home = str(Path.home().resolve())
+    line = line.replace(home, "~")
+    line = redact(line)
+    for pattern in CREDENTIAL_PATTERNS:
+        line = pattern.sub("<redacted>", line)
+    return line[:2000]
+
+
+def _lines(path, digest):
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    lines = content.splitlines()
+    earlier = max(0, len(lines) - KEEP_LINES)
+    cleaned = [_clean_line(line) for line in lines[-KEEP_LINES:]]
+    if earlier:
+        cleaned.insert(0, f"[truncated: {earlier} earlier lines]")
+    shipped = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cleaned.insert(0, f"[shipped {shipped} sha256:{digest[:12]}]")
+    return cleaned
+
+
+def _state(path):
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _ship(row, lines, digest, state, state_path, base, dry_run):
+    version, slug, run = row
+    key = "/".join(row)
+    labels = {"job": "k3dm-dispatch-run", "version": version, "slug": slug, "run": run}
+    if dry_run:
+        print(f"would push labels={json.dumps(labels, sort_keys=True)} lines={len(lines)}")
+        return True
+    now = time.time_ns()
+    stream = {"stream": labels, "values": [[str(now + index), line] for index, line in enumerate(lines)]}
+    payload = json.dumps({"streams": [stream]}, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(base + "/loki/api/v1/push", data=payload,
+                                    headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if not 200 <= response.status < 300:
+                return False
+    except Exception as exc:
+        print(f"dispatch log push failed for {version}/{slug}/{run}: {exc}", file=sys.stderr)
+        return False
+    state[key] = digest
+    temp = state_path.with_name(state_path.name + ".tmp")
+    try:
+        temp.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
+        os.replace(temp, state_path)
+    except OSError as exc:
+        print(f"dispatch log state write failed for {version}/{slug}/{run}: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--strict", action="store_true")
+    args = parser.parse_args(argv)
+    root = _root()
+    state_path = root / "dispatch-logs-shipped.json"
+    state = _state(state_path)
+    base = os.environ.get("K3DM_DISPATCH_LOKI_URL", "http://localhost:19100").rstrip("/")
+    failures = 0
+    for version, slug, run in _rows(root / "ledger.jsonl"):
+        log_path = root / version / f"{slug}.run" / "land-test.log"
+        try:
+            raw = log_path.read_bytes()
+        except OSError:
+            continue
+        digest = hashlib.sha256(raw).hexdigest()
+        if state.get("/".join((version, slug, run))) == digest:
+            continue
+        lines = _lines(log_path, digest)
+        if lines is None:
+            continue
+        if not _ship((version, slug, run), lines, digest, state, state_path, base, args.dry_run):
+            failures += 1
+    return 1 if args.strict and failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

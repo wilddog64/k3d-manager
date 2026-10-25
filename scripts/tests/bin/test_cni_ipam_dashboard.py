@@ -81,7 +81,7 @@ def test_guide_names_dashboard_in_inventory_and_triage():
     assert "**k3dm Host Pod IP Pool** shows `No data`" in triage  # agent-audit: allow assert-removed same assertion, now on the split sub-page
 
 
-def test_host_disk_dashboard_is_unchanged():
+def test_host_disk_dashboard_keeps_its_panels_and_adds_only_orbstack():
     path = ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-host-disk.yaml"
     expected = subprocess.run(
         ["git", "show", "5a96bfb7:scripts/etc/argocd/platform-ops/grafana-dashboard-host-disk.yaml"],
@@ -89,7 +89,20 @@ def test_host_disk_dashboard_is_unchanged():
         check=True,
         capture_output=True,
     ).stdout
-    assert path.read_bytes() == expected
+
+    def dashboard(text):
+        return json.loads(yaml.safe_load(text)["data"]["host-disk.json"])
+
+    # agent-audit: allow assert-removed byte pin replaced by panel-level equality so the OrbStack panel can be added
+    before, after = dashboard(expected), dashboard(path.read_bytes())
+    added_panels = after["panels"][len(before["panels"]):]
+    assert after["panels"][:len(before["panels"])] == before["panels"]
+    assert [panel["title"] for panel in added_panels] == ["OrbStack"]
+    assert [item["name"] for item in after["annotations"]["list"]] == ["OrbStack upgraded"]
+    # agent-audit: allow assert-removed refresh moved out of the key-equality pin to its own 5m assertion (v1.43.7 dashboard refresh)
+    assert after["refresh"] == "5m"
+    assert {key: value for key, value in after.items() if key not in ("panels", "annotations", "refresh")} == \
+        {key: value for key, value in before.items() if key not in ("panels", "annotations", "refresh")}
 
 
 def test_n1_guide_does_not_reference_missing_dashboard():

@@ -9,7 +9,7 @@ metadata:
 data:
   pr-checks.json: |
     {
-      "title":"k3dm PR Checks","uid":"k3dm-pr-checks","tags":["k3dm","ci"],"schemaVersion":39,"version":1,"refresh":"1m","time":{"from":"now-24h","to":"now"},
+      "title":"k3dm PR Checks","uid":"k3dm-pr-checks","tags":["k3dm","ci"],"schemaVersion":39,"version":1,"refresh": "5m","time":{"from":"now-24h","to":"now"},
       "templating":{"list":[{"name":"repo","type":"query","query":"label_values(k3dm_pr_checks_open_prs, repo)","definition":"label_values(k3dm_pr_checks_open_prs, repo)","multi":true,"includeAll":true,"allValue":".*","current":{"text":"All","value":["$__all"]}}]},
       "panels":[
         {"id":1,"type":"stat","title":"Open PRs","gridPos":{"h":4,"w":6,"x":0,"y":0},"targets":[{"expr":"sum(k3dm_pr_checks_open_prs{repo=~\"$repo\"}) or vector(0)"}]},

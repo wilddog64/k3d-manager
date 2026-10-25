@@ -26,3 +26,7 @@ orb status                       # OrbStack daemon status
 ./scripts/k3d-manager deploy_cluster   # should auto-select orbstack
 ./scripts/k3d-manager test all         # validate all services
 ```
+
+## Updating OrbStack
+
+Check for an available update with `orbctl update --check`; install it with `orbctl update`. An update restarts every hub container. Afterward, check that Vault is unsealed.

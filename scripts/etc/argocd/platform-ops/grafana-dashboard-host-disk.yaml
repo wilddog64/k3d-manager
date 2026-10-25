@@ -9,7 +9,7 @@ metadata:
 data:
   host-disk.json: |
     {
-      "annotations": {"list": []},
+      "annotations": {"list": [{"name": "OrbStack upgraded", "enable": true, "iconColor": "purple", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(k3dm_orbstack_info unless on(version) last_over_time(k3dm_orbstack_info[1d] offset 1h)) and on() (count(last_over_time(k3dm_orbstack_info[1d] offset 1h)) > 0)", "step": "1m", "titleFormat": "OrbStack upgraded to {{version}}", "textFormat": "The hub VM restarted for this upgrade."}]},
       "editable": true,
       "graphTooltip": 1,
       "title": "k3dm Host Disk",
@@ -17,13 +17,14 @@ data:
       "tags": ["k3dm", "disk"],
       "schemaVersion": 39,
       "version": 1,
-      "refresh": "1m",
+      "refresh": "5m",
       "time": {"from": "now-24h", "to": "now"},
       "panels": [
         {"id": 1, "type": "stat", "title": "Used %", "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}, "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * (1 - k3dm_disk_avail_bytes / k3dm_disk_size_bytes)", "legendFormat": "{{host}}"}]},
         {"id": 2, "type": "stat", "title": "Free", "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0}, "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []}, "targets": [{"expr": "k3dm_disk_avail_bytes", "legendFormat": "{{host}}"}]},
         {"id": 3, "type": "timeseries", "title": "Used % over time", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 6}, "fieldConfig": {"defaults": {"unit": "percent", "custom": {"showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * (1 - k3dm_disk_avail_bytes / k3dm_disk_size_bytes)", "legendFormat": "{{host}}"}]},
         {"id": 4, "type": "stat", "title": "Probe status", "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0}, "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "down", "color": "red"}, "1": {"text": "up", "color": "green"}}}]}, "overrides": []}, "targets": [{"expr": "k3dm_disk_probe_success", "legendFormat": "{{host}}"}]},
-        {"id": 5, "type": "stat", "title": "Last push age", "gridPos": {"h": 6, "w": 8, "x": 16, "y": 14}, "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}, "targets": [{"expr": "time() - max(push_time_seconds{job=\"k3dm-disk\"})"}]}
+        {"id": 5, "type": "stat", "title": "Last push age", "gridPos": {"h": 6, "w": 8, "x": 16, "y": 14}, "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}, "targets": [{"expr": "time() - max(push_time_seconds{job=\"k3dm-disk\"})"}]},
+        {"id": 6, "type": "stat", "title": "OrbStack", "description": "Installed OrbStack version (left) and whether orbctl update --check reports a newer one (right). Installing an update stops the hub VM.", "gridPos": {"h": 6, "w": 8, "x": 0, "y": 22}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "fieldConfig": {"defaults": {"unit": "none"}, "overrides": [{"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"1": {"text": "installed", "color": "blue"}}}]}]}, {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"0": {"text": "up to date", "color": "green"}, "1": {"text": "update available", "color": "orange"}}}]}]}]}, "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value_and_name", "justifyMode": "center"}, "targets": [{"refId": "A", "expr": "k3dm_orbstack_info", "legendFormat": "{{version}}", "instant": true}, {"refId": "B", "expr": "k3dm_orbstack_update_available", "legendFormat": "Update status", "instant": true}]}
       ]
     }

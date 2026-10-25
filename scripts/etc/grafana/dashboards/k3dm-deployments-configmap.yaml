@@ -13,7 +13,7 @@ data:
       "tags": ["k3dm"],
       "schemaVersion": 38,
       "version": 1,
-      "refresh": "30s",
+      "refresh": "5m",
       "time": { "from": "now-24h", "to": "now" },
       "panels": [
         {

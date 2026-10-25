@@ -1460,3 +1460,15 @@ def test_token_expiry_advisory_dedup_and_silence():
     far = token_headers({"github-authentication-token-expiration": "2027-06-01 00:00:00 UTC"})
     assert token_expiry_advisory(far, {}, "2026-11-25", token="x", now=now) is None
     assert token_expiry_advisory(token_headers({}), {}, "2026-11-25", token="x", now=now) is None
+
+
+def test_orbstack_metrics_publisher_runs_hourly(monkeypatch):
+    calls = []
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", lambda *args, **kwargs: calls.append(args[0]))
+    recent = {"orbstack_last_run": 1000}
+    k3dm_hermes._publish_orbstack_metrics(recent, 1600)
+    assert calls == []
+    due = {"orbstack_last_run": 1000}
+    k3dm_hermes._publish_orbstack_metrics(due, 4660)
+    assert calls == [[str(ROOT / "bin" / "k3dm-orbstack-metrics")]]
+    assert due["orbstack_last_run"] == 4660

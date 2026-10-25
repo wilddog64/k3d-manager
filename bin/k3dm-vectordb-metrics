@@ -11,6 +11,7 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
@@ -479,7 +480,10 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
         fixed_item = (fixed_in or {}).get(path) or {}
-        fix_sha = fixed_item.get("commit", "")[:8] if status == "fixed" and isinstance(fixed_item.get("commit", ""), str) else "-"
+        fix_commit = doc_fix_commit(texts.get(path, "")) if status == "fixed" else None
+        if not fix_commit and status == "fixed":
+            fix_commit = fixed_item.get("commit", "")
+        fix_sha = fix_commit[:8] if isinstance(fix_commit, str) else "-"
         verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"
         if not re.fullmatch(r"[0-9a-f]{8}|-", fix_sha):
             fix_sha = "-"
@@ -546,6 +550,14 @@ def _load_milestones(root, ref=None):
             raise ValueError("milestone missing version")
         if not _VERSION_RE.fullmatch(version):
             raise ValueError(f"invalid milestone version: {version}")
+        not_before = milestone.get("not_before")
+        if not_before is not None:
+            try:
+                parsed = datetime.strptime(not_before, "%Y-%m-%d")
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid not_before date for {version}: {not_before}") from exc
+            if parsed.strftime("%Y-%m-%d") != not_before:
+                raise ValueError(f"invalid not_before date for {version}: {not_before}")
         if version in versions:
             raise ValueError(f"duplicate milestone version: {version}")
         versions.add(version)
@@ -571,6 +583,8 @@ def _forecast(milestones, tags, cadence, now):
     shipped = {version for version, _ in tags}
     rows, blocked = [], False
     k = 0
+    previous = {"low": cadence["last_ts"], "mid": cadence["last_ts"],
+                "high": cadence["last_ts"]} if cadence else {}
     for item in milestones:
         version = item["version"]
         row = {**item, "overdue": False}
@@ -587,7 +601,16 @@ def _forecast(milestones, tags, cadence, now):
             k += 1
             row["state"] = "forecast"
             for bound, key in (("low", "p25"), ("mid", "p50"), ("high", "p75")):
-                value = cadence["last_ts"] + k * cadence[key]
+                value = previous[bound] + cadence[key]
+                floor = item.get("not_before")
+                if floor:
+                    floor_ts = int(datetime.strptime(floor, "%Y-%m-%d").replace(
+                        tzinfo=ZoneInfo(os.environ.get("K3DM_FORECAST_TZ", "America/Los_Angeles"))).timestamp())
+                    if value < floor_ts:
+                        value = floor_ts
+                        if bound == "mid":
+                            row["floored"] = True
+                previous[bound] = value
                 if value < now:
                     value = now
                     row["overdue"] = True
@@ -615,7 +638,10 @@ def _forecast_metrics(root, ref=None, now=None, repo="k3d-manager"):
         version = row["version"]
         blocked_by = re.sub(r'["\\\r\n]+', " ", row.get("blocked_by", ""))[:80]
         blocked_by = " ".join(blocked_by.split())
-        lines.append(f'k3dm_release_milestone_info{{repo="{repo}",version="{version}",release_order="{_release_order(version)}",position="{position}",kind="{row.get("kind", "")}",state="{row["state"]}",blocked_by="{blocked_by}",target="{str(bool(row.get("target"))).lower()}",current="{str(version == current).lower()}",overdue="{str(row["overdue"]).lower()}"}} 1')
+        not_before = row.get("not_before", "")
+        not_before_reason = re.sub(r'["\\\r\n]+', " ", row.get("not_before_reason", ""))[:80]
+        not_before_reason = " ".join(not_before_reason.split())
+        lines.append(f'k3dm_release_milestone_info{{repo="{repo}",version="{version}",release_order="{_release_order(version)}",position="{position}",kind="{row.get("kind", "")}",state="{row["state"]}",blocked_by="{blocked_by}",not_before="{not_before}",not_before_reason="{not_before_reason}",target="{str(bool(row.get("target"))).lower()}",current="{str(version == current).lower()}",overdue="{str(row["overdue"]).lower()}"}} 1')
         if row["state"] != "shipped":
             remaining += 1
         if row.get("target"):

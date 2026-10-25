@@ -118,6 +118,8 @@ def substitute_variables(expr, dashboard, series):
     variables = {item["name"]: item for item in dashboard["templating"]["list"]}
     expr = expr.replace("$repo", variables["repo"]["current"]["value"])
     expr = expr.replace("$verified", variables["verified"]["current"]["value"])
+    if "release_mode" in variables:
+        expr = expr.replace("$release_mode", variables["release_mode"]["current"]["value"])
     release_var = variables["release"]
     label_values = []
     for _, labels, _ in series:

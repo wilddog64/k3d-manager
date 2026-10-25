@@ -87,8 +87,16 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
 
 - Fleet throughput is landed tasks per day.
 - Landing success is landed divided by landed plus refusals at the integration-test step.
-- Human intervention is verifier lines changed after Codex, plus wall-clock waiting minutes from
-  Codex exit to land. Waiting time is not active minutes.
+- **Dispatch-to-land elapsed (wall clock)** is `land.ts - earliest(start.ts)`, including retries,
+  idle time and overnight waits. It is total elapsed time, not worker execution time.
+- **Final worker exit → land** is `max(0, land.ts - latest qualifying codex_exit.ts)`, using the
+  latest valid Codex exit at or before land. Missing or invalid timestamps are omitted. This is a
+  wall-clock gap, not proven human waiting or active review; live verification occurs after land.
+- Human continuation prompts are explicit manual records, not inferred from chat or elapsed time.
+  Record one with `bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other`.
+  The first accepted record writes a coverage-start marker. The dashboard's tracked-task count is
+  the denominator from that point; older history remains unknown and zero recorded prompts does
+  not prove no human effort occurred.
 - Agent efficiency is Codex tokens per landed task. It excludes Claude's verification tokens and
   is not converted to dollars because token pricing is not stable.
 - Per-spec series include the latest Codex token total, Codex seconds summed across runs, elapsed
@@ -121,6 +129,22 @@ to a bug cannot contribute a known bug-level token total; N/A means attribution 
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.
+## Work in another repo
+
+Create and push a target branch in the work repository first. Then dispatch the spec from the
+k3d-manager release checkout while naming the work repository checkout and target branch:
+
+```bash
+make codex-dispatch SPEC=docs/bugs/<file>.md REPO=~/src/gitrepo/personal/shopping-carts/<repo> BRANCH=fix/<slug>
+```
+
+The dispatcher validates and snapshots the spec in k3d-manager, and creates the task worktree from
+`origin/<branch>` in the other repository. On landing, the operator checkout of that repository must
+be clean and on the target branch. The dispatcher checks target movement, rebases, runs the requested
+test command, and fast-forwards the target. It prints the push command; it never pushes for you.
+The Agent Dispatch ledger and Per spec table identify the work repository by its origin repository
+name.
+
 ## agy (Gemini 4 Argon)
 
 Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.

@@ -49,12 +49,14 @@ See **[Vault PKI Configuration](../api/vault-pki.md)** for full PKI variable ref
 # Check Vault status
 kubectl exec -n secrets vault-0 -- vault status
 
-# Re-unseal after restart
-./scripts/k3d-manager deploy_vault --confirm   # idempotent — safe to re-run
+# Re-unseal a sealed, initialized Vault after restart
+./scripts/k3d-manager hub_data_unseal_dr
 
 # Rotate root token (manual — store securely)
 vault token create -policy=root -period=0
 ```
+
+`deploy_vault` refuses to reset an initialized Vault when its cached unseal shards are rejected or missing, or when the root token Secret is missing. `K3DM_VAULT_ALLOW_REINIT=1` explicitly permits a reset and destroys the Vault's data; use it only for a deliberate rebuild.
 
 ## Notes
 

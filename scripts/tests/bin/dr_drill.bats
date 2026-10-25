@@ -387,11 +387,7 @@ STUB
 @test "dr drill: generate-root key failure cancels" {
   export DR_TEST_KEY_FAIL=1
   run_drill
-  cancel_found=0
-  for cancel_file in /tmp/bats-run-*/test/*/home/cancel-seen; do
-    if [[ -f "$cancel_file" ]]; then cancel_found=1; break; fi
-  done
-  [ "$cancel_found" -eq 1 ]
+  [ -f "$HOME/cancel-seen" ]
 }
 
 @test "dr drill: deny-list remains absent" {
