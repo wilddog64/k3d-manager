@@ -409,6 +409,14 @@ Plan 2 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.9-bug-dashbo
 hard-coded version. Moved from v1.43.5 on 2026-10-23 and again from v1.43.7 on 2026-10-24, to make room for the hub
 ArgoCD upgrade.
 
+Plan 3 of 5 is [`vectordb-drift-kinds-and-age`](plans/v1.43.9-vectordb-drift-kinds-and-age.md) (operator,
+2026-10-24). It splits VectorDB drift into missing, stale-hash and deleted docs (the net count can read 0 while docs
+are wrong) and publishes how long the oldest drift has lasted.
+
+Plan 4 of 5 is [`vectordb-retrieval-quality-probe`](plans/v1.43.9-vectordb-retrieval-quality-probe.md) (operator,
+2026-10-24). Hermes runs the v1.40.0 retrieval eval once a day against the live store and reports recall,
+intrusion and outdated results; the VectorDB dashboard is reorganised into health, consistency and retrieval rows.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
