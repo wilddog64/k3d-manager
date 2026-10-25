@@ -490,3 +490,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - **v1.43.6 plan 2 `dispatch-verified-delivery-cost` DISPATCHED to Codex (Luna) 2026-10-24** after adding a Files section and the dispatcher-lands DoD. Plan 3 (Codex solo + agy wrapper) follows once it lands.
 - [x] v1.43.6 plan 2 `dispatch-verified-delivery-cost` landed `8cf6ee5f` 2026-10-24, Claude-verified offline; follow-up `e4eea86f`. E4 live pending release platform-ops.
 - [ ] v1.43.6 plan 3 dispatch-codex-solo-activity: DISPATCHED 2026-10-24 (Luna); first run reviewed, interactive stdin dropped by `bin/k3dm-agy`; rework 2 fixed stdin; rework 3 (SIGINT ignored in interactive child) running.
+- [ ] **dispatch-codex-solo-activity** landed `bcf8ce76` 2026-10-24 17:55 PDT by the operator — Claude review + live evidence pending.
