@@ -18,6 +18,7 @@
 ### Fixed
 
 - Agent Activity bar gauges: names still truncated after the left-placement fix; narrow gauges now put names above the bar and every gauge uses fixed font sizes. Rows holding a narrow gauge are 8 units high so six repo rows keep their values legible. Tokens by repo and agy tokens use the short unit (593 Mil, not 593275830).
+- Agent Dispatch Human continuation prompts: a labelled bar per reason plus tracked tasks, instead of a 30-day time series whose only points sat at the right edge and whose legend was cut off.
 - Agent Dispatch Per run evidence: the slug link opened a GitHub 404 because the organize step dropped the `doc` field the URL reads; `doc` is now hidden instead of excluded, and Tokens sits after run.
 - **Agent Dispatch: open each run's test log from the Per run Log column.** Redacted `land-test.log` output is shipped to hub Loki and linked to a run-filtered Grafana dashboard; Codex transcripts are never shipped.
 - **Agent Dispatch: show each run's test result and log path.** Per run evidence now summarizes land-test output and exposes the local log path in an inspectable Log column. See `docs/bugs/2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open.md`.

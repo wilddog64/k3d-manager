@@ -136,6 +136,7 @@ assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker
 human=panels["Human continuation prompts"]
 assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
 assert any("k3dm_dispatch_human_continuation_prompts" in t["expr"] for t in human["targets"])
+assert human["type"]=="bargauge" and human["options"]["namePlacement"]=="left" and all(t.get("instant") for t in human["targets"]),human["type"]
 index=next(x["options"]["indexByName"] for x in per["transformations"] if x["id"]=="organize")
 assert len(set(index.values()))==len(index),index
 assert index["Value #J"]==index["Value #C"]+1,index
