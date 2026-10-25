@@ -351,3 +351,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Filed P3 `docs/bugs/2026-10-25-dispatch-metrics-rollup-temp-file-race.md` (fixed rollup.json.tmp name; make dispatch-metrics overlaps the dispatcher's locked run → FileNotFoundError, push lost); dispatching to Luna.
 - 2026-10-25: v1.43.9 orbstack-upgrade-coordinated reviewed → READY (references current, phase 1 live-verified); blocked only on branch order v1.43.7 (≥11-03) → v1.43.8 → v1.43.9. Reconfirm with operator before dispatch.
 - 2026-10-25: rollup temp-file race landed `3295edd2` (Luna + Claude mkstemp-in-try fix); E2 = no rollup traceback in metrics.log through 2026-11-01.
+- 2026-10-25: Agent Cost panel 86 Claude tokens by kind landed `ccf7d21e` (bats 22/22, red on pre-change). Filed P3 docs/bugs/2026-10-25-claude-tokens-per-day-no-cache-kind-breakdown.md (daily + cost by kind, panels 87/88); dispatched to Luna.
