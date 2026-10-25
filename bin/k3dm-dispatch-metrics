@@ -324,7 +324,62 @@ def _session_records(events):
     return latest
 
 
-def _session_files(codex_home, now):
+def _dispatch_worktree_repos(events):
+    latest = {}
+    for event in events:
+        if event.get("event") != "start":
+            continue
+        version, slug = event.get("version"), event.get("slug")
+        if not isinstance(version, str) or not isinstance(slug, str) or slug.endswith(".run"):
+            continue
+        key = (version, slug)
+        if key not in latest or event.get("ts", 0) >= latest[key].get("ts", 0):
+            latest[key] = event
+    result = {}
+    for key, event in latest.items():
+        repo = event.get("repo")
+        result[key] = repo if isinstance(repo, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo) else "k3d-manager"
+    return result
+
+
+def _worktree_repo(cwd, repo_by_worktree):
+    if not isinstance(cwd, str):
+        return "other"
+    try:
+        path = Path(cwd).resolve()
+        relative = path.relative_to(_root().resolve())
+    except (OSError, RuntimeError, ValueError):
+        return None
+    parts = relative.parts
+    if len(parts) < 2 or parts[1].endswith(".run"):
+        return None
+    key = (parts[0], parts[1])
+    if key in repo_by_worktree:
+        return repo_by_worktree[key]
+    try:
+        git_file = _root() / parts[0] / parts[1] / ".git"
+        if not git_file.is_file():
+            return "other"
+        match = re.fullmatch(r"\s*gitdir:\s*(.+?)\s*", git_file.read_text(encoding="utf-8"))
+        if not match:
+            return "other"
+        gitdir = Path(match.group(1))
+        if not gitdir.is_absolute():
+            gitdir = git_file.parent / gitdir
+        git_parts = gitdir.resolve().parts
+        for index in range(len(git_parts) - 2):
+            if git_parts[index:index + 3] == (".git", "worktrees", git_parts[index + 2]):
+                repo = git_parts[index - 1] if index else ""
+                if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+                    return repo
+                break
+    except (OSError, RuntimeError, ValueError):
+        pass
+    return "other"
+
+
+def _session_files(codex_home, now, repo_by_worktree=None):
+    repo_by_worktree = repo_by_worktree or {}
     cutoff = now - WINDOWS["30d"]
     for name in glob.glob(str(Path(codex_home) / "sessions" / "*" / "*" / "*" / "rollout-*.jsonl")):
         try:
@@ -351,7 +406,9 @@ def _session_files(codex_home, now):
                         origin = payload.get("originator")
                         mode = "exec" if origin == "codex_exec" else "interactive" if origin == "codex-tui" else "other"
                         cwd = payload.get("cwd")
-                        repo = Path(cwd).name if isinstance(cwd, str) else "other"
+                        repo = _worktree_repo(cwd, repo_by_worktree)
+                        if repo is None:
+                            repo = Path(cwd).name if isinstance(cwd, str) else "other"
                         if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo or ""):
                             repo = "other"
                     if item.get("type") == "event_msg":
@@ -1384,7 +1441,8 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
     now = time.time() if now is None else now
     doc_root = Path(repo_root) if repo_root is not None else _repo_root()
     prices = prices or {}
-    coverage = list(_session_files(codex_home, now)) if codex_home else None
+    repo_by_worktree = _dispatch_worktree_repos(events)
+    coverage = list(_session_files(codex_home, now, repo_by_worktree)) if codex_home else None
     lines = [f"k3dm_dispatch_ledger_bad_lines {bad_lines}"]
     for window, seconds in WINDOWS.items():
         _render_scope(lines, window, _window_metrics(events, now, seconds, prices, doc_root), events,

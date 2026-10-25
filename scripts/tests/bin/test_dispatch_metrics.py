@@ -53,13 +53,16 @@ def event(ts, name, slug="one", **extra):
     return {"ts": ts, "event": name, "version": "9.9.9", "slug": slug, **extra}
 
 
-def write_session(home, session, started, now):
+def write_session(home, session, started, now, cwd=None, usage=None):
     stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
     folder = home / "sessions/2026/10/23"
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"rollout-{session}.jsonl"
-    path.write_text(json.dumps({"type": "session_meta", "payload": {
-        "id": session, "timestamp": stamp}}) + "\n")
+    rows = [{"type": "session_meta", "payload": {
+        "id": session, "timestamp": stamp, **({"cwd": str(cwd)} if cwd is not None else {})}}]
+    if usage is not None:
+        rows.append({"type": "event_msg", "payload": {"info": {"total_token_usage": usage}}})
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     os.utime(path, (now, now))
 
 
@@ -1575,6 +1578,83 @@ def test_codex_activity_exports_sessions_tokens_quota_and_untracked(tmp_path):
     assert 'k3dm_codex_active_seconds{window="1d",mode="exec"} 1.5' in output
     assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
     assert "secret" not in output
+
+
+def test_dispatch_worktree_activity_uses_latest_ledger_repo(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "some-slug"
+    write_session(home, "dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([
+        event(now - 2, "start", "some-slug", version="v1.43.7", repo="shopping-cart-order"),
+        event(now - 1, "start", "some-slug", version="v1.43.7", repo="shopping-cart-order"),
+    ], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="shopping-cart-order"} 1' in output
+    assert str(tmp_path) not in output
+
+
+def test_dispatch_worktree_without_ledger_repo_defaults_to_manager(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "legacy-slug"
+    write_session(home, "legacy-dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([
+        event(now - 1, "start", "legacy-slug", version="v1.43.7"),
+    ], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="k3d-manager"} 1' in output
+
+
+def test_dispatch_worktree_falls_back_to_gitdir_repo_and_nested_cwd(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "nested-slug"
+    (cwd / "subdir").mkdir(parents=True)
+    (cwd / ".git").write_text(f"gitdir: {tmp_path}/my-repo/.git/worktrees/s\n")
+    write_session(home, "nested-dispatch", now - 10, now, cwd / "subdir")
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="my-repo"} 1' in output
+
+
+def test_dispatch_worktree_without_match_or_gitdir_is_other(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    cwd = root / "v1.43.7" / "unknown-slug"
+    write_session(home, "unknown-dispatch", now - 10, now, cwd)
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="other"} 1' in output
+
+
+def test_dispatch_sessions_outside_worktree_keep_folder_label(tmp_path, monkeypatch):
+    now = time.time()
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
+    home = tmp_path / "codex"
+    write_session(home, "outside", now - 10, now, tmp_path / "my-project")
+    output = dispatch_metrics.render([], 0, now, codex_home=home)
+    assert 'k3dm_codex_sessions{window="1d",mode="other",repo="my-project"} 1' in output
+
+
+def test_eleven_dispatch_worktrees_fold_into_manager_not_other(tmp_path, monkeypatch):
+    now = time.time()
+    root = tmp_path / "worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    home = tmp_path / "codex"
+    starts = []
+    for index in range(11):
+        slug = f"dispatch-{index}"
+        write_session(home, slug, now - 10, now, root / "v1.43.7" / slug,
+                      {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 0})
+        starts.append(event(now - index, "start", slug, version="v1.43.7"))
+    output = dispatch_metrics.render(starts, 0, now, codex_home=home)
+    assert 'k3dm_codex_tokens{window="1d",mode="other",repo="k3d-manager",kind="uncached_input"} 110' in output
+    assert not any('repo="other"' in line for line in output.splitlines() if line.startswith("k3dm_codex_tokens{"))
 
 
 def test_agy_ledger_missing_or_corrupt_is_nonfatal(tmp_path):
