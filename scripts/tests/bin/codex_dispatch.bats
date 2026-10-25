@@ -193,8 +193,8 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   sleep 1
   [ "$(jq -r -s '[.[]|select(.event=="identity")|.worker_identity.model]|join(",")' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1,gpt-test-2" ]
   [ "$(jq -r 'select(.event=="resume" and .slug=="runtime")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
-  ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
-  ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/metrics.log"
+  run ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/metrics.log"
 }
 
 @test "codex dispatch: invalid runtime model and coordinator are rejected safely" {
