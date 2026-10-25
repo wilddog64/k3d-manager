@@ -22,6 +22,7 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
 ./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
 ./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
+make argocd-upgrade DRY_RUN=1                           # preview the pinned hub ArgoCD chart upgrade
 ./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
   ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer

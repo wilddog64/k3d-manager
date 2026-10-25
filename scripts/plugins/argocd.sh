@@ -454,6 +454,70 @@ HELP
    deploy_argocd_bootstrap
 }
 
+function argocd_upgrade() {
+   local target="${ARGOCD_HELM_CHART_VERSION:-}" dry_run=0 allow_downgrade=0
+   while (($#)); do
+      case "$1" in
+         --to) (($# >= 2)) || { _err "[argocd-upgrade] --to requires a version"; return 2; }; target="$2"; shift 2 ;;
+         --dry-run) dry_run=1; shift ;;
+         --allow-downgrade) allow_downgrade=1; shift ;;
+         -h|--help) printf 'Usage: argocd_upgrade [--to <chart-version>] [--dry-run] [--allow-downgrade]\n'; return 0 ;;
+         *) _err "[argocd-upgrade] unknown option: $1"; return 2 ;;
+      esac
+   done
+   [[ -n "$target" ]] || { _err '[argocd-upgrade] target chart version is empty'; return 1; }
+   local namespace="${ARGOCD_NAMESPACE:-cicd}" release="${ARGOCD_HELM_RELEASE:-argocd}" state_dir="${K3DM_STATE_DIR:-${HOME}/.local/share/k3d-manager/state}"
+   local status_json chart previous revision stamp snapshot apps_file current_context hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+   current_context="$(_kubectl --no-exit config current-context 2>/dev/null)"
+   [[ "$current_context" == "$hub_context" ]] || { _err "[argocd-upgrade] current context '${current_context}' is not the hub (${hub_context})"; return 1; }
+   _kubectl --no-exit get --raw=/readyz >/dev/null 2>&1 || { _err '[argocd-upgrade] hub context is unreachable'; return 1; }
+   status_json="$(_helm status "$release" -n "$namespace" -o json 2>/dev/null)" || { _err '[argocd-upgrade] helm status failed'; return 1; }
+   [[ "$(jq -r '.info.status // empty' <<<"$status_json")" == deployed ]] || { _err '[argocd-upgrade] release is not deployed'; return 1; }
+   chart="$(jq -r '.chart // empty' <<<"$status_json")"; previous="${chart##*-}"
+   revision="$(jq -r '.version // empty' <<<"$status_json")"
+   _helm repo update "${ARGOCD_HELM_REPO_NAME:-argo}" >/dev/null || { _err '[argocd-upgrade] helm repo update failed'; return 1; }
+   _helm show chart "${ARGOCD_HELM_CHART_REF:-argo/argo-cd}" --version "$target" >/dev/null 2>&1 || { _err "[argocd-upgrade] unknown chart version: $target"; return 1; }
+   if [[ "$target" == "$previous" ]]; then _info "[argocd-upgrade] already at $target"; return 0; fi
+   local cmp
+   cmp="$(printf '%s\n%s\n' "$previous" "$target" | sort -V | tail -n 1)"
+   if [[ "$cmp" == "$previous" && $allow_downgrade -eq 0 ]]; then _err "[argocd-upgrade] refusing downgrade $previous -> $target (use --allow-downgrade)"; return 1; fi
+   stamp="$(date -u +%Y%m%dT%H%M%SZ)"; snapshot="$state_dir/argocd-upgrade/$stamp"; mkdir -p "$snapshot" || return 1
+   apps_file="$snapshot/before.json"
+   _kubectl --no-exit -n "$namespace" get applications.argoproj.io -o json |
+      jq '[.items[] | {name:.metadata.name,sync:.status.sync.status,health:.status.health.status}]' >"$apps_file" || { _err '[argocd-upgrade] could not snapshot Applications'; return 1; }
+   jq -n --arg chart_version "$previous" --argjson revision "${revision:-0}" --slurpfile applications "$apps_file" '{chart_version:$chart_version,revision:$revision,applications:$applications[0]}' >"$snapshot/metadata.json"
+   if ((dry_run)); then
+      _info "[argocd-upgrade] snapshot: $snapshot (chart=$previous revision=$revision)"
+      printf 'helm upgrade --install --reset-values -n %q %q %q --create-namespace --set-string %q --set-string %q --values <rendered %q> --version %q\n' "$namespace" "$release" "${ARGOCD_HELM_CHART_REF:-argo/argo-cd}" "configs.cm.url=${ARGOCD_PUBLIC_URL:-}" 'redisSecretInit.podAnnotations.sidecar\.istio\.io/inject=false' "${ARGOCD_CONFIG_DIR:-scripts/etc/argocd}/values.yaml.tmpl" "$target"
+      return 0
+   fi
+   ARGOCD_HELM_CHART_VERSION="$target" _argocd_helm_deploy_release 1 1 || return 1
+   local deadline=$((SECONDS + ${ARGOCD_UPGRADE_SETTLE_SECONDS:-600})) resource failed=0
+   while :; do
+      failed=0
+      for resource in deployment/argocd-applicationset-controller deployment/argocd-dex-server deployment/argocd-notifications-controller deployment/argocd-redis deployment/argocd-repo-server deployment/argocd-server statefulset/argocd-application-controller; do
+         _kubectl --no-exit -n "$namespace" rollout status "$resource" --timeout=1s >/dev/null 2>&1 || failed=1
+      done
+      ((failed == 0 || SECONDS >= deadline)) && break
+      sleep 2
+   done
+   local apps_after="$snapshot/after.json"
+   _kubectl --no-exit -n "$namespace" get applications.argoproj.io -o json |
+      jq '[.items[] | {name:.metadata.name,sync:.status.sync.status,health:.status.health.status}]' >"$apps_after" || return 1
+   # Keep checking the baseline healthy set until the settle deadline.
+   while ((failed == 0 && SECONDS < deadline)); do
+      if jq -e --slurpfile after "$apps_after" 'all(.[] as $old; $old.sync != "Synced" or $old.health != "Healthy" or any($after[0][]; .name == $old.name and .sync == "Synced" and .health == "Healthy"))' "$apps_file" >/dev/null; then break; fi
+      sleep 2
+      _kubectl --no-exit -n "$namespace" get applications.argoproj.io -o json | jq '[.items[] | {name:.metadata.name,sync:.status.sync.status,health:.status.health.status}]' >"$apps_after" || return 1
+   done
+   local worsened
+   worsened="$(jq -n --slurpfile before "$apps_file" --slurpfile after "$apps_after" '$before[0] as $b | $after[0] as $a | [$b[] as $old | select($old.sync=="Synced" and $old.health=="Healthy") | (([$a[] | select(.name==$old.name)] | first) // {sync:"Missing",health:"Missing"}) | select(.sync!="Synced" or .health!="Healthy") | {name:$old.name,sync:.sync,health:.health}]')"
+   if ((failed)) || [[ "$worsened" != '[]' ]]; then
+      printf '%s\n' "$worsened"; _err "[argocd-upgrade] postcheck failed; rollback hint: helm rollback $release $revision -n $namespace; snapshot: $snapshot"; return 1
+   fi
+   _info "[argocd-upgrade] completed; snapshot: $snapshot"
+}
+
 function _argocd_check_dependencies() {
    local missing_deps=()
 
