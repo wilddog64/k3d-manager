@@ -1,6 +1,8 @@
 # Bug: Agent Cost cannot show Claude tokens per day or cost by cache kind
 
-**Status:** OPEN
+**Status:** FIXED 2026-10-25 — `79fab0b1`; pytest 119/119, BATS 23/23, validate-manifests 85/85; Luna showed the new tests red on pre-fix copies. Live E2 pending the operator's screenshot.
+**Fix commit:** `79fab0b1`
+**Review note:** Claude raised the dashboard `$window` expression count 58 → 60. Claude's panel 86 (`ccf7d21e`) had already broken it at 59 because pytest was not rerun before that commit. Luna's `_claude_cost` now treats non-numeric or negative usage as unpriced (N3). Offline on real data, the cost kinds sum to the total in every scope and each day's kinds equal its per-model total. At 7d: cache_read $125.00, cache_write $90.47, output $57.11, input $0.04 of $272.63.
 **Priority:** P3
 **Severity:** low — the per-day bars read as cost, but about 98% of them are cheap cache reads
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)

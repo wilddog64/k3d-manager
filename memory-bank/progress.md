@@ -592,3 +592,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: v1.43.9 orbstack-upgrade-coordinated reviewed → READY (references current, phase 1 live-verified); blocked only on branch order v1.43.7 (≥11-03) → v1.43.8 → v1.43.9. Reconfirm with operator before dispatch.
 - 2026-10-25: rollup temp-file race landed `3295edd2` (Luna + Claude mkstemp-in-try fix); E2 = no rollup traceback in metrics.log through 2026-11-01.
 - 2026-10-25: Agent Cost panel 86 Claude tokens by kind landed `ccf7d21e` (bats 22/22, red on pre-change). Filed P3 docs/bugs/2026-10-25-claude-tokens-per-day-no-cache-kind-breakdown.md (daily + cost by kind, panels 87/88); dispatched to Luna.
+- 2026-10-25: cache-kind breakdown (panels 87/88) landed `79fab0b1`; sums verified on real data; live screenshot pending. Next: v1.43.9 plan for context-threshold comparison across releases (operator "go for v1.43.9").
