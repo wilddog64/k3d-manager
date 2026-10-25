@@ -98,7 +98,8 @@ task-to-bug link and an independently verified live closure.
 run's Codex tokens. Each slug links to its spec on GitHub, at the release branch named by the
 row's version: `docs/bugs/<slug>.md` for a dated bug slug, `docs/plans/<version>-<slug>.md`
 otherwise. The raw sample value of the outcome series (always 1) is hidden. The **Run outcomes**
-bars are horizontal, so each outcome name reads in full left of its bar.
+bars are horizontal, so each outcome name reads in full left of its bar. **First-pass live
+verification** sits left of the table, the way Last update sits beside Per spec.
 
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.

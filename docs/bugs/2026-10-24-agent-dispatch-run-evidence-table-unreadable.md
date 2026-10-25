@@ -40,7 +40,11 @@ On k3dm Agent Dispatch, row **Run outcomes and verified bug cost**:
    `Value #B` to `Codex tokens`. Sort by slug.
 4. A `slug` data link to
    `https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md`.
-5. The pre-split fixture test exempts bar gauge orientation keys on every dashboard and panel 47,
+5. **First-pass live verification** (panel 48) moves beside the table, like Last update beside
+   Per spec: `x: 0`, `w: 6`, `h: 10` at the table's `y`; the table narrows to `x: 6`, `w: 18`. The
+   bar gauge is horizontal with names on the left. Requested by the operator 2026-10-25
+   (screenshot 226).
+6. The pre-split fixture test exempts bar gauge orientation keys on every dashboard and panel 47,
    which the new test covers.
 
 ## Acceptance
@@ -53,6 +57,8 @@ must:
     text: Per run evidence shows one row per attempt with version, slug, run, outcome, evidence and Codex tokens.
   - id: M3
     text: Each slug opens its plan or bug spec on GitHub.
+  - id: M4
+    text: First-pass live verification sits left of Per run evidence on the same rows, with the same height.
 must_not:
   - id: N1
     text: No raw plumbing column (Time, __name__, job, window, doc, Value #A) may be shown.
@@ -61,11 +67,11 @@ must_not:
 evidence:
   - id: E1
     kind: offline
-    proves: [M1, M2, M3, N1, N2]
+    proves: [M1, M2, M3, M4, N1, N2]
     text: agent_dispatch_dashboard.bats 18/18; the new test red on the pre-fix file; make validate-manifests passes.
   - id: E2
     kind: live
-    proves: [M1, M2, M3, N1]
+    proves: [M1, M2, M3, M4, N1]
     text: After the hub syncs, the operator's screenshot shows full outcome names, a Codex tokens column, and a slug link that opens the spec.
 interface:
   - Grafana /d/k3dm-agent-dispatch

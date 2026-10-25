@@ -1227,8 +1227,8 @@ data:
           "description": "Capped table of task/run number, outcome, evidence reference and known Codex token increment. Token values are absent when the cumulative counter baseline is unknown or reset.",
           "gridPos": {
             "h": 10,
-            "w": 24,
-            "x": 0,
+            "w": 18,
+            "x": 6,
             "y": 39
           },
           "datasource": {
@@ -1320,10 +1320,10 @@ data:
           "title": "First-pass live verification",
           "description": "First recorded independent verification result for directly linked live-verified bug documents. Unmatched tasks are excluded; no data means no attributable first-pass result.",
           "gridPos": {
-            "h": 6,
+            "h": 10,
             "w": 6,
             "x": 0,
-            "y": 49
+            "y": 39
           },
           "datasource": {
             "type": "prometheus",
@@ -1357,7 +1357,9 @@ data:
             "overrides": []
           },
           "options": {
-            "displayMode": "basic"
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left"
           }
         }
       ]

@@ -532,3 +532,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: v1.43.6 RELEASED — PR #149 merged 61256041; tag + GitHub release v1.43.6; enforce_admins restored (true); branch k3d-manager-v1.43.7 cut from 61256041.
 - 2026-10-24: Agent Dispatch Run outcomes horizontal + Per run evidence merged (Codex tokens column, plumbing hidden, slug links to spec); bug docs/bugs/2026-10-24-agent-dispatch-run-evidence-table-unreadable.md. Cherry-picked onto k3d-manager-v1.43.7 2026-10-25.
 - 2026-10-25: v1.43.6 retro written (docs/retro/2026-10-25-v1.43.6-retrospective.md); run-evidence dashboard fix on k3d-manager-v1.43.7 (a4d98518) — inert on the hub until appsets reapplied on v1.43.7.
+- 2026-10-25: Agent Dispatch: First-pass live verification moved beside Per run evidence (x0 w6 h10; table x6 w18), horizontal; BATS 18/18, red on prior layout, validate-manifests 83.
