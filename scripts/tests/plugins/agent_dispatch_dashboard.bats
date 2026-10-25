@@ -515,6 +515,8 @@ assert rename and {"id":"displayName","value":"continue"} in rename[0]["properti
 clarify=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"clarification"}]
 assert clarify and {"id":"displayName","value":"clarify"} in clarify[0]["properties"]
 assert [t["legendFormat"] for t in dispatch[85]["targets"]]==["{{reason}}","tasks"]
+names={o["matcher"]["options"]:o["properties"][0]["value"] for o in dispatch[85]["fieldConfig"]["overrides"]}
+assert names.get("correction")=="correct" and max(len(v) for v in list(names.values())+["other","tasks"])<=8,names
 print("ok")
 PY
   [ "$status" -eq 0 ]
