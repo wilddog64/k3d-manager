@@ -331,11 +331,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-10-24 | [PR #149 review findings](docs/issues/2026-10-24-copilot-pr149-review-findings.md) | Copilot: agy section heading in the dispatch how-to was H1 |
 | 2026-10-13 | [Repeated CVE remediation marked applied](docs/issues/2026-10-13-repeated-cve-remediation-applied-history-investigation.md) | Investigation superseded by a bug doc; CVE remediation events repeat and read as applied |
 | 2026-10-11 | [PR #139 review findings](docs/issues/2026-10-11-copilot-pr139-review-findings.md) | Copilot flagged an `rg` call in a new test suite, which exited 127 on the CI runner (now `grep`). CI also failed two pre-commit priority tests: the lint job's `K3DM_ENABLE_AI=1` sent the hook into AI lint. Both reproduced in `ubuntu:24.04`, and the test now pins the switch |
 | 2026-10-09 | [PR #138 review findings](docs/issues/2026-10-09-copilot-pr138-review-findings.md) | Copilot found nothing; CI lint caught `bin/k3dm-webhook` calling an undefined `REPO_ROOT` in the test-metrics fallback publisher, which a broad `except` had hidden as a log warning. Fixed with a direct test that fails on the old code; a CodeQL ambiguous-regex alert in a test is left to the operator (the edit trips the assertion audit) |
 | 2026-10-08 | [Webhook and cloud-bridge security review](docs/issues/2026-10-08-webhook-cloud-bridge-security-review.md) | Two offline-reproduced defects: relayed slash commands trusted the relay's role header, so a reader-mapped caller could reach admin commands, and `ask-bash` checked path scope on argv but not shell strings. Both fixed in v1.42.0 (caller-role cap, OS read boundary) |
-| 2026-10-08 | [v1.42.0 gate results](docs/issues/2026-10-08-v1420-gate-results.md) | Shell, Python, relay, focused BATS and full `make test` gate output for v1.42.0, run on temporary test homes with no live worker or cluster |
 [All issues →](docs/issues/)
 
 ---

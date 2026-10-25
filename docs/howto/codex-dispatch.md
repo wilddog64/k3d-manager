@@ -121,7 +121,7 @@ to a bug cannot contribute a known bug-level token total; N/A means attribution 
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.
-# agy (Gemini 4 Argon)
+## agy (Gemini 4 Argon)
 
 Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.
 
