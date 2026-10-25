@@ -1,6 +1,7 @@
 # Bug: deploy_vault on a sealed Vault with a rejected unseal cache deletes the unseal key and root token and tries to wipe the data
 
-**Status:** OPEN — dispatched to Luna 2026-10-25
+**Status:** FIXED 2026-10-25 — offline E1 green (82/82; tests 1, 2, 3, 5, 6, 7 red on the pre-fix vault.sh; shellcheck clean); live E3 pending
+**Fix commit:** `f11e0c6e` (Claude moved the opt-in check into `_vault_reinit_refused` to stay under the agent-audit if-count limit; `357866b7` fixed a dr_drill test that globbed `/tmp`)
 **Priority:** P1
 **Severity:** critical — the documented "re-unseal after restart" command deletes the hub's in-cluster unseal key and root token and attempts a data reset; only a host-path lookup miss saved the Raft data on 2026-10-25
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
@@ -153,6 +154,14 @@ interface:
   - _vault_reset_data_path <ns> <release>
   - env K3DM_VAULT_ALLOW_REINIT
 ```
+
+## Follow-up
+
+- E3 as written needs `vault-root` missing; the 2026-10-25 repoint recreated it. Run E3 at the next
+  rebuild drill instead, or by renaming the Secret only with the operator's go.
+- Any path that deletes the vault-0 pod (this reinit, a pod delete, a rebuild) also invalidates the
+  pod-bound `token_reviewer_jwt` in Vault's Kubernetes auth config, so ESO returns 403 until
+  `_hub_data_repoint_vault` runs. That is not covered here; file it separately if it recurs.
 
 ## Definition of Done
 
