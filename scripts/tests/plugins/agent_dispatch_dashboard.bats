@@ -219,11 +219,11 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"]==83:
+    if panel["id"] in (47,83):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
-      if field=="options" and panel["type"]=="bargauge" and key=="agent-activity.json":
+      if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
       assert new==old_field,(panel["id"],field)
 print("ok")
@@ -303,6 +303,31 @@ for p in panels:
   if p["type"]=="bargauge":
     assert p.get("options",{}).get("orientation")=="horizontal",p["id"]
     assert p.get("options",{}).get("namePlacement")=="left",p["id"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch: run outcomes read beside each bar and per run evidence links each slug to its spec" {
+  run python3 - "$BASE" <<'PY'
+import json,re,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["id"]:p for p in d["panels"]}
+assert panels[43]["options"].get("orientation")=="horizontal" and panels[43]["options"].get("namePlacement")=="left"
+table=panels[47]
+for target in table["targets"]:
+  assert target["expr"].startswith("sum by (version, slug, run, ") and 'label_join(' in target["expr"] and '"doc", "plans/$1"' in target["expr"] and '"doc", "bugs/$1"' in target["expr"]
+ids=[t["id"] for t in table.get("transformations",[])]
+assert ids[:2]==["merge","organize"],ids
+org=table["transformations"][1]["options"]
+for hidden in ("Time","__name__","job","window","doc","Value #A"):
+  assert org["excludeByName"].get(hidden) is True,hidden
+assert org["renameByName"].get("Value #B")=="Codex tokens"
+links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
+assert len(links)==1 and links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
 print("ok")
 PY
   [ "$status" -eq 0 ]

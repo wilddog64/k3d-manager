@@ -1077,7 +1077,9 @@ data:
             "overrides": []
           },
           "options": {
-            "displayMode": "basic"
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left"
           }
         },
         {
@@ -1235,13 +1237,13 @@ data:
           },
           "targets": [
             {
-              "expr": "k3dm_dispatch_task_run_outcome{window=\"$window\"}",
+              "expr": "sum by (version, slug, run, outcome, evidence, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
               "instant": true,
               "format": "table",
               "refId": "A"
             },
             {
-              "expr": "k3dm_dispatch_task_run_codex_tokens{window=\"$window\"}",
+              "expr": "sum by (version, slug, run, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_codex_tokens{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
               "instant": true,
               "format": "table",
               "refId": "B"
@@ -1251,17 +1253,66 @@ data:
             "defaults": {
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "slug"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open spec",
+                        "targetBlank": true,
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "options": {
             "showHeader": true,
             "sortBy": [
               {
-                "displayName": "Time",
-                "desc": true
+                "displayName": "slug",
+                "desc": false
               }
             ]
-          }
+          },
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "job": true,
+                  "window": true,
+                  "doc": true,
+                  "Value #A": true
+                },
+                "indexByName": {
+                  "version": 0,
+                  "slug": 1,
+                  "run": 2,
+                  "outcome": 3,
+                  "evidence": 4,
+                  "Value #B": 5
+                },
+                "renameByName": {
+                  "Value #B": "Codex tokens"
+                }
+              }
+            }
+          ]
         },
         {
           "id": 48,

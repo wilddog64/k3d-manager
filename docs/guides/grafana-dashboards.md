@@ -94,6 +94,12 @@ attempt; `failed` requires an evidenced failure or abandonment without an accept
 and unknown token totals are not treated as waste. Bug-level token cost is N/A without an explicit
 task-to-bug link and an independently verified live closure.
 
+**Per run evidence** lists one row per attempt: version, slug, run, outcome, evidence and the
+run's Codex tokens. Each slug links to its spec on GitHub, at the release branch named by the
+row's version: `docs/bugs/<slug>.md` for a dated bug slug, `docs/plans/<version>-<slug>.md`
+otherwise. The raw sample value of the outcome series (always 1) is hidden. The **Run outcomes**
+bars are horizontal, so each outcome name reads in full left of its bar.
+
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
 Rates live in `scripts/etc/agent/codex-model-prices.json`; update a model's input, cached-input and
