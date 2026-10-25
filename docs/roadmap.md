@@ -432,7 +432,7 @@ turns the operator's manual acceptance checks into repeatable scenarios with evi
 Bug fixes carried into v1.44.0 (operator, 2026-10-12; found when the OrbStack upgrade restarted the hub):
 - `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md` (P2): the watchdog retries for up to a minute while Vault boots.
 - `docs/bugs/2026-10-12-hermes-has-no-vault-sealed-sensor.md` (P3): a read-only `vault_seal` Hermes sensor; no repair.
-- `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
+- `docs/bugs/2026-10-12-orbstack-update-is-invisible-to-monitoring.md` (P3; **moved to v1.43.7 on 2026-10-25**, prerequisite of v1.43.9 plan 5): Hermes publishes OrbStack's version and `orbctl update --check` hourly; email-only `OrbStackUpdateAvailable` alert and an "OrbStack upgraded" dashboard annotation. Phase 2 (scheduled unattended `orbctl update`) waits for both Vault fixes and an operator-approved restart window.
 - Added 2026-10-15 (triage):
   - `docs/bugs/2026-10-13-hermes-alert-delivery-probe-unknown-hides-error.md` (P2): `alert_delivery`
     shows `unknown` with no reason. Two later docs about the same symptom were merged into it.

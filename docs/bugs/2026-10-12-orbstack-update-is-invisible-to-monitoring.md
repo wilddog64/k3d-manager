@@ -1,10 +1,10 @@
 # Bug: a pending or finished OrbStack update is invisible to monitoring
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.43.9` (moved from v1.44.0 on 2026-10-25, Claude: it is the prerequisite of `docs/plans/v1.43.9-orbstack-upgrade-coordinated.md`, which replaces phase 2 below with an operator-run upgrade)
-**Status:** OPEN
+**Branch:** `k3d-manager-v1.43.7` (moved from v1.44.0 to v1.43.9 on 2026-10-25, then to v1.43.7 the same day by Claude: it is a bug, so it does not count toward the cap, and landing it now clears the prerequisite of `docs/plans/v1.43.9-orbstack-upgrade-coordinated.md` before that branch exists. Phase 2 below is replaced by that plan's operator-run upgrade.)
+**Status:** DISPATCHED to Luna 2026-10-25 (phase 1 only)
 **Priority:** P3 — a visibility gap; an update restarts the whole hub, and nothing warns before or labels it after
-**Approval:** explicit 2026-10-12 "go ahead" (operator, to "file it for v1.44.0, alert only first, scheduled install as a later phase")
+**Approval:** explicit 2026-10-12 "go ahead" (operator, to "file it for v1.44.0, alert only first, scheduled install as a later phase"); dispatch go 2026-10-25 ("go ahead", for the OrbStack work). Not critical: read-only probe, alert and dashboard.
 **Severity:** low
 
 ## Symptom
@@ -182,6 +182,54 @@ re-renders Alertmanager and restarts Hermes.
   1 h until the next check, plus 1 h `for:`.
 - After the operator runs `orbctl update`, the dashboard shows an **OrbStack upgraded to x.y.z**
   annotation over the restart spike.
+
+## Acceptance
+
+`orbctl update --help` (OrbStack 2.2.5, checked 2026-10-25): `-c, --check   Check for updates, but don't install. Returns exit status 3 if outdated and 0 if not.`
+
+```yaml
+must:
+  - id: M1
+    text: bin/k3dm-orbstack-metrics emits k3dm_orbstack_info{version}, k3dm_orbstack_update_available (1 on check exit 3, 0 on exit 0) and k3dm_orbstack_probe_success 1.
+  - id: M2
+    text: A failed probe (other exit, timeout, orbctl missing) emits k3dm_orbstack_probe_success 0, no update_available line, and the script still exits 0.
+  - id: M3
+    text: Hermes runs the producer at most once per 3600 s, right after the disk metrics.
+  - id: M4
+    text: OrbStackUpdateAvailable (warning, cluster hub, carries version, description names orbctl update) and OrbStackMetricsStale exist; OrbStackUpdateAvailable is in the platform-warning allowlist.
+  - id: M5
+    text: The Host Disk dashboard (uid k3dm-host-disk) has an OrbStack stat and an "OrbStack upgraded" annotation using offset 1h; existing panels keep their gridPos.
+  - id: M6
+    text: alerting.md, grafana-dashboards.md and providers/orbstack.md describe the alert, panel and update procedure.
+must_not:
+  - id: N1
+    text: The producer never runs orbctl update without --check, and never start, stop or restart.
+  - id: N2
+    text: OrbStack alerts never route to sms-critical; OrbStackMetricsStale is not allowlisted.
+  - id: N3
+    text: Tests never push to the real Pushgateway.
+  - id: N4
+    text: Exit 3 must not be read as up to date, and a failed probe must not emit update_available 0.
+evidence:
+  - id: E1
+    kind: offline
+    proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
+    text: pytest scripts/tests/bin/test_orbstack_metrics.py scripts/tests/hermes/test_hermes.py green with K3DM_ORBSTACK_PUSHGATEWAY_URL=http://127.0.0.1:9; the three listed mutations each turn a test red on a temp copy; ruff 0.15.8 clean; make validate-manifests passes.
+  - id: E2
+    kind: offline
+    proves: [M6]
+    text: make check-doc-links passes on the three docs.
+  - id: E3
+    kind: live
+    proves: [M1, M3, M5]
+    text: After landing and the operator's Hermes restart, Claude confirms the Host Disk dashboard shows OrbStack 2.2.5 and its update state within an hour.
+interface:
+  - bin/k3dm-orbstack-metrics [--dry-run] (env K3DM_ORBSTACK_PUSHGATEWAY_URL; orbctl on PATH)
+  - _publish_orbstack_metrics(state, now) in bin/k3dm-hermes
+  - scripts/etc/prometheus/rules/host-orbstack.yaml
+  - scripts/etc/prometheus/alertmanager.yaml.tmpl (platform-warning matcher)
+  - Grafana uid k3dm-host-disk
+```
 
 ## Later — phase 2: scheduled install (not in this bug)
 
