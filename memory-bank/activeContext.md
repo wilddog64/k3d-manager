@@ -325,3 +325,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: OrbStack plan (v1.43.9) can't dispatch: branch not cut. Phase-1 bug 2026-10-12-orbstack-update-is-invisible-to-monitoring moved to v1.43.7, Acceptance added (orbctl --check exit 3/0 verified), dispatched to Luna.
 - 2026-10-25: verify 1/4 rejected-attempt tokens LIVE-VERIFIED (0 at 1d and v1.43.7, operator screenshots). Verify 2/4 forecast: floor showed Nov 2 16:00 PST (UTC midnight); Claude fixed to Pacific midnight (K3DM_FORECAST_TZ), 99/99.
 - 2026-10-25: verify 2/4 forecast LIVE-VERIFIED (screenshot 248: v1.43.7 all bounds 2026-11-03 00:00).
+- 2026-10-25: filed P3 2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open (Result + Log path with inspect; no file:// link), dispatched to Luna.
