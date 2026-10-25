@@ -377,6 +377,10 @@ def test_per_plan_dispatch_state_uses_latest_started_task():
     ([event(1,"start"),event(2,"codex_exit",exit=1),event(3,"land_refused"),event(4,"resume")], "running"),
     ([event(1,"start"),event(2,"land")], "landed"),
     ([event(1,"start"),event(2,"abandon")], "abandoned"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"land"),event(4,"intervention_coverage_start"),event(5,"intervention")], "landed"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"land"),event(4,"verify")], "landed"),
+    ([event(1,"start"),event(2,"codex_exit",exit=0),event(3,"intervention")], "awaiting_land"),
+    ([event(1,"start"),event(2,"abandon"),event(3,"codex_usage")], "abandoned"),
 ])
 def test_dispatch_state_table(events, expected):
     assert dispatch_metrics._dispatch_state(events) == expected

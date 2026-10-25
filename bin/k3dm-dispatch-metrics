@@ -574,8 +574,12 @@ def _task_state(task_events):
     return "awaiting"
 
 
+DISPATCH_LIFECYCLE_EVENTS = {"start", "resume", "codex_exit", "agent_exit", "land", "land_refused", "abandon"}
+
+
 def _dispatch_state(task_events):
-    ordered = sorted(enumerate(task_events), key=lambda item: (item[1].get("ts", 0), item[0]))
+    lifecycle = [e for e in task_events if e.get("event") in DISPATCH_LIFECYCLE_EVENTS]
+    ordered = sorted(enumerate(lifecycle), key=lambda item: (item[1].get("ts", 0), item[0]))
     last = ordered[-1][1].get("event") if ordered else None
     if last == "land":
         return "landed"
