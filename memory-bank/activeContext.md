@@ -263,3 +263,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: agent-dashboards-split commit blocked by _agent_audit (BATS 10→4 merged tests; pytest $window count 51→25). Resume 2 sent: restore 10 tests + add new ones, count across all three dashboards, then commit.
 - 2026-10-24: agent-dashboards-split LANDED `4cb877c7` (Luna resume 3 restored the `== 51` allow line; 15 @test). E1 offline-verified; E2 live pending operator hard-refresh + screenshots of the three dashboards via Agents links.
 - 2026-10-24: agent-dashboards-split LIVE-VERIFIED (E2): three dashboards linked on hub, Window 7d carried; Activity var custom 1d/7d/30d read from the deployed ConfigMap.
+- 2026-10-24: agent-dashboards-split verify pass recorded (verifier claude) + Live evidence line; dry run: k3dm_dispatch_delivered 7d=1, codex_tokens_per_delivered 146571. Plan 2 E4 awaits the next metrics push + operator screenshot of Codex tokens per verified spec.
