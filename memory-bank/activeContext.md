@@ -276,3 +276,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: VectorDB rework 7f679f5a cherry-picked as a04e7d34 (BATS 12/12, red on pre-fix); live recheck pending. Filed v1.43.9 plans 3 (vectordb-drift-kinds-and-age) and 4 (vectordb-retrieval-quality-probe) on operator request; not dispatched.
 - 2026-10-24: Roadmap: v1.44.3 plan 3 (roadmap only) dispatch-prior-art-usage — prior-art lookup in the dispatcher contract + Release knowledge usage row on Agent Dispatch; waits for v1.43.7 dashboards and v1.43.9 plan 4.
 - 2026-10-24: VectorDB ticks P3 LIVE-VERIFIED (a04e7d34; operator screenshots 216-219). Manual worktree + branch task/v1.43.6/vectordb-ticks-interactive removed. Interactive Codex needed 1 rework (overlap) — noted for the vendor trial comparison.
+- 2026-10-24: Duplicate Codex task claude-context-compaction-metrics abandoned by the operator (agy's d98c7423 kept); worktree and branch gone, no longer in codex-status.
