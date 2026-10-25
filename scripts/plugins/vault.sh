@@ -763,7 +763,8 @@ function _vault_reset_data_path() {
    fi
 
    if [[ ! -d "$host_path" ]]; then
-      return 0
+      _warn "[vault] data path is not reachable from this host: $host_path"
+      return 1
    fi
 
    if [[ "$host_path" != *"vault_data-"* ]]; then
@@ -1454,14 +1455,22 @@ function _is_vault_deployed() {
 
 # _vault_reinit_from_reset
 # Purges unseal cache, resets data path, restarts pod, re-initializes Vault.
+# Returns 0 (and warns) unless K3DM_VAULT_ALLOW_REINIT is exactly 1.
+# Args: $1=message
+function _vault_reinit_refused() {
+   [[ "${K3DM_VAULT_ALLOW_REINIT:-}" == "1" ]] && return 1
+   _warn "$1"
+   return 0
+}
+
 # Args: $1=ns $2=release
 function _vault_reinit_from_reset() {
    local ns="$1" release="$2"
-   _vault_purge_unseal_cache "$ns" "$release"
    if ! _vault_reset_data_path "$ns" "$release"; then
       _warn "[vault] failed to reset data directory; manual intervention required"
       return 1
    fi
+   _vault_purge_unseal_cache "$ns" "$release"
    _vault_restart_pod "$ns" "$release"
    local jsonfile=""
    jsonfile=$(_vault_operator_init "$ns" "$release")
@@ -1506,8 +1515,10 @@ function _vault_bootstrap_ha() {
            return 0
         fi
         if (( replay_rc == 42 )); then
+           _vault_reinit_refused "[vault] Vault is initialized and sealed; cached unseal shards were rejected (42). Nothing was changed. Recover with ./scripts/k3d-manager hub_data_unseal_dr (DR shard copy) or unseal by hand." && return 1
            _warn "[vault] cached unseal shards rejected; resetting data directory and re-initializing"
         elif (( replay_rc == 43 )); then
+           _vault_reinit_refused "[vault] Vault is initialized and sealed; cached unseal shards were missing (43). Nothing was changed. Recover with ./scripts/k3d-manager hub_data_unseal_dr (DR shard copy) or unseal by hand." && return 1
            _warn "[vault] cached unseal shards missing; resetting data directory and re-initializing"
         fi
         if (( replay_rc == 42 || replay_rc == 43 )); then
@@ -1518,6 +1529,7 @@ function _vault_bootstrap_ha() {
         return 1
      fi
      if (( !root_secret_present )); then
+        _vault_reinit_refused "[vault] root token Secret is missing; nothing was changed. Create a new root token with vault operator generate-root." && return 1
         _warn "[vault] root token secret missing; resetting data directory and re-initializing"
         _vault_reinit_from_reset "$ns" "$release" || return 1
         return 0
