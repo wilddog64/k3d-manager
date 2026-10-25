@@ -336,16 +336,22 @@ compaction, and Claude cost per verified spec, plus a hand tally of resumption f
 missing-context corrections. It sets up a two-week 200K versus larger-window experiment. Depends on
 v1.43.5 plan 5's Claude scan.
 
-Plan 5 of 5 is [`hub-argocd-pinned-upgrade`](plans/v1.43.6-hub-argocd-pinned-upgrade.md) (operator,
-2026-10-18). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`) and has never had a
-planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry run,
-before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
-2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
+Plan 5, `hub-argocd-pinned-upgrade`, moved to v1.43.7 on 2026-10-24 (Claude, operator-approved). Its live
+evidence is the upgrade itself, which waits for the 2026-11-03 window, and v1.43.6 should ship before then.
+**v1.43.6 now has four plans.**
 
 ### Candidate milestone — v1.43.7 (patch)
 
 **Cross-repo Codex dispatch** (operator, 2026-10-18). Branch `k3d-manager-v1.43.7`, cut from `main`
-after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap. Plan 1 of 5 is
+after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap.
+
+First to dispatch is [`hub-argocd-pinned-upgrade`](plans/v1.43.7-hub-argocd-pinned-upgrade.md) (operator,
+2026-10-18; moved from v1.43.6 on 2026-10-24). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`)
+and has never had a planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry
+run, before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with 2026-11-10
+as fallback. The operator runs it from the release branch. Critical (hub): needs a dispatch go.
+
+Plan 1 of 5 is
 [`codex-dispatch-cross-repo`](plans/v1.43.7-codex-dispatch-cross-repo.md). Fixes in `shopping-cart-*`,
 `lib-foundation` and other repos currently go through a bare `codex exec` and never reach the dispatch
 ledger. This adds `--repo`/`--branch` to `bin/k3dm-codex-dispatch`, a `repo` field on every ledger event,
@@ -355,9 +361,8 @@ Plan 2 of 5 is [`dispatch-vendor-coordinator-model-telemetry`](plans/v1.43.7-dis
 
 Plan 3 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
 
-Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashboard-auto-release-selection.md)
-(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
-hard-coded version. Moved from v1.43.5 on 2026-10-23, because that release already had five plans and v1.43.6 is full.
+Plan 4, `bug-dashboard-auto-release-selection`, moved to v1.43.9 on 2026-10-24 to make room for the hub ArgoCD
+upgrade.
 
 Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
 (operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
@@ -395,6 +400,11 @@ merges. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.9-cni-ipam-re
 on 2026-10-24. It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod sandbox,
 adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live needs
 `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+
+Plan 2 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.9-bug-dashboard-auto-release-selection.md)
+(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
+hard-coded version. Moved from v1.43.5 on 2026-10-23 and again from v1.43.7 on 2026-10-24, to make room for the hub
+ArgoCD upgrade.
 
 ### Candidate milestone — v1.44.0
 

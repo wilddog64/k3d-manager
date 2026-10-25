@@ -26,7 +26,7 @@ fails the existing test that the dashboard opens on the release branch's version
 - The dropdown reads `release_order` from both `k3dm_bug_info` and `k3dm_plan_release_docs`, so any release
   with plans or bugs is selectable. Selecting a release with no bugs shows zero bugs, which is correct.
 - The saved default is `v1.43.6`. Following the current release automatically remains
-  `docs/plans/v1.43.7-bug-dashboard-auto-release-selection.md`.
+  `docs/plans/v1.43.9-bug-dashboard-auto-release-selection.md`.
 
 ## Evidence
 
