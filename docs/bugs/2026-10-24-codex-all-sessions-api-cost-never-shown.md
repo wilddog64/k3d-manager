@@ -1,6 +1,8 @@
 # Bug: "Codex at API prices, all sessions" never shows a value
 
-**Status:** FIXED — `b14dab86` (Luna, dispatched by the operator; landed 2026-10-24 by Claude). E1 offline-verified: dashboard BATS 16/16, pytest 81 passed, validate-manifests 83 valid; the new pytest fails on the pre-fix exporter (N1). Real-data dry run at 7d: exec $5.09, interactive $7.04, 70 unpriced sessions. E2 (live) pending the operator's screenshot.
+**Status:** LIVE-VERIFIED — `b14dab86` (Luna, dispatched by the operator; landed 2026-10-24 by Claude). E1 offline-verified: dashboard BATS 16/16, pytest 81 passed, validate-manifests 83 valid; the new pytest fails on the pre-fix exporter (N1). Real-data dry run at 7d: exec $5.09, interactive $7.04, 70 unpriced sessions. E2 live-verified 2026-10-24 (PDT): operator screenshot of Agent Activity at Window 7d shows Codex at API prices, all sessions $12.1 and Unpriced Codex sessions 70, matching the dry run.
+**Live evidence:** 2026-10-24 · run operator-screenshot-209 · env hub/k3d-k3d-cluster · scenario agent-activity-codex-api-cost · commit b14dab86 · proves E2
+**Fix commit:** b14dab86
 **Priority:** P3
 **Severity:** low — one stat panel on the Agent Activity dashboard is always No data; the dispatcher-only cost panels are unaffected
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
