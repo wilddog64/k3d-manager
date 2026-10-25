@@ -281,3 +281,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: v1.43.6 PR #149 opened (1440296b); Copilot requested; CI run 40155792300 in progress.
 - 2026-10-24 PDT: PR #149 CI red on bats_negation_lint (bare `! grep` in codex_dispatch.bats:192 from 2040d546); fixed with `run !` in ebce722a, red check on a copy confirmed.
 - 2026-10-24 PDT: operator screenshot 221 — Agent Activity titles/bar names truncated + 4-col gap in Claude row; bug doc filed, fixed by Claude in 979dbdb7 (BATS 17/17, pytest 81, manifests 83); live check after hub sync.
+- 2026-10-24 PDT: Copilot PR #149 — 1 finding (agy H1 heading in docs/howto/codex-dispatch.md), fixed in 21378fad; issue doc docs/issues/2026-10-24-copilot-pr149-review-findings.md.
