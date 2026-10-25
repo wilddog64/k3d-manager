@@ -475,6 +475,50 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
 
 
+@pytest.mark.parametrize(("log_text", "expected"), [
+    ("ok 1 - first\nok 2 - second\nnot ok 3 - third\n", "2/3 ok"),
+    ("89 passed in 1.41s\n", "89 passed"),
+    ("ok 1 - first\n89 passed in 1.41s\n", "1/1 ok; 89 passed"),
+    ('ok 1 - quote " and newline\nname\n', "1/1 ok"),
+])
+def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, log_text, expected):
+    now = int(time.time())
+    run_dir = tmp_path / "worktrees" / "9.9.9" / "attempt.run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "land-test.log").write_text(log_text)
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "attempt", run=1),
+        event(now - 10, "codex_exit", "attempt", run=1, exit=0, tokens=10, tree="tree-a"),
+        event(now, "land", "attempt", test_result="passed", tree="tree-a"),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert f'evidence_summary="{expected}"' in line
+    assert f'evidence_path="{run_dir}/land-test.log"' in line
+    assert 'evidence="land-test.log"' in line
+
+
+def test_run_outcome_missing_log_and_codex_exit_keep_metrics_valid(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "missing", run=1),
+        event(now - 10, "codex_exit", "missing", run=1, exit=7, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'evidence_summary="exit 7"' in line
+    assert line.split('evidence_path="', 1)[1].split('"', 1)[0].endswith("/missing.run/codex.log")
+    assert "\\n" not in line and "\\" not in line and line.count('"') % 2 == 0
+
+
+def test_accepted_missing_log_is_unknown_and_render_succeeds(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "missing", run=1),
+        event(now - 10, "codex_exit", "missing", run=1, exit=0, tokens=10, tree="tree-a"),
+        event(now, "land", "missing", test_result="passed", tree="tree-a"),
+    ], 0, now, repo_root=tmp_path)
+    assert 'evidence_summary="unknown"' in output
+
+
 def test_agent_neutral_metrics_include_agy_usage_without_codex_series():
     now = int(time.time())
     output = dispatch_metrics.render([
@@ -1522,3 +1566,16 @@ def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_pa
     dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 100)), {"secondary": {"used_percent": 26, "resets_at": 201}}), 100)
     assert "k3dm_codex_quota_efficiency_coverage 1" in lines
     assert "k3dm_codex_verified_outputs 1" in lines
+
+
+def test_run_outcome_keeps_a_long_evidence_path_whole(tmp_path, monkeypatch):
+    slug = "2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open"
+    root = tmp_path / ("worktrees-" + "x" * 40)
+    run_dir = root / "v1.43.7" / f"{slug}.run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "land-test.log").write_text("8 passed in 0.1s\n")
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    summary, path = dispatch_metrics._evidence_details("v1.43.7", slug, "land-test.log")
+    assert len(path) > 120
+    assert dispatch_metrics._label_value(path, limit=512) == path
+    assert summary == "8 passed"

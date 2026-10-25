@@ -1226,7 +1226,7 @@ data:
           "id": 47,
           "type": "table",
           "title": "Per run evidence",
-          "description": "Capped table of task/run number, outcome, evidence reference and known token increment (Codex or agy). Token values are absent when the cumulative counter baseline is unknown or reset.",
+          "description": "Capped table of task/run number, outcome, test result, log path and known token increment (Codex or agy). Token values are absent when the cumulative counter baseline is unknown or reset.",
           "gridPos": {
             "h": 10,
             "w": 18,
@@ -1239,7 +1239,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug, run, outcome, evidence, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
+              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
               "instant": true,
               "format": "table",
               "refId": "A"
@@ -1273,6 +1273,16 @@ data:
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Log"
+                },
+                "properties": [
+                  {"id": "custom.width", "value": 150},
+                  {"id": "custom.inspect", "value": true}
+                ]
               }
             ]
           },
@@ -1299,6 +1309,7 @@ data:
                   "job": true,
                   "window": true,
                   "doc": true,
+                  "evidence": true,
                   "Value #A": true
                 },
                 "indexByName": {
@@ -1306,10 +1317,13 @@ data:
                   "slug": 1,
                   "run": 2,
                   "outcome": 3,
-                  "evidence": 4,
-                  "Value #B": 5
+                  "evidence_summary": 4,
+                  "evidence_path": 5,
+                  "Value #B": 6
                 },
                 "renameByName": {
+                  "evidence_summary": "Result",
+                  "evidence_path": "Log",
                   "Value #B": "Tokens"
                 }
               }

@@ -399,6 +399,35 @@ def _root():
     return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
 
 
+def _evidence_details(version, slug, evidence):
+    """Return a bounded summary and local evidence path for one run outcome."""
+    run_dir = _root() / version / f"{slug}.run"
+    path = ""
+    summary = evidence
+    if evidence in {"land-test.log", "land_refused.tests"}:
+        log_path = run_dir / "land-test.log"
+        path = str(log_path.resolve())
+        if evidence == "land-test.log":
+            try:
+                content = log_path.read_text(errors="replace")
+            except OSError:
+                content = ""
+            tap_ok = sum(1 for line in content.splitlines() if line.startswith("ok "))
+            tap_bad = sum(1 for line in content.splitlines() if line.startswith("not ok "))
+            tap = f"{tap_ok}/{tap_ok + tap_bad} ok" if tap_ok + tap_bad else None
+            pytest = re.findall(r"(?m)^(\d+ (?:passed|failed)[^\n]*?)(?: in |$)", content)
+            pytest_summary = pytest[-1].strip() if pytest else None
+            summaries = [value for value in (tap, pytest_summary) if value]
+            summary = "; ".join(summaries) if summaries else "unknown"
+    elif evidence == "codex_exit.exit":
+        path = str((run_dir / "codex.log").resolve())
+    return summary, path
+
+
+def _label_value(value, limit=120):
+    return str(value).replace('"', "").replace("\\", "").replace("\n", "").replace("\r", "")[:limit]
+
+
 def read_ledger(path):
     events = []
     bad = 0
@@ -671,10 +700,14 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 outcome, evidence = "unknown", "none"
             if matching_launch not in launches:
                 continue
+            evidence_summary, evidence_path = _evidence_details(version, slug, evidence)
+            if evidence == "codex_exit.exit":
+                evidence_summary = f"exit {exit_event.get('exit', 'unknown')}"
             outcomes[outcome] += 1
             task_rows.append({"run": run_number, "outcome": outcome, "tokens": increment,
                               "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
-                              "evidence": evidence})
+                              "evidence": evidence, "evidence_summary": evidence_summary,
+                              "evidence_path": evidence_path})
             if outcome in {"rework", "failed"} and evidence in {"land_refused.tests", "codex_exit.exit"}:
                 rejected_seen = True
                 if increment is not None:
@@ -894,7 +927,9 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         if type(row["run"]) is not int or row["run"] < 1 or row["run"] > RUN_CAP:
             continue
         labels = f'window="{window}",version="{version}",slug="{slug}",run="{row["run"]}"'
-        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}"}} 1')
+        evidence_summary = _label_value(row.get("evidence_summary", "unknown"))
+        evidence_path = _label_value(row.get("evidence_path", ""), limit=512)
+        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"}} 1')
         if type(row["tokens"]) is int:
             lines.append(f'k3dm_dispatch_task_run_codex_tokens{{{labels}}} {row["tokens"]}')
         if type(row.get("agent_tokens")) is int:

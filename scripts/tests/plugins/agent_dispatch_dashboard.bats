@@ -338,6 +338,15 @@ assert org["renameByName"].get("Value #B")=="Tokens"
 assert "k3dm_dispatch_task_run_agent_tokens{" in next(x["expr"] for x in table["targets"] if x["refId"]=="B")
 links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
 assert len(links)==1 and links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
+assert org["renameByName"].get("evidence_summary")=="Result"
+assert org["renameByName"].get("evidence_path")=="Log"
+assert org["excludeByName"].get("evidence") is True
+assert "evidence_summary" in table["targets"][0]["expr"] and "evidence_path" in table["targets"][0]["expr"]
+log_overrides=[o for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"}]
+assert len(log_overrides)==1
+log_properties={p["id"]:p["value"] for p in log_overrides[0]["properties"]}
+assert log_properties.get("custom.inspect") is True and log_properties.get("custom.width", 999)>0 and log_properties["custom.width"]<=160
+assert "file://" not in text
 print("ok")
 PY
   [ "$status" -eq 0 ]

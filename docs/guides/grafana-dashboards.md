@@ -97,8 +97,11 @@ attempt; `failed` requires an evidenced failure or abandonment without an accept
 and unknown token totals are not treated as waste. Bug-level token cost is N/A without an explicit
 task-to-bug link and an independently verified live closure.
 
-**Per run evidence** lists one row per attempt: version, slug, run, outcome, evidence and the
-run's Codex tokens. Each slug links to its spec on GitHub, at the release branch named by the
+**Per run evidence** lists one row per attempt: version, slug, run, outcome, **Result**, **Log** and the
+run's Codex tokens. Result summarizes TAP and pytest output from the land test log, or shows the
+exit code for a Codex process failure; unavailable test output is `unknown`. To open a run log,
+click its **Log** cell, copy the full path shown in the inspector, then run `less <path>` in a
+terminal on the operator's Mac. Each slug links to its spec on GitHub, at the release branch named by the
 row's version: `docs/bugs/<slug>.md` for a dated bug slug, `docs/plans/<version>-<slug>.md`
 otherwise. The raw sample value of the outcome series (always 1) is hidden. The **Run outcomes**
 bars are horizontal, so each outcome name reads in full left of its bar. **First-pass live
