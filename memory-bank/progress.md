@@ -621,3 +621,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: Remaining releases forecast headers renamed Earliest/Expected/Latest 891ccc4c.
 - 2026-10-25: v1.43.7 release prep — CHANGELOG promoted, releases rows, not_before dropped, pending live E-items carried forward (roadmap) a9269fc6.
 - 2026-10-25: v1.43.7 release PR #150 opened; Copilot requested; CI pending a7cc8277.
+- 2026-10-25: PR #150 CI lint fixed (bare ! grep in codex_dispatch.bats → run !) 85290592; v1.43.10 quota-telemetry plan reviewed + corrected f461ccb0.
