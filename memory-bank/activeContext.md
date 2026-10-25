@@ -261,3 +261,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: dispatched agent-dashboards-split to Luna (worktree ~/.local/share/k3d-manager/worktrees/v1.43.6/agent-dashboards-split); review + land when done.
 - 2026-10-24: agent-dashboards-split reviewed by Claude (black-box M1–M3/N1–N3 OK; 3 mutations red); land refused (uncommitted) → codex-resume asking Luna to commit only.
 - 2026-10-24: agent-dashboards-split commit blocked by _agent_audit (BATS 10→4 merged tests; pytest $window count 51→25). Resume 2 sent: restore 10 tests + add new ones, count across all three dashboards, then commit.
+- 2026-10-24: agent-dashboards-split LANDED `4cb877c7` (Luna resume 3 restored the `== 51` allow line; 15 @test). E1 offline-verified; E2 live pending operator hard-refresh + screenshots of the three dashboards via Agents links.
