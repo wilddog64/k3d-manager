@@ -1,6 +1,6 @@
 # Bug: Release forecast dates v1.43.7 before its live window, and Target state does not say what is blocked
 
-**Status:** OPEN — spec ready; dispatch to Luna after `bug-dashboard-auto-release-selection` lands (same dashboard file and BATS suite)
+**Status:** DISPATCHED to Luna 2026-10-25 (after `bug-dashboard-auto-release-selection` landed as `f6e92ffd`)
 **Priority:** P3
 **Severity:** low — the forecast is optimistic and one stat is ambiguous; no data is wrong
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
