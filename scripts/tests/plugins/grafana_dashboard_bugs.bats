@@ -3,7 +3,7 @@
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
-  dashboard="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"
+  dashboard="${BUG_DASHBOARD_PATH:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-bugs.yaml}"
   metrics="${BATS_TEST_DIRNAME}/../../../bin/k3dm-vectordb-metrics"
 }
 
@@ -97,23 +97,69 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "bug dashboard opens on the release branch's version" {
-  branch="${GITHUB_HEAD_REF:-$(git -C "${BATS_TEST_DIRNAME}" branch --show-current)}"
-  if [[ ! "${branch}" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    skip "branch ${branch} is not a release branch"
-  fi
-  run env EXPECTED_BRANCH="${branch}" python3 - "${dashboard}" <<'PY'
-import json, os, re, sys
-path = sys.argv[1]
-branch = os.environ["EXPECTED_BRANCH"]
-data = json.loads(open(path).read().split("  k3dm-bugs.json: |\n", 1)[1])
-variable = next(v for v in data["templating"]["list"] if v["name"] == "release")
-assert variable["includeAll"] is True and variable["allValue"] == ".*"
-match = re.fullmatch(r"k3d-manager-v([0-9]+\.[0-9]+\.[0-9]+)", branch)
-assert match, branch
-expected = f"v{match.group(1)}"
-assert variable["current"]["value"] == [expected]
-assert variable["current"]["text"] == [expected]
+@test "bug dashboard defaults to Auto current release and keeps Manual selection" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+variables = {v["name"]: v for v in data["templating"]["list"]}
+mode = variables["release_mode"]
+manual = variables["release"]
+assert mode["type"] == "custom"
+assert mode["query"] == "Auto (current) : 1,Manual : 0"
+assert mode["current"] == {"selected": True, "text": "Auto (current)", "value": "1"}
+assert manual["label"] == "Manual releases (ignored in Auto)"
+assert manual["multi"] is True and manual["includeAll"] is True and manual["allValue"] == ".*"
+assert manual["current"]["selected"] is True
+assert isinstance(manual["current"]["value"], list) and manual["current"]["value"]
+assert manual["current"]["text"] == manual["current"]["value"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "Auto bug filtering follows the repo-scoped current-release metric" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["id"]:p for p in data["panels"]}
+for panel_id in (9,10,11,12,13,16,17,23,24):
+    expr=panels[panel_id]["targets"][0]["expr"]
+    assert 'k3dm_bug_current_release_info{repo="$repo"}' in expr, (panel_id,expr)
+    assert "and on(repo,release)" in expr, (panel_id,expr)
+    assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr, (panel_id,expr)
+    assert 'release=~"$release"' in expr, (panel_id,expr)
+    auto=expr.split("vector($release_mode) == 0",1)[0]
+    assert not re.search(r"v\d+\.\d+\.\d+",auto), (panel_id,auto)
+for panel_id in (14,15):
+    assert "$release_mode" not in " ".join(t["expr"] for t in panels[panel_id]["targets"])
+for mode_value in ("1", "0"):
+    expr=panels[23]["targets"][0]["expr"]
+    expanded=expr.replace("$repo","k3d-manager").replace("$release_mode",mode_value).replace("$release","v1.43.4|v1.43.6").replace("$verified",".*")
+    assert "$" not in expanded, expanded
+    assert f"vector({mode_value}) == {mode_value}" in expanded, expanded
+    assert 'repo="k3d-manager"' in expanded and 'release=~"v1.43.4|v1.43.6"' in expanded, expanded
+
+# Model PromQL's repo+release join and Manual regex against two release samples.
+bugs=[
+    {"repo":"k3d-manager","release":"v1.43.4","bug":"old"},
+    {"repo":"k3d-manager","release":"v1.43.5","bug":"r5"},
+    {"repo":"k3d-manager","release":"v1.43.6","bug":"r6"},
+    {"repo":"lib-foundation","release":"v0.4.8","bug":"other-repo"},
+]
+def effective(mode, current, selected, repo="k3d-manager"):
+    if mode == 1:
+        return [b for b in bugs if b["repo"] == repo and any(r==repo and v==b["release"] for r,v in current)]
+    import re
+    pattern="|".join(re.escape(x) for x in selected) if selected != [".*"] else ".*"
+    return [b for b in bugs if b["repo"] == repo and re.fullmatch(pattern,b["release"])]
+assert [b["bug"] for b in effective(1,[("k3d-manager","v1.43.5")],[])] == ["r5"]
+assert [b["bug"] for b in effective(1,[("k3d-manager","v1.43.6")],[])] == ["r6"]
+assert [b["bug"] for b in effective(0,[],["v1.43.4"])] == ["old"]
+assert [b["bug"] for b in effective(0,[],["v1.43.4","v1.43.6"])] == ["old","r6"]
+assert len(effective(0,[],[".*"])) == 3
+assert effective(1,[],[]) == []
+assert effective(1,[("lib-foundation","v0.4.8")],[]) == []
 PY
   [ "${status}" -eq 0 ]
 }
@@ -137,15 +183,19 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "release filters status summary stats and table" {
+@test "Auto and Manual modes filter every filed-in bug summary and the table" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
-for panel_id in (9, 10, 11, 12, 13, 16, 17, 23):
-    assert 'release=~"$release"' in panels[panel_id]["targets"][0]["expr"]
-for panel_id in (14, 15):
-    assert 'release=~"$release"' not in " ".join(t["expr"] for t in panels[panel_id]["targets"])
+for panel_id in (9,10,11,12,13,16,17,23,24):
+    expr=panels[panel_id]["targets"][0]["expr"]
+    assert "and on(repo,release) k3dm_bug_current_release_info" in expr, (panel_id,expr)
+    assert 'release=~"$release"' in expr, (panel_id,expr)
+    assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr, (panel_id,expr)
+assert 'live_verified=~"$verified"' in panels[23]["targets"][0]["expr"]
+for panel_id in (2,3,4,5,6,7,8,14,15):
+    assert "$release_mode" not in " ".join(t["expr"] for t in panels[panel_id].get("targets",[])), panel_id
 PY
   [ "${status}" -eq 0 ]
 }

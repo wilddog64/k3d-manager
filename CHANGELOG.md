@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Bug Tracking now defaults to **Auto (current)**, keeping the filed-in bug summaries and table aligned with the selected repository's current-release metric while preserving historical and All filtering in Manual mode.
+
 ### Fixed
 
 - **Vault: rejected unseal cache cannot trigger a destructive reinitialization.** Initialized Vaults now refuse reset without `K3DM_VAULT_ALLOW_REINIT=1`; failed data-path resets also preserve the unseal cache and Secrets.
