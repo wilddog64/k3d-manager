@@ -136,7 +136,7 @@ assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker
 human=panels["Human continuation prompts"]
 assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
 assert any("k3dm_dispatch_human_continuation_prompts" in t["expr"] for t in human["targets"])
-assert human["type"]=="bargauge" and human["options"]["namePlacement"]=="left" and all(t.get("instant") for t in human["targets"]),human["type"]
+assert human["type"]=="bargauge" and human["options"]["namePlacement"]=="top" and all(t.get("instant") for t in human["targets"]),human["type"]
 index=next(x["options"]["indexByName"] for x in per["transformations"] if x["id"]=="organize")
 assert len(set(index.values()))==len(index),index
 assert index["Value #J"]==index["Value #C"]+1,index
@@ -512,11 +512,8 @@ for i in (32,87):
   assert cost[i]["options"]["text"]["valueSize"]>=14,i
 rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
 assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
-clarify=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"clarification"}]
-assert clarify and {"id":"displayName","value":"clarify"} in clarify[0]["properties"]
-assert [t["legendFormat"] for t in dispatch[85]["targets"]]==["{{reason}}","tasks"]
-names={o["matcher"]["options"]:o["properties"][0]["value"] for o in dispatch[85]["fieldConfig"]["overrides"]}
-assert names.get("correction")=="correct" and max(len(v) for v in list(names.values())+["other","tasks"])<=8,names
+assert dispatch[85]["options"]["namePlacement"]=="top"
+assert [t["legendFormat"] for t in dispatch[85]["targets"]]==["{{reason}}","tracked tasks"]
 print("ok")
 PY
   [ "$status" -eq 0 ]

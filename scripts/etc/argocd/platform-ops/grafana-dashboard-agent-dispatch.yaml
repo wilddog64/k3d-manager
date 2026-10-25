@@ -980,15 +980,15 @@ data:
           "id": 85,
           "type": "bargauge",
           "title": "Human continuation prompts",
-          "description": "Explicitly recorded operator events by reason. The tasks bar is the number of tracked tasks, the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
+          "description": "Explicitly recorded operator events by reason. The tracked tasks bar is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
           "gridPos": {"h": 6, "w": 18, "x": 6, "y": 50},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {"expr": "k3dm_dispatch_human_continuation_prompts{window=\"$window\"}", "legendFormat": "{{reason}}", "instant": true, "refId": "A"},
-            {"expr": "k3dm_dispatch_intervention_tracking_tasks{window=\"$window\"}", "legendFormat": "tasks", "instant": true, "refId": "B"}
+            {"expr": "k3dm_dispatch_intervention_tracking_tasks{window=\"$window\"}", "legendFormat": "tracked tasks", "instant": true, "refId": "B"}
           ],
-          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": [{"matcher": {"id": "byName", "options": "continue_prompt"}, "properties": [{"id": "displayName", "value": "continue"}]}, {"matcher": {"id": "byName", "options": "clarification"}, "properties": [{"id": "displayName", "value": "clarify"}]}, {"matcher": {"id": "byName", "options": "correction"}, "properties": [{"id": "displayName", "value": "correct"}]}]},
-          "options": {"orientation": "horizontal", "namePlacement": "left", "displayMode": "basic", "showUnfilled": true, "minVizHeight": 8, "text": {"titleSize": 14, "valueSize": 20}, "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0, "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": [{"matcher": {"id": "byName", "options": "continue_prompt"}, "properties": [{"id": "displayName", "value": "continue"}]}]},
+          "options": {"orientation": "horizontal", "namePlacement": "top", "displayMode": "basic", "showUnfilled": true, "minVizHeight": 6, "text": {"titleSize": 12, "valueSize": 16}, "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
         },
         {
           "id": 40,
