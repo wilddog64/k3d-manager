@@ -688,3 +688,32 @@ assert all(p["gridPos"]["w"] >= 4 or "description" not in p for p in tiles.value
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "bugs table columns fit a laptop-width panel without horizontal scrolling" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] == "Bugs")
+assert table["gridPos"]["w"] == 24
+widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
+assert "Bug" not in widths, widths
+assert widths["Fixed in"] and sum(widths.values()) + 150 <= 1350, sum(widths.values())
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "plans table columns fit a laptop-width panel without horizontal scrolling" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = {p["id"]: p for p in data["panels"]}[107]
+assert table["gridPos"]["w"] == 24
+widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
+org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
+auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
+min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
+assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)
+PY
+  [ "${status}" -eq 0 ]
+}
