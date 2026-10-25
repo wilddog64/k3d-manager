@@ -513,6 +513,7 @@ for i in (32,87):
 rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
 assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
 assert dispatch[85]["options"]["namePlacement"]=="top"
+assert dispatch[85]["gridPos"]["h"]>=8 and dispatch[84]["gridPos"]["h"]==dispatch[85]["gridPos"]["h"]
 assert [t["legendFormat"] for t in dispatch[85]["targets"]]==["{{reason}}","tracked tasks"]
 print("ok")
 PY

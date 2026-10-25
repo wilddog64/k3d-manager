@@ -970,7 +970,7 @@ data:
           "type": "stat",
           "title": "Final worker exit → land",
           "description": "Mean wall-clock gap from the final qualifying Codex exit to land. Missing exit timestamps are excluded. This is not proven human waiting or active review; live verification occurs after landing.",
-          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 50},
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 50},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_post_exit_land_minutes_per_landed{window=\"$window\"}", "instant": true}],
           "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
@@ -981,7 +981,7 @@ data:
           "type": "bargauge",
           "title": "Human continuation prompts",
           "description": "Explicitly recorded operator events by reason. The tracked tasks bar is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
-          "gridPos": {"h": 6, "w": 18, "x": 6, "y": 50},
+          "gridPos": {"h": 8, "w": 18, "x": 6, "y": 50},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {"expr": "k3dm_dispatch_human_continuation_prompts{window=\"$window\"}", "legendFormat": "{{reason}}", "instant": true, "refId": "A"},
