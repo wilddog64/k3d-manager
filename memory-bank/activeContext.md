@@ -377,3 +377,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Plans hides Dispatch task (Title 360), Bugs Verified at/Live-verified at date-only 95px 59b83ce2.
 - 2026-10-25: Plans Title 300, Dispatch 150 so dispatch status is not truncated abea64b6.
 - 2026-10-25: P3 bug plans-dispatch-shows-awaiting-land-after-land fixed by Claude 6b847dd0 (lifecycle-only _dispatch_state); E2 next metrics push.
+- 2026-10-25: Remaining releases date-only forecasts + fit widths 4c2e15e0; awaiting-land bug E2 PASSED (screenshot 330).
