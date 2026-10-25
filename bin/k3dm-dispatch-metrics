@@ -604,6 +604,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     rows = []
     rejected_tokens = 0
     rejected_known = False
+    rejected_seen = False
     for (version, slug), task_events in states.items():
         if release and _normalize_version(version) != release:
             continue
@@ -675,6 +676,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                               "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
                               "evidence": evidence})
             if outcome in {"rework", "failed"} and evidence in {"land_refused.tests", "codex_exit.exit"}:
+                rejected_seen = True
                 if increment is not None:
                     rejected_tokens += increment
                     rejected_known = True
@@ -684,7 +686,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     return {
         "outcomes": outcomes,
         "coverage": sum(count for name, count in outcomes.items() if name != "unknown") / run_total if run_total else None,
-        "rejected_tokens": rejected_tokens if rejected_known else None,
+        "rejected_tokens": (rejected_tokens if rejected_known else 0 if run_total and not rejected_seen else None),
         "bug_cost": bug_cost,
         "bug_first_pass": bug_first_pass,
         "rows": rows,

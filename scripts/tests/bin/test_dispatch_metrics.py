@@ -554,6 +554,24 @@ def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
     assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="reset",run="2"}' not in output
 
+
+def test_rejected_tokens_are_zero_when_counted_runs_have_no_objective_rejection(tmp_path):
+    now = int(time.time())
+    rows = [event(now - 20, "start", "accepted", run=1),
+            event(now - 15, "codex_exit", "accepted", run=1, exit=0, tokens=100, tree="tree-a"),
+            event(now - 10, "land", "accepted", test_result="passed", tree="tree-a"),
+            event(now - 8, "start", "abandoned", run=1),
+            event(now - 5, "codex_exit", "abandoned", run=1, exit=0, tokens=20),
+            event(now - 1, "abandon", "abandoned")]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 0' in output
+
+
+def test_rejected_tokens_are_absent_when_window_has_no_runs():
+    output = dispatch_metrics.render([], 0, int(time.time()))
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
+
+
 def test_rebase_and_scope_refusals_are_not_rework():
     output = dispatch_metrics.render([
         event(0, "start"), event(10, "codex_exit"),
