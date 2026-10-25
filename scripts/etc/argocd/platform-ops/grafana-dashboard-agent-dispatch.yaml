@@ -1283,7 +1283,12 @@ data:
                   {"id": "custom.width", "value": 150},
                   {"id": "custom.inspect", "value": true}
                 ]
-              }
+              },
+              {"matcher": {"id": "byName", "options": "version"}, "properties": [{"id": "custom.width", "value": 70}]},
+              {"matcher": {"id": "byName", "options": "run"}, "properties": [{"id": "custom.width", "value": 45}]},
+              {"matcher": {"id": "byName", "options": "outcome"}, "properties": [{"id": "custom.width", "value": 85}]},
+              {"matcher": {"id": "byName", "options": "Result"}, "properties": [{"id": "custom.width", "value": 165}]},
+              {"matcher": {"id": "byName", "options": "Tokens"}, "properties": [{"id": "custom.width", "value": 75}]}
             ]
           },
           "options": {

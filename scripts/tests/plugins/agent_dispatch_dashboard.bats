@@ -347,6 +347,10 @@ assert len(log_overrides)==1
 log_properties={p["id"]:p["value"] for p in log_overrides[0]["properties"]}
 assert log_properties.get("custom.inspect") is True and log_properties.get("custom.width", 999)>0 and log_properties["custom.width"]<=160
 assert "file://" not in text
+widths={o["matcher"]["options"]:p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]["id"]=="byName" for p in o["properties"] if p["id"]=="custom.width"}
+assert all(name in widths for name in ("version","run","outcome","Result","Log","Tokens")), widths
+assert "slug" not in widths
+assert sum(widths.values())<=table["gridPos"]["w"]*55-300, widths
 print("ok")
 PY
   [ "$status" -eq 0 ]
