@@ -1,6 +1,8 @@
 # Bug: Codex activity files every dispatch worktree session under `other`
 
-**Status:** OPEN
+**Status:** FIXED 2026-10-25 — `9cb1fa09`; pytest 123/123, BATS 21/21, shellcheck clean; 5 new tests red on the pre-fix script (tests 1, 2, 3/6, 4, 7). ruff unavailable locally. Live E2 pending (operator screenshot of Tokens by repo at 7d).
+**Fix commit:** `9cb1fa09`
+**Review note:** Claude removed an out-of-spec hunk that type-guarded `ts` in `_session_records` (read_ledger already rejects non-numeric `ts`). Offline dry-run at 7d on the operator's data: k3d-manager 593.3M → 895.9M tokens, other 305.5M → 2.9M; total 901.6M and 203 sessions unchanged (N3).
 **Priority:** P3
 **Severity:** low — totals are right, but a third of k3d-manager's Codex tokens show as `other`
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
