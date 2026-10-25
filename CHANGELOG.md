@@ -4,6 +4,10 @@
 
 ### Added
 
+- Hermes publishes OrbStack version and update availability metrics hourly; warning alerts and the Host Disk dashboard expose pending updates and version changes.
+
+### Added
+
 - Bug Tracking now defaults to **Auto (current)**, keeping the filed-in bug summaries and table aligned with the selected repository's current-release metric while preserving historical and All filtering in Manual mode.
 
 ### Fixed

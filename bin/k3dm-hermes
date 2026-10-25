@@ -685,6 +685,17 @@ def _publish_disk_metrics():
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
 
 
+def _publish_orbstack_metrics(state, now):
+    if now - state.get("orbstack_last_run", 0) < 3600:
+        return
+    state["orbstack_last_run"] = now
+    try:
+        subprocess.run([str(ROOT / "bin" / "k3dm-orbstack-metrics")],
+                       capture_output=True, text=True, timeout=120, check=False)
+    except Exception as exc:
+        print(f"OrbStack metrics publish skipped: {exc}", file=sys.stderr)
+
+
 def _publish_cni_ipam_metrics():
     try:
         subprocess.run([str(ROOT / "bin" / "k3dm-cni-ipam-metrics")],
@@ -788,6 +799,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _push_kine_metrics(next((item for item in records if item.get("sensor") == "kine"), None))
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
+    _publish_orbstack_metrics(state, now)
     _publish_cni_ipam_metrics()
     _publish_pr_checks()
     _schedule_e2e(state)

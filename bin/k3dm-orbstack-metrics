@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Publish OrbStack version and update state to the hub Pushgateway."""
+
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib.request
+
+PUSH_RETRIES = 3
+PUSH_SLEEP_SECONDS = 2
+
+
+def _label(value):
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def _collect():
+    version = None
+    try:
+        result = subprocess.run(["orbctl", "version"], capture_output=True, text=True,
+                               timeout=30, check=False)
+        if result.returncode != 0:
+            raise RuntimeError("orbctl version failed")
+        match = re.match(r"^Version:\s*(\S+)", result.stdout.splitlines()[0])
+        if not match:
+            raise ValueError("orbctl version output was not recognized")
+        version = match.group(1)
+        check = subprocess.run(["orbctl", "update", "--check"], capture_output=True, text=True,
+                               timeout=60, check=False)
+        if check.returncode not in (0, 3):
+            raise RuntimeError(f"orbctl update --check exited {check.returncode}")
+        lines = [f'k3dm_orbstack_info{{version="{_label(version)}"}} 1',
+                 f"k3dm_orbstack_update_available {1 if check.returncode == 3 else 0}",
+                 "k3dm_orbstack_probe_success 1"]
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, IndexError):
+        lines = ([f'k3dm_orbstack_info{{version="{_label(version)}"}} 1'] if version else [])
+        lines.append("k3dm_orbstack_probe_success 0")
+    return "\n".join(lines) + "\n"
+
+
+def publish(body):
+    base = os.environ.get("K3DM_ORBSTACK_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    request = urllib.request.Request(f"{base}/metrics/job/k3dm-orbstack", data=body.encode(), method="PUT",
+                                     headers={"Content-Type": "text/plain; charset=utf-8"})
+    for attempt in range(1, PUSH_RETRIES + 1):
+        try:
+            urllib.request.urlopen(request, timeout=5).close()
+            return True
+        except Exception as exc:
+            if attempt < PUSH_RETRIES:
+                print(f"OrbStack metrics push attempt {attempt}/{PUSH_RETRIES} failed: {exc}", file=sys.stderr)
+                time.sleep(PUSH_SLEEP_SECONDS)
+            else:
+                print(f"OrbStack metrics push skipped (non-fatal): {exc}", file=sys.stderr)
+    return False
+
+
+def main():
+    body = _collect()
+    if "--dry-run" in sys.argv[1:]:
+        print(body, end="")
+    else:
+        publish(body)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

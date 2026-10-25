@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: host-orbstack
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: host.orbstack
+      interval: 60s
+      rules:
+        - alert: OrbStackUpdateAvailable
+          expr: (k3dm_orbstack_update_available * on() group_left(version) k3dm_orbstack_info) == 1
+          for: 1h
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "OrbStack update available"
+            description: "OrbStack {{ $labels.version }} is installed and an update is waiting. Updating restarts every hub container: run `orbctl update` when a short hub restart is acceptable, then check Vault is unsealed."
+        - alert: OrbStackMetricsStale
+          expr: k3dm_orbstack_probe_success == 0 or (time() - max(push_time_seconds{job="k3dm-orbstack"}) > 10800) or absent(k3dm_orbstack_probe_success)
+          for: 1h
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "OrbStack update metrics are stale"
+            description: "OrbStack update metrics are stale; check Hermes, `orbctl` and the Pushgateway port-forward."

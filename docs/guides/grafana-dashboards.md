@@ -152,3 +152,7 @@ The **Release forecast** row reads the ordered inventory in `docs/release-milest
 - [No data triage](grafana-dashboards/shared-operations.md#triage-no-data-by-cause)
 - [Adding or changing a dashboard](grafana-dashboards/shared-operations.md#adding-or-changing-a-dashboard)
 - [Where to look next](grafana-dashboards/shared-operations.md#where-to-look-next)
+
+### k3dm Host Disk
+
+The **OrbStack** stat shows the installed version and whether an update is available. The **OrbStack upgraded** annotation marks when a new version first appears, over the restart interval.
