@@ -86,8 +86,14 @@ The Agent dispatch **Per spec** table links each Spec name to its plan or bug do
 task's release branch; the link opens in a new tab. **Agent** names who landed the spec
 (`codex` or `agy`); the Codex columns stay empty for an agy row. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
-totals. Time to land is not summed: parallel dispatches overlap, so the useful number is the mean,
-which the **Time to land** stat shows. Codex tokens uses the cumulative session total from the last
+totals. **Dispatch-to-land elapsed (wall clock)** is `earliest(start.ts) → land.ts`, including retries,
+idle time and overnight waits; it is not worker runtime or active review. **Final worker exit → land**
+is the wall-clock gap from the final qualifying Codex exit to land, and missing exits remain N/A.
+Both values are means rather than footer sums because parallel dispatches overlap. The former
+includes the full dispatch-to-land interval; the latter is not proof of human waiting. Live
+verification happens after land. **Human continuation prompts** counts explicit operator records
+by reason and displays the tracked-task coverage denominator; older history is unknown and is not
+backfilled. Codex tokens uses the cumulative session total from the last
 exit after a resume; summing those exits would double count. API equiv. counts each session's
 recorded cumulative usage once.
 

@@ -507,8 +507,8 @@ data:
               "valueSize": 32
             }
           },
-          "title": "Time to land",
-          "description": "Mean wall-clock time from a spec's first Codex start to its land, including Claude's verification.",
+          "title": "Dispatch-to-land elapsed (wall clock)",
+          "description": "Mean earliest start.ts → land.ts, including retries, idle time, overnight waits and verification. This is total wall-clock elapsed, not worker execution or active review; live verification happens after land.",
           "gridPos": {
             "h": 6,
             "w": 4,
@@ -554,7 +554,7 @@ data:
             }
           },
           "title": "Codex time",
-          "description": "Mean time Codex itself ran per spec, summed over its runs.",
+          "description": "Mean worker execution time, summed over Codex runs. It excludes idle time between worker exit and landing.",
           "gridPos": {
             "h": 6,
             "w": 4,
@@ -595,7 +595,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Worker and Coordinator show vendor, model and status from the latest start: selected (chosen at dispatch), unverified (inherited from configuration, not reported by the runtime) or unknown (no evidence recorded, including tasks dispatched before identity was recorded). Claude ≈ is Claude's intervention cost, not coordinator attribution. Repo is the origin repository name. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Tokens, Agent time and Runs cover every agent (Codex and agy); a Codex spec's Tokens are the session total of its last run, an agy spec's the sum of its runs' reported usage. API equiv. stays Codex-only: there is no agy pricing. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch-to-land elapsed is earliest start.ts → land.ts including retries, idle time and overnight waits; Final worker exit → land is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
           "gridPos": {
             "h": 10,
             "w": 19,
@@ -624,6 +624,12 @@ data:
               "format": "table",
               "instant": true,
               "refId": "C"
+            },
+            {
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_post_exit_land_seconds{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "J"
             },
             {
               "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_agent_runs{window=\"$window\"})",
@@ -683,12 +689,13 @@ data:
                   "Value #A": 4,
                   "Value #B": 5,
                   "Value #C": 6,
-                  "Value #D": 7,
-                  "Value #F": 8,
-                  "Value #G": 9,
-                  "worker": 10,
-                  "coordinator": 11,
-                  "spec": 12
+                  "Value #J": 7,
+                  "Value #D": 8,
+                  "Value #F": 9,
+                  "Value #G": 10,
+                  "worker": 11,
+                  "coordinator": 12,
+                  "spec": 13
                 },
                 "renameByName": {
                   "version": "Release",
@@ -697,7 +704,8 @@ data:
                   "agent": "Agent",
                   "Value #A": "Tokens",
                   "Value #B": "Agent time",
-                  "Value #C": "Time to land",
+                  "Value #C": "Dispatch-to-land elapsed (wall clock)",
+                  "Value #J": "Final worker exit → land",
                   "Value #D": "Runs",
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈",
@@ -737,13 +745,20 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Time to land"
+                  "options": "Dispatch-to-land elapsed (wall clock)"
                 },
                 "properties": [
                   {
                     "id": "unit",
                     "value": "s"
                   }
+                ]
+              },
+              {
+                "matcher": {"id": "byName", "options": "Final worker exit → land"},
+                "properties": [
+                  {"id": "unit", "value": "s"},
+                  {"id": "description", "value": "Wall-clock interval from the final valid Codex exit at or before land to land. N/A when no qualifying exit is available; this is not proof of human waiting or active review."}
                 ]
               },
               {
@@ -949,6 +964,31 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "id": 84,
+          "type": "stat",
+          "title": "Final worker exit → land",
+          "description": "Mean wall-clock gap from the final qualifying Codex exit to land. Missing exit timestamps are excluded. This is not proven human waiting or active review; live verification occurs after landing.",
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 50},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_post_exit_land_minutes_per_landed{window=\"$window\"}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 85,
+          "type": "timeseries",
+          "title": "Human continuation prompts",
+          "description": "Explicitly recorded operator events by reason. The tracked task count is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
+          "gridPos": {"h": 6, "w": 18, "x": 6, "y": 50},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "k3dm_dispatch_human_continuation_prompts{window=\"$window\"}", "legendFormat": "{{reason}}", "refId": "A"},
+            {"expr": "k3dm_dispatch_intervention_tracking_tasks{window=\"$window\"}", "legendFormat": "tracked tasks denominator", "refId": "B"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+          "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
         },
         {
           "id": 40,

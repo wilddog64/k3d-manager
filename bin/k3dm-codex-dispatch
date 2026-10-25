@@ -268,6 +268,7 @@ Usage:
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--tokens N] [--verifier NAME]
+  bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
@@ -303,6 +304,45 @@ _dispatch_verify() {
   fi
   _dispatch_schedule_metrics
   echo "verification recorded: $slug ($result)"
+}
+
+_dispatch_intervention() {
+  local slug="" reason="" version ledger event_repo ts current_root
+  while (($#)); do
+    case "$1" in
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
+      *) _dispatch_error "unknown intervention option: $1" ;;
+    esac
+  done
+  if [[ "${K3DM_JOB_DIR:-}" == "$_dispatch_worktree_root/"*/*.run/state/jobs ]]; then
+    _dispatch_error "interventions must be recorded by the operator, not a dispatched worker"
+  fi
+  if [[ "${K3DM_REPO_ROOT:-}" == "$_dispatch_worktree_root/"*/* ]]; then
+    _dispatch_error "interventions must be recorded by the operator, not a dispatched worker"
+  fi
+  current_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ "$current_root" == "$_dispatch_worktree_root/"*/* ]]; then
+    _dispatch_error "interventions must be recorded by the operator, not a dispatched worker"
+  fi
+  [[ "$slug" =~ ^[A-Za-z0-9._-]+$ ]] || _dispatch_error "invalid or missing slug"
+  case "$reason" in continue_prompt|clarification|correction|other) ;; *) _dispatch_error "invalid intervention reason" ;; esac
+  ledger="$_dispatch_worktree_root/ledger.jsonl"
+  [[ -f "$ledger" ]] || _dispatch_error "unknown task: $slug"
+  version="$(jq -sr --arg slug "$slug" '[.[] | select(.slug == $slug and (.event == "start" or .event == "resume"))] | last | .version // empty' "$ledger" 2>/dev/null)"
+  [[ -n "$version" && -d "$_dispatch_worktree_root/$version/$slug.run" ]] || _dispatch_error "unknown task: $slug"
+  event_repo="$(cat "$_dispatch_worktree_root/$version/$slug.run/repo-name" 2>/dev/null || echo k3d-manager)"
+  ts="$(date +%s)"
+  if ! jq -e 'select(.event == "intervention_coverage_start")' "$ledger" >/dev/null 2>&1; then
+    jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --argjson ts "$ts" \
+      '{ts:$ts,event:"intervention_coverage_start",version:$version,slug:$slug,repo:$repo}' >>"$ledger" \
+      || _dispatch_error "could not record intervention coverage"
+  fi
+  jq -nc --arg version "$version" --arg slug "$slug" --arg repo "$event_repo" --arg reason "$reason" --argjson ts "$ts" \
+    '{ts:$ts,event:"intervention",version:$version,slug:$slug,repo:$repo,reason:$reason}' >>"$ledger" \
+    || _dispatch_error "could not record intervention"
+  _dispatch_schedule_metrics
+  echo "recorded $reason for $slug ($version)"
 }
 
 _dispatch_usage_backfill() {
@@ -829,6 +869,7 @@ main() {
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;
     verify) shift; _dispatch_verify "$@" ;;
+    intervention) shift; _dispatch_intervention "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;

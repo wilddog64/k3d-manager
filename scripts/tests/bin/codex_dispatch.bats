@@ -1023,6 +1023,36 @@ EOF
   [ "$(jq -s 'map(select(.event == "codex_usage")) | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
 }
 
+@test "codex dispatch: intervention records reason and starts explicit coverage once" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/known.run"
+  printf 'k3d-manager\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/known.run/repo-name"
+  printf '%s\n' '{"ts":1,"event":"start","version":"v9.9.9","slug":"known"}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch intervention --slug known --reason continue_prompt
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  run dispatch intervention --slug known --reason clarification
+  [ "$status" -eq 0 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention_coverage_start")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 2 ]
+  [ "$(jq -r -s '[.[] | select(.event == "intervention")][-1].reason' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = clarification ]
+}
+
+@test "codex dispatch: intervention refuses unknown task invalid reason and worker self-report" {
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/known.run"
+  printf '%s\n' '{"ts":1,"event":"start","version":"v9.9.9","slug":"known"}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch intervention --slug missing --reason other
+  [ "$status" -ne 0 ]
+  run dispatch intervention --slug known --reason guess
+  [ "$status" -ne 0 ]
+  run env K3DM_WORKTREE_ROOT="$K3DM_WORKTREE_ROOT" K3DM_REPO_ROOT="$K3DM_WORKTREE_ROOT/v9.9.9/known" \
+    "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" intervention --slug known --reason other
+  [ "$status" -ne 0 ]
+  run env K3DM_WORKTREE_ROOT="$K3DM_WORKTREE_ROOT" \
+    K3DM_JOB_DIR="$K3DM_WORKTREE_ROOT/v9.9.9/known.run/state/jobs" \
+    "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" intervention --slug known --reason other
+  [ "$status" -ne 0 ]
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
 @test "codex dispatch: metrics scheduling coalesces concurrent requests and preserves the last request" {
   local source_file="$BATS_TEST_TMPDIR/dispatcher-functions.sh"
   sed '/^main "\$@"$/d; s|source "${_dispatch_script_dir}/../scripts/lib/system.sh"|source "'"$BATS_TEST_DIRNAME"'/../../lib/system.sh"|' "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" >"$source_file"

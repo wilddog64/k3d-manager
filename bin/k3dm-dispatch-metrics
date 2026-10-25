@@ -4,6 +4,7 @@
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import time
@@ -544,6 +545,14 @@ def _task_metrics(task_events, land_event, prices=None):
     elapsed = None
     if start_events:
         elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
+    def valid_timestamp(value):
+        return (type(value) in {int, float} and math.isfinite(value) and value >= 0)
+    land_ts = land_event.get("ts")
+    qualifying_exits = [event.get("ts") for event in task_events
+                        if event.get("event") == "codex_exit"
+                        and valid_timestamp(event.get("ts")) and valid_timestamp(land_ts)
+                        and event["ts"] <= land_ts]
+    post_exit_land = max(0, land_ts - max(qualifying_exits)) if qualifying_exits else None
     usage = _session_records(task_events)
     session_costs = [_cost(item, prices or {}) for item in usage.values()]
     return {
@@ -552,6 +561,7 @@ def _task_metrics(task_events, land_event, prices=None):
         "agent_tokens": agent_token_total if has_agent_tokens else None,
         "agent_seconds": agent_seconds,
         "elapsed_seconds": elapsed,
+        "post_exit_land_seconds": post_exit_land,
         "runs": len(exits),
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
         "spec": latest_start.get("spec"),
@@ -828,6 +838,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
     wait_values = []
     elapsed_values = []
     codex_values = []
+    post_exit_land_values = []
     verification = _verification_metrics(events, verification_landed if verification_landed is not None else landed_selected,
                                          repo_root or _repo_root(), cutoff, release)
     run_outcomes = _run_outcome_metrics(events, repo_root or _repo_root(), cutoff, release)
@@ -855,6 +866,8 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
             wait_values.append(event["wait_seconds"] / 60)
         if task["elapsed_seconds"] is not None:
             elapsed_values.append(task["elapsed_seconds"] / 60)
+        if task["post_exit_land_seconds"] is not None:
+            post_exit_land_values.append(task["post_exit_land_seconds"] / 60)
         if task["runs"]:
             codex_values.append(task["codex_seconds"] / 60)
         repo = next((item.get("repo") for item in states[key] if item.get("event") == "start"), "k3d-manager")
@@ -863,7 +876,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
                       task["agent_tokens"], task["agent_seconds"], repo,
-                      task["worker_identity"], task["coordinator_identity"]))
+                      task["worker_identity"], task["coordinator_identity"], task["post_exit_land_seconds"]))
 
     return {
         "landed": len(landed),
@@ -872,6 +885,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         "verifier": sum(verifier_values) / len(verifier_values) if verifier_values else 0,
         "wait": sum(wait_values) / len(wait_values) if wait_values else None,
         "elapsed": sum(elapsed_values) / len(elapsed_values) if elapsed_values else None,
+        "post_exit_land": sum(post_exit_land_values) / len(post_exit_land_values) if post_exit_land_values else None,
         "codex_minutes": sum(codex_values) / len(codex_values) if codex_values else None,
         "rework": rework,
         "verification": verification,
@@ -974,6 +988,26 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if metrics["elapsed"] is not None:
         lines.append(f'k3dm_dispatch_elapsed_minutes_per_landed{{window="{window}"}} '
                      f'{metrics["elapsed"]}')
+    if metrics["post_exit_land"] is not None:
+        lines.append(f'k3dm_dispatch_post_exit_land_minutes_per_landed{{window="{window}"}} '
+                     f'{metrics["post_exit_land"]}')
+    source_events = events or []
+    if time_scope:
+        scoped = [event for event in source_events if cutoff is None or event.get("ts", 0) >= cutoff]
+    else:
+        scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
+    markers = [event for event in source_events if event.get("event") == "intervention_coverage_start"]
+    if markers:
+        marker_ts = min(event["ts"] for event in markers)
+        tracked = {(event.get("version"), event.get("slug")) for event in scoped
+                   if event.get("event") in {"start", "intervention"}
+                   and event.get("ts", 0) >= marker_ts}
+        lines.append(f'k3dm_dispatch_intervention_tracking_tasks{{window="{window}"}} {len(tracked)}')
+        interventions = [event for event in scoped if event.get("event") == "intervention"
+                         and event.get("reason") in {"continue_prompt", "clarification", "correction", "other"}]
+        for reason in ("continue_prompt", "clarification", "correction", "other"):
+            count = sum(1 for event in interventions if event.get("reason") == reason)
+            lines.append(f'k3dm_dispatch_human_continuation_prompts{{window="{window}",reason="{reason}"}} {count}')
     if metrics["codex_minutes"] is not None:
         lines.append(f'k3dm_dispatch_codex_minutes_per_landed{{window="{window}"}} '
                      f'{metrics["codex_minutes"]}')
@@ -993,7 +1027,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             continue
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
-         agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity) in valid_tasks[:TASK_CAP]:
+         agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity, post_exit_land) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
         def identity_labels(identity, role):
             vendor = identity.get("vendor") if identity.get("vendor") in {"openai", "google", "anthropic", "unknown"} else "unknown"
@@ -1017,6 +1051,9 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             lines.append(f"k3dm_dispatch_task_agent_seconds{{{labels}}} {agent_seconds}")
         if elapsed_seconds is not None:
             lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
+        if post_exit_land is not None:
+            gap_labels = f'window="{window}",version="{version}",slug="{slug}",repo="{repo}"'
+            lines.append(f"k3dm_dispatch_task_post_exit_land_seconds{{{gap_labels}}} {post_exit_land}")
         if agent == "codex" and runs:
             lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
         if runs:

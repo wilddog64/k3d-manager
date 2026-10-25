@@ -124,6 +124,29 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent dispatch dashboard: final exit gap and operator coverage are exposed" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["title"]:p for p in d["panels"]}
+per=panels["Per spec"]
+assert any("k3dm_dispatch_task_post_exit_land_seconds" in t["expr"] for t in per["targets"])
+assert any(p["title"]=="Dispatch-to-land elapsed (wall clock)" for p in d["panels"])
+assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker exit → land"]["targets"][0]["expr"]
+human=panels["Human continuation prompts"]
+assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
+assert any("k3dm_dispatch_human_continuation_prompts" in t["expr"] for t in human["targets"])
+index=next(x["options"]["indexByName"] for x in per["transformations"] if x["id"]=="organize")
+assert len(set(index.values()))==len(index),index
+assert index["Value #J"]==index["Value #C"]+1,index
+for phrase in ("bin/k3dm-codex-dispatch","Claude ≈","footer"):
+  assert phrase in per["description"],phrase
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d" {
   run python3 - "$BASE" <<'PY'
 import json,sys
@@ -199,14 +222,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[83]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,14))|{40,41}|set(range(42,49))
+assert sorted(all_ids)==sorted(old_ids+[83,84,85]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,14))|{40,41,84,85}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 65 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 67 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -219,7 +242,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (47,83):
+    if panel["id"] in (47,83,84,85):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)

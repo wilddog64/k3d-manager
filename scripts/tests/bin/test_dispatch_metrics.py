@@ -286,6 +286,37 @@ def test_landed_task_without_exit_omits_codex_samples_but_keeps_elapsed():
     assert 'k3dm_dispatch_task_runs{window="1d",version="9.9.9",slug="one",agent="codex",repo="k3d-manager"}' not in output
     assert 'k3dm_dispatch_elapsed_minutes_per_landed{window="1d"} 4.983333333333333' in output
     assert 'k3dm_dispatch_codex_minutes_per_landed{window="1d"}' not in output
+    assert 'k3dm_dispatch_task_post_exit_land_seconds{window="1d",version="9.9.9",slug="one",repo="k3d-manager"}' not in output
+
+
+def test_post_exit_land_uses_latest_exit_before_land_and_ignores_later_exit():
+    output = dispatch_metrics.render([
+        event(100, "start"), event(120, "codex_exit"), event(200, "resume"),
+        event(240, "codex_exit"), event(300, "land"), event(350, "codex_exit"),
+    ], 0, 400)
+    assert 'k3dm_dispatch_task_post_exit_land_seconds{window="1d",version="9.9.9",slug="one",repo="k3d-manager"} 60' in output
+    assert 'k3dm_dispatch_post_exit_land_minutes_per_landed{window="1d"} 1.0' in output
+
+
+def test_post_exit_land_invalid_exit_and_land_timestamps_are_omitted():
+    output = dispatch_metrics.render([
+        event(1, "start"), {"ts": float("nan"), "event": "codex_exit", "version": "9.9.9", "slug": "one"},
+        event(3, "land"),
+    ], 0, 10)
+    assert "k3dm_dispatch_task_post_exit_land_seconds" not in output
+
+
+def test_intervention_metrics_require_coverage_marker_and_count_reason():
+    legacy = dispatch_metrics.render([
+        event(1, "start"), event(2, "intervention", reason="correction"), event(3, "land"),
+    ], 0, 10)
+    assert "k3dm_dispatch_human_continuation_prompts" not in legacy
+    output = dispatch_metrics.render([
+        event(1, "start", "one"), event(2, "intervention_coverage_start", "one"),
+        event(3, "intervention", "one", reason="correction"), event(4, "land", "one"),
+    ], 0, 10)
+    assert 'k3dm_dispatch_intervention_tracking_tasks{window="1d"} 1' in output
+    assert 'k3dm_dispatch_human_continuation_prompts{window="1d",reason="correction"} 1' in output
 
 
 def test_recorded_exit_keeps_codex_samples_including_zero_duration():
@@ -698,7 +729,7 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
     actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
-                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_")) and
+                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_")) and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -838,7 +869,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 54  # agent-audit: allow assert-removed Codex and agy activity rows plus worker and coordinator identity add fifteen $window expressions
+    assert sum("$window" in expr for expr in expressions) == 58  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",

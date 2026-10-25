@@ -4,6 +4,7 @@
 
 ### Added
 
+- Agent Dispatch separates total dispatch-to-land elapsed time from the final worker-exit-to-land gap and records explicitly reported operator continuation prompts with a coverage start marker.
 - Agent Dispatch records worker vendor/model identity per execution and separate coordinator identity with provenance; missing or unverified identities remain explicit in ledger-derived metrics.
 
 - Agent Dispatch can run a spec against a target branch in another repository, guard target movement during landing, and expose the repository on per-task metrics and the Per spec table.
