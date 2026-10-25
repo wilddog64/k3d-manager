@@ -367,9 +367,12 @@ assert fpo.get("text")=={"titleSize":14,"valueSize":24},fpo
 for target in table["targets"]:
   assert target["expr"].startswith("sum by (version, slug, run, ") and 'label_join(' in target["expr"] and '"doc", "plans/$1"' in target["expr"] and '"doc", "bugs/$1"' in target["expr"]
 ids=[t["id"] for t in table.get("transformations",[])]
-assert ids[:2]==["merge","organize"],ids
-org=table["transformations"][1]["options"]
-for hidden in ("Time","__name__","job","window","Value #A"):
+assert ids[:3]==["merge","sortBy","organize"],ids
+assert table["transformations"][1]["options"]["sort"]==[{"field":"vsort","desc":True}] and "sortBy" not in table["options"]
+for target in table["targets"]:
+  assert target["expr"].split(") (",1)[0].endswith(", vsort") and '"v$1.0$2.$3"' in target["expr"] and '"$1.0$2"' in target["expr"]
+org=table["transformations"][2]["options"]
+for hidden in ("Time","__name__","job","window","Value #A","vsort"):
   assert org["excludeByName"].get(hidden) is True,hidden
 assert not org["excludeByName"].get("doc"),"doc feeds the slug link; excluding it empties the URL"
 assert any(o["matcher"]=={"id":"byName","options":"doc"} and {"id":"custom.hidden","value":True} in o["properties"] for o in table["fieldConfig"]["overrides"])
