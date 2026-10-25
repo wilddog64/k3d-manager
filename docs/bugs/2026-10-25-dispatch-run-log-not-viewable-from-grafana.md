@@ -1,6 +1,8 @@
 # Bug: Agent Dispatch Log column gives a local path, not a log you can open from Grafana
 
-**Status:** OPEN — filed 2026-10-25
+**Status:** FIXED 2026-10-25 — offline E1 green (pytest 109/109, BATS dashboard + port-forward green, ruff clean, validate-manifests 85/85; Luna's mutations of redaction, codex_exit exclusion, failed-push state guard and dashboard link red; Claude's two new tests red under mutation); live E2 pending
+**Fix commit:** `fa0d780a`
+**Review note:** Claude changed four things before landing. (1) The run directory keeps one `land-test.log` per slug, so shipping it under every run (and re-shipping on change, as F2 said) put a later attempt's log under an earlier run; only the latest run of a slug is shipped now. (2) Loki's default `max_entries_limit_per_query` is 5,000 and Grafana's Loki default is 1,000 lines, so the panel would have shown only the last 1,000; the panel asks for `maxLines` 5000 and the shipper keeps 4,998 lines plus a `[shipped <time> sha256:<prefix>]` header and the truncation notice. (3) The metrics script's call to the shipper now has a 300 s timeout. (4) `884062ef`'s path test assumed the temp dir is outside `$HOME`; the land runs pytest with a temp dir under it, so the test now sets `HOME`.
 **Priority:** P3
 **Severity:** low — the run log is reachable by copying a path into a terminal on the operator's Mac; it cannot be opened from the dashboard
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
