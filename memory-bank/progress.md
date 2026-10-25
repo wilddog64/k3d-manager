@@ -629,3 +629,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25 16:22 PDT: operator ran appsets-reapply + platform-ops on k3d-manager-v1.43.8 (tmux). Claude verified: appsets-check 21 refs all k3d-manager-v1.43.8; vulnerability-inventory-exporter rolled out 23:22Z.
 - 2026-10-25: v1.43.8 dispatch order set (wave 1 snapshot+slack+release-duration; wave 2 claude-cost-by-reference; hostinger after 10-29). Depends on header added to claude-cost-by-reference f829237c (Plans table Depends on column).
 - 2026-10-25: filed v1.43.10 plan 4 plans-table-dispatch-waves-and-file-overlaps (APPROVED, operator 'go ahead for that'); hostinger plan gets **Wave:** 3 header (inert until implemented) 83f126a5. v1.43.10 4/5.
+- 2026-10-25: v1.43.10 plan 4 extended from operator-shared review: Approval → Spec approval + Dispatch header, Depends on links, Blocked by column c58f5ee0.
