@@ -421,6 +421,15 @@ Plan 5 of 5 is [`orbstack-upgrade-coordinated`](plans/v1.43.9-orbstack-upgrade-c
 fixes host-network drift, refills the Pushgateway and verifies against preflight counts. Its prerequisite,
 the 2026-10-12 OrbStack monitoring bug, moved from v1.44.0 to v1.43.9. v1.43.9 is now full.
 
+### Candidate milestone — v1.43.10 (patch)
+
+**Context threshold comparison** (operator, 2026-10-25). Branch `k3d-manager-v1.43.10`, cut from `main` after v1.43.9
+merges. Plan 1 of 5 is [`context-threshold-release-comparison`](plans/v1.43.10-context-threshold-release-comparison.md):
+per release, API-equivalent cost per live-verified spec (Claude, Codex and total), post-compaction re-read share with
+shell reads counted, compactions, first-pass verification and continuation prompts, in one Agent Cost table. It also
+fixes the verified-spec count (FIXED no longer counts; author time, not committer time). The operator asked for
+v1.43.9; v1.43.9 was full, so Claude split it here (2026-10-25). Read it before changing the compaction threshold.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
