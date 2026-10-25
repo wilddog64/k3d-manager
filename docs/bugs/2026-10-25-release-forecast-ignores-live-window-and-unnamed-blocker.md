@@ -143,6 +143,13 @@ interface:
   - Grafana /d/k3dm-bugs, row Release forecast
 ```
 
+## Follow-up (2026-10-25, live E2)
+
+The live forecast showed v1.43.7 at Nov 2 16:00 PST: F1 read `not_before` as 00:00 UTC, which is the
+previous evening in Pacific time, so the dashboard showed a date before the window. Claude anchored the
+floor to midnight in `K3DM_FORECAST_TZ` (default `America/Los_Angeles`); new test red on the pre-fix
+script, pytest 99/99, ruff clean.
+
 ## Definition of Done
 
 - [ ] F1–F5 and a CHANGELOG `[Unreleased]` `### Fixed` entry; only the Files above change.

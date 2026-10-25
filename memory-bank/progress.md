@@ -563,3 +563,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: live E2 (screenshot 244) Target state names v1.49.0 + reason ✓; panel 28 title truncated, shortened to 'Median gap (days)'.
 - 2026-10-25: agy bug F4 (Agent Dispatch Per spec / Per run agent-neutral columns) landed 2204fdff by Claude; bug FIXED, live check pending.
 - 2026-10-25: OrbStack plan (v1.43.9) can't dispatch: branch not cut. Phase-1 bug 2026-10-12-orbstack-update-is-invisible-to-monitoring moved to v1.43.7, Acceptance added (orbctl --check exit 3/0 verified), dispatched to Luna.
+- 2026-10-25: verify 1/4 rejected-attempt tokens LIVE-VERIFIED (0 at 1d and v1.43.7, operator screenshots). Verify 2/4 forecast: floor showed Nov 2 16:00 PST (UTC midnight); Claude fixed to Pacific midnight (K3DM_FORECAST_TZ), 99/99.

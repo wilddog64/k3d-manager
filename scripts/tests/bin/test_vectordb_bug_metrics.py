@@ -1159,3 +1159,14 @@ def test_plan_push_failure_is_nonfatal(metrics, monkeypatch, tmp_path, capsys):
     assert metrics.publish_bug_metrics(tmp_path) is True
     assert any(job == "k3dm-bug-docs" for job, _method in pushed)
     assert "plan metrics skipped (non-fatal): plan parse" in capsys.readouterr().err
+
+
+def test_not_before_floor_is_midnight_in_the_operator_time_zone(metrics, monkeypatch):
+    from zoneinfo import ZoneInfo
+    monkeypatch.delenv("K3DM_FORECAST_TZ", raising=False)
+    cadence = {"p25": 86400, "p50": 86400, "p75": 86400,
+               "last_ts": int(datetime(2026, 10, 25, tzinfo=timezone.utc).timestamp())}
+    row = metrics._forecast([{"version": "v1.0.1", "not_before": "2026-11-03"}], [], cadence, 0)[0]
+    pacific = ZoneInfo("America/Los_Angeles")
+    for bound in ("low", "mid", "high"):
+        assert datetime.fromtimestamp(row[bound], pacific).strftime("%Y-%m-%d %H:%M") == "2026-11-03 00:00"

@@ -1,6 +1,9 @@
 # Bug: Rejected-attempt Codex tokens shows No data when no run was rejected
 
-**Status:** FIXED 2026-10-25 — `9d6f6a06`; pytest 91/91, ruff clean, new test red on the pre-fix script; live check (panel 44 reads 0) pending
+**Status:** LIVE-VERIFIED 2026-10-25 — `9d6f6a06`; pytest 91/91, ruff clean, new test red on the pre-fix script; live: panel 44 reads 0 at Window 1d and v1.43.7 (operator screenshots 245, 246)
+**Live evidence:** 2026-10-25 · run hub-grafana-dispatch-rejected-tokens-screenshot · env hub/k3d-k3d-cluster · scenario agent-dispatch/rejected-tokens-zero · commit 9d6f6a06 · proves E2
+**Fix commit:** `9d6f6a06`
+**Live note:** E2 names window v1.43.6; the screenshots show 1d and v1.43.7, which take the same zero path; the dry run also prints 0 for v1.43.6
 **Priority:** P3
 **Severity:** low — the panel says "unavailable" when the true answer is a measured 0
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
