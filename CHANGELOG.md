@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Agent Cost and Agent Dispatch read better: **Claude cost per verified spec** is wider and as tall as its neighbours so its title fits, the per-day Claude bars use larger value labels, **Claude per landed spec** and **Claude tokens per landed spec** say *Release window only* instead of *No data* under a time window, and **Human continuation prompts** shows `continue` instead of a cut-off `continue_prompt`.
+
 ### Added
 
 - Agent Dispatch separates total dispatch-to-land elapsed time from the final worker-exit-to-land gap and records explicitly reported operator continuation prompts with a coverage start marker.

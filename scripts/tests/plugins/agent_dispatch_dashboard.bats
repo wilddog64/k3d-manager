@@ -253,6 +253,10 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
+      if field=="fieldConfig" and panel["id"] in (29,31):
+        new=json.loads(json.dumps(new)); new["defaults"].pop("noValue",None)
+      if field=="options" and panel["id"]==32:
+        new={k:v for k,v in new.items() if k!="text"}
       if field=="fieldConfig" and panel["id"] in (56,71) and new["defaults"].get("unit")=="short":
         new=json.loads(json.dumps(new)); new["defaults"]["unit"]=old_field["defaults"]["unit"]
       assert new==old_field,(panel["id"],field)
@@ -484,6 +488,30 @@ assert gauge["gridPos"]=={"h":8,"w":8,"x":16,"y":27}
 assert gauge["options"]["orientation"]=="horizontal" and gauge["options"]["namePlacement"]=="left"
 assert gauge["options"]["text"]=={"titleSize":14,"valueSize":20}
 assert "cache_read" in gauge["description"] and "fraction" in gauge["description"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
+
+@test "agent dashboards: labels and titles stay readable and release-only stats say why they are empty" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(name,key):
+  return json.loads("\n".join(x[4:] for x in (base/name).read_text().split(f"  {key}: |\n",1)[1].splitlines()))
+cost={p["id"]:p for p in load("grafana-dashboard-agent-cost.yaml","agent-cost.json")["panels"]}
+dispatch={p["id"]:p for p in load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")["panels"]}
+assert cost[34]["gridPos"]["w"]>=6 and cost[86]["gridPos"]["x"]==cost[34]["gridPos"]["w"]
+assert cost[34]["gridPos"]["h"]==cost[86]["gridPos"]["h"]==cost[88]["gridPos"]["h"]
+assert sum(cost[i]["gridPos"]["w"] for i in (34,86,88))==24
+for i in (29,31):
+  assert cost[i]["fieldConfig"]["defaults"]["noValue"]=="Release window only",i
+for i in (32,87):
+  assert cost[i]["options"]["text"]["valueSize"]>=14,i
+rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
+assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
