@@ -777,7 +777,7 @@ data:
         {
           "id": 9,
           "type": "stat",
-          "title": "P0",
+          "title": "Open P0",
           "gridPos": {
             "x": 0,
             "y": 47,
@@ -826,7 +826,7 @@ data:
         {
           "id": 10,
           "type": "stat",
-          "title": "P1",
+          "title": "Open P1",
           "gridPos": {
             "x": 2,
             "y": 47,
@@ -875,7 +875,7 @@ data:
         {
           "id": 11,
           "type": "stat",
-          "title": "P2",
+          "title": "Open P2",
           "gridPos": {
             "x": 4,
             "y": 47,
@@ -920,7 +920,7 @@ data:
         {
           "id": 12,
           "type": "stat",
-          "title": "P3",
+          "title": "Open P3",
           "gridPos": {
             "x": 6,
             "y": 47,

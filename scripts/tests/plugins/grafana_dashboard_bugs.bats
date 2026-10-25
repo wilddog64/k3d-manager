@@ -671,3 +671,18 @@ assert any(item.get("url") == "/d/k3dm-agent-dispatch" for item in d["links"])
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "priority tiles say they count open bugs" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+def walk(panels):
+    for p in panels:
+        yield p
+        yield from walk(p.get("panels", []))
+tiles={p["title"]: p for p in walk(d["panels"]) if any('status="open",priority="P' in t.get("expr", "") for t in p.get("targets", []))}
+assert set(tiles) == {"Open P0", "Open P1", "Open P2", "Open P3"}, sorted(tiles)
+PY
+  [ "${status}" -eq 0 ]
+}
