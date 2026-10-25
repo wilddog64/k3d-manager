@@ -603,3 +603,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: panel 85 labels clarify/tasks a587c6b5 (bats 24/24, pytest 119, manifests 85/85); bug-dashboard plan E2 Manual v1.43.6 shown (295), Manual All + back to Auto remain.
 - 2026-10-25: Fix commit column bug LIVE-VERIFIED (screenshot 296, header SHAs shown).
 - 2026-10-25: bug-dashboard auto release plan LIVE-VERIFIED (screenshots 295/297/298).
+- 2026-10-25: telemetry plan live check found Worker model always unknown (codex.log reports gpt-6-luna, unread) and coordinator undeclarable; filed P3 docs/bugs/2026-10-25-dispatch-worker-model-unknown-despite-runtime-report.md; dispatching to Luna.
