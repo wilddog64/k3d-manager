@@ -374,3 +374,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: bug summary tiles back on one row (h3, Open tiles w2 without duplicate description); Per spec Worker/Coordinator blank when unknown 37c2f5e2.
 - 2026-10-25: Per spec full width (w24, minWidth 80), Last update + Rework rate side by side at y22 e6d7056d.
 - 2026-10-25: Bugs + Plans tables narrowed to fit without horizontal scroll 6010a426.
+- 2026-10-25: Plans hides Dispatch task (Title 360), Bugs Verified at/Live-verified at date-only 95px 59b83ce2.
