@@ -17,6 +17,7 @@
 
 - Agent Activity: **Codex at API prices, all sessions** never showed a value, because one unpriced session (Codex's built-in `codex-auto-review` model has no public rate, and some sessions end before writing usage) hid the whole mode's cost. The exporter now sums the priced sessions and publishes `k3dm_codex_unpriced_sessions{window,mode,reason}` beside it; no price is invented.
 - VectorDB dashboard: **Rows vs corpus docs** showed fractional document ticks on narrow ranges, and the corpus series hid the rows series when they were equal. Counts now render as whole numbers, rows as a line and corpus as points on top, with both values in the tooltip.
+- Agent Activity: panel titles in the **Claude context and compaction** row and the series names under each bar were cut off, and the row started with an empty four-column gap left by the dashboard split. The row's stats are now 8 columns wide and its bar gauges 12, and every bar gauge on the dashboard is horizontal with the full name to the left of each bar.
 - `make agy-wrapper-install` could overwrite the real agy binary with the wrapper; it now refuses to.
 - Bug Tracking dashboard: the "Release (filed in)" dropdown took its options only from bug docs, so a new release with no bugs filed yet (v1.43.6 on the day it was cut) could not be selected. It now also reads the release labels of `k3dm_plan_release_docs`, so every release with plans or bugs is listed. The saved default moves to `v1.43.6`.
 
