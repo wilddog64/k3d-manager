@@ -1,6 +1,6 @@
 # Grafana Dashboards
 
-This guide is the entry point for the Grafana dashboards shipped by this repository. The inventory below follows the 16 unique dashboard UIDs defined by the current labeled ConfigMaps and their deployment locations. Dashboard references document panels, metric producers, operational details, and known caveats.
+This guide is the entry point for the Grafana dashboards shipped by this repository. The inventory below follows the 19 unique dashboard UIDs defined by the current labeled ConfigMaps and their deployment locations. Dashboard references document panels, metric producers, operational details, and known caveats.
 
 ## Dashboard inventory
 
@@ -15,6 +15,7 @@ This guide is the entry point for the Grafana dashboards shipped by this reposit
 | k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-pr-checks.md) |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-alertmanager-delivery.md) |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-agent-dispatch.md) |
+| k3dm Agent Run Log | `k3dm-agent-run-log` | `platform-ops/grafana-dashboard-agent-run-log.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | This guide |
 | k3dm Agent Cost | `k3dm-agent-cost` | `platform-ops/grafana-dashboard-agent-cost.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | This guide |
 | k3dm Agent Activity | `k3dm-agent-activity` | `platform-ops/grafana-dashboard-agent-activity.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | This guide |
 | k3dm Bug Tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `grafana-dashboards-hub` ApplicationSet; `make platform-ops` | hub | [Reference](grafana-dashboards/k3dm-bugs.md) |
@@ -62,6 +63,12 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 The **Agent Dispatch** dashboard covers dispatch throughput, active runs, per-spec delivery and verification, plus run outcomes. Its **Window** selector includes time windows and ledger releases from v1.43.0 onward. Use the **Agents** link to move between the three agent dashboards while keeping the selected time range and window.
 
 Agent-neutral task token totals include Codex's cumulative `codex_exit.tokens` and the sum of agy's per-run `agent_exit.usage.total_tokens`; agent runtime and run counts include exits from both agents.
+
+The **Per run evidence** table's **Log** cell opens **k3dm Agent Run Log** for that version, slug and run; keep `make install-hub-loki-port-forward` installed once to connect Grafana log shipping to the hub's Loki. Only `land-test.log` is shipped, after redaction, with at most its last 4,998 lines (under Loki's 5,000-line query limit). Each push starts with a `[shipped <time> sha256:<prefix>]` line, so a log re-shipped after a re-land shows as a second block. The run directory keeps one `land-test.log` per slug, so only the slug's latest run is shipped; an earlier run's Log link shows whatever was shipped while it was the latest, or nothing. `codex.log` and every other run file stay on the Mac. The local path remains inspectable and copyable.
+
+## k3dm Agent Run Log
+
+The **Agent Run Log** dashboard shows the selected run's redacted test output from Loki. Open it from a Log cell in Agent Dispatch; it shows the last 30 days by default.
 
 ## k3dm Agent Cost
 

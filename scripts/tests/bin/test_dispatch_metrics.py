@@ -482,7 +482,8 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     ("ok 1 - first\n89 passed in 1.41s\n", "1/1 ok; 89 passed"),
     ('ok 1 - quote " and newline\nname\n', "1/1 ok"),
 ])
-def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, log_text, expected):
+def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, monkeypatch, log_text, expected):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     now = int(time.time())
     run_dir = tmp_path / "worktrees" / "9.9.9" / "attempt.run"
     run_dir.mkdir(parents=True)

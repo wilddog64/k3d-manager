@@ -36,7 +36,7 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
-.PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -430,6 +430,9 @@ codex-prune:
 dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
+dispatch-logs:
+	@bin/k3dm-dispatch-logs $(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
 ## Put the agy recording wrapper first on PATH
 AGY_WRAPPER_DIR ?= $(HOME)/.local/share/k3d-manager/bin
 agy-wrapper-install:
@@ -625,6 +628,21 @@ uninstall-hub-pushgateway-port-forward:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
 	@echo "Hub Pushgateway port-forward agent removed"
+
+install-hub-loki-port-forward:
+	sed \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.hub-loki-port-forward.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-loki-port-forward" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+	@echo "Hub Loki port-forward agent installed — port 19100 will stay open while the hub is reachable"
+
+uninstall-hub-loki-port-forward:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-loki-port-forward" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+	@echo "Hub Loki port-forward agent removed"
 
 install-alertmanager-port-forward:
 	sed \

@@ -1411,6 +1411,11 @@ def main(argv=None):
     except Exception as exc:  # one bounded request; callers should not retry forever
         print(f"dispatch metrics push failed: {exc}")
         return 1
+    try:
+        subprocess.run([str(Path(__file__).with_name("k3dm-dispatch-logs"))],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=300)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
     return 0
 
 

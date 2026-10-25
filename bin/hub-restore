@@ -195,6 +195,7 @@ PLIST
 _step_start 8
 _local_agents_ok=1
 if ! "${_make}" install-hub-pushgateway-port-forward; then _local_agents_ok=0; fi
+if ! "${_make}" install-hub-loki-port-forward; then _local_agents_ok=0; fi
 for _pf_name in argocd keycloak; do
   _hub_restore_ensure_pf_agent "${_pf_name}" || _local_agents_ok=0
 done

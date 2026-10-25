@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- **Agent Dispatch: open each run's test log from the Per run Log column.** Redacted `land-test.log` output is shipped to hub Loki and linked to a run-filtered Grafana dashboard; Codex transcripts are never shipped.
 - **Agent Dispatch: show each run's test result and log path.** Per run evidence now summarizes land-test output and exposes the local log path in an inspectable Log column. See `docs/bugs/2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open.md`.
 
 - **Agent Dispatch: rejected-attempt Codex tokens show zero when no run was rejected.** Counted windows with no objectively rejected run now export `0`; windows with no runs or only rejected runs whose token increments are unknown remain unavailable. Abandoned runs still do not count as objective rejections.

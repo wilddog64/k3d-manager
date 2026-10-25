@@ -376,3 +376,34 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
+
+@test "agent dispatch dashboard: Log opens the filtered run log dashboard" {
+  run python3 - "${BASE}" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(name,key):
+    text=(base/name).read_text()
+    return json.loads("\n".join(line[4:] for line in text.split(f"  {key}: |\n",1)[1].splitlines()))
+d=load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")
+panel=next(p for p in d["panels"] if p["id"]==47)
+log=next(o for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")=="Log")
+props=log["properties"]
+assert any(p["id"]=="custom.inspect" and p["value"] for p in props)
+links=next(p["value"] for p in props if p["id"]=="links")
+url=links[0]["url"]
+assert links[0]["title"]=="Open log" and "/d/k3dm-agent-run-log" in url
+assert all(f"var-{key}=${{__data.fields.{key}}}" in url for key in ("version","slug","run")),url
+assert "file://" not in json.dumps(d)
+runlog=load("grafana-dashboard-agent-run-log.yaml","agent-run-log.json")
+assert runlog["uid"]=="k3dm-agent-run-log"
+p=runlog["panels"][0]
+assert p["type"]=="logs" and p["datasource"]["uid"]=="loki"
+expr=p["targets"][0]["expr"]
+assert 'job="k3dm-dispatch-run"' in expr and all(f'${key}' in expr for key in ("version","slug","run"))
+assert runlog["time"]=={"from":"now-30d","to":"now"}
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
