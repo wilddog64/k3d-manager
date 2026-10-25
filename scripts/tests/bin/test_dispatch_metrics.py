@@ -26,6 +26,12 @@ def _pin_pushgateway_target(monkeypatch):
     monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
 
 
+@pytest.fixture(autouse=True)
+def _isolate_state_dirs(monkeypatch, tmp_path):
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
+    monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(tmp_path / "agent-sessions"))
+
+
 def load_dispatch_dashboard():
     dashboard_path = Path(os.environ.get("DISPATCH_DASHBOARD_PATH", DASHBOARD_PATH))
     raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
