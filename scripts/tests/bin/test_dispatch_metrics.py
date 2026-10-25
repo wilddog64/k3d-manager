@@ -81,6 +81,33 @@ def test_api_cost_windows_use_session_start_and_report_observed_days(tmp_path):
     assert 'k3dm_dispatch_api_cost_observed_days{window="30d"} 20.00' in output
 
 
+def test_activity_cost_keeps_priced_sessions_and_counts_unpriced(tmp_path):
+    now = time.time()
+    home = tmp_path / "codex"
+    for name, model, usage in (
+        ("priced", "gpt-5.6-luna", {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0}),
+        ("review", "codex-auto-review", {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 0}),
+        ("missing", "gpt-5.6-luna", None),
+        ("only-review", "codex-auto-review", {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 0}),
+    ):
+        write_session(home, name, now - 10, now)
+        path = next((home / "sessions").rglob(f"rollout-{name}.jsonl"))
+        lines = path.read_text().splitlines()
+        meta = json.loads(lines[0])
+        meta["payload"]["originator"] = "codex_exec" if name != "only-review" else "codex-tui"
+        path.write_text(json.dumps(meta) + "\n" + "\n".join([
+            json.dumps({"type": "turn_context", "payload": {"model": model}}),
+            json.dumps({"type": "event_msg", "payload": {"info": {"total_token_usage": usage}}}),
+        ]) + "\n")
+    output = dispatch_metrics.render([], 0, now,
+        prices={"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}, codex_home=home)
+    assert 'k3dm_codex_api_cost_usd{window="1d",mode="exec"} 0.2' in output
+    assert 'k3dm_codex_unpriced_sessions{window="1d",mode="exec",reason="model"} 1' in output
+    assert 'k3dm_codex_unpriced_sessions{window="1d",mode="exec",reason="usage"} 1' in output
+    assert 'k3dm_codex_unpriced_sessions{window="1d",mode="interactive",reason="model"} 1' in output
+    assert not any(line.startswith('k3dm_codex_api_cost_usd{window="1d",mode="interactive"}') for line in output.splitlines())
+
+
 def test_usage_without_scanned_session_is_excluded_from_time_but_kept_in_release(tmp_path):
     now = 1_800_000_000
     row = event(now, "codex_usage", version="v9.9.9", session="missing", model="gpt-5.6-luna",
@@ -664,7 +691,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 51  # agent-audit: allow assert-removed Codex and agy activity rows add twelve $window expressions
+    assert sum("$window" in expr for expr in expressions) == 52  # agent-audit: allow assert-removed Codex and agy activity rows add thirteen $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",

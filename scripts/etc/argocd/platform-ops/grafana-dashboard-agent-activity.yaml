@@ -721,7 +721,7 @@ data:
             }
           },
           "title": "Codex at API prices, all sessions",
-          "description": "",
+          "description": "Estimated API list-price cost for priced sessions only in the selected window. Unpriced sessions are shown beside this total.",
           "gridPos": {
             "h": 6,
             "w": 6,
@@ -1226,6 +1226,52 @@ data:
                 "steps": [
                   {
                     "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 83,
+          "type": "stat",
+          "title": "Unpriced Codex sessions",
+          "description": "Sessions excluded from the API-price total because their model has no published rate or usage counts are missing.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 20
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_codex_unpriced_sessions{window=\"$window\"})",
+              "instant": true
+            }
+          ],
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "orange"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "orange",
                     "value": null
                   }
                 ]

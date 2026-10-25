@@ -1036,7 +1036,8 @@ def _activity_metrics(lines, events, files, now, prices):
                 lines.append(f'k3dm_codex_tokens{{window="{window}",mode="{mode}",repo="{repo}",kind="{kind}"}} {value}')
         for mode, group in by_mode.items():
             lines.append(f'k3dm_codex_active_seconds{{window="{window}",mode="{mode}"}} {sum(r["active"] for r in group)}')
-            total, priced = 0.0, True
+            total = 0.0
+            unpriced = defaultdict(int)
             for row in group:
                 usage = row.get("usage")
                 fields = ("input_tokens", "cached_input_tokens", "output_tokens")
@@ -1045,10 +1046,18 @@ def _activity_metrics(lines, events, files, now, prices):
                 else:
                     amount = _cost({"model": row.get("model"), "input": int(usage[fields[0]]),
                                     "cached_input": int(usage[fields[1]]), "output": int(usage[fields[2]])}, prices)
-                if amount is None: priced = False
-                else: total += amount
-            if priced:
+                if amount is None:
+                    reason = "usage" if not isinstance(usage, dict) or any(
+                        not isinstance(usage.get(k), (int, float)) or isinstance(usage.get(k), bool) or usage[k] < 0
+                        for k in fields
+                    ) else "model"
+                    unpriced[reason] += 1
+                else:
+                    total += amount
+            if total or len(group) > sum(unpriced.values()):
                 lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",mode="{mode}"}} {total}')
+            for reason, count in unpriced.items():
+                lines.append(f'k3dm_codex_unpriced_sessions{{window="{window}",mode="{mode}",reason="{reason}"}} {count}')
     newest = None
     for row in files:
         sample = row.get("quota")
