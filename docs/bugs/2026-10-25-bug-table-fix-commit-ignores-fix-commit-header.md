@@ -1,7 +1,7 @@
 # Bug: Bug Tracking "Fix commit" shows the docs commit that marked a bug fixed, not the fix
 
-**Status:** FIXED 2026-10-25 — `8a23a66b`; pytest 103/103, validate-manifests 85/85; Luna showed tests 1, 2 and 6 red on pre-fix copies. Live E2 pending the next bug scan and dashboard sync.
-**Fix commit:** `8a23a66b`
+**Status:** FIXED 2026-10-25 — `8a23a66b`; pytest 103/103, validate-manifests 85/85; Luna showed tests 1, 2 and 6 red on pre-fix copies. Follow-up `e3bef10b`: the first live scan still showed the old SHAs. `fix_sha` is built in a second loop over rows, where `text` was the last doc of the first loop; Claude made it read `texts[path]` and added a two-doc test (red on `8a23a66b`). Live E2 pending the next scan.
+**Fix commit:** `e3bef10b`
 **Review note:** Claude ran `doc_fix_commit` over all 95 real `**Fix commit:**` headers: every one parses, including the three in the Problem table (`79fab0b1`, `9cb1fa09`, `f11e0c6e`).
 **Priority:** P3
 **Severity:** low — the column points a reader at a status-flip docs commit instead of the code fix
