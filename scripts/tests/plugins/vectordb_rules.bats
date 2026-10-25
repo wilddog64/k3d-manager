@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
-DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml"
+DASHBOARD="${DASHBOARD:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml}"
 OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
 
 @test "vectordb rules target the hub prometheus stack" {
@@ -114,11 +114,18 @@ panel = next(panel for panel in dashboard["panels"] if panel.get("id") == 1)
 styles = {}
 for override in panel.get("fieldConfig", {}).get("overrides", []):
     name = override.get("matcher", {}).get("options")
-    for prop in override.get("properties", []):
-        if prop.get("id") == "custom.lineStyle":
-            styles[name] = prop.get("value", {}).get("fill")
-assert styles.get("rows (last published)") == "dash", styles
-assert styles.get("corpus docs (last published)") == "solid", styles
+    styles[name] = {prop["id"]: prop.get("value") for prop in override.get("properties", [])}
+rows = styles.get("rows (last published)", {})
+corpus = styles.get("corpus docs (last published)", {})
+assert rows.get("color") == {"mode": "fixed", "fixedColor": "green"}, rows
+assert rows.get("custom.drawStyle") == "line", rows
+assert rows.get("custom.lineWidth") == 3, rows
+assert rows.get("custom.showPoints") == "never", rows
+assert corpus.get("color") == {"mode": "fixed", "fixedColor": "yellow"}, corpus
+assert corpus.get("custom.drawStyle") == "points", corpus
+assert corpus.get("custom.showPoints") == "always", corpus
+assert corpus.get("custom.pointSize") == 4, corpus
+assert corpus.get("custom.lineWidth") == 0, corpus
 assert panel.get("options", {}).get("tooltip", {}).get("mode") == "multi", panel.get("options")
 assert panel.get("options", {}).get("legend", {}).get("showLegend") is True, panel.get("options")
 ' "${DASHBOARD}"
