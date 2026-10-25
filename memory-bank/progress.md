@@ -561,3 +561,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: rejected-tokens bug landed as 9d6f6a06 (pytest 91/91, red on pre-fix). Forecast task exited; under review.
 - 2026-10-25: forecast bug landed as 1ce420f6 (Claude fix: Target state blocker gated on target). Remaining releases (panel 32) now follows Release mode; all dashboard release filters done. Both Luna tasks closed; none running.
 - 2026-10-25: live E2 (screenshot 244) Target state names v1.49.0 + reason ✓; panel 28 title truncated, shortened to 'Median gap (days)'.
+- 2026-10-25: agy bug F4 (Agent Dispatch Per spec / Per run agent-neutral columns) landed 2204fdff by Claude; bug FIXED, live check pending.
