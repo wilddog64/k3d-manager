@@ -66,6 +66,8 @@ Agent-neutral task token totals include Codex's cumulative `codex_exit.tokens` a
 
 The **Per run evidence** table's **Log** cell opens **k3dm Agent Run Log** for that version, slug and run; keep `make install-hub-loki-port-forward` installed once to connect Grafana log shipping to the hub's Loki. Only `land-test.log` is shipped, after redaction, with at most its last 4,998 lines (under Loki's 5,000-line query limit). Each push starts with a `[shipped <time> sha256:<prefix>]` line, so a log re-shipped after a re-land shows as a second block. The run directory keeps one `land-test.log` per slug, so only the slug's latest run is shipped; an earlier run's Log link shows whatever was shipped while it was the latest, or nothing. `codex.log` and every other run file stay on the Mac. The local path remains inspectable and copyable.
 
+The Agent Dispatch **Per spec** table includes a **Repo** column. Per-task metrics carry the origin repository name as a `repo` label; legacy or invalid labels are exported as `k3d-manager`. Aggregate series do not include this label.
+
 ## k3dm Agent Run Log
 
 The **Agent Run Log** dashboard shows the selected run's redacted test output from Loki. Open it from a Log cell in Agent Dispatch; it shows the last 30 days by default.

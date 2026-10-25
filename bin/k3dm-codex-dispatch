@@ -9,15 +9,19 @@ _dispatch_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 # shellcheck source=/dev/null
 source "${_dispatch_script_dir}/../scripts/lib/system.sh"
 _dispatch_worktree_root="${K3DM_WORKTREE_ROOT:-${HOME}/.local/share/k3d-manager/worktrees}"
+_dispatch_event_repo="k3d-manager"
 
 _dispatch_ledger_event() {
-  local event="$1" version="$2" slug="$3" json filter='.' arg_count
+  local event="$1" version="$2" slug="$3" json filter='.' arg_count event_repo="$_dispatch_event_repo"
   shift 3
+  if [[ -s "$_dispatch_worktree_root/$version/$slug.run/repo-name" ]]; then
+    event_repo="$(<"$_dispatch_worktree_root/$version/$slug.run/repo-name")"
+  fi
   if (($#)); then
     arg_count=$#; filter="${!arg_count}"; set -- "${@:1:arg_count-1}"
   fi
   json="$(jq -nc --arg event "$event" --arg version "$version" --arg slug "$slug" \
-    --argjson ts "$(date +%s)" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug} | ($filter)" 2>/dev/null)" || {
+    --argjson ts "$(date +%s)" --arg repo "$event_repo" "$@" "{ts:\$ts,event:\$event,version:\$version,slug:\$slug,repo:\$repo} | ($filter)" 2>/dev/null)" || {
     echo "[codex-dispatch] WARNING: could not build ledger event ${event} for ${slug}" >&2
     return 1
   }
@@ -196,6 +200,7 @@ _dispatch_worker() {
     "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
     "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
   )
+  _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ "$agent" != agy ]] || state_vars+=("K3DM_DISPATCH_SLUG=$slug")
   cd "$worktree" || { _dispatch_log "$run" "could not enter worker worktree"; return 125; }
   set +e
@@ -258,7 +263,7 @@ _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
 _dispatch_usage() {
   cat <<'EOF'
 Usage:
-  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--network]
+  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
@@ -288,6 +293,7 @@ _dispatch_verify() {
   jq -se --arg version "$version" --arg slug "$slug" \
     'any(.[]; .event == "land" and .version == $version and .slug == $slug)' \
     "$_dispatch_worktree_root/ledger.jsonl" >/dev/null 2>&1 || _dispatch_error "no landed task for $slug in $version"
+  _dispatch_event_repo="$(cat "$_dispatch_worktree_root/$version/$slug.run/repo-name" 2>/dev/null || echo k3d-manager)"
   if (( tokens_set )); then
     _dispatch_ledger_event verify "$version" "$slug" --arg result "$result" --arg verifier "$verifier" --argjson tokens "$tokens" \
       '.result=$result|.tokens=$tokens|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
@@ -348,7 +354,18 @@ _dispatch_scope_verdict() {
   if merge_base="$(git -C "$worktree" merge-base "$rel" HEAD 2>/dev/null)" && git -C "$worktree" merge-base --is-ancestor "$base" "$merge_base"; then
     from="$merge_base"
   fi
-  while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(git -C "$worktree" show "$base:$spec" | _dispatch_spec_files)
+  if [[ -f "$worktree.run/spec.md" ]]; then
+    local expected_spec_hash actual_spec_hash
+    expected_spec_hash="$(cat "$worktree.run/spec-sha256" 2>/dev/null || true)"
+    actual_spec_hash="$(shasum -a 256 "$worktree.run/spec.md" 2>/dev/null | awk '{print $1}')"
+    [[ -n "$expected_spec_hash" && "$expected_spec_hash" == "$actual_spec_hash" ]] || {
+      echo "scope: unknown (spec snapshot changed)"
+      return 1
+    }
+    while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(_dispatch_spec_files <"$worktree.run/spec.md")
+  else
+    while IFS= read -r path; do [[ -n "$path" ]] && patterns+=("$path"); done < <(git -C "$worktree" show "$base:$spec" | _dispatch_spec_files)
+  fi
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
     matched=1
@@ -372,7 +389,7 @@ _dispatch_task_spec() {
   local task="$1" run="$2" spec
   [[ -f "$run/spec" ]] || return 1
   spec="$(<"$run/spec")"
-  [[ -n "$spec" && -f "$task/$spec" ]] || return 1
+  [[ -n "$spec" && ( -f "$task/$spec" || -f "$run/spec.md" ) ]] || return 1
   printf '%s\n' "$spec"
 }
 
@@ -398,19 +415,39 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models
+  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --agent) (($# >= 2)) || _dispatch_error "--agent requires a value"; agent="$2"; shift 2 ;;
       --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; model_source=explicit; shift 2 ;;
+      --repo) (($# >= 2)) || _dispatch_error "--repo requires a path"; repo="$2"; shift 2 ;;
+      --branch) (($# >= 2)) || _dispatch_error "--branch requires a name"; target="$2"; shift 2 ;;
       --network) network=1; shift ;;
       -h|--help) _dispatch_usage; return 0 ;;
       *) _dispatch_error "unknown start option: $1" ;;
     esac
   done
   [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  [[ -z "$repo" && -z "$target" || -n "$repo" && -n "$target" ]] || _dispatch_error "--repo and --branch must be used together"
+  case "$repo" in
+    \~|\~/*) repo="${HOME}${repo#\~}" ;;
+  esac
+  task_repo="$_dispatch_repo_root"
+  if [[ -n "$repo" ]]; then
+    [[ "$target" != main && "$target" != master ]] || _dispatch_error "--branch must not be main or master"
+    task_repo="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" || _dispatch_error "--repo must be a git checkout"
+    manager_git="$(git -C "$_dispatch_repo_root" rev-parse --path-format=absolute --git-common-dir)"
+    task_git="$(git -C "$task_repo" rev-parse --path-format=absolute --git-common-dir)"
+    [[ "$task_git" != "$manager_git" ]] || _dispatch_error "--repo must not point at k3d-manager"
+    git -C "$task_repo" remote get-url origin >/dev/null 2>&1 || _dispatch_error "--repo requires an origin remote"
+    repo_name="$(git -C "$task_repo" remote get-url origin | sed -E 's#/*\.git$##; s#^.*/##; s#^([^:]+):##')"
+    [[ "$repo_name" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || _dispatch_error "origin repository name is invalid"
+    git -C "$task_repo" fetch origin "+$target:refs/remotes/origin/$target" >/dev/null 2>&1 || _dispatch_error "branch does not exist on origin: $target"
+  else
+    repo_name=k3d-manager; target=""
+  fi
   [[ "$agent" == codex || "$agent" == agy ]] || _dispatch_error "unknown agent: $agent"
   if [[ "$agent" == agy ]]; then
     (( network == 0 )) || _dispatch_error "--network is not supported with --agent agy"
@@ -426,7 +463,7 @@ _dispatch_start() {
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
   git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1 || _dispatch_error "spec is not tracked: $spec"
   git -C "$_dispatch_repo_root" diff --quiet HEAD -- "$spec" || _dispatch_error "spec is changed: $spec"
-  git -C "$_dispatch_repo_root" fetch origin "$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
+  git -C "$_dispatch_repo_root" fetch origin "+$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"
   head="$(git -C "$_dispatch_repo_root" rev-parse HEAD)"; remote="$(git -C "$_dispatch_repo_root" rev-parse "origin/$rel")"
   [[ "$head" == "$remote" ]] || _dispatch_error "HEAD is not pushed to origin/$rel"
   _dispatch_spec_files <"$_dispatch_repo_root/$spec" | grep . >/dev/null || _dispatch_error "spec has no backticked path in its ## Files section"
@@ -434,8 +471,8 @@ _dispatch_start() {
   [[ -n "$slug" ]] || slug="${spec_base#"${version}"-}"
   [[ "$slug" != "$spec_base" ]] || slug="$spec_base"
   [[ "$slug" =~ ^[A-Za-z0-9._-]+$ ]] || _dispatch_error "invalid slug: $slug"
-  git -C "$_dispatch_repo_root" show-ref --verify --quiet "refs/heads/task/$version/$slug" && _dispatch_error "task branch already exists: task/$version/$slug"
-  git -C "$_dispatch_repo_root" ls-remote --exit-code --heads origin "task/$version/$slug" >/dev/null 2>&1 && _dispatch_error "remote task branch already exists: task/$version/$slug"
+  git -C "$task_repo" show-ref --verify --quiet "refs/heads/task/$version/$slug" && _dispatch_error "task branch already exists: task/$version/$slug"
+  git -C "$task_repo" ls-remote --exit-code --heads origin "task/$version/$slug" >/dev/null 2>&1 && _dispatch_error "remote task branch already exists: task/$version/$slug"
   worktree="$_dispatch_worktree_root/$version/$slug"; run="$_dispatch_worktree_root/$version/$slug.run"
   [[ ! -e "$worktree" ]] || _dispatch_error "worktree path already exists: $worktree"
   [[ ! -e "$run" ]] || _dispatch_error "run path already exists: $run"
@@ -443,7 +480,12 @@ _dispatch_start() {
     _dispatch_error "network task $network_slug is still running; only one networked task at a time"
   fi
   mkdir -p "$_dispatch_worktree_root/$version"
-  git -C "$_dispatch_repo_root" worktree add -b "task/$version/$slug" "$worktree" "origin/$rel" >/dev/null
+  if [[ -n "$repo" ]]; then
+    remote="$(git -C "$task_repo" rev-parse "origin/$target")"
+    git -C "$task_repo" worktree add -b "task/$version/$slug" "$worktree" "origin/$target" >/dev/null
+  else
+    git -C "$task_repo" worktree add -b "task/$version/$slug" "$worktree" "origin/$rel" >/dev/null
+  fi
   mkdir -m 700 "$run"; state_dir="$run/state"; mkdir -m 700 "$state_dir"
   for arg in jobs run state logs tmp port-cache; do mkdir -m 700 "$state_dir/$arg"; done
   if (( network )); then
@@ -451,6 +493,19 @@ _dispatch_start() {
   fi
   printf '%s\n' "$remote" >"$run/base"
   printf '%s\n' "$spec" >"$run/spec"
+  if [[ -n "$repo" ]]; then
+    printf '%s\n' "$task_repo" >"$run/repo"
+    printf '%s\n' "$target" >"$run/target"
+    printf '%s\n' "$head" >"$run/spec-base"
+    cp "$_dispatch_repo_root/$spec" "$run/spec.md"
+    shasum -a 256 "$run/spec.md" | awk '{print $1}' >"$run/spec-sha256"
+    printf '%s\n' "$repo_name" >"$run/repo-name"
+  else
+    printf '%s\n' "$_dispatch_repo_root" >"$run/repo"
+    printf '%s\n' "$rel" >"$run/target"
+    printf '%s\n' "$repo_name" >"$run/repo-name"
+  fi
+  _dispatch_event_repo="$repo_name"
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
@@ -458,8 +513,10 @@ _dispatch_start() {
   else
     _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
   fi
+  local prompt_spec="$spec"
+  [[ ! -f "$run/spec.md" ]] || prompt_spec="$(cd "$run" && pwd)/spec.md"
   cat >"$run/prompt.md" <<EOF
-Read the spec at $spec in full, and implement it in this directory only.
+Read the spec at $prompt_spec in full, and implement it in this directory only.
 Run the spec's Rules gates and paste their output.
 Do not run git add, git commit or git push. .git is read-only to you. Leave the changes in the working tree.
 Do not touch memory-bank/.
@@ -498,13 +555,17 @@ _dispatch_status() {
     if compgen -G "$run/prompt-[0-9]*.md" >/dev/null; then
       echo "resumes: $(find "$run" -maxdepth 1 -name 'prompt-[0-9]*.md' | wc -l | tr -d ' ')"
     fi
-    git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$rel..HEAD" || true
-    if spec="$(_dispatch_task_spec "$task" "$run")"; then _dispatch_scope_verdict "$task" "$spec" "$rel" 1 || true; else echo "scope: unknown (no recorded spec)"; fi
+    local task_target task_repo
+    task_target="$(cat "$run/target" 2>/dev/null || printf '%s' "$rel")"
+    task_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
+    echo "repo: $task_repo"
+    git -C "$task" status --porcelain || true; git -C "$task" log --oneline "origin/$task_target..HEAD" || true
+    if spec="$(_dispatch_task_spec "$task" "$run")"; then _dispatch_scope_verdict "$task" "$spec" "$task_target" 1 || true; else echo "scope: unknown (no recorded spec)"; fi
   done
 }
 
 _dispatch_land() {
-  local slug="" superseding="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts
+  local slug="" superseding="" allow=0 test_set=0 no_test=0 test_cmd="" rel version task run pid spec current land_lock verifier_lines wait_seconds land_ts codex_ts target repo_path base target_sha task_before target_count=0
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
@@ -519,12 +580,16 @@ _dispatch_land() {
   (( test_set + no_test == 1 )) || _dispatch_error "land requires exactly one of --test CMD or --no-test"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
+  repo_path="$(cat "$run/repo" 2>/dev/null || printf '%s' "$_dispatch_repo_root")"
+  target="$(cat "$run/target" 2>/dev/null || printf '%s' "$rel")"
+  [[ -n "$target" ]] || target="$rel"
+  _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ ! -f "$run/violation" ]] || _dispatch_error "VIOLATION: agent committed"
   [[ -f "$run/pid" ]] && pid="$(<"$run/pid")" || pid=""
   [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null || _dispatch_error "Codex is still running"
   [[ -f "$run/base" ]] || _dispatch_error "no recorded base for $slug (expected $run/base)"
   [[ -z "$(git -C "$task" status --porcelain)" ]] || _dispatch_error "worktree has uncommitted changes"
-  [[ "$(git -C "$task" rev-list --count "origin/$rel..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$rel"
+  [[ "$(git -C "$task" rev-list --count "origin/$target..HEAD")" -gt 0 ]] || _dispatch_error "task branch has no commits ahead of origin/$target"
   spec="$(_dispatch_task_spec "$task" "$run")" || _dispatch_error "no recorded spec for $slug (expected $run/spec)"
   local prior_slug prior_run
   for prior_run in "$_dispatch_worktree_root/$version"/*.run; do
@@ -535,11 +600,12 @@ _dispatch_land() {
       [[ "$superseding" == "$prior_slug" ]] || _dispatch_error "spec already landed by $prior_slug; use --superseding $prior_slug"
     fi
   done
-  if ! _dispatch_scope_verdict "$task" "$spec" "$rel" "$allow"; then
+  if ! _dispatch_scope_verdict "$task" "$spec" "$target" "$allow"; then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason scope '.["reason"]=$reason'
     _dispatch_schedule_metrics
     _dispatch_error "task changes are out of scope"
   fi
+  task_before="$(git -C "$task" rev-parse HEAD)"
   verifier_lines=0
   if [[ -s "$run/codex-tree" ]]; then
     verifier_lines="$(git -C "$task" diff --numstat "$(<"$run/codex-tree")" HEAD | awk '{if ($1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/) total += $1 + $2} END {print total + 0}')"
@@ -555,12 +621,36 @@ _dispatch_land() {
   printf '%s\n' "$$" >"$land_lock/pid"
   _dispatch_land_lock_path="$land_lock"
   trap '_dispatch_release_land_lock "${_dispatch_land_lock_path}"' EXIT
-  current="$(git -C "$_dispatch_repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"; [[ "$current" == "$rel" ]] || _dispatch_error "operator checkout is not on $rel"
-  [[ -z "$(git -C "$_dispatch_repo_root" status --porcelain)" ]] || _dispatch_error "operator checkout is dirty"
-  if ! git -C "$task" rebase "$rel" >/dev/null; then
+  current="$(git -C "$repo_path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [[ "$current" != "$target" ]]; then
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_diverged '.reason=$reason'
+    _dispatch_error "target checkout is not on $target"
+  fi
+  if [[ -n "$(git -C "$repo_path" status --porcelain)" ]]; then
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_diverged '.reason=$reason'
+    _dispatch_error "target checkout is dirty"
+  fi
+  if ! git -C "$repo_path" fetch origin "+$target:refs/remotes/origin/$target" >/dev/null 2>&1; then
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_diverged '.reason=$reason'
+    _dispatch_error "could not fetch origin/$target"
+  fi
+  base="$(<"$run/base")"; target_sha="$(git -C "$repo_path" rev-parse "origin/$target")"
+  if [[ "$(git -C "$repo_path" rev-parse "$target")" != "$target_sha" ]]; then
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_diverged '.reason=$reason'
+    _dispatch_error "local $target differs from origin/$target"
+  fi
+  if [[ "$target_sha" != "$base" ]]; then
+    if ! git -C "$repo_path" merge-base --is-ancestor "$base" "$target_sha"; then
+      _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_rewritten '.reason=$reason'
+      _dispatch_error "origin/$target was rewritten since dispatch"
+    fi
+    target_count="$(git -C "$repo_path" rev-list --count "$base..$target_sha")"
+    echo "target moved: +$target_count commits since dispatch ($base..$target_sha)"
+  fi
+  if ! git -C "$task" rebase "$target_sha" >/dev/null; then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason rebase '.["reason"]=$reason'
     _dispatch_schedule_metrics
-    _dispatch_error "rebase of task/$version/$slug onto $rel failed; resolve it in $task"
+    _dispatch_error "rebase of task/$version/$slug onto $target failed; resolve it in $task"
   fi
   if (( no_test )); then
     echo "tests: skipped (--no-test)"
@@ -572,11 +662,16 @@ _dispatch_land() {
     tail -n 20 "$run/land-test.log"
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
     _dispatch_schedule_metrics
-    _dispatch_error "tests failed after rebase onto $rel; see $run/land-test.log"
+    _dispatch_error "tests failed after rebase onto $target; see $run/land-test.log"
   else
     echo "tests: passed"
   fi
-  git -C "$_dispatch_repo_root" merge --ff-only "task/$version/$slug" >/dev/null || _dispatch_error "fast-forward merge of task/$version/$slug failed"
+  if [[ "$(git -C "$repo_path" rev-parse "$target")" != "$target_sha" ]]; then
+    git -C "$task" reset --hard "$task_before" >/dev/null 2>&1 || true
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_moved_during_land '.reason=$reason'
+    _dispatch_error "$target moved during land"
+  fi
+  git -C "$repo_path" merge --ff-only "task/$version/$slug" >/dev/null || _dispatch_error "fast-forward merge of task/$version/$slug failed"
   land_ts="$(date +%s)"; wait_seconds=null
   if [[ -s "$run/codex-exit-ts" ]]; then
     codex_ts="$(<"$run/codex-exit-ts")"; wait_seconds=$((land_ts - codex_ts))
@@ -586,12 +681,12 @@ _dispatch_land() {
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
     --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
     --arg validation "$run/land-test.log" --arg test_result "$test_result" \
-    '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.chosen=true'
+    --argjson target_moved_commits "$target_count" '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.chosen=true'
   _dispatch_schedule_metrics
-  git -C "$_dispatch_repo_root" worktree remove "$task"
-  git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
-  git -C "$_dispatch_repo_root" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
-  echo "landed: $slug"; echo "push: git push origin $rel"
+  git -C "$repo_path" worktree remove "$task"
+  git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
+  git -C "$repo_path" branch -d "task/$version/$slug" >/dev/null; : >"$run/landed"
+  echo "landed: $slug"; echo "push: git -C $repo_path push origin $target"
 }
 
 _dispatch_release_land_lock() {
@@ -613,6 +708,7 @@ _dispatch_resume() {
   [[ -n "$prompt_file" ]] || _dispatch_error "resume requires --prompt-file PATH"
   [[ -s "$prompt_file" ]] || _dispatch_error "prompt file is missing or empty: $prompt_file"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
+  _dispatch_event_repo="$(cat "$run/repo-name" 2>/dev/null || echo k3d-manager)"
   [[ -d "$task" ]] || _dispatch_error "worktree does not exist: $task"
   [[ ! -f "$run/landed" ]] || _dispatch_error "task has landed: $slug"
   if [[ ! -f "$run/exit" ]] && _dispatch_worker_matches_start "$run"; then
@@ -654,8 +750,12 @@ _dispatch_abandon() {
   done
   [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
+  _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo k3d-manager)"
+  local repo_path target
+  repo_path="$(cat "$_dispatch_run_dir/repo" 2>/dev/null || printf '%s' "$_dispatch_repo_root")"
+  target="$(cat "$_dispatch_run_dir/target" 2>/dev/null || printf '%s' "$rel")"
   if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
-  git -C "$_dispatch_repo_root" worktree remove --force "$_dispatch_task_dir"; git -C "$_dispatch_repo_root" branch -D "task/$version/$slug" >/dev/null
+  git -C "$repo_path" worktree remove --force "$_dispatch_task_dir"; git -C "$repo_path" branch -D "task/$version/$slug" >/dev/null
   _dispatch_ledger_event_best_effort abandon "$version" "$slug"
   _dispatch_schedule_metrics
   echo "abandoned: $slug"

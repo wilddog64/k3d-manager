@@ -299,14 +299,17 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
         lines.append(f'k3dm_dispatch_claude_api_cost_observed_days{{window="{window}"}} {max(0, (now-earliest)/86400):.2f}')
     if selected_tasks:
         for task in selected_tasks:
-            _, _, version, slug = task
+            _, _, version, slug, *_ = task
             if shown_keys is not None and (version, slug) not in shown_keys:
                 continue
             if not (isinstance(version, str) and VERSION_RE.fullmatch(version)
                     and isinstance(slug, str) and SLUG_RE.fullmatch(slug)):
                 continue
             amount = task_costs[(version, slug)]
-            lines.append(f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}"}} {amount}')
+            repo = task[4] if len(task) > 4 and isinstance(task[4], str) else "k3d-manager"
+            if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+                repo = "k3d-manager"
+            lines.append(f'k3dm_dispatch_task_claude_api_cost_usd{{window="{window}",version="{version}",slug="{slug}",repo="{repo}"}} {amount}')
 
 
 def _session_records(events):
@@ -726,7 +729,10 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 if increment is not None:
                     rejected_tokens += increment
                     rejected_known = True
-        rows.append((version, slug, task_rows))
+        repo = next((item.get("repo") for item in task_events if item.get("event") == "start"), "k3d-manager")
+        if not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+            repo = "k3d-manager"
+        rows.append((version, slug, repo, task_rows))
     bug_cost, bug_first_pass = _direct_bug_costs(states, repo_root, release, cutoff)
     run_total = sum(outcomes.values())
     return {
@@ -849,9 +855,12 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
             elapsed_values.append(task["elapsed_seconds"] / 60)
         if task["runs"]:
             codex_values.append(task["codex_seconds"] / 60)
+        repo = next((item.get("repo") for item in states[key] if item.get("event") == "start"), "k3d-manager")
+        if not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+            repo = "k3d-manager"
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
-                      task["agent_tokens"], task["agent_seconds"]))
+                      task["agent_tokens"], task["agent_seconds"], repo))
 
     return {
         "landed": len(landed),
@@ -932,14 +941,14 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     for result, count in run_metrics["bug_first_pass"].items():
         lines.append(f'k3dm_dispatch_live_verified_bug_first_pass{{window="{window}",result="{result}"}} {count}')
     run_rows = []
-    for version, slug, rows in run_metrics["rows"]:
+    for version, slug, repo, rows in run_metrics["rows"]:
         if isinstance(version, str) and VERSION_RE.fullmatch(version) and isinstance(slug, str) and SLUG_RE.fullmatch(slug):
-            run_rows.extend((version, slug, row) for row in rows)
+            run_rows.extend((version, slug, repo, row) for row in rows)
     skipped_runs = max(0, len(run_rows) - TASK_CAP * RUN_CAP)
-    for version, slug, row in run_rows[:TASK_CAP * RUN_CAP]:
+    for version, slug, repo, row in run_rows[:TASK_CAP * RUN_CAP]:
         if type(row["run"]) is not int or row["run"] < 1 or row["run"] > RUN_CAP:
             continue
-        labels = f'window="{window}",version="{version}",slug="{slug}",run="{row["run"]}"'
+        labels = f'window="{window}",version="{version}",slug="{slug}",run="{row["run"]}",repo="{repo}"'
         evidence_summary = _label_value(row.get("evidence_summary", "unknown"))
         evidence_path = _label_value(row.get("evidence_path", ""), limit=512)
         lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"}} 1')
@@ -981,8 +990,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             continue
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
-         agent_tokens, agent_seconds) in valid_tasks[:TASK_CAP]:
-        labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}"'
+         agent_tokens, agent_seconds, repo) in valid_tasks[:TASK_CAP]:
+        labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
         if agent == "codex" and tokens is not None:
@@ -1037,7 +1046,10 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             lands = [e["ts"] for e in task_events if e.get("event") == "land"]
             if starts and lands:
                 task_version = _normalize_version(key[0]) if not time_scope else key[0]
-                interval = (min(starts), max(lands), task_version or key[0], key[1])
+                task_repo = next((e.get("repo") for e in task_events if e.get("event") == "start"), "k3d-manager")
+                if not isinstance(task_repo, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", task_repo):
+                    task_repo = "k3d-manager"
+                interval = (min(starts), max(lands), task_version or key[0], key[1], task_repo)
                 all_tasks.append(interval)
                 normalized_key = (_normalize_version(key[0]) or key[0], key[1])
                 if key in scoped_keys or normalized_key in scoped_keys:

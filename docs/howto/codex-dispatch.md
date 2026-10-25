@@ -121,6 +121,22 @@ to a bug cannot contribute a known bug-level token total; N/A means attribution 
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.
+## Work in another repo
+
+Create and push a target branch in the work repository first. Then dispatch the spec from the
+k3d-manager release checkout while naming the work repository checkout and target branch:
+
+```bash
+make codex-dispatch SPEC=docs/bugs/<file>.md REPO=~/src/gitrepo/personal/shopping-carts/<repo> BRANCH=fix/<slug>
+```
+
+The dispatcher validates and snapshots the spec in k3d-manager, and creates the task worktree from
+`origin/<branch>` in the other repository. On landing, the operator checkout of that repository must
+be clean and on the target branch. The dispatcher checks target movement, rebases, runs the requested
+test command, and fast-forwards the target. It prints the push command; it never pushes for you.
+The Agent Dispatch ledger and Per spec table identify the work repository by its origin repository
+name.
+
 ## agy (Gemini 4 Argon)
 
 Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.

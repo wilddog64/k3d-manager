@@ -595,7 +595,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Tokens, Agent time and Runs cover every agent (Codex and agy); a Codex spec's Tokens are the session total of its last run, an agy spec's the sum of its runs' reported usage. API equiv. stays Codex-only: there is no agy pricing. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Repo is the origin repository name. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Tokens, Agent time and Runs cover every agent (Codex and agy); a Codex spec's Tokens are the session total of its last run, an agy spec's the sum of its runs' reported usage. API equiv. stays Codex-only: there is no agy pricing. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
           "gridPos": {
             "h": 10,
             "w": 19,
@@ -608,43 +608,43 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_tokens{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_agent_tokens{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "A"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_seconds{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_agent_seconds{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "B"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_elapsed_seconds{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_elapsed_seconds{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "C"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_runs{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_agent_runs{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "D"
             },
             {
-              "expr": "max by (version, slug, spec, agent) (k3dm_dispatch_task_spec{window=\"$window\"})",
+              "expr": "max by (version, slug, spec, agent, repo) (k3dm_dispatch_task_spec{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "E"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_api_cost_usd{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_api_cost_usd{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "F"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_claude_api_cost_usd{window=\"$window\"})",
+              "expr": "sum by (version, slug, repo) (k3dm_dispatch_task_claude_api_cost_usd{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "G"
@@ -664,18 +664,20 @@ data:
                 "indexByName": {
                   "version": 0,
                   "slug": 1,
-                  "agent": 2,
-                  "Value #A": 3,
-                  "Value #B": 4,
-                  "Value #C": 5,
-                  "Value #D": 6,
-                  "Value #F": 7,
-                  "Value #G": 8,
-                  "spec": 9
+                  "repo": 2,
+                  "agent": 3,
+                  "Value #A": 4,
+                  "Value #B": 5,
+                  "Value #C": 6,
+                  "Value #D": 7,
+                  "Value #F": 8,
+                  "Value #G": 9,
+                  "spec": 10
                 },
                 "renameByName": {
                   "version": "Release",
                   "slug": "Spec",
+                  "repo": "Repo",
                   "agent": "Agent",
                   "Value #A": "Tokens",
                   "Value #B": "Agent time",

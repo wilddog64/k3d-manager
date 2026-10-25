@@ -4,6 +4,7 @@
 
 ### Added
 
+- Agent Dispatch can run a spec against a target branch in another repository, guard target movement during landing, and expose the repository on per-task metrics and the Per spec table.
 - Pin the hub Argo CD chart at 10.10.5 and add a snapshot-backed, guarded in-place upgrade command with dry-run and post-upgrade health checks.
 - Hermes publishes OrbStack version and update availability metrics hourly; warning alerts and the Host Disk dashboard expose pending updates and version changes. The "OrbStack upgraded" marker fires only when the version differs from one seen in the previous day, not when the metric first appears or returns after a gap.
 
