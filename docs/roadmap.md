@@ -448,7 +448,13 @@ Plan 3 of 5 is [`spec-and-fix-quality`](plans/v1.43.10-spec-and-fix-quality.md) 
 P3 enhancement measuring spec quality (rework causes, review and independent-verifier results, spec
 edits after dispatch, per spec) and fix quality (escaped defects linked by a `**Caused by:**` bug-doc
 header, per spec and per release), as separate columns with no combined score. Depends on v1.43.9's
-complexity plan. v1.43.10 has 3 of 5 plans.
+complexity plan.
+
+Plan 4 of 5 is [`plans-table-dispatch-waves-and-file-overlaps`](plans/v1.43.10-plans-table-dispatch-waves-and-file-overlaps.md)
+(operator, 2026-10-25): the Plans table gains a Wave column derived from `Depends on`, an optional
+`**Wave:**` header for timing constraints (such as "after the 10-29 rebuild"), and an Overlaps column
+for same-release plans whose `**Component:**` files overlap with no dependency between them.
+v1.43.10 has 4 of 5 plans.
 
 ### Candidate milestone — v1.44.0
 
