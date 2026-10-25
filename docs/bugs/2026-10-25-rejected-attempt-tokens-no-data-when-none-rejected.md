@@ -1,6 +1,6 @@
 # Bug: Rejected-attempt Codex tokens shows No data when no run was rejected
 
-**Status:** DISPATCHED to Luna 2026-10-25 (after the agy per-spec task landed as `be7ef686`)
+**Status:** FIXED 2026-10-25 — `9d6f6a06`; pytest 91/91, ruff clean, new test red on the pre-fix script; live check (panel 44 reads 0) pending
 **Priority:** P3
 **Severity:** low — the panel says "unavailable" when the true answer is a measured 0
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
