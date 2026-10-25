@@ -1305,6 +1305,7 @@ data:
                   {"id": "links", "value": [{"title": "Open log", "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"}]}
                 ]
               },
+              {"matcher": {"id": "byName", "options": "doc"}, "properties": [{"id": "custom.hidden", "value": true}]},
               {"matcher": {"id": "byName", "options": "version"}, "properties": [{"id": "custom.width", "value": 70}]},
               {"matcher": {"id": "byName", "options": "run"}, "properties": [{"id": "custom.width", "value": 45}]},
               {"matcher": {"id": "byName", "options": "outcome"}, "properties": [{"id": "custom.width", "value": 85}]},
@@ -1334,7 +1335,6 @@ data:
                   "__name__": true,
                   "job": true,
                   "window": true,
-                  "doc": true,
                   "evidence": true,
                   "Value #A": true
                 },
@@ -1342,10 +1342,11 @@ data:
                   "version": 0,
                   "slug": 1,
                   "run": 2,
-                  "outcome": 3,
-                  "evidence_summary": 4,
-                  "evidence_path": 5,
-                  "Value #B": 6
+                  "Value #B": 3,
+                  "outcome": 4,
+                  "evidence_summary": 5,
+                  "evidence_path": 6,
+                  "doc": 7
                 },
                 "renameByName": {
                   "evidence_summary": "Result",

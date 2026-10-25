@@ -332,8 +332,12 @@ for target in table["targets"]:
 ids=[t["id"] for t in table.get("transformations",[])]
 assert ids[:2]==["merge","organize"],ids
 org=table["transformations"][1]["options"]
-for hidden in ("Time","__name__","job","window","doc","Value #A"):
+for hidden in ("Time","__name__","job","window","Value #A"):
   assert org["excludeByName"].get(hidden) is True,hidden
+assert not org["excludeByName"].get("doc"),"doc feeds the slug link; excluding it empties the URL"
+assert any(o["matcher"]=={"id":"byName","options":"doc"} and {"id":"custom.hidden","value":True} in o["properties"] for o in table["fieldConfig"]["overrides"])
+order=sorted(org["indexByName"],key=org["indexByName"].get)
+assert order[:4]==["version","slug","run","Value #B"],order
 assert org["renameByName"].get("Value #B")=="Tokens"
 assert "k3dm_dispatch_task_run_agent_tokens{" in next(x["expr"] for x in table["targets"] if x["refId"]=="B")
 links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
