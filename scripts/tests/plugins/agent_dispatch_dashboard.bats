@@ -225,7 +225,7 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
         continue
-      if field=="targets" and panel["id"]==12:
+      if panel["id"]==12:
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
@@ -334,7 +334,8 @@ assert ids[:2]==["merge","organize"],ids
 org=table["transformations"][1]["options"]
 for hidden in ("Time","__name__","job","window","doc","Value #A"):
   assert org["excludeByName"].get(hidden) is True,hidden
-assert org["renameByName"].get("Value #B")=="Codex tokens"
+assert org["renameByName"].get("Value #B")=="Tokens"
+assert "k3dm_dispatch_task_run_agent_tokens{" in next(x["expr"] for x in table["targets"] if x["refId"]=="B")
 links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
 assert len(links)==1 and links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
 print("ok")

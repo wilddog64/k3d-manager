@@ -993,6 +993,20 @@ def test_per_spec_footer_totals_all_but_time_to_land_and_by_model_starts_at_zero
     assert panels[27]["fieldConfig"]["defaults"]["min"] == 0
 
 
+def test_per_spec_reads_agent_neutral_series_and_keeps_api_equiv_codex_only():
+    panel = {p["id"]: p for p in load_dispatch_dashboard()["panels"]}[12]
+    exprs = {t["refId"]: t["expr"] for t in panel["targets"]}
+    assert "k3dm_dispatch_task_agent_tokens{" in exprs["A"]
+    assert "k3dm_dispatch_task_agent_seconds{" in exprs["B"]
+    assert "k3dm_dispatch_task_agent_runs{" in exprs["D"]
+    assert "k3dm_dispatch_task_api_cost_usd{" in exprs["F"]
+    organize = next(t for t in panel["transformations"] if t["id"] == "organize")["options"]
+    assert {k: organize["renameByName"][k] for k in ("Value #A", "Value #B", "Value #D")} == {
+        "Value #A": "Tokens", "Value #B": "Agent time", "Value #D": "Runs"}
+    assert "Codex" not in " ".join(organize["renameByName"].values())
+    assert "API equiv. stays Codex-only" in panel["description"]
+
+
 def test_claude_rollup_deduplicates_and_discards_transcript_text(tmp_path):
     projects = tmp_path / "projects"
     projects.mkdir()

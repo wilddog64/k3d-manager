@@ -595,7 +595,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Codex tokens are the session total of the spec's last run. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Codex tokens, Codex time, Codex runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Tokens, Agent time and Runs cover every agent (Codex and agy); a Codex spec's Tokens are the session total of its last run, an agy spec's the sum of its runs' reported usage. API equiv. stays Codex-only: there is no agy pricing. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
           "gridPos": {
             "h": 10,
             "w": 19,
@@ -608,13 +608,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_codex_tokens{window=\"$window\"})",
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_tokens{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "A"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_codex_seconds{window=\"$window\"})",
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_seconds{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "B"
@@ -626,7 +626,7 @@ data:
               "refId": "C"
             },
             {
-              "expr": "sum by (version, slug) (k3dm_dispatch_task_runs{window=\"$window\"})",
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_agent_runs{window=\"$window\"})",
               "format": "table",
               "instant": true,
               "refId": "D"
@@ -677,10 +677,10 @@ data:
                   "version": "Release",
                   "slug": "Spec",
                   "agent": "Agent",
-                  "Value #A": "Codex tokens",
-                  "Value #B": "Codex time",
+                  "Value #A": "Tokens",
+                  "Value #B": "Agent time",
                   "Value #C": "Time to land",
-                  "Value #D": "Codex runs",
+                  "Value #D": "Runs",
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈"
                 }
@@ -693,7 +693,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Codex tokens"
+                  "options": "Tokens"
                 },
                 "properties": [
                   {
@@ -705,7 +705,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Codex time"
+                  "options": "Agent time"
                 },
                 "properties": [
                   {
@@ -815,7 +815,7 @@ data:
           "options": {
             "sortBy": [
               {
-                "displayName": "Codex tokens",
+                "displayName": "Tokens",
                 "desc": true
               }
             ],
@@ -831,9 +831,9 @@ data:
                 "Value #D",
                 "Value #F",
                 "Value #G",
-                "Codex tokens",
-                "Codex time",
-                "Codex runs",
+                "Tokens",
+                "Agent time",
+                "Runs",
                 "API equiv.",
                 "Claude ≈"
               ]
@@ -1226,7 +1226,7 @@ data:
           "id": 47,
           "type": "table",
           "title": "Per run evidence",
-          "description": "Capped table of task/run number, outcome, evidence reference and known Codex token increment. Token values are absent when the cumulative counter baseline is unknown or reset.",
+          "description": "Capped table of task/run number, outcome, evidence reference and known token increment (Codex or agy). Token values are absent when the cumulative counter baseline is unknown or reset.",
           "gridPos": {
             "h": 10,
             "w": 18,
@@ -1245,7 +1245,7 @@ data:
               "refId": "A"
             },
             {
-              "expr": "sum by (version, slug, run, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_codex_tokens{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
+              "expr": "sum by (version, slug, run, doc) (label_replace(label_replace(label_join(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"))",
               "instant": true,
               "format": "table",
               "refId": "B"
@@ -1310,7 +1310,7 @@ data:
                   "Value #B": 5
                 },
                 "renameByName": {
-                  "Value #B": "Codex tokens"
+                  "Value #B": "Tokens"
                 }
               }
             }
