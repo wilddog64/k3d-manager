@@ -1,6 +1,9 @@
 # Bug: Agent Dispatch Per spec and Per run evidence show no tokens or time for an agy-landed spec
 
-**Status:** FIXED 2026-10-25 — F1 (Agent column, Claude) and F2/F3 (agent-neutral series, Luna, landed `be7ef686`; 89/89 pytest, new tests red on the pre-fix script, ruff clean) done; F4 dashboard (Claude) landed `2204fdff` (BATS 19/19, pytest 92/92, new checks red on the pre-fix dashboard). Live check pending: an agy spec shows Tokens, Agent time and Runs
+**Status:** LIVE-VERIFIED 2026-10-25 (fixed 2026-10-25) — F1 (Agent column, Claude) and F2/F3 (agent-neutral series, Luna, landed `be7ef686`; 89/89 pytest, new tests red on the pre-fix script, ruff clean) done; F4 dashboard (Claude) landed `2204fdff` (BATS 19/19, pytest 92/92, new checks red on the pre-fix dashboard). Live check pending: an agy spec shows Tokens, Agent time and Runs
+**Live evidence:** 2026-10-25 · run hub-grafana-agent-dispatch-per-spec-screenshot · env hub/k3d-k3d-cluster · scenario agent-dispatch/per-spec-agy-row · commit 27bb5d85 · proves E3
+**Fix commit:** `2204fdff`
+**Live note:** operator screenshot 250, Window v1.43.6: Per spec row claude-context-compaction-metrics-agy shows Agent agy, 484 K tokens, 11.6 mins agent time, 1 run; Per run evidence lists the same slug at 484 K.
 **Priority:** P3
 **Severity:** low — the ledger has the data; the dashboard hides it, so agy and Codex cannot be compared per spec
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
