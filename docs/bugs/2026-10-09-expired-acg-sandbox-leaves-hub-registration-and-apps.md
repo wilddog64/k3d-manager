@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-09, Claude (operator: "can we automatically clean up these after acg sandbox tear down")
 **Branch:** k3d-manager-v1.42.0 (bug docs are exempt from the 5-plan cap)
-**Status:** IMPLEMENTED — the reaper is on k3d-manager-v1.42.0. The operator installed it 2026-10-09: `com.k3d-manager.sandbox-reaper` is loaded, the first run exited 0, and PATH is set in the plist. The live reap waits for the next sandbox to expire. Release decision 2026-10-09: ships in v1.42.0 as **verify on next occurrence** (an ACG sandbox expires every 4–8h, so the next lapse is the test; simulating it would delete real hub registrations).
+**Status:** LIVE-VERIFIED 2026-10-24 — two real expiries reaped: the reaper log shows `deregistered ubuntu-k3s reason=credentials-dead` at 2026-10-21T20:02:53Z and 2026-10-24T14:56:07Z, and on 2026-10-24 no hub Application targets `ubuntu-k3s` and the only remaining app-cluster registration is the hub's own (`k3d-cluster`). Both reaps logged `notify failed`; filed separately as `docs/bugs/2026-10-24-sandbox-reaper-slack-notice-always-fails.md`. Was: IMPLEMENTED — the reaper is on k3d-manager-v1.42.0. The operator installed it 2026-10-09: `com.k3d-manager.sandbox-reaper` is loaded, the first run exited 0, and PATH is set in the plist. The live reap waits for the next sandbox to expire. Release decision 2026-10-09: ships in v1.42.0 as **verify on next occurrence** (an ACG sandbox expires every 4–8h, so the next lapse is the test; simulating it would delete real hub registrations).
+**Fix commit:** `cc88386c`
+**Live evidence:** 2026-10-24 · run sandbox-reaper-20261024T145607Z · env hub · scenario expired-sandbox-deregistered · commit 22ca2a35 · proves fix
 **Priority:** P3 — noise in ArgoCD, and alert/dashboard pollution; no outage
 **Severity:** Low
 **Component:**

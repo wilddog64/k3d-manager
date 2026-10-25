@@ -2,7 +2,9 @@
 
 **Branch:** `k3d-manager-v1.43.0`
 **Filed:** 2026-10-11
-**Status:** IMPLEMENTED — landed `90a5a463` (Codex, Claude verified: BATS 21/21 with promtool (Claude fixed the promtool test: one-sample series went stale before 5d, and the expected annotations named the static tier); pre-fix grouping turns the promtool test red. Rollout: operator `make platform-ops`.)
+**Status:** LIVE-VERIFIED 2026-10-24 — the live hub PrometheusRule `cicd/argocd-degraded` alert `E2EVerificationStale` reads `time() - max by (tier, exported_service, project) (e2e_last_success_timestamp_seconds) > 259200`, the fixed grouping with no `runner` (shipped in v1.43.2, squash `93f9b940`). Was: IMPLEMENTED — landed `90a5a463` (Codex, Claude verified: BATS 21/21 with promtool (Claude fixed the promtool test: one-sample series went stale before 5d, and the expected annotations named the static tier); pre-fix grouping turns the promtool test red. Rollout: operator `make platform-ops`.)
+**Fix commit:** `93f9b940`
+**Live evidence:** 2026-10-24 · run claude-kubectl-prometheusrule-read · env hub · scenario live-rule-groups-without-runner · commit 22ca2a35 · proves fix
 **Priority:** P3
 **Severity:** Low — a false warning e-mail; the e2e signal itself is fresh
 **Files:** `scripts/etc/argocd/platform-ops/prometheusrule.yaml`,
