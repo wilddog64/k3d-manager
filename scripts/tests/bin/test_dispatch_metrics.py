@@ -10,6 +10,7 @@ import sys
 import time
 from pathlib import Path
 import pytest
+# agent-audit: allow assert-removed evidence_path drops the home directory; the absolute-path assert becomes a root-relative one plus a no-tmp-path assert
 # agent-audit: allow assert-removed per-spec series gained an agent label; every removed assert is re-added with agent="codex" and the same value
 
 SCRIPT = Path(__file__).parents[3] / "bin" / "k3dm-dispatch-metrics"
@@ -493,7 +494,8 @@ def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, log_t
     ], 0, now, repo_root=tmp_path)
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
     assert f'evidence_summary="{expected}"' in line
-    assert f'evidence_path="{run_dir}/land-test.log"' in line
+    assert 'evidence_path="9.9.9/attempt.run/land-test.log"' in line
+    assert str(tmp_path) not in line
     assert 'evidence="land-test.log"' in line
 
 
@@ -1574,8 +1576,10 @@ def test_run_outcome_keeps_a_long_evidence_path_whole(tmp_path, monkeypatch):
     run_dir = root / "v1.43.7" / f"{slug}.run"
     run_dir.mkdir(parents=True)
     (run_dir / "land-test.log").write_text("8 passed in 0.1s\n")
+    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
     summary, path = dispatch_metrics._evidence_details("v1.43.7", slug, "land-test.log")
     assert len(path) > 120
+    assert path.startswith("~/worktrees-") and str(tmp_path) not in path
     assert dispatch_metrics._label_value(path, limit=512) == path
     assert summary == "8 passed"

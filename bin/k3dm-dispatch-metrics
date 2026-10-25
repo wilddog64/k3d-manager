@@ -399,6 +399,19 @@ def _root():
     return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
 
 
+def _display_path(path):
+    """Show a local path without the operator's home directory, so labels carry no username."""
+    resolved = path.resolve()
+    try:
+        return "~/" + str(resolved.relative_to(Path.home().resolve()))
+    except ValueError:
+        pass
+    try:
+        return str(resolved.relative_to(_root().resolve()))
+    except ValueError:
+        return resolved.name
+
+
 def _evidence_details(version, slug, evidence):
     """Return a bounded summary and local evidence path for one run outcome."""
     run_dir = _root() / version / f"{slug}.run"
@@ -406,7 +419,7 @@ def _evidence_details(version, slug, evidence):
     summary = evidence
     if evidence in {"land-test.log", "land_refused.tests"}:
         log_path = run_dir / "land-test.log"
-        path = str(log_path.resolve())
+        path = _display_path(log_path)
         if evidence == "land-test.log":
             try:
                 content = log_path.read_text(errors="replace")
@@ -420,7 +433,7 @@ def _evidence_details(version, slug, evidence):
             summaries = [value for value in (tap, pytest_summary) if value]
             summary = "; ".join(summaries) if summaries else "unknown"
     elif evidence == "codex_exit.exit":
-        path = str((run_dir / "codex.log").resolve())
+        path = _display_path(run_dir / "codex.log")
     return summary, path
 
 
