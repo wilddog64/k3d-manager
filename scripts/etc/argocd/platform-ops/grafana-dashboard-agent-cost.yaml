@@ -653,6 +653,59 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "id": 86,
+          "type": "bargauge",
+          "title": "Claude tokens by kind",
+          "description": "All Claude tokens in the selected window or release, split by kind across every model. cache_read is a prompt-cache hit, billed at a small fraction of the input rate; cache_write is a cache fill (5m and 1h combined), billed above the input rate; input is uncached input. Token volume is therefore not proportional to cost.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 4,
+            "y": 27
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (kind) (k3dm_dispatch_claude_tokens{window=\"$window\"})",
+              "instant": true,
+              "legendFormat": "{{kind}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "decimals": 1,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "namePlacement": "left",
+            "displayMode": "basic",
+            "showUnfilled": true,
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 14,
+              "valueSize": 20
+            },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
         }
       ]
     }

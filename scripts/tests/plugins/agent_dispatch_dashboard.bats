@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[83,84,85]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[83,84,85,86]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,14))|{40,41,84,85}|set(range(42,49))
-assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34}
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 67 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 68 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (47,83,84,85):
+    if panel["id"] in (47,83,84,85,86):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -444,4 +444,22 @@ print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: Claude tokens by kind splits the selected window by cache kind" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
+cost=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
+panel=next(p for p in cost["panels"] if p["title"]=="Claude tokens by kind")
+expr=panel["targets"][0]["expr"]
+assert panel["type"]=="bargauge" and panel["options"]["orientation"]=="horizontal" and panel["options"]["namePlacement"]=="left",panel["type"]
+assert "sum by (kind)" in expr and "k3dm_dispatch_claude_tokens{" in expr and 'window=\"$window\"' in expr,expr
+assert panel["targets"][0]["instant"] and panel["targets"][0]["legendFormat"]=="{{kind}}"
+assert panel["fieldConfig"]["defaults"]["unit"]=="short" and "cache_read" in panel["description"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
 }

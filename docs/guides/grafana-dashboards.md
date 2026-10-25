@@ -143,6 +143,12 @@ output rates there when pricing changes. Models without an explicit entry remain
   cost of sessions missing from that ledger.
 - **By model** splits priced usage by model. Time windows count a session by when it started;
   **Projected / month** divides the 7d cost by the days actually observed, then scales to 30 days.
+- **Claude per landed spec** and **Claude tokens per landed spec** have values only when Window is a
+  release; at `1d`/`7d`/`30d` they show No data by design, because a time window's Claude total
+  includes work that is not dispatch work.
+- **Claude tokens by kind** splits every Claude token in the selected window or release into
+  `cache_read`, `cache_write`, `input` and `output`. Cache reads are usually most of the volume but
+  are billed at a small fraction of the input rate, so token volume is not proportional to cost.
 
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
