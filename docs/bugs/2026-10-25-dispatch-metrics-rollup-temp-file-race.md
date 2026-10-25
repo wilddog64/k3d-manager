@@ -1,6 +1,8 @@
 # Bug: two overlapping dispatch-metrics runs crash on the shared Claude rollup temp file
 
-**Status:** OPEN
+**Status:** FIXED 2026-10-25 — `3295edd2`; pytest 115/115 (+ logs suite, BATS, shellcheck in the land gate); tests 1 and 2 red on a temp copy of the pre-fix script. Live E2: Claude checks metrics.log until 2026-11-01.
+**Fix commit:** `3295edd2`
+**Review note:** Claude moved `mkdir` and `mkstemp` inside the `try`, so an unwritable cache directory is also reported instead of crashing (checked by hand: 1 record returned, stderr line written).
 **Priority:** P3
 **Severity:** low — one metrics push is lost; the next run recovers
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)

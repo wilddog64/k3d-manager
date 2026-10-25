@@ -590,3 +590,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: E4 LIVE-VERIFIED (screenshot 275, 7d: exit→land 51.6 min = exporter, continue_prompt 1/2) — landing-latency plan closed. Worktree-repo bug E2 LIVE-VERIFIED (screenshot 276: k3d-manager 896 Mil, other 2.88 Mil).
 - 2026-10-25: Filed P3 `docs/bugs/2026-10-25-dispatch-metrics-rollup-temp-file-race.md` (fixed rollup.json.tmp name; make dispatch-metrics overlaps the dispatcher's locked run → FileNotFoundError, push lost); dispatching to Luna.
 - 2026-10-25: v1.43.9 orbstack-upgrade-coordinated reviewed → READY (references current, phase 1 live-verified); blocked only on branch order v1.43.7 (≥11-03) → v1.43.8 → v1.43.9. Reconfirm with operator before dispatch.
+- 2026-10-25: rollup temp-file race landed `3295edd2` (Luna + Claude mkstemp-in-try fix); E2 = no rollup traceback in metrics.log through 2026-11-01.
