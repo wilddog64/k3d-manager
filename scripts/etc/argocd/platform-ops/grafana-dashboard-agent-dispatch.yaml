@@ -656,13 +656,13 @@ data:
               "refId": "G"
             },
             {
-              "expr": "max by (version, slug, repo, worker) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"worker\"}, \"worker\", \" \", \"vendor\", \"model\", \"status\"))",
+              "expr": "max by (version, slug, repo, worker) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"worker\",model!=\"unknown\"}, \"worker\", \" \", \"vendor\", \"model\", \"status\"))",
               "format": "table",
               "instant": true,
               "refId": "H"
             },
             {
-              "expr": "max by (version, slug, repo, coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"coordinator\"}, \"coordinator\", \" \", \"vendor\", \"model\", \"status\"))",
+              "expr": "max by (version, slug, repo, coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"coordinator\",model!=\"unknown\"}, \"coordinator\", \" \", \"vendor\", \"model\", \"status\"))",
               "format": "table",
               "instant": true,
               "refId": "I"

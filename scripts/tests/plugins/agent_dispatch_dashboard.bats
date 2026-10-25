@@ -523,3 +523,20 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
 }
+
+@test "agent dispatch dashboard: Per spec leaves an unknown worker or coordinator blank" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+dispatch=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+spec=[p for p in dispatch["panels"] if p["title"]=="Per spec"][0]
+exprs=[t["expr"] for t in spec["targets"] if "k3dm_dispatch_model_identity" in t["expr"]]
+assert len(exprs)==2,exprs
+for role in ("worker","coordinator"):
+  assert any(f'role="{role}",model!="unknown"' in e for e in exprs),role
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
