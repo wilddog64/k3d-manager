@@ -189,7 +189,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null
   sleep 1
   grep -q -- '--conversation agy-conversation-1' "$BATS_TEST_TMPDIR/agy.argv"
-  ! grep -q -- '--continue' "$BATS_TEST_TMPDIR/agy.argv"
+  run ! grep -q -- '--continue' "$BATS_TEST_TMPDIR/agy.argv"
 }
 
 @test "codex dispatch: network is refused for agy" {
