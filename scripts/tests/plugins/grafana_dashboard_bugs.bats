@@ -717,7 +717,7 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 350, widths
+assert widths["Title"] >= 300 and widths["Dispatch"] >= 150, widths
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
 assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)

@@ -2037,7 +2037,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 360
+                    "value": 300
                   }
                 ]
               },
@@ -2065,6 +2065,10 @@ data:
                   "options": "Dispatch"
                 },
                 "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 150
+                  },
                   {
                     "id": "links",
                     "value": [
