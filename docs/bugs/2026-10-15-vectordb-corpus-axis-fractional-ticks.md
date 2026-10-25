@@ -2,7 +2,9 @@
 
 **Filed:** 2026-10-15
 **Branch:** `k3d-manager-v1.45.2` (triage 2026-10-15, operator-approved placement)
-**Status:** FIXED — `ba1b2a01`, rework `a04e7d34` (rows line, corpus points) 2026-10-24 (Codex GPT-6-Luna, interactive TUI session run by the operator in a manual worktree, not the dispatcher; reviewed and merged by Claude). Offline: vectordb_rules.bats 12/12, both new tests red on the pre-fix dashboard; validate-manifests 83 valid. Criterion 1 confirmed from code: the exporter publishes `int(rows)` and `len(corpus)`, so fractions are Grafana axis ticks. Live check pending the operator's screenshot (narrow 2013→2014 case and overlapping series).
+**Status:** LIVE-VERIFIED — `a04e7d34` (first fix `ba1b2a01`, reworked after the live overlap check failed) 2026-10-24 (Codex GPT-6-Luna, interactive TUI session run by the operator in a manual worktree, not the dispatcher; reviewed and merged by Claude). Offline: vectordb_rules.bats 12/12, both new tests red on the pre-fix dashboard; validate-manifests 83 valid. Criterion 1 confirmed from code: the exporter publishes `int(rows)` and `len(corpus)`, so fractions were Grafana axis ticks. Live 2026-10-24 (PDT), operator screenshots: 30d shows the green rows line where it diverges from the yellow corpus points; Last 3 hours shows ticks 2248/2250/2252/2254 with no repeats, one-document steps 2248→2253 visible, rows leading corpus visible 18:05–18:45, and the tooltip at 19:36 listing rows 2253 and corpus docs 2253.
+**Live evidence:** 2026-10-24 · run operator-screenshots-216-219 · env hub/k3d-k3d-cluster · scenario vectordb-rows-corpus-integer-ticks · commit a04e7d34 · proves fix
+**Fix commit:** a04e7d34
 **Priority:** P3 — Grafana readability/presentation only; document counts remain integers
 **Severity:** low
 **Origin:** operator screenshots 2026-10-15, VectorDB dashboard corpus trend near 04:47 and matching row/corpus series near 05:56
