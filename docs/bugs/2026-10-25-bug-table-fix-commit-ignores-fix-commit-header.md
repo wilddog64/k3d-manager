@@ -1,6 +1,8 @@
 # Bug: Bug Tracking "Fix commit" shows the docs commit that marked a bug fixed, not the fix
 
-**Status:** FIXED 2026-10-25 — `8a23a66b`; pytest 103/103, validate-manifests 85/85; Luna showed tests 1, 2 and 6 red on pre-fix copies. Follow-up `e3bef10b`: the first live scan still showed the old SHAs. `fix_sha` is built in a second loop over rows, where `text` was the last doc of the first loop; Claude made it read `texts[path]` and added a two-doc test (red on `8a23a66b`). Live E2 pending the next scan.
+**Status:** LIVE-VERIFIED 2026-10-25 — `8a23a66b`; pytest 103/103, validate-manifests 85/85; Luna showed tests 1, 2 and 6 red on pre-fix copies. Follow-up `e3bef10b`: the first live scan still showed the old SHAs. `fix_sha` is built in a second loop over rows, where `text` was the last doc of the first loop; Claude made it read `texts[path]` and added a two-doc test (red on `8a23a66b`).
+**Live evidence:** 2026-10-25 · run hub-grafana-bug-tracking-fix-commit-screenshot · env hub/k3d-k3d-cluster · scenario bug-tracking/bugs-table-v1.43.7 · commit e3bef10b · proves E2
+**Live note:** operator screenshot 296: Fix commit shows f11e0c6e (deploy_vault), 79fab0b1 (Agent Cost cache kind), 9cb1fa09 (Codex activity), 3295edd2 (rollup race) and e3bef10b (this bug), each the doc's own header; the docs commits 20b02234, 32f1ee64 and be51473b are gone.
 **Fix commit:** `e3bef10b`
 **Review note:** Claude ran `doc_fix_commit` over all 95 real `**Fix commit:**` headers: every one parses, including the three in the Problem table (`79fab0b1`, `9cb1fa09`, `f11e0c6e`).
 **Priority:** P3

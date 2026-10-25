@@ -601,3 +601,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: readability fix bd8de9e8 live-confirmed on Agent Cost (screenshot 291): panel 34 full title at h8, Release window only on 29/31, larger bar labels. Agent Dispatch continue label not yet seen.
 - 2026-10-25: Fix commit column follow-up e3bef10b (stale loop variable; two-doc test red on 8a23a66b); offline real-data run shows 79fab0b1/9cb1fa09; live after next hermes scan (5 min).
 - 2026-10-25: panel 85 labels clarify/tasks a587c6b5 (bats 24/24, pytest 119, manifests 85/85); bug-dashboard plan E2 Manual v1.43.6 shown (295), Manual All + back to Auto remain.
+- 2026-10-25: Fix commit column bug LIVE-VERIFIED (screenshot 296, header SHAs shown).
