@@ -17,7 +17,7 @@ data:
       "tags": ["k3dm", "disk"],
       "schemaVersion": 39,
       "version": 1,
-      "refresh": "1m",
+      "refresh": "5m",
       "time": {"from": "now-24h", "to": "now"},
       "panels": [
         {"id": 1, "type": "stat", "title": "Used %", "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0}, "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * (1 - k3dm_disk_avail_bytes / k3dm_disk_size_bytes)", "legendFormat": "{{host}}"}]},

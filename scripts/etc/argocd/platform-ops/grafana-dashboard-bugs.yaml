@@ -23,7 +23,7 @@ data:
       ],
       "schemaVersion": 38,
       "version": 5,
-      "refresh": "1m",
+      "refresh": "5m",
       "time": {
         "from": "now-7d",
         "to": "now"

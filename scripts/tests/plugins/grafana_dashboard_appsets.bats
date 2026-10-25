@@ -661,3 +661,16 @@ print(json.dumps({"groups":[{"name":"panel13","rules":[{"alert":"Panel13QueryPar
   done
   [ -z "$untagged" ] || { echo "untagged dashboards: ${untagged}"; false; }
 }
+
+@test "every dashboard refreshes every five minutes by default" {
+  run python3 - "$PLATFORM_OPS_DIR" "$DASHBOARDS_DIR" <<'PY'
+import re, sys
+from pathlib import Path
+files=[f for d in sys.argv[1:] for f in sorted(Path(d).glob("*.yaml")) if '"panels"' in f.read_text()]
+assert len(files) >= 18, len(files)
+bad={f.name: re.findall(r'"refresh": ?"([^"]*)"', f.read_text()) for f in files}
+bad={k: v for k, v in bad.items() if v != ["5m"]}
+assert not bad, bad
+PY
+  [ "$status" -eq 0 ]
+}

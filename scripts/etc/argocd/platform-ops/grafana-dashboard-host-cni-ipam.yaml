@@ -17,7 +17,7 @@ data:
       "tags": ["k3dm", "cni", "ipam"],
       "schemaVersion": 39,
       "version": 1,
-      "refresh": "1m",
+      "refresh": "5m",
       "time": {"from": "now-24h", "to": "now"},
       "panels": [
         {"id": 1, "type": "stat", "title": "Pool used %", "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0}, "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 90}]}}, "overrides": []}, "targets": [{"expr": "100 * k3dm_cni_ipam_reservations / k3dm_cni_ipam_range_size", "legendFormat": "{{host}}"}]},
