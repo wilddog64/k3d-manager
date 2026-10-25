@@ -129,6 +129,7 @@ email only, never SMS. Do not add `OrbStackMetricsStale`.
 | `scripts/etc/argocd/platform-ops/grafana-dashboard-host-disk.yaml` | panel + annotation |
 | `scripts/tests/bin/test_orbstack_metrics.py` | new tests |
 | `scripts/tests/hermes/test_hermes.py` | cadence test |
+| `scripts/tests/bin/test_cni_ipam_dashboard.py` | Host Disk guard: added by Claude in review; the byte pin becomes "original five panels unchanged, only OrbStack added" |
 | `docs/guides/alerting.md`, `docs/guides/grafana-dashboards.md`, `docs/providers/orbstack.md` | sections above |
 | `CHANGELOG.md` | `[Unreleased]` entry |
 
