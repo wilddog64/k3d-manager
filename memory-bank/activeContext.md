@@ -367,3 +367,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: panel 85 correction→correct 15c09b4f (name column sizes to the longest label; all <=8 chars).
 - 2026-10-25: panel 85 names placed on top e98af9b3; full labels restored (clarification/continue/correction/other/tracked tasks).
 - 2026-10-25: panels 84/85 h 6->8 583d092c (values clipped with names on top).
+- 2026-10-25: worker-model/coordinator bug FIXED 71f70dd2 (Luna; Claude red-checked tests 1/2/4 on pre-fix copy). E2 needs next dispatch with COORDINATOR=anthropic/claude-opus-5-5.

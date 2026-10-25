@@ -1,6 +1,8 @@
 # Bug: dispatch worker model shows `unknown` though Codex reports it, and the coordinator cannot be declared
 
-**Status:** OPEN
+**Status:** FIXED 2026-10-25 — `71f70dd2`; pytest 121/121, BATS 78/78, shellcheck clean (land gate). Claude ran Luna's tests against a pre-fix copy: test 1 (bats 9), test 2 (pytest), test 4 (bats 11), plus the invalid-input (bats 10) and make-target (bats 78) cases all failed. Live E2 waits for the next dispatch with `COORDINATOR=`.
+**Fix commit:** `71f70dd2`
+**Review note:** reported models other than the latest are emitted with `role="worker_history"`, so the Per spec Worker column (role `worker`) still has one row per task.
 **Priority:** P3
 **Severity:** low — attribution only; the Worker and Coordinator columns carry no information yet
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
