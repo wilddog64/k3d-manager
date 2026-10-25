@@ -9,7 +9,7 @@ metadata:
 data:
   host-disk.json: |
     {
-      "annotations": {"list": [{"name": "OrbStack upgraded", "enable": true, "iconColor": "purple", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "k3dm_orbstack_info unless on(version) (k3dm_orbstack_info offset 1h)", "step": "1m", "titleFormat": "OrbStack upgraded to {{version}}", "textFormat": "The hub VM restarted for this upgrade."}]},
+      "annotations": {"list": [{"name": "OrbStack upgraded", "enable": true, "iconColor": "purple", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(k3dm_orbstack_info unless on(version) last_over_time(k3dm_orbstack_info[1d] offset 1h)) and on() (count(last_over_time(k3dm_orbstack_info[1d] offset 1h)) > 0)", "step": "1m", "titleFormat": "OrbStack upgraded to {{version}}", "textFormat": "The hub VM restarted for this upgrade."}]},
       "editable": true,
       "graphTooltip": 1,
       "title": "k3dm Host Disk",

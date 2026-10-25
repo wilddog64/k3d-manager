@@ -260,3 +260,14 @@ File phase 2 as its own bug then.
 - Do NOT apply rules, Alertmanager config or dashboards to the live hub; the operator does that.
 - Do NOT commit, push or create a PR. Claude verifies and commits.
 - Do NOT modify files outside the Files list.
+
+## Follow-up (2026-10-25, after live E3)
+
+The operator's screenshot 256 showed four "OrbStack upgraded" markers around 07:50–08:35 PDT and none at
+the real upgrade (05:36). The metric first appeared after the 07:50 activation, and the annotation
+`k3dm_orbstack_info unless on(version) (k3dm_orbstack_info offset 1h)` is true whenever the series has no
+sample exactly an hour earlier: on first appearance, and again after any gap longer than an hour (a hub
+outage). Claude changed it to compare against any version seen in the previous day
+(`last_over_time(...[1d] offset 1h)`) and to require that history exists. A promtool test covers first
+appearance (no mark), a 2.2.4 → 2.2.5 change (mark), and a two-hour gap (no mark); it is red on the old
+expression at 2h10m and 3h30m.

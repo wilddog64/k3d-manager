@@ -156,3 +156,29 @@ def test_orbstack_rules_parse_and_fire_with_version(tmp_path):
                        {"eval_time": "70m", "alertname": "OrbStackUpdateAvailable", "exp_alerts": []}]}]}))
     result = _promtool(tmp_path, "test", "rules", "test.yaml")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.external("runs promtool, from PATH or the pinned Prometheus image")
+def test_upgrade_annotation_marks_a_version_change_only(tmp_path):
+    dashboard = yaml.safe_load((ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-host-disk.yaml").read_text())
+    board = json.loads(next(iter(dashboard["data"].values())))
+    expr = next(item for item in board["annotations"]["list"] if item["name"] == "OrbStack upgraded")["expr"]
+    (tmp_path / "rules.yaml").write_text(yaml.safe_dump({"groups": [{"name": "annotation", "rules": [
+        {"alert": "OrbStackUpgradedMark", "expr": expr}]}]}))
+    labels = 'job="k3dm-orbstack",instance=""'
+
+    def case(series, eval_time, versions):
+        return {"interval": "1m", "input_series": [
+            {"series": f'k3dm_orbstack_info{{{labels},version="{version}"}}', "values": values}
+            for version, values in series],
+            "alert_rule_test": [{"eval_time": eval_time, "alertname": "OrbStackUpgradedMark", "exp_alerts": [
+                {"exp_labels": {"job": "k3dm-orbstack", "version": version}} for version in versions]}]}
+
+    (tmp_path / "test.yaml").write_text(yaml.safe_dump({"rule_files": ["rules.yaml"], "evaluation_interval": "1m",
+        "tests": [
+            case([("2.2.5", "_x119 1x60")], "130m", []),
+            case([("2.2.4", "1x119"), ("2.2.5", "_x119 1x60")], "130m", ["2.2.5"]),
+            case([("2.2.5", "1x60 _x139 1x30")], "210m", []),
+        ]}))
+    result = _promtool(tmp_path, "test", "rules", "test.yaml")
+    assert result.returncode == 0, result.stdout + result.stderr

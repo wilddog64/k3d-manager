@@ -4,7 +4,7 @@
 
 ### Added
 
-- Hermes publishes OrbStack version and update availability metrics hourly; warning alerts and the Host Disk dashboard expose pending updates and version changes.
+- Hermes publishes OrbStack version and update availability metrics hourly; warning alerts and the Host Disk dashboard expose pending updates and version changes. The "OrbStack upgraded" marker fires only when the version differs from one seen in the previous day, not when the metric first appears or returns after a gap.
 
 ### Added
 
