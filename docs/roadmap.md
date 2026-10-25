@@ -453,7 +453,9 @@ complexity plan.
 Plan 4 of 5 is [`plans-table-dispatch-waves-and-file-overlaps`](plans/v1.43.10-plans-table-dispatch-waves-and-file-overlaps.md)
 (operator, 2026-10-25): the Plans table gains a Wave column derived from `Depends on`, an optional
 `**Wave:**` header for timing constraints (such as "after the 10-29 rebuild"), and an Overlaps column
-for same-release plans whose `**Component:**` files overlap with no dependency between them.
+for same-release plans whose `**Component:**` files overlap with no dependency between them. It also
+splits Approval into Spec approval and Dispatch (a new `**Dispatch:**` header), links Depends on to
+the dependency's spec, and adds a Blocked by column.
 v1.43.10 has 4 of 5 plans.
 
 ### Candidate milestone — v1.44.0
