@@ -442,7 +442,13 @@ Plan 2 of 5 is [`claude-quota-exhaustion-availability-telemetry`](plans/v1.43.10
 scheduled reset versus observed resumption, confirmed quota-induced wait and coordinator availability.
 A provider-neutral schema permits later Codex/Gemini adapters, but this plan does not add automatic
 failover. Filed after the first observed five-hour quota cap; v1.43.8 and v1.43.9 are both full.
-Implementation waits for v1.43.10 and operator dispatch approval. v1.43.10 has 2 of 5 plans.
+Implementation waits for v1.43.10 and operator dispatch approval.
+
+Plan 3 of 5 is [`spec-and-fix-quality`](plans/v1.43.10-spec-and-fix-quality.md) (operator, 2026-10-25):
+P3 enhancement measuring spec quality (rework causes, review and independent-verifier results, spec
+edits after dispatch, per spec) and fix quality (escaped defects linked by a `**Caused by:**` bug-doc
+header, per spec and per release), as separate columns with no combined score. Depends on v1.43.9's
+complexity plan. v1.43.10 has 3 of 5 plans.
 
 ### Candidate milestone — v1.44.0
 
