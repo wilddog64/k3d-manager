@@ -610,3 +610,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: worker-model/coordinator bug FIXED 71f70dd2 (Luna; Claude red-checked tests 1/2/4 on pre-fix copy). E2 needs next dispatch with COORDINATOR=anthropic/claude-opus-5-5.
 - 2026-10-25: Per run evidence sorts newest release first 088b113a (padded vsort label + sortBy transform).
 - 2026-10-25: Bug Tracking tiles renamed Open P0..P3 23d725e6.
+- 2026-10-25: Open P0..P3 tiles on own line 251a9a88; all 20 dashboards default refresh 5m 2ee0e901.
