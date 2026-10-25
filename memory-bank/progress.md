@@ -597,3 +597,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 
 - 2026-10-25: filed P3 docs/bugs/2026-10-25-bug-table-fix-commit-ignores-fix-commit-header.md (826fa655) and dispatched to Luna. Plan bug-dashboard-auto-release-selection: Auto live part confirmed (screenshots 283/284), Manual/All still to show. Panel 87 and Worker/Coordinator columns still need screenshots (281 was panel 32; 282 cut off the columns).
 - 2026-10-25: Fix commit column bug FIXED 8a23a66b (landed, pushed); live E2 after next scan + sync.
+- 2026-10-25: claude-tokens-per-day-no-cache-kind-breakdown LIVE-VERIFIED (screenshots 280/288). Readability fix bd8de9e8 (panel 34 wider + h8, Release window only noValue on 29/31, bar value labels 14, continue_prompt→continue on panel 85); live check after sync.

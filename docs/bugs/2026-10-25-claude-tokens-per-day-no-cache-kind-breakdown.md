@@ -1,6 +1,8 @@
 # Bug: Agent Cost cannot show Claude tokens per day or cost by cache kind
 
-**Status:** FIXED 2026-10-25 — `79fab0b1`; pytest 119/119, BATS 23/23, validate-manifests 85/85; Luna showed the new tests red on pre-fix copies. Live E2 pending the operator's screenshot.
+**Status:** LIVE-VERIFIED 2026-10-25 — `79fab0b1`; pytest 119/119, BATS 23/23, validate-manifests 85/85; Luna showed the new tests red on pre-fix copies.
+**Live evidence:** 2026-10-25 · run hub-grafana-agent-cost-cache-kind-screenshots · env hub/k3d-k3d-cluster · scenario agent-cost/claude-by-kind-7d · commit 79fab0b1 · proves E2
+**Live note:** operator screenshots 280 and 288 at Window 7d: panel 87 stacks each day by kind with cache_read the largest (e.g. 2026-10-09 251M); panel 88 cache_read $125.68 + cache_write $91.37 + input $0.04 + output $57.58 = $274.67 against Claude at API prices $274.68 (panel 28, rounding).
 **Fix commit:** `79fab0b1`
 **Review note:** Claude raised the dashboard `$window` expression count 58 → 60. Claude's panel 86 (`ccf7d21e`) had already broken it at 59 because pytest was not rerun before that commit. Luna's `_claude_cost` now treats non-numeric or negative usage as unpriced (N3). Offline on real data, the cost kinds sum to the total in every scope and each day's kinds equal its per-model total. At 7d: cache_read $125.00, cache_write $90.47, output $57.11, input $0.04 of $272.63.
 **Priority:** P3
