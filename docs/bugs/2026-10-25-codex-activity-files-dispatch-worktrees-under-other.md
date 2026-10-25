@@ -1,6 +1,8 @@
 # Bug: Codex activity files every dispatch worktree session under `other`
 
-**Status:** FIXED 2026-10-25 — `9cb1fa09`; pytest 123/123, BATS 21/21, shellcheck clean; 5 new tests red on the pre-fix script (tests 1, 2, 3/6, 4, 7). ruff unavailable locally. Live E2 pending (operator screenshot of Tokens by repo at 7d).
+**Status:** LIVE-VERIFIED 2026-10-25 — `9cb1fa09`; pytest 123/123, BATS 21/21, shellcheck clean; 5 new tests red on the pre-fix script. ruff unavailable locally.
+**Live evidence:** 2026-10-25 · run hub-grafana-agent-activity-tokens-by-repo-screenshot · env hub/k3d-k3d-cluster · scenario agent-activity/tokens-by-repo-7d · commit 9cb1fa09 · proves E2
+**Live note:** operator screenshot 276 at Window 7d: Tokens by repo k3d-manager 896 Mil, shopping-cart-infra 1.91 Mil, shopping-cart-frontend 920 K, other 2.88 Mil.
 **Fix commit:** `9cb1fa09`
 **Review note:** Claude removed an out-of-spec hunk that type-guarded `ts` in `_session_records` (read_ledger already rejects non-numeric `ts`). Offline dry-run at 7d on the operator's data: k3d-manager 593.3M → 895.9M tokens, other 305.5M → 2.9M; total 901.6M and 203 sessions unchanged (N3).
 **Priority:** P3
