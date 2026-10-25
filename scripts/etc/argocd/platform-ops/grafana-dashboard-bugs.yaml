@@ -2293,7 +2293,7 @@ data:
         {
           "id": 28,
           "type": "stat",
-          "title": "Median days between releases",
+          "title": "Median gap (days)",
           "description": "Median gap between the last 12 release tags. A cadence, not the effort one release takes. Earliest and latest forecasts use the 25th and 75th percentile gaps.",
           "gridPos": {
             "x": 4,

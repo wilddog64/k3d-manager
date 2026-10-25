@@ -59,7 +59,7 @@ PY
 import json, sys
 d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
 p={panel["id"]:panel for panel in d["panels"]}
-assert p[28]["title"] == "Median days between releases"
+assert p[28]["title"] == "Median gap (days)"
 assert "cadence, not the effort" in p[28]["description"]
 PY
   [ "${status}" -eq 0 ]
