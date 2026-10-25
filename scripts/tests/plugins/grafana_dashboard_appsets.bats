@@ -368,7 +368,7 @@ _assert_no_panel_overlap() {
   [ "$status" -ne 0 ]
 
   cp "${BUGS_DASHBOARD}" "$snapshot"
-  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .targets[0].expr) |= sub("repo=\\\"\\$repo\\\","; "") | tojson))' "$snapshot"
+  yq -i '(.data["k3dm-bugs.json"] |= (fromjson | (.panels[] | select(.title == "Bugs") | .targets[0].expr) |= sub("repo=\\\"\\$repo\\\",?"; "") | tojson))' "$snapshot"
   run _assert_bugs_table_filter_contract "$snapshot"
   printf 'mutation (query missing repo matcher): status=%s output=%s\n' "$status" "$output"
   [ "$status" -ne 0 ]
