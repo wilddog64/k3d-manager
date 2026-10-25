@@ -44,7 +44,9 @@ EOF
 set -euo pipefail
 printf '%s\n' "$*" >>"${STUB_ARGV:?}"
 printf '%s\n' "$PWD" >>"${STUB_ARGV}.cwd"
+[[ -z "${STUB_MODEL_LINE+x}" ]] || printf '%s\n' "$STUB_MODEL_LINE"
 printf 'session id: 01a122dd-71c3-7763-87f0-3de505f10168\n'
+[[ -z "${STUB_LOG_MARKER:-}" ]] || printf '%s\n' "$STUB_LOG_MARKER"
 printf 'K3DM_REPO_ROOT=%s\nK3DM_JOB_DIR=%s\nK3DM_RUN_DIR=%s\nK3DM_STATE_DIR=%s\nK3DM_LOG_DIR=%s\nK3DM_TMP_ROOT=%s\nK3DM_PORT_CACHE_DIR=%s\nTMPDIR=%s\nHOME=%s\n' "$K3DM_REPO_ROOT" "$K3DM_JOB_DIR" "$K3DM_RUN_DIR" "$K3DM_STATE_DIR" "$K3DM_LOG_DIR" "$K3DM_TMP_ROOT" "$K3DM_PORT_CACHE_DIR" "$TMPDIR" "$HOME" >"${STUB_ENV:?}"
 codex_dir="${K3DM_REPO_ROOT:-}"
 out_file=""
@@ -175,7 +177,41 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug codex >/dev/null
   sleep 1
   [ "$(jq -r 'select(.event=="start")|.agent+":"+(.model|tostring)+":"+.model_source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "codex:null:inherited" ]
+  [ "$(jq -s '[.[]|select(.event=="identity")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
   [[ "$(<"$BATS_TEST_TMPDIR/default.argv")" == "exec --sandbox workspace-write -C $K3DM_WORKTREE_ROOT/v9.9.9/codex --add-dir $K3DM_WORKTREE_ROOT/v9.9.9/codex.run/state -o $K3DM_WORKTREE_ROOT/v9.9.9/codex.run/last-message.md -" ]]
+}
+
+@test "codex dispatch: runtime model is recorded for each attempt without copying other log text" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/runtime.argv" STUB_ENV="$BATS_TEST_TMPDIR/runtime.env"
+  export STUB_MODEL_LINE='model: gpt-test-1' STUB_LOG_MARKER='private-stub-marker'
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug runtime >/dev/null
+  sleep 1
+  [ "$(jq -r 'select(.event=="identity")|.worker_identity.model+":"+.worker_identity.source+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1:runtime:reported" ]
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/runtime-prompt.md"
+  export STUB_MODEL_LINE='model: gpt-test-2'
+  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --coordinator anthropic/claude-test >/dev/null
+  sleep 1
+  [ "$(jq -r -s '[.[]|select(.event=="identity")|.worker_identity.model]|join(",")' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1,gpt-test-2" ]
+  [ "$(jq -r 'select(.event=="resume" and .slug=="runtime")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
+  ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  ! grep -q 'private-stub-marker' "$K3DM_WORKTREE_ROOT/metrics.log"
+}
+
+@test "codex dispatch: invalid runtime model and coordinator are rejected safely" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/invalid.argv" STUB_ENV="$BATS_TEST_TMPDIR/invalid.env"
+  export STUB_MODEL_LINE='model: bad value!'
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-model >/dev/null
+  sleep 1
+  [ "$(jq -s '[.[]|select(.event=="identity" and .slug=="invalid-model")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug bad-coordinator --coordinator 'bad/x y'
+  [ "$status" -eq 2 ] && [[ "$output" == *'invalid coordinator'* ]]
+  [ "$(jq -s '[.[]|select(.event=="start" and .slug=="bad-coordinator")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 0 ]
+}
+
+@test "codex dispatch: declared coordinator is recorded on start" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/coordinator.argv" STUB_ENV="$BATS_TEST_TMPDIR/coordinator.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug coordinator --coordinator anthropic/claude-test >/dev/null
+  [ "$(jq -r 'select(.event=="start" and .slug=="coordinator")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
 }
 
 @test "codex dispatch: agy resume requires and uses its stored conversation" {
@@ -1082,4 +1118,12 @@ EOF
   [ "$status" -eq 0 ]; [[ "$output" == *"--spec 'docs/plans/x.md'"* ]]; [[ "$output" != *"--branch"* ]]
   run env -u BRANCH make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md REPO=/r BRANCH=fix/b
   [ "$status" -eq 0 ]; [[ "$output" == *"--repo '/r' --branch 'fix/b'"* ]]
+}
+
+@test "codex dispatch: make targets pass a declared coordinator" {
+  local root="$BATS_TEST_DIRNAME/../../.."
+  run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
+  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }

@@ -1798,6 +1798,40 @@ def test_model_identity_rejects_unbounded_label_values():
     assert "evil" not in output and "acme" not in output
 
 
+def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
+    output = dispatch_metrics.render([
+        event(1, "start", "runtime", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "runtime", run=1,
+              worker_identity={"vendor": "openai", "model": "gpt-test-1", "source": "runtime", "status": "reported"}),
+        event(3, "resume", "runtime", run=2, n=2,
+              coordinator_identity={"vendor": "anthropic", "model": "claude-test", "source": "declared", "status": "declared"}),
+        event(4, "identity", "runtime", run=2,
+              worker_identity={"vendor": "openai", "model": "gpt-test-2", "source": "runtime", "status": "reported"}),
+        event(5, "land", "runtime"),
+    ], 0, 100)
+    workers = _identity_lines(output, "worker")
+    worker_history = _identity_lines(output, "worker_history")
+    coordinators = _identity_lines(output, "coordinator")
+    assert len(workers) == 1 and 'model="gpt-test-2",source="runtime",status="reported"' in workers[0]
+    assert len(worker_history) == 1 and 'model="gpt-test-1",source="runtime",status="reported"' in worker_history[0]
+    assert len(coordinators) == 1
+    assert 'vendor="anthropic",model="claude-test",source="declared",status="declared"' in coordinators[0]
+
+
+def test_invalid_runtime_identity_does_not_replace_legacy_value():
+    output = dispatch_metrics.render([
+        event(1, "start", "invalid", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "invalid", worker_identity={
+            "vendor": "openai", "model": "bad value!", "source": "runtime", "status": "reported"}),
+        event(3, "land", "invalid"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1 and 'model="unknown",source="inherited",status="unknown"' in worker[0]
+    assert "bad value" not in output
+
+
 def test_per_spec_identity_queries_give_one_row_per_task():
     panels = {panel["title"]: panel for panel in load_dispatch_dashboard()["panels"]}
     per_spec = panels["Per spec"]

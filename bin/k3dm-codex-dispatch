@@ -236,6 +236,13 @@ _dispatch_worker() {
     _dispatch_agy_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code" "$run_number"
   else
     _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write Codex exit marker"
+    local runtime_model
+    runtime_model="$(awk 'NR <= 40 && /^model: [^[:space:]]+$/ {sub(/^model: /, ""); print; exit}' "$log" 2>/dev/null || true)"
+    if [[ "$runtime_model" =~ ^[A-Za-z0-9._:-]{1,64}$ ]]; then
+      _dispatch_ledger_event_best_effort identity "$version" "$slug" --argjson run "$run_number" \
+        --arg vendor openai --arg model "$runtime_model" \
+        '.run=$run|.worker_identity={vendor:$vendor,model:$model,source:"runtime",status:"reported"}'
+    fi
     if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code" "$run_number"; then
       _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
     fi
@@ -263,10 +270,10 @@ _dispatch_error() { echo "[codex-dispatch] ERROR: $*" >&2; exit 2; }
 _dispatch_usage() {
   cat <<'EOF'
 Usage:
-  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--network] [--repo PATH --branch NAME]
+  bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
-  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
+  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
@@ -455,13 +462,14 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git
+  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model=""
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --agent) (($# >= 2)) || _dispatch_error "--agent requires a value"; agent="$2"; shift 2 ;;
       --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; model_source=explicit; shift 2 ;;
+      --coordinator) (($# >= 2)) || _dispatch_error "invalid coordinator"; coordinator="$2"; shift 2 ;;
       --repo) (($# >= 2)) || _dispatch_error "--repo requires a path"; repo="$2"; shift 2 ;;
       --branch) (($# >= 2)) || _dispatch_error "--branch requires a name"; target="$2"; shift 2 ;;
       --network) network=1; shift ;;
@@ -470,6 +478,10 @@ _dispatch_start() {
     esac
   done
   [[ -n "$spec" ]] || _dispatch_error "start requires --spec PATH"
+  if [[ -n "$coordinator" ]]; then
+    [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
+    coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
+  fi
   [[ -z "$repo" && -z "$target" || -n "$repo" && -n "$target" ]] || _dispatch_error "--repo and --branch must be used together"
   case "$repo" in
     \~|\~/*) repo="${HOME}${repo#\~}" ;;
@@ -549,9 +561,9 @@ _dispatch_start() {
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   fi
   local prompt_spec="$spec"
   [[ ! -f "$run/spec.md" ]] || prompt_spec="$(cd "$run" && pwd)/spec.md"
@@ -736,15 +748,20 @@ _dispatch_release_land_lock() {
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run session_id n network_slug agent model
+  local slug="" prompt_file="" rel version task run session_id n network_slug agent model coordinator="" coordinator_vendor="" coordinator_model=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --prompt-file) (($# >= 2)) || _dispatch_error "--prompt-file requires a path"; prompt_file="$2"; shift 2 ;;
+      --coordinator) (($# >= 2)) || _dispatch_error "invalid coordinator"; coordinator="$2"; shift 2 ;;
       *) _dispatch_error "unknown resume option: $1" ;;
     esac
   done
   [[ -n "$slug" ]] || _dispatch_error "resume requires --slug SLUG"
+  if [[ -n "$coordinator" ]]; then
+    [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
+    coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
+  fi
   [[ -n "$prompt_file" ]] || _dispatch_error "resume requires --prompt-file PATH"
   [[ -s "$prompt_file" ]] || _dispatch_error "prompt file is missing or empty: $prompt_file"
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"; task="$_dispatch_task_dir"; run="$_dispatch_run_dir"
@@ -774,7 +791,7 @@ _dispatch_resume() {
   rm -f "$run/exit" "$run/start"
   _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited '.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }

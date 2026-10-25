@@ -404,7 +404,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',)
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
 
 ## Show Codex worktree task status
 codex-status:
@@ -420,7 +420,7 @@ codex-land-pending:
 
 ## Resume a Codex task (SLUG=slug, PROMPT=path)
 codex-resume:
-	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)'
+	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
 
 ## Abandon a Codex task (SLUG=slug, YES=1 to remove)
 codex-abandon:

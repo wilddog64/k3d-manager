@@ -634,6 +634,30 @@ def _task_metrics(task_events, land_event, prices=None):
             has_agent_tokens = True
     start_events = [event for event in task_events if event.get("event") == "start"]
     latest_start = max(enumerate(start_events), key=lambda item: (item[1].get("ts", 0), item[0]))[1] if start_events else {}
+    identity_events = [event for event in ordered if event[1].get("event") == "identity"]
+    valid_identities = []
+    latest_runtime_identity = None
+    for _, identity_event in identity_events:
+        identity = identity_event.get("worker_identity")
+        if (isinstance(identity, dict) and identity.get("source") == "runtime"
+                and identity.get("status") == "reported"
+                and identity.get("vendor") in {"openai", "google"}
+                and isinstance(identity.get("model"), str)
+                and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", identity["model"])):
+            latest_runtime_identity = identity
+            if identity not in valid_identities:
+                valid_identities.append(identity)
+    if latest_runtime_identity is not None:
+        worker_identity = latest_runtime_identity
+    else:
+        worker_identity = latest_start.get("worker_identity") if isinstance(latest_start.get("worker_identity"), dict) else {}
+    declared_coordinators = [event.get("coordinator_identity") for _, event in ordered
+                             if event.get("event") in {"start", "resume"}
+                             and isinstance(event.get("coordinator_identity"), dict)
+                             and event["coordinator_identity"].get("source") == "declared"
+                             and event["coordinator_identity"].get("status") == "declared"]
+    coordinator_identity = declared_coordinators[-1] if declared_coordinators else (
+        latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {})
     elapsed = None
     if start_events:
         elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
@@ -658,8 +682,9 @@ def _task_metrics(task_events, land_event, prices=None):
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
         "spec": latest_start.get("spec"),
         "agent": latest_start.get("agent") if latest_start.get("agent") in {"codex", "agy"} else ("codex" if "agent" not in latest_start else "other"),
-        "worker_identity": latest_start.get("worker_identity") if isinstance(latest_start.get("worker_identity"), dict) else {},
-        "coordinator_identity": latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {},
+        "worker_identity": worker_identity,
+        "worker_runtime_identities": valid_identities,
+        "coordinator_identity": coordinator_identity,
     }
 
 
@@ -968,7 +993,8 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
                       task["agent_tokens"], task["agent_seconds"], repo,
-                      task["worker_identity"], task["coordinator_identity"], task["post_exit_land_seconds"]))
+                      task["worker_identity"], task["coordinator_identity"], task["post_exit_land_seconds"],
+                      task["worker_runtime_identities"]))
 
     return {
         "landed": len(landed),
@@ -1119,17 +1145,23 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             continue
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
-         agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity, post_exit_land) in valid_tasks[:TASK_CAP]:
+         agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity, post_exit_land,
+         worker_runtime_identities) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
         def identity_labels(identity, role):
+            source = identity.get("source") if identity.get("source") in {"explicit", "default", "inherited", "runtime", "unreported", "declared"} else "unreported"
             vendor = identity.get("vendor") if identity.get("vendor") in {"openai", "google", "anthropic", "unknown"} else "unknown"
+            if source == "declared" and isinstance(identity.get("vendor"), str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", identity["vendor"]):
+                vendor = identity["vendor"]
             model = identity.get("model")
-            if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", model):
+            if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", model):
                 model = "unknown"
-            source = identity.get("source") if identity.get("source") in {"explicit", "default", "inherited", "runtime", "unreported"} else "unreported"
-            status = identity.get("status") if identity.get("status") in {"selected", "runtime_reported", "unverified", "unknown"} else "unknown"
+            status = identity.get("status") if identity.get("status") in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
             lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}"}} 1')
         identity_labels(worker_identity, "worker")
+        for reported_identity in worker_runtime_identities:
+            if reported_identity != worker_identity:
+                identity_labels(reported_identity, "worker_history")
         identity_labels(coordinator_identity, "coordinator")
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')

@@ -23,6 +23,8 @@
 
 ### Fixed
 
+- Agent Dispatch records the model reported in each Codex attempt and accepts an explicit `COORDINATOR=<vendor>/<model>` identity for dispatch and resume metrics.
+
 - Bug Tracking's **Fix commit** now prefers a bug doc's **Fix commit:** header, including headers with a trailing note or a comma-separated SHA list; it falls back to the commit that marked the bug fixed.
 - Agent Dispatch Claude usage rollup: overlapping cache saves now use private temporary files, and a failed save reports the error while allowing metrics export to continue.
 - Agent Activity now maps Codex dispatch worktree sessions to their dispatched repository, keeping their session and token totals out of `other`.
