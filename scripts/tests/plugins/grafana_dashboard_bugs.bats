@@ -509,9 +509,10 @@ elif check == "sort":
     assert sort == [{"field": "sort_key", "desc": False}], sort
 elif check == "layout":
     assert panels[22]["type"] == "row"
-    assert table["gridPos"] == {"x": 0, "y": 51, "w": 24, "h": 12}, table["gridPos"]
-    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 51 for i in (9, 10, 11, 12, 13, 14, 16, 17))
-    assert panels[15]["gridPos"]["y"] == 63
+    assert table["gridPos"] == {"x": 0, "y": 53, "w": 24, "h": 12}, table["gridPos"]
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 50 for i in (9, 10, 11, 12))
+    assert all(panels[i]["gridPos"]["y"] + panels[i]["gridPos"]["h"] == 53 for i in (13, 14, 16, 17))
+    assert panels[15]["gridPos"]["y"] == 65
     rows = sorted((p["gridPos"]["y"], p["id"]) for p in data["panels"] if p["type"] == "row")
     owner = [rid for y, rid in rows if y <= table["gridPos"]["y"]][-1]
     assert owner == 22, owner
@@ -551,11 +552,11 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 live = panels[24]
 assert live["title"] == "Live-verified"
 assert 'live_verified="true"' in live["targets"][0]["expr"]
-assert panels[13]["gridPos"] == {"x": 8, "y": 47, "w": 3, "h": 4}
-assert panels[16]["gridPos"] == {"x": 11, "y": 47, "w": 3, "h": 4}
-assert live["gridPos"] == {"x": 14, "y": 47, "w": 4, "h": 4}
-assert panels[17]["gridPos"] == {"x": 18, "y": 47, "w": 3, "h": 4}
-assert panels[14]["gridPos"] == {"x": 21, "y": 47, "w": 3, "h": 4}
+assert panels[13]["gridPos"] == {"x": 0, "y": 50, "w": 5, "h": 3}
+assert panels[16]["gridPos"] == {"x": 5, "y": 50, "w": 5, "h": 3}
+assert live["gridPos"] == {"x": 10, "y": 50, "w": 5, "h": 3}
+assert panels[17]["gridPos"] == {"x": 15, "y": 50, "w": 5, "h": 3}
+assert panels[14]["gridPos"] == {"x": 20, "y": 50, "w": 4, "h": 3}
 table = panels[23]
 assert 'live_verified=~"$verified"' in table["targets"][0]["expr"]
 PY
@@ -683,6 +684,7 @@ def walk(panels):
         yield from walk(p.get("panels", []))
 tiles={p["title"]: p for p in walk(d["panels"]) if any('status="open",priority="P' in t.get("expr", "") for t in p.get("targets", []))}
 assert set(tiles) == {"Open P0", "Open P1", "Open P2", "Open P3"}, sorted(tiles)
+assert all(p["gridPos"]["w"] >= 4 for p in tiles.values()), [p["gridPos"] for p in tiles.values()]
 PY
   [ "${status}" -eq 0 ]
 }
