@@ -369,3 +369,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: panels 84/85 h 6->8 583d092c (values clipped with names on top).
 - 2026-10-25: worker-model/coordinator bug FIXED 71f70dd2 (Luna; Claude red-checked tests 1/2/4 on pre-fix copy). E2 needs next dispatch with COORDINATOR=anthropic/claude-opus-5-5.
 - 2026-10-25: Per run evidence sorts newest release first 088b113a (padded vsort label + sortBy transform).
+- 2026-10-25: Bug Tracking tiles renamed Open P0..P3 23d725e6.
