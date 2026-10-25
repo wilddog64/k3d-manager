@@ -619,3 +619,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: P3 bug plans-dispatch-shows-awaiting-land-after-land fixed by Claude 6b847dd0 (lifecycle-only _dispatch_state); E2 next metrics push.
 - 2026-10-25: Remaining releases date-only forecasts + fit widths 4c2e15e0; awaiting-land bug E2 PASSED (screenshot 330).
 - 2026-10-25: Remaining releases forecast headers renamed Earliest/Expected/Latest 891ccc4c.
+- 2026-10-25: v1.43.7 release prep — CHANGELOG promoted, releases rows, not_before dropped, pending live E-items carried forward (roadmap) a9269fc6.
