@@ -431,11 +431,17 @@ dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 ## Put the agy recording wrapper first on PATH
-AGY_WRAPPER_DIR ?= $(HOME)/.local/bin
+AGY_WRAPPER_DIR ?= $(HOME)/.local/share/k3d-manager/bin
 agy-wrapper-install:
-	@mkdir -p "$(AGY_WRAPPER_DIR)"
-	@ln -sf "$(CURDIR)/bin/k3dm-agy" "$(AGY_WRAPPER_DIR)/agy"
-	@type -a agy
+	@_t="$(AGY_WRAPPER_DIR)/agy"; \
+	if [ -e "$$_t" ] || [ -L "$$_t" ]; then \
+	  if [ ! -L "$$_t" ] || [ "$$(readlink "$$_t")" != "$(CURDIR)/bin/k3dm-agy" ]; then \
+	    echo "[make] ERROR: $$_t exists and is not the k3dm-agy wrapper; refusing to replace it (set AGY_WRAPPER_DIR to a dedicated dir)" >&2; exit 1; \
+	  fi; \
+	fi; \
+	mkdir -p "$(AGY_WRAPPER_DIR)" && ln -sfn "$(CURDIR)/bin/k3dm-agy" "$$_t"
+	@case ":$$PATH:" in *":$(AGY_WRAPPER_DIR):"*) ;; *) echo "[make] add $(AGY_WRAPPER_DIR) to the front of PATH, ahead of the real agy" ;; esac
+	@type -a agy || true
 
 agy-wrapper-uninstall:
 	@if [ -L "$(AGY_WRAPPER_DIR)/agy" ] && [ "$$(readlink "$(AGY_WRAPPER_DIR)/agy")" = "$(CURDIR)/bin/k3dm-agy" ]; then rm "$(AGY_WRAPPER_DIR)/agy"; fi

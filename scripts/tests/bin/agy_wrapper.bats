@@ -110,3 +110,24 @@ assert json.loads(open(sys.argv[1]).read())['usage']=={'input_tokens':12,'output
 PY
   [ "$status" -eq 0 ]
 }
+
+@test "agy wrapper install: refuses to replace a real agy binary in the target dir" {
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\necho real\n' >"$BATS_TEST_TMPDIR/bin/agy"
+  chmod +x "$BATS_TEST_TMPDIR/bin/agy"
+  cp "$BATS_TEST_TMPDIR/bin/agy" "$BATS_TEST_TMPDIR/expected"
+  run make -s -C "$ROOT" agy-wrapper-install AGY_WRAPPER_DIR="$BATS_TEST_TMPDIR/bin"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not the k3dm-agy wrapper"* ]]
+  [ ! -L "$BATS_TEST_TMPDIR/bin/agy" ]
+  cmp "$BATS_TEST_TMPDIR/bin/agy" "$BATS_TEST_TMPDIR/expected"
+}
+
+@test "agy wrapper install: default dir is not ~/.local/bin and reinstall is idempotent" {
+  grep -qxF 'AGY_WRAPPER_DIR ?= $(HOME)/.local/share/k3d-manager/bin' "$ROOT/Makefile"
+  run make -s -C "$ROOT" agy-wrapper-install AGY_WRAPPER_DIR="$BATS_TEST_TMPDIR/wbin"
+  [ "$status" -eq 0 ]
+  run make -s -C "$ROOT" agy-wrapper-install AGY_WRAPPER_DIR="$BATS_TEST_TMPDIR/wbin"
+  [ "$status" -eq 0 ]
+  [ -L "$BATS_TEST_TMPDIR/wbin/agy" ]
+}
