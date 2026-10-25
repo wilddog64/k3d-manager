@@ -1041,3 +1041,11 @@ EOF
   run bash -c 'source "$1"; _dispatch_schedule_metrics' _ "$source_file"
   [ "$status" -eq 0 ]; [ ! -e "$METRICS_STARTS" ]
 }
+
+@test "codex dispatch: make codex-dispatch passes --branch only when BRANCH is given" {
+  root="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  run env -u BRANCH -u REPO make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md
+  [ "$status" -eq 0 ]; [[ "$output" == *"--spec 'docs/plans/x.md'"* ]]; [[ "$output" != *"--branch"* ]]
+  run env -u BRANCH make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md REPO=/r BRANCH=fix/b
+  [ "$status" -eq 0 ]; [[ "$output" == *"--repo '/r' --branch 'fix/b'"* ]]
+}
