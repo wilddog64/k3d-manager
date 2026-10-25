@@ -613,3 +613,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: Open P0..P3 tiles on own line 251a9a88; all 20 dashboards default refresh 5m 2ee0e901.
 - 2026-10-25: bug summary tiles back on one row (h3, Open tiles w2 without duplicate description); Per spec Worker/Coordinator blank when unknown 37c2f5e2.
 - 2026-10-25: Per spec full width (w24, minWidth 80), Last update + Rework rate side by side at y22 e6d7056d.
+- 2026-10-25: Bugs + Plans tables narrowed to fit without horizontal scroll 6010a426.
