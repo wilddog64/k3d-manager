@@ -99,8 +99,10 @@ def test_host_disk_dashboard_keeps_its_panels_and_adds_only_orbstack():
     assert after["panels"][:len(before["panels"])] == before["panels"]
     assert [panel["title"] for panel in added_panels] == ["OrbStack"]
     assert [item["name"] for item in after["annotations"]["list"]] == ["OrbStack upgraded"]
-    assert {key: value for key, value in after.items() if key not in ("panels", "annotations")} == \
-        {key: value for key, value in before.items() if key not in ("panels", "annotations")}
+    # agent-audit: allow assert-removed refresh moved out of the key-equality pin to its own 5m assertion (v1.43.7 dashboard refresh)
+    assert after["refresh"] == "5m"
+    assert {key: value for key, value in after.items() if key not in ("panels", "annotations", "refresh")} == \
+        {key: value for key, value in before.items() if key not in ("panels", "annotations", "refresh")}
 
 
 def test_n1_guide_does_not_reference_missing_dashboard():
