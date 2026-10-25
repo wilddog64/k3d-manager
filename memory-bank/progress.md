@@ -505,3 +505,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-24: agent-dashboards-split LIVE-VERIFIED (E2): three dashboards linked on hub, Window 7d carried; Activity var custom 1d/7d/30d read from the deployed ConfigMap.
 - 2026-10-24: agent-dashboards-split verify pass recorded (verifier claude) + Live evidence line; dry run: k3dm_dispatch_delivered 7d=1, codex_tokens_per_delivered 146571. Plan 2 E4 awaits the next metrics push + operator screenshot of Codex tokens per verified spec.
 - 2026-10-24: codex-all-sessions-api-cost P3 retargeted to Agent Activity (panel 58 moved by split) + ## Files added; chosen as the operator's first hands-on Codex dispatch (Codex baseline for the vendor trial).
+- 2026-10-24: operator dispatched 2026-10-24-codex-all-sessions-api-cost-never-shown to Luna from tmux work:4.0 (first operator-run dispatch); running, touching exporter + pytest so far.
