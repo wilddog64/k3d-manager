@@ -388,9 +388,12 @@ Plan 2 of 5 is [`slack-route-system-notices-to-status-channel`](plans/v1.43.8-sl
 channel (#grafana-notification), and operator- and agent-started posts stay in #acg-automation. The
 operator swaps the CronJob incoming webhook so ACG expiry and rotator notices follow.
 
-Plan 3 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.8-dispatch-claude-cost-by-reference.md)
-(operator, 2026-10-24): each spec is charged with the Claude turns whose tool calls name it (spec file,
-worktree, `SLUG=`), including spec writing, instead of all Claude usage while it was dispatched.
+Plan 3 of 5 is [`plans-table-dispatch-waves-and-file-overlaps`](plans/v1.43.8-plans-table-dispatch-waves-and-file-overlaps.md)
+(operator, 2026-10-25; moved from v1.43.10 the same day, swapping with Claude cost-by-reference): the Plans
+table gains a Wave column derived from `Depends on`, an optional `**Wave:**` header for timing constraints,
+an Overlaps column for same-release plans whose `**Component:**` files overlap with no dependency, Spec
+approval and Dispatch columns (a new `**Dispatch:**` header) in place of Approval, Depends on links and a
+Blocked by column.
 
 Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md)
 (operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
@@ -450,13 +453,10 @@ edits after dispatch, per spec) and fix quality (escaped defects linked by a `**
 header, per spec and per release), as separate columns with no combined score. Depends on v1.43.9's
 complexity plan.
 
-Plan 4 of 5 is [`plans-table-dispatch-waves-and-file-overlaps`](plans/v1.43.10-plans-table-dispatch-waves-and-file-overlaps.md)
-(operator, 2026-10-25): the Plans table gains a Wave column derived from `Depends on`, an optional
-`**Wave:**` header for timing constraints (such as "after the 10-29 rebuild"), and an Overlaps column
-for same-release plans whose `**Component:**` files overlap with no dependency between them. It also
-splits Approval into Spec approval and Dispatch (a new `**Dispatch:**` header), links Depends on to
-the dependency's spec, and adds a Blocked by column.
-v1.43.10 has 4 of 5 plans.
+Plan 4 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.10-dispatch-claude-cost-by-reference.md)
+(operator, 2026-10-24; moved from v1.43.8 on 2026-10-25): each spec is charged with the Claude turns whose
+tool calls name it (spec file, worktree, `SLUG=`), including spec writing, instead of all Claude usage
+while it was dispatched. v1.43.10 has 4 of 5 plans.
 
 ### Candidate milestone — v1.44.0
 
