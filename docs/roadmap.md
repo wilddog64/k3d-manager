@@ -338,7 +338,10 @@ v1.43.5 plan 5's Claude scan.
 
 Plan 5, `hub-argocd-pinned-upgrade`, moved to v1.43.7 on 2026-10-24 (Claude, operator-approved). Its live
 evidence is the upgrade itself, which waits for the 2026-11-03 window, and v1.43.6 should ship before then.
-**v1.43.6 now has four plans.**
+Plan 5 is now `agent-dashboards-split` (`docs/plans/v1.43.6-agent-dashboards-split.md`, added 2026-10-24 at the
+operator's request). It splits Agent Dispatch into three linked dashboards: Dispatch, Cost and Activity.
+It costs no delay, because the release waits for plan 3's E6 until ~10-26, and it lands before v1.43.7's
+dashboard plans add more panels. **v1.43.6 has five plans: the cap.**
 
 ### Candidate milestone — v1.43.7 (patch)
 
