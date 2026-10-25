@@ -1,6 +1,6 @@
 # Bug: Rejected-attempt Codex tokens shows No data when no run was rejected
 
-**Status:** OPEN — spec ready; dispatch to Luna after `2026-10-25-dispatch-per-spec-blank-for-agy-landed-specs` lands (same file)
+**Status:** DISPATCHED to Luna 2026-10-25 (after the agy per-spec task landed as `be7ef686`)
 **Priority:** P3
 **Severity:** low — the panel says "unavailable" when the true answer is a measured 0
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)

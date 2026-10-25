@@ -1,6 +1,6 @@
 # Bug: Agent Dispatch Per spec and Per run evidence show no tokens or time for an agy-landed spec
 
-**Status:** OPEN — part 1 (Agent column) fixed by Claude; part 2 (metrics) dispatched to Luna
+**Status:** PARTLY FIXED 2026-10-25 — F1 (Agent column, Claude) and F2/F3 (agent-neutral series, Luna, landed `be7ef686`; 89/89 pytest, new tests red on the pre-fix script, ruff clean) done; F4 dashboard (Claude) pending
 **Priority:** P3
 **Severity:** low — the ledger has the data; the dashboard hides it, so agy and Codex cannot be compared per spec
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
