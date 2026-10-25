@@ -90,6 +90,41 @@ for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
   [ "${status}" -eq 0 ]
 }
 
+@test "rows and corpus panel formats document counts as whole documents" {
+  run python3 -c '
+import json, sys
+text = open(sys.argv[1]).read()
+dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
+panel = next(panel for panel in dashboard["panels"] if panel.get("id") == 1)
+defaults = panel["fieldConfig"]["defaults"]
+assert defaults.get("unit") == "none", defaults
+assert defaults.get("decimals") == 0, defaults
+assert all(target["expr"] in {"k3dm_vectordb_rows", "k3dm_vectordb_corpus_docs"} for target in panel["targets"])
+assert len(panel["targets"]) == 2
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "rows and corpus remain distinguishable when their values overlap" {
+  run python3 -c '
+import json, sys
+text = open(sys.argv[1]).read()
+dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
+panel = next(panel for panel in dashboard["panels"] if panel.get("id") == 1)
+styles = {}
+for override in panel.get("fieldConfig", {}).get("overrides", []):
+    name = override.get("matcher", {}).get("options")
+    for prop in override.get("properties", []):
+        if prop.get("id") == "custom.lineStyle":
+            styles[name] = prop.get("value", {}).get("fill")
+assert styles.get("rows (last published)") == "dash", styles
+assert styles.get("corpus docs (last published)") == "solid", styles
+assert panel.get("options", {}).get("tooltip", {}).get("mode") == "multi", panel.get("options")
+assert panel.get("options", {}).get("legend", {}).get("showLegend") is True, panel.get("options")
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "vectordb dashboard is no longer in the app-cluster dashboard folder" {
   [ ! -e "${OLD_DASHBOARD}" ]
 }
