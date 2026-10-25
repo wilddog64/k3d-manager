@@ -364,12 +364,10 @@ Plan 2 of 5 is [`dispatch-vendor-coordinator-model-telemetry`](plans/v1.43.7-dis
 
 Plan 3 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
 
-Plan 4, `bug-dashboard-auto-release-selection`, moved to v1.43.9 on 2026-10-24 to make room for the hub ArgoCD
-upgrade.
-
-Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
-(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
-per release on Agent Dispatch, as separate columns with no combined score. v1.43.7 is now full.
+Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashboard-auto-release-selection.md)
+(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
+hard-coded version. Moved to v1.43.9 on 2026-10-24, and back on 2026-10-25 (Claude) when the operator asked for it
+now; it swapped places with `dispatch-spec-and-change-complexity`, which had not started. v1.43.7 is full.
 
 ### Candidate milestone — v1.43.8 (patch)
 
@@ -404,10 +402,10 @@ on 2026-10-24. It publishes the sweep's per-outcome counts and the age of the ol
 adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live needs
 `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
 
-Plan 2 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.9-bug-dashboard-auto-release-selection.md)
-(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
-hard-coded version. Moved from v1.43.5 on 2026-10-23 and again from v1.43.7 on 2026-10-24, to make room for the hub
-ArgoCD upgrade.
+Plan 2 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.9-dispatch-spec-and-change-complexity.md)
+(operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
+per release on Agent Dispatch, as separate columns with no combined score. Moved from v1.43.7 on 2026-10-25
+(Claude), swapping with `bug-dashboard-auto-release-selection`.
 
 Plan 3 of 5 is [`vectordb-drift-kinds-and-age`](plans/v1.43.9-vectordb-drift-kinds-and-age.md) (operator,
 2026-10-24). It splits VectorDB drift into missing, stale-hash and deleted docs (the net count can read 0 while docs
