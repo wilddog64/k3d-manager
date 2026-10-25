@@ -560,7 +560,7 @@ data:
           "title": "Untracked by repo",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 0,
             "y": 20
@@ -611,7 +611,7 @@ data:
           "title": "Sessions by mode",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 6,
             "y": 20
@@ -662,7 +662,7 @@ data:
           "title": "Tokens by repo",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 12,
             "y": 20
@@ -718,7 +718,7 @@ data:
           "title": "Codex active hours",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 18,
             "y": 20
@@ -767,7 +767,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 26
+            "y": 28
           },
           "datasource": {
             "type": "prometheus",
@@ -808,7 +808,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 32
+            "y": 34
           }
         },
         {
@@ -825,7 +825,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 33
+            "y": 35
           },
           "datasource": {
             "type": "prometheus",
@@ -871,7 +871,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 33
+            "y": 35
           },
           "datasource": {
             "type": "prometheus",
@@ -917,7 +917,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 33
+            "y": 35
           },
           "datasource": {
             "type": "prometheus",
@@ -963,7 +963,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 33
+            "y": 35
           },
           "datasource": {
             "type": "prometheus",
@@ -1004,7 +1004,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 39
+            "y": 41
           }
         },
         {
@@ -1018,10 +1018,10 @@ data:
           "title": "agy sessions",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 0,
-            "y": 40
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",
@@ -1064,10 +1064,10 @@ data:
           "title": "Untracked agy sessions",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 6,
-            "y": 40
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",
@@ -1110,10 +1110,10 @@ data:
           "title": "agy active hours",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 12,
-            "y": 40
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",
@@ -1151,10 +1151,10 @@ data:
           "title": "agy sessions by mode",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 18,
-            "y": 40
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",
@@ -1202,10 +1202,10 @@ data:
           "title": "agy untracked by repo",
           "description": "",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 0,
-            "y": 46
+            "y": 50
           },
           "datasource": {
             "type": "prometheus",
@@ -1258,10 +1258,10 @@ data:
           "title": "agy tokens",
           "description": "No data means no wrapped agy run reported parseable usage; interactive runs do not carry usage.",
           "gridPos": {
-            "h": 6,
+            "h": 8,
             "w": 6,
             "x": 6,
-            "y": 46
+            "y": 50
           },
           "datasource": {
             "type": "prometheus",
@@ -1302,7 +1302,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 26
+            "y": 28
           },
           "datasource": {
             "type": "prometheus",

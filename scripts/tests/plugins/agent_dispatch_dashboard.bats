@@ -333,6 +333,8 @@ for p in panels:
     assert p.get("options",{}).get("namePlacement")==want,(p["id"],p["gridPos"]["w"])  # agent-audit: allow assert-removed narrow gauges put names above the bar so long repo names fit
     text_sizes=p.get("options",{}).get("text",{})
     assert text_sizes.get("titleSize") and text_sizes.get("valueSize"),p["id"]
+    if want=="top":
+      assert p["gridPos"]["h"]>=8,(p["id"],p["gridPos"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
