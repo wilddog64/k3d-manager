@@ -1316,7 +1316,7 @@ data:
         },
         {
           "id": 48,
-          "type": "stat",
+          "type": "bargauge",
           "title": "First-pass live verification",
           "description": "First recorded independent verification result for directly linked live-verified bug documents. Unmatched tasks are excluded; no data means no attributable first-pass result.",
           "gridPos": {
@@ -1357,21 +1357,12 @@ data:
             "overrides": []
           },
           "options": {
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "orientation": "vertical",
-            "textMode": "value_and_name",
-            "colorMode": "value",
-            "graphMode": "none",
-            "justifyMode": "center",
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left",
             "text": {
               "titleSize": 14,
-              "valueSize": 32
+              "valueSize": 24
             }
           }
         }

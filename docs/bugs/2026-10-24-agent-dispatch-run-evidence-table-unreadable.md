@@ -42,9 +42,10 @@ On k3dm Agent Dispatch, row **Run outcomes and verified bug cost**:
    `https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md`.
 5. **First-pass live verification** (panel 48) moves beside the table, like Last update beside
    Per spec: `x: 0`, `w: 6`, `h: 10` at the table's `y`; the table narrows to `x: 6`, `w: 18`. The
-   panel is a stat like Last update and Rework rate (`valueSize` 32, `titleSize` 14, value and name,
-   stacked vertically). Requested by the operator 2026-10-25 (screenshots 226, 227–228): as a
-   bar gauge it auto-sized its text so large that `pass` truncated to `p…`.
+   panel stays a horizontal bar gauge with names on the left, with fixed text sizes (`titleSize`
+   14, `valueSize` 24). Requested by the operator 2026-10-25 (screenshots 226, 227, 231): with
+   auto-sized text the names grew so large that `pass` truncated to `p…`. A stat version was tried
+   and rejected; the operator preferred the bars.
 6. The pre-split fixture test exempts bar gauge orientation keys on every dashboard and panel 47,
    which the new test covers.
 
@@ -59,7 +60,7 @@ must:
   - id: M3
     text: Each slug opens its plan or bug spec on GitHub.
   - id: M4
-    text: First-pass live verification sits left of Per run evidence on the same rows, with the same height, and shows each result name in full at stat-panel font size.
+    text: First-pass live verification sits left of Per run evidence on the same rows, with the same height, and shows each result name in full at a fixed font size.
 must_not:
   - id: N1
     text: No raw plumbing column (Time, __name__, job, window, doc, Value #A) may be shown.

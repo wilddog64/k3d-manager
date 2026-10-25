@@ -311,7 +311,7 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent dispatch: run outcomes read beside each bar, first-pass verification is a named stat beside per run evidence, and each slug links to its spec" {
+@test "agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec" {
   run python3 - "$BASE" <<'PY'
 import json,re,sys
 from pathlib import Path
@@ -323,8 +323,8 @@ table=panels[47]
 fp,tg=panels[48]["gridPos"],table["gridPos"]
 assert fp["y"]==tg["y"] and fp["h"]==tg["h"] and fp["x"]==0 and fp["x"]+fp["w"]==tg["x"] and tg["x"]+tg["w"]==24,(fp,tg)
 fpo=panels[48]["options"]
-assert panels[48]["type"]=="stat" and fpo.get("textMode")=="value_and_name" and fpo.get("orientation")=="vertical",fpo
-assert fpo.get("text")=={"titleSize":14,"valueSize":32},fpo
+assert panels[48]["type"]=="bargauge" and fpo.get("orientation")=="horizontal" and fpo.get("namePlacement")=="left",fpo
+assert fpo.get("text")=={"titleSize":14,"valueSize":24},fpo
 for target in table["targets"]:
   assert target["expr"].startswith("sum by (version, slug, run, ") and 'label_join(' in target["expr"] and '"doc", "plans/$1"' in target["expr"] and '"doc", "bugs/$1"' in target["expr"]
 ids=[t["id"] for t in table.get("transformations",[])]
