@@ -480,7 +480,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
         fixed_item = (fixed_in or {}).get(path) or {}
-        fix_commit = doc_fix_commit(text) if status == "fixed" else None
+        fix_commit = doc_fix_commit(texts.get(path, "")) if status == "fixed" else None
         if not fix_commit and status == "fixed":
             fix_commit = fixed_item.get("commit", "")
         fix_sha = fix_commit[:8] if isinstance(fix_commit, str) else "-"

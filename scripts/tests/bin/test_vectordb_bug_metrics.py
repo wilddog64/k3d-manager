@@ -1013,6 +1013,20 @@ def test_bug_fix_sha_prefers_header_and_falls_back_safely(metrics, tmp_path):
     assert 'fix_sha="-"' in output
 
 
+def test_bug_fix_sha_reads_each_docs_own_header(metrics, tmp_path):
+    with_header = "**Priority:** P3\n**Status:** FIXED\n**Fix commit:** `79fab0b1`\n"
+    without_header = "**Priority:** P3\n**Status:** FIXED\n"
+    texts = {"docs/bugs/2026-10-25-with-header.md": with_header,
+             "docs/bugs/2026-10-25-without-header.md": without_header}
+    output = metrics._bug_status_metrics(tmp_path, texts=texts, tally={
+        "v1.43.7": {"closed_paths": [{"path": path} for path in texts]}
+    }, fixed_in={"docs/bugs/2026-10-25-with-header.md": {"release": "v1.43.7", "commit": "aaaaaaaa11"},
+                 "docs/bugs/2026-10-25-without-header.md": {"release": "v1.43.7", "commit": "bbbbbbbb22"}})
+    rows = {re.search(r'bug="([^"]+)"', line).group(1): re.search(r'fix_sha="([^"]+)"', line).group(1)
+            for line in output.splitlines() if line.startswith("k3dm_bug_info{")}
+    assert rows == {"2026-10-25-with-header": "79fab0b1", "2026-10-25-without-header": "bbbbbbbb"}, rows
+
+
 def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metrics, monkeypatch, tmp_path):
     tags = ["v1.9.0", "v1.10.0", "v1.38.0", "v1.39.0", "v1.40.0", "v1.41.0", "v1.42.0", "v1.43.1", "v1.44.0", "not-a-tag"]
     tally = {"v1.43.0": _bucket(P2={"open": 3, "closed": 4}), "v1.42.0": _bucket(P1={"closed": 3}),
