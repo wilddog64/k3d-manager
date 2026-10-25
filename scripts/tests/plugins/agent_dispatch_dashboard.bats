@@ -223,6 +223,8 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
+      if field=="options" and panel["id"]==48:
+        continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
       assert new==old_field,(panel["id"],field)
@@ -309,7 +311,7 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent dispatch: run outcomes read beside each bar, first-pass verification sits beside per run evidence, and each slug links to its spec" {
+@test "agent dispatch: run outcomes read beside each bar, first-pass verification is a named stat beside per run evidence, and each slug links to its spec" {
   run python3 - "$BASE" <<'PY'
 import json,re,sys
 from pathlib import Path
@@ -320,7 +322,9 @@ assert panels[43]["options"].get("orientation")=="horizontal" and panels[43]["op
 table=panels[47]
 fp,tg=panels[48]["gridPos"],table["gridPos"]
 assert fp["y"]==tg["y"] and fp["h"]==tg["h"] and fp["x"]==0 and fp["x"]+fp["w"]==tg["x"] and tg["x"]+tg["w"]==24,(fp,tg)
-assert panels[48]["options"].get("orientation")=="horizontal" and panels[48]["options"].get("namePlacement")=="left"
+fpo=panels[48]["options"]
+assert panels[48]["type"]=="stat" and fpo.get("textMode")=="value_and_name" and fpo.get("orientation")=="vertical",fpo
+assert fpo.get("text")=={"titleSize":14,"valueSize":32},fpo
 for target in table["targets"]:
   assert target["expr"].startswith("sum by (version, slug, run, ") and 'label_join(' in target["expr"] and '"doc", "plans/$1"' in target["expr"] and '"doc", "bugs/$1"' in target["expr"]
 ids=[t["id"] for t in table.get("transformations",[])]
