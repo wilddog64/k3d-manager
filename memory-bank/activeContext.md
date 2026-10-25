@@ -356,3 +356,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: wrote docs/plans/v1.43.10-context-threshold-release-comparison.md (READY; v1.43.9 was full at 5, so split into new patch v1.43.10, recorded in docs/roadmap.md). Compare cost per live-verified spec, re-read share (shell reads counted), first pass + prompts per release before changing the compaction threshold.
 
 - 2026-10-25: filed P3 docs/bugs/2026-10-25-bug-table-fix-commit-ignores-fix-commit-header.md (826fa655) and dispatched to Luna. Plan bug-dashboard-auto-release-selection: Auto live part confirmed (screenshots 283/284), Manual/All still to show. Panel 87 and Worker/Coordinator columns still need screenshots (281 was panel 32; 282 cut off the columns).
+- 2026-10-25: Fix commit column bug FIXED 8a23a66b (landed, pushed); live E2 after next scan + sync.
