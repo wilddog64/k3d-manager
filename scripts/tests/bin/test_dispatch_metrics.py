@@ -32,10 +32,20 @@ def _isolate_state_dirs(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(tmp_path / "agent-sessions"))
 
 
+def load_dashboard(path, key):
+    raw = path.read_text().split(f"  {key}: |\n", 1)[1]
+    return json.loads("\n".join(line[4:] for line in raw.splitlines()))
+
+
 def load_dispatch_dashboard():
     dashboard_path = Path(os.environ.get("DISPATCH_DASHBOARD_PATH", DASHBOARD_PATH))
-    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
-    return json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    dashboard = load_dashboard(dashboard_path, "agent-dispatch.json")
+    for offset, (key, filename) in enumerate((
+        ("agent-cost.json", "grafana-dashboard-agent-cost.yaml"),
+        ("agent-activity.json", "grafana-dashboard-agent-activity.yaml")), start=1):
+        extra = load_dashboard(dashboard_path.with_name(filename), key)
+        dashboard["panels"].extend(dict(panel, gridPos=dict(panel.get("gridPos", {}), y=panel.get("gridPos", {}).get("y", 0) + offset * 1000)) for panel in extra["panels"])
+    return dashboard
 
 
 def event(ts, name, slug="one", **extra):
@@ -647,9 +657,7 @@ def test_global_metrics_are_emitted_once_without_scope_labels():
 
 
 def test_dispatch_dashboard_window_variable_and_release_link():
-    dashboard_path = Path(__file__).parents[2] / "etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
-    raw = dashboard_path.read_text().split("  agent-dispatch.json: |\n", 1)[1]
-    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    dashboard = load_dispatch_dashboard()
     window = dashboard["templating"]["list"][0]
     assert window["type"] == "query"
     assert window["query"]["query"] == "label_values(k3dm_dispatch_landed, window)"
@@ -1197,8 +1205,7 @@ def test_claude_per_landed_only_in_release_scope():
 
 
 def test_claude_daily_chart_groups_by_date_and_model():
-    raw = DASHBOARD_PATH.read_text().split("  agent-dispatch.json: |\n", 1)[1]
-    dashboard = json.loads("\n".join(line[4:] for line in raw.splitlines()))
+    dashboard = load_dashboard(DASHBOARD_PATH.with_name("grafana-dashboard-agent-cost.yaml"), "agent-cost.json")
     panel = next(p for p in dashboard["panels"] if p.get("title") == "Claude tokens per day")
     steps = {t["id"]: t.get("options", {}) for t in panel["transformations"]}
     assert [t["id"] for t in panel["transformations"]][:2] == ["merge", "groupingToMatrix"]
