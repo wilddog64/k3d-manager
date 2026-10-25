@@ -177,7 +177,7 @@ def doc_verification(text):
     return ""
 
 
-_FIX_COMMIT_RE = re.compile(r"^\*\*Fix commit:\*\*\s*`?([0-9a-f]{7,40})`?\s*$", re.MULTILINE)
+_FIX_COMMIT_RE = re.compile(r"^\*\*Fix commit:\*\*\s*`?([0-9a-f]{7,40})(?:`|(?=\s|,|$))", re.MULTILINE)
 
 
 def doc_fix_commit(text):

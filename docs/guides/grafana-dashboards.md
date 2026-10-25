@@ -38,6 +38,8 @@ In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column he
 
 Bug Tracking defaults to **Auto (current)**: the bug summaries and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. The Release stat remains the current release independently of Manual selection. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
 
+In the Bugs table, **Fix commit** comes from the bug doc's **Fix commit:** header when present, otherwise from the commit that marked the bug fixed. **Fixed in** continues to show the release where its status changed.
+
 ### Release plans
 
 The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Release:**`, and `**Depends on:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:

@@ -977,6 +977,42 @@ def test_bug_status_metrics_adds_commit_labels_with_guard(metrics, tmp_path):
     assert all("_sha=" not in line for line in output.splitlines() if line.startswith("k3dm_bug_status_docs{"))
 
 
+@pytest.mark.parametrize(("header", "expected"), [
+    ("**Fix commit:** `a8909477` (v1.43.4 squash; note)", "a8909477"),
+    ("**Fix commit:** 17c7cda5, 152f7978", "17c7cda5"),
+    ("**Fix commit:** `f11e0c6e` (Claude moved the helper)", "f11e0c6e"),
+    ("**Fix commit:** pending", None),
+])
+def test_doc_fix_commit_accepts_notes_and_lists(metrics, header, expected):
+    assert metrics.doc_fix_commit(header) == expected
+
+
+def test_bug_fix_sha_prefers_header_and_falls_back_safely(metrics, tmp_path):
+    fixed = "**Priority:** P1\n**Status:** FIXED\n**Fix commit:** `79fab0b1`\n"
+    fixed_item = {"release": "v1.43.7", "commit": "32f1ee64abcdef0123456789abcdef01234567"}
+    args = {"tally": {"v1.43.7": {"closed_paths": [{"path": "docs/bugs/fixed.md"}]}},
+            "fixed_in": {"docs/bugs/fixed.md": fixed_item}}
+    output = metrics._bug_status_metrics(tmp_path, texts={"docs/bugs/fixed.md": fixed}, **args)
+    assert 'fix_sha="79fab0b1"' in output
+
+    for header, expected in (("**Fix commit:** f11e0c6e (a note)", "f11e0c6e"),
+                             ("**Fix commit:** 17c7cda5, 152f7978", "17c7cda5")):
+        text = fixed.replace("**Fix commit:** `79fab0b1`", header)
+        output = metrics._bug_status_metrics(tmp_path, texts={"docs/bugs/fixed.md": text}, **args)
+        assert f'fix_sha="{expected}"' in output
+
+    for text in (fixed.replace("**Fix commit:** `79fab0b1`\n", ""),
+                 fixed.replace("**Fix commit:** `79fab0b1`", "**Fix commit:** pending")):
+        output = metrics._bug_status_metrics(tmp_path, texts={"docs/bugs/fixed.md": text}, **args)
+        assert 'fix_sha="32f1ee64"' in output
+
+    opened = "**Priority:** P1\n**Status:** OPEN\n**Fix commit:** f11e0c6e\n"
+    output = metrics._bug_status_metrics(tmp_path, texts={"docs/bugs/open.md": opened}, tally={
+        "v1.43.7": {"open_paths": [{"path": "docs/bugs/open.md"}]}
+    }, fixed_in={"docs/bugs/open.md": {"commit": "f11e0c6e"}})
+    assert 'fix_sha="-"' in output
+
+
 def test_release_metrics_cover_current_and_five_shipped_releases_in_order(metrics, monkeypatch, tmp_path):
     tags = ["v1.9.0", "v1.10.0", "v1.38.0", "v1.39.0", "v1.40.0", "v1.41.0", "v1.42.0", "v1.43.1", "v1.44.0", "not-a-tag"]
     tally = {"v1.43.0": _bucket(P2={"open": 3, "closed": 4}), "v1.42.0": _bucket(P1={"closed": 3}),
