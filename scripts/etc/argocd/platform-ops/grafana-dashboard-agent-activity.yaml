@@ -185,7 +185,12 @@ data:
           "options": {
             "displayMode": "basic",
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "left",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 14,
+              "valueSize": 24
+            }
           }
         },
         {
@@ -279,7 +284,12 @@ data:
           "options": {
             "displayMode": "basic",
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "left",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 14,
+              "valueSize": 24
+            }
           }
         },
         {
@@ -587,7 +597,12 @@ data:
           },
           "options": {
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "top",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 12,
+              "valueSize": 16
+            }
           }
         },
         {
@@ -633,7 +648,12 @@ data:
           },
           "options": {
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "top",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 12,
+              "valueSize": 16
+            }
           }
         },
         {
@@ -679,7 +699,12 @@ data:
           },
           "options": {
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "top",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 12,
+              "valueSize": 16
+            }
           }
         },
         {
@@ -1163,7 +1188,12 @@ data:
           },
           "options": {
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "top",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 12,
+              "valueSize": 16
+            }
           }
         },
         {
@@ -1209,7 +1239,12 @@ data:
           },
           "options": {
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "top",
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 12,
+              "valueSize": 16
+            }
           }
         },
         {

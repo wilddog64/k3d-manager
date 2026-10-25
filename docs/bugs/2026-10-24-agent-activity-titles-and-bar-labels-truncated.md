@@ -63,3 +63,12 @@ evidence:
 interface:
   - Grafana /d/k3dm-agent-activity
 ```
+
+## Recurrence (2026-10-25)
+
+Operator screenshots 261 and 262: names still truncated after `979dbdb7` (`shopping-cart-fro…`,
+`k3d-manager inter…`, `intera…`, `missing-conte…`, `resumption-fai…`). Left placement shares a quarter-width
+panel's width between the name and the bar, and Grafana's auto-sized text grows to fill tall rows.
+Fix: every bar gauge gets fixed `text` sizes and `minVizHeight: 8`; gauges narrower than 12 columns
+(54, 55, 56, 69, 70) put names on top, where they get the full width; 36 and 38 stay left at 14/24 px.
+Test 18 now requires top placement below 12 columns and fixed sizes, red on the previous file.

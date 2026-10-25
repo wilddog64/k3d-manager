@@ -251,7 +251,7 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       if panel["id"]==12:
         continue
       if field=="options" and panel["type"]=="bargauge":
-        new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
+        new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
       assert new==old_field,(panel["id"],field)
 print("ok")
 PY
@@ -329,7 +329,10 @@ for y in {p["gridPos"]["y"] for p in claude}:
 for p in panels:
   if p["type"]=="bargauge":
     assert p.get("options",{}).get("orientation")=="horizontal",p["id"]
-    assert p.get("options",{}).get("namePlacement")=="left",p["id"]
+    want="left" if p["gridPos"]["w"]>=12 else "top"
+    assert p.get("options",{}).get("namePlacement")==want,(p["id"],p["gridPos"]["w"])  # agent-audit: allow assert-removed narrow gauges put names above the bar so long repo names fit
+    text_sizes=p.get("options",{}).get("text",{})
+    assert text_sizes.get("titleSize") and text_sizes.get("valueSize"),p["id"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
