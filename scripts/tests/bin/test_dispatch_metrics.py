@@ -475,6 +475,74 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
 
 
+def test_agent_neutral_metrics_include_agy_usage_without_codex_series():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "agy", agent="agy"),
+        event(now - 10, "agent_exit", "agy", exit=0, usage={"total_tokens": 500}),
+        event(now, "land", "agy"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="agy",agent="agy"} 500' in output
+    assert 'k3dm_dispatch_task_agent_seconds{window="30d",version="9.9.9",slug="agy",agent="agy"} 10' in output
+    assert 'k3dm_dispatch_task_agent_runs{window="30d",version="9.9.9",slug="agy",agent="agy"} 1' in output
+    assert 'k3dm_dispatch_task_codex_tokens{' not in output
+
+
+def test_agent_neutral_metrics_match_codex_series():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "codex", agent="codex"),
+        event(now - 10, "codex_exit", "codex", exit=0, tokens=500),
+        event(now, "land", "codex"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="codex",agent="codex"} 500' in output
+    assert 'k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="codex",agent="codex"} 500' in output
+    assert 'k3dm_dispatch_task_agent_seconds{window="30d",version="9.9.9",slug="codex",agent="codex"} 10' in output
+    assert 'k3dm_dispatch_task_codex_seconds{window="30d",version="9.9.9",slug="codex",agent="codex"} 10' in output
+
+
+def test_agent_neutral_tokens_sum_agy_runs_and_count_them():
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 40, "start", "agy-many", agent="agy", run=1),
+        event(now - 30, "agent_exit", "agy-many", run=1, usage={"total_tokens": 300}),
+        event(now - 20, "resume", "agy-many", agent="agy", run=2),
+        event(now - 10, "agent_exit", "agy-many", run=2, usage={"total_tokens": 200}),
+        event(now, "land", "agy-many"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{window="30d",version="9.9.9",slug="agy-many",agent="agy"} 500' in output
+    assert 'k3dm_dispatch_task_agent_runs{window="30d",version="9.9.9",slug="agy-many",agent="agy"} 2' in output
+
+
+@pytest.mark.parametrize("usage", [None, {"total_tokens": "500"}, {"total_tokens": -1},
+                                   {"total_tokens": True}])
+def test_invalid_agy_usage_does_not_emit_agent_tokens(usage):
+    now = int(time.time())
+    usage_fields = {} if usage is None else {"usage": usage}
+    row = event(now - 10, "agent_exit", "invalid", **usage_fields)
+    output = dispatch_metrics.render([event(now - 20, "start", "invalid", agent="agy"), row,
+                                      event(now, "land", "invalid")], 0, now)
+    assert 'k3dm_dispatch_task_agent_tokens{' not in output
+
+
+def test_agent_neutral_per_run_tokens_preserve_codex_series():
+    now = int(time.time())
+    agy = dispatch_metrics.render([
+        event(now - 20, "start", "agy-run", agent="agy", run=1),
+        event(now - 10, "agent_exit", "agy-run", run=1, usage={"total_tokens": 500}),
+        event(now, "land", "agy-run"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_run_agent_tokens{window="30d",version="9.9.9",slug="agy-run",run="1"} 500' in agy
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="agy-run",run="1"}' not in agy
+    codex = dispatch_metrics.render([
+        event(now - 20, "start", "codex-run", agent="codex", run=1),
+        event(now - 10, "codex_exit", "codex-run", run=1, exit=0, tokens=500),
+        event(now, "land", "codex-run"),
+    ], 0, now)
+    assert 'k3dm_dispatch_task_run_agent_tokens{window="30d",version="9.9.9",slug="codex-run",run="1"} 500' in codex
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="codex-run",run="1"} 500' in codex
+
+
 def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
     now = int(time.time())
     rows = [event(now - 20, "start", "reset", run=1),
@@ -551,7 +619,8 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_verifier_lines_per_landed", "k3dm_dispatch_wait_minutes_per_landed",
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
-    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and not line.startswith("k3dm_dispatch_task_run_") and
+    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
+                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_")) and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -701,7 +770,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
                    "k3dm_dispatch_rework_ratio")))
     per_spec = next(panel for panel in dashboard["panels"] if panel["id"] == 12)
     targets = {target["refId"]: target["expr"] for target in per_spec["targets"]}
-    assert targets["E"] == 'max by (version, slug, spec) (k3dm_dispatch_task_spec{window="$window"})'
+    assert targets["E"] == 'max by (version, slug, spec, agent) (k3dm_dispatch_task_spec{window="$window"})'  # agent-audit: allow assert-removed Per spec groups by agent since 210040d8
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #E"] is True
     assert organize["renameByName"]["Value #F"] == "API equiv."

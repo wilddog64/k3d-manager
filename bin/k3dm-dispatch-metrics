@@ -474,8 +474,26 @@ def _task_metrics(task_events, land_event, prices=None):
         if candidates:
             codex_seconds += exit_event["ts"] - max(candidates, key=lambda event: event["ts"])["ts"]
         previous_exit = exit_event["ts"]
+    agent_seconds = 0
+    previous_exit = None
+    for exit_event in exits:
+        candidates = [launch for launch in launches if launch["ts"] <= exit_event["ts"]
+                      and (previous_exit is None or launch["ts"] > previous_exit)]
+        if candidates:
+            agent_seconds += exit_event["ts"] - max(candidates, key=lambda event: event["ts"])["ts"]
+        previous_exit = exit_event["ts"]
 
     token_events = [event for event in codex_exits if isinstance(event.get("tokens"), int)]
+    agent_token_total = token_events[-1]["tokens"] if token_events else 0
+    has_agent_tokens = bool(token_events)
+    for event in exits:
+        if event.get("event") != "agent_exit":
+            continue
+        usage = event.get("usage")
+        usage_tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
+        if type(usage_tokens) is int and usage_tokens >= 0:
+            agent_token_total += usage_tokens
+            has_agent_tokens = True
     start_events = [event for event in task_events if event.get("event") == "start"]
     latest_start = max(enumerate(start_events), key=lambda item: (item[1].get("ts", 0), item[0]))[1] if start_events else {}
     elapsed = None
@@ -486,6 +504,8 @@ def _task_metrics(task_events, land_event, prices=None):
     return {
         "tokens": token_events[-1]["tokens"] if token_events else None,
         "codex_seconds": codex_seconds,
+        "agent_tokens": agent_token_total if has_agent_tokens else None,
+        "agent_seconds": agent_seconds,
         "elapsed_seconds": elapsed,
         "runs": len(exits),
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
@@ -615,6 +635,12 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 continue
             token_count = (exit_event.get("tokens") if exit_event.get("event") == "codex_exit"
                            and type(exit_event.get("tokens")) is int else None)
+            agent_token_count = None
+            if exit_event.get("event") == "agent_exit":
+                usage = exit_event.get("usage")
+                value = usage.get("total_tokens") if isinstance(usage, dict) else None
+                if type(value) is int and value >= 0:
+                    agent_token_count = value
             if exit_event.get("event") != "codex_exit":
                 increment = None
             elif token_count is None or not counter_known or token_count < previous_tokens:
@@ -645,7 +671,9 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
             if matching_launch not in launches:
                 continue
             outcomes[outcome] += 1
-            task_rows.append({"run": run_number, "outcome": outcome, "tokens": increment, "evidence": evidence})
+            task_rows.append({"run": run_number, "outcome": outcome, "tokens": increment,
+                              "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
+                              "evidence": evidence})
             if outcome in {"rework", "failed"} and evidence in {"land_refused.tests", "codex_exit.exit"}:
                 if increment is not None:
                     rejected_tokens += increment
@@ -774,7 +802,8 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         if task["runs"]:
             codex_values.append(task["codex_seconds"] / 60)
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
-                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"]))
+                      task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
+                      task["agent_tokens"], task["agent_seconds"]))
 
     return {
         "landed": len(landed),
@@ -866,6 +895,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}"}} 1')
         if type(row["tokens"]) is int:
             lines.append(f'k3dm_dispatch_task_run_codex_tokens{{{labels}}} {row["tokens"]}')
+        if type(row.get("agent_tokens")) is int:
+            lines.append(f'k3dm_dispatch_task_run_agent_tokens{{{labels}}} {row["agent_tokens"]}')
     lines.append(f'k3dm_dispatch_task_run_skipped{{window="{window}"}} {skipped_runs}')
     lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
     for result in RESULTS:
@@ -899,7 +930,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             skipped += 1
             continue
         valid_tasks.append(task)
-    for _, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent in valid_tasks[:TASK_CAP]:
+    for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
+         agent_tokens, agent_seconds) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}"'
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
@@ -907,10 +939,16 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             lines.append(f"k3dm_dispatch_task_codex_tokens{{{labels}}} {tokens}")
         if agent == "codex" and runs:
             lines.append(f"k3dm_dispatch_task_codex_seconds{{{labels}}} {codex_seconds}")
+        if agent_tokens is not None:
+            lines.append(f"k3dm_dispatch_task_agent_tokens{{{labels}}} {agent_tokens}")
+        if runs:
+            lines.append(f"k3dm_dispatch_task_agent_seconds{{{labels}}} {agent_seconds}")
         if elapsed_seconds is not None:
             lines.append(f"k3dm_dispatch_task_elapsed_seconds{{{labels}}} {elapsed_seconds}")
         if agent == "codex" and runs:
             lines.append(f"k3dm_dispatch_task_runs{{{labels}}} {runs}")
+        if runs:
+            lines.append(f"k3dm_dispatch_task_agent_runs{{{labels}}} {runs}")
         if api_cost is not None:
             lines.append(f"k3dm_dispatch_task_api_cost_usd{{{labels}}} {api_cost}")
     lines.append(f'k3dm_dispatch_task_skipped{{window="{window}"}} {skipped}')

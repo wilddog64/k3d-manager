@@ -61,6 +61,8 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 
 The **Agent Dispatch** dashboard covers dispatch throughput, active runs, per-spec delivery and verification, plus run outcomes. Its **Window** selector includes time windows and ledger releases from v1.43.0 onward. Use the **Agents** link to move between the three agent dashboards while keeping the selected time range and window.
 
+Agent-neutral task token totals include Codex's cumulative `codex_exit.tokens` and the sum of agy's per-run `agent_exit.usage.total_tokens`; agent runtime and run counts include exits from both agents.
+
 ## k3dm Agent Cost
 
 The **Agent Cost** dashboard contains the per-spec cost table, Codex API-equivalent costs, subscription costs, model breakdown, projected monthly cost, and Claude usage totals. Its **Window** selector matches Agent Dispatch, including release scope.

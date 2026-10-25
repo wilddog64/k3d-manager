@@ -9,7 +9,7 @@
 ### Fixed
 
 - **Vault: rejected unseal cache cannot trigger a destructive reinitialization.** Initialized Vaults now refuse reset without `K3DM_VAULT_ALLOW_REINIT=1`; failed data-path resets also preserve the unseal cache and Secrets.
-
+- **Agent Dispatch: export agent-neutral tokens, runtime and runs.** Per-spec metrics now include totals from agy's `agent_exit` usage and time across Codex and agy exits; per-run evidence includes each agy run's token total. Existing Codex-only series remain unchanged. See `docs/bugs/2026-10-25-dispatch-per-spec-blank-for-agy-landed-specs.md`.
 - **Agent Dispatch: Per spec names the agent.** A spec landed by agy showed only Time to land, because the Codex columns are Codex-only, and nothing said which agent ran it. Per spec now has an Agent column, read from the `agent` label the spec series already carries. See `docs/bugs/2026-10-25-dispatch-per-spec-blank-for-agy-landed-specs.md`.
 - **Agent Dispatch: Run outcomes labels and Per run evidence table.** The Run outcomes bars were vertical, which truncated `accepted`, `progress` and `unknown`; they are now horizontal with names beside each bar. Per run evidence showed Prometheus plumbing (`__name__`, `job`, `window`, and `Value #A`, the outcome series' constant sample value of 1) and never joined in the run's Codex tokens, because the two queries differed on `__name__`. Both queries now aggregate to the join labels and merge into one row per attempt with a `Codex tokens` column, and each slug links to its plan or bug spec on GitHub. First-pass live verification now sits beside the table, with fixed font sizes so `pass` and `fail` read in full. See `docs/bugs/2026-10-24-agent-dispatch-run-evidence-table-unreadable.md`.
 
