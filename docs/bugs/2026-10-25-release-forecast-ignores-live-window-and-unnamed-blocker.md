@@ -1,6 +1,9 @@
 # Bug: Release forecast dates v1.43.7 before its live window, and Target state does not say what is blocked
 
-**Status:** FIXED 2026-10-25 — `1ce420f6`; pytest 98/98, BATS 32/32, ruff clean, tests 2, 3, 6, 8, 9 red on the pre-fix files. Claude gated Target state on the target being blocked (it showed the blocker even when the target came first). Live E2: Target state names v1.49.0 and its reason (operator screenshot 244); panel 28 retitled `Median gap (days)` in `d4aa4597` because the spec title truncated in the tile.
+**Status:** LIVE-VERIFIED 2026-10-25 — `1ce420f6`; pytest 98/98, BATS 32/32, ruff clean, tests 2, 3, 6, 8, 9 red on the pre-fix files. Claude gated Target state on the target being blocked (it showed the blocker even when the target came first). Live E2: Target state names v1.49.0 and its reason (operator screenshot 244); panel 28 retitled `Median gap (days)` in `d4aa4597` because the spec title truncated in the tile.
+**Live evidence:** 2026-10-25 · run hub-grafana-bugs-remaining-releases-screenshot · env hub/k3d-k3d-cluster · scenario bugs-dashboard/forecast-floor-pacific · commit 54bc6940 · proves E2
+**Fix commit:** `54bc6940`
+**Live note:** operator screenshot 248: v1.43.7 earliest, expected and latest all 2026-11-03 00:00, Not before 2026-11-03 with its reason; Target state and Median gap confirmed earlier (screenshot 244). The fix is `1ce420f6` plus the Pacific-midnight follow-up `54bc6940`.
 **Priority:** P3
 **Severity:** low — the forecast is optimistic and one stat is ambiguous; no data is wrong
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
