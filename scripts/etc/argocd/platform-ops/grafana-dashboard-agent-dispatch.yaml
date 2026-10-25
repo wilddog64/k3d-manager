@@ -596,12 +596,7 @@ data:
           "type": "table",
           "title": "Per spec",
           "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch-to-land elapsed is earliest start.ts → land.ts including retries, idle time and overnight waits; Final worker exit → land is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
-          "gridPos": {
-            "h": 10,
-            "w": 19,
-            "x": 5,
-            "y": 12
-          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -716,7 +711,7 @@ data:
             }
           ],
           "fieldConfig": {
-            "defaults": {},
+            "defaults": {"custom": {"minWidth": 80}},
             "overrides": [
               {
                 "matcher": {
@@ -885,12 +880,7 @@ data:
           },
           "title": "Last update",
           "description": "Time since bin/k3dm-dispatch-metrics last published the ledger. It runs after every bin/k3dm-codex-dispatch event (start, exit, land, resume, abandon) or make dispatch-metrics, so a large value means no wrapped dispatch since, not a broken exporter. Yellow above one day. (not release-scoped)",
-          "gridPos": {
-            "h": 6,
-            "w": 5,
-            "x": 0,
-            "y": 12
-          },
+          "gridPos": {"h": 4, "w": 12, "x": 0, "y": 22},
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -930,12 +920,7 @@ data:
           },
           "title": "Rework rate",
           "description": "Share of landed specs that needed a second pass: Codex ran more than once, the integration gate refused it for tests, Claude changed lines before landing, or the independent verifier failed. Rebase and scope refusals are not rework. Split by cause, including review: k3dm_dispatch_rework_landed.",
-          "gridPos": {
-            "h": 4,
-            "w": 5,
-            "x": 0,
-            "y": 22
-          },
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 22},
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

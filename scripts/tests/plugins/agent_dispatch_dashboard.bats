@@ -540,3 +540,18 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
 }
+
+@test "agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+dispatch={p["id"]:p for p in json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]}
+assert dispatch[12]["gridPos"]=={"h":10,"w":24,"x":0,"y":12},dispatch[12]["gridPos"]
+assert dispatch[12]["fieldConfig"]["defaults"]["custom"]["minWidth"]<=80
+assert dispatch[9]["gridPos"]=={"h":4,"w":12,"x":0,"y":22} and dispatch[13]["gridPos"]=={"h":4,"w":12,"x":12,"y":22}
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
