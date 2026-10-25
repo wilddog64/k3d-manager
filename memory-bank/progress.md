@@ -623,3 +623,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: v1.43.7 release PR #150 opened; Copilot requested; CI pending a7cc8277.
 - 2026-10-25: PR #150 CI lint fixed (bare ! grep in codex_dispatch.bats → run !) 85290592; v1.43.10 quota-telemetry plan reviewed + corrected f461ccb0.
 - 2026-10-25: PR #150 CI pytest fixes (host-disk refresh 5m, v1.43.10 in release-milestones.json) 7e278b01; full local pytest 1294 pass, 4 promtool-in-docker blocked by local tripwire only.
+- 2026-10-25: PR #150 CI green (run 40243146371), 0 unresolved threads, Copilot no issues; enforce_admins DISABLED for merge — restore after merge or if deferred c1cfe786.
