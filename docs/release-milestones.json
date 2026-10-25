@@ -3,7 +3,7 @@
   "milestones": [
     {"version": "v1.43.5", "kind": "patch"},
     {"version": "v1.43.6", "kind": "patch"},
-    {"version": "v1.43.7", "kind": "patch"},
+    {"version": "v1.43.7", "kind": "patch", "not_before": "2026-11-03", "not_before_reason": "hub ArgoCD upgrade live window"},
     {"version": "v1.43.8", "kind": "patch"},
     {"version": "v1.43.9", "kind": "patch"},
     {"version": "v1.44.0", "kind": "minor"},

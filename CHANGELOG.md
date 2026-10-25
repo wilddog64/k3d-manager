@@ -9,6 +9,8 @@
 ### Fixed
 
 - **Agent Dispatch: rejected-attempt Codex tokens show zero when no run was rejected.** Counted windows with no objectively rejected run now export `0`; windows with no runs or only rejected runs whose token increments are unknown remain unavailable. Abandoned runs still do not count as objective rejections.
+
+- **Release forecast respects scheduled live windows and names blockers.** Milestones can set a `not_before` date that moves that and later forecasts; the Bug Tracking row now identifies the blocked milestone, exposes the floor date, and describes release cadence accurately.
 - **Vault: rejected unseal cache cannot trigger a destructive reinitialization.** Initialized Vaults now refuse reset without `K3DM_VAULT_ALLOW_REINIT=1`; failed data-path resets also preserve the unseal cache and Secrets.
 - **Agent Dispatch: export agent-neutral tokens, runtime and runs.** Per-spec metrics now include totals from agy's `agent_exit` usage and time across Codex and agy exits; per-run evidence includes each agy run's token total. Existing Codex-only series remain unchanged. See `docs/bugs/2026-10-25-dispatch-per-spec-blank-for-agy-landed-specs.md`.
 - **Agent Dispatch: Per spec names the agent.** A spec landed by agy showed only Time to land, because the Codex columns are Codex-only, and nothing said which agent ran it. Per spec now has an Agent column, read from the `agent` label the spec series already carries. See `docs/bugs/2026-10-25-dispatch-per-spec-blank-for-agy-landed-specs.md`.

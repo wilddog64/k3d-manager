@@ -358,6 +358,52 @@ def test_release_forecast_unblocked_shipped_and_overdue_positions(metrics):
     assert overdue["low"] == 11 and overdue["overdue"] is True
 
 
+def test_release_forecast_without_not_before_keeps_the_original_formula(metrics):
+    cadence = {"p25": 10 * 86400, "p50": 20 * 86400, "p75": 30 * 86400,
+               "last_ts": int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())}
+    plain = [{"version": f"v1.0.{i}"} for i in range(1, 4)]
+    rows = metrics._forecast(plain, [], cadence, 0)
+    for index, row in enumerate(rows, 1):
+        assert [row[b] for b in ("low", "mid", "high")] == [
+            cadence["last_ts"] + index * cadence[key] for key in ("p25", "p50", "p75")]
+    early = metrics._forecast([{"version": "v1.0.1", "not_before": "2025-01-01"}], [], cadence, 0)[0]
+    assert [early[b] for b in ("low", "mid", "high")] == [
+        cadence["last_ts"] + cadence[key] for key in ("p25", "p50", "p75")]
+    shipped = metrics._forecast([{"version": "v1.0.1", "not_before": "2099-01-01"}],
+                                [("v1.0.1", 50)], cadence, 0)[0]
+    assert shipped["state"] == "shipped" and "low" not in shipped
+
+
+def test_release_forecast_not_before_floors_every_bound(metrics):
+    cadence = {"p25": 10 * 86400, "p50": 20 * 86400, "p75": 30 * 86400,
+               "last_ts": int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())}
+    floor = int(datetime(2026, 2, 1, tzinfo=timezone.utc).timestamp())
+    row = metrics._forecast([{"version": "v1.0.1", "not_before": "2026-02-01"}],
+                            [], cadence, 0)[0]
+    assert all(row[b] >= floor for b in ("low", "mid", "high"))
+    assert row["floored"] is True
+
+
+def test_release_after_floored_milestone_chains_from_its_bound(metrics):
+    cadence = {"p25": 10 * 86400, "p50": 20 * 86400, "p75": 30 * 86400,
+               "last_ts": int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())}
+    floor = int(datetime(2026, 3, 15, tzinfo=timezone.utc).timestamp())
+    rows = metrics._forecast([{"version": "v1.0.1", "not_before": "2026-03-15"},
+                              {"version": "v1.0.2"}], [], cadence, 0)
+    assert all(rows[1][b] >= floor + cadence[key] for b, key in
+               zip(("low", "mid", "high"), ("p25", "p50", "p75")))
+
+
+@pytest.mark.parametrize("value", ["2026-13-40", "next week"])
+def test_load_milestones_rejects_invalid_not_before(metrics, tmp_path, value):
+    path = tmp_path / "docs/release-milestones.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps({"milestones": [{"version": "v1.0.0", "target": True,
+                                                  "not_before": value}]}))
+    with pytest.raises(ValueError):
+        metrics._load_milestones(tmp_path)
+
+
 def _prepare_publish_metrics(metrics, root, monkeypatch, tmp_path):
     _git_repo(root, {"bug.md": "# Bug\n**Priority:** P2\n**Status:** OPEN\n"})
     (root / "docs/plans").mkdir(parents=True, exist_ok=True)
@@ -401,6 +447,23 @@ def test_forecast_metrics_and_publish_put_and_blocking(metrics, monkeypatch, tmp
     assert metrics.publish_bug_metrics(root) is True
     forecast = next(entry for entry in pushed if entry[0] == "k3dm-release-forecast")
     assert forecast[1] == "PUT"
+
+
+def test_forecast_metrics_exports_not_before_labels(metrics, tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git_repo(root, {"seed.md": "seed\n"})
+    (root / "docs").mkdir(exist_ok=True)
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": [
+        {"version": "v1.0.1", "not_before": "2026-11-03",
+         "not_before_reason": 'live window "primary"'},
+        {"version": "v1.0.2", "target": True},
+    ]}))
+    out = metrics._forecast_metrics(root, now=1_700_000_000)
+    row = next(line for line in out.splitlines()
+               if line.startswith('k3dm_release_milestone_info{') and 'version="v1.0.1"' in line)
+    assert 'not_before="2026-11-03"' in row
+    assert 'not_before_reason="live window primary"' in row
 
 
 def test_malformed_forecast_is_nonfatal_to_other_groups(metrics, monkeypatch, tmp_path, capsys):

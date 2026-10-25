@@ -2293,7 +2293,8 @@ data:
         {
           "id": 28,
           "type": "stat",
-          "title": "Median days per release",
+          "title": "Median days between releases",
+          "description": "Median gap between the last 12 release tags. A cadence, not the effort one release takes. Earliest and latest forecasts use the 25th and 75th percentile gaps.",
           "gridPos": {
             "x": 4,
             "y": 11,
@@ -2407,6 +2408,7 @@ data:
           "id": 31,
           "type": "stat",
           "title": "Target state",
+          "description": "Target is the milestone marked target: true in docs/release-milestones.json. When the target is blocked or follows a blocker, this names the blocking milestone and reason.",
           "gridPos": {
             "x": 16,
             "y": 11,
@@ -2416,13 +2418,14 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(1 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"forecast\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
+              "expr": "(1 * label_replace(label_join(k3dm_release_milestone_info{repo=\"$repo\",state=\"blocked\"}, \"blocker\", \": \", \"version\", \"blocked_by\"), \"blocker\", \"blocked at $1\", \"blocker\", \"(.*)\") and on(repo) k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"forecast\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
               "instant": true
             }
           ],
           "options": {
             "graphMode": "none",
             "colorMode": "value",
+            "textMode": "value_and_name",
             "reduceOptions": {
               "calcs": [
                 "lastNotNull"
@@ -2431,13 +2434,14 @@ data:
           },
           "fieldConfig": {
             "defaults": {
+              "displayName": "${__field.labels.blocker}",
               "noValue": "-",
               "mappings": [
                 {
                   "type": "value",
                   "options": {
                     "1": {
-                      "text": "blocked upstream",
+                      "text": "blocked",
                       "color": "orange"
                     },
                     "2": {
@@ -2545,6 +2549,8 @@ data:
                   "kind": "Kind",
                   "state": "State",
                   "blocked_by": "Blocked by",
+                  "not_before": "Not before",
+                  "not_before_reason": "Not before reason",
                   "Value #E": "Plans",
                   "Value #B": "Forecast \u2014 earliest",
                   "Value #C": "Forecast \u2014 expected",

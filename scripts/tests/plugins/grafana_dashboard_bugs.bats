@@ -39,16 +39,54 @@ assert table["transformations"][-1]["options"]["excludeByName"].get("Value #A") 
 conversion=table["transformations"][1]["options"]["conversions"]
 assert any(c["targetField"]=="position" and c["destinationType"]=="number" for c in conversion)
 state_expr=tiles[31]["targets"][0]["expr"]
-assert all(f"({code} * k3dm_release_milestone_info" in state_expr for code in range(1,5))
+assert all(f"({code} * k3dm_release_milestone_info" in state_expr for code in range(2,5))
+assert '(1 * label_replace(label_join(k3dm_release_milestone_info' in state_expr
 mapping=tiles[31]["fieldConfig"]["defaults"]["mappings"]
 assert set(mapping[0]["options"])=={"1","2","3","4"}
-assert {k:v["text"] for k,v in mapping[0]["options"].items()}=={"1":"blocked upstream","2":"insufficient history","3":"forecast","4":"shipped"}
+assert mapping[0]["options"]["1"]["text"] == "blocked"
 for panel in new:
  a=panel["gridPos"]
  for other in panels:
   if other["id"]==panel["id"]: continue
   b=other["gridPos"]
   assert a["x"]+a["w"]<=b["x"] or b["x"]+b["w"]<=a["x"] or a["y"]+a["h"]<=b["y"] or b["y"]+b["h"]<=a["y"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release cadence panel names the median tag gap and explains cadence" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+p={panel["id"]:panel for panel in d["panels"]}
+assert p[28]["title"] == "Median days between releases"
+assert "cadence, not the effort" in p[28]["description"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "target state names the blocked milestone and reason" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+p={panel["id"]:panel for panel in d["panels"]}
+blocked=p[31]["targets"][0]["expr"]
+assert 'state="blocked"' in blocked and 'target="true"' not in blocked.split("state=\"blocked\"")[0][-100:]
+assert "label_join" in blocked and '"version", "blocked_by"' in blocked
+assert 'and on(repo) k3dm_release_milestone_info{repo="$repo",target="true",state=~"blocked|after_blocked"})' in blocked.split(" or (2 *")[0], blocked
+assert p[31]["fieldConfig"]["defaults"]["displayName"] == "${__field.labels.blocker}"
+assert p[31]["options"]["textMode"] == "value_and_name"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "remaining releases table shows a not-before column" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+p={panel["id"]:panel for panel in d["panels"]}
+organize=next(t for t in p[32]["transformations"] if t["id"]=="organize")["options"]
+assert organize["renameByName"].get("not_before") == "Not before"
 PY
   [ "${status}" -eq 0 ]
 }
