@@ -466,7 +466,7 @@ def _task_metrics(task_events, land_event, prices=None):
 
 def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
     states = _task_states(events)
-    known = delivered = awaiting = unknown = 0
+    known = delivered = awaiting = unknown = codex_delivered = 0
     delivered_tokens = []
     review = 0
     for land in landed:
@@ -512,13 +512,16 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
         if cutoff is not None and delivered_at < cutoff:
             continue
         delivered += 1
+        if start.get("agent", "codex") != "codex":
+            continue
+        codex_delivered += 1
         task = _task_metrics(task_events, land)
         token_values = [event.get("tokens") for event in verifies
                         if event.get("result") == "pass" and type(event.get("tokens")) is int]
         if type(task.get("tokens")) is int:
             delivered_tokens.append(task["tokens"] + (token_values[-1] if token_values else 0))
     token_mean = (sum(delivered_tokens) / len(delivered_tokens)
-                  if delivered and len(delivered_tokens) == delivered else None)
+                  if codex_delivered and len(delivered_tokens) == codex_delivered else None)
     return {
         "delivered": delivered,
         "delivered_tokens": token_mean,

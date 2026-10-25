@@ -346,6 +346,26 @@ def test_verified_delivery_cost_and_review_rework(tmp_path):
     assert f'k3dm_dispatch_rework_landed{{window="30d",cause="any"}} 1' in output
 
 
+def test_delivered_agy_spec_counts_but_stays_out_of_codex_token_mean(tmp_path):
+    spec = tmp_path / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("**Status:** VERIFIED\n\n## Acceptance\n\n```yaml\nevidence:\n  - kind: offline\n```\n")
+    now = int(time.time())
+    rows = [
+        event(now - 20, "start", "codex", spec="docs/plans/v9.9.9-demo.md"),
+        event(now - 10, "codex_exit", "codex", tokens=100),
+        event(now - 5, "land", "codex"),
+        event(now - 3, "verify", "codex", result="pass"),
+        event(now - 20, "start", "agy", spec="docs/plans/v9.9.9-demo.md", agent="agy"),
+        event(now - 10, "agent_exit", "agy", usage={"total_tokens": 900}),
+        event(now - 5, "land", "agy"),
+        event(now - 3, "verify", "agy", result="pass"),
+    ]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert 'k3dm_dispatch_delivered{window="30d"} 2' in output
+    assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 100.0' in output
+
+
 def test_live_delivery_waiting_and_unknown_spec_are_distinct(tmp_path):
     now = int(time.time())
     spec = tmp_path / "docs/plans/v9.9.9-live.md"

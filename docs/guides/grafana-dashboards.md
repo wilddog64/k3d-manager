@@ -69,7 +69,8 @@ recorded cumulative usage once.
 requires live evidence, its document must also have `**Status:** LIVE-VERIFIED` and a well-formed
 `**Live evidence:**` line. The **Codex tokens per verified spec** stat averages implementation
 Codex tokens plus any `verify --tokens` value when the verifier was a Codex task. It excludes
-Claude's own verification tokens. **Awaiting verification** counts landed specs whose document is
+Claude's own verification tokens, and averages over Codex-run specs only: a spec implemented by agy
+counts as delivered but is left out of this mean, since it has no Codex tokens. **Awaiting verification** counts landed specs whose document is
 available but whose verification pass or required live evidence is missing. **Verification
 unknown** counts landed specs whose `spec` path is absent from the start event or whose document
 cannot be read. A failed independent review contributes to rework cause `review` and to `any`.
