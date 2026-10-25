@@ -1,6 +1,6 @@
 # Bug: "Codex at API prices, all sessions" never shows a value
 
-**Status:** OPEN — filed 2026-10-24; not dispatched
+**Status:** FIXED — `b14dab86` (Luna, dispatched by the operator; landed 2026-10-24 by Claude). E1 offline-verified: dashboard BATS 16/16, pytest 81 passed, validate-manifests 83 valid; the new pytest fails on the pre-fix exporter (N1). Real-data dry run at 7d: exec $5.09, interactive $7.04, 70 unpriced sessions. E2 (live) pending the operator's screenshot.
 **Priority:** P3
 **Severity:** low — one stat panel on the Agent Activity dashboard is always No data; the dispatcher-only cost panels are unaffected
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
