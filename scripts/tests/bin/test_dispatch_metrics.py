@@ -383,10 +383,10 @@ def test_verified_delivery_cost_and_review_rework(tmp_path):
         event(now - 3, "verify", "one", result="pass", tokens=50),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
-    assert f'k3dm_dispatch_delivered{{window="30d"}} 1' in output
-    assert f'k3dm_dispatch_codex_tokens_per_delivered{{window="30d"}} 150.0' in output
-    assert f'k3dm_dispatch_rework_landed{{window="30d",cause="review"}} 1' in output
-    assert f'k3dm_dispatch_rework_landed{{window="30d",cause="any"}} 1' in output
+    assert 'k3dm_dispatch_delivered{window="30d"} 1' in output  # agent-audit: allow assert-removed same 19 asserts, f prefix dropped for ruff F541
+    assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 150.0' in output
+    assert 'k3dm_dispatch_rework_landed{window="30d",cause="review"} 1' in output
+    assert 'k3dm_dispatch_rework_landed{window="30d",cause="any"} 1' in output
 
 
 def test_delivered_agy_spec_counts_but_stays_out_of_codex_token_mean(tmp_path):
@@ -423,9 +423,9 @@ def test_live_delivery_waiting_and_unknown_spec_are_distinct(tmp_path):
         event(now - 8, "verify", "unknown", result="pass"),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
-    assert f'k3dm_dispatch_delivered{{window="30d"}} 0' in output
-    assert f'k3dm_dispatch_awaiting_verification{{window="30d"}} 1' in output
-    assert f'k3dm_dispatch_verification_unknown{{window="30d"}} 1' in output
+    assert 'k3dm_dispatch_delivered{window="30d"} 0' in output
+    assert 'k3dm_dispatch_awaiting_verification{window="30d"} 1' in output
+    assert 'k3dm_dispatch_verification_unknown{window="30d"} 1' in output
 
 
 
@@ -454,8 +454,8 @@ def test_live_delivery_requires_status_and_well_formed_evidence(tmp_path):
             event(now - 15, "codex_exit", "live", tokens=100), event(now - 10, "land", "live"),
             event(now - 5, "verify", "live", result="pass", tokens=7)]
     output = dispatch_metrics.render(rows, 0, now, repo_root=repo)
-    assert f'k3dm_dispatch_delivered{{window="30d"}} 1' in output
-    assert f'k3dm_dispatch_codex_tokens_per_delivered{{window="30d"}} 107.0' in output
+    assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
+    assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 107.0' in output
 
 def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     now = int(time.time())
@@ -468,10 +468,10 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
         event(now - 10, "land", "attempt", test_result="passed", tree="tree-b"),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
-    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="rework"}} 1' in output
-    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="accepted"}} 1' in output
-    assert f'k3dm_dispatch_objectively_rejected_codex_tokens{{window="30d"}} 100' in output
-    assert f'k3dm_dispatch_task_run_codex_tokens{{window="30d",version="9.9.9",slug="attempt",run="2"}} 60' in output
+    assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="rework"} 1' in output
+    assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="accepted"} 1' in output
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 100' in output
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="attempt",run="2"} 60' in output
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
 
 
@@ -482,7 +482,7 @@ def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
             event(now - 10, "resume", "reset", run=2, n=2),
             event(now - 5, "codex_exit", "reset", run=2, exit=1, tokens=20)]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
-    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="failed"}} 1' in output
+    assert 'k3dm_dispatch_run_outcomes{window="30d",outcome="failed"} 1' in output
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
     assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="reset",run="2"}' not in output
 
@@ -529,8 +529,8 @@ def test_directly_linked_live_verified_bug_has_known_run_cost(tmp_path):
             event(now - 10, "land", "bug", tree="tree", test_result="passed"),
             event(now - 5, "verify", "bug", result="pass")]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
-    assert f'k3dm_dispatch_codex_tokens_per_live_verified_bug{{window="30d"}} 100.0' in output
-    assert f'k3dm_dispatch_live_verified_bug_first_pass{{window="30d",result="pass"}} 1' in output
+    assert 'k3dm_dispatch_codex_tokens_per_live_verified_bug{window="30d"} 100.0' in output
+    assert 'k3dm_dispatch_live_verified_bug_first_pass{window="30d",result="pass"} 1' in output
 
 def test_time_window_output_matches_pre_release_scope_golden():
     now = 1_000_000
@@ -1377,9 +1377,9 @@ def test_codex_activity_exports_sessions_tokens_quota_and_untracked(tmp_path):
         json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "duration_ms": 1500}}),
     ]) + "\n")
     output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
-    assert f'k3dm_codex_sessions{{window="1d",mode="exec",repo="shop"}} 1' in output
-    assert f'k3dm_codex_untracked_sessions{{window="1d",mode="exec",repo="shop"}} 1' in output
-    assert f'k3dm_codex_tokens{{window="1d",mode="exec",repo="shop",kind="uncached_input"}} 80' in output
+    assert 'k3dm_codex_sessions{window="1d",mode="exec",repo="shop"} 1' in output
+    assert 'k3dm_codex_untracked_sessions{window="1d",mode="exec",repo="shop"} 1' in output
+    assert 'k3dm_codex_tokens{window="1d",mode="exec",repo="shop",kind="uncached_input"} 80' in output
     assert 'k3dm_codex_active_seconds{window="1d",mode="exec"} 1.5' in output
     assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
     assert "secret" not in output
