@@ -2,8 +2,10 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.43.7` (moved from v1.44.0 to v1.43.9 on 2026-10-25, then to v1.43.7 the same day by Claude: it is a bug, so it does not count toward the cap, and landing it now clears the prerequisite of `docs/plans/v1.43.9-orbstack-upgrade-coordinated.md` before that branch exists. Phase 2 below is replaced by that plan's operator-run upgrade.)
-**Status:** FIXED 2026-10-25 (phase 1) — offline E1/E2 green (100 passed; Luna's mutations red; ruff clean; validate-manifests and check-doc-links OK); live E3 pending (needs prometheus rules + alertmanager apply and a Hermes restart)
+**Status:** LIVE-VERIFIED 2026-10-25 (phase 1) — offline E1/E2 green (100 passed; Luna's mutations red; ruff clean; validate-manifests and check-doc-links OK); live E3 confirmed after `make prometheus-rules`, `make alertmanager-config` and a Hermes restart
+**Live evidence:** 2026-10-25 · run hub-grafana-host-disk-orbstack-screenshot · env hub/k3d-k3d-cluster · scenario host-disk/orbstack-tile · commit e0f45c46 · proves E3
 **Fix commit:** `7d0e51a5`
+**Live note:** operator screenshot 254: the Host Disk OrbStack tile reads 2.2.5 installed and update status up to date; the OrbStack upgraded annotation toggle is present and marks the 2026-10-25 morning upgrade.
 **Review note:** Claude fixed three defects before landing: `OrbStackUpdateAvailable` used `and on() group_left`, which promtool rejects (the rule would never have loaded; now `* on() group_left(version)` with a promtool unit test); the annotation was a dashboard-type annotation that never ran its query; the stat's mappings also relabelled the version series "update available". Also landed on the branch: `dc31a258` and `1645916f` repair two tests `f6e92ffd` had broken (dashboard-query substitution and the Bugs contract mutation).
 **Priority:** P3 — a visibility gap; an update restarts the whole hub, and nothing warns before or labels it after
 **Approval:** explicit 2026-10-12 "go ahead" (operator, to "file it for v1.44.0, alert only first, scheduled install as a later phase"); dispatch go 2026-10-25 ("go ahead", for the OrbStack work). Not critical: read-only probe, alert and dashboard.

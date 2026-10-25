@@ -1,7 +1,9 @@
 # Bug: Agent Dispatch run evidence shows a file name you cannot open
 
-**Status:** FIXED 2026-10-25 — offline E1 green (pytest 100/100, BATS 19/19, ruff clean, validate-manifests 83/83; 7 pytest + 1 BATS red on the pre-fix files); live E2 pending
+**Status:** LIVE-VERIFIED 2026-10-25 — offline E1 green (pytest 100/100, BATS 19/19, ruff clean, validate-manifests 83/83; 7 pytest + 1 BATS red on the pre-fix files); live E2 from operator screenshot 253
+**Live evidence:** 2026-10-25 · run hub-grafana-agent-dispatch-per-run-screenshot · env hub/k3d-k3d-cluster · scenario agent-dispatch/per-run-result-log-columns · commit 884062ef · proves E2
 **Fix commit:** `b63fe8da`
+**Live note:** operator screenshot 253 at Window v1.43.7: Result shows parsed results (`101 passed`, `82/82 ok`, `19/19 ok; 99 passed`), Log shows `~/.local/share/k3d-m…` paths with no username, Tokens fits the panel; the running task's row reads `unknown`/`none` as specified. The cell-inspect click was not shown; the click-through is replaced by the Loki link in `docs/bugs/2026-10-25-dispatch-run-log-not-viewable-from-grafana.md`. The fix is `b63fe8da` plus widths `3041183d` and home-free paths `884062ef`.
 **Review note:** Claude raised the `evidence_path` cap to 512 characters (real run paths are ~145, so the 120 cap in F1 cut them mid-name) and matched the Log override on the renamed field `Log`, as every other dashboard override does; added a long-path test.
 **Priority:** P3
 **Severity:** low — the column names its evidence but gives no result and no way to reach the file
