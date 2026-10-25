@@ -437,6 +437,13 @@ shell reads counted, compactions, first-pass verification and continuation promp
 fixes the verified-spec count (FIXED no longer counts; author time, not committer time). The operator asked for
 v1.43.9; v1.43.9 was full, so Claude split it here (2026-10-25). Read it before changing the compaction threshold.
 
+Plan 2 of 5 is [`claude-quota-exhaustion-availability-telemetry`](plans/v1.43.10-claude-quota-exhaustion-availability-telemetry.md)
+(operator, 2026-10-25): P3 enhancement recording Claude five-hour/seven-day quota-exhaustion,
+scheduled reset versus observed resumption, confirmed quota-induced wait and coordinator availability.
+A provider-neutral schema permits later Codex/Gemini adapters, but this plan does not add automatic
+failover. Filed after the first observed five-hour quota cap; v1.43.8 and v1.43.9 are both full.
+Implementation waits for v1.43.10 and operator dispatch approval. v1.43.10 has 2 of 5 plans.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
