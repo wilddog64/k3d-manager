@@ -371,3 +371,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Per run evidence sorts newest release first 088b113a (padded vsort label + sortBy transform).
 - 2026-10-25: Bug Tracking tiles renamed Open P0..P3 23d725e6.
 - 2026-10-25: Open P0..P3 tiles on own line 251a9a88; all 20 dashboards default refresh 5m 2ee0e901.
+- 2026-10-25: bug summary tiles back on one row (h3, Open tiles w2 without duplicate description); Per spec Worker/Coordinator blank when unknown 37c2f5e2.
