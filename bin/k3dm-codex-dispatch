@@ -509,9 +509,9 @@ _dispatch_start() {
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
   fi
   local prompt_spec="$spec"
   [[ ! -f "$run/spec.md" ]] || prompt_spec="$(cd "$run" && pwd)/spec.md"
@@ -734,7 +734,7 @@ _dispatch_resume() {
   rm -f "$run/exit" "$run/start"
   _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" '.["n"]=$n|.run=$run'
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited '.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity={vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"}'
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }

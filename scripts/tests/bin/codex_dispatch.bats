@@ -101,6 +101,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   grep -q '^K3DM_DISPATCH_SLUG=agy$' "$BATS_TEST_TMPDIR/agy.argv.env"
   [ "$(cd "$(<"$BATS_TEST_TMPDIR/agy.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/agy" && pwd -P)" ]
   [ "$(jq -r 'select(.event=="start")|.agent+":"+.model_source+":"+.model' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "agy:default:gemini-4-argon-medium" ]
+  [ "$(jq -r 'select(.event=="start")|.worker_identity.vendor+":"+.worker_identity.model+":"+.worker_identity.status+":"+.coordinator_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "google:gemini-4-argon-medium:selected:unknown" ]
   [ "$(jq -r 'select(.event=="agent_exit")|(.run|tostring)+":"+.session' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "1:agy-conversation-1" ]
   grep -q '"event":"agent_usage"' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ ! -e "$BATS_TEST_TMPDIR/codex.argv" ]
@@ -824,6 +825,9 @@ EOF
   [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"exec resume"* ]]
   [[ "$(<"$BATS_TEST_TMPDIR/a.argv")" == *"01a122dd-71c3-7763-87f0-3de505f10168"* ]]
   run dispatch status one; [[ "$output" == *"resumes: 1"* ]]
+  [ "$(jq -r -s 'map(select(.slug=="one" and .event=="start"))[0].worker_identity.vendor' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = openai ]
+  [ "$(jq -r -s 'map(select(.slug=="one" and .event=="resume"))[0] | (.run|tostring)+":"+.worker_identity.vendor+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "2:openai:unknown" ]
+  [ "$(jq -r -s '[.[]|select(.slug=="one" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
   export STUB_SLEEP=5
   dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
   run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"

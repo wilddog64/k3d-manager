@@ -117,7 +117,7 @@ import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
 panel12=next(p for p in panels if p["id"]==12); assert len(panel12["targets"])>=4
-assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)")) for t in panel12["targets"])
+assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)","max by (version, slug, repo, worker)","max by (version, slug, repo, coordinator)")) for t in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]

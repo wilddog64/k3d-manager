@@ -186,7 +186,7 @@ def test_slug_only_in_task_series():
     # agent-audit: allow assert-removed test_render_has_no_slug replaced per spec; both halves kept here
     assert "pending-slug" not in output
     assert 'slug="secret-slug"' in output
-    assert all("secret-slug" not in line or "k3dm_dispatch_task_" in line
+    assert all("secret-slug" not in line or "k3dm_dispatch_task_" in line or "k3dm_dispatch_model_identity" in line
                for line in output.splitlines())
 
 
@@ -838,7 +838,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 52  # agent-audit: allow assert-removed Codex and agy activity rows add thirteen $window expressions
+    assert sum("$window" in expr for expr in expressions) == 54  # agent-audit: allow assert-removed Codex and agy activity rows plus worker and coordinator identity add fifteen $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1597,3 +1597,60 @@ def test_run_outcome_keeps_a_long_evidence_path_whole(tmp_path, monkeypatch):
     assert path.startswith("~/worktrees-") and str(tmp_path) not in path
     assert dispatch_metrics._label_value(path, limit=512) == path
     assert summary == "8 passed"
+
+
+def _identity_lines(output, role):
+    return [line for line in output.splitlines()
+            if line.startswith('k3dm_dispatch_model_identity{window="1d",') and f'role="{role}"' in line]
+
+
+def test_model_identity_exports_worker_and_coordinator_from_latest_start():
+    output = dispatch_metrics.render([
+        event(1, "start", "mixed", agent="codex", model="gpt-5.6-luna",
+              worker_identity={"vendor": "openai", "model": "gpt-5.6-luna", "source": "explicit", "status": "selected"},
+              coordinator_identity={"vendor": "anthropic", "model": "claude-opus-5-5", "source": "runtime", "status": "runtime_reported"}),
+        event(2, "codex_exit", "mixed", tokens=10),
+        event(3, "land", "mixed"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    coordinator = _identity_lines(output, "coordinator")
+    assert len(worker) == 1 and len(coordinator) == 1
+    assert 'vendor="openai",model="gpt-5.6-luna",source="explicit",status="selected"' in worker[0]
+    assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
+
+
+def test_model_identity_is_unknown_for_a_legacy_start_with_a_model_field():
+    output = dispatch_metrics.render([
+        event(1, "start", "legacy", agent="codex", model="gpt-5.6-luna", model_source="inherited"),
+        event(2, "codex_exit", "legacy", tokens=10),
+        event(3, "land", "legacy"),
+    ], 0, 100)
+    for role in ("worker", "coordinator"):
+        lines = _identity_lines(output, role)
+        assert len(lines) == 1
+        assert 'vendor="unknown",model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+
+
+def test_model_identity_rejects_unbounded_label_values():
+    output = dispatch_metrics.render([
+        event(1, "start", "bad", agent="codex",
+              worker_identity={"vendor": "acme", "model": 'x"}\nevil', "source": "prompt", "status": "great"}),
+        event(2, "codex_exit", "bad", tokens=10),
+        event(3, "land", "bad"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1
+    assert 'vendor="unknown",model="unknown",source="unreported",status="unknown"' in worker[0]
+    assert "evil" not in output and "acme" not in output
+
+
+def test_per_spec_identity_queries_give_one_row_per_task():
+    panels = {panel["title"]: panel for panel in load_dispatch_dashboard()["panels"]}
+    per_spec = panels["Per spec"]
+    exprs = {t["refId"]: t["expr"] for t in per_spec["targets"]}
+    assert 'role="worker"' in exprs["H"] and exprs["H"].startswith("max by (version, slug, repo, worker)")
+    assert 'role="coordinator"' in exprs["I"] and exprs["I"].startswith("max by (version, slug, repo, coordinator)")
+    organize = per_spec["transformations"][1]["options"]
+    assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
+    assert organize["renameByName"]["worker"] == "Worker"
+    assert organize["renameByName"]["coordinator"] == "Coordinator"

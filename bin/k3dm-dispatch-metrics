@@ -556,6 +556,8 @@ def _task_metrics(task_events, land_event, prices=None):
         "api_cost_usd": sum(session_costs) if session_costs and all(x is not None for x in session_costs) else None,
         "spec": latest_start.get("spec"),
         "agent": latest_start.get("agent") if latest_start.get("agent") in {"codex", "agy"} else ("codex" if "agent" not in latest_start else "other"),
+        "worker_identity": latest_start.get("worker_identity") if isinstance(latest_start.get("worker_identity"), dict) else {},
+        "coordinator_identity": latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {},
     }
 
 
@@ -860,7 +862,8 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
             repo = "k3d-manager"
         tasks.append((event["ts"], key[0], key[1], task["tokens"], task["codex_seconds"],
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
-                      task["agent_tokens"], task["agent_seconds"], repo))
+                      task["agent_tokens"], task["agent_seconds"], repo,
+                      task["worker_identity"], task["coordinator_identity"]))
 
     return {
         "landed": len(landed),
@@ -990,8 +993,18 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             continue
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
-         agent_tokens, agent_seconds, repo) in valid_tasks[:TASK_CAP]:
+         agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
+        def identity_labels(identity, role):
+            vendor = identity.get("vendor") if identity.get("vendor") in {"openai", "google", "anthropic", "unknown"} else "unknown"
+            model = identity.get("model")
+            if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", model):
+                model = "unknown"
+            source = identity.get("source") if identity.get("source") in {"explicit", "default", "inherited", "runtime", "unreported"} else "unreported"
+            status = identity.get("status") if identity.get("status") in {"selected", "runtime_reported", "unverified", "unknown"} else "unknown"
+            lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}"}} 1')
+        identity_labels(worker_identity, "worker")
+        identity_labels(coordinator_identity, "coordinator")
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
         if agent == "codex" and tokens is not None:
