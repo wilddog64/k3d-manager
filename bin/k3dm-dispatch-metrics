@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import tempfile
 import time
 import urllib.request
 from collections import defaultdict
@@ -139,10 +140,21 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
         context_out["compactions"] = compactions
         context_out["reads"] = reads
     target = Path(cache_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temp = target.with_name(target.name + ".tmp")
-    temp.write_text(json.dumps(cache, separators=(",", ":")), encoding="utf-8")
-    os.replace(temp, target)
+    temp = None
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(dir=target.parent, prefix=target.name + ".", suffix=".tmp")
+        temp = Path(temp_path)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(cache, stream, separators=(",", ":"))
+        os.replace(temp, target)
+    except OSError as exc:
+        if temp is not None:
+            try:
+                temp.unlink()
+            except OSError:
+                pass
+        print(f"claude rollup cache not saved: {exc}", file=sys.stderr)
     return list(cache["records"].values())
 
 

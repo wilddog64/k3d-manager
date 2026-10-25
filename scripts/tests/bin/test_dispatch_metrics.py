@@ -1144,6 +1144,49 @@ def test_claude_rollup_incremental_append(tmp_path):
     assert len(json.loads(cache.read_text())["records"]) == 3
 
 
+def test_claude_rollup_overlapping_saves_use_private_temp_files(tmp_path, monkeypatch):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "timestamp": "2026-10-24T12:00:00Z",
+        "message": {"id": "one", "model": "m", "usage": {"input_tokens": 1}}}) + "\n")
+    cache = tmp_path / "cache.json"
+    real_replace = os.replace
+    nested_results = []
+    triggered = False
+
+    def overlap_replace(source, target):
+        nonlocal triggered
+        if not triggered:
+            triggered = True
+            nested_results.append(dispatch_metrics._claude_rollup(projects, cache))
+        real_replace(source, target)
+
+    monkeypatch.setattr(dispatch_metrics.os, "replace", overlap_replace)
+    outer_records = dispatch_metrics._claude_rollup(projects, cache)
+    assert outer_records == nested_results[0]
+    assert json.loads(cache.read_text())["records"]["one"]["model"] == "m"
+
+
+def test_claude_rollup_save_failure_is_reported_and_cleaned(tmp_path, monkeypatch, capsys):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    transcript = projects / "one.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "timestamp": "2026-10-24T12:00:00Z",
+        "message": {"id": "one", "model": "m", "usage": {"input_tokens": 1}}}) + "\n")
+    cache = tmp_path / "cache.json"
+
+    def fail_replace(source, target):
+        raise FileNotFoundError("simulated rename race")
+
+    monkeypatch.setattr(dispatch_metrics.os, "replace", fail_replace)
+    records = dispatch_metrics._claude_rollup(projects, cache)
+    assert records == [{"ts": "2026-10-24T12:00:00Z", "model": "m", "speed": None,
+        "input": 1, "cache_5m": 0, "cache_1h": 0, "cache_read": 0, "output": 0}]
+    assert "claude rollup cache not saved: simulated rename race" in capsys.readouterr().err
+    assert list(tmp_path.glob("cache.json.*.tmp")) == []
+
+
 def test_claude_rollup_seeks_to_saved_byte_offset(tmp_path, monkeypatch):
     projects = tmp_path / "projects"; projects.mkdir()
     transcript = projects / "one.jsonl"

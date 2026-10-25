@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Agent Dispatch Claude usage rollup: overlapping cache saves now use private temporary files, and a failed save reports the error while allowing metrics export to continue.
 - Agent Activity now maps Codex dispatch worktree sessions to their dispatched repository, keeping their session and token totals out of `other`.
 - Agent Activity bar gauges: names still truncated after the left-placement fix; narrow gauges now put names above the bar and every gauge uses fixed font sizes. Rows holding a narrow gauge are 8 units high so six repo rows keep their values legible. Tokens by repo and agy tokens use the short unit (593 Mil, not 593275830).
 - Agent Dispatch Human continuation prompts: a labelled bar per reason plus tracked tasks, instead of a 30-day time series whose only points sat at the right edge and whose legend was cut off.
