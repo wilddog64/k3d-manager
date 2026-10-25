@@ -14,6 +14,7 @@
 ### Added
 
 - Agent Cost adds **Claude tokens by kind**, splitting the selected window's Claude tokens into cache reads, cache writes, uncached input and output, so the per-day token bars (about 98% cache reads) are not read as cost.
+- Agent Cost adds daily Claude tokens and Claude API-equivalent cost panels split by cache kind, showing which token classes drive daily volume and price.
 - Bug Tracking now defaults to **Auto (current)**, keeping the filed-in bug summaries and table aligned with the selected repository's current-release metric while preserving historical and All filtering in Manual mode.
 
 ### Fixed

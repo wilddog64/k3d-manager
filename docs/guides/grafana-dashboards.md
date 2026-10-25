@@ -149,6 +149,10 @@ output rates there when pricing changes. Models without an explicit entry remain
 - **Claude tokens by kind** splits every Claude token in the selected window or release into
   `cache_read`, `cache_write`, `input` and `output`. Cache reads are usually most of the volume but
   are billed at a small fraction of the input rate, so token volume is not proportional to cost.
+- **Claude tokens per day by kind** stacks the last 30 local dates by `cache_read`, `cache_write`,
+  `input` and `output`; cache reads are billed at a fraction of the input rate.
+- **Claude cost by kind** splits Claude API-equivalent cost in the selected window or release into
+  `cache_read`, `cache_write`, `input` and `output`, using the price for each cache write duration.
 
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`

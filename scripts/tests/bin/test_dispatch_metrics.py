@@ -872,7 +872,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 58  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions
+    assert sum("$window" in expr for expr in expressions) == 60  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1402,7 +1402,7 @@ def test_claude_daily_tokens_use_local_timezone_and_dashboard_panel():
         for zone in ("America/Los_Angeles", "UTC"):
             os.environ["TZ"] = zone; time.tzset()
             output = dispatch_metrics.render([], 0, now, claude_records=records)
-            daily[zone] = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens")]
+            daily[zone] = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens{")]
             assert not any('model="m3"' in line for line in daily[zone])
         assert any('model="m1"' in line and line.endswith(" 15") for line in daily["UTC"])
         assert any('model="m1"' in line and "2026-01-01" in line for line in daily["America/Los_Angeles"])
@@ -1808,3 +1808,84 @@ def test_per_spec_identity_queries_give_one_row_per_task():
     assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
     assert organize["renameByName"]["worker"] == "Worker"
     assert organize["renameByName"]["coordinator"] == "Coordinator"
+
+
+def test_claude_daily_tokens_by_kind_partition_local_dates_and_filter_records():
+    now = calendar.timegm(time.strptime("2026-01-10T12:00:00", "%Y-%m-%dT%H:%M:%S"))
+    before_tz = os.environ.get("TZ")
+    records = [
+        _claude_message("one", calendar.timegm(time.strptime("2026-01-01T23:59:00", "%Y-%m-%dT%H:%M:%S")),
+                        input=1, cache_5m=2, cache_1h=3, cache_read=4, output=5),
+        _claude_message("two", calendar.timegm(time.strptime("2026-01-02T00:01:00", "%Y-%m-%dT%H:%M:%S")),
+                        input=6, cache_5m=7, cache_1h=8, cache_read=9, output=10),
+        _claude_message("synthetic", now, model="<synthetic>", input=999),
+        _claude_message("old", now - 31 * 86400, input=999),
+    ]
+    try:
+        os.environ["TZ"] = "UTC"; time.tzset()
+        output = dispatch_metrics.render([], 0, now, claude_records=records)
+        rows = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_claude_daily_tokens_by_kind{")]
+        assert len(rows) == 8
+        assert 'date="2026-01-01",kind="cache_write"} 5' in "\n".join(rows)
+        assert 'date="2026-01-02",kind="cache_write"} 15' in "\n".join(rows)
+        for day in ("2026-01-01", "2026-01-02"):
+            by_kind = sum(float(line.rsplit(" ", 1)[1]) for line in rows if f'date="{day}"' in line)
+            by_model = sum(float(line.rsplit(" ", 1)[1]) for line in output.splitlines()
+                           if line.startswith("k3dm_dispatch_claude_daily_tokens{") and f'date="{day}"' in line)
+            assert by_kind == by_model
+        assert not any('date="2026-01-10"' in line for line in rows)
+    finally:
+        if before_tz is None: os.environ.pop("TZ", None)
+        else: os.environ["TZ"] = before_tz
+        time.tzset()
+
+
+def test_claude_cost_by_kind_uses_rates_and_unpriced_record_is_excluded():
+    now = 30
+    rates = _claude_rates(input=2, cache_write_5m=3, cache_write_1h=5, cache_read=0.1, output=4)
+    tasks = [event(0, "start", "A", version="v1.0.0"), event(20, "land", "A", version="v1.0.0")]
+    records = [_claude_message("priced", 10, input=1_000_000, cache_5m=2_000_000,
+                               cache_1h=3_000_000, cache_read=4_000_000, output=5_000_000),
+               _claude_message("unpriced", 11, model="unknown", input=100)]
+    output = dispatch_metrics.render(tasks, 0, now, claude_records=records, claude_prices=rates)
+    expected = {"input": 2, "cache_write": 21, "cache_read": 0.4, "output": 20}
+    for kind, amount in expected.items():
+        line = next(row for row in output.splitlines()
+                    if row.startswith(f'k3dm_dispatch_claude_api_cost_by_kind_usd{{window="v1.0.0",kind="{kind}"}}'))
+        assert abs(float(line.rsplit(" ", 1)[1]) - amount) < 1e-6
+    assert abs(sum(expected.values()) - _metric(output, "k3dm_dispatch_claude_api_cost_usd", "v1.0.0")) < 1e-6
+    time_output = dispatch_metrics.render([], 0, now, claude_records=records, claude_prices=rates)
+    for window in ("1d", "7d", "30d"):
+        values = [float(line.rsplit(" ", 1)[1]) for line in time_output.splitlines()
+                  if line.startswith(f'k3dm_dispatch_claude_api_cost_by_kind_usd{{window="{window}"')]
+        assert len(values) == 4
+        assert abs(sum(values) - _metric(time_output, "k3dm_dispatch_claude_api_cost_usd", window)) < 1e-6
+
+
+def test_claude_non_numeric_usage_does_not_break_render_or_emit_invalid_values():
+    now = 1_800_000_000
+    records = [_claude_message("bad", now, input="invalid", cache_read=None),
+               {"ts": "bad timestamp", "model": "m", "input": object()}]
+    output = dispatch_metrics.render([], 0, now, claude_records=records, claude_prices=_claude_rates())
+    assert "k3dm_dispatch_claude_api_cost_usd" in output
+    claude_lines = [line for line in output.splitlines()
+                    if line.startswith(("k3dm_dispatch_claude_api_cost", "k3dm_dispatch_claude_tokens",
+                                       "k3dm_dispatch_claude_daily_tokens"))]
+    assert all(not line.rstrip().endswith((" nan", " inf", " -inf")) for line in claude_lines)
+
+
+def test_claude_existing_series_keep_their_fixture_output():
+    now = 1_800_000_000
+    record = _claude_message("stable", now, input=11, cache_5m=13, cache_1h=17, cache_read=19, output=23)
+    output = dispatch_metrics.render([], 0, now, claude_records=[record], claude_prices=_claude_rates())
+    existing = [line for line in output.splitlines()
+                if line.startswith(("k3dm_dispatch_claude_api_cost_usd{", "k3dm_dispatch_claude_tokens{",
+                                    "k3dm_dispatch_claude_daily_tokens{"))]
+    expected = []
+    for window in ("1d", "7d", "30d"):
+        expected.append(f'k3dm_dispatch_claude_api_cost_usd{{window="{window}"}} 8.3e-05')
+        expected.extend(f'k3dm_dispatch_claude_tokens{{window="{window}",model="m",kind="{kind}"}} {value}'
+                        for kind, value in (("input", "11.0"), ("cache_write", "30.0"),
+                                            ("cache_read", "19.0"), ("output", "23.0")))
+    expected.append('k3dm_dispatch_claude_daily_tokens{date="2027-01-15",model="m"} 83')
+    assert existing == expected

@@ -706,6 +706,114 @@ data:
               "values": false
             }
           }
+        },
+        {
+          "id": 87,
+          "type": "barchart",
+          "title": "Claude tokens per day by kind",
+          "description": "Last 30 days, all Claude sessions in this repo including subagents, split into input, cache_write, cache_read and output. Cache reads are billed at a fraction of the input rate.",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 35
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (date, kind) (k3dm_dispatch_claude_daily_tokens_by_kind)",
+              "instant": true,
+              "format": "table",
+              "legendFormat": "{{kind}}"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge"
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "rowField": "date",
+                "columnField": "kind",
+                "valueField": "Value"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "date\\kind": "date"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "xField": "date",
+            "stacking": "normal"
+          }
+        },
+        {
+          "id": 88,
+          "type": "bargauge",
+          "title": "Claude cost by kind",
+          "description": "Claude API-equivalent cost in the selected window or release, split into input, cache_write, cache_read and output. Cache reads are billed at a fraction of the input rate.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 27
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_claude_api_cost_by_kind_usd{window=\"$window\"}",
+              "instant": true,
+              "legendFormat": "{{kind}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "min": 0,
+              "decimals": 2,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "namePlacement": "left",
+            "displayMode": "basic",
+            "showUnfilled": true,
+            "minVizHeight": 8,
+            "text": {
+              "titleSize": 14,
+              "valueSize": 20
+            },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
         }
       ]
     }

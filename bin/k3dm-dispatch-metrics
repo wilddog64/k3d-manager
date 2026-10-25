@@ -258,7 +258,14 @@ def _claude_cost(record, prices):
         return None
     kinds = ("input", "cache_5m", "cache_1h", "cache_read", "output")
     ratekeys = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
-    return sum(float(record.get(kind, 0) or 0) * float(rates[rk]) for kind, rk in zip(kinds, ratekeys)) / 1_000_000
+    values = [record.get(kind, 0) or 0 for kind in kinds]
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value < 0
+           for value in values):
+        return None
+    try:
+        return sum(float(value) * float(rates[rk]) for value, rk in zip(values, ratekeys)) / 1_000_000
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def _render_claude(lines, window, records, rates, landed, now, cutoff=None, tasks=None,
@@ -267,6 +274,7 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
     selected_tasks = tasks or []
     overlap_tasks = all_tasks or selected_tasks
     cost = 0.0
+    cost_by_kind = defaultdict(float)
     unpriced = 0.0
     totals = defaultdict(lambda: defaultdict(float))
     task_costs = defaultdict(float)
@@ -285,19 +293,34 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
         model = record["model"]
         amount = _claude_cost(record, rates)
         if chosen_for_release:
-            for kind, source in (("input", "input"), ("cache_write", "cache_5m"),
-                                 ("cache_write", "cache_1h"), ("cache_read", "cache_read"),
-                                 ("output", "output")):
-                totals[model][kind] += int(record.get(source, 0) or 0) * share
+            for kind, sources in (("input", ("input",)),
+                                  ("cache_write", ("cache_5m", "cache_1h")),
+                                  ("cache_read", ("cache_read",)),
+                                  ("output", ("output",))):
+                for source in sources:
+                    value = record.get(source, 0) or 0
+                    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0:
+                        totals[model][kind] += int(value) * share
             if amount is None:
                 unpriced += share
             else:
                 cost += amount * share
+                key = record["model"] if record.get("speed") in (None, "standard") else f'{record["model"]}@{record["speed"]}'
+                model_rates = rates.get(key, {})
+                for kind, source, ratekey in (("input", "input", "input"),
+                                               ("cache_write", "cache_5m", "cache_write_5m"),
+                                               ("cache_write", "cache_1h", "cache_write_1h"),
+                                               ("cache_read", "cache_read", "cache_read"),
+                                               ("output", "output", "output")):
+                    value = record.get(source, 0) or 0
+                    cost_by_kind[kind] += float(value) * float(model_rates[ratekey]) / 1_000_000 * share
         if amount is not None:
             for task in selected_tasks:
                 if task[0] <= timestamp <= task[1]:
                     task_costs[(task[2], task[3])] += amount / len(overlaps)
     lines.append(f'k3dm_dispatch_claude_api_cost_usd{{window="{window}"}} {cost}')
+    for kind in ("input", "cache_write", "cache_read", "output"):
+        lines.append(f'k3dm_dispatch_claude_api_cost_by_kind_usd{{window="{window}",kind="{kind}"}} {cost_by_kind[kind]}')
     if landed and task_scoped:
         lines.append(f'k3dm_dispatch_claude_api_cost_per_landed_usd{{window="{window}"}} {cost / landed}')
         tokens = sum(value for kinds in totals.values() for value in kinds.values())
@@ -1468,15 +1491,28 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         from datetime import datetime, timedelta
         today = datetime.fromtimestamp(now).astimezone().date()
         daily = defaultdict(int)
+        daily_by_kind = defaultdict(int)
         for record in claude_records:
             try:
                 stamp = datetime.fromisoformat(record["ts"].replace("Z", "+00:00")).astimezone().date()
             except (ValueError, TypeError, AttributeError):
                 continue
-            if stamp >= today - timedelta(days=29) and record["model"] != "<synthetic>":
-                daily[(stamp.isoformat(), record["model"])] += sum(int(record.get(k, 0) or 0) for k in ("input", "cache_5m", "cache_1h", "cache_read", "output"))
+            if stamp >= today - timedelta(days=29) and record.get("model") != "<synthetic>":
+                for kind, sources in (("input", ("input",)), ("cache_write", ("cache_5m", "cache_1h")),
+                                      ("cache_read", ("cache_read",)), ("output", ("output",))):
+                    value = 0
+                    for source in sources:
+                        raw = record.get(source, 0) or 0
+                        if isinstance(raw, (int, float)) and not isinstance(raw, bool) and math.isfinite(raw) and raw >= 0:
+                            value += int(raw)
+                    daily_by_kind[(stamp.isoformat(), kind)] += value
+                values = [record.get(k, 0) or 0 for k in ("input", "cache_5m", "cache_1h", "cache_read", "output")]
+                daily[(stamp.isoformat(), record["model"])] += sum(int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0 else 0 for v in values)
         for (date, model), value in sorted(daily.items()):
             lines.append(f'k3dm_dispatch_claude_daily_tokens{{date="{date}",model="{model}"}} {value}')
+        for (date, kind), value in sorted(daily_by_kind.items()):
+            if value:
+                lines.append(f'k3dm_dispatch_claude_daily_tokens_by_kind{{date="{date}",kind="{kind}"}} {value}')
     for plan, amount in (subscriptions or {}).items():
         lines.append(f'k3dm_dispatch_subscription_usd_per_month{{plan="{plan}"}} {amount}')
     task_states = [_task_state(task_events) for task_events in _task_states(events).values()]
