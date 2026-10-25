@@ -2,12 +2,20 @@
 
 **Status:** OPEN — filed 2026-10-24; not dispatched
 **Priority:** P3
-**Severity:** low — one stat panel on the Agent Dispatch dashboard is always No data; the dispatcher-only cost panels are unaffected
+**Severity:** low — one stat panel on the Agent Activity dashboard is always No data; the dispatcher-only cost panels are unaffected
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
 **Filed:** 2026-10-24, by Claude, while live-checking `docs/plans/v1.43.6-dispatch-codex-solo-activity.md` E3
 **Approval:** explicit 2026-10-24, as part of the bug cleanup the operator approved ("sounds like a plan"). Not critical (laptop exporter and a dashboard panel), so it may dispatch once written.
-**Component:** `bin/k3dm-dispatch-metrics` (`_activity_metrics`), `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml` (panel 58)
+**Component:** `bin/k3dm-dispatch-metrics` (`_activity_metrics`), `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` (panel 58; moved there by the v1.43.6 dashboard split, `4cb877c7`)
 **Related:** `docs/plans/v1.43.6-dispatch-codex-solo-activity.md` (lines 99–100 set the omit rule)
+
+## Files
+
+- `bin/k3dm-dispatch-metrics`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats`
+- `docs/guides/grafana-dashboards.md`
 
 ## Problem
 
@@ -29,7 +37,7 @@ priced 385 sessions forever.
 
 1. Export the priced sum per mode whenever at least one session in it is priced, and add
    `k3dm_codex_unpriced_sessions{window,mode,reason}` with `reason` `model` or `usage`.
-2. Panel 58 shows the priced sum. Its description says it covers priced sessions only, and a second
+2. Panel 58 on Agent Activity shows the priced sum. Place the new unpriced-count stat on the same dashboard, inside the All Codex activity row, with no overlap and no gap. Update the guide's Agent Activity section to say the total covers priced sessions only. Its description says it covers priced sessions only, and a second
    stat (or an override line) shows the unpriced session count beside it, the same way
    **Ledger coverage** shows spend outside the ledger.
 3. Do not add a price for `codex-auto-review` or any model without a published rate.
@@ -72,7 +80,7 @@ evidence:
     text: After the next metrics push, the operator's screenshot at Window 7d shows a dollar value in Codex at API prices, all sessions, with the unpriced count beside it.
 interface:
   - bin/k3dm-dispatch-metrics --dry-run --codex-home PATH --prices PATH
-  - Agent Dispatch dashboard, row "All Codex activity"
+  - Agent Activity dashboard (/d/k3dm-agent-activity), row "All Codex activity"
 ```
 
 ## What NOT to Do
