@@ -608,3 +608,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: panel 85 names placed on top e98af9b3; full labels restored (clarification/continue/correction/other/tracked tasks).
 - 2026-10-25: panels 84/85 h 6->8 583d092c (values clipped with names on top).
 - 2026-10-25: worker-model/coordinator bug FIXED 71f70dd2 (Luna; Claude red-checked tests 1/2/4 on pre-fix copy). E2 needs next dispatch with COORDINATOR=anthropic/claude-opus-5-5.
+- 2026-10-25: Per run evidence sorts newest release first 088b113a (padded vsort label + sortBy transform).
