@@ -32,7 +32,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -429,6 +429,16 @@ codex-prune:
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+## Put the agy recording wrapper first on PATH
+AGY_WRAPPER_DIR ?= $(HOME)/.local/bin
+agy-wrapper-install:
+	@mkdir -p "$(AGY_WRAPPER_DIR)"
+	@ln -sf "$(CURDIR)/bin/k3dm-agy" "$(AGY_WRAPPER_DIR)/agy"
+	@type -a agy
+
+agy-wrapper-uninstall:
+	@if [ -L "$(AGY_WRAPPER_DIR)/agy" ] && [ "$$(readlink "$(AGY_WRAPPER_DIR)/agy")" = "$(CURDIR)/bin/k3dm-agy" ]; then rm "$(AGY_WRAPPER_DIR)/agy"; fi
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:

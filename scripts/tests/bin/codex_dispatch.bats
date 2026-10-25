@@ -78,6 +78,7 @@ if [[ "${1:-}" == models ]]; then
 fi
 printf '%s\n' "$*" >>"${AGY_ARGV:?}"
 printf '%s\n' "$PWD" >>"${AGY_ARGV}.cwd"
+printf 'K3DM_DISPATCH_SLUG=%s\n' "${K3DM_DISPATCH_SLUG:-}" >>"${AGY_ARGV}.env"
 [[ "${AGY_EDIT:-0}" != 1 ]] || printf 'agy working-tree edit\n' >a.txt
 if [[ "${AGY_NO_USAGE:-0}" == 1 ]]; then
   printf '{"conversation_id":"agy-conversation-1"}\n'
@@ -97,6 +98,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   sleep 1
   [[ "$(<"$BATS_TEST_TMPDIR/agy.argv")" == *"--model gemini-4-argon-medium"* ]]
   [[ "$(<"$BATS_TEST_TMPDIR/agy.argv")" == *"--sandbox"* ]]
+  grep -q '^K3DM_DISPATCH_SLUG=agy$' "$BATS_TEST_TMPDIR/agy.argv.env"
   [ "$(cd "$(<"$BATS_TEST_TMPDIR/agy.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/agy" && pwd -P)" ]
   [ "$(jq -r 'select(.event=="start")|.agent+":"+.model_source+":"+.model' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "agy:default:gemini-4-argon-medium" ]
   [ "$(jq -r 'select(.event=="agent_exit")|(.run|tostring)+":"+.session' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "1:agy-conversation-1" ]

@@ -326,29 +326,59 @@ def _session_files(codex_home, now):
         try:
             if os.path.getmtime(name) < cutoff:
                 continue
-            session = model = None
+            session = model = mode = repo = None
             start = None
             usage = None
+            active = 0
+            quota = None
             with open(name, encoding="utf-8") as stream:
                 for index, line in enumerate(stream):
                     try:
                         item = json.loads(line)
                     except (ValueError, TypeError):
                         continue
+                    if not isinstance(item, dict):
+                        continue
                     if index == 0 and item.get("type") == "session_meta":
                         payload = item.get("payload", {})
+                        if not isinstance(payload, dict):
+                            continue
                         session, start = payload.get("id"), payload.get("timestamp")
-                    if "total_token_usage" in line:
-                        value = item.get("payload", {}).get("info", {}).get("total_token_usage")
-                        if isinstance(value, dict):
-                            usage = value
-                    if '"model"' in line:
+                        origin = payload.get("originator")
+                        mode = "exec" if origin == "codex_exec" else "interactive" if origin == "codex-tui" else "other"
+                        cwd = payload.get("cwd")
+                        repo = Path(cwd).name if isinstance(cwd, str) else "other"
+                        if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo or ""):
+                            repo = "other"
+                    if item.get("type") == "event_msg":
                         payload = item.get("payload", {})
-                        value = payload.get("model") or payload.get("info", {}).get("model")
-                        if isinstance(value, str):
-                            model = value
-            if session and isinstance(start, str):
-                yield {"session": session, "start": start, "model": model, "usage": usage}
+                        if not isinstance(payload, dict):
+                            continue
+                        event_type = payload.get("type")
+                        if event_type == "task_complete":
+                            duration = payload.get("duration_ms")
+                            if isinstance(duration, (int, float)) and duration >= 0:
+                                active += duration / 1000
+                        if event_type in ("token_count", None):
+                            info = payload.get("info", {})
+                            if isinstance(info, dict):
+                                value = info.get("total_token_usage")
+                                if isinstance(value, dict):
+                                    usage = value
+                                model_value = payload.get("model") or info.get("model")
+                                if isinstance(model_value, str):
+                                    model = model_value
+                        limits = payload.get("rate_limits")
+                        if isinstance(limits, dict):
+                            stamp = item.get("timestamp") or start
+                            quota = (stamp, limits)
+                    elif item.get("type") == "turn_context":
+                        payload = item.get("payload", {})
+                        if isinstance(payload, dict) and isinstance(payload.get("model"), str):
+                            model = payload["model"]
+            if isinstance(session, str) and session and isinstance(start, str):
+                yield {"session": session, "start": start, "model": model, "usage": usage,
+                       "mode": mode or "other", "repo": repo or "other", "active": active, "quota": quota}
         except (OSError, ValueError, TypeError):
             continue
 
@@ -934,6 +964,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
 
 
 def _timestamp(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
     try:
         from datetime import datetime
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
@@ -977,6 +1009,178 @@ def _render_cost(lines, window, usage, landed, prices):
     if total:
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
     lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {unpriced}')
+
+def _activity_metrics(lines, events, files, now, prices):
+    associated = {e.get("session") for e in events if e.get("event") == "codex_usage"}
+    counts = defaultdict(int)
+    for row in files:
+        if _timestamp(row.get("start")) >= now - WINDOWS["30d"]:
+            counts[row["repo"]] += 1
+    top = {name for name, _ in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:10]}
+    rows = [{**row, "repo": row["repo"] if row["repo"] in top else "other"} for row in files]
+    for window, seconds in WINDOWS.items():
+        selected = [r for r in rows if now-seconds <= _timestamp(r.get("start")) <= now]
+        grouped = defaultdict(list)
+        for row in selected:
+            grouped[(row["mode"], row["repo"])].append(row)
+        by_mode = defaultdict(list)
+        for (mode, repo), group in grouped.items():
+            by_mode[mode].extend(group)
+            lines.append(f'k3dm_codex_sessions{{window="{window}",mode="{mode}",repo="{repo}"}} {len(group)}')
+            lines.append(f'k3dm_codex_untracked_sessions{{window="{window}",mode="{mode}",repo="{repo}"}} {sum(r["session"] not in associated for r in group)}')
+            for kind, key in (("uncached_input", "input_tokens"), ("cached_input", "cached_input_tokens"), ("output", "output_tokens")):
+                def token_value(row, field):
+                    raw = (row.get("usage") or {}).get(field)
+                    return int(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw >= 0 else 0
+                value = sum(max(0, token_value(r, key) - (token_value(r, "cached_input_tokens") if kind == "uncached_input" else 0)) for r in group)
+                lines.append(f'k3dm_codex_tokens{{window="{window}",mode="{mode}",repo="{repo}",kind="{kind}"}} {value}')
+        for mode, group in by_mode.items():
+            lines.append(f'k3dm_codex_active_seconds{{window="{window}",mode="{mode}"}} {sum(r["active"] for r in group)}')
+            total, priced = 0.0, True
+            for row in group:
+                usage = row.get("usage")
+                fields = ("input_tokens", "cached_input_tokens", "output_tokens")
+                if not isinstance(usage, dict) or any(not isinstance(usage.get(k), (int, float)) or isinstance(usage.get(k), bool) or usage[k] < 0 for k in fields):
+                    amount = None
+                else:
+                    amount = _cost({"model": row.get("model"), "input": int(usage[fields[0]]),
+                                    "cached_input": int(usage[fields[1]]), "output": int(usage[fields[2]])}, prices)
+                if amount is None: priced = False
+                else: total += amount
+            if priced:
+                lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",mode="{mode}"}} {total}')
+    newest = None
+    for row in files:
+        sample = row.get("quota")
+        if sample:
+            stamp = _timestamp(sample[0])
+            if stamp and (newest is None or stamp > newest[0]): newest = (stamp, sample[1])
+    if newest:
+        stamp, limits = newest
+        lines.append(f"k3dm_codex_quota_sample_timestamp_seconds {stamp}")
+        for limit in ("primary", "secondary"):
+            data = limits.get(limit)
+            if not isinstance(data, dict): continue
+            used, minutes = data.get("used_percent"), data.get("window_minutes")
+            if isinstance(used, (int, float)) and not isinstance(used, bool):
+                label = f'limit="{limit}",window_minutes="{minutes}"'
+                lines.append(f"k3dm_codex_quota_used_ratio{{{label}}} {used / 100}")
+                if isinstance(data.get("resets_at"), (int, float)):
+                    lines.append(f"k3dm_codex_quota_resets_at_seconds{{{label}}} {data['resets_at']}")
+
+
+def _quota_efficiency(lines, events, quota, now):
+    observation_file = _root() / "codex-quota-observations.jsonl"
+    observations = []
+    try:
+        for line in observation_file.read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(line)
+                if isinstance(row, dict) and isinstance(row.get("timestamp"), (int, float)) and isinstance(row.get("used_percent"), (int, float)) and isinstance(row.get("resets_at"), (int, float)):
+                    observations.append(row)
+            except (ValueError, TypeError):
+                continue
+    except OSError:
+        pass
+    reversed_sample = False
+    if quota:
+        stamp = _timestamp(quota[0]); secondary = quota[1].get("secondary")
+        if stamp and isinstance(secondary, dict) and all(isinstance(secondary.get(k), (int, float)) for k in ("used_percent", "resets_at")):
+            candidate = {"timestamp": stamp, "used_percent": secondary["used_percent"], "resets_at": secondary["resets_at"]}
+            if observations and stamp < max(x["timestamp"] for x in observations):
+                reversed_sample = True
+            elif not any(x["timestamp"] == stamp for x in observations): observations.append(candidate)
+            observations = sorted(observations, key=lambda x: x["timestamp"])[-1000:]
+            try:
+                observation_file.parent.mkdir(parents=True, exist_ok=True)
+                tmp = observation_file.with_suffix(".tmp")
+                tmp.write_text("".join(json.dumps(x, separators=(",", ":")) + "\n" for x in observations), encoding="utf-8")
+                os.replace(tmp, observation_file)
+            except OSError:
+                pass
+    valid = sorted(observations, key=lambda x: x["timestamp"])
+    pair = valid[-2:] if len(valid) >= 2 else []
+    points = float("nan"); verified_count = float("nan"); ratio = float("nan"); covered = 0
+    start_used = end_used = start_ts = end_ts = float("nan")
+    if len(pair) == 2 and not reversed_sample:
+        before, after = pair
+        delta = after["used_percent"] - before["used_percent"]
+        if before["timestamp"] < after["timestamp"] and before["resets_at"] == after["resets_at"] and delta > 0.01:
+            start, end = before["timestamp"], after["timestamp"]
+            start_used, end_used, start_ts, end_ts = before["used_percent"], after["used_percent"], start, end
+            states = _task_states(events)
+            lands = [event for event in events if event.get("event") == "land"]
+            eligible = 0
+            for key, task_events in states.items():
+                verifies = [e for e in task_events if e.get("event") == "verify"]
+                if not verifies: continue
+                latest = max(verifies, key=lambda e: e.get("ts", 0))
+                if latest.get("result") != "pass" or not (start < latest.get("ts", 0) <= end): continue
+                matching_lands = [l for l in lands if l.get("version") == key[0] and l.get("slug") == key[1]]
+                if not matching_lands: continue
+                check_events = task_events + matching_lands
+                if _verification_metrics(check_events, matching_lands, _repo_root(), cutoff=start)["delivered"]:
+                    eligible += 1
+            covered = 1
+            points, verified_count = delta, eligible
+            ratio = eligible / delta
+    lines.extend([f"k3dm_codex_verified_outputs {verified_count}",
+                  f"k3dm_codex_weekly_quota_delta_percentage_points {points}",
+                  f"k3dm_codex_verified_outputs_per_quota_point {ratio}",
+                  f"k3dm_codex_quota_efficiency_coverage {covered}",
+                  f"k3dm_codex_weekly_quota_used_percent_start {start_used}",
+                  f"k3dm_codex_weekly_quota_used_percent_end {end_used}",
+                  f"k3dm_codex_quota_efficiency_interval_start_timestamp_seconds {start_ts}",
+                  f"k3dm_codex_quota_efficiency_interval_end_timestamp_seconds {end_ts}"])
+
+
+def _agy_metrics(lines, ledger, now):
+    rows = []
+    try:
+        for raw in Path(ledger).read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(raw)
+                if isinstance(row, dict) and isinstance(row.get("start"), (int, float)):
+                    rows.append(row)
+            except (ValueError, TypeError):
+                continue
+    except OSError:
+        return
+    counts = defaultdict(int)
+    for row in rows:
+        repo = row.get("repo")
+        if isinstance(repo, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo):
+            counts[repo] += 1
+    top = {name for name, _ in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:10]}
+    for window, seconds in WINDOWS.items():
+        selected = [r for r in rows if now-seconds <= r["start"] <= now]
+        by_mode = defaultdict(list)
+        groups = defaultdict(list)
+        for row in selected:
+            mode = row.get("mode") if row.get("mode") in ("print", "interactive") else "other"
+            repo = row.get("repo") if row.get("repo") in top else "other"
+            by_mode[mode].append(row)
+            groups[(mode, repo)].append(row)
+        for (mode, repo), group in groups.items():
+            labels = f'window="{window}",mode="{mode}",repo="{repo}"'
+            lines.append(f"k3dm_agy_sessions{{{labels}}} {len(group)}")
+            lines.append(f"k3dm_agy_untracked_sessions{{{labels}}} {sum(r.get('dispatch_slug') is None for r in group)}")
+        for mode, group in by_mode.items():
+            lines.append(f'k3dm_agy_active_seconds{{window="{window}",mode="{mode}"}} {sum(r.get("duration_s", 0) or 0 for r in group)}')
+            without_usage = 0
+            tokens = defaultdict(int)
+            for row in group:
+                usage = row.get("usage")
+                if not isinstance(usage, dict):
+                    without_usage += 1
+                    continue
+                for kind, value in usage.items():
+                    if isinstance(kind, str) and re.fullmatch(r"[A-Za-z0-9_]{1,48}", kind) and "token" in kind.lower() and type(value) is int and value >= 0:
+                        tokens[kind.lower()] += value
+            lines.append(f'k3dm_agy_runs_without_usage{{window="{window}",mode="{mode}"}} {without_usage}')
+            for kind, value in tokens.items():
+                lines.append(f'k3dm_agy_tokens{{window="{window}",mode="{mode}",kind="{kind}"}} {value}')
+
 
 def _render_claude_context(lines, now, claude_context, repo_root):
     verified = _verified_specs(repo_root, now)
@@ -1069,6 +1273,13 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
     if claude_context is not None or repo_root is not None:
         _render_claude_context(lines, now, claude_context, repo_root)
+    if coverage is not None:
+        _activity_metrics(lines, events, coverage, now, prices)
+        newest_quota = max((r.get("quota") for r in coverage if r.get("quota") and _timestamp(r["quota"][0])), key=lambda q: _timestamp(q[0]), default=None)
+        _quota_efficiency(lines, events, newest_quota, now)
+    else:
+        _quota_efficiency(lines, events, None, now)
+    _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
 

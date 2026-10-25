@@ -196,6 +196,7 @@ _dispatch_worker() {
     "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
     "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
   )
+  [[ "$agent" != agy ]] || state_vars+=("K3DM_DISPATCH_SLUG=$slug")
   cd "$worktree" || { _dispatch_log "$run" "could not enter worker worktree"; return 125; }
   set +e
   if [[ "$agent" == agy ]]; then

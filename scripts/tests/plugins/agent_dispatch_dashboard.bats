@@ -27,7 +27,7 @@ body = text.split("agent-dispatch.json: |\n", 1)[1]
 dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
 exporter = open(sys.argv[2], encoding="utf-8").read()
 queries = "\n".join(target.get("expr", "") for panel in dashboard["panels"] for target in panel.get("targets", []))
-for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude)_[a-z0-9_]+", queries)):
+for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude|codex|agy)_[a-z0-9_]+", queries)):
     assert metric in exporter, metric
 print("ok")
 PY

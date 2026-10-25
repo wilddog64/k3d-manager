@@ -130,3 +130,7 @@ agy runs inside the task worktree and can write its `.git` directory. The dispat
 Resume an agy task with `bin/k3dm-codex-dispatch resume --slug <slug> --prompt-file <path>`. The dispatcher resumes only with the conversation ID stored from that task's JSON output; if agy did not return one, start a new task. It never selects the latest conversation implicitly. `--network` is unavailable for agy.
 
 For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace an already landed implementation, name that slug with `land --superseding <landed-slug>`.
+
+### Record local agy activity
+
+`make agy-wrapper-install` symlinks `${AGY_WRAPPER_DIR:-$HOME/.local/bin}/agy` to `bin/k3dm-agy` and prints `type -a agy`; confirm the wrapper appears first. `make agy-wrapper-uninstall` removes that symlink only when it still points to this repository's wrapper. The wrapper records run timing, exit status, mode, validated model and repo labels, an optional dispatch slug, and filtered token usage from print-mode JSON. It does not record arguments, prompts, output, or environment values. Interactive runs have no usage. Help and informational subcommands are passed through without recording. Only runs through the wrapper appear in the agy dashboard row.

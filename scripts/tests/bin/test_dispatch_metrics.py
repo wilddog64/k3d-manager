@@ -47,7 +47,7 @@ def write_session(home, session, started, now):
 
 
 def test_api_cost_windows_use_session_start_and_report_observed_days(tmp_path):
-    now = 1_800_000_000
+    now = time.time()
     home = tmp_path / "codex"
     prices = {"gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
     write_session(home, "old", now - 20 * 86400, now)
@@ -79,7 +79,7 @@ def test_usage_without_scanned_session_is_excluded_from_time_but_kept_in_release
 
 
 def test_observed_span_is_capped_and_zero_without_ledgered_sessions(tmp_path):
-    now = 1_800_000_000
+    now = time.time()
     home = tmp_path / "codex"
     write_session(home, "recent", now - 3 * 86400, now)
     recent = dispatch_metrics.render([event(now, "codex_usage", session="recent",
@@ -650,7 +650,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 39  # agent-audit: allow assert-removed Claude context and compaction row adds five $window expressions
+    assert sum("$window" in expr for expr in expressions) == 51  # agent-audit: allow assert-removed Codex and agy activity rows add twelve $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1321,3 +1321,63 @@ def test_claude_verified_specs_counts_closed_status_transitions_in_window(tmp_pa
     assert 'k3dm_claude_verified_specs{window="1d"} 1' in output
     assert 'k3dm_claude_verified_specs{window="7d"} 1' in output
     assert 'k3dm_claude_verified_specs{window="30d"} 1' in output
+
+
+def test_codex_activity_exports_sessions_tokens_quota_and_untracked(tmp_path):
+    from datetime import datetime, timezone
+    now = time.time()
+    home = tmp_path / "codex"
+    day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y/%m/%d")
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    path = folder / "rollout-one.jsonl"
+    path.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid", "timestamp": datetime.fromtimestamp(now-10, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec", "account_id": "secret"}}),
+        json.dumps({"type": "event_msg", "timestamp": datetime.fromtimestamp(now-2, timezone.utc).isoformat(), "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": {"primary": {"used_percent": 30, "window_minutes": 300, "resets_at": now+10}, "secondary": {"used_percent": 40, "window_minutes": 10080, "resets_at": now+20}}}}),
+        json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "duration_ms": 1500}}),
+    ]) + "\n")
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert f'k3dm_codex_sessions{{window="1d",mode="exec",repo="shop"}} 1' in output
+    assert f'k3dm_codex_untracked_sessions{{window="1d",mode="exec",repo="shop"}} 1' in output
+    assert f'k3dm_codex_tokens{{window="1d",mode="exec",repo="shop",kind="uncached_input"}} 80' in output
+    assert 'k3dm_codex_active_seconds{window="1d",mode="exec"} 1.5' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
+    assert "secret" not in output
+
+
+def test_agy_ledger_missing_or_corrupt_is_nonfatal(tmp_path):
+    output = []
+    dispatch_metrics._agy_metrics(output, tmp_path / "missing.jsonl", 100)
+    assert output == []
+    path = tmp_path / "agy.jsonl"
+    path.write_text("{bad}\n")
+    dispatch_metrics._agy_metrics(output, path, 100)
+    assert output == []
+
+
+def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_path, monkeypatch):
+    monkeypatch.setattr(dispatch_metrics, "_root", lambda: tmp_path / "state")
+    repo = tmp_path / "repo"
+    spec = repo / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("# Demo\n\n## Acceptance\n\n- offline\n")
+    monkeypatch.setattr(dispatch_metrics, "_repo_root", lambda: repo)
+    now = time.time()
+    events = [
+        event(now - 300, "start", version="v9.9.9", slug="quota", spec="docs/plans/v9.9.9-demo.md", agent="codex"),
+        event(now - 250, "land", version="v9.9.9", slug="quota"),
+        event(now - 150, "verify", version="v9.9.9", slug="quota", result="pass"),
+    ]
+    lines = []
+    dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 600)), {"secondary": {"used_percent": 20, "resets_at": 200}}), 100)
+    assert "k3dm_codex_quota_efficiency_coverage 0" in lines
+    lines.clear()
+    dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 500)), {"secondary": {"used_percent": 25, "resets_at": 201}}), 100)
+    assert "k3dm_codex_quota_efficiency_coverage 0" in lines
+    lines.clear()
+    dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 400)), {"secondary": {"used_percent": 25.005, "resets_at": 201}}), 100)
+    assert "k3dm_codex_quota_efficiency_coverage 0" in lines
+    lines.clear()
+    dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 100)), {"secondary": {"used_percent": 26, "resets_at": 201}}), 100)
+    assert "k3dm_codex_quota_efficiency_coverage 1" in lines
+    assert "k3dm_codex_verified_outputs 1" in lines
