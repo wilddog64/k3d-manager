@@ -1645,7 +1645,7 @@ data:
         {
           "id": 100,
           "type": "row",
-          "title": "Release plans — $release",
+          "title": "Release plans",
           "collapsed": false,
           "gridPos": {
             "x": 0,
@@ -1672,7 +1672,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"}) or vector(0)",
+              "expr": "sum((k3dm_plan_release_docs{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -1720,7 +1720,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"}) or vector(0)",
+              "expr": "sum((k3dm_plan_release_docs{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -1759,7 +1759,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"implemented\",verification=\"unknown\"}) or vector(0)",
+              "expr": "sum((k3dm_plan_release_docs{repo=\"$repo\",execution=\"implemented\",verification=\"unknown\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"implemented\",verification=\"unknown\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -1807,7 +1807,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",verification=\"live_verified\"}) or vector(0)",
+              "expr": "sum((k3dm_plan_release_docs{repo=\"$repo\",verification=\"live_verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",verification=\"live_verified\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -1851,7 +1851,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"unknown\"}) or vector(0)",
+              "expr": "sum((k3dm_plan_release_docs{repo=\"$repo\",execution=\"unknown\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\",execution=\"unknown\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -1899,7 +1899,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "count((k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} * on(plan) group_left k3dm_dispatch_plan_state{dispatch_state=\"landed\"})) or vector(0)",
+              "expr": "count(((k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0)) * on(plan) group_left k3dm_dispatch_plan_state{dispatch_state=\"landed\"})) or vector(0)",
               "instant": true
             }
           ],
@@ -1952,7 +1952,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace(k3dm_plan_info{repo=\"$repo\",release=~\"$release\"}, \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")",
+              "expr": "((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")",
               "instant": true,
               "format": "table"
             }

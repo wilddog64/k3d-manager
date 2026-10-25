@@ -318,7 +318,8 @@ PY
 import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
-panels=d['panels']; row=next(p for p in panels if p['title']=='Release plans — $release')
+panels=d['panels']; row=next(p for p in panels if p['id']==100)
+assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
 assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27]
 assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
@@ -334,6 +335,8 @@ assert 'label_replace(' in expr and '"dispatch_state", "none"' in expr
 assert table['fieldConfig']['overrides'] and any('none' in str(o.get('properties')) and 'no record' in str(o.get('properties')) for o in table['fieldConfig']['overrides'])
 exprs=[t['expr'] for p in added for t in p.get('targets',[])]
 assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
+assert all('and on(repo,release) k3dm_bug_current_release_info{repo="$repo"}' in e for e in exprs), exprs
+assert all('vector($release_mode) == 1' in e and 'vector($release_mode) == 0' in e for e in exprs), exprs
 PY
   [ "${status}" -eq 0 ]
 }
