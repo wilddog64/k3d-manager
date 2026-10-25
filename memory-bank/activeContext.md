@@ -271,3 +271,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-24: API-cost P3 LIVE-VERIFIED (operator screenshot: $12.1, 70 unpriced); verify pass recorded.
 - 2026-10-24: duplicate Codex run claude-context-compaction-metrics kept for operator inspection; codex-abandon without YES=1 is preview-only (no ledger event). Abandon YES=1 after operator looks.
 - 2026-10-24: interactive Codex trial set up: bug 2026-10-15-vectordb-corpus-axis-fractional-ticks (P3, was placed v1.45.2) in worktree ~/.local/share/k3d-manager/worktrees/manual/vectordb-ticks, branch task/v1.43.6/vectordb-ticks-interactive. Not via dispatcher (operator choice): no ledger events; shows only as an untracked interactive session. Claude reviews + merges by hand.
+- 2026-10-24: VectorDB ticks P3 (interactive Codex) merged as `ba1b2a01` (cherry-pick of be4dcbd5); review passed, red on pre-fix. Live screenshot pending. Manual worktree kept until verified.
