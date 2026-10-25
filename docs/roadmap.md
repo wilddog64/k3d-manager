@@ -415,6 +415,12 @@ Plan 4 of 5 is [`vectordb-retrieval-quality-probe`](plans/v1.43.9-vectordb-retri
 2026-10-24). Hermes runs the v1.40.0 retrieval eval once a day against the live store and reports recall,
 intrusion and outdated results; the VectorDB dashboard is reorganised into health, consistency and retrieval rows.
 
+Plan 5 of 5 is [`orbstack-upgrade-coordinated`](plans/v1.43.9-orbstack-upgrade-coordinated.md) (operator,
+2026-10-25, after an OrbStack update stopped the hub). Hermes announces an available update;
+`make orbstack-upgrade` refuses while the hub is busy, updates OrbStack on a typed yes, then unseals Vault,
+fixes host-network drift, refills the Pushgateway and verifies against preflight counts. Its prerequisite,
+the 2026-10-12 OrbStack monitoring bug, moved from v1.44.0 to v1.43.9. v1.43.9 is now full.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the

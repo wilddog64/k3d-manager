@@ -1,7 +1,7 @@
 # Bug: a pending or finished OrbStack update is invisible to monitoring
 
 **Filed:** 2026-10-12
-**Branch:** `k3d-manager-v1.44.0`
+**Branch:** `k3d-manager-v1.43.9` (moved from v1.44.0 on 2026-10-25, Claude: it is the prerequisite of `docs/plans/v1.43.9-orbstack-upgrade-coordinated.md`, which replaces phase 2 below with an operator-run upgrade)
 **Status:** OPEN
 **Priority:** P3 — a visibility gap; an update restarts the whole hub, and nothing warns before or labels it after
 **Approval:** explicit 2026-10-12 "go ahead" (operator, to "file it for v1.44.0, alert only first, scheduled install as a later phase")
