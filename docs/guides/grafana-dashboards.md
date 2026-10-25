@@ -61,8 +61,25 @@ The Agent dispatch **Per spec** table links each Spec name to its plan or bug do
 task's release branch; the link opens in a new tab. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
 totals. Time to land is not summed: parallel dispatches overlap, so the useful number is the mean,
-which the **Time to land** stat shows. Codex tokens counts each spec's last run only, so its total
-is low for specs that were resumed; API equiv. counts every run.
+which the **Time to land** stat shows. Codex tokens uses the cumulative session total from the last
+exit after a resume; summing those exits would double count. API equiv. counts each session's
+recorded cumulative usage once.
+
+**Delivered** means the latest independent verification recorded `pass`. If the spec's Acceptance
+requires live evidence, its document must also have `**Status:** LIVE-VERIFIED` and a well-formed
+`**Live evidence:**` line. The **Codex tokens per verified spec** stat averages implementation
+Codex tokens plus any `verify --tokens` value when the verifier was a Codex task. It excludes
+Claude's own verification tokens. **Awaiting verification** counts landed specs whose document is
+available but whose verification pass or required live evidence is missing. **Verification
+unknown** counts landed specs whose `spec` path is absent from the start event or whose document
+cannot be read. A failed independent review contributes to rework cause `review` and to `any`.
+
+Run outcomes require independently referenced evidence. `accepted` means controlled validation
+accepted that run's output; `rework` means objective refusal or failed verification led to another
+attempt; `failed` requires an evidenced failure or abandonment without an accepted artifact;
+`progress` requires reviewer-approved useful evidence; otherwise the outcome is `unknown`. Progress
+and unknown token totals are not treated as waste. Bug-level token cost is N/A without an explicit
+task-to-bug link and an independently verified live closure.
 
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.

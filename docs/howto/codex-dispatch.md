@@ -97,6 +97,27 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
   exporter exposes skipped and truncated counts. The two per-spec means cover all landed tasks,
   not only the displayed rows.
 
+### Independent verification and delivered cost
+
+After the controlled landing step, Claude records the independent verifier's result once it has
+reported. Use `bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail`; include
+`--verifier NAME` when the verifier identity is useful and `--tokens N` only when that verifier
+was itself a Codex task. A verifier run outside Codex has no token value. The command requires an
+existing `land` event and refuses invalid values without appending a ledger event.
+
+A spec is **delivered** when its latest independent verification passed and, if its Acceptance
+requires live evidence, its document is `LIVE-VERIFIED` with well-formed `Live evidence`. Delivered
+cost is Codex tokens for implementation plus any recorded Codex verifier tokens. It excludes
+Claude's own verification tokens. **Awaiting verification** means the landed document exists but
+the pass or required live evidence is still missing; **verification unknown** means the spec path
+was not recorded or the document cannot be read. A failed review adds `cause="review"` to landed
+rework.
+
+The `Run outcomes and verified bug cost` dashboard readouts classify an implementation run only
+when controlled test, review, or live-verification evidence identifies its outcome. Investigation
+and unknown outcomes are not counted as rejected tokens. A task without an explicit immutable link
+to a bug cannot contribute a known bug-level token total; N/A means attribution is unavailable.
+
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.

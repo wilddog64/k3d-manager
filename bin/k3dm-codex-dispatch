@@ -47,6 +47,7 @@ _dispatch_schedule_metrics() {
     fi
   fi
   (
+    # shellcheck disable=SC2329 # invoked indirectly by the EXIT trap
     _dispatch_metrics_cleanup() {
       if (( owns_lock )); then rmdir "$lock" 2>/dev/null || true; fi
     }
@@ -113,8 +114,9 @@ _dispatch_worker_matches_start() {
 }
 
 _dispatch_codex_exit() {
-  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tokens tree
+  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" run_number="$7" tokens tree session_id
   tokens="$(awk '/^tokens used$/{getline; gsub(/,/, ""); if ($0 ~ /^[0-9]+$/) value=$0} END{if (value != "") print value}' "$log" 2>/dev/null || true)"
+  session_id="$(sed -n 's/^session id: //p' "$log" 2>/dev/null | head -n 1)"
   git -C "$worktree" add -A || return 1
   tree="$(git -C "$worktree" write-tree)" || return 1
   git -C "$worktree" reset -q || return 1
@@ -122,28 +124,31 @@ _dispatch_codex_exit() {
   if [[ -n "$tokens" ]]; then
     _dispatch_ledger_event codex_exit "$version" "$slug" \
       --argjson exit "$exit_code" --argjson tokens "$tokens" --arg tree "$tree" \
-      '.["exit"]=$exit|.["tokens"]=$tokens|.["tree"]=$tree' || return 1
+      --argjson run "$run_number" --arg session "$session_id" \
+      '.["exit"]=$exit|.["tokens"]=$tokens|.["tree"]=$tree|.["run"]=$run|.["session"]=$session' || return 1
   else
     _dispatch_ledger_event codex_exit "$version" "$slug" \
       --argjson exit "$exit_code" --arg tree "$tree" \
-      '.["exit"]=$exit|.["tokens"]=null|.["tree"]=$tree' || return 1
+      --argjson run "$run_number" --arg session "$session_id" \
+      '.["exit"]=$exit|.["tokens"]=null|.["tree"]=$tree|.["run"]=$run|.["session"]=$session' || return 1
   fi
   _dispatch_schedule_metrics
 }
 
 _dispatch_agy_exit() {
-  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" tree json usage conversation
+  local worktree="$1" run="$2" version="$3" slug="$4" log="$5" exit_code="$6" run_number="$7" tree json usage conversation
   tree="$(git -C "$worktree" write-tree 2>/dev/null || true)"
   [[ -n "$tree" ]] && printf '%s\n' "$tree" >"$run/codex-tree"
   json="$(tail -n 1 "$log" 2>/dev/null || true)"
   conversation="$(jq -r '.conversation_id // .conversationId // .session_id // empty' <<<"$json" 2>/dev/null || true)"
+  [[ -n "$conversation" || ! -s "$run/session" ]] || conversation="$(<"$run/session")"
   [[ -z "$conversation" ]] || printf '%s\n' "$conversation" >"$run/session"
   usage="$(jq -c '.usage // .result.usage // empty' <<<"$json" 2>/dev/null || true)"
   _dispatch_ledger_event_best_effort agent_exit "$version" "$slug" --argjson exit "$exit_code" \
-    --argjson usage "${usage:-null}" --arg tree "${tree:-}" \
-    '.exit=$exit|.usage=$usage|.tree=$tree'
+    --argjson usage "${usage:-null}" --arg tree "${tree:-}" --argjson run "$run_number" --arg session "$conversation" \
+    '.exit=$exit|.usage=$usage|.tree=$tree|.run=$run|.session=$session'
   [[ -z "$usage" ]] || _dispatch_ledger_event_best_effort agent_usage "$version" "$slug" \
-    --argjson usage "$usage" '.usage=$usage'
+    --argjson usage "$usage" --argjson run "$run_number" '.usage=$usage|.run=$run'
   _dispatch_schedule_metrics
 }
 
@@ -184,6 +189,7 @@ _dispatch_codex_usage() {
 _dispatch_worker() {
   local operation="$1" worktree="$2" run="$3" version="$4" slug="$5" network="$6" n="${7:-}" session_id="${8:-}" agent="${9:-codex}" model="${10:-}" model_source="${11:-inherited}"
   local -a state_vars
+  local run_number="${n:-1}"
   _dispatch_write_start_marker "$run" || { _dispatch_log "$run" "could not write worker start marker"; return 125; }
   state_vars=(
     "K3DM_REPO_ROOT=$worktree" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
@@ -221,10 +227,10 @@ _dispatch_worker() {
       : >"$run/violation"
       _dispatch_ledger_event_best_effort scope_violation "$version" "$slug" --arg reason 'agent committed' '.reason=$reason'
     fi
-    _dispatch_agy_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"
+    _dispatch_agy_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code" "$run_number"
   else
     _dispatch_write_exit_marker "$run" "$exit_code" || _dispatch_log "$run" "could not write Codex exit marker"
-    if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code"; then
+    if ! _dispatch_codex_exit "$worktree" "$run" "$version" "$slug" "$log" "$exit_code" "$run_number"; then
       _dispatch_log "$run" "Codex bookkeeping failed after exit code ${exit_code} was recorded"
     fi
     _dispatch_codex_usage "$log" "$version" "$slug" || true
@@ -255,10 +261,41 @@ Usage:
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH
+  bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
 EOF
+}
+
+_dispatch_verify() {
+  local slug="" result="" tokens="" verifier="" rel version tokens_set=0
+  while (($#)); do
+    case "$1" in
+      --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --result) (($# >= 2)) || _dispatch_error "--result requires a value"; result="$2"; shift 2 ;;
+      --tokens) (($# >= 2)) || _dispatch_error "--tokens requires a value"; tokens="$2"; tokens_set=1; shift 2 ;;
+      --verifier) (($# >= 2)) || _dispatch_error "--verifier requires a value"; verifier="$2"; shift 2 ;;
+      *) _dispatch_error "unknown verify option: $1" ;;
+    esac
+  done
+  [[ "$slug" =~ ^[A-Za-z0-9._-]{1,120}$ ]] || _dispatch_error "verify requires a valid --slug SLUG"
+  [[ "$result" == pass || "$result" == fail ]] || _dispatch_error "--result must be pass or fail"
+  (( ! tokens_set )) || [[ "$tokens" =~ ^[0-9]+$ ]] || _dispatch_error "--tokens must be a non-negative integer"
+  [[ -z "$verifier" || "$verifier" =~ ^[A-Za-z0-9._-]{1,80}$ ]] || _dispatch_error "invalid verifier name"
+  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
+  jq -se --arg version "$version" --arg slug "$slug" \
+    'any(.[]; .event == "land" and .version == $version and .slug == $slug)' \
+    "$_dispatch_worktree_root/ledger.jsonl" >/dev/null 2>&1 || _dispatch_error "no landed task for $slug in $version"
+  if (( tokens_set )); then
+    _dispatch_ledger_event verify "$version" "$slug" --arg result "$result" --arg verifier "$verifier" --argjson tokens "$tokens" \
+      '.result=$result|.tokens=$tokens|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
+  else
+    _dispatch_ledger_event verify "$version" "$slug" --arg result "$result" --arg verifier "$verifier" \
+      '.result=$result|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
+  fi
+  _dispatch_schedule_metrics
+  echo "verification recorded: $slug ($result)"
 }
 
 _dispatch_usage_backfill() {
@@ -416,9 +453,9 @@ _dispatch_start() {
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" '.network=$network|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" '.network=$network|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source'
   fi
   cat >"$run/prompt.md" <<EOF
 Read the spec at $spec in full, and implement it in this directory only.
@@ -543,8 +580,12 @@ _dispatch_land() {
   if [[ -s "$run/codex-exit-ts" ]]; then
     codex_ts="$(<"$run/codex-exit-ts")"; wait_seconds=$((land_ts - codex_ts))
   fi
+  local test_result=passed
+  (( no_test )) && test_result=skipped
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
-    --argjson wait_seconds "$wait_seconds" '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.chosen=true'
+    --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
+    --arg validation "$run/land-test.log" --arg test_result "$test_result" \
+    '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.chosen=true'
   _dispatch_schedule_metrics
   git -C "$_dispatch_repo_root" worktree remove "$task"
   git -C "$_dispatch_repo_root" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
@@ -596,7 +637,7 @@ _dispatch_resume() {
   rm -f "$run/exit" "$run/start"
   _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" '.["n"]=$n'
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" '.["n"]=$n|.run=$run'
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }
@@ -686,6 +727,7 @@ main() {
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;
+    verify) shift; _dispatch_verify "$@" ;;
     abandon) shift; _dispatch_abandon "$@" ;;
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;

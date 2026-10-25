@@ -99,6 +99,7 @@ dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispa
   [[ "$(<"$BATS_TEST_TMPDIR/agy.argv")" == *"--sandbox"* ]]
   [ "$(cd "$(<"$BATS_TEST_TMPDIR/agy.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/agy" && pwd -P)" ]
   [ "$(jq -r 'select(.event=="start")|.agent+":"+.model_source+":"+.model' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "agy:default:gemini-4-argon-medium" ]
+  [ "$(jq -r 'select(.event=="agent_exit")|(.run|tostring)+":"+.session' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "1:agy-conversation-1" ]
   grep -q '"event":"agent_usage"' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
   [ ! -e "$BATS_TEST_TMPDIR/codex.argv" ]
 }
@@ -738,9 +739,36 @@ EOF
   [ "$(jq -r -s '.[0].event' "$ledger")" = start ]
   [ "$(jq -r -s '.[1].event' "$ledger")" = codex_exit ]
   [ "$(jq -r -s '.[1].tokens' "$ledger")" = 12345 ]
+  [ "$(jq -r -s '.[0].spec' "$ledger")" = docs/plans/v9.9.9-demo.md ]
   [[ "$(jq -r -s '.[1].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-tree" ]
   [ -z "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" diff --cached --name-only)" ]
+}
+
+@test "codex dispatch: verify records pass tokens only for a landed task" {
+  printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"verified"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  run dispatch verify --slug verified --result pass --tokens 456 --verifier codex
+  [ "$status" -eq 0 ]
+  [ "$(jq -r -s '.[-1].event' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = verify ]
+  [ "$(jq -r -s '.[-1].result' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = pass ]
+  [ "$(jq -r -s '.[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 456 ]
+  [ "$(jq -r -s '.[-1].verifier' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = codex ]
+}
+
+@test "codex dispatch: verify refusals do not append ledger events" {
+  printf '{"ts":1,"event":"start","version":"9.9.9","slug":"unlanded"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  run dispatch verify --slug unlanded --result pass
+  [ "$status" -ne 0 ]
+  run dispatch verify --slug absent --result pass
+  [ "$status" -ne 0 ]
+  run dispatch verify --slug absent --result maybe
+  [ "$status" -ne 0 ]
+  run dispatch verify --slug absent --result pass --tokens 1.5
+  [ "$status" -ne 0 ]
+  run dispatch verify --slug absent --result pass --tokens ""
+  [ "$status" -ne 0 ]
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq "$before" ]
 }
 
 @test "codex dispatch: ledger records verifier lines before a release rebase" {

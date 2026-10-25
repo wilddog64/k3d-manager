@@ -150,6 +150,30 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "agent dispatch dashboard: verified delivery stats use exported metrics without overlap" {
+  run python3 - "$DASH" <<'PY'
+import json, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+body = text.split("agent-dispatch.json: |\n", 1)[1]
+panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
+by_title = {panel["title"]: panel for panel in panels}
+tokens = by_title["Codex tokens per verified spec"]
+awaiting = by_title["Awaiting verification"]
+assert tokens["targets"][0]["expr"] == 'k3dm_dispatch_codex_tokens_per_delivered{window="$window"}'
+assert awaiting["targets"][0]["expr"] == 'k3dm_dispatch_awaiting_verification{window="$window"}'
+assert tokens["gridPos"]["y"] == awaiting["gridPos"]["y"] == 56
+for i, left in enumerate(panels):
+    a = left["gridPos"]
+    for right in panels[i + 1:]:
+        b = right["gridPos"]
+        overlap = a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]
+        assert not overlap, (left["title"], right["title"])
+rework = by_title["Rework rate"]["description"]
+assert "review" in rework and "verdict is not in the ledger" not in rework
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "agent dispatch dashboard: stat and bar gauge panels use explicit colours" {
   run python3 - "$DASH" <<'PY'
 import json, sys

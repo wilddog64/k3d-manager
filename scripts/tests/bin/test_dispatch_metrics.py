@@ -1,4 +1,5 @@
 import importlib.machinery
+from textwrap import dedent
 import importlib.util
 import calendar
 import json
@@ -325,6 +326,103 @@ def test_rework_counts_each_cause_and_ratio():
     assert 'k3dm_dispatch_rework_ratio{window="1d"} 0.75\n' in output
 
 
+
+def test_verified_delivery_cost_and_review_rework(tmp_path):
+    spec = tmp_path / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("**Status:** VERIFIED\n\n## Acceptance\n\n```yaml\nevidence:\n  - kind: offline\n```\n")
+    now = int(time.time())
+    rows = [
+        event(now - 20, "start", "one", spec="docs/plans/v9.9.9-demo.md"),
+        event(now - 10, "codex_exit", "one", tokens=100),
+        event(now - 5, "land", "one"),
+        event(now - 4, "verify", "one", result="fail"),
+        event(now - 3, "verify", "one", result="pass", tokens=50),
+    ]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert f'k3dm_dispatch_delivered{{window="30d"}} 1' in output
+    assert f'k3dm_dispatch_codex_tokens_per_delivered{{window="30d"}} 150.0' in output
+    assert f'k3dm_dispatch_rework_landed{{window="30d",cause="review"}} 1' in output
+    assert f'k3dm_dispatch_rework_landed{{window="30d",cause="any"}} 1' in output
+
+
+def test_live_delivery_waiting_and_unknown_spec_are_distinct(tmp_path):
+    now = int(time.time())
+    spec = tmp_path / "docs/plans/v9.9.9-live.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("**Status:** VERIFIED\n\n## Acceptance\n\n```yaml\nevidence:\n  - kind: live\n```\n")
+    rows = [
+        event(now - 20, "start", "waiting", spec="docs/plans/v9.9.9-live.md"),
+        event(now - 10, "land", "waiting"),
+        event(now - 8, "verify", "waiting", result="pass"),
+        event(now - 20, "start", "unknown"),
+        event(now - 10, "land", "unknown"),
+        event(now - 8, "verify", "unknown", result="pass"),
+    ]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert f'k3dm_dispatch_delivered{{window="30d"}} 0' in output
+    assert f'k3dm_dispatch_awaiting_verification{{window="30d"}} 1' in output
+    assert f'k3dm_dispatch_verification_unknown{{window="30d"}} 1' in output
+
+
+
+def test_live_delivery_requires_status_and_well_formed_evidence(tmp_path):
+    repo = tmp_path
+    spec = repo / "docs/plans/v9.9.9-live.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(dedent("""\
+        **Status:** LIVE-VERIFIED
+        **Live evidence:** 2026-10-24 · run job-123 · env dev · scenario smoke · commit deadbee · proves E1
+
+        ## Acceptance
+
+        ```yaml
+        evidence:
+          - kind: live
+        ```
+        """))
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "docs/plans/v9.9.9-live.md"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "live evidence"], check=True)
+    now = int(time.time())
+    rows = [event(now - 20, "start", "live", spec="docs/plans/v9.9.9-live.md"),
+            event(now - 15, "codex_exit", "live", tokens=100), event(now - 10, "land", "live"),
+            event(now - 5, "verify", "live", result="pass", tokens=7)]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=repo)
+    assert f'k3dm_dispatch_delivered{{window="30d"}} 1' in output
+    assert f'k3dm_dispatch_codex_tokens_per_delivered{{window="30d"}} 107.0' in output
+
+def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
+    now = int(time.time())
+    rows = [
+        event(now - 60, "start", "attempt", run=1),
+        event(now - 50, "codex_exit", "attempt", run=1, exit=0, tokens=100, tree="tree-a"),
+        event(now - 40, "land_refused", "attempt", reason="tests"),
+        event(now - 30, "resume", "attempt", run=2, n=2),
+        event(now - 20, "codex_exit", "attempt", run=2, exit=0, tokens=160, tree="tree-b"),
+        event(now - 10, "land", "attempt", test_result="passed", tree="tree-b"),
+    ]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="rework"}} 1' in output
+    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="accepted"}} 1' in output
+    assert f'k3dm_dispatch_objectively_rejected_codex_tokens{{window="30d"}} 100' in output
+    assert f'k3dm_dispatch_task_run_codex_tokens{{window="30d",version="9.9.9",slug="attempt",run="2"}} 60' in output
+    assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
+
+
+def test_reset_cumulative_run_counter_stays_unknown(tmp_path):
+    now = int(time.time())
+    rows = [event(now - 20, "start", "reset", run=1),
+            event(now - 15, "codex_exit", "reset", run=1, exit=0, tokens=100),
+            event(now - 10, "resume", "reset", run=2, n=2),
+            event(now - 5, "codex_exit", "reset", run=2, exit=1, tokens=20)]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert f'k3dm_dispatch_run_outcomes{{window="30d",outcome="failed"}} 1' in output
+    assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"}' not in output
+    assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="reset",run="2"}' not in output
+
 def test_rebase_and_scope_refusals_are_not_rework():
     output = dispatch_metrics.render([
         event(0, "start"), event(10, "codex_exit"),
@@ -341,6 +439,35 @@ def test_rework_ratio_absent_without_landed_spec():
     assert "k3dm_dispatch_rework_ratio" not in output
     assert _rework(output, "7d", "any") == 0
 
+
+
+def test_directly_linked_live_verified_bug_has_known_run_cost(tmp_path):
+    now = int(time.time())
+    spec = tmp_path / "docs/bugs/2026-10-24-dispatch-cost.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(dedent("""\
+        **Status:** LIVE-VERIFIED
+        **Live evidence:** 2026-10-24 · run job-123 · env dev · scenario smoke · commit deadbee · proves E1
+
+        ## Acceptance
+
+        ```yaml
+        evidence:
+          - kind: live
+        ```
+        """))
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "docs/bugs/2026-10-24-dispatch-cost.md"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "live bug"], check=True)
+    rows = [event(now - 20, "start", "bug", run=1, spec="docs/bugs/2026-10-24-dispatch-cost.md"),
+            event(now - 15, "codex_exit", "bug", run=1, exit=0, tokens=100, tree="tree"),
+            event(now - 10, "land", "bug", tree="tree", test_result="passed"),
+            event(now - 5, "verify", "bug", result="pass")]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert f'k3dm_dispatch_codex_tokens_per_live_verified_bug{{window="30d"}} 100.0' in output
+    assert f'k3dm_dispatch_live_verified_bug_first_pass{{window="30d",result="pass"}} 1' in output
 
 def test_time_window_output_matches_pre_release_scope_golden():
     now = 1_000_000
@@ -361,7 +488,7 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_verifier_lines_per_landed", "k3dm_dispatch_wait_minutes_per_landed",
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
-    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
+    actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and not line.startswith("k3dm_dispatch_task_run_") and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -376,6 +503,7 @@ k3dm_dispatch_codex_minutes_per_landed{window="1d"} 0.16666666666666666
 k3dm_dispatch_rework_landed{window="1d",cause="rerun"} 1
 k3dm_dispatch_rework_landed{window="1d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="1d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="1d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="1d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="1d"} 1.0
 k3dm_dispatch_task_codex_tokens{window="1d",version="9.9.9",slug="one",agent="codex"} 20000
@@ -397,6 +525,7 @@ k3dm_dispatch_codex_minutes_per_landed{window="7d"} 0.16666666666666666
 k3dm_dispatch_rework_landed{window="7d",cause="rerun"} 1
 k3dm_dispatch_rework_landed{window="7d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="7d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="7d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="7d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="7d"} 1.0
 k3dm_dispatch_task_codex_tokens{window="7d",version="9.9.9",slug="one",agent="codex"} 20000
@@ -418,6 +547,7 @@ k3dm_dispatch_codex_minutes_per_landed{window="30d"} 0.16666666666666666
 k3dm_dispatch_rework_landed{window="30d",cause="rerun"} 1
 k3dm_dispatch_rework_landed{window="30d",cause="tests"} 0
 k3dm_dispatch_rework_landed{window="30d",cause="claude_edit"} 1
+k3dm_dispatch_rework_landed{window="30d",cause="review"} 0
 k3dm_dispatch_rework_landed{window="30d",cause="any"} 1
 k3dm_dispatch_rework_ratio{window="30d"} 1.0
 k3dm_dispatch_task_codex_tokens{window="30d",version="9.9.9",slug="one",agent="codex"} 20000
@@ -500,7 +630,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 30  # agent-audit: allow assert-removed Claude context and compaction row adds five $window expressions
+    assert sum("$window" in expr for expr in expressions) == 39  # agent-audit: allow assert-removed Claude context and compaction row adds five $window expressions
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
