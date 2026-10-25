@@ -490,3 +490,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - **v1.43.6 plan 2 `dispatch-verified-delivery-cost` DISPATCHED to Codex (Luna) 2026-10-24** after adding a Files section and the dispatcher-lands DoD. Plan 3 (Codex solo + agy wrapper) follows once it lands.
 - [x] v1.43.6 plan 2 `dispatch-verified-delivery-cost` landed `8cf6ee5f` 2026-10-24, Claude-verified offline; follow-up `e4eea86f`. E4 live pending release platform-ops.
 - [x] v1.43.6 plan 3 dispatch-codex-solo-activity: LANDED `bcf8ce76` 2026-10-24 (Luna, 3 reworks), Claude offline verified, `verify --result pass` recorded; test leak fix `4dfed36f`. [ ] E6 operator wrapper install + agy runs; [ ] E3 after release platform-ops.
+- [x] 2026-10-24 bug agy-wrapper-install-overwrites-real-agy-binary (P1) FIXED `6d6c41da` by Claude; live E2 with plan 3 E6 after agy quota resets (~10-26 18:30 PDT).
