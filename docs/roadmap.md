@@ -369,6 +369,13 @@ Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashbo
 hard-coded version. Moved to v1.43.9 on 2026-10-24, and back on 2026-10-25 (Claude) when the operator asked for it
 now; it swapped places with `dispatch-spec-and-change-complexity`, which had not started. v1.43.7 is full.
 
+**Cut 2026-10-25, ahead of the 11-03 window** (operator, via `/create-pr`). All five plans are implemented and every
+bug is fixed; the live evidence still pending carries forward without holding the release: the Vault unseal-cache
+E3 and the Argo CD pin at the 10-29 rebuild, the `make argocd-upgrade` E-items in the 11-03 window (11-10
+fallback), which now run from `main` or the open release branch, the cross-repo dispatch E3 at the next
+shopping-cart fix, the worker/coordinator model E2 at the next `COORDINATOR=` dispatch, and the rollup-race E2
+through 11-01. The `not_before` floor was removed from `docs/release-milestones.json`.
+
 ### Candidate milestone — v1.43.8 (patch)
 
 **Release duration on Agent Dispatch** (operator, 2026-10-24). Branch `k3d-manager-v1.43.8`, cut from

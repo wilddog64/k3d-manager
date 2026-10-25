@@ -2,29 +2,31 @@
 
 ## [Unreleased]
 
+## [1.43.7] - 2026-10-25
+
 ### Changed
 
+- **Every hub dashboard refreshes every five minutes by default** (was 1m on some). A `refresh=` value in the URL still overrides it.
+- **Bug Tracking and Agent Dispatch tables fit a laptop-width panel without horizontal scrolling** (a Magic Mouse has no wheel to scroll sideways). Per spec spans the full width with a smaller minimum column width; Bugs, Plans and Remaining releases use narrower fixed widths. Bugs' Verified at and Live-verified at, and Remaining releases' forecasts, show the date only; the forecast columns are headed Earliest, Expected and Latest; Plans drops the Dispatch task column, which repeated the plan name, and gives Dispatch room for its full status.
+- **Bug Tracking's nine summary tiles sit on one row**, and the narrow tiles no longer repeat the release-mode description that crowded out their titles.
+- **Agent Dispatch Per spec leaves Worker and Coordinator blank when the model is unknown**, instead of repeating `unknown` on every row.
 - Agent Cost and Agent Dispatch read better: **Claude cost per verified spec** is wider and as tall as its neighbours so its title fits, the per-day Claude bars use larger value labels, **Claude per landed spec** and **Claude tokens per landed spec** say *Release window only* instead of *No data* under a time window, and **Human continuation prompts** shows `continue` instead of a cut-off `continue_prompt`.
 
 ### Added
 
 - Agent Dispatch separates total dispatch-to-land elapsed time from the final worker-exit-to-land gap and records explicitly reported operator continuation prompts with a coverage start marker.
 - Agent Dispatch records worker vendor/model identity per execution and separate coordinator identity with provenance; missing or unverified identities remain explicit in ledger-derived metrics.
-
 - Agent Dispatch can run a spec against a target branch in another repository, guard target movement during landing, and expose the repository on per-task metrics and the Per spec table.
 - Pin the hub Argo CD chart at 10.10.5 and add a snapshot-backed, guarded in-place upgrade command with dry-run and post-upgrade health checks.
 - Hermes publishes OrbStack version and update availability metrics hourly; warning alerts and the Host Disk dashboard expose pending updates and version changes. The "OrbStack upgraded" marker fires only when the version differs from one seen in the previous day, not when the metric first appears or returns after a gap.
-
-### Added
-
 - Agent Cost adds **Claude tokens by kind**, splitting the selected window's Claude tokens into cache reads, cache writes, uncached input and output, so the per-day token bars (about 98% cache reads) are not read as cost.
 - Agent Cost adds daily Claude tokens and Claude API-equivalent cost panels split by cache kind, showing which token classes drive daily volume and price.
 - Bug Tracking now defaults to **Auto (current)**, keeping the filed-in bug summaries and table aligned with the selected repository's current-release metric while preserving historical and All filtering in Manual mode.
 
 ### Fixed
 
+- **Bug Tracking Plans: a landed plan no longer reads `awaiting land`.** The dispatch state was taken from the task's newest ledger event of any kind, so an `intervention`, `verify` or late `codex_usage` entry recorded after the land hid it. The state now comes from dispatch lifecycle events only. See `docs/bugs/2026-10-25-plans-dispatch-shows-awaiting-land-after-land.md`.
 - Agent Dispatch records the model reported in each Codex attempt and accepts an explicit `COORDINATOR=<vendor>/<model>` identity for dispatch and resume metrics.
-
 - Bug Tracking's **Fix commit** now prefers a bug doc's **Fix commit:** header, including headers with a trailing note or a comma-separated SHA list; it falls back to the commit that marked the bug fixed.
 - Agent Dispatch Claude usage rollup: overlapping cache saves now use private temporary files, and a failed save reports the error while allowing metrics export to continue.
 - Agent Activity now maps Codex dispatch worktree sessions to their dispatched repository, keeping their session and token totals out of `other`.
@@ -33,7 +35,6 @@
 - Agent Dispatch Per run evidence: the slug link opened a GitHub 404 because the organize step dropped the `doc` field the URL reads; `doc` is now hidden instead of excluded, and Tokens sits after run.
 - **Agent Dispatch: open each run's test log from the Per run Log column.** Redacted `land-test.log` output is shipped to hub Loki and linked to a run-filtered Grafana dashboard; Codex transcripts are never shipped.
 - **Agent Dispatch: show each run's test result and log path.** Per run evidence now summarizes land-test output and exposes the local log path in an inspectable Log column. See `docs/bugs/2026-10-25-dispatch-run-evidence-column-names-a-file-you-cannot-open.md`.
-
 - **Agent Dispatch: rejected-attempt Codex tokens show zero when no run was rejected.** Counted windows with no objectively rejected run now export `0`; windows with no runs or only rejected runs whose token increments are unknown remain unavailable. Abandoned runs still do not count as objective rejections.
 
 - **Release forecast respects scheduled live windows and names blockers.** Milestones can set a `not_before` date that moves that and later forecasts; the Bug Tracking row now identifies the blocked milestone, exposes the floor date, and describes release cadence accurately.
