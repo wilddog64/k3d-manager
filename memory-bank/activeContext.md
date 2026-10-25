@@ -375,3 +375,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Per spec full width (w24, minWidth 80), Last update + Rework rate side by side at y22 e6d7056d.
 - 2026-10-25: Bugs + Plans tables narrowed to fit without horizontal scroll 6010a426.
 - 2026-10-25: Plans hides Dispatch task (Title 360), Bugs Verified at/Live-verified at date-only 95px 59b83ce2.
+- 2026-10-25: Plans Title 300, Dispatch 150 so dispatch status is not truncated abea64b6.
