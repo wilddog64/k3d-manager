@@ -517,3 +517,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-24: Roadmap: v1.44.3 plan 3 (roadmap only) dispatch-prior-art-usage — prior-art lookup in the dispatcher contract + Release knowledge usage row on Agent Dispatch; waits for v1.43.7 dashboards and v1.43.9 plan 4.
 - 2026-10-24: VectorDB ticks P3 LIVE-VERIFIED (a04e7d34; operator screenshots 216-219). Manual worktree + branch task/v1.43.6/vectordb-ticks-interactive removed. Interactive Codex needed 1 rework (overlap) — noted for the vendor trial comparison.
 - 2026-10-24: Duplicate Codex task claude-context-compaction-metrics abandoned by the operator (agy's d98c7423 kept); worktree and branch gone, no longer in codex-status.
+- 2026-10-24: v1.43.6 release prep — CHANGELOG promoted to [1.43.6], README/releases rows added, plan 3 E6 deferred to after merge (operator). PR being opened.
