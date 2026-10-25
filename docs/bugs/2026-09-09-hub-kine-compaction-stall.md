@@ -1,6 +1,6 @@
 # Hub Kine compaction stall causes control-plane saturation
 
-**Status:** MONITORING 2026-10-15 — compaction resumed by itself at 2026-10-12T11:40:07Z, 5 min after the OrbStack upgrade restarted the server container (11:35:01Z); 651 catch-up events that day, then 288/day on 10-13 and 10-14, 0 `Compact failed` in 72h, `state.db` 2.12 GiB. Close after 14 clean days (2026-10-26). No hub rebuild needed now; earlier stall history below
+**Status:** RECURRED 2026-10-24 — compaction died again at 2026-10-24T17:08:49Z (10:08 PDT) with the known `Compact failed: failed to record compact revision` signature; no `COMPACT deleted` since 17:03:44Z. `HubKineCompactionStalled` fired. The 2026-10-26 close-out is void. Remedy: the 2026-10-29 hub rebuild; no restart. Earlier history below
 **Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
 **Release:** v1.43.6 — verification-only; close-out check 2026-10-26 (14 clean days). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 
@@ -400,4 +400,31 @@ caused a bootstrap crash loop. At about 2 GiB the restart recovered. So a restar
 can be counted on: what decides it is how large the backlog is. The rebuild path
 (`make hub-recover-all`, fixed in v1.43.2) stays the remedy if the stall returns. Hermes'
 `HubKineCompactionStalled` alert watches for it.
+
+## Recurrence — 2026-10-24 (read-only, found from the `HubKineCompactionStalled` alert)
+
+Checked 2026-10-25T03:24Z (2026-10-24 20:24 PDT) with `docker logs` on `k3d-k3d-cluster-server-0`.
+
+| Day (UTC) | `msg="COMPACT deleted"` events |
+|---|---|
+| 2026-10-22 | 247 (partial window) |
+| 2026-10-23 | 288 |
+| 2026-10-24 | 205, the last at 17:03:44Z |
+
+The single error, then silence:
+
+```text
+time="2026-10-24T17:08:49Z" level=error msg="Compact failed: failed to record compact revision: sql: transaction has already been committed or rolled back"
+```
+
+- `state.db` 338,251,776 bytes (about 323 MiB), WAL about 18 MiB. The container restarted once,
+  at 2026-10-23T23:53Z, and is running.
+- The failure lands inside the operator's frontend-login test window: postgres-keycloak was
+  restarted at 10:05:51 and 10:12:32 PDT, the failure at 10:08:49 PDT. That is a timing
+  correlation only, not a proven cause.
+- The database is small, far below the 2 GiB where a restart recovered (2026-10-12) and the 8 GiB
+  where it crash-looped (2026-09-20). A restart is still not recommended: the rebuild is the
+  remedy, and one is already scheduled for 2026-10-29 (`project_hub_rebuild_drill_2026_10_29`).
+- Next check: `state.db` size again on 2026-10-25. If it grows by more than about 500 MiB a day,
+  move the rebuild earlier rather than wait.
 

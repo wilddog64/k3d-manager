@@ -123,3 +123,5 @@ interface:
 - Do NOT query the live Prometheus, Pushgateway or Grafana from a test.
 - Do NOT change any panel query in this fix; the two known defects are already fixed.
 - Do NOT create a PR, commit to `main`, or use `--no-verify`.
+
+**CI evidence (E2):** CI run 40124898903 on `eae158cc` (2026-10-24, PR #148): `scripts/tests/bin/test_dashboard_queries.py .` — ran against a real promtool 3.1.0 and passed, not skipped.

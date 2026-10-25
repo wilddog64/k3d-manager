@@ -97,6 +97,40 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
   exporter exposes skipped and truncated counts. The two per-spec means cover all landed tasks,
   not only the displayed rows.
 
+### Independent verification and delivered cost
+
+After the controlled landing step, Claude records the independent verifier's result once it has
+reported. Use `bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail`; include
+`--verifier NAME` when the verifier identity is useful and `--tokens N` only when that verifier
+was itself a Codex task. A verifier run outside Codex has no token value. The command requires an
+existing `land` event and refuses invalid values without appending a ledger event.
+
+A spec is **delivered** when its latest independent verification passed and, if its Acceptance
+requires live evidence, its document is `LIVE-VERIFIED` with well-formed `Live evidence`. Delivered
+cost is Codex tokens for implementation plus any recorded Codex verifier tokens. It excludes
+Claude's own verification tokens. **Awaiting verification** means the landed document exists but
+the pass or required live evidence is still missing; **verification unknown** means the spec path
+was not recorded or the document cannot be read. A failed review adds `cause="review"` to landed
+rework.
+
+The `Run outcomes and verified bug cost` dashboard readouts classify an implementation run only
+when controlled test, review, or live-verification evidence identifies its outcome. Investigation
+and unknown outcomes are not counted as rejected tokens. A task without an explicit immutable link
+to a bug cannot contribute a known bug-level token total; N/A means attribution is unavailable.
+
 Use `make dispatch-metrics DRY_RUN=1` to render the Prometheus text without contacting
 Pushgateway, including the per-task series. The exporter uses the latest Codex token total that a
 task recorded.
+## agy (Gemini 4 Argon)
+
+Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.
+
+agy runs inside the task worktree and can write its `.git` directory. The dispatcher compares the task branch with its recorded base when the worker exits. A commit creates a `scope_violation`, which status reports as `VIOLATION: agent committed` and land refuses. Leave changes uncommitted for review and landing.
+
+Resume an agy task with `bin/k3dm-codex-dispatch resume --slug <slug> --prompt-file <path>`. The dispatcher resumes only with the conversation ID stored from that task's JSON output; if agy did not return one, start a new task. It never selects the latest conversation implicitly. `--network` is unavailable for agy.
+
+For a side-by-side comparison, dispatch the same spec under separate slugs, such as `--slug example-codex` and `--slug example-agy`. Land only one. To replace an already landed implementation, name that slug with `land --superseding <landed-slug>`.
+
+### Record local agy activity
+
+`make agy-wrapper-install` symlinks `${AGY_WRAPPER_DIR:-$HOME/.local/share/k3d-manager/bin}/agy` to `bin/k3dm-agy` and prints `type -a agy`. Put that directory at the front of `PATH`, ahead of the real agy, and confirm the wrapper appears first. The install refuses to replace an existing `agy` there that is not the wrapper, because the agy installer itself puts the real binary in `~/.local/bin`; never point `AGY_WRAPPER_DIR` at the real binary's directory. `make agy-wrapper-uninstall` removes that symlink only when it still points to this repository's wrapper. The wrapper records run timing, exit status, mode, validated model and repo labels, an optional dispatch slug, and filtered token usage from print-mode JSON. It does not record arguments, prompts, output, or environment values. Interactive runs have no usage. Help and informational subcommands are passed through without recording. Only runs through the wrapper appear in the agy dashboard row.

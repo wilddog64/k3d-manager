@@ -313,12 +313,11 @@ The release is now at the 5-plan cap; any further plan goes to v1.43.6. Most fix
 
 ### Candidate milestone — v1.43.6 (patch)
 
-**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.6`, cut from
-`main` after v1.43.5 merges. Opened because v1.43.4 is bug-fix-only and v1.43.5 is at its five-plan
-cap. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.6-cni-ipam-reclaim-visibility.md).
-It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod
-sandbox. It adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live
-needs `make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+**Per-agent dispatch data** (operator, 2026-10-18; re-themed 2026-10-24). Branch `k3d-manager-v1.43.6`, cut from
+`main` after v1.43.5 merges. Plan 1 of 5 is [`dispatch-agy-agent-ledger`](plans/v1.43.6-dispatch-agy-agent-ledger.md)
+(operator, 2026-10-24): the dispatcher runs specs on agy (Gemini 4 Argon) as well as Codex, and the ledger records agent and
+model for both, so per-vendor data accrues before Claude's weekly quota runs out. Split from v1.44.1's agy plan, which keeps
+the dashboard. The Pod IP pool cleanup plan that was plan 1 moved to v1.43.9 to make room (Claude's call, operator-approved).
 
 Plan 2 of 5 is [`dispatch-verified-delivery-cost`](plans/v1.43.6-dispatch-verified-delivery-cost.md)
 (operator, 2026-10-18). It records the independent verifier's verdict in the dispatch ledger and
@@ -328,7 +327,8 @@ requires it. It also adds a `review` cause to the v1.43.4 rework rate.
 Plan 3 of 5 is [`dispatch-codex-solo-activity`](plans/v1.43.6-dispatch-codex-solo-activity.md)
 (operator, 2026-10-18). The dispatch dashboard sees only dispatcher-launched Codex runs; this adds a row for
 every Codex session (headless or interactive, by repo), and Codex's own 5-hour and weekly quota, read
-from the session files. Depends on v1.43.5 plan 4's session scan.
+from the session files. Depends on v1.43.5 plan 4's session scan. Widened 2026-10-24 (operator) to agy:
+a pass-through `bin/k3dm-agy` wrapper records every agy run, dispatched or not, without reading `~/.gemini`.
 
 Plan 4 of 5 is [`claude-context-compaction-metrics`](plans/v1.43.6-claude-context-compaction-metrics.md)
 (operator, 2026-10-18). It measures what context compaction costs: compactions, files re-read after a
@@ -336,16 +336,25 @@ compaction, and Claude cost per verified spec, plus a hand tally of resumption f
 missing-context corrections. It sets up a two-week 200K versus larger-window experiment. Depends on
 v1.43.5 plan 5's Claude scan.
 
-Plan 5 of 5 is [`hub-argocd-pinned-upgrade`](plans/v1.43.6-hub-argocd-pinned-upgrade.md) (operator,
-2026-10-18). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`) and has never had a
-planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry run,
-before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with
-2026-11-10 as fallback. **v1.43.6 is now at its five-plan cap.**
+Plan 5, `hub-argocd-pinned-upgrade`, moved to v1.43.7 on 2026-10-24 (Claude, operator-approved). Its live
+evidence is the upgrade itself, which waits for the 2026-11-03 window, and v1.43.6 should ship before then.
+Plan 5 is now `agent-dashboards-split` (`docs/plans/v1.43.6-agent-dashboards-split.md`, added 2026-10-24 at the
+operator's request). It splits Agent Dispatch into three linked dashboards: Dispatch, Cost and Activity.
+It costs no delay, because the release waits for plan 3's E6 until ~10-26, and it lands before v1.43.7's
+dashboard plans add more panels. **v1.43.6 has five plans: the cap.**
 
 ### Candidate milestone — v1.43.7 (patch)
 
 **Cross-repo Codex dispatch** (operator, 2026-10-18). Branch `k3d-manager-v1.43.7`, cut from `main`
-after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap. Plan 1 of 5 is
+after v1.43.6 merges. Opened because v1.43.6 is at its five-plan cap.
+
+First to dispatch is [`hub-argocd-pinned-upgrade`](plans/v1.43.7-hub-argocd-pinned-upgrade.md) (operator,
+2026-10-18; moved from v1.43.6 on 2026-10-24). The hub ArgoCD chart floats to latest (`ARGOCD_HELM_CHART_VERSION=""`)
+and has never had a planned in-place upgrade. This pins it at 10.10.5 and adds `make argocd-upgrade`, with a dry
+run, before/after Application snapshots and a rollback hint. The first patch window is 2026-11-03, with 2026-11-10
+as fallback. The operator runs it from the release branch. Critical (hub): needs a dispatch go.
+
+Plan 1 of 5 is
 [`codex-dispatch-cross-repo`](plans/v1.43.7-codex-dispatch-cross-repo.md). Fixes in `shopping-cart-*`,
 `lib-foundation` and other repos currently go through a bare `codex exec` and never reach the dispatch
 ledger. This adds `--repo`/`--branch` to `bin/k3dm-codex-dispatch`, a `repo` field on every ledger event,
@@ -355,9 +364,8 @@ Plan 2 of 5 is [`dispatch-vendor-coordinator-model-telemetry`](plans/v1.43.7-dis
 
 Plan 3 of 5 is [`dispatch-landing-latency-human-interventions`](plans/v1.43.7-dispatch-landing-latency-human-interventions.md) (operator, 2026-10-22). It distinguishes dispatch-to-land wall-clock elapsed from the final Codex exit-to-land gap and explicitly recorded human continuation prompts, with coverage and no inferred historical zeros. It complements the cross-repo dispatch plan and helps compare coordinator autonomy without confusing waiting time with coding time.
 
-Plan 4 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.7-bug-dashboard-auto-release-selection.md)
-(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
-hard-coded version. Moved from v1.43.5 on 2026-10-23, because that release already had five plans and v1.43.6 is full.
+Plan 4, `bug-dashboard-auto-release-selection`, moved to v1.43.9 on 2026-10-24 to make room for the hub ArgoCD
+upgrade.
 
 Plan 5 of 5 is [`dispatch-spec-and-change-complexity`](plans/v1.43.7-dispatch-spec-and-change-complexity.md)
 (operator, 2026-10-23). It records spec size at dispatch and change size at land, and shows both per spec and
@@ -387,6 +395,27 @@ Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-
 (operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
 directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
 10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+
+### Candidate milestone — v1.43.9 (patch)
+
+**Pod IP pool cleanup visibility** (operator, 2026-10-18). Branch `k3d-manager-v1.43.9`, cut from `main` after v1.43.8
+merges. Plan 1 of 5 is [`cni-ipam-reclaim-visibility`](plans/v1.43.9-cni-ipam-reclaim-visibility.md), moved from v1.43.6
+on 2026-10-24. It publishes the sweep's per-outcome counts and the age of the oldest IP still held with no pod sandbox,
+adds an alert when such an IP is held for over an hour, plus a dashboard row. Going live needs
+`make refresh CLUSTER_PROVIDER=k3s-hostinger` and `make platform-ops`.
+
+Plan 2 of 5 is [`bug-dashboard-auto-release-selection`](plans/v1.43.9-bug-dashboard-auto-release-selection.md)
+(operator, 2026-10-19). It keeps the Bug Tracking release filter on the current release automatically, without a
+hard-coded version. Moved from v1.43.5 on 2026-10-23 and again from v1.43.7 on 2026-10-24, to make room for the hub
+ArgoCD upgrade.
+
+Plan 3 of 5 is [`vectordb-drift-kinds-and-age`](plans/v1.43.9-vectordb-drift-kinds-and-age.md) (operator,
+2026-10-24). It splits VectorDB drift into missing, stale-hash and deleted docs (the net count can read 0 while docs
+are wrong) and publishes how long the oldest drift has lasted.
+
+Plan 4 of 5 is [`vectordb-retrieval-quality-probe`](plans/v1.43.9-vectordb-retrieval-quality-probe.md) (operator,
+2026-10-24). Hermes runs the v1.40.0 retrieval eval once a day against the live store and reports recall,
+intrusion and outdated results; the VectorDB dashboard is reorganised into health, consistency and retrieval rows.
 
 ### Candidate milestone — v1.44.0
 
@@ -499,6 +528,33 @@ Plan 2 is [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.
 2026-10-23: "go for it"): flagd on the ACG sandbox only (stage 1; Hostinger is a later, gated one-line stage), one `basket-cart-summary` flag in
 `shopping-cart-basket`, per-variant metrics and a rollout-health dashboard, and `make flag-set` recording
 each flip on the v1.44.2 command ledger. Depends on v1.44.2 and on v1.43.7's cross-repo dispatch.
+
+Plan 3 (roadmap only; spec not written) is **`dispatch-prior-art-usage`** (operator, 2026-10-24: "can we build
+this ... in the future/roadmap"). It makes prior-art lookup part of the dispatcher contract and measures whether
+agents use it. It waits for v1.43.7's dispatch dashboards and v1.43.9 plan 4 (retrieval quality probe), so usage is
+measured against a retriever already known to be healthy.
+
+| Step | What is recorded | Source |
+|---|---|---|
+| Prior-art lookup | `prior_art` ledger event: top 5 paths, scores, indexed revision; or `unavailable`/`skipped` with reason | dispatcher runs the existing `search()` on the spec's Problem text at `codex-dispatch`, excludes the spec itself, adds the list to the agent prompt |
+| Documents read | paths the agent reports reading | a `Prior-art-read:` section the prompt asks for, checked against the list |
+| References cited | paths named in the landed commit | `Prior-art:` commit trailer, parsed at `codex-land` |
+| Outcome | resumes (rework) and the verify result | already in the ledger |
+
+Metrics: share of tasks with a lookup, docs retrieved per task, docs read, docs cited, lookups unavailable or
+skipped, and resumes plus verify-pass rate split by "cited prior art" yes/no. A **Release knowledge usage** row
+goes on the Agent Dispatch dashboard, not Agent Activity, because the data exists only for dispatched tasks and
+should follow the release Window.
+
+Decisions for the spec:
+- **The lookup is advisory.** An unavailable store records `unavailable` and never blocks a dispatch, the same
+  rule as `make find-similar-docs`.
+- **"Read" is self-reported at first.** Observing it would mean parsing tool calls in `~/.codex` session files,
+  and the exporter is limited to model, usage, mode and repo. Widening that needs the operator's explicit go.
+- **The rework comparison is correlation, not proof.** Tasks with obvious prior art may simply be easier, and
+  dispatch volume is a few tasks a week. The panels show `n` beside every rate, and the guide says to draw no
+  conclusion below about 30 tasks per group.
+- **Same contract for every agent.** It applies to Luna, agy and the vendor-LLM trial, so they stay comparable.
 
 ### Candidate milestone — v1.45.0
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 RULES="${BATS_TEST_DIRNAME}/../../etc/prometheus/rules/vectordb.yaml"
-DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml"
+DASHBOARD="${DASHBOARD:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-vectordb.yaml}"
 OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-configmap.yaml"
 
 @test "vectordb rules target the hub prometheus stack" {
@@ -86,6 +86,48 @@ queries = " ".join(target["expr"] for panel in below for target in panel["target
 metrics = open("bin/k3dm-hermes").read()
 for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
     assert name in metrics or name == "k3dm_vectordb_drift_docs", name
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "rows and corpus panel formats document counts as whole documents" {
+  run python3 -c '
+import json, sys
+text = open(sys.argv[1]).read()
+dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
+panel = next(panel for panel in dashboard["panels"] if panel.get("id") == 1)
+defaults = panel["fieldConfig"]["defaults"]
+assert defaults.get("unit") == "none", defaults
+assert defaults.get("decimals") == 0, defaults
+assert all(target["expr"] in {"k3dm_vectordb_rows", "k3dm_vectordb_corpus_docs"} for target in panel["targets"])
+assert len(panel["targets"]) == 2
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "rows and corpus remain distinguishable when their values overlap" {
+  run python3 -c '
+import json, sys
+text = open(sys.argv[1]).read()
+dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
+panel = next(panel for panel in dashboard["panels"] if panel.get("id") == 1)
+styles = {}
+for override in panel.get("fieldConfig", {}).get("overrides", []):
+    name = override.get("matcher", {}).get("options")
+    styles[name] = {prop["id"]: prop.get("value") for prop in override.get("properties", [])}
+rows = styles.get("rows (last published)", {})
+corpus = styles.get("corpus docs (last published)", {})
+assert rows.get("color") == {"mode": "fixed", "fixedColor": "green"}, rows
+assert rows.get("custom.drawStyle") == "line", rows
+assert rows.get("custom.lineWidth") == 3, rows
+assert rows.get("custom.showPoints") == "never", rows
+assert corpus.get("color") == {"mode": "fixed", "fixedColor": "yellow"}, corpus
+assert corpus.get("custom.drawStyle") == "points", corpus
+assert corpus.get("custom.showPoints") == "always", corpus
+assert corpus.get("custom.pointSize") == 4, corpus
+assert corpus.get("custom.lineWidth") == 0, corpus
+assert panel.get("options", {}).get("tooltip", {}).get("mode") == "multi", panel.get("options")
+assert panel.get("options", {}).get("legend", {}).get("showLegend") is True, panel.get("options")
 ' "${DASHBOARD}"
   [ "${status}" -eq 0 ]
 }

@@ -105,7 +105,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
 | `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
-| `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence |
+| `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence; unscoped agents require an explicit `TUNNEL_SSH_HOST` and refuse to repoint to a different host unless `TUNNEL_FORCE_HOST=1` |
 | `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
 | `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Playwright persistent context and write to `~/.aws/credentials` |

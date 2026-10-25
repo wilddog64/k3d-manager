@@ -2,7 +2,9 @@
 
 **Branch:** `k3d-manager-v1.34.0`
 **Filed:** 2026-09-15
-**Status:** PR #98 MERGED 2026-09-16 as `af4b053d`. `enforce_admins` on shopping-cart-infra main RESTORED to true. Remaining: ArgoCD sync of `identity/keycloak/` and the PostSync reconcile hook run is outstanding (live verification, not yet confirmed; in progress).
+**Status:** LIVE-VERIFIED 2026-10-24 — the outstanding items are done: hub Application `cicd/shopping-cart-identity` is `Synced`/`Healthy`, and its last sync (`Succeeded` 2026-10-16T02:56:24Z) ran the PostSync hook `Job/keycloak-realm-reconcile` to `Succeeded`. No browser login was run for this check. The fix is in `shopping-cart-infra`. Was: PR #98 MERGED 2026-09-16 as `af4b053d`. `enforce_admins` on shopping-cart-infra main RESTORED to true. Remaining: ArgoCD sync of `identity/keycloak/` and the PostSync reconcile hook run is outstanding (live verification, not yet confirmed; in progress).
+**Fix commit:** `af4b053d`
+**Live evidence:** 2026-10-24 · run claude-kubectl-application-read · env hub · scenario identity-sync-and-realm-reconcile-hook · commit af4b053d · proves fix
 **Priority:** P3 — fix merged (`af4b053d`); only the ArgoCD sync confirmation remains
 **Live verification:** DONE 2026-09-30. The PostSync reconcile hook completed at shopping-cart-infra `e41f2ad` after #100, #101, #103, #104 and #105; see `2026-09-30-keycloak-reconcile-flow-lookup-404-after-partial-import.md`.
 **Severity:** high — no one can log in to the `shopping-cart` realm through a browser: the frontend and ArgoCD SSO both fail.

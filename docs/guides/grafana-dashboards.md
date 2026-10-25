@@ -15,6 +15,8 @@ This guide is the entry point for the Grafana dashboards shipped by this reposit
 | k3dm PR Checks | `k3dm-pr-checks` | `platform-ops/grafana-dashboard-pr-checks.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-pr-checks.md) |
 | k3dm Alertmanager Delivery | `k3dm-alertmanager-delivery` | `platform-ops/grafana-dashboard-alertmanager-delivery.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-alertmanager-delivery.md) |
 | k3dm Agent Dispatch | `k3dm-agent-dispatch` | `platform-ops/grafana-dashboard-agent-dispatch.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | [Reference](grafana-dashboards/k3dm-agent-dispatch.md) |
+| k3dm Agent Cost | `k3dm-agent-cost` | `platform-ops/grafana-dashboard-agent-cost.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | This guide |
+| k3dm Agent Activity | `k3dm-agent-activity` | `platform-ops/grafana-dashboard-agent-activity.yaml` | `grafana-dashboards-hub` ApplicationSet | hub | This guide |
 | k3dm Bug Tracking | `k3dm-bugs` | `platform-ops/grafana-dashboard-bugs.yaml` | `grafana-dashboards-hub` ApplicationSet; `make platform-ops` | hub | [Reference](grafana-dashboards/k3dm-bugs.md) |
 | k3dm Deployment Metrics | `k3dm-deployments` | `etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | `make observability-acg` | ACG | [Reference](grafana-dashboards/k3dm-deployments.md) |
 | k3dm Tests | `k3dm-tests` | `etc/grafana/dashboards/k3dm-tests-configmap.yaml` | `grafana-dashboards-hub` and `grafana-dashboards-acg` ApplicationSets | hub + ACG | [Reference](grafana-dashboards/k3dm-tests.md) |
@@ -55,14 +57,42 @@ The **Order** column comes from the plan number on each document's `**Release:**
 
 Approval is `explicit` unless the line is absent (`none`) or begins with `pending`; plans before v1.43.2 use `n/a`. Dispatch is joined by the plan filename stem from the Codex dispatch ledger. Only a start event that records a `docs/plans/` spec can appear; `landed` describes integration and does not change verification. Missing dispatch telemetry displays **no record**. The dashboard deliberately does not infer **not started** from missing information or **done** from implementation. As the operator requirements say: “Include every planned specification”; “Keep execution state separate from verification state”; “Don't infer completion from missing information.” Each **Dispatch** cell links to that release in Agent dispatch, and the Agent dispatch dashboard has a top-level **Bug Tracking** link back. The Agent dispatch **Window** selector lists the time windows and ledger releases from v1.43.0 onward; v1.43.0 is the coverage floor because earlier releases predate the ledger. Its **Release** cells link back to Bug Tracking. A release before v1.43.0 has no dispatch scope, so its row link opens an empty dispatch view.
 
-## Agent dispatch costs
+## k3dm Agent Dispatch
+
+The **Agent Dispatch** dashboard covers dispatch throughput, active runs, per-spec delivery and verification, plus run outcomes. Its **Window** selector includes time windows and ledger releases from v1.43.0 onward. Use the **Agents** link to move between the three agent dashboards while keeping the selected time range and window.
+
+## k3dm Agent Cost
+
+The **Agent Cost** dashboard contains the per-spec cost table, Codex API-equivalent costs, subscription costs, model breakdown, projected monthly cost, and Claude usage totals. Its **Window** selector matches Agent Dispatch, including release scope.
+
+Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant transcript records under `~/.claude/projects`, including subagent transcripts. The exporter stores only message IDs, model, timestamp, speed and usage numbers in `~/.local/share/k3d-manager/claude-usage/rollup.json`, reading appended bytes incrementally so coverage survives transcript deletion. Transcripts older than Claude Code's retention period are gone unless the exporter saw them first. Time-window Claude totals count each retained message exactly once; the **Claude ≈** Per spec column attributes usage between each task's dispatch and land, splitting messages evenly across overlapping tasks. It is approximate because it misses spec writing and post-land verification and can include unrelated work during the task interval. Claude API-equivalent rates remain unpriced until confirmed.
+
+### Agent dispatch cost details
 
 The Agent dispatch **Per spec** table links each Spec name to its plan or bug document on the
 task's release branch; the link opens in a new tab. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
 totals. Time to land is not summed: parallel dispatches overlap, so the useful number is the mean,
-which the **Time to land** stat shows. Codex tokens counts each spec's last run only, so its total
-is low for specs that were resumed; API equiv. counts every run.
+which the **Time to land** stat shows. Codex tokens uses the cumulative session total from the last
+exit after a resume; summing those exits would double count. API equiv. counts each session's
+recorded cumulative usage once.
+
+**Delivered** means the latest independent verification recorded `pass`. If the spec's Acceptance
+requires live evidence, its document must also have `**Status:** LIVE-VERIFIED` and a well-formed
+`**Live evidence:**` line. The **Codex tokens per verified spec** stat averages implementation
+Codex tokens plus any `verify --tokens` value when the verifier was a Codex task. It excludes
+Claude's own verification tokens, and averages over Codex-run specs only: a spec implemented by agy
+counts as delivered but is left out of this mean, since it has no Codex tokens. **Awaiting verification** counts landed specs whose document is
+available but whose verification pass or required live evidence is missing. **Verification
+unknown** counts landed specs whose `spec` path is absent from the start event or whose document
+cannot be read. A failed independent review contributes to rework cause `review` and to `any`.
+
+Run outcomes require independently referenced evidence. `accepted` means controlled validation
+accepted that run's output; `rework` means objective refusal or failed verification led to another
+attempt; `failed` requires an evidenced failure or abandonment without an accepted artifact;
+`progress` requires reviewer-approved useful evidence; otherwise the outcome is `unknown`. Progress
+and unknown token totals are not treated as waste. Bug-level token cost is N/A without an explicit
+task-to-bug link and an independently verified live closure.
 
 The **Cost (API-equivalent)** row estimates what recorded Codex session tokens would cost at the
 configured API rates. It is an estimate, not a bill: Codex runs on the $20/month ChatGPT plan.
@@ -87,6 +117,14 @@ output rates there when pricing changes. Models without an explicit entry remain
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
 tuples and reports missing session files.
 
+## k3dm Agent Activity
+
+The **Agent Activity** dashboard contains Claude context and compaction panels, all Codex session activity, quota readings and efficiency, and agy activity. Its **Window** selector offers `1d`, `7d`, and `30d` only. Use the **Agents** link to switch between Agent Dispatch, Agent Cost, and Agent Activity while retaining the time range and window. Bar gauges on this dashboard are horizontal, with each series name (trigger, kind, mode or repo) printed in full to the left of its bar.
+
+The **All Codex activity** row counts every Codex session file on this machine, including sessions outside the dispatcher. **Codex at API prices, all sessions** totals priced sessions only; **Unpriced Codex sessions** shows sessions excluded because their model has no published rate or usage counts are missing. `mode` is `exec` for headless `codex exec`, `interactive` for the Codex TUI, and `other` for any other originator; `repo` is the validated working-directory basename, with all but the ten busiest repositories folded into `other`. Untracked means detected sessions minus sessions associated with a dispatch record, matched by session id. A session from before plan 4's `usage-backfill` ran reads as untracked until that backfill runs. Quota panels show Codex's own limits as of the newest session sample; they are not live readings. Claude's weekly limit is not recorded in a local file and is not shown. Quota efficiency is reported only when timestamped observations and independently verified delivery events cover an interval within the same reported reset cycle; otherwise the readings and coverage status remain unavailable. Its quota denominator is global Codex use, including interactive and untracked sessions, and is not attributable solely to dispatched workers. The **All agy activity** row counts only runs made through the local `agy` wrapper; `mode` and `repo` follow the same meanings, and interactive runs never carry usage. The activity rows sit below **Claude context and compaction** and use the time-window selector.
+
+The **Claude context and compaction** row measures what context compaction costs Claude per verified spec. **Claude cost per verified spec** divides the time window's Claude cost at API list prices (not subscription usage) by `k3dm_claude_verified_specs`, where a "verified spec" is a `docs/bugs` or `docs/plans` document whose `**Status:**` line moved to a closed state in a commit within the window (shows "No data" when the count is 0). **Compactions per verified spec** divides total `compact_boundary` events in the window by verified specs, **Compactions by trigger** splits those compactions by `auto` or `manual` trigger, and **Re-read share after compaction** shows the fraction of `Read` tool calls in the window that re-read a file already read before the latest compaction boundary in the same session. **Context incidents** splits `resumption-failure` and `missing-context-correction` counts by kind, and **Auto-compact threshold** shows the latest non-future `auto_compact_tokens` setting; the incident panels are only as complete as the hand tally in [context-window-experiment.md](../metrics/context-window-experiment.md).
+
 ## CVE Auto-Patch triage
 
 ### Release forecast
@@ -103,5 +141,3 @@ The **Release forecast** row reads the ordered inventory in `docs/release-milest
 - [No data triage](grafana-dashboards/shared-operations.md#triage-no-data-by-cause)
 - [Adding or changing a dashboard](grafana-dashboards/shared-operations.md#adding-or-changing-a-dashboard)
 - [Where to look next](grafana-dashboards/shared-operations.md#where-to-look-next)
-
-Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant transcript records under `~/.claude/projects`, including subagent transcripts. The exporter stores only message IDs, model, timestamp, speed and usage numbers in `~/.local/share/k3d-manager/claude-usage/rollup.json`, reading appended bytes incrementally so coverage survives transcript deletion. Transcripts older than Claude Code's retention period are gone unless the exporter saw them first. Time-window Claude totals count each retained message exactly once; the **Claude ≈** Per spec column attributes usage between each task's dispatch and land, splitting messages evenly across overlapping tasks. It is approximate because it misses spec writing and post-land verification and can include unrelated work during the task interval. Claude API-equivalent rates remain unpriced until confirmed.

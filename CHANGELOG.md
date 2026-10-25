@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [1.43.6] - 2026-10-24
+
+### Added
+
+- Split Agent Dispatch into three linked dashboards — Agent Dispatch, Agent Cost and Agent Activity — with an **Agents** link bar that carries the time range and Window between them. Every panel keeps its query, units and options; Agent Activity offers only the 1d/7d/30d windows its data supports.
+- Export all Codex session activity and quota samples, expose agy sessions through the opt-in `bin/k3dm-agy` pass-through wrapper, and add activity and quota-efficiency coverage panels to Agent Dispatch.
+
+- Record independent dispatch verification and report delivered-spec Codex token cost, awaiting verification, unknown specs, and review rework in the Agent Dispatch metrics and dashboard.
+- Export Claude context compaction, post-compaction re-read, verified-spec, context-incident, and auto-compact threshold metrics from `bin/k3dm-dispatch-metrics`, and add the **Claude context and compaction** row to the Agent Dispatch dashboard (`docs/metrics/context-window-experiment.md`).
+- Run dispatch specs on agy (Gemini 4 Argon) through the task dispatcher and record agent identity and usage in the dispatch ledger and metrics.
+
+### Fixed
+
+- Agent Activity: **Codex at API prices, all sessions** never showed a value, because one unpriced session (Codex's built-in `codex-auto-review` model has no public rate, and some sessions end before writing usage) hid the whole mode's cost. The exporter now sums the priced sessions and publishes `k3dm_codex_unpriced_sessions{window,mode,reason}` beside it; no price is invented.
+- VectorDB dashboard: **Rows vs corpus docs** showed fractional document ticks on narrow ranges, and the corpus series hid the rows series when they were equal. Counts now render as whole numbers, rows as a line and corpus as points on top, with both values in the tooltip.
+- Agent Activity: panel titles in the **Claude context and compaction** row and the series names under each bar were cut off, and the row started with an empty four-column gap left by the dashboard split. The row's stats are now 8 columns wide and its bar gauges 12, and every bar gauge on the dashboard is horizontal with the full name to the left of each bar.
+- `make agy-wrapper-install` could overwrite the real agy binary with the wrapper; it now refuses to.
+- Bug Tracking dashboard: the "Release (filed in)" dropdown took its options only from bug docs, so a new release with no bugs filed yet (v1.43.6 on the day it was cut) could not be selected. It now also reads the release labels of `k3dm_plan_release_docs`, so every release with plans or bugs is listed. The saved default moves to `v1.43.6`.
+
 ## [1.43.5] - 2026-10-24
 
 ### Fixed

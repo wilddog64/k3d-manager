@@ -6,7 +6,9 @@
 identity manifest change reaches the cluster, and `keycloak-realm-reconcile` has been `Failed 0/1`
 for 2d1h. Nothing is currently broken at runtime (`health: Healthy`), which is why it has gone
 unnoticed.
-**Status:** FIX LANDED in `shopping-cart-infra` `00d0d8a` (#101, "exempt bound PVCs from Replace=true so shopping-cart-identity can sync"), seen 2026-09-30 — live confirmation pending: Hermes `argocd` should stop reporting `shopping-cart-identity Healthy/OutOfSync`.
+**Status:** LIVE-VERIFIED 2026-10-24 — hub Application `cicd/shopping-cart-identity` is `Synced`/`Healthy`, last sync operation `Succeeded` 2026-10-16T02:56:24Z. The fix is in `shopping-cart-infra`, so the evidence commit is that repo's. Was: FIX LANDED in `shopping-cart-infra` `00d0d8a` (#101, "exempt bound PVCs from Replace=true so shopping-cart-identity can sync"), seen 2026-09-30 — live confirmation pending: Hermes `argocd` should stop reporting `shopping-cart-identity Healthy/OutOfSync`.
+**Fix commit:** `00d0d8a`
+**Live evidence:** 2026-10-24 · run claude-kubectl-application-read · env hub · scenario identity-synced-healthy · commit 00d0d8a · proves fix
 **Priority:** P3 — fix landed in shopping-cart-infra `00d0d8a`
 
 ## Symptom

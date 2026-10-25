@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+_wrapper_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+_resolve() { readlink -f "$1" 2>/dev/null || realpath "$1" 2>/dev/null || printf '%s' "$1"; }
+_real="${K3DM_AGY_REAL:-}"
+if [[ -z "$_real" ]]; then
+  IFS=: read -r -a _path_dirs <<<"$PATH"
+  for _dir in "${_path_dirs[@]}"; do
+    [[ -n "$_dir" ]] || _dir=.
+    _candidate="$_dir/agy"
+    [[ -x "$_candidate" && ! -d "$_candidate" ]] || continue
+    [[ "$(_resolve "$_candidate")" == "$(_resolve "$_wrapper_path")" ]] && continue
+    _real="$_candidate"; break
+  done
+fi
+if [[ -z "$_real" ]]; then echo 'k3dm-agy: real agy not found on PATH' >&2; exit 127; fi
+
+_record=1; _mode=interactive; _json=0
+_first_argument=1; _prompt_value=0; _option_value=""
+for _arg in "$@"; do
+  if [[ -n "$_option_value" ]]; then
+    [[ "$_option_value" != output-format || "$_arg" != json ]] || _json=1
+    _option_value=""
+    continue
+  fi
+  if [[ "$_arg" == -h || "$_arg" == --help || "$_arg" == --version ]]; then
+    _record=0
+    continue
+  fi
+  case "$_arg" in
+    --print|--prompt) _mode=print; _prompt_value=1; continue ;;
+    --output-format) _option_value=output-format; continue ;;
+    --model|--conversation|--add-dir) _option_value=other; continue ;;
+    --output-format=json) _json=1; continue ;;
+    --output-format=*) continue ;;
+    -*) continue ;;
+  esac
+  if (( _prompt_value )); then
+    _prompt_value=0
+    _first_argument=0
+    continue
+  fi
+  if (( _first_argument )); then
+    case "$_arg" in models|changelog|help) _record=0 ;; esac
+  fi
+  _first_argument=0
+done
+_start="$(date +%s)"; _id="$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || printf '%s-%s' "$_start" "$$")"
+_tmp=""
+# shellcheck disable=SC2329 # invoked indirectly by the EXIT trap
+_cleanup() { [[ -z "$_tmp" ]] || rm -f "$_tmp"; }
+trap _cleanup EXIT HUP INT TERM
+if [[ "$_mode" == print ]]; then
+  _tmp="$(mktemp "${TMPDIR:-/tmp}/k3dm-agy.XXXXXX")" || exit 1
+  if [[ "$_record" == 1 && "$_json" == 1 ]]; then
+    set +e
+    "$_real" "$@" | tee "$_tmp"
+    _exit=${PIPESTATUS[0]}
+    set -u
+  else
+    "$_real" "$@"; _exit=$?
+  fi
+else
+  trap : INT
+  "$_real" "$@"; _exit=$?
+fi
+_end="$(date +%s)"
+if [[ "$_record" == 1 ]]; then
+  _ledger="${K3DM_AGENT_LEDGER_DIR:-$HOME/.local/share/k3d-manager/agent-sessions}"
+  _warn() { echo "k3dm-agy: warning: could not write run ledger" >&2; }
+  if (umask 077; mkdir -p "$_ledger" && chmod 700 "$_ledger" && touch "$_ledger/agy.jsonl" && chmod 600 "$_ledger/agy.jsonl"); then
+    _model="null"; _repo="$(basename "$PWD")"; [[ "$_repo" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || _repo=other
+    _slug="null"; [[ "${K3DM_DISPATCH_SLUG:-}" =~ ^[A-Za-z0-9._-]{1,120}$ ]] && _slug="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$K3DM_DISPATCH_SLUG")"
+    _expect=0
+    for _arg in "$@"; do
+      if (( _expect )); then [[ "$_arg" =~ ^[A-Za-z0-9._-]{1,64}$ ]] && _model="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$_arg")"; _expect=0; fi
+      [[ "$_arg" == --model ]] && _expect=1
+    done
+    _usage=null
+    if [[ "$_mode" == print && "$_json" == 1 && -s "$_tmp" ]]; then
+      _usage="$(python3 - "$_tmp" <<'PY'
+import json,re,sys
+try:
+ lines=open(sys.argv[1],encoding='utf-8').read().splitlines()
+ for line in reversed(lines):
+  try: obj=json.loads(line)
+  except (ValueError,TypeError): continue
+  if not isinstance(obj,dict): continue
+  src=obj.get('usage'); kept={k:v for k,v in src.items() if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,48}',k) and re.search('token',k,re.I) and type(v) is int and v>=0} if isinstance(src,dict) else {}
+  print(json.dumps(kept if kept else None,separators=(',',':'))); break
+ else: print('null')
+except OSError: print('null')
+PY
+)"
+    fi
+    _line="$(python3 - "$_id" "$_start" "$_end" "$_exit" "$_mode" "$_model" "$_repo" "$_slug" "$_usage" <<'PY'
+import json,sys
+id,start,end,code,mode,model,repo,slug,usage=sys.argv[1:]
+try: u=json.loads(usage)
+except ValueError: u=None
+print(json.dumps({'agent':'agy','id':id,'start':int(start),'end':int(end),'duration_s':max(0,int(end)-int(start)),'exit':int(code),'mode':mode,'model':json.loads(model),'repo':repo,'dispatch_slug':json.loads(slug),'usage':u},separators=(',',':')))
+PY
+)"
+    printf '%s\n' "$_line" >>"$_ledger/agy.jsonl" || _warn
+  else _warn; fi
+fi
+exit "$_exit"

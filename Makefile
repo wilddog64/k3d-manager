@@ -32,7 +32,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -400,7 +400,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)'
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',)
 
 ## Show Codex worktree task status
 codex-status:
@@ -429,6 +429,22 @@ codex-prune:
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+## Put the agy recording wrapper first on PATH
+AGY_WRAPPER_DIR ?= $(HOME)/.local/share/k3d-manager/bin
+agy-wrapper-install:
+	@_t="$(AGY_WRAPPER_DIR)/agy"; \
+	if [ -e "$$_t" ] || [ -L "$$_t" ]; then \
+	  if [ ! -L "$$_t" ] || [ "$$(readlink "$$_t")" != "$(CURDIR)/bin/k3dm-agy" ]; then \
+	    echo "[make] ERROR: $$_t exists and is not the k3dm-agy wrapper; refusing to replace it (set AGY_WRAPPER_DIR to a dedicated dir)" >&2; exit 1; \
+	  fi; \
+	fi; \
+	mkdir -p "$(AGY_WRAPPER_DIR)" && ln -sfn "$(CURDIR)/bin/k3dm-agy" "$$_t"
+	@case ":$$PATH:" in *":$(AGY_WRAPPER_DIR):"*) ;; *) echo "[make] add $(AGY_WRAPPER_DIR) to the front of PATH, ahead of the real agy" ;; esac
+	@type -a agy || true
+
+agy-wrapper-uninstall:
+	@if [ -L "$(AGY_WRAPPER_DIR)/agy" ] && [ "$$(readlink "$(AGY_WRAPPER_DIR)/agy")" = "$(CURDIR)/bin/k3dm-agy" ]; then rm "$(AGY_WRAPPER_DIR)/agy"; fi
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:

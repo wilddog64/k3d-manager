@@ -9,52 +9,1305 @@ metadata:
 data:
   agent-dispatch.json: |
     {
-      "annotations": {"list": []},
+      "annotations": {
+        "list": []
+      },
       "editable": true,
       "graphTooltip": 1,
       "title": "k3dm Agent Dispatch",
       "uid": "k3dm-agent-dispatch",
       "description": "Codex dispatch throughput, landing outcomes, intervention and agent efficiency across the selected window or release. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed.",
-      "links": [{"type": "link", "title": "Bug Tracking", "url": "/d/k3dm-bugs"}],
-      "tags": ["k3d-manager", "codex", "dispatch"],
+      "links": [
+        {
+          "type": "dashboards",
+          "tags": [
+            "k3dm-agents"
+          ],
+          "asDropdown": false,
+          "includeVars": true,
+          "keepTime": true,
+          "title": "Agents"
+        },
+        {
+          "type": "link",
+          "title": "Bug Tracking",
+          "url": "/d/k3dm-bugs"
+        }
+      ],
+      "tags": [
+        "k3d-manager",
+        "k3dm-agents"
+      ],
       "schemaVersion": 39,
       "version": 1,
       "refresh": "1m",
-      "time": {"from": "now-30d", "to": "now"},
-      "templating": {"list": [{
-        "name": "window", "label": "Window", "type": "query",
-        "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "query": {"query": "label_values(k3dm_dispatch_landed, window)", "refId": "window"},
-        "definition": "label_values(k3dm_dispatch_landed, window)",
-        "refresh": 2, "sort": 7, "includeAll": false, "multi": false,
-        "current": {"text": "7d", "value": "7d", "selected": true}
-      }]},
+      "time": {
+        "from": "now-30d",
+        "to": "now"
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "window",
+            "label": "Window",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "query": {
+              "query": "label_values(k3dm_dispatch_landed, window)",
+              "refId": "window"
+            },
+            "definition": "label_values(k3dm_dispatch_landed, window)",
+            "refresh": 2,
+            "sort": 7,
+            "includeAll": false,
+            "multi": false,
+            "current": {
+              "text": "7d",
+              "value": "7d",
+              "selected": true
+            }
+          }
+        ]
+      },
       "panels": [
-        {"id": 1, "type": "stat", "title": "Accepted specs", "description": "Landed tasks in the selected window.", "gridPos": {"h": 6, "w": 5, "x": 0, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id": 2, "type": "stat", "title": "Landing success", "description": "Integration-test success: scope and rebase refusals are not counted because they are not integration results.", "gridPos": {"h": 6, "w": 5, "x": 5, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "sum(k3dm_dispatch_land_attempts{window=\"$window\",result=\"landed\"}) / sum(k3dm_dispatch_land_attempts{window=\"$window\",result=~\"landed|tests\"})", "instant": true}], "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 0.8}]}}, "overrides": []}},
-        {"id": 3, "type": "stat", "title": "Claude lines changed per task", "description": "Added plus deleted lines between Codex's finished tree and what landed; this measures intervention, not active time.", "gridPos": {"h": 6, "w": 5, "x": 10, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_verifier_lines_per_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id": 4, "type": "stat", "title": "Wait minutes per task", "description": "Wall-clock waiting time from Codex exit to land, not Claude's active minutes.", "gridPos": {"h": 6, "w": 5, "x": 15, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_wait_minutes_per_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "minutes", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id":5,"type":"stat","title":"Codex tokens / spec","description":"Codex tokens only; Claude verification tokens are not recorded per task. See Cost (API-equivalent) for dollars. A mean; one long spec can dominate it — see Per spec.","gridPos":{"h":6,"w":5,"x":0,"y":20},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_codex_tokens_per_landed{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"short","color":{"mode":"fixed","fixedColor":"blue"},"thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id": 6, "type": "stat", "title": "Running", "description": "Started tasks with no Codex exit, land, or abandon event. (not release-scoped)", "gridPos": {"h": 6, "w": 5, "x": 5, "y": 20}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_running", "instant": true}], "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id": 7, "type": "stat", "title": "Awaiting land", "description": "Tasks with a Codex exit and no land or abandon event. (not release-scoped)", "gridPos": {"h": 6, "w": 5, "x": 10, "y": 20}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_awaiting_land", "instant": true}], "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id": 8, "type": "bargauge", "title": "Land outcomes", "description": "Land outcomes by result in the selected window.", "gridPos": {"h": 6, "w": 5, "x": 15, "y": 20}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_land_attempts{window=\"$window\"}", "legendFormat": "{{result}}"}], "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": [{"matcher": {"id": "byName", "options": "landed"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}, {"matcher": {"id": "byName", "options": "rebase"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}, {"matcher": {"id": "byName", "options": "scope"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}, {"matcher": {"id": "byName", "options": "tests"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}]}, "options": {"displayMode": "basic"}},
-        {"id": 10, "type": "stat", "title": "Time to land", "description": "Mean wall-clock time from a spec's first Codex start to its land, including Claude's verification.", "gridPos": {"h": 6, "w": 4, "x": 20, "y": 0}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_elapsed_minutes_per_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id": 11, "type": "stat", "title": "Codex time", "description": "Mean time Codex itself ran per spec, summed over its runs.", "gridPos": {"h": 6, "w": 4, "x": 20, "y": 20}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_codex_minutes_per_landed{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}},
-        {"id":12,"type":"table","title":"Per spec","description":"Each landed spec in the selected window or release, newest 50. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Codex tokens are the session total of the spec's last run. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Codex tokens, Codex time, Codex runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.","gridPos":{"h":10,"w":19,"x":5,"y":26},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (version, slug) (k3dm_dispatch_task_codex_tokens{window=\"$window\"})","format":"table","instant":true,"refId":"A"},{"expr":"sum by (version, slug) (k3dm_dispatch_task_codex_seconds{window=\"$window\"})","format":"table","instant":true,"refId":"B"},{"expr":"sum by (version, slug) (k3dm_dispatch_task_elapsed_seconds{window=\"$window\"})","format":"table","instant":true,"refId":"C"},{"expr":"sum by (version, slug) (k3dm_dispatch_task_runs{window=\"$window\"})","format":"table","instant":true,"refId":"D"},{"expr":"max by (version, slug, spec) (k3dm_dispatch_task_spec{window=\"$window\"})","format":"table","instant":true,"refId":"E"},{"expr":"sum by (version, slug) (k3dm_dispatch_task_api_cost_usd{window=\"$window\"})","format":"table","instant":true,"refId":"F"},{"expr":"sum by (version, slug) (k3dm_dispatch_task_claude_api_cost_usd{window=\"$window\"})","format":"table","instant":true,"refId":"G"}],"transformations":[{"id":"merge"},{"id":"organize","options":{"excludeByName":{"Time":true,"Value #E":true},"indexByName":{"version":0,"slug":1,"Value #A":2,"Value #B":3,"Value #C":4,"Value #D":5,"Value #F":6,"Value #G":7,"spec":8},"renameByName":{"version":"Release","slug":"Spec","Value #A":"Codex tokens","Value #B":"Codex time","Value #C":"Time to land","Value #D":"Codex runs","Value #F":"API equiv.","Value #G":"Claude ≈"}}}],"fieldConfig":{"defaults":{},"overrides":[{"matcher":{"id":"byName","options":"Codex tokens"},"properties":[{"id":"unit","value":"short"}]},{"matcher":{"id":"byName","options":"Codex time"},"properties":[{"id":"unit","value":"s"}]},{"matcher":{"id":"byName","options":"Time to land"},"properties":[{"id":"unit","value":"s"}]},{"matcher":{"id":"byName","options":"Release"},"properties":[{"id":"links","value":[{"title":"Open this release in Bug Tracking","url":"/d/k3dm-bugs?var-release=${__data.fields.version}","targetBlank":true}]}]},{"matcher":{"id":"byName","options":"API equiv."},"properties":[{"id":"unit","value":"currencyUSD"},{"id":"decimals","value":2}]},{"matcher":{"id":"byName","options":"Claude ≈"},"properties":[{"id":"unit","value":"currencyUSD"},{"id":"decimals","value":2},{"id":"description","value":"Claude usage between dispatch and land, split across tasks that overlap. Excludes spec writing before dispatch. Time overlap, not measured spend: Claude work on something else in that time is included."}]},{"matcher":{"id":"byName","options":"spec"},"properties":[{"id":"custom.hidden","value":true}]},{"matcher":{"id":"byName","options":"Spec"},"properties":[{"id":"links","value":[{"title":"Open spec document","url":"https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/${__data.fields.spec}","targetBlank":true}]}]}]},"options":{"sortBy":[{"displayName":"Codex tokens","desc":true}],"footer":{"show":true,"reducer":["sum"],"countRows":false,"fields":["Value #A","Value #B","Value #D","Value #F","Value #G","Codex tokens","Codex time","Codex runs","API equiv.","Claude ≈"]}}},
-        {"id": 9, "type": "stat", "title": "Last update", "description": "Time since bin/k3dm-dispatch-metrics last published the ledger. It runs after every bin/k3dm-codex-dispatch event (start, exit, land, resume, abandon) or make dispatch-metrics, so a large value means no wrapped dispatch since, not a broken exporter. Yellow above one day. (not release-scoped)", "gridPos": {"h": 6, "w": 5, "x": 0, "y": 26}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "time() - k3dm_dispatch_ledger_timestamp_seconds", "instant": true}], "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 86400}]}}, "overrides": []}},
-        {"id": 13, "type": "stat", "title": "Rework rate", "description": "Share of landed specs that needed a second pass: Codex ran more than once, the integration gate refused it for tests, or Claude changed lines before landing. Rebase and scope refusals are not rework. The independent verifier's verdict is not in the ledger, so it counts only through the re-run or edit that followed. Split by cause: k3dm_dispatch_rework_landed.", "gridPos": {"h": 4, "w": 5, "x": 0, "y": 32}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "targets": [{"expr": "k3dm_dispatch_rework_ratio{window=\"$window\"}", "instant": true}], "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 0.5}]}}, "overrides": []}},
-        {"id":19,"type":"row","title":"Cost (API-equivalent)","collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":36},"panels":[]},
-        {"id":20,"type":"stat","title":"Codex at API prices","description":"API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":6,"x":0,"y":37},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_api_cost_usd{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id":21,"type":"stat","title":"Per landed spec","description":"All Codex usage in scope, including refused and abandoned attempts, divided by landed specs. Landed means the tests and scope gate passed, not a live proof. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":6,"x":6,"y":37},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_api_cost_per_landed_usd{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id":22,"type":"stat","title":"Cached input","description":"API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":6,"x":12,"y":37},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_cached_input_ratio{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"percentunit","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id":23,"type":"stat","title":"Subscriptions / month","description":"The per-plan split is available from subscription_usd_per_month; only the ChatGPT plan pays for Codex. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":6,"x":18,"y":37},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(k3dm_dispatch_subscription_usd_per_month)","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id":24,"type":"stat","title":"Ledger coverage","description":"time windows only; shows no data for a release. The second target shows estimated unledgered API-equivalent cost. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":8,"x":0,"y":43},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_codex_sessions{window=\"$window\",ledgered=\"true\"} / ignoring(ledgered) sum without(ledgered) (k3dm_dispatch_codex_sessions{window=\"$window\"})","instant":true,"legendFormat":"in the ledger"},{"expr":"k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}","instant":true,"legendFormat":"outside the ledger"}],"fieldConfig":{"defaults":{"unit":"percentunit","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[{"matcher":{"id":"byName","options":"outside the ledger"},"properties":[{"id":"unit","value":"currencyUSD"},{"id":"decimals","value":2}]}]}},
-        {"id":25,"type":"stat","title":"Projected / month","description":"Codex usage at API prices over the last 7 days (or since the ledger's first session, if newer), by session start time, scaled to 30 days. What this workload would cost on pay-per-token billing. Codex and Claude. Gemini is not instrumented. API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":8,"x":8,"y":43},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_api_cost_usd{window=\"7d\"} / k3dm_dispatch_api_cost_observed_days{window=\"7d\"} * 30 + k3dm_dispatch_claude_api_cost_usd{window=\"7d\"} / k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"} * 30","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]}},
-        {"id":27,"type":"bargauge","title":"By model","description":"API-equivalent: Codex session tokens, cached input included, priced at scripts/etc/agent/codex-model-prices.json (checked 2026-10-23). Not a bill. Codex runs on the $20/month ChatGPT plan.","gridPos":{"h":6,"w":8,"x":16,"y":43},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_api_cost_by_model_usd{window=\"$window\"}","instant":true,"legendFormat":"{{model}}"}],"fieldConfig":{"defaults":{"unit":"currencyUSD","min":0,"thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},"overrides":[]},"options":{"displayMode":"basic"}}
-        ,{"id":28,"type":"stat","title":"Claude at API prices","description":"Claude Code usage priced at Anthropic API list rates; not the subscription bill. A time window counts every message in it, including spec writing, design and discussion. A release counts only messages sent while one of its specs was between dispatch and land, split across specs that overlap. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.","gridPos":{"h":6,"w":6,"x":0,"y":6},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","decimals":2,"color":{"mode":"fixed","fixedColor":"blue"}},"overrides":[]}},
-        {"id":29,"type":"stat","title":"Claude per landed spec","description":"Release scope only; time windows show no data, because their total is all Claude work, not only dispatch work. Claude at API prices divided by the release's landed specs. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.","gridPos":{"h":6,"w":6,"x":6,"y":6},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_claude_api_cost_per_landed_usd{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"currencyUSD","decimals":2,"color":{"mode":"fixed","fixedColor":"blue"}},"overrides":[]}},
-        {"id":30,"type":"stat","title":"Claude data since","description":"Earliest retained Claude usage record.","gridPos":{"h":6,"w":6,"x":12,"y":6},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_claude_coverage_start_timestamp_seconds * 1000","instant":true}],"fieldConfig":{"defaults":{"unit":"dateTimeFromNow","color":{"mode":"fixed","fixedColor":"blue"}},"overrides":[]}},
-        {"id":31,"type":"stat","title":"Claude tokens per landed spec","description":"Release scope only; time windows show no data. All Claude tokens in scope, including cache reads, divided by the release's landed specs; same scope as Claude per landed spec. Attribution is by time overlap: it does not measure what Claude spent on any one Codex dispatch, because Claude's activity in that time can include spec writing, design, discussion and other work.","gridPos":{"h":6,"w":6,"x":18,"y":6},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"k3dm_dispatch_claude_tokens_per_landed{window=\"$window\"}","instant":true}],"fieldConfig":{"defaults":{"unit":"short","color":{"mode":"fixed","fixedColor":"blue"}},"overrides":[]}},
-        {"id":32,"type":"barchart","title":"Claude tokens per day","description":"Last 30 days, all Claude sessions in this repo including subagents, all token kinds including cache reads. Ignores the Spec window.","gridPos":{"h":8,"w":24,"x":0,"y":12},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by (date, model) (k3dm_dispatch_claude_daily_tokens)","instant":true,"format":"table"}],"transformations":[{"id":"merge"},{"id":"groupingToMatrix","options":{"rowField":"date","columnField":"model","valueField":"Value"}},{"id":"organize","options":{"renameByName":{"date\\model":"date"}}}],"fieldConfig":{"defaults":{"unit":"short"},"overrides":[]},"options":{"xField":"date","stacking":"normal"}}
+        {
+          "id": 1,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Accepted specs",
+          "description": "Landed tasks in the selected window.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Landing success",
+          "description": "Integration-test success: scope and rebase refusals are not counted because they are not integration results.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 5,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_dispatch_land_attempts{window=\"$window\",result=\"landed\"}) / sum(k3dm_dispatch_land_attempts{window=\"$window\",result=~\"landed|tests\"})",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.8
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claude lines changed per task",
+          "description": "Added plus deleted lines between Codex's finished tree and what landed; this measures intervention, not active time.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 10,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_verifier_lines_per_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Wait minutes per task",
+          "description": "Wall-clock waiting time from Codex exit to land, not Claude's active minutes.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 15,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_wait_minutes_per_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "minutes",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Codex tokens / spec",
+          "description": "Codex tokens only; Claude verification tokens are not recorded per task. See Cost (API-equivalent) for dollars. A mean; one long spec can dominate it — see Per spec.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 0,
+            "y": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_codex_tokens_per_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Running",
+          "description": "Started tasks with no Codex exit, land, or abandon event. (not release-scoped)",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 5,
+            "y": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_running",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Awaiting land",
+          "description": "Tasks with a Codex exit and no land or abandon event. (not release-scoped)",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 10,
+            "y": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_awaiting_land",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 8,
+          "type": "bargauge",
+          "title": "Land outcomes",
+          "description": "Land outcomes by result in the selected window.",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 15,
+            "y": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_land_attempts{window=\"$window\"}",
+              "legendFormat": "{{result}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "landed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "rebase"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "scope"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "tests"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "displayMode": "basic"
+          }
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Time to land",
+          "description": "Mean wall-clock time from a spec's first Codex start to its land, including Claude's verification.",
+          "gridPos": {
+            "h": 6,
+            "w": 4,
+            "x": 20,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_elapsed_minutes_per_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Codex time",
+          "description": "Mean time Codex itself ran per spec, summed over its runs.",
+          "gridPos": {
+            "h": 6,
+            "w": 4,
+            "x": 20,
+            "y": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_codex_minutes_per_landed{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 12,
+          "type": "table",
+          "title": "Per spec",
+          "description": "Each landed spec in the selected window or release, newest 50. Release scope covers v1.43.0 onward; earlier releases were dispatched before the ledger existed. Codex tokens are the session total of the spec's last run. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Codex tokens, Codex time, Codex runs and API equiv. over the rows shown; Time to land is not totalled, because its mean is the Time to land stat above.",
+          "gridPos": {
+            "h": 10,
+            "w": 19,
+            "x": 5,
+            "y": 12
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_codex_tokens{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_codex_seconds{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "B"
+            },
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_elapsed_seconds{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "C"
+            },
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_runs{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "D"
+            },
+            {
+              "expr": "max by (version, slug, spec) (k3dm_dispatch_task_spec{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "E"
+            },
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_api_cost_usd{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "F"
+            },
+            {
+              "expr": "sum by (version, slug) (k3dm_dispatch_task_claude_api_cost_usd{window=\"$window\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "G"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge"
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value #E": true
+                },
+                "indexByName": {
+                  "version": 0,
+                  "slug": 1,
+                  "Value #A": 2,
+                  "Value #B": 3,
+                  "Value #C": 4,
+                  "Value #D": 5,
+                  "Value #F": 6,
+                  "Value #G": 7,
+                  "spec": 8
+                },
+                "renameByName": {
+                  "version": "Release",
+                  "slug": "Spec",
+                  "Value #A": "Codex tokens",
+                  "Value #B": "Codex time",
+                  "Value #C": "Time to land",
+                  "Value #D": "Codex runs",
+                  "Value #F": "API equiv.",
+                  "Value #G": "Claude ≈"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Codex tokens"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Codex time"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to land"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Release"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open this release in Bug Tracking",
+                        "url": "/d/k3dm-bugs?var-release=${__data.fields.version}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "API equiv."
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Claude ≈"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "currencyUSD"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "description",
+                    "value": "Claude usage between dispatch and land, split across tasks that overlap. Excludes spec writing before dispatch. Time overlap, not measured spend: Claude work on something else in that time is included."
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "spec"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spec"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open spec document",
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/${__data.fields.spec}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "sortBy": [
+              {
+                "displayName": "Codex tokens",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": true,
+              "reducer": [
+                "sum"
+              ],
+              "countRows": false,
+              "fields": [
+                "Value #A",
+                "Value #B",
+                "Value #D",
+                "Value #F",
+                "Value #G",
+                "Codex tokens",
+                "Codex time",
+                "Codex runs",
+                "API equiv.",
+                "Claude ≈"
+              ]
+            }
+          }
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Last update",
+          "description": "Time since bin/k3dm-dispatch-metrics last published the ledger. It runs after every bin/k3dm-codex-dispatch event (start, exit, land, resume, abandon) or make dispatch-metrics, so a large value means no wrapped dispatch since, not a broken exporter. Yellow above one day. (not release-scoped)",
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 0,
+            "y": 12
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "time() - k3dm_dispatch_ledger_timestamp_seconds",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 86400
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 13,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Rework rate",
+          "description": "Share of landed specs that needed a second pass: Codex ran more than once, the integration gate refused it for tests, Claude changed lines before landing, or the independent verifier failed. Rebase and scope refusals are not rework. Split by cause, including review: k3dm_dispatch_rework_landed.",
+          "gridPos": {
+            "h": 4,
+            "w": 5,
+            "x": 0,
+            "y": 22
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_rework_ratio{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 40,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Codex tokens per verified spec",
+          "description": "Mean implementation Codex tokens plus any Codex-run verifier tokens for delivered specs in the selected window or release. Claude verification tokens are excluded. No data means no delivered spec has a token total.",
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 0,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_codex_tokens_per_delivered{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 41,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Awaiting verification",
+          "description": "Landed specs with a missing or failed latest independent verification, or with required live evidence still missing. Specs whose source document is absent are shown separately as unknown.",
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_awaiting_verification{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 42,
+          "type": "row",
+          "title": "Run outcomes and verified bug cost",
+          "description": "Evidence-based Codex attempt outcomes, objective rejection cost and directly linked live-verified bug cost. N/A means evidence or explicit linkage is unavailable.",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 32
+          },
+          "panels": []
+        },
+        {
+          "id": 43,
+          "type": "bargauge",
+          "title": "Run outcomes",
+          "description": "Bounded counts for accepted, rework, failed, progress and unknown attempts. Unknown attempts remain visible and are not counted as rejected work.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 33
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_run_outcomes{window=\"$window\"}",
+              "instant": true,
+              "legendFormat": "{{outcome}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "min": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "basic"
+          }
+        },
+        {
+          "id": 44,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Rejected-attempt Codex tokens",
+          "description": "Tokens on objectively rejected runs with a known cumulative-counter increment. No data means the rejected-token total is unavailable, not zero.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 33
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_objectively_rejected_codex_tokens{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 45,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Run outcome coverage",
+          "description": "Share of runs with independently evidenced accepted, rework or failed outcomes. Progress and unknown are not evidence of acceptance or failure.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 33
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_run_outcome_coverage{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 46,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Codex tokens per live-verified bug",
+          "description": "Mean Codex tokens for tasks whose explicit spec is a live-verified bug document. Tasks linked only through a plan remain unmatched and are excluded; no data means no attributable bug total.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 18,
+            "y": 33
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_codex_tokens_per_live_verified_bug{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 47,
+          "type": "table",
+          "title": "Per run evidence",
+          "description": "Capped table of task/run number, outcome, evidence reference and known Codex token increment. Token values are absent when the cumulative counter baseline is unknown or reset.",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 39
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_task_run_outcome{window=\"$window\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "expr": "k3dm_dispatch_task_run_codex_tokens{window=\"$window\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Time",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": 48,
+          "type": "bargauge",
+          "title": "First-pass live verification",
+          "description": "First recorded independent verification result for directly linked live-verified bug documents. Unmatched tasks are excluded; no data means no attributable first-pass result.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 49
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_live_verified_bug_first_pass{window=\"$window\"}",
+              "instant": true,
+              "legendFormat": "{{result}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "min": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "basic"
+          }
+        }
       ]
     }

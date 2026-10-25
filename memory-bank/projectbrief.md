@@ -4,7 +4,7 @@
 
 k3d-manager is a multi-cloud k3s cluster lifecycle framework built in Bash. It provisions,
 configures, and tears down lightweight Kubernetes clusters on AWS EC2 (live), GCP, Azure, and
-OCI (live), plus local runtimes (k3d, OrbStack) — all from a single entry point with a
+Hostinger k3s (live; OCI descoped), plus local runtimes (k3d, OrbStack) — all from a single entry point with a
 consistent command interface.
 
 It is **not** a general-purpose cluster tool and is **not** a local-only dev environment.

@@ -1,34 +1,62 @@
 #!/usr/bin/env bats
 
-DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
+BASE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops"
+FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-pre-split.yaml"
 EXPORTER="${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics"
 
-_dashboard_json() {
-  python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-print(json.dumps(json.loads("\n".join(line[4:] for line in body.splitlines()))))
-PY
-}
-
 @test "agent dispatch dashboard: valid ConfigMap JSON and datasource" {
-  run _dashboard_json
+  run python3 - "$BASE" <<'PY'
+import json, sys
+from pathlib import Path
+base=Path(sys.argv[1])
+for filename,key,uid in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json","k3dm-agent-dispatch"),
+                         ("grafana-dashboard-agent-cost.yaml","agent-cost.json","k3dm-agent-cost"),
+                         ("grafana-dashboard-agent-activity.yaml","agent-activity.json","k3dm-agent-activity")):
+    text=(base/filename).read_text(); dashboard=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+    assert dashboard["uid"]==uid
+    assert all(panel.get("datasource",{}).get("uid")=="prometheus" for panel in dashboard["panels"] if panel.get("targets"))
+print("ok")
+PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *'"uid": "k3dm-agent-dispatch"'* ]]
-  [[ "$output" == *'"type": "prometheus", "uid": "prometheus"'* ]]
+  [[ "$output" == *ok* ]]
 }
 
 @test "agent dispatch dashboard: every queried metric is exported" {
-  run python3 - "$DASH" "$EXPORTER" <<'PY'
-import json, re, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
-exporter = open(sys.argv[2], encoding="utf-8").read()
-queries = "\n".join(target.get("expr", "") for panel in dashboard["panels"] for target in panel.get("targets", []))
-for metric in set(re.findall(r"\bk3dm_dispatch_[a-z0-9_]+", queries)):
-    assert metric in exporter, metric
+  run python3 - "$BASE" "$EXPORTER" <<'PY'
+import json,re,sys
+from pathlib import Path
+base=Path(sys.argv[1]); dashboards=[]
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+    text=(base/filename).read_text(); dashboards.append(json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines())))
+exporter=Path(sys.argv[2]).read_text()
+queries="\n".join(t.get("expr","") for d in dashboards for p in d["panels"] for t in p.get("targets",[]))
+for metric in set(re.findall(r"\bk3dm_(?:dispatch|claude|codex|agy)_[a-z0-9_]+",queries)):
+    assert metric in exporter,metric
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch dashboard: Claude context and compaction row panels exist below existing rows" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
+by_id={p["id"]:p for p in d["panels"]}; row=by_id[33]
+assert row["title"]=="Claude context and compaction" and row["type"]=="row"
+expected={35:("Compactions per verified spec","stat","short"),36:("Compactions by trigger","bargauge","none"),37:("Re-read share after compaction","stat","percentunit"),38:("Context incidents","bargauge","none"),39:("Auto-compact threshold","stat","short")}
+for panel_id,(title,ptype,unit) in expected.items():
+    panel=by_id[panel_id]
+    assert panel["title"]==title and panel["type"]==ptype
+    assert panel["fieldConfig"]["defaults"]["unit"]==unit
+    assert panel["gridPos"]["y"]>row["gridPos"]["y"]
+cost=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
+cost=json.loads("\n".join(x[4:] for x in cost.split("  agent-cost.json: |\n",1)[1].splitlines()))
+panel=next(p for p in cost["panels"] if p["id"]==34)
+assert panel["title"]=="Claude cost per verified spec" and panel["fieldConfig"]["defaults"]["unit"]=="currencyUSD"
+assert by_id[35]["targets"][0]["expr"]=='sum(k3dm_claude_compactions{window="$window"}) / sum(k3dm_claude_verified_specs{window="$window"} > 0)'
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -36,16 +64,11 @@ PY
 }
 
 @test "agent dispatch dashboard: landing success aggregates both sides" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
-panel = next(panel for panel in panels if panel["id"] == 2)
-expr = panel["targets"][0]["expr"]
-numerator, denominator = [side.strip() for side in expr.split(" / ")]
-assert numerator.startswith("sum("), numerator
-assert denominator.startswith("sum("), denominator
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panel=next(p for p in d["panels"] if p["id"]==2); numerator,denominator=[side.strip() for side in panel["targets"][0]["expr"].split(" / ")]
+assert numerator.startswith("sum(") and denominator.startswith("sum(")
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -53,18 +76,35 @@ PY
 }
 
 @test "agent dispatch dashboard: panel rectangles do not overlap" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
-ids = [panel["id"] for panel in panels]
-assert len(ids) == len(set(ids))
-for i, left in enumerate(panels):
-    a = left["gridPos"]
-    for right in panels[i + 1:]:
-        b = right["gridPos"]
-        assert not (a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]), (left["id"], right["id"])
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+    text=(base/filename).read_text(); panels=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))["panels"]
+    ids=[p["id"] for p in panels]; assert len(ids)==len(set(ids)),filename
+    for i,left in enumerate(panels):
+        a=left["gridPos"]
+        for right in panels[i+1:]:
+            b=right["gridPos"]
+            assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(filename,left["id"],right["id"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch dashboard: Codex API cost shows priced total and excluded sessions" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
+by_id={p["id"]:p for p in d["panels"]}
+cost=by_id[58]; excluded=by_id[83]
+assert "priced sessions only" in cost["description"]
+assert cost["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window"})'
+assert excluded["title"]=="Unpriced Codex sessions"
+assert excluded["targets"][0]["expr"]=='sum(k3dm_codex_unpriced_sessions{window="$window"})'
+assert cost["gridPos"]["y"]==excluded["gridPos"]["y"] and cost["gridPos"]["x"]+cost["gridPos"]["w"]==excluded["gridPos"]["x"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -72,17 +112,12 @@ PY
 }
 
 @test "agent dispatch dashboard: per-spec panels use readable units and grouped targets" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
-panel5 = next(panel for panel in panels if panel["id"] == 5)
-assert panel5["fieldConfig"]["defaults"]["unit"] == "short"
-panel12 = next(panel for panel in panels if panel["id"] == 12)
-assert len(panel12["targets"]) >= 4
-assert all(target["expr"].startswith(("sum by (version, slug)", "max by (version, slug, spec)"))
-           for target in panel12["targets"])
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
+panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
+panel12=next(p for p in panels if p["id"]==12); assert len(panel12["targets"])>=4
+assert all(t["expr"].startswith(("sum by (version, slug)","max by (version, slug, spec)")) for t in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -90,63 +125,184 @@ PY
 }
 
 @test "agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
-var = next(item for item in dashboard["templating"]["list"] if item["name"] == "window")
-assert var["type"] == "query"
-assert var["definition"] == "label_values(k3dm_dispatch_landed, window)"
-assert var["current"]["value"] == "7d", var["current"]
-assert var["label"] == "Window"
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
+    text=(Path(sys.argv[1])/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+    var=next(v for v in d["templating"]["list"] if v["name"]=="window")
+    assert var["type"]=="query" and var["definition"]=="label_values(k3dm_dispatch_landed, window)"
+    assert var["current"]["value"]=="7d" and var["label"]=="Window"
 PY
   [ "$status" -eq 0 ]
 }
 
 @test "agent dispatch dashboard: rework rate stat reads the selected window" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-dashboard = json.loads("\n".join(line[4:] for line in body.splitlines()))
-panel = next(p for p in dashboard["panels"] if p["title"] == "Rework rate")
-assert panel["type"] == "stat"
-assert [t["expr"] for t in panel["targets"]] == ['k3dm_dispatch_rework_ratio{window="$window"}']
-assert panel["fieldConfig"]["defaults"]["unit"] == "percentunit"
-assert "independent verifier" in panel["description"]
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+p=next(p for p in d["panels"] if p["title"]=="Rework rate")
+assert p["type"]=="stat" and [t["expr"] for t in p["targets"]]==['k3dm_dispatch_rework_ratio{window="$window"}']
+assert p["fieldConfig"]["defaults"]["unit"]=="percentunit" and "independent verifier" in p["description"]
+PY
+  [ "$status" -eq 0 ]
+}
+
+@test "agent dispatch dashboard: verified delivery stats use exported metrics without overlap" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
+by_id={p["id"]:p for p in panels}; tokens=by_id[40]; awaiting=by_id[41]
+assert tokens["targets"][0]["expr"]=='k3dm_dispatch_codex_tokens_per_delivered{window="$window"}'
+assert awaiting["targets"][0]["expr"]=='k3dm_dispatch_awaiting_verification{window="$window"}'
+assert tokens["gridPos"]["y"]==awaiting["gridPos"]["y"]
+rework=next(p for p in panels if p["title"]=="Rework rate")["description"]
+assert "review" in rework and "verdict is not in the ledger" not in rework
 PY
   [ "$status" -eq 0 ]
 }
 
 @test "agent dispatch dashboard: stat and bar gauge panels use explicit colours" {
-  run python3 - "$DASH" <<'PY'
-import json, sys
-text = open(sys.argv[1], encoding="utf-8").read()
-body = text.split("agent-dispatch.json: |\n", 1)[1]
-panels = json.loads("\n".join(line[4:] for line in body.splitlines()))["panels"]
-by_id = {panel["id"]: panel for panel in panels}
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1]); dashboards=[]
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+    text=(base/filename).read_text(); dashboards.append(json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines())))
+panels=[p for d in dashboards for p in d["panels"]]; by_id={p["id"]:p for p in panels}
 for panel in panels:
-    if panel["type"] not in ("stat", "bargauge"):
-        continue
-    defaults = panel["fieldConfig"]["defaults"]
-    assert "thresholds" in defaults or defaults.get("color", {}).get("mode") == "fixed", panel["id"]
-land = by_id[8]
-assert land["options"]["displayMode"] == "basic"
-overrides = {item["matcher"].get("options"): item["properties"] for item in land["fieldConfig"]["overrides"]}
+    if panel["type"] not in ("stat","bargauge"): continue
+    defaults=panel["fieldConfig"]["defaults"]; assert "thresholds" in defaults or defaults.get("color",{}).get("mode")=="fixed",panel["id"]
+land=by_id[8]; assert land["options"]["displayMode"]=="basic"
+overrides={item["matcher"].get("options"):item["properties"] for item in land["fieldConfig"]["overrides"]}
 def fixed_color(series):
-    prop = next(item for item in overrides[series] if item["id"] == "color")
-    assert prop["value"]["mode"] == "fixed"
-    return prop["value"]["fixedColor"]
-assert fixed_color("landed") == "green"
-for series in ("rebase", "scope", "tests"):
-    assert fixed_color(series) != "green", series
-for panel_id, expected in {
-    2: {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 0.8}]},
-    9: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 86400}]},
-    13: {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 0.5}]},
-}.items():
-    assert by_id[panel_id]["fieldConfig"]["defaults"]["thresholds"] == expected, panel_id
+    prop=next(item for item in overrides[series] if item["id"]=="color")
+    assert prop["value"]["mode"]=="fixed"; return prop["value"]["fixedColor"]
+assert fixed_color("landed")=="green"
+for series in ("rebase","scope","tests"): assert fixed_color(series)!="green",series
+for panel_id,expected in {2:{"mode":"absolute","steps":[{"color":"red"},{"color":"green","value":0.8}]},9:{"mode":"absolute","steps":[{"color":"green"},{"color":"yellow","value":86400}]},13:{"mode":"absolute","steps":[{"color":"green"},{"color":"yellow","value":0.5}]}}.items():
+    assert by_id[panel_id]["fieldConfig"]["defaults"]["thresholds"]==expected,panel_id
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups" {
+  run python3 - "$BASE" "$FIXTURE" <<'PY'
+import json,sys
+from pathlib import Path
+base,fixture=Path(sys.argv[1]),Path(sys.argv[2])
+def load(path,key):
+ text=path.read_text(); return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+old=load(fixture,"agent-dispatch.json")
+files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
+new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
+all_ids=[p["id"] for d in new for p in d["panels"]]
+assert sorted(all_ids)==sorted(old_ids+[83]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,14))|{40,41}|set(range(42,49))
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34}
+assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+print(f"ok: {len(all_ids)} panels, each exactly once")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: 65 panels, each exactly once"* ]]
+}
+
+@test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
+  run python3 - "$BASE" "$FIXTURE" <<'PY'
+import json,sys
+from pathlib import Path
+base,fixture=Path(sys.argv[1]),Path(sys.argv[2])
+def load(path,key):
+ text=path.read_text(); return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+ for panel in load(base/filename,key)["panels"]:
+    if panel["id"]==83:
+      continue
+    for field in ("targets","fieldConfig","options"):
+      new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
+      if field=="options" and panel["type"]=="bargauge" and key=="agent-activity.json":
+        new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
+      assert new==old_field,(panel["id"],field)
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dashboards: each dashboard has unique panel ids and no overlapping rectangles" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+ text=(base/filename).read_text(); panels=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))["panels"]
+ ids=[p["id"] for p in panels]; assert len(ids)==len(set(ids)),filename
+ for i,left in enumerate(panels):
+    a=left["gridPos"]
+    for right in panels[i+1:]:
+      b=right["gridPos"]
+      assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(filename,left["id"],right["id"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dashboards: all dashboards have the tag-based Agents link" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+expected={"type":"dashboards","tags":["k3dm-agents"],"asDropdown":False,"includeVars":True,"keepTime":True,"title":"Agents"}
+for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
+ text=(base/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+ assert "k3dm-agents" in d["tags"] and d["links"][0]==expected
+ assert d["links"][1]=={"type":"link","title":"Bug Tracking","url":"/d/k3dm-bugs"}
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(file,key):
+ text=(base/file).read_text(); return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+activity=load("grafana-dashboard-agent-activity.yaml","agent-activity.json")["templating"]["list"][0]
+assert activity["name"]=="window" and activity["label"]=="Window" and activity["type"]=="custom"
+assert [o["value"] for o in activity["options"]]==["1d","7d","30d"] and activity["current"]["value"]=="7d"
+for file,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
+ window=load(file,key)["templating"]["list"][0]
+ assert window["type"]=="query" and window["definition"]=="label_values(k3dm_dispatch_landed, window)"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: Claude row fills the width and bar gauge names read beside each bar" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
+panels=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+by_id={p["id"]:p for p in panels}
+claude=[by_id[i] for i in (35,36,37,38,39)]
+assert min(p["gridPos"]["x"] for p in claude)==0
+for p in claude:
+  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 8),(p["id"],p["gridPos"])
+for y in {p["gridPos"]["y"] for p in claude}:
+  assert sum(p["gridPos"]["w"] for p in claude if p["gridPos"]["y"]==y)==24,y
+for p in panels:
+  if p["type"]=="bargauge":
+    assert p.get("options",{}).get("orientation")=="horizontal",p["id"]
+    assert p.get("options",{}).get("namePlacement")=="left",p["id"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
