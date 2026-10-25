@@ -1,6 +1,7 @@
 # Bug: Agent Activity titles and bar labels are truncated, and the Claude row starts with a gap
 
-**Status:** FIXED — offline-verified: dashboard BATS 17/17 (new layout test red on the pre-fix file), pytest 81 passed, validate-manifests 83 valid. Live check pending the hub sync.
+**Status:** FIXED — `979dbdb7`. offline-verified: dashboard BATS 17/17 (new layout test red on the pre-fix file), pytest 81 passed, validate-manifests 83 valid. Live check pending the hub sync.
+**Fix commit:** 979dbdb7
 **Priority:** P3
 **Severity:** low — the numbers are correct; the operator cannot read which panel or bar they belong to
 **Release:** v1.43.6 (bug; does not count toward the five-plan cap)
