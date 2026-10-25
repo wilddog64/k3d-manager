@@ -5,6 +5,7 @@
     {"version": "v1.43.6", "kind": "patch"},
     {"version": "v1.43.7", "kind": "patch"},
     {"version": "v1.43.8", "kind": "patch"},
+    {"version": "v1.43.9", "kind": "patch"},
     {"version": "v1.44.0", "kind": "minor"},
     {"version": "v1.44.1", "kind": "patch"},
     {"version": "v1.44.2", "kind": "patch"},

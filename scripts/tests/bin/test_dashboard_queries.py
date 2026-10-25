@@ -34,31 +34,33 @@ def fixture_metrics(tmp_path):
     """Run the real offline producers on a tagged fixture repo, docs, and ledger."""
     producer = load_module("vectordb_metrics_dashboard_test", ROOT / "bin/k3dm-vectordb-metrics")
     dispatch = load_module("dispatch_metrics_dashboard_test", ROOT / "bin/k3dm-dispatch-metrics")
+    release = next(item for item in load_dashboard()["templating"]["list"]
+                   if item["name"] == "release")["current"]["value"][0]
     repo = tmp_path / "repo"
     docs = repo / "docs"
     (docs / "bugs").mkdir(parents=True)
     (docs / "plans").mkdir()
     (docs / "release-milestones.json").write_text(json.dumps({"milestones": [
-        {"version": "v1.43.4"}, {"version": "v1.43.5", "target": True},
+        {"version": "v1.43.4"}, {"version": release, "target": True},
     ]}))
     bug_path = "docs/bugs/2026-10-23-fixture.md"
     bug_text = ("# Bug: fixture\n**Filed:** 2026-10-23\n**Status:** LIVE-VERIFIED\n"
-                "**Priority:** P2\n**Release:** v1.43.5\n")
+                f"**Priority:** P2\n**Release:** {release}\n")
     (repo / bug_path).write_text(bug_text)
     plans = {
-        "v1.43.5-fixture-dispatched": "DISPATCHED",
-        "v1.43.5-fixture-undispatched": "PROPOSED",
+        f"{release}-fixture-dispatched": "DISPATCHED",
+        f"{release}-fixture-undispatched": "PROPOSED",
     }
     texts = {}
     for name, status in plans.items():
         path = f"docs/plans/{name}.md"
         texts[path] = (f"# {name}\n**Status:** {status}\n**Approval:** explicit\n"
-                       "**Release:** v1.43.5 (plan 1 of 2)\n**Depends on:** none\n")
+                       f"**Release:** {release} (plan 1 of 2)\n**Depends on:** none\n")
     bug_texts = {bug_path: bug_text}
     metric_text = (producer._plan_metrics(repo, texts=texts)
                    + producer._bug_metrics(repo, texts=bug_texts)
                    + producer._bug_status_metrics(repo, texts=bug_texts, tally={
-                       "v1.43.5": {"closed_paths": [{"path": bug_path}]}
+                       release: {"closed_paths": [{"path": bug_path}]}
                    }))
 
     # Release and forecast producers intentionally read Git tags/current branch
@@ -66,7 +68,7 @@ def fixture_metrics(tmp_path):
     subprocess.run(["git", "init", str(repo)], check=True, capture_output=True, text=True)
     subprocess.run(["git", "-C", str(repo), "config", "user.name", "Dashboard fixture"], check=True)
     subprocess.run(["git", "-C", str(repo), "config", "user.email", "fixture@example.invalid"], check=True)
-    subprocess.run(["git", "-C", str(repo), "branch", "-m", "k3d-manager-v1.43.5"], check=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-m", f"k3d-manager-{release}"], check=True)
     subprocess.run(["git", "-C", str(repo), "add", "docs"], check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-m", "fixture"], check=True,
                    capture_output=True, text=True)
@@ -79,17 +81,17 @@ def fixture_metrics(tmp_path):
         subprocess.run(["git", "-C", str(repo), "tag", "-a", version, "-m", "fixture release"],
                        check=True, env=tag_env, capture_output=True, text=True)
     release_tally = {
-        "v1.43.5": {
+        release: {
             "by_priority": {"P2": {"open": 0, "closed": 1, "unknown": 0}},
             "closed_paths": [{"path": bug_path, "priority": "P2"}],
         }
     }
     metric_text += producer._release_metrics(repo, tally=release_tally,
-                                          fixed_in={bug_path: {"release": "v1.43.5"}})
+                                          fixed_in={bug_path: {"release": release}})
     metric_text += producer._forecast_metrics(repo, now=1_800_000_000)
 
-    events = [{"ts": 1_800_000_000, "event": "start", "version": "v1.43.5",
-               "slug": "fixture-dispatched", "spec": "docs/plans/v1.43.5-fixture-dispatched.md"}]
+    events = [{"ts": 1_800_000_000, "event": "start", "version": release,
+               "slug": "fixture-dispatched", "spec": f"docs/plans/{release}-fixture-dispatched.md"}]
     metric_text += dispatch.render(events, 0, now=1_800_000_000)
     return metric_text, set(texts)
 
