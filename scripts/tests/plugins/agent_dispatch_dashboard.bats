@@ -512,6 +512,9 @@ for i in (32,87):
   assert cost[i]["options"]["text"]["valueSize"]>=14,i
 rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
 assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
+clarify=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"clarification"}]
+assert clarify and {"id":"displayName","value":"clarify"} in clarify[0]["properties"]
+assert [t["legendFormat"] for t in dispatch[85]["targets"]]==["{{reason}}","tasks"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
