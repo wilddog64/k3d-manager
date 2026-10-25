@@ -2484,31 +2484,31 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}",
+              "expr": "((k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"}) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}) and on() (vector($release_mode) == 0))",
               "instant": true,
               "format": "table"
             },
             {
               "refId": "B",
-              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"low\"}) * 1000",
+              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"low\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"low\"}) * 1000) and on() (vector($release_mode) == 0))",
               "instant": true,
               "format": "table"
             },
             {
               "refId": "C",
-              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"mid\"}) * 1000",
+              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"mid\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"mid\"}) * 1000) and on() (vector($release_mode) == 0))",
               "instant": true,
               "format": "table"
             },
             {
               "refId": "D",
-              "expr": "max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"high\"}) * 1000",
+              "expr": "((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",bound=\"high\"}) * 1000) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or ((max by (version) (k3dm_release_milestone_forecast_seconds{repo=\"$repo\",version=~\"$release\",bound=\"high\"}) * 1000) and on() (vector($release_mode) == 0))",
               "instant": true,
               "format": "table"
             },
             {
               "refId": "E",
-              "expr": "(sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"}, \"version\", \"$1\", \"release\", \"(.*)\")) and on(version) k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"})",
+              "expr": "(((sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\")) and on(version) k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"}) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",state!=\"shipped\"})) and on(version) label_replace(k3dm_bug_current_release_info{repo=\"$repo\"}, \"version\", \"$1\", \"release\", \"(.*)\") and on() (vector($release_mode) == 1)) or (((sum by (version) (label_replace(k3dm_plan_release_docs{repo=\"$repo\",release=~\"$release\"}, \"version\", \"$1\", \"release\", \"(.*)\")) and on(version) k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"}) or on(version) sum by (version) (0 * k3dm_release_milestone_info{repo=\"$repo\",version=~\"$release\",state!=\"shipped\"})) and on() (vector($release_mode) == 0))",
               "instant": true,
               "format": "table"
             }

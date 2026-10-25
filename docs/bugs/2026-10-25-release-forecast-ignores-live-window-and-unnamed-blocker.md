@@ -1,6 +1,6 @@
 # Bug: Release forecast dates v1.43.7 before its live window, and Target state does not say what is blocked
 
-**Status:** DISPATCHED to Luna 2026-10-25 (after `bug-dashboard-auto-release-selection` landed as `f6e92ffd`)
+**Status:** FIXED 2026-10-25 — `1ce420f6`; pytest 98/98, BATS 32/32, ruff clean, tests 2, 3, 6, 8, 9 red on the pre-fix files. Claude gated Target state on the target being blocked (it showed the blocker even when the target came first). Live E2 pending
 **Priority:** P3
 **Severity:** low — the forecast is optimistic and one stat is ambiguous; no data is wrong
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)

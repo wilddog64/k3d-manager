@@ -319,3 +319,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25 08:05: LANDED agy per-spec F2/F3 be7ef686 (Claude trimmed a no-op refactor, marked the stale target-E assertion update allowed, resolved CHANGELOG rebase conflict). F4 dashboard (Claude) next. Rejected-tokens P3 dispatched to Luna.
 - 2026-10-25 08:25: operator saw Release plans row stuck on v1.43.6 in Auto — Luna's auto-release change missed panels 100–107 (M4). Claude fixed them (Auto/Manual join, row title 'Release plans'), BATS 29/29, test 15 red on pre-fix. Panel 32 to follow after forecast task lands.
 - 2026-10-25: rejected-tokens bug landed as 9d6f6a06 (pytest 91/91, red on pre-fix). Forecast task exited; under review.
+- 2026-10-25: forecast bug landed as 1ce420f6 (Claude fix: Target state blocker gated on target). Remaining releases (panel 32) now follows Release mode; all dashboard release filters done. Both Luna tasks closed; none running.

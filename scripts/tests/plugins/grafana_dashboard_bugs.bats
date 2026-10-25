@@ -86,6 +86,10 @@ import json, sys
 d=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
 p={panel["id"]:panel for panel in d["panels"]}
 organize=next(t for t in p[32]["transformations"] if t["id"]=="organize")["options"]
+for tgt in p[32]["targets"]:
+    e=tgt["expr"]
+    assert 'and on(version) label_replace(k3dm_bug_current_release_info{repo="$repo"}, "version", "$1", "release", "(.*)") and on() (vector($release_mode) == 1)' in e, e
+    assert 'and on() (vector($release_mode) == 0)' in e and '=~"$release"' in e.split("vector($release_mode) == 1")[1], e
 assert organize["renameByName"].get("not_before") == "Not before"
 PY
   [ "${status}" -eq 0 ]
@@ -318,7 +322,7 @@ forecast=by_title["Release forecast"]["gridPos"]["y"]
 assert tiles["y"]+tiles["h"] <= forecast < by_title["Plans"]["gridPos"]["y"]
 table=by_title["Remaining releases"]
 plans_expr=next(t["expr"] for t in table["targets"] if t["refId"]=="E")
-head=plans_expr.split(" or on(version) ",1)[0]
+head=plans_expr.split("vector($release_mode) == 1)) or ",1)[-1].split(" or on(version) ",1)[0]
 assert 'and on(version) k3dm_release_milestone_info{repo="$repo",version=~"$release",state!="shipped"}' in head, head
 for target in table["targets"]:
     assert 'version=~"$release"' in target["expr"], (target["refId"], target["expr"])
