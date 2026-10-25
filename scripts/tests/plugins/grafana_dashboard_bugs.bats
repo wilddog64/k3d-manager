@@ -724,3 +724,20 @@ assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "remaining releases table shows forecast dates only and fits a laptop-width panel" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
+table = {p["id"]: p for p in data["panels"]}[32]
+assert table["gridPos"]["w"] == 24
+props = {o["matcher"].get("options"): {p["id"]: p["value"] for p in o["properties"]} for o in table["fieldConfig"]["overrides"]}
+for field in ("Value #B", "Value #C", "Value #D"):
+    assert props[field]["unit"] == "time:YYYY-MM-DD", field
+widths = {name: p["custom.width"] for name, p in props.items() if "custom.width" in p}
+org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+assert "not_before_reason" not in org["renameByName"] or "Not before reason" not in widths
+assert sum(widths.values()) + 2 * table["fieldConfig"]["defaults"]["custom"]["minWidth"] <= 1100, widths
+PY
+  [ "${status}" -eq 0 ]
+}

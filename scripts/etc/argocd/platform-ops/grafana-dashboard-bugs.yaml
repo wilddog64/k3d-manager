@@ -2546,7 +2546,9 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "minWidth": 80
+              }
             },
             "overrides": [
               {
@@ -2556,8 +2558,12 @@ data:
                 },
                 "properties": [
                   {
+                    "id": "custom.width",
+                    "value": 105
+                  },
+                  {
                     "id": "unit",
-                    "value": "dateTimeAsIso"
+                    "value": "time:YYYY-MM-DD"
                   },
                   {
                     "id": "noValue",
@@ -2572,8 +2578,12 @@ data:
                 },
                 "properties": [
                   {
+                    "id": "custom.width",
+                    "value": 105
+                  },
+                  {
                     "id": "unit",
-                    "value": "dateTimeAsIso"
+                    "value": "time:YYYY-MM-DD"
                   },
                   {
                     "id": "noValue",
@@ -2588,12 +2598,88 @@ data:
                 },
                 "properties": [
                   {
+                    "id": "custom.width",
+                    "value": 105
+                  },
+                  {
                     "id": "unit",
-                    "value": "dateTimeAsIso"
+                    "value": "time:YYYY-MM-DD"
                   },
                   {
                     "id": "noValue",
                     "value": "-"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Position"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Version"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Kind"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "State"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Plans"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 60
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Not before"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 105
                   }
                 ]
               }
