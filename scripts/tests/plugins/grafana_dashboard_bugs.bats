@@ -737,6 +737,7 @@ for field in ("Value #B", "Value #C", "Value #D"):
 widths = {name: p["custom.width"] for name, p in props.items() if "custom.width" in p}
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 assert "not_before_reason" not in org["renameByName"] or "Not before reason" not in widths
+assert [org["renameByName"][k] for k in ("Value #B", "Value #C", "Value #D")] == ["Earliest", "Expected", "Latest"]
 assert sum(widths.values()) + 2 * table["fieldConfig"]["defaults"]["custom"]["minWidth"] <= 1100, widths
 PY
   [ "${status}" -eq 0 ]

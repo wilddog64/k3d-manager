@@ -2525,9 +2525,9 @@ data:
                   "not_before": "Not before",
                   "not_before_reason": "Not before reason",
                   "Value #E": "Plans",
-                  "Value #B": "Forecast \u2014 earliest",
-                  "Value #C": "Forecast \u2014 expected",
-                  "Value #D": "Forecast \u2014 latest"
+                  "Value #B": "Earliest",
+                  "Value #C": "Expected",
+                  "Value #D": "Latest"
                 },
                 "excludeByName": {
                   "repo": true,
