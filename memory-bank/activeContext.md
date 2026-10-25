@@ -364,3 +364,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Fix commit column bug LIVE-VERIFIED (screenshot 296, header SHAs shown).
 - 2026-10-25: bug-dashboard auto release plan LIVE-VERIFIED (screenshots 295/297/298).
 - 2026-10-25: telemetry plan live check found Worker model always unknown (codex.log reports gpt-6-luna, unread) and coordinator undeclarable; filed P3 docs/bugs/2026-10-25-dispatch-worker-model-unknown-despite-runtime-report.md; dispatching to Luna.
+- 2026-10-25: panel 85 correction→correct 15c09b4f (name column sizes to the longest label; all <=8 chars).
