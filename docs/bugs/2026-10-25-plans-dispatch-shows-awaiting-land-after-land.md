@@ -1,6 +1,7 @@
 # Bug: Plans Dispatch shows `awaiting land` for a landed plan when bookkeeping follows the land
 
 **Status:** FIXED 2026-10-25 — fix commit below; pytest `test_dispatch_metrics.py` green, three new state-table cases red on a temp copy of the pre-fix exporter. Live E2 pending the next metrics push.
+**Fix commit:** `6b847dd0`
 **Priority:** P3
 **Severity:** low — one dashboard cell reads a wrong state; no dispatch or landing behaviour is affected
 **Release:** v1.43.7 (bug; does not count toward the five-plan cap)
