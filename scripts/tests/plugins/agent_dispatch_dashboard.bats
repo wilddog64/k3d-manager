@@ -222,7 +222,10 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
     if panel["id"]==83:
       continue
     for field in ("targets","fieldConfig","options"):
-      assert panel.get(field)==old_by_id[panel["id"]].get(field),(panel["id"],field)
+      new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
+      if field=="options" and panel["type"]=="bargauge" and key=="agent-activity.json":
+        new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement")} or None
+      assert new==old_field,(panel["id"],field)
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -277,6 +280,29 @@ assert [o["value"] for o in activity["options"]]==["1d","7d","30d"] and activity
 for file,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
  window=load(file,key)["templating"]["list"][0]
  assert window["type"]=="query" and window["definition"]=="label_values(k3dm_dispatch_landed, window)"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: Claude row fills the width and bar gauge names read beside each bar" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
+panels=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+by_id={p["id"]:p for p in panels}
+claude=[by_id[i] for i in (35,36,37,38,39)]
+assert min(p["gridPos"]["x"] for p in claude)==0
+for p in claude:
+  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 8),(p["id"],p["gridPos"])
+for y in {p["gridPos"]["y"] for p in claude}:
+  assert sum(p["gridPos"]["w"] for p in claude if p["gridPos"]["y"]==y)==24,y
+for p in panels:
+  if p["type"]=="bargauge":
+    assert p.get("options",{}).get("orientation")=="horizontal",p["id"]
+    assert p.get("options",{}).get("namePlacement")=="left",p["id"]
 print("ok")
 PY
   [ "$status" -eq 0 ]
