@@ -380,3 +380,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Remaining releases date-only forecasts + fit widths 4c2e15e0; awaiting-land bug E2 PASSED (screenshot 330).
 - 2026-10-25: Remaining releases forecast headers renamed Earliest/Expected/Latest 891ccc4c.
 - 2026-10-25: v1.43.7 release prep — CHANGELOG promoted, releases rows, not_before dropped, pending live E-items carried forward (roadmap) a9269fc6.
+- 2026-10-25: v1.43.7 release PR #150 opened; Copilot requested; CI pending a7cc8277.
