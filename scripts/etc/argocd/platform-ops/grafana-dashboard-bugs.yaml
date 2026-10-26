@@ -1332,6 +1332,28 @@ data:
               {
                 "matcher": {
                   "id": "byName",
+                  "options": "Dispatch"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "go": {"text": "go", "color": "green"},
+                          "needed": {"text": "needed", "color": "orange"},
+                          "not required": {"text": "not required", "color": "gray"},
+                          "unknown": {"text": "unknown", "color": "yellow"}
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
                   "options": "branch"
                 },
                 "properties": [
@@ -1905,7 +1927,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Blocked by explains why a proposed or ready plan cannot dispatch.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -1948,7 +1970,8 @@ data:
                   "job": true,
                   "instance": true,
                   "version": true,
-                  "slug": true
+                  "slug": true,
+                  "depends_on_path": true
                 },
                 "indexByName": {
                   "release": 0,
@@ -1956,11 +1979,16 @@ data:
                   "plan": 2,
                   "title": 3,
                   "depends_on": 4,
-                  "execution": 5,
-                  "verification": 6,
-                  "approval": 7,
-                  "dispatch_state": 8,
-                  "slug": 9
+                  "wave": 5,
+                  "wave_note": 6,
+                  "overlaps": 7,
+                  "blocked_by": 8,
+                  "execution": 9,
+                  "verification": 10,
+                  "approval": 11,
+                  "dispatch_approval": 12,
+                  "dispatch_state": 13,
+                  "slug": 14
                 },
                 "renameByName": {
                   "release": "Release",
@@ -1968,10 +1996,15 @@ data:
                   "plan": "Plan",
                   "title": "Title",
                   "depends_on": "Depends on",
+                  "wave": "Wave",
+                  "wave_note": "Wave note",
+                  "overlaps": "Overlaps",
+                  "blocked_by": "Blocked by",
                   "execution": "Execution",
                   "verification": "Verification",
-                  "approval": "Approval",
-                  "dispatch_state": "Dispatch",
+                  "approval": "Spec approval",
+                  "dispatch_approval": "Dispatch",
+                  "dispatch_state": "Dispatch task",
                   "slug": "Dispatch task"
                 }
               }
@@ -1985,7 +2018,7 @@ data:
                   "type": "auto"
                 },
                 "inspect": false,
-                "minWidth": 90
+                "minWidth": 45
               }
             },
             "overrides": [
@@ -2014,6 +2047,16 @@ data:
                   {
                     "id": "custom.width",
                     "value": 160
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open first dependency plan",
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.depends_on_path}.md",
+                        "targetBlank": true
+                      }
+                    ]
                   }
                 ]
               },
@@ -2062,7 +2105,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch"
+                  "options": "Dispatch task"
                 },
                 "properties": [
                   {
@@ -2694,6 +2737,16 @@ data:
               }
             ]
           }
+        },
+        {
+          "id": 108,
+          "type": "stat",
+          "title": "Undeclared plan overlaps",
+          "description": "Count of same-release plan pairs sharing Component paths without a dependency.",
+          "gridPos": {"x": 0, "y": 70, "w": 4, "h": 4},
+          "targets": [{"refId": "A", "expr": "sum((k3dm_plan_undeclared_overlaps{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
+          "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     }

@@ -197,14 +197,39 @@ def _plan_approval(text, release):
     match = re.search(r"^\*\*Approval:\*\*\s*(.*?)\s*$", text, re.MULTILINE | re.IGNORECASE)
     if not match:
         return "none"
-    return "pending" if match.group(1).lower().startswith("pending") else "explicit"
+    return "pending" if match.group(1).lower().startswith("pending") else "approved"
+
+
+def _plan_header(text, name):
+    match = re.search(r"^\*\*" + re.escape(name) + r":\*\*\s*(.*?)\s*$", text,
+                     re.MULTILINE | re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _plan_clean(value, limit=120):
+    value = re.sub(r'["\\\x00-\x1f\x7f]+', " ", value)
+    value = " ".join(value.split())
+    return value[:limit]
+
+
+def _plan_dispatch(text):
+    value = _plan_header(text, "Dispatch")
+    match = re.match(r"(go|needed|not required)\b", value, re.IGNORECASE)
+    return match.group(1).lower() if match else "unknown"
+
+
+def _plan_has_branch(root, release):
+    branch = f"k3d-manager-{release}"
+    result = subprocess.run(["git", "-C", str(root), "branch", "-a", "--list", branch,
+                            f"origin/{branch}"], capture_output=True, text=True, check=False)
+    return any(line.strip().lstrip("* ").removeprefix("remotes/") in
+               (branch, f"origin/{branch}") for line in result.stdout.splitlines())
 
 
 def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     texts = _plan_texts(root, ref) if texts is None else texts
     info, counts, skipped = [], defaultdict(int), 0
     branch = _scan_branch(root, ref)
-    plans = {}
     parsed = []
     for path, text in texts.items():
         match = _PLAN_FILE_RE.fullmatch(Path(path).name)
@@ -218,43 +243,143 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
         heading = _HEADING_RE.search(text)
         title = heading.group(1) if heading else match.group(4).replace("-", " ")
         title = re.sub(r"^v\d+\.\d+\.\d+\s*[—–:-]\s*", "", title, flags=re.IGNORECASE)
-        title = re.sub(r'["\\\t\r\n]+', " ", title.replace("`", "").replace("*", ""))
-        title = " ".join(title.split())
+        title = _plan_clean(title.replace("`", "").replace("*", ""))
         if len(title) > 120:
             title = title[:119] + "…"
-        order = _release_order(release)
+        order_label = _release_order(release)
         approval = _plan_approval(text, release)
-        release_line = re.search(
-            r"^\*\*Release:\*\*\s*v\d+\.\d+\.\d+\s*\(plan\s+(\d+)\s+of\b",
-            text, re.MULTILINE | re.IGNORECASE)
+        release_line = re.search(r"^\*\*Release:\*\*\s*v\d+\.\d+\.\d+\s*\(plan\s+(\d+)\s+of\b",
+                                 text, re.MULTILINE | re.IGNORECASE)
         plan_order = release_line.group(1) if release_line else ""
-        if plan_order:
-            plans[plan] = (release, plan_order)
-        depends_line = re.search(r"^\*\*Depends on:\*\*.*$", text,
-                                 re.MULTILINE | re.IGNORECASE)
-        paths = []
+        dependencies = []
+        depends_line = re.search(r"^\*\*Depends on:\*\*.*$", text, re.MULTILINE | re.IGNORECASE)
         if depends_line:
             for dependency in re.findall(r"`(docs/plans/[^`]+\.md)`", depends_line.group(0)):
                 stem = Path(dependency).stem
-                if stem not in paths:
-                    paths.append(stem)
-        parsed.append((release, plan, title, execution, verification, approval,
-                       plan_order, paths))
-        counts[(release, order, execution, verification)] += 1
-    for release, plan, title, execution, verification, approval, plan_order, paths in parsed:
-        dependencies = []
-        for stem in paths:
-            dependency = plans.get(stem)
-            if dependency and dependency[0] == release:
-                dependencies.append(f"plan {dependency[1]}")
-            else:
-                dependencies.append(stem)
-        depends_on = ", ".join(dependencies) if dependencies else "-"
-        depends_on = re.sub(r'["\\\t\r\n]+', " ", depends_on)
-        depends_on = " ".join(depends_on.split())
-        info.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{release}",release_order="{_release_order(release)}",plan="{plan}",title="{title}",execution="{execution}",verification="{verification}",approval="{approval}",order="{plan_order}",depends_on="{depends_on}"}} 1')
-    lines = info + [f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
-                    for (release, order, execution, verification), count in sorted(counts.items())]
+                if stem not in dependencies:
+                    dependencies.append(stem)
+        component_line = _plan_header(text, "Component")
+        files = list(dict.fromkeys(re.findall(r"`([^`]+)`", component_line)))
+        wave_header = _plan_header(text, "Wave")
+        wave_match = re.match(r"(\d+)\s*[—–-]?\s*(.*)", wave_header)
+        declared_wave = int(wave_match.group(1)) if wave_match else None
+        wave_note = _plan_clean(wave_match.group(2), 80) if wave_match else "-"
+        parsed.append(dict(release=release, plan=plan, title=title, execution=execution,
+                           verification=verification, approval=approval, plan_order=plan_order,
+                           dependencies=dependencies, files=files, declared_wave=declared_wave,
+                           wave_note=wave_note, dispatch=_plan_dispatch(text)))
+        counts[(release, order_label, execution, verification)] += 1
+    by_stem = {p["plan"]: p for p in parsed}
+    for p in parsed:
+        same_deps = [by_stem[s] for s in p["dependencies"] if s in by_stem and
+                     by_stem[s]["release"] == p["release"]]
+        p["same_deps"] = same_deps
+
+    visiting, visited = set(), set()
+    def derive(p):
+        key = p["plan"]
+        if not p["plan_order"]:
+            p["wave"], p["cycle"] = "-", False
+            return 0
+        if key in visiting:
+            return None
+        if key in visited:
+            return p.get("wave") if isinstance(p.get("wave"), int) else None
+        visiting.add(key)
+        values = [derive(dep) for dep in p["same_deps"]]
+        cycle = any(value is None for value in values)
+        visiting.remove(key)
+        visited.add(key)
+        if cycle:
+            p["wave"], p["cycle"] = "cycle", True
+            p["derived_wave"] = None
+            return None
+        derived = 1 + max(values, default=0)
+        p["derived_wave"], p["cycle"] = derived, False
+        if p["declared_wave"] is not None and p["declared_wave"] < derived:
+            p["wave_note"] = _plan_clean(
+                f"declared {p['declared_wave']} < required {derived}", 80)
+            p["wave"] = derived
+        else:
+            p["wave"] = max(derived, p["declared_wave"] or derived)
+        return p["wave"]
+    for p in parsed:
+        derive(p)
+    # Mark every member that can reach a detected cycle, including the cycle itself.
+    for p in parsed:
+        if p["plan_order"] and p.get("derived_wave") is None:
+            p["wave"] = "cycle"
+
+    def depends_transitively(source, target, seen=None):
+        seen = set() if seen is None else seen
+        if source["plan"] in seen:
+            return False
+        seen.add(source["plan"])
+        return any(dep is target or depends_transitively(dep, target, seen)
+                   for dep in source["same_deps"])
+
+    overlap_counts = defaultdict(int)
+    for p in parsed:
+        overlap_counts[p["release"]] += 0
+    for p in parsed:
+        p["overlap_items"] = []
+    for i, left in enumerate(parsed):
+        for right in parsed[i + 1:]:
+            if left["release"] != right["release"] or not left["plan_order"] or not right["plan_order"]:
+                continue
+            if depends_transitively(left, right) or depends_transitively(right, left):
+                continue
+            shared = next((a if not a.endswith("/") else b for a in left["files"]
+                           for b in right["files"] if a == b or
+                           (a.endswith("/") and b.startswith(a)) or
+                           (b.endswith("/") and a.startswith(b))), None)
+            if shared:
+                left["overlap_items"].append(f"plan {right['plan_order']}: {shared}")
+                right["overlap_items"].append(f"plan {left['plan_order']}: {shared}")
+                overlap_counts[left["release"]] += 1
+    lines = []
+    branch_cut = {}
+    for p in parsed:
+        deps = [by_stem[s] for s in p["dependencies"] if s in by_stem]
+        depends_on = ", ".join(
+            f"plan {by_stem[s]['plan_order']}" if s in by_stem and
+            by_stem[s]["release"] == p["release"] and by_stem[s]["plan_order"] else s
+            for s in p["dependencies"]) or "-"
+        depends_on = _plan_clean(depends_on)
+        depends_on_path = p["dependencies"][0] if p["dependencies"] else ""
+        overlap = "; ".join(p["overlap_items"][:3]) or "-"
+        if len(p["overlap_items"]) > 3:
+            overlap += f" +{len(p['overlap_items']) - 3} more"
+        overlap = _plan_clean(overlap, 500)
+        blockers = []
+        dispatchable = p["execution"] in ("proposed", "ready")
+        if dispatchable:
+            if p["release"] not in branch_cut:
+                branch_cut[p["release"]] = _plan_has_branch(root, p["release"])
+            if not branch_cut[p["release"]]:
+                blockers.append("branch not cut")
+            for dep in deps:
+                if dep["execution"] != "implemented":
+                    label = (f"plan {dep['plan_order']}" if dep["release"] == p["release"] and dep["plan_order"]
+                             else dep["plan"])
+                    blockers.append(f"{label} not landed")
+                    break
+            if p["dispatch"] == "unknown":
+                blockers.append("dispatch approval unknown")
+            elif p["dispatch"] == "needed":
+                blockers.append("dispatch go needed")
+            if p["wave_note"] != "-":
+                blockers.append("wave note")
+        if not dispatchable:
+            blocked = "-"
+        else:
+            blocked = "; ".join(blockers[:3]) if blockers else "ready to dispatch"
+        dispatch = p["dispatch"]
+        lines.append(f'k3dm_plan_info{{repo="{repo}",branch="{branch}",release="{p["release"]}",release_order="{_release_order(p["release"])}",plan="{p["plan"]}",title="{p["title"]}",execution="{p["execution"]}",verification="{p["verification"]}",approval="{p["approval"]}",dispatch_approval="{dispatch}",order="{p["plan_order"]}",depends_on="{depends_on}",depends_on_path="{depends_on_path}",wave="{p["wave"]}",wave_note="{p["wave_note"]}",overlaps="{overlap}",blocked_by="{_plan_clean(blocked, 120)}"}} 1')
+    lines.extend(f'k3dm_plan_undeclared_overlaps{{repo="{repo}",release="{release}"}} {count}'
+                 for release, count in sorted(overlap_counts.items()))
+    lines.extend(f'k3dm_plan_release_docs{{repo="{repo}",release="{release}",release_order="{order}",execution="{execution}",verification="{verification}"}} {count}'
+                 for (release, order, execution, verification), count in sorted(counts.items()))
     lines.extend([f'k3dm_plan_info_skipped{{repo="{repo}"}} {skipped}',
                   f'k3dm_plan_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}'])
     return "\n".join(lines) + "\n"

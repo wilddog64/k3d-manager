@@ -77,7 +77,7 @@ def test_plan_state_leading_status_only(metrics, status, expected):
 
 
 def test_plan_approval_and_plan_metrics(metrics, tmp_path):
-    assert metrics._plan_approval("**Approval:** explicit by operator", "v1.43.5") == "explicit"
+    assert metrics._plan_approval("**Approval:** explicit by operator", "v1.43.5") == "approved"
     assert metrics._plan_approval("**Approval:** pending — review", "v1.43.5") == "pending"
     assert metrics._plan_approval("", "v1.43.5") == "none"
     assert metrics._plan_approval("", "v1.43.1") == "n/a"
@@ -90,11 +90,84 @@ def test_plan_approval_and_plan_metrics(metrics, tmp_path):
     output = metrics._plan_metrics(tmp_path, texts=docs)
     rows = [line for line in output.splitlines() if line.startswith("k3dm_plan_info{")]
     assert len(rows) == 3
-    assert 'plan="v1.43.5-a",title="Foo",execution="ready",verification="n/a",approval="explicit"' in rows[0]
+    assert 'plan="v1.43.5-a",title="Foo",execution="ready",verification="n/a",approval="approved"' in rows[0]  # agent-audit: allow assert-removed spec W5 renames approval value explicit to approved
     assert 'title="A quoted title"' in rows[1]
     assert metrics._release_order("v1.43.5") in rows[0]
     assert 'k3dm_plan_info_skipped{repo="k3d-manager"} 1' in output
     assert 'release="v1.43.5"' in output and 'execution="ready",verification="n/a"} 1' in output
+
+
+def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.50.0-a.md": "# A\n**Release:** v1.50.0 (plan 1 of 8)\n**Status:** IMPLEMENTED\n**Component:** `scripts/shared/`\n",
+        "docs/plans/v1.50.0-b.md": "# B\n**Release:** v1.50.0 (plan 2 of 8)\n**Depends on:** `docs/plans/v1.50.0-a.md`\n**Component:** `scripts/shared/file.sh`\n",
+        "docs/plans/v1.50.0-c.md": "# C\n**Release:** v1.50.0 (plan 3 of 8)\n**Depends on:** `docs/plans/v1.50.0-b.md`\n**Component:** `scripts/c.sh`\n**Wave:** 6 — " + 'x' * 100 + ' "quoted"\n',
+        "docs/plans/v1.50.0-d.md": "# D\n**Release:** v1.50.0 (plan 4 of 8)\n**Depends on:** `docs/plans/v1.50.0-c.md`\n**Wave:** 1 — too early\n",
+        "docs/plans/v1.50.0-e.md": "# E\n**Release:** v1.50.0 (plan 5 of 8)\n**Depends on:** `docs/plans/v1.50.0-f.md`\n",
+        "docs/plans/v1.50.0-f.md": "# F\n**Release:** v1.50.0 (plan 6 of 8)\n**Depends on:** `docs/plans/v1.50.0-e.md`\n",
+        "docs/plans/v1.50.0-g.md": "# G\n**Release:** v1.50.0 (plan 7 of 8)\n**Status:** READY\n**Approval:** approved to file spec — dispatch not yet approved\n**Component:** `scripts/c.sh`\n**Dispatch:** needed — wait\n",
+        "docs/plans/v1.50.0-h.md": "# H\n**Release:** v1.50.0 (plan 8 of 8)\n**Status:** READY\nOnly mentions `scripts/c.sh` in body.\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'wave="1"' in rows["v1.50.0-a"]
+    assert 'wave="2"' in rows["v1.50.0-b"]
+    assert 'wave="6"' in rows["v1.50.0-c"]
+    assert 'wave="7",wave_note="declared 1 < required 7"' in rows["v1.50.0-d"]
+    assert 'wave="cycle"' in rows["v1.50.0-e"] and 'wave="cycle"' in rows["v1.50.0-f"]
+    assert 'overlaps="plan 7: scripts/c.sh"' in rows["v1.50.0-c"]
+    assert 'overlaps="plan 3: scripts/c.sh"' in rows["v1.50.0-g"]
+    assert 'overlaps="-"' in rows["v1.50.0-h"]
+    assert 'approval="approved",dispatch_approval="needed"' in rows["v1.50.0-g"]
+    assert 'dispatch_approval="unknown"' in rows["v1.50.0-h"]
+    assert 'blocked_by="branch not cut; dispatch go needed"' in rows["v1.50.0-g"]
+    assert len(re.search(r'wave_note="([^"]*)"', rows["v1.50.0-c"]).group(1)) <= 80
+    assert 'k3dm_plan_undeclared_overlaps{repo="k3d-manager",release="v1.50.0"} 1' in output
+
+
+def test_plan_overlap_cap_and_blocker_branches(metrics, tmp_path):
+    docs = {}
+    for number in range(1, 7):
+        stem = f"v1.51.0-p{number}"
+        docs[f"docs/plans/{stem}.md"] = (
+            f"# P{number}\n**Release:** v1.51.0 (plan {number} of 6)\n"
+            "**Status:** READY\n**Dispatch:** go\n**Component:** `shared/file`\n"
+        )
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    first = rows["v1.51.0-p1"]
+    assert 'blocked_by="branch not cut"' in first
+    assert 'overlaps="plan 2: shared/file; plan 3: shared/file; plan 4: shared/file +2 more"' in first
+    assert len(re.search(r'overlaps="([^"]*)"', first).group(1).split("; ")) == 3
+
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.51.0", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
+    (tmp_path / "seed").write_text("seed")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "seed"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "seed"], check=True)
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    first = next(line for line in output.splitlines()
+                 if line.startswith("k3dm_plan_info{") and 'plan="v1.51.0-p1"' in line)
+    assert 'blocked_by="ready to dispatch"' in first
+
+
+def test_plan_blocked_by_only_for_undispatched_and_cross_release_uses_stem(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.52.0-dep.md": "# Dep\n**Release:** v1.52.0 (plan 2 of 2)\n**Status:** PROPOSED\n**Dispatch:** go\n",
+        "docs/plans/v1.52.0-done.md": "# Done\n**Release:** v1.52.0 (plan 1 of 2)\n**Status:** IMPLEMENTED\n**Dispatch:** go\n",
+        "docs/plans/v1.53.0-run.md": "# Run\n**Release:** v1.53.0 (plan 1 of 2)\n**Status:** IN PROGRESS\n**Dispatch:** go\n",
+        "docs/plans/v1.53.0-next.md": ("# Next\n**Release:** v1.53.0 (plan 2 of 2)\n**Status:** PROPOSED\n"
+                                       "**Dispatch:** go\n**Depends on:** `docs/plans/v1.52.0-dep.md`\n"),
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'blocked_by="-"' in rows["v1.52.0-done"]
+    assert 'blocked_by="-"' in rows["v1.53.0-run"]
+    assert 'blocked_by="branch not cut; v1.52.0-dep not landed"' in rows["v1.53.0-next"]
 
 
 def test_plan_info_carries_the_scanned_branch_for_doc_links(metrics, tmp_path):

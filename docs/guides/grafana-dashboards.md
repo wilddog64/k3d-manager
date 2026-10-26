@@ -42,9 +42,15 @@ In the Bugs table, **Fix commit** comes from the bug doc's **Fix commit:** heade
 
 ### Release plans
 
-The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Release:**`, and `**Depends on:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
+The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Dispatch:**`, `**Release:**`, `**Depends on:**`, `**Wave:**`, and `**Component:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
 
-The **Order** column comes from the plan number on each document's `**Release:**` line, and **Depends on** lists the plan paths from its `**Depends on:**` line. A plan whose dependency has not been implemented is not ready to dispatch.
+The **Order** column comes from the plan number on each document's `**Release:**` line. **Depends on** lists the referenced plans and links to the first dependency's spec on the scanned branch. A plan whose dependency has not been implemented is not ready to dispatch. **Wave** is calculated from same-release dependencies: independent plans start at 1, and each dependent plan follows the highest dependency wave. A cycle displays `cycle`. A declared `**Wave:** <n> — <reason>` can postpone a plan; it cannot make it earlier. **Wave note** shows the sanitized reason (up to 80 characters), or reports when the declared number is earlier than required.
+
+**Overlaps** flags same-release plans that share a path listed on their `**Component:**` lines and have no direct or transitive dependency. Directory paths ending in `/` cover paths below them. To clear an overlap, add the real prerequisite to `**Depends on:**`; if the shared work is intentionally independent, record the accepted overlap in the plan body. The table continues to flag accepted overlaps by design. Keep `**Component:**` complete: detection reads only that header, not paths mentioned elsewhere in the document. The Undeclared plan overlaps stat counts conflicting pairs for the selected releases.
+
+**Spec approval** reports `approved`, `pending`, `none`, or `n/a` from `**Approval:**`. **Dispatch** reports only the explicit `**Dispatch:**` header (`go`, `needed`, `not required`, or `unknown`); approval prose does not grant dispatch approval. **Blocked by** explains dispatch readiness, including a missing release branch, unlanded prerequisites, missing dispatch go, and declared timing notes. It applies only to `proposed` and `ready` plans; plans already in progress or landed show `-`. A same-release prerequisite reads `plan <n> not landed`; a prerequisite from another release is named by its stem. Unknown dispatch approval is never treated as ready.
+
+When filing a plan, keep `**Component:**` complete with every touched file or directory in backticks. The overlap scanner intentionally uses this line alone.
 
 | Status starts with | Execution | Verification |
 |---|---|---|

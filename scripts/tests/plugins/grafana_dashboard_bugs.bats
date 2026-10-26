@@ -363,7 +363,7 @@ d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['id']==100)
 assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
-assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27, 70]
 assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
@@ -389,7 +389,7 @@ import json, sys
 from pathlib import Path
 data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 table=next(p for p in data['panels'] if p['id']==107)
-assert table['description']=="Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line."
+assert "Wave note" in table['description'] and "Overlaps" in table['description'] and "Blocked by" in table['description']
 transforms=table['transformations']
 convert=next(i for i,t in enumerate(transforms) if t['id']=='convertFieldType')
 organize=next(i for i,t in enumerate(transforms) if t['id']=='organize')
@@ -399,7 +399,19 @@ options=transforms[organize]['options']
 assert options['indexByName']['order']==1
 assert options['renameByName']['order']=='Order'
 assert options['renameByName']['depends_on']=='Depends on'
+assert options['renameByName']['wave']=='Wave'
+assert options['renameByName']['wave_note']=='Wave note'
+assert options['renameByName']['overlaps']=='Overlaps'
+assert options['renameByName']['blocked_by']=='Blocked by'
+assert options['renameByName']['approval']=='Spec approval'
+assert options['renameByName']['dispatch_approval']=='Dispatch'
+assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
+           for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
+           for p in o['properties'])
 assert table['options']['sortBy']==[{'displayName':'Order','desc':False}]
+overlap=next(p for p in data['panels'] if p['id']==108)
+assert overlap['title']=='Undeclared plan overlaps'
+assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
 assert order_props['custom.width']==70 and order_props['noValue']=='-'
@@ -665,7 +677,7 @@ organize=next(t for t in panel["transformations"] if t["id"]=="organize")
 exclude=organize["options"]["excludeByName"]
 assert "release" not in exclude
 links=next(prop["value"] for override in panel["fieldConfig"]["overrides"]
-           if override["matcher"]["options"] == "Dispatch"
+           if override["matcher"]["options"] == "Dispatch task"
            for prop in override["properties"] if prop["id"] == "links")
 assert links[0]["url"] == "/d/k3dm-agent-dispatch?var-window=${__data.fields.release}"
 assert any(item.get("url") == "/d/k3dm-agent-dispatch" for item in d["links"])
@@ -717,7 +729,7 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 300 and widths["Dispatch"] >= 150, widths
+assert widths["Title"] >= 300 and widths["Dispatch task"] >= 150, widths
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
 assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)
