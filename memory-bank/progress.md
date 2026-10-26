@@ -647,3 +647,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: M2 = 16GB/1TB, operator's daily browsing + Grafana machine.
 - 2026-10-25: operator SSHes from M2 into M4 (tmux work + Claude sessions run on M4).
 - 2026-10-25: agreed layout — M5 hub + Claude + tmux; M4 worker (Luna, tests, ACG); M2 console (browse/Grafana/SSH, maybe off-hub snapshot copies). One setup command per role. Spec after laptop arrives 10-28.
+- 2026-10-25: Release-row P3 landed c567cc68 (Claude fixed Manual/All tile to ${release:text}); E2 screenshot pending after ArgoCD sync.
