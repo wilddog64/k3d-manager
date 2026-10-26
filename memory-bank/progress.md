@@ -640,3 +640,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: Dashboard fit round 2 56f0007d — Plans value columns widened, Per spec fixed widths + headers Dispatch → land / Exit → land.
 - 2026-10-25: Dashboard fit round 3 373db9a3. Operator ran restart-webhook + snapshot-schedule from tmux; hub-snapshot agent loaded (Sun 02:30), webhook PID up.
 - 2026-10-25: 1aa97d29 overlaps stat w=6. Round 3 widths confirmed live in ConfigMap; E5 plans table read from operator screenshots: values correct (4 implemented/landed, Hostinger dispatch go needed + wave note, 0 undeclared overlaps).
+- 2026-10-25: release-duration E2 live-verified on dashboard (v1.43.4 span 1.74d = 2506 min, active 1.06h = 63.4 min); spec b80edd9b. Remaining wave-1 live evidence: slack E-live (next alert analysis in status channel).
