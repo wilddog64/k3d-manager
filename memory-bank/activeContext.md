@@ -447,3 +447,5 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-26: operator explicitly dispatched fix for docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md via k3dm-codex-dispatch; bounded credential reuse to one in-memory lookup per evaluation, offline-only tests, no live pytest/restart/deploy. Task slug vectordb-retrieval-key-cache; awaiting worker.
 
 - 2026-10-26: v1.43.9 credential-reuse fix dispatch running as `vectordb-retrieval-key-cache-retry2` from the approved P2 issue. Worker status: running, scope in-scope. Initial start failures (missing codex/node PATH) and the Files-heading parser correction recorded in the issue doc.
+
+- 2026-10-26: credential-reuse fix LANDED `8237c54d` via `k3dm-codex-dispatch` (issue/task `vectordb-retrieval-key-cache-retry2`). Reuses one in-memory API key per probe/live evaluation; standalone search retains prior lookup. Gates: prior_art/retrieval pytest 105 passed, 1 live skipped; VectorDB+negation BATS 18/18; Ruff clean; manifests 85/85; audit and diff checks passed. Live verification pending deploy + Hermes restart (explicitly excluded from dispatched task).

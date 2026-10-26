@@ -1,6 +1,6 @@
 # VectorDB retrieval dashboard stays empty during probe
 
-**Status:** OPEN — **Priority:** P2
+**Status:** FIXED in branch; offline verified; live verification pending — **Priority:** P2
 **Date:** 2026-10-26
 **Release:** v1.43.9
 **Approval:** explicit 2026-10-26 (operator: "can you dispatch the fix?")
@@ -114,3 +114,27 @@ After abandoning those failed startup attempts, the dispatcher was relaunched wi
 `PATH=/opt/homebrew/bin:$PATH` and `K3DM_CODEX_BIN=/opt/homebrew/bin/codex`.
 Run `vectordb-retrieval-key-cache-retry2` started successfully and reported
 `state: running`, `scope: in-scope`.
+
+
+## Offline fix landed — 2026-10-26
+
+**Status:** FIXED in branch; offline verified; live verification pending.
+**Commit:** `8237c54d` (`fix(vectordb): reuse embeddings key during retrieval evaluation`)
+
+The Hermes probe and the opt-in live pytest now resolve the API credential once at the start
+of an evaluation and pass it to each query embedding. Standalone searches retain their prior
+credential lookup behavior. The key stays in memory for the evaluation and is not added to
+the process environment, child command arguments, logs, or metrics.
+
+Verification:
+
+- `pytest scripts/tests/bin/test_prior_art.py scripts/tests/bin/test_retrieval_probe.py scripts/tests/bin/test_find_similar_docs.py -q`: 105 passed, 1 skipped (live-only).
+- Focused VectorDB and negation guard BATS: 18/18 passed.
+- Ruff: `All checks passed!`
+- `make validate-manifests`: 85 valid, 0 invalid, 0 errors.
+- Dispatcher landing gate and `git diff --check`: passed.
+
+Live verification is pending because the m4-air Hermes LaunchAgent process still has the old
+module loaded. Restart Hermes after deploying the pushed commit, then wait for a successful or
+no-op index refresh and probe completion. Confirm `retrieval_probe_last_attempt` advances and
+the `k3dm-vectordb-retrieval` metrics appear before checking Grafana.
