@@ -1,5 +1,7 @@
 # Codex dispatch
 
+For component relationships, trust boundaries, task lifecycle, and Mermaid diagrams, see the [Codex Dispatch architecture](../architecture/codex-dispatch.md).
+
 `bin/k3dm-codex-dispatch` gives each spec a separate worktree and task branch. Run it from a clean, pushed release branch:
 
 ```bash
