@@ -153,6 +153,15 @@ test command, and fast-forwards the target. It prints the push command; it never
 The Agent Dispatch ledger and Per spec table identify the work repository by its origin repository
 name.
 
+Dispatch start events snapshot spec complexity from the spec as it exists at dispatch: entries in
+`## Files` and the `must`, `must_not`, and `evidence` item counts in `## Acceptance`, including live
+evidence. Land events record the landed commit and the rebased task diff's changed-file count and
+added-plus-deleted lines. Test paths are under `scripts/tests/` or named `test_*.py` / `*.bats`;
+documentation paths are under `docs/` or `memory-bank/`, plus Markdown files; remaining paths are
+code. Binary files count as changed files and contribute no lines. These are separate size measures,
+not a combined complexity score. Missing spec sections and failed measurements stay blank. Specs
+landed before this measurement shipped are not backfilled.
+
 ## agy (Gemini 4 Argon)
 
 Use `make codex-dispatch SPEC=docs/plans/example.md AGENT=agy` to run a spec on agy. The default model is `gemini-4-argon-medium`; pass `MODEL=<id>` to select another model. The dispatcher checks the requested model against `agy models` before creating the task worktree. `AGENT` and `MODEL` are optional; omitting both keeps the existing Codex command.

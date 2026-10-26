@@ -44,6 +44,35 @@ def _prices(path):
         return {}, {}, None, {}
 
 
+def _spec_stats(path):
+    """Count declared spec scope and acceptance items without affecting dispatch."""
+    result = {"files": None, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError, TypeError):
+        return result
+    match = re.search(r"(?ms)^## Files\s*\n(.*?)(?=^## |\Z)", text)
+    if match:
+        body = match.group(1)
+        bullets = re.findall(r"(?m)^\s*[-*+]\s+", body)
+        rows = [line for line in body.splitlines() if line.strip().startswith("|")]
+        table_rows = [line for line in rows if not re.match(r"\s*\|\s*:?-{2,}", line)]
+        table_count = max(0, len(table_rows) - 1)
+        result["files"] = len(bullets) + table_count
+    acceptance = re.search(r"(?ms)^## Acceptance\s*\n```ya?ml\s*\n(.*?)^```", text)
+    if acceptance:
+        body = acceptance.group(1)
+        for key in ("must", "must_not", "evidence"):
+            section = re.search(rf"(?ms)^{key}:\s*\n(.*?)(?=^[A-Za-z_][A-Za-z0-9_]*:|\Z)", body)
+            if section:
+                items = re.findall(r"(?m)^\s+-\s+id\s*:", section.group(1))
+                result[key] = len(items)
+        if result["evidence"] is not None:
+            evidence_section = re.search(r"(?ms)^evidence:\s*\n(.*?)(?=^[A-Za-z_][A-Za-z0-9_]*:|\Z)", body)
+            result["live_evidence"] = len(re.findall(r"(?m)^\s+kind:\s*live\s*$", evidence_section.group(1))) if evidence_section else 0
+    return result
+
+
 def _claude_rollup(projects_dir, cache_path, context_out=None):
     cache = {"offsets": {}, "records": {}}
     try:
@@ -1166,6 +1195,63 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
         _render_release_duration(lines, window, scoped)
+    complexity = {}
+    complexity_events = source_events if time_scope else scoped
+    for task_events in _task_states(complexity_events).values():
+        starts = [event for event in task_events if event.get("event") == "start"]
+        lands = [event for event in task_events if event.get("event") == "land"]
+        if time_scope and not any(cutoff is None or land.get("ts", 0) >= cutoff for land in lands):
+            continue
+        if not time_scope and not lands:
+            continue
+        if not starts or not lands:
+            continue
+        start = max(starts, key=lambda event: event.get("ts", 0))
+        land = max(lands, key=lambda event: event.get("ts", 0))
+        key = (land.get("version"), land.get("slug"))
+        if not isinstance(key[0], str) or not VERSION_RE.fullmatch(key[0]) or not isinstance(key[1], str) or not SLUG_RE.fullmatch(key[1]):
+            continue
+        complexity[key] = (start.get("spec_stats"), land.get("change"))
+    measured_specs = []
+    measured_acceptance = []
+    measured_changes = []
+    shown_complexity = []
+    shown_task_keys = {(task[1], task[2]) for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True)[:TASK_CAP]}
+    for (version, slug), (spec_stats, change) in sorted(complexity.items(), key=lambda item: item[0], reverse=True):
+        repo = next((event.get("repo") for event in scoped if event.get("slug") == slug and event.get("version") == version and event.get("event") == "land"), "k3d-manager")
+        repo = repo if isinstance(repo, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo) else "k3d-manager"
+        labels = f'window="{window}",version="{version}",slug="{slug}",repo="{repo}"'
+        if isinstance(spec_stats, dict):
+            files, must, must_not = spec_stats.get("files"), spec_stats.get("must"), spec_stats.get("must_not")
+            if type(files) is int and files >= 0:
+                measured_specs.append(spec_stats)
+            if (version, slug) in shown_task_keys and type(files) is int and files >= 0:
+                lines.append(f'k3dm_dispatch_task_spec_files{{{labels}}} {files}')
+            if type(must) is int and must >= 0 and type(must_not) is int and must_not >= 0:
+                measured_acceptance.append(must + must_not)
+                if (version, slug) in shown_task_keys:
+                    lines.append(f'k3dm_dispatch_task_spec_acceptance_items{{{labels}}} {must + must_not}')
+        if isinstance(change, dict) and type(change.get("files")) is int and change["files"] >= 0:
+            values = {kind: change.get(kind) for kind in ("code", "tests", "docs")}
+            if all(type(value) is int and value >= 0 for value in values.values()):
+                measured_changes.append((change["files"], values))
+                shown_complexity.append((change["files"], values))
+                if (version, slug) in shown_task_keys:
+                    lines.append(f'k3dm_dispatch_task_change_files{{{labels}}} {change["files"]}')
+                    for kind, value in values.items():
+                        lines.append(f'k3dm_dispatch_task_change_lines{{{labels},kind="{kind}"}} {value}')
+    lines.append(f'k3dm_dispatch_complexity_measured_tasks{{window="{window}",measure="spec"}} {len(measured_specs)}')
+    lines.append(f'k3dm_dispatch_complexity_measured_tasks{{window="{window}",measure="change"}} {len(measured_changes)}')
+    if measured_acceptance:
+        lines.append(f'k3dm_dispatch_spec_acceptance_items_total{{window="{window}"}} {sum(measured_acceptance)}')
+    if measured_changes:
+        for kind in ("code", "tests", "docs"):
+            lines.append(f'k3dm_dispatch_change_lines_total{{window="{window}",kind="{kind}"}} {sum(item[1][kind] for item in measured_changes)}')
+        lines.append(f'k3dm_dispatch_change_files_total{{window="{window}"}} {sum(item[0] for item in measured_changes)}')
+        totals = sorted(sum(item[1].values()) for item in measured_changes)
+        mid = len(totals) // 2
+        median = totals[mid] if len(totals) % 2 else (totals[mid - 1] + totals[mid]) / 2
+        lines.append(f'k3dm_dispatch_change_lines_median{{window="{window}"}} {median:g}')
     markers = [event for event in source_events if event.get("event") == "intervention_coverage_start"]
     if markers:
         marker_ts = min(event["ts"] for event in markers)
@@ -1635,6 +1721,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument("--spec-stats", metavar="PATH")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--prices", default=str(_repo_root() / "scripts/etc/agent/codex-model-prices.json"))
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
@@ -1642,6 +1729,9 @@ def main(argv=None):
     parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
     parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
     args = parser.parse_args(argv)
+    if args.spec_stats is not None:
+        print(json.dumps(_spec_stats(args.spec_stats), separators=(",", ":")))
+        return 0
     events, bad_lines = read_ledger(_root() / "ledger.jsonl")
     model_prices, subscriptions, checked, claude_prices = _prices(args.prices)
     claude_context = {} if Path(args.claude_projects).is_dir() else None

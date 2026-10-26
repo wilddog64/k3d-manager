@@ -117,7 +117,7 @@ import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
 panel12=next(p for p in panels if p["id"]==12); assert len(panel12["targets"])>=4
-assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)","max by (version, slug, repo, worker)","max by (version, slug, repo, coordinator)")) for t in panel12["targets"])
+assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)","max by (version, slug, repo, worker)","max by (version, slug, repo, coordinator)","max by (version, slug, repo) (")) for t in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85}|set(range(42,49))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 72 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 76 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,47,83,84,85,86,87,88):
+    if panel["id"] in (14,15,47,83,84,85,86,87,88,89,90,91,92):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -408,7 +408,7 @@ from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
 d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 panel=next(p for p in d["panels"] if p["id"]==12)
-spec=[t for t in panel["targets"] if "k3dm_dispatch_task_spec" in t["expr"]]
+spec=[t for t in panel["targets"] if "k3dm_dispatch_task_spec{" in t["expr"]]
 assert len(spec)==1 and spec[0]["expr"].startswith("max by (version, slug, spec, agent, repo) "),spec
 org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
 assert org["renameByName"].get("agent")=="Agent",org

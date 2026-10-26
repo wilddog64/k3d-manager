@@ -92,6 +92,15 @@ Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant trans
 
 ### Agent dispatch cost details
 
+Agent Dispatch measures two kinds of size separately. **Spec files** and **Acceptance items** are
+captured at dispatch from the spec's `## Files` and `## Acceptance` sections. **Files changed**,
+**Lines changed** and **Test lines** are captured at land from the rebased task diff; added and
+deleted lines are both counted. Tests are under `scripts/tests/` or named `test_*.py` / `*.bats`;
+documentation is under `docs/` or `memory-bank/`, plus Markdown files; other files are code. Binary
+files count as changed files and add no lines. Release totals and the median include all measured
+landed tasks, even when the table shows only its newest 50 rows. Missing measurements remain blank.
+Specs landed before this shipped are not backfilled.
+
 The Agent dispatch **Per spec** table links each Spec name to its plan or bug document on the
 task's release branch; the link opens in a new tab. **Agent** names who landed the spec
 (`codex` or `agy`); the Codex columns stay empty for an agy row. Its totals row sums Codex tokens, Codex time, Codex runs and

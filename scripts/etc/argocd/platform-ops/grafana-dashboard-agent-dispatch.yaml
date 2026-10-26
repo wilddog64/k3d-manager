@@ -617,7 +617,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land (dispatch-to-land elapsed, wall clock) is earliest start.ts → land.ts including retries, idle time and overnight waits; Exit → land (final worker exit → land) is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land (dispatch-to-land elapsed, wall clock) is earliest start.ts → land.ts including retries, idle time and overnight waits; Exit → land (final worker exit → land) is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. Spec files and Acceptance items are measured at dispatch from the spec as it was then; Files changed, Lines changed and Test lines are measured at land from the rebased task diff. Specs landed before this shipped are blank, never 0. The footer totals Tokens, Agent time, Runs, API equiv. and the size columns over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
           "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
           "datasource": {
             "type": "prometheus",
@@ -683,7 +683,12 @@ data:
               "format": "table",
               "instant": true,
               "refId": "I"
-            }
+            },
+            {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_spec_files{window=\"$window\"})", "format": "table", "instant": true, "refId": "K"},
+            {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_spec_acceptance_items{window=\"$window\"})", "format": "table", "instant": true, "refId": "L"},
+            {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_change_files{window=\"$window\"})", "format": "table", "instant": true, "refId": "M"},
+            {"expr": "sum by (version, slug, repo) (k3dm_dispatch_task_change_lines{window=\"$window\"})", "format": "table", "instant": true, "refId": "N"},
+            {"expr": "sum by (version, slug, repo) (k3dm_dispatch_task_change_lines{window=\"$window\",kind=\"tests\"})", "format": "table", "instant": true, "refId": "O"}
           ],
           "transformations": [
             {
@@ -696,7 +701,12 @@ data:
                   "Time": true,
                   "Value #E": true,
                   "Value #H": true,
-                  "Value #I": true
+                  "Value #I": true,
+                  "Value #K": true,
+                  "Value #L": true,
+                  "Value #M": true,
+                  "Value #N": true,
+                  "Value #O": true
                 },
                 "indexByName": {
                   "version": 0,
@@ -712,7 +722,12 @@ data:
                   "Value #G": 10,
                   "worker": 11,
                   "coordinator": 12,
-                  "spec": 13
+                  "spec": 13,
+                  "Value #K": 14,
+                  "Value #L": 15,
+                  "Value #M": 16,
+                  "Value #N": 17,
+                  "Value #O": 18
                 },
                 "renameByName": {
                   "version": "Release",
@@ -727,7 +742,12 @@ data:
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈",
                   "worker": "Worker",
-                  "coordinator": "Coordinator"
+                  "coordinator": "Coordinator",
+                  "Value #K": "Spec files",
+                  "Value #L": "Acceptance items",
+                  "Value #M": "Files changed",
+                  "Value #N": "Lines changed",
+                  "Value #O": "Test lines"
                 }
               }
             }
@@ -951,14 +971,71 @@ data:
                 "Value #D",
                 "Value #F",
                 "Value #G",
+                "Value #K",
+                "Value #L",
+                "Value #M",
+                "Value #N",
+                "Value #O",
                 "Tokens",
                 "Agent time",
                 "Runs",
                 "API equiv.",
-                "Claude ≈"
+                "Claude ≈",
+                "Spec files",
+                "Acceptance items",
+                "Files changed",
+                "Lines changed",
+                "Test lines"
               ]
             }
           }
+        },
+        {
+          "id": 89,
+          "type": "stat",
+          "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+          "title": "Lines changed total",
+          "description": "Code + test + documentation lines added and deleted across every measured landed task in scope.",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 49},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "sum(k3dm_dispatch_change_lines_total{window=\"$window\"})", "legendFormat": "Lines changed", "refId": "A"}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+        },
+        {
+          "id": 90,
+          "type": "stat",
+          "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+          "title": "Median lines / spec",
+          "description": "Median code + test + documentation lines added and deleted per measured landed task.",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 49},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_change_lines_median{window=\"$window\"}", "legendFormat": "Median lines / spec", "refId": "A"}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+        },
+        {
+          "id": 91,
+          "type": "stat",
+          "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+          "title": "Acceptance items total",
+          "description": "Must + must_not items for landed specs whose acceptance counts were measured at dispatch.",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 49},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_spec_acceptance_items_total{window=\"$window\"}", "legendFormat": "Acceptance items", "refId": "A"}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+        },
+        {
+          "id": 92,
+          "type": "stat",
+          "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
+          "title": "Measured",
+          "description": "First value is landed specs with recorded change size; second value is all landed specs in scope.",
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 49},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"expr": "k3dm_dispatch_complexity_measured_tasks{window=\"$window\",measure=\"change\"}", "legendFormat": "Measured", "refId": "A"},
+            {"expr": "k3dm_dispatch_landed{window=\"$window\"}", "legendFormat": "Landed", "refId": "B"}
+          ],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
         },
         {
           "id": 9,
@@ -1045,7 +1122,7 @@ data:
           "type": "stat",
           "title": "Final worker exit → land",
           "description": "Mean wall-clock gap from the final qualifying Codex exit to land. Missing exit timestamps are excluded. This is not proven human waiting or active review; live verification occurs after landing.",
-          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 50},
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 54},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_post_exit_land_minutes_per_landed{window=\"$window\"}", "instant": true}],
           "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
@@ -1056,7 +1133,7 @@ data:
           "type": "bargauge",
           "title": "Human continuation prompts",
           "description": "Explicitly recorded operator events by reason. The tracked tasks bar is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
-          "gridPos": {"h": 8, "w": 18, "x": 6, "y": 50},
+          "gridPos": {"h": 8, "w": 18, "x": 6, "y": 54},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {"expr": "k3dm_dispatch_human_continuation_prompts{window=\"$window\"}", "legendFormat": "{{reason}}", "instant": true, "refId": "A"},

@@ -918,7 +918,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 62  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more; release duration adds two
+    assert sum("$window" in expr for expr in expressions) == 72  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency, intervention, complexity columns and summary stats
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1952,6 +1952,85 @@ def test_claude_non_numeric_usage_does_not_break_render_or_emit_invalid_values()
                     if line.startswith(("k3dm_dispatch_claude_api_cost", "k3dm_dispatch_claude_tokens",
                                        "k3dm_dispatch_claude_daily_tokens"))]
     assert all(not line.rstrip().endswith((" nan", " inf", " -inf")) for line in claude_lines)
+
+
+def test_spec_stats_counts_files_and_acceptance_yaml(tmp_path):
+    spec = tmp_path / "spec.md"
+    spec.write_text(dedent("""\
+        ## Files
+        - `one.py`
+        - `two.py`
+        | File |
+        |---|
+        | `three.py` |
+
+        ## Acceptance
+        ```yaml
+        must:
+          - id: M1
+          - id: M2
+          - id: M3
+        must_not:
+          - id: N1
+          - id: N2
+        evidence:
+          - id: E1
+            kind: offline
+          - id: E2
+            kind: live
+        ```
+        """))
+    assert dispatch_metrics._spec_stats(spec) == {
+        "files": 3, "must": 3, "must_not": 2, "evidence": 2, "live_evidence": 1}
+    no_acceptance = tmp_path / "no-acceptance.md"
+    no_acceptance.write_text("## Files\n| File |\n|---|\n| `x.py` |\n")
+    assert dispatch_metrics._spec_stats(no_acceptance) == {
+        "files": 1, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+
+
+def test_complexity_series_omit_unmeasured_and_totals_cover_all_tasks():
+    now = 100
+    events = []
+    for index in range(dispatch_metrics.TASK_CAP + 1):
+        slug = f"task-{index:03}"
+        events.extend([
+            event(index + 1, "start", slug, version="v1.0.0", spec_stats={"files": 2, "must": 1, "must_not": 1}),
+            event(index + 2, "land", slug, version="v1.0.0", change={"files": 3, "code": 2, "tests": 3, "docs": 4}),
+        ])
+    events.extend([event(200, "start", "legacy", version="v1.0.0"), event(201, "land", "legacy", version="v1.0.0")])
+    output = dispatch_metrics.render(events, 0, now)
+    # The newest 50 displayed tasks include the unmeasured legacy task, so only 49 have change rows.
+    assert output.count('k3dm_dispatch_task_change_files{window="v1.0.0"') == dispatch_metrics.TASK_CAP - 1
+    assert 'k3dm_dispatch_change_files_total{window="v1.0.0"} 153' in output
+    assert 'k3dm_dispatch_change_lines_total{window="v1.0.0",kind="code"} 102' in output
+    assert 'k3dm_dispatch_change_lines_median{window="v1.0.0"} 9' in output
+    assert 'k3dm_dispatch_spec_acceptance_items_total{window="v1.0.0"} 102' in output
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="change"} 51' in output
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="spec"} 51' in output
+
+
+def test_null_spec_stats_are_not_counted_as_measured():
+    null_stats = {"files": None, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+    events = [
+        event(1, "start", "old-spec", version="v1.0.0", spec_stats=null_stats),
+        event(2, "land", "old-spec", version="v1.0.0"),
+        event(3, "start", "new-spec", version="v1.0.0", spec_stats={"files": 2, "must": 1, "must_not": 1}),
+        event(4, "land", "new-spec", version="v1.0.0"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="spec"} 1' in output
+    assert 'slug="old-spec"' not in "".join(line for line in output.splitlines() if "task_spec_" in line)
+
+
+def test_dashboard_complexity_columns_and_stat_queries():
+    dashboard = load_dispatch_dashboard()
+    per_spec = next(panel for panel in dashboard["panels"] if panel.get("title") == "Per spec")
+    assert {"Spec files", "Acceptance items", "Files changed", "Lines changed", "Test lines"} <= set(
+        per_spec["transformations"][1]["options"]["renameByName"].values())
+    assert {"Spec files", "Acceptance items", "Files changed", "Lines changed", "Test lines"} <= set(
+        per_spec["options"]["footer"]["fields"])
+    stat_titles = {panel.get("title") for panel in dashboard["panels"] if panel.get("type") == "stat"}
+    assert {"Lines changed total", "Median lines / spec", "Acceptance items total", "Measured"} <= stat_titles
 
 
 def test_claude_existing_series_keep_their_fixture_output():

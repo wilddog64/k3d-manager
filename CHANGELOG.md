@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
+
 ## [1.43.8] - 2026-10-25
 
 ### Added

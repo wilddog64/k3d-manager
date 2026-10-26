@@ -416,6 +416,23 @@ _dispatch_spec_files() {
     grep -oE "\`[^\`]+\`" | sed "s/^\`//; s/\`$//" || true
 }
 
+_dispatch_change_stats() {
+  local input="$1" added deleted path kind filename result='{"files":0,"code":0,"tests":0,"docs":0}'
+  while IFS=$'\t' read -r added deleted path; do
+    [[ -n "$path" ]] || continue
+    filename="${path##*/}"
+    if [[ "$path" == scripts/tests/* || "$filename" == test_*.py || "$filename" == *.bats ]]; then kind=tests
+    elif [[ "$path" == docs/* || "$path" == memory-bank/* || "$path" == *.md ]]; then kind=docs
+    else kind=code; fi
+    if [[ "$added" =~ ^[0-9]+$ && "$deleted" =~ ^[0-9]+$ ]]; then
+      result="$(jq -c --arg kind "$kind" --argjson lines "$((added + deleted))" '.files+=1|.[$kind]+=$lines' <<<"$result")"
+    else
+      result="$(jq -c '.files+=1' <<<"$result")"
+    fi
+  done <<<"$input"
+  printf '%s\n' "$result"
+}
+
 _dispatch_scope_verdict() {
   local worktree="$1" spec="$2" rel="$3" allow="$4" path pattern in_scope=1 matched base from merge_base
   local -a patterns=()
@@ -585,12 +602,16 @@ _dispatch_start() {
     printf '%s\n' "$repo_name" >"$run/repo-name"
   fi
   _dispatch_event_repo="$repo_name"
+  local spec_stats_json stats_args=()
+  spec_stats_json="$(python3 "${K3DM_DISPATCH_SPEC_STATS_BIN:-$_dispatch_script_dir/k3dm-dispatch-metrics}" --spec-stats "$_dispatch_repo_root/$spec" 2>/dev/null || true)"
+  if ! jq -e 'type == "object"' <<<"$spec_stats_json" >/dev/null 2>&1; then spec_stats_json=null; fi
+  stats_args=(--argjson spec_stats "$spec_stats_json")
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   fi
   local prompt_spec="$spec"
   [[ ! -f "$run/spec.md" ]] || prompt_spec="$(cd "$run" && pwd)/spec.md"
@@ -750,6 +771,12 @@ _dispatch_land() {
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason target_moved_during_land '.reason=$reason'
     _dispatch_error "$target moved during land"
   fi
+  local land_commit="" change_json="null" numstat=""
+  land_commit="$(git -C "$task" rev-parse HEAD 2>/dev/null || true)"
+  if numstat="$(git -C "$task" diff --numstat "$rel" HEAD 2>/dev/null)"; then
+    change_json="$(_dispatch_change_stats "$numstat" 2>/dev/null || echo null)"
+    [[ "$change_json" =~ ^\{.*\}$ ]] || change_json=null
+  fi
   git -C "$repo_path" merge --ff-only "task/$version/$slug" >/dev/null || _dispatch_error "fast-forward merge of task/$version/$slug failed"
   land_ts="$(date +%s)"; wait_seconds=null
   if [[ -s "$run/codex-exit-ts" ]]; then
@@ -760,7 +787,7 @@ _dispatch_land() {
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
     --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
     --arg validation "$run/land-test.log" --arg test_result "$test_result" \
-    --argjson target_moved_commits "$target_count" '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.chosen=true'
+    --argjson target_moved_commits "$target_count" --arg commit "$land_commit" --argjson change "$change_json" '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'
   _dispatch_schedule_metrics
   git -C "$repo_path" worktree remove "$task"
   git -C "$repo_path" branch --unset-upstream "task/$version/$slug" 2>/dev/null || true
