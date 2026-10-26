@@ -448,6 +448,12 @@ a browser SSH console to the M5 and M4 for the operator only. Each machine has i
 and a Cloudflare Access app accepts only the operator's GitHub identity, with 2FA by authenticator app or GitHub Mobile.
 A dedicated `sshd` on a loopback-only, uncommon port (default 42722; macOS Remote Login stays off) accepts only Access short-lived certificates. It includes a `revoke` emergency stop. Critical: dispatch needs the operator's go.
 
+Plan 4 of 5 is [`dev-staging-prod-promotion-path`](plans/v1.43.11-dev-staging-prod-promotion-path.md) (operator,
+2026-10-25, "so we don't work on hostiger directly"). Phase 1: a persistent k3s staging cluster built like Hostinger, plus `env`
+labels, a read-only prod kubeconfig for agents and `make env-status`. Hostinger is unchanged. Phases 2 and 3 (`deploy/staging`
+and `deploy/prod` refs, pinned locks, gated `make promote`, rollback, CVE fixes through staging, prod self-heal) go to
+patch v1.43.12. Decisions D1–D3 pending.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
