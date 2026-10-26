@@ -1,7 +1,8 @@
 # Bug: Bug Tracking's Current release row ignores Manual mode
 
-**Status:** FIXED 2026-10-25 — E1 green (grafana_dashboard_bugs 37/37, appsets 51/51, dashboard queries pytest); 2 mode tests red on the pre-fix dashboard. E2 (operator screenshot) pending
+**Status:** LIVE-VERIFIED 2026-10-25 (fixed 2026-10-25) — E1 green (grafana_dashboard_bugs 37/37, appsets 51/51, dashboard queries pytest); 2 mode tests red on the pre-fix dashboard. E2 passed (screenshots 349/350)
 **Fix commit:** `c567cc68`
+**Live evidence:** 2026-10-25 · run hub-grafana-bug-tracking-release-row-screenshots · env hub/k3d-k3d-cluster · scenario bug-tracking/manual-v1.43.4-then-auto · commit c567cc68 · proves E2
 **Priority:** P3
 **Severity:** low — four tiles show the current release while the rest of the dashboard shows the picked one; the numbers are right for what they measure, only the scope is unexpected
 **Release:** v1.43.8 (bug; does not count toward the five-plan cap)
@@ -102,3 +103,7 @@ interface:
 ## Review
 
 Claude reviewed Luna's fix on 2026-10-25. Luna's Manual arm for the Release tile listed every release that had series. With **All** picked (`allValue` `.*`), that showed every release, which M2 forbids. Claude replaced it with `label_replace(vector(1), "release", "${release:text}", "", "")`, so the tile shows exactly what the Manual releases box shows: one name, `v1.43.4 + v1.43.6` for a multi-pick, and `All` for All. A picked release with no bug docs also shows. Claude also added an Auto-arm check for panels 1–4 (N1: current release only, no hard-coded version). Landed as `c567cc68`.
+
+## Live evidence
+
+- **E2 (Claude from operator screenshots 349/350, 2026-10-25):** In Manual with `v1.43.4`, the row is titled Release and shows Release `v1.43.4`, 29 filed, 0 open and 30 fixed. Release plans shows 5/0/3/2. In Auto it shows `v1.43.8` with 1 filed and 1 open (this bug, counted before the scan picked up its FIXED status), and 0 fixed. Scheduled later (7) and untriaged (0) are the same in both modes, as N2 requires.
