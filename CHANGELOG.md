@@ -6,6 +6,10 @@
 
 - Agent Dispatch shows a release's calendar span to merge (or latest land) and unioned active time; `codex-release-merged` records the PR merge timestamp in the local ledger.
 
+### Changed
+
+- Alert analyses without a Slack response URL are posted to `K3DM_STATUS_CHANNEL_ID` by the bot, with the incoming webhook as fallback.
+
 ## [1.43.7] - 2026-10-25
 
 ### Changed

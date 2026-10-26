@@ -1,5 +1,25 @@
 # Webhook operations
 
+## Which channel
+
+Route notices by who started them:
+
+| Started by | Channel | Examples |
+|---|---|---|
+| The operator or an agent | `#acg-automation` (`SLACK_CHANNEL_ID`) | Slash commands, `/ask`, make and cluster jobs, their failure and stall analyses, and cloud-bridge task replies |
+| The system | `#grafana-notification` (`K3DM_STATUS_CHANNEL_ID`) | Alert analyses, ACG expiry, scheduled credential rotations, CVE scan notices, and cluster-status reports |
+
+Alert analyses from Alertmanager use this order: a supplied Slack `response_url` gets
+the reply; otherwise, when the bot token and `K3DM_STATUS_CHANNEL_ID` are configured,
+the webhook bot posts there. If that bot post fails or the status channel is unset, the
+analysis falls back to `K3DM_SLACK_WEBHOOK_URL`.
+
+To route scheduled ACG expiry and credential-rotation notices, create an Incoming
+Webhook for `#grafana-notification` in the Slack app and replace the
+`slack-incoming-webhook-url` value in the hub Secret
+`platform-ops/platform-ops-notifications`. The CronJobs read that Secret on each run,
+so they do not need a restart. The webhook URL is managed by the operator.
+
 API-origin cluster status, Hostinger status and diagnostics reports can be posted as
 threads in a dedicated Slack channel by setting `K3DM_STATUS_CHANNEL_ID`. Invite the
 webhook bot to the channel first, then install the setting with:

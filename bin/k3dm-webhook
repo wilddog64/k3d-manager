@@ -2074,10 +2074,15 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             analysis = _call_gemini(prompt)
             _log(analysis + "\n")
 
-            notify_url = response_url or SLACK_WEBHOOK_URL
-            if notify_url:
-                _slack_post(notify_url,
-                    f"🔍 *{alert_name}* — `{display_name}`\n{analysis}")
+            message = f"🔍 *{alert_name}* — `{display_name}`\n{analysis}"
+            if response_url:
+                _slack_post(response_url, message)
+            else:
+                posted = ""
+                if SLACK_BOT_TOKEN and STATUS_CHANNEL_ID:
+                    posted = _post_slack_bot(message, channel_id=STATUS_CHANNEL_ID)
+                if not posted and SLACK_WEBHOOK_URL:
+                    _slack_post(SLACK_WEBHOOK_URL, message)
 
         _finish("success")
     except Exception as exc:
