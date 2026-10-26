@@ -228,7 +228,7 @@ def _plan_has_branch(root, release):
 
 def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     texts = _plan_texts(root, ref) if texts is None else texts
-    info, counts, skipped = [], defaultdict(int), 0
+    counts, skipped = defaultdict(int), 0
     branch = _scan_branch(root, ref)
     parsed = []
     for path, text in texts.items():
