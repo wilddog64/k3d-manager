@@ -8,6 +8,7 @@ setup() {
   export K3DM_SNAPSHOT_DIR="$BATS_TEST_TMPDIR/remote"
   export K3DM_SNAPSHOT_TIMESTAMP=20260922T000000Z
   export K3DM_SNAPSHOT_STAMP="$BATS_TEST_TMPDIR/hub-snapshot-last"
+  export K3DM_SNAPSHOT_LOCK="$BATS_TEST_TMPDIR/hub-snapshot.lock"
   export K3DM_SNAPSHOT_MAX_AGE_HOURS=24
   export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_AUTO_PRUNE=1 K3DM_SNAPSHOT_MIN_FREE_GB=20
   export DATA_GIT_FAIL=1
@@ -154,7 +155,7 @@ EOF
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0/data"
   printf 'claim fixture\n' > "$TAR_FIXTURE_DIR/storage-loki-0/data"
   : > "$PATCH_LOG"
-  source "$SCRIPT_DIR/plugins/hub_snapshot.sh"
+  source "${HUB_SNAPSHOT_SOURCE:-$SCRIPT_DIR/plugins/hub_snapshot.sh}"
 }
 
 capture_snapshot() {
@@ -357,8 +358,7 @@ PY
 @test "hub snapshot: auto-prune leaves incomplete entries" {
   mkdir -p "$K3DM_SNAPSHOT_DIR/20260919T000000Z.INCOMPLETE"
   capture_snapshot
-  [ -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z.INCOMPLETE" ]
-  [[ "$output" == *"remove with make snapshot-prune"* ]]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260919T000000Z.INCOMPLETE" ]
 }
 
 @test "hub snapshot: auto-prune can be disabled" {
@@ -445,6 +445,103 @@ PY
     done < <(find "$stage" -type f ! -name SHA256SUMS -print)
   }
   capture_snapshot
+}
+
+@test "hub snapshot: age prune removes only old snapshots outside the floor" {
+  export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_MAX_AGE_DAYS=30
+  export K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  for name in 20261001T000000Z 20261020T000000Z 20261027T000000Z 20261103T000000Z 20261110T000000Z 20261117T000000Z 20261124T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  run _hub_snapshot_prune_verified 3
+  [ "$status" -eq 0 ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20261001T000000Z" ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20261020T000000Z" ]
+  for name in 20261103T000000Z 20261110T000000Z 20261117T000000Z 20261124T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20261027T000000Z" ]
+}
+
+@test "hub snapshot: all recent snapshots survive regardless of count" {
+  export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_MAX_AGE_DAYS=30
+  export K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  for name in 20261101T000000Z 20261105T000000Z 20261110T000000Z 20261115T000000Z 20261120T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  run _hub_snapshot_prune_verified 3
+  [ "$status" -eq 0 ]
+  [ "$(find "$K3DM_SNAPSHOT_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" -eq 5 ]
+}
+
+@test "hub snapshot: three old verified snapshots remain as the retention floor" {
+  export K3DM_SNAPSHOT_KEEP=3 K3DM_SNAPSHOT_MAX_AGE_DAYS=30
+  export K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  for name in 20260901T000000Z 20260905T000000Z 20260910T000000Z 20260915T000000Z; do mkdir -p "$K3DM_SNAPSHOT_DIR/$name"; done
+  run _hub_snapshot_prune_verified 3
+  [ "$status" -eq 0 ]
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20260901T000000Z" ]
+  for name in 20260905T000000Z 20260910T000000Z 20260915T000000Z; do [ -d "$K3DM_SNAPSHOT_DIR/$name" ]; done
+}
+
+@test "hub snapshot: malformed names are kept and warned about" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/20notatimestamp" "$K3DM_SNAPSHOT_DIR/20261124T000000Z"
+  export K3DM_SNAPSHOT_KEEP=1 K3DM_SNAPSHOT_MAX_AGE_DAYS=1 K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  _warn() { printf '%s\n' "$*" >> "$BATS_TEST_TMPDIR/warnings.log"; }
+  run _hub_snapshot_prune_verified 1
+  [ "$status" -eq 0 ]
+  [ -d "$K3DM_SNAPSHOT_DIR/20notatimestamp" ]
+  grep -Fq "[hub-snapshot] keeping 20notatimestamp: name is not a timestamp" "$BATS_TEST_TMPDIR/warnings.log"
+}
+
+@test "hub snapshot: invalid max age fails before removing anything" {
+  mkdir -p "$K3DM_SNAPSHOT_DIR/20260101T000000Z"
+  export K3DM_SNAPSHOT_KEEP=1 K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  for value in 0 abc; do
+    export K3DM_SNAPSHOT_MAX_AGE_DAYS="$value"
+    run _hub_snapshot_prune_verified 1
+    [ "$status" -eq 2 ]
+    [ -d "$K3DM_SNAPSHOT_DIR/20260101T000000Z" ]
+  done
+}
+
+@test "hub snapshot: successful capture removes only stale incomplete uploads" {
+  export K3DM_SNAPSHOT_MAX_AGE_DAYS=30 K3DM_SNAPSHOT_NOW_EPOCH="$(python3 -c 'import datetime; print(int(datetime.datetime(2026, 11, 30, tzinfo=datetime.timezone.utc).timestamp()))')"
+  mkdir -p "$K3DM_SNAPSHOT_DIR/20261001T000000Z.INCOMPLETE" "$K3DM_SNAPSHOT_DIR/20261129T220000Z.INCOMPLETE" "$K3DM_SNAPSHOT_DIR/$K3DM_SNAPSHOT_TIMESTAMP.INCOMPLETE"
+  capture_snapshot
+  [ ! -d "$K3DM_SNAPSHOT_DIR/20261001T000000Z.INCOMPLETE" ]
+  [ -d "$K3DM_SNAPSHOT_DIR/20261129T220000Z.INCOMPLETE" ]
+  [ -d "$K3DM_SNAPSHOT_DIR/$K3DM_SNAPSHOT_TIMESTAMP" ]
+}
+
+@test "hub snapshot: manual capture releases the lock" {
+  capture_snapshot
+  [ ! -e "$K3DM_SNAPSHOT_LOCK" ]
+}
+
+@test "hub snapshot: scheduled capture skips when lock is held" {
+  mkdir -p "$K3DM_SNAPSHOT_LOCK"
+  hub_snapshot_capture() { touch "$BATS_TEST_TMPDIR/capture-called"; }
+  run hub_snapshot_scheduled
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/capture-called" ]
+  [[ "$output" == *"another capture is running; skipping"* ]]
+}
+
+@test "hub snapshot: scheduled capture returns status and releases lock" {
+  hub_snapshot_capture() { return "${CAPTURE_RC:-0}"; }
+  for rc in 0 7; do
+    export CAPTURE_RC="$rc"
+    run hub_snapshot_scheduled
+    [ "$status" -eq "$rc" ]
+    [ ! -e "$K3DM_SNAPSHOT_LOCK" ]
+    [[ "$output" == *"scheduled capture ended at"*"(exit ${rc})"* ]]
+  done
+}
+
+@test "hub snapshot: weekly LaunchAgent template has Sunday schedule and logging" {
+  local template="$SCRIPT_DIR/etc/launchd/com.k3d-manager.hub-snapshot.plist.tmpl"
+  grep -Fq '<string>com.k3d-manager.hub-snapshot</string>' "$template"
+  grep -Fq '<string>hub_snapshot_scheduled</string>' "$template"
+  grep -A1 '<key>Weekday</key>' "$template" | grep -Fq '<integer>0</integer>'
+  grep -A1 '<key>Hour</key>' "$template" | grep -Fq '<integer>2</integer>'
+  grep -A1 '<key>Minute</key>' "$template" | grep -Fq '<integer>30</integer>'
+  grep -A1 '<key>RunAtLoad</key>' "$template" | grep -Fq '<false/>'
+  grep -Fq '{{HOME}}/Library/Logs/k3dm-hub-snapshot.log' "$template"
 }
 
 @test "hub snapshot: Loki record is present" {

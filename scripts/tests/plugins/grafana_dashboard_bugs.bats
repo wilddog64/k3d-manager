@@ -230,14 +230,40 @@ PY
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
-for panel_id in (9,10,11,12,13,16,17,23,24):
+for panel_id in (2,3,4,9,10,11,12,13,16,17,23,24):
     expr=panels[panel_id]["targets"][0]["expr"]
-    assert "and on(repo,release) k3dm_bug_current_release_info" in expr, (panel_id,expr)
+    assert "and on(repo,release) k3dm_bug_current_release_info" in expr or "and on(release,repo) k3dm_bug_current_release_info" in expr, (panel_id,expr)
     assert 'release=~"$release"' in expr, (panel_id,expr)
     assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr, (panel_id,expr)
 assert 'live_verified=~"$verified"' in panels[23]["targets"][0]["expr"]
-for panel_id in (2,3,4,5,6,7,8,14,15):
+for panel_id in (5,6,7,8,14,15):
     assert "$release_mode" not in " ".join(t["expr"] for t in panels[panel_id].get("targets",[])), panel_id
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release summary tiles follow mode while repository-wide tiles do not" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+data=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["id"]:p for p in data["panels"]}
+assert panels[20]["title"] == "Release"
+for panel_id, metric in ((2,"k3dm_bug_release_docs"),(3,"k3dm_bug_status_docs"),(4,"k3dm_bug_fixed_in_release_docs")):
+    expr=panels[panel_id]["targets"][0]["expr"]
+    assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr
+    assert 'release=~"$release"' in expr and "or vector(0)" in expr
+    assert metric in expr
+assert "vector($release_mode) == 1" in panels[1]["targets"][0]["expr"]
+assert "vector($release_mode) == 0" in panels[1]["targets"][0]["expr"]
+assert '"${release:text}"' in panels[1]["targets"][0]["expr"]
+assert 'release=~"$release"' not in panels[1]["targets"][0]["expr"]
+for panel_id in (1,2,3,4):
+    auto=panels[panel_id]["targets"][0]["expr"].split("vector($release_mode) == 0",1)[0]
+    assert "k3dm_bug_current_release_info" in auto and not re.search(r"v\d+\.\d+\.\d+",auto), (panel_id,auto)
+assert "Release mode" in panels[1]["description"]
+assert "Repository-wide" in panels[5]["description"] and "Release mode" in panels[5]["description"]
+assert "Repository-wide" in panels[6]["description"] and "Release mode" in panels[6]["description"]
+assert panels[6]["targets"][0]["expr"] == 'sum(k3dm_bug_docs{repo="$repo",state=~"open|unknown",priority="unset"})'
 PY
   [ "${status}" -eq 0 ]
 }
@@ -363,7 +389,7 @@ d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['id']==100)
 assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
-assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27, 70]
 assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
@@ -389,7 +415,7 @@ import json, sys
 from pathlib import Path
 data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 table=next(p for p in data['panels'] if p['id']==107)
-assert table['description']=="Order is the plan number from each plan's Release line: the order Claude intends to implement. Depends on lists the plans that must land first, from the Depends on line."
+assert "Wave note" in table['description'] and "Overlaps" in table['description'] and "Blocked by" in table['description']
 transforms=table['transformations']
 convert=next(i for i,t in enumerate(transforms) if t['id']=='convertFieldType')
 organize=next(i for i,t in enumerate(transforms) if t['id']=='organize')
@@ -399,11 +425,23 @@ options=transforms[organize]['options']
 assert options['indexByName']['order']==1
 assert options['renameByName']['order']=='Order'
 assert options['renameByName']['depends_on']=='Depends on'
+assert options['renameByName']['wave']=='Wave'
+assert options['renameByName']['wave_note']=='Wave note'
+assert options['renameByName']['overlaps']=='Overlaps'
+assert options['renameByName']['blocked_by']=='Blocked by'
+assert options['renameByName']['approval']=='Spec approval'
+assert options['renameByName']['dispatch_approval']=='Dispatch'
+assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
+           for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
+           for p in o['properties'])
 assert table['options']['sortBy']==[{'displayName':'Order','desc':False}]
+overlap=next(p for p in data['panels'] if p['id']==108)
+assert overlap['title']=='Undeclared plan overlaps'
+assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==70 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==160 for p in overrides['Depends on'])
+assert order_props['custom.width']==62 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==100 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -665,7 +703,7 @@ organize=next(t for t in panel["transformations"] if t["id"]=="organize")
 exclude=organize["options"]["excludeByName"]
 assert "release" not in exclude
 links=next(prop["value"] for override in panel["fieldConfig"]["overrides"]
-           if override["matcher"]["options"] == "Dispatch"
+           if override["matcher"]["options"] == "Dispatch task"
            for prop in override["properties"] if prop["id"] == "links")
 assert links[0]["url"] == "/d/k3dm-agent-dispatch?var-window=${__data.fields.release}"
 assert any(item.get("url") == "/d/k3dm-agent-dispatch" for item in d["links"])
@@ -717,7 +755,8 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 300 and widths["Dispatch"] >= 150, widths
+assert widths["Title"] >= 150 and widths["Dispatch task"] >= 150, widths
+assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
 assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)

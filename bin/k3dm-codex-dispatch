@@ -279,7 +279,34 @@ Usage:
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
+  bin/k3dm-codex-dispatch release-merged --version vX.Y.Z --pr N --merged-at YYYY-MM-DDTHH:MM:SSZ
 EOF
+}
+
+_dispatch_release_merged() {
+  local version="" pr="" merged_at="" merged_ts ledger
+  while (($#)); do
+    case "$1" in
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; version="$2"; shift 2 ;;
+      --pr) (($# >= 2)) || _dispatch_error "--pr requires a value"; pr="$2"; shift 2 ;;
+      --merged-at) (($# >= 2)) || _dispatch_error "--merged-at requires a value"; merged_at="$2"; shift 2 ;;
+      *) _dispatch_error "unknown release-merged option: $1" ;;
+    esac
+  done
+  [[ "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid or missing --version"
+  [[ "$pr" =~ ^[1-9][0-9]*$ ]] || _dispatch_error "invalid or missing --pr"
+  [[ "$merged_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || _dispatch_error "invalid or missing --merged-at"
+  merged_ts="$(python3 -c 'from datetime import datetime, timezone; import sys; print(int(datetime.strptime(sys.argv[1], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()))' "$merged_at" 2>/dev/null)" || _dispatch_error "invalid --merged-at date"
+  ledger="$_dispatch_worktree_root/ledger.jsonl"
+  if [[ -f "$ledger" ]] && jq -se --arg version "$version" --argjson merged_at "$merged_ts" \
+    'any(.[]; .event == "release_merged" and .version == $version and .merged_at == $merged_at)' \
+    "$ledger" >/dev/null 2>&1; then
+    echo "already recorded: $version"
+    return 0
+  fi
+  _dispatch_ledger_event release_merged "$version" release --argjson pr "$pr" --argjson merged_at "$merged_ts" \
+    '.pr=$pr|.merged_at=$merged_at' || _dispatch_error "could not record release merge"
+  echo "recorded release merge: $version PR #$pr"
 }
 
 _dispatch_verify() {
@@ -890,6 +917,7 @@ main() {
     abandon) shift; _dispatch_abandon "$@" ;;
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;
+    release-merged) shift; _dispatch_release_merged "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;
   esac

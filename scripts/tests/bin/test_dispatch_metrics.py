@@ -823,6 +823,48 @@ def test_release_scope_includes_old_lands():
     assert 'k3dm_dispatch_landed{window="30d"} 0' in output
 
 
+def test_release_span_union_and_latest_merge_ignore_unlanded_and_refusals():
+    rows = [
+        event(0, "start", "early-unlanded", version="v1.43.8"),
+        event(100, "start", "one", version="v1.43.8"),
+        event(100, "start", "one", version="v1.43.8"),
+        event(200, "start", "two", version="v1.43.8"),
+        event(700, "land", "one", version="v1.43.8"),
+        event(800, "land", "two", version="v1.43.8"),
+        event(900, "land_refused", "two", version="v1.43.8"),
+        event(1000, "release_merged", "release", merged_at=7200, version="v1.43.8"),
+        event(1100, "release_merged", "release", merged_at=7200, version="v1.43.8"),
+    ]
+    output = dispatch_metrics.render(rows, 0, 8000)
+    assert 'k3dm_dispatch_release_span_minutes{window="v1.43.8",end="merge"} 120' in output
+    assert 'k3dm_dispatch_release_active_minutes{window="v1.43.8"} 11.6667' in output
+    assert 'k3dm_dispatch_landed{window="v1.43.8"} 2' in output
+
+
+def test_release_span_uses_last_land_without_merge_and_not_time_windows():
+    rows = [event(0, "start", "early", version="v1.43.8"),
+            event(300, "start", "one", version="v1.43.8"),
+            event(900, "land", "one", version="v1.43.8"),
+            event(1200, "land_refused", "one", version="v1.43.8")]
+    output = dispatch_metrics.render(rows, 0, 2000)
+    assert 'k3dm_dispatch_release_span_minutes{window="v1.43.8",end="last_land"} 15' in output
+    assert 'k3dm_dispatch_release_active_minutes{window="v1.43.8"} 10' in output
+    assert "k3dm_dispatch_release_span_minutes{window=\"7d\"" not in output
+    assert "k3dm_dispatch_release_active_minutes{window=\"7d\"" not in output
+
+
+def test_release_merged_does_not_change_other_dispatch_metrics():
+    rows = [event(10, "start", "one", version="v1.43.8", run=1),
+            event(20, "land", "one", version="v1.43.8")]
+    baseline = dispatch_metrics.render(rows, 0, 100)
+    recorded = dispatch_metrics.render(rows + [event(30, "release_merged", "release",
+                                                      version="v1.43.8", merged_at=90, pr=1)], 0, 100)
+    duration_metrics = ("k3dm_dispatch_release_span_minutes", "k3dm_dispatch_release_active_minutes")
+    recorded_other = [line for line in recorded.splitlines() if not line.startswith(duration_metrics)]
+    baseline_other = [line for line in baseline.splitlines() if not line.startswith(duration_metrics)]
+    assert recorded_other == baseline_other
+
+
 def test_release_versions_normalize_and_sort_numerically():
     events = [
         event(1, "start", "plain", version="1.43.3"), event(2, "land", "plain", version="1.43.3"),
@@ -876,7 +918,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 60  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more
+    assert sum("$window" in expr for expr in expressions) == 62  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more; release duration adds two
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",

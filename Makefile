@@ -32,7 +32,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -429,6 +429,9 @@ codex-abandon:
 ## Prune landed task worktrees across releases (YES=1 to remove)
 codex-prune:
 	@bin/k3dm-codex-dispatch prune $(if $(filter 1,$(YES)),--yes,)
+
+codex-release-merged:
+	@bin/k3dm-codex-dispatch release-merged --version '$(VERSION)' --pr '$(PR)' --merged-at '$(MERGED_AT)'
 
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
@@ -1506,6 +1509,14 @@ snapshot-list:
 ## Prune old hub snapshots, keeping K3DM_SNAPSHOT_KEEP (default 3).
 snapshot-prune:
 	./scripts/k3d-manager hub_snapshot_prune
+
+## Install the Sunday 02:30 weekly hub snapshot LaunchAgent.
+snapshot-schedule:
+	./scripts/k3d-manager hub_snapshot_schedule
+
+## Remove the weekly hub snapshot LaunchAgent.
+snapshot-unschedule:
+	./scripts/k3d-manager hub_snapshot_unschedule
 
 ## Set the mapped Hub PVs to Retain (operator-run; repeat after rebuild).
 hub-retain-pvs:

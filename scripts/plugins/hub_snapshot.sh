@@ -5,6 +5,7 @@ set -euo pipefail
 K3DM_SNAPSHOT_HOST="${K3DM_SNAPSHOT_HOST:-${E2E_M2_SSH_HOST:-m2jump}}"
 K3DM_SNAPSHOT_DIR="${K3DM_SNAPSHOT_DIR:-k3dm-snapshots}"
 K3DM_SNAPSHOT_KEEP="${K3DM_SNAPSHOT_KEEP:-3}"
+K3DM_SNAPSHOT_MAX_AGE_DAYS="${K3DM_SNAPSHOT_MAX_AGE_DAYS:-30}"
 K3DM_SNAPSHOT_AUTO_PRUNE="${K3DM_SNAPSHOT_AUTO_PRUNE:-1}"
 K3DM_SNAPSHOT_MIN_FREE_GB="${K3DM_SNAPSHOT_MIN_FREE_GB:-20}"
 K3DM_SNAPSHOT_CLUSTER="${K3DM_SNAPSHOT_CLUSTER:-k3d-k3d-cluster}"
@@ -131,7 +132,16 @@ function _hub_snapshot_preflight_space() {
 }
 
 function _hub_snapshot_capture_retention_notice() {
-  local _name _incomplete_count=0
+  local _name _stamp _epoch _now _incomplete_count=0 _current="${1:-${K3DM_SNAPSHOT_TIMESTAMP:-}}"
+  _now="${K3DM_SNAPSHOT_NOW_EPOCH:-$(date -u +%s)}"
+  while IFS= read -r _name; do
+    [[ "$_name" == *.INCOMPLETE ]] || continue
+    _stamp="${_name%.INCOMPLETE}"
+    [[ "$_stamp" == "$_current" ]] && continue
+    if _epoch="$(_hub_snapshot_timestamp_epoch "$_stamp")" && (( _now - _epoch > 86400 )); then
+      _hub_snapshot_remote_remove "$_name" || _warn "[hub-snapshot] could not remove stale incomplete snapshot ${_name}"
+    fi
+  done < <(_hub_snapshot_remote_names)
   if [[ "$K3DM_SNAPSHOT_AUTO_PRUNE" == 1 ]]; then
     if ! _hub_snapshot_prune_verified "$K3DM_SNAPSHOT_KEEP"; then
       _warn "[hub-snapshot] auto-prune failed; run make snapshot-prune"
@@ -188,18 +198,25 @@ function hub_snapshot_guard_delete() {
   _info "[hub-snapshot] latest verified snapshot ${_latest} on ${K3DM_SNAPSHOT_HOST} is ${_age}h old"
 }
 
-function hub_snapshot_capture() {
+# shellcheck disable=SC2120
+function hub_snapshot_capture() (
   if [[ "${1:-}" == "--help" ]]; then
     echo "Usage: hub_snapshot_capture"
     return 0
   fi
   [[ "$#" -eq 0 ]] || { echo "Usage: hub_snapshot_capture" >&2; return 2; }
+  local _lock="${K3DM_SNAPSHOT_LOCK:-${HOME}/.local/share/k3d-manager/hub-snapshot.lock}"
+  if [[ "${HUB_SNAPSHOT_LOCK_HELD:-0}" != 1 ]]; then
+    if ! mkdir "$_lock" 2>/dev/null; then _info "[hub-snapshot] another capture is running; skipping"; return 0; fi
+    trap 'rmdir -- "$_lock" 2>/dev/null || true' EXIT
+  fi
   local _stage _timestamp _remote _node _namespace _claim _storage _pv _uid _path _container
   [[ "${K3DM_SNAPSHOT_KEEP}" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_KEEP must be a positive integer"; return 2; }
+  [[ "${K3DM_SNAPSHOT_MAX_AGE_DAYS}" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_MAX_AGE_DAYS must be a positive integer"; return 2; }
   _stage="$(_run_command -- mktemp -d "${TMPDIR:-/tmp}/k3dm-hub-snapshot.XXXXXX")"
   _run_command -- chmod 700 "$_stage"
   _hub_snapshot_stage="$_stage"
-  trap 'rm -rf -- "$_hub_snapshot_stage"' EXIT
+  trap 'rm -rf -- "$_hub_snapshot_stage"; [[ "${HUB_SNAPSHOT_LOCK_HELD:-0}" == 1 ]] || rmdir -- "$_lock" 2>/dev/null || true' EXIT
   _timestamp="${K3DM_SNAPSHOT_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
   _remote="${K3DM_SNAPSHOT_DIR}/${_timestamp}"
   if ! _hub_snapshot_ssh true; then
@@ -241,8 +258,8 @@ function hub_snapshot_capture() {
   _run_command -- mkdir -p "$(dirname "$K3DM_SNAPSHOT_STAMP")"
   printf '%s\n' "$_timestamp" > "$K3DM_SNAPSHOT_STAMP"
   _info "[hub-snapshot] captured ${_timestamp} to ${K3DM_SNAPSHOT_HOST}:${_remote}"
-  _hub_snapshot_capture_retention_notice
-}
+  _hub_snapshot_capture_retention_notice "$_timestamp"
+)
 
 function _hub_snapshot_remote_names() {
   _hub_snapshot_ssh "find '$K3DM_SNAPSHOT_DIR' -mindepth 1 -maxdepth 1 -type d -name '20*' -exec basename {} \\; | sort"
@@ -263,13 +280,28 @@ function _hub_snapshot_remote_remove() {
   _hub_snapshot_ssh "rm -rf -- '$K3DM_SNAPSHOT_DIR/$1'"
 }
 
+function _hub_snapshot_timestamp_epoch() {
+  local _name="$1" _parsed
+  [[ "$_name" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || return 1
+  if _parsed="$(date -j -u -f '%Y%m%dT%H%M%SZ' "$_name" +%s 2>/dev/null)"; then printf '%s\n' "$_parsed"; return 0; fi
+  date -u -d "${_name:0:4}-${_name:4:2}-${_name:6:2} ${_name:9:2}:${_name:11:2}:${_name:13:2} UTC" +%s 2>/dev/null
+}
+
 function _hub_snapshot_prune_verified() {
-  local _keep="$1" _name _count=0
+  local _keep="$1" _name _count=0 _age _epoch _now _max_age="${K3DM_SNAPSHOT_MAX_AGE_DAYS}"
   [[ "$_keep" =~ ^[1-9][0-9]*$ ]] || return 2
+  [[ "$_max_age" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_MAX_AGE_DAYS must be a positive integer"; return 2; }
+  _now="${K3DM_SNAPSHOT_NOW_EPOCH:-$(date -u +%s)}"
   while IFS= read -r _name; do
     [[ -z "$_name" || "$_name" == *.INCOMPLETE ]] && continue
     _count=$((_count + 1))
-    if [[ "$_count" -gt "$_keep" ]]; then
+    if ! _epoch="$(_hub_snapshot_timestamp_epoch "$_name")"; then
+      _warn "[hub-snapshot] keeping ${_name}: name is not a timestamp"
+      continue
+    fi
+    if [[ "$_count" -le "$_keep" ]]; then continue; fi
+    _age=$((_now - _epoch))
+    if (( _age > _max_age * 86400 )); then
       _hub_snapshot_remote_remove "$_name" || return 1
     fi
   done < <(_hub_snapshot_remote_names | sort -r)
@@ -279,6 +311,7 @@ function hub_snapshot_prune() {
   local _keep="${K3DM_SNAPSHOT_KEEP}" _name _verified=0
   local -a _incomplete=()
   [[ "$_keep" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_KEEP must be a positive integer"; return 2; }
+  [[ "${K3DM_SNAPSHOT_MAX_AGE_DAYS}" =~ ^[1-9][0-9]*$ ]] || { _err "[hub-snapshot] K3DM_SNAPSHOT_MAX_AGE_DAYS must be a positive integer"; return 2; }
   while IFS= read -r _name; do
     [[ -z "$_name" ]] && continue
     if [[ "$_name" == *.INCOMPLETE ]]; then
@@ -294,8 +327,37 @@ function hub_snapshot_prune() {
     _hub_snapshot_remote_remove "$_name"
   done
   _hub_snapshot_prune_verified "$_keep" || return 1
-  _info "[hub-snapshot] retained ${_keep} newest verified snapshots"
+  _info "[hub-snapshot] retained verified snapshots newer than ${K3DM_SNAPSHOT_MAX_AGE_DAYS} days (at least ${_keep} newest)"
 }
+
+function hub_snapshot_scheduled() { (
+  local _lock="${K3DM_SNAPSHOT_LOCK:-${HOME}/.local/share/k3d-manager/hub-snapshot.lock}" _rc=0 _start
+  if ! mkdir "$_lock" 2>/dev/null; then _info "[hub-snapshot] another capture is running; skipping"; return 0; fi
+  trap 'rmdir -- "$_lock" 2>/dev/null || true' EXIT
+  _start="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  _info "[hub-snapshot] scheduled capture started at ${_start}"
+  if declare -f _ssh_config_guard >/dev/null 2>&1; then _ssh_config_guard --repair "$K3DM_SNAPSHOT_HOST" || _rc=$?; fi
+  if (( _rc == 0 )); then
+    # shellcheck disable=SC2119
+    HUB_SNAPSHOT_LOCK_HELD=1 hub_snapshot_capture || _rc=$?
+  fi
+  _info "[hub-snapshot] scheduled capture ended at $(date -u '+%Y-%m-%dT%H:%M:%SZ') (exit ${_rc})"
+  return "$_rc"
+) }
+
+function hub_snapshot_schedule() { (
+  local template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.hub-snapshot.plist.tmpl" plist="${HOME}/Library/LaunchAgents/com.k3d-manager.hub-snapshot.plist"
+  _is_mac || return 0; command -v launchctl >/dev/null 2>&1 || { _warn "[hub-snapshot] launchctl not available"; return 0; }
+  mkdir -p "$(dirname "$plist")"
+  sed -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" -e "s|{{HOME}}|${HOME}|g" "$template" > "$plist"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-snapshot" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+) }
+
+function hub_snapshot_unschedule() { (
+  _is_mac || return 0
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-snapshot" 2>/dev/null || true
+) }
 
 function hub_snapshot_retain_pvs() {
   local _node _namespace _claim _storage _pv _policy _rc=0

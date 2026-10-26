@@ -44,63 +44,30 @@ The project ships fast, small releases (see `docs/releases.md`). Condensed arc:
 | **v1.26.0** | Count-agnostic k3s-aws fleet node lifecycle + E2E promotion gate (durable artifacts, Grafana/alerts) + safe reclamation of dead sandbox registrations |
 | **v1.27.0** | Image signing + attestation (cosign sign/attest, three-latch BUILD/PROMOTE/ADMIT via Kyverno, Audit→Enforce) + adaptive checkout load testing |
 | **v1.28.0** | Parallel multi-cloud provisioning (Phase 1–3b) + public-endpoint probe (Hermes Phase-1 first deliverable); zero-downtime rollouts deferred (hardware-gated) |
+| **v1.29–v1.34** | Hermes: read-only monitoring, then guarded repairs, credential watch, monthly security digest, Slack approvals and scheduled autonomy; self-healing Vault seeders; Kine circuit breaker |
+| **v1.35–v1.39** | CI visibility, Tier 2 E2E, webhook modularization, gates that prove what they claim, a cloud agent's read-only window on the cluster, dedup with prior-art memory |
+| **v1.40–v1.42** | Slack `/ask-docs`, cloud agent drives the disposable sandbox, rebuild-durable logs and caches, Slack hardening |
+| **v1.43.0–v1.43.2** | Hub data export, verified restore drill, hub recovery and dashboard truthfulness fixes |
+| **v1.43.3–v1.43.8** | Bug Tracking and Agent Dispatch dashboards: live-verification evidence, release planning, per-agent dispatch data, release duration, plan waves, weekly hub snapshots, status-channel Slack routing |
 
 ---
 
-## Current milestone — v1.29.0 (active)
+## Current milestone — v1.43.8 (closing)
 
-**Theme: Hermes Phase-1 — read-only operations monitoring.** An optional off-hub agent (runs on
-the laptop like `bin/k3dm-webhook`, so **not** hardware-gated) that samples cluster/CI health from
-existing read-only interfaces and posts a single Slack summary only on sustained, multi-signal
-degradation. Hard constraints: reports-and-stops (NO mutation path in the codebase), the
-k3d-manager webhook stays authoritative, least-privilege (three read-only creds, no direct
-kube-apiserver credential), and LLM as last resort (non-Claude default, per-day budget, deterministic
-fallback). Scope: `docs/architecture/hermes-phase1-monitoring-scope.md`.
-
-### Workstreams — all code complete + verified
-
-| WS | Scope | Status |
-|---|---|---|
-| WS0 | Read-only access model — reuse webhook bearer (GET-only) + new ArgoCD `hermes` local account (get-only) + new GitHub read-only PAT | ✅ live + DoD-verified (`can-i get`=yes, `sync`/`delete`=no; no K8s SA, no kubeconfig) |
-| WS1+WS2 | Five sensors (ESO, ArgoCD per-app, reachability probe, node/data-layer via webhook, GitHub Actions) + correlator + Slack (`4e9d3e6e`) | ✅ Python stdlib-only, pytest 8/8, no mutation verb / no kubeconfig |
-| WS3 | `_install_hermes_agent`/`_uninstall_hermes_agent` in lib-foundation **v0.4.15** → subtree-pulled → consumer files (`6aad603d`): launchd plist, `bin/k3dm-hermes-setup`, jitter | ✅ LaunchAgent installed, first cycle 5/5 sensors real data |
-| WS4 | `docs/guides/hermes.md` (`c7fa27a8`) | ✅ passes `_doc_hygiene_check` |
-
-### Also shipped in v1.29.0 — self-healing Vault seeders
-Cluster rebuilds wipe the Vault raft; grafana + cosign KV had no bring-up seeders (`43ce7732`).
-Added `observability_seed_grafana` (fresh-generate-if-absent) and fixed `signing_restore`
-(`7eaaf897`: missing `_vault_login`; `ae9d8cb4`: graceful skip when the Kyverno admission namespace
-is absent). Live-verified: all four remediation targets healthy. Bug doc:
-`docs/bugs/v1.29.0-bugfix-signing-restore-no-login-grafana-seed-no-public-entry.md`.
-
-### Closing condition for v1.29.0
-- [x] Hermes WS0–WS4 code complete, verified, LaunchAgent installed + first cycle clean.
-- [x] Vault seeder self-heal shipped + live-verified (grafana + cosign).
-- [x] Reapply **all** ApplicationSets pinned to `k3d-manager-v1.29.0`, confirmed with
-      `argocd_check_values_branch` — **DONE 2026-09-06**: `deploy_argocd_applicationsets --confirm`
-      applied 12/12 sets; after reconcile the check reports *All Applications reference values branch
-      k3d-manager-v1.29.0* (all 6 that were on `v1.28.0` flipped). Durable entrypoint added this
-      release: `./scripts/k3d-manager deploy_argocd_applicationsets --confirm` (surgical reapply-all +
-      self-verify; no image-updater/platform-ops redeploy).
-      *Note:* the earlier scratchpad render+diff only covered `observability`/`observability-acg` —
-      2 of the ~7 branch-pinned sets — so it would not have cleared all 6 drifted apps. The
-      reapply-all entrypoint is what actually satisfied this condition.
-- [x] Hub CPU overcommit Step 2 load-shed — **already live** (verified 2026-09-06: no loki-canary
-      pods, prometheus scrape/eval 60s, retention 3d/8GB); shipped with the v1.28.0 values pin.
-- [ ] `/create-pr` gate met (CI green + Copilot addressed + Gemini smoke + Claude scope), PR merged,
-      tag `v1.29.0`, retro written. **Never auto-merge.**
+Release-tracking and ops-routing patch: release duration on Agent Dispatch, Plans-table waves and
+overlaps, the weekly hub snapshot with 30-day retention, and Slack system notices routed to the status
+channel. Scope and plan list: [Candidate milestone — v1.43.8](#candidate-milestone--v1438-patch) below.
+Next: v1.43.9 (full at five plans), then v1.43.10.
 
 ---
 
 ## Queued milestones (scoped)
 
-None currently queued with a committed version number. The previously queued block has all shipped
-(**v1.24.1** status output contract, **v1.25.0** Tier 1 E2E harness + dry-run standardization,
-**v1.26.0** fleet node lifecycle + E2E promotion gate + sandbox-registration cleanup, **v1.27.0**
-image signing + adaptive checkout load) — see the arc table above and `docs/releases.md`. The
-originally-queued **v1.28.0 platform zero-downtime rollouts** was deferred (hardware-gated); the
-v1.28.0 tag instead shipped parallel multi-cloud provisioning + the public-endpoint probe. The next
-milestone will be chosen from Forward themes below once it gets a scope doc.
+Candidate sections for releases already tagged (v1.42.0 through v1.43.7) have shipped; they stay
+below as the record of each release's scope. `docs/releases.md` is the ledger.
+
+Queued with committed version numbers: v1.43.9 and v1.43.10 (each full at five plans), then the
+v1.44–v1.48 milestones below. Unversioned work stays under Forward themes until it gets a scope doc.
 
 ### Candidate milestone — v1.42.0: k3d-manager Dot
 
@@ -388,18 +355,19 @@ Plan 2 of 5 is [`slack-route-system-notices-to-status-channel`](plans/v1.43.8-sl
 channel (#grafana-notification), and operator- and agent-started posts stay in #acg-automation. The
 operator swaps the CronJob incoming webhook so ACG expiry and rotator notices follow.
 
-Plan 3 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.8-dispatch-claude-cost-by-reference.md)
-(operator, 2026-10-24): each spec is charged with the Claude turns whose tool calls name it (spec file,
-worktree, `SLUG=`), including spec writing, instead of all Claude usage while it was dispatched.
+Plan 3 of 5 is [`plans-table-dispatch-waves-and-file-overlaps`](plans/v1.43.8-plans-table-dispatch-waves-and-file-overlaps.md)
+(operator, 2026-10-25; moved from v1.43.10 the same day, swapping with Claude cost-by-reference): the Plans
+table gains a Wave column derived from `Depends on`, an optional `**Wave:**` header for timing constraints,
+an Overlaps column for same-release plans whose `**Component:**` files overlap with no dependency, Spec
+approval and Dispatch columns (a new `**Dispatch:**` header) in place of Approval, Depends on links and a
+Blocked by column.
 
 Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-hub-snapshot-weekly-schedule-and-age-retention.md)
 (operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
 "newest three" to "purge verified snapshots older than 30 days, never the newest three". Dispatch go recorded 2026-10-24.
 
-Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-path-on-node.md)
-(operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
-directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
-10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+Hostinger public path (was plan 5) moved to v1.43.10 on 2026-10-25 (Claude): it waits for the 10-29 hub
+rebuild, and v1.43.8 ships with plans 1–4.
 
 ### Candidate milestone — v1.43.9 (patch)
 
@@ -442,7 +410,24 @@ Plan 2 of 5 is [`claude-quota-exhaustion-availability-telemetry`](plans/v1.43.10
 scheduled reset versus observed resumption, confirmed quota-induced wait and coordinator availability.
 A provider-neutral schema permits later Codex/Gemini adapters, but this plan does not add automatic
 failover. Filed after the first observed five-hour quota cap; v1.43.8 and v1.43.9 are both full.
-Implementation waits for v1.43.10 and operator dispatch approval. v1.43.10 has 2 of 5 plans.
+Implementation waits for v1.43.10 and operator dispatch approval.
+
+Plan 3 of 5 is [`spec-and-fix-quality`](plans/v1.43.10-spec-and-fix-quality.md) (operator, 2026-10-25):
+P3 enhancement measuring spec quality (rework causes, review and independent-verifier results, spec
+edits after dispatch, per spec) and fix quality (escaped defects linked by a `**Caused by:**` bug-doc
+header, per spec and per release), as separate columns with no combined score. Depends on v1.43.9's
+complexity plan.
+
+Plan 4 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.10-dispatch-claude-cost-by-reference.md)
+(operator, 2026-10-24; moved from v1.43.8 on 2026-10-25): each spec is charged with the Claude turns whose
+tool calls name it (spec file, worktree, `SLUG=`), including spec writing, instead of all Claude usage
+while it was dispatched.
+
+Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.10-hostinger-public-path-on-node.md)
+(operator, 2026-10-24; moved from v1.43.8 on 2026-10-25 by Claude, so v1.43.8 could ship): cloudflared
+runs on the Hostinger node and serves `frontend.3ai-talk.org` directly, so an M4 → Hostinger path drop is
+no longer a public outage (six drops 2026-10-12 to 10-22). Wave: after the 2026-10-29 hub rebuild.
+Critical: needs a dispatch go. v1.43.10 is now full.
 
 ### Candidate milestone — v1.44.0
 

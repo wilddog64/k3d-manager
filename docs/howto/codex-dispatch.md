@@ -7,6 +7,14 @@ make codex-dispatch SPEC=docs/plans/v1.43.0-example.md
 make codex-status
 ```
 
+After a release PR merges, record its merge time once in the dispatch ledger (the command makes no network call):
+
+```bash
+make codex-release-merged VERSION=v1.43.8 PR=151 MERGED_AT=2026-10-25T23:01:51Z
+```
+
+The target calls `bin/k3dm-codex-dispatch release-merged --version VERSION --pr PR --merged-at MERGED_AT`. Repeating the same version and merge time is idempotent; a corrected merge time is appended and the exporter uses the latest recorded event.
+
 Review the task worktree, run the spec's gates, and commit the verified changes in that worktree. Then return to the operator checkout and land it. `land` rebases first, runs the requested command on the rebased task, and only then fast-forwards:
 
 ```bash

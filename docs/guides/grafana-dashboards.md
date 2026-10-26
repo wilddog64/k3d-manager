@@ -36,15 +36,21 @@ All dashboard ConfigMaps use the `grafana_dashboard: "1"` label in the `monitori
 
 In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 
-Bug Tracking defaults to **Auto (current)**: the bug summaries and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. The Release stat remains the current release independently of Manual selection. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
+Bug Tracking defaults to **Auto (current)**: the **Release** row (Release, Bugs filed, Bugs open and Bugs fixed) and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**; the Release tile shows the picked releases as that box names them, or All. **Open, scheduled later** and **Open, untriaged** are repository-wide counts in both modes. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
 
 In the Bugs table, **Fix commit** comes from the bug doc's **Fix commit:** header when present, otherwise from the commit that marked the bug fixed. **Fixed in** continues to show the release where its status changed.
 
 ### Release plans
 
-The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Release:**`, and `**Depends on:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
+The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Dispatch:**`, `**Release:**`, `**Depends on:**`, `**Wave:**`, and `**Component:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
 
-The **Order** column comes from the plan number on each document's `**Release:**` line, and **Depends on** lists the plan paths from its `**Depends on:**` line. A plan whose dependency has not been implemented is not ready to dispatch.
+The **Order** column comes from the plan number on each document's `**Release:**` line. **Depends on** lists the referenced plans and links to the first dependency's spec on the scanned branch. A plan whose dependency has not been implemented is not ready to dispatch. **Wave** is calculated from same-release dependencies: independent plans start at 1, and each dependent plan follows the highest dependency wave. A cycle displays `cycle`. A declared `**Wave:** <n> — <reason>` can postpone a plan; it cannot make it earlier. **Wave note** shows the sanitized reason (up to 80 characters), or reports when the declared number is earlier than required.
+
+**Overlaps** flags same-release plans that share a path listed on their `**Component:**` lines and have no direct or transitive dependency. Directory paths ending in `/` cover paths below them. To clear an overlap, add the real prerequisite to `**Depends on:**`; if the shared work is intentionally independent, record the accepted overlap in the plan body. The table continues to flag accepted overlaps by design. Keep `**Component:**` complete: detection reads only that header, not paths mentioned elsewhere in the document. The Undeclared plan overlaps stat counts conflicting pairs for the selected releases.
+
+**Spec approval** reports `approved`, `pending`, `none`, or `n/a` from `**Approval:**`. **Dispatch** reports only the explicit `**Dispatch:**` header (`go`, `needed`, `not required`, or `unknown`); approval prose does not grant dispatch approval. **Blocked by** explains dispatch readiness, including a missing release branch, unlanded prerequisites, missing dispatch go, and declared timing notes. It applies only to `proposed` and `ready` plans; plans already in progress or landed show `-`. A same-release prerequisite reads `plan <n> not landed`; a prerequisite from another release is named by its stem. Unknown dispatch approval is never treated as ready.
+
+When filing a plan, keep `**Component:**` complete with every touched file or directory in backticks. The overlap scanner intentionally uses this line alone.
 
 | Status starts with | Execution | Verification |
 |---|---|---|
@@ -63,6 +69,8 @@ Approval is `explicit` unless the line is absent (`none`) or begins with `pendin
 ## k3dm Agent Dispatch
 
 The **Agent Dispatch** dashboard covers dispatch throughput, active runs, per-spec delivery and verification, plus run outcomes. Its **Window** selector includes time windows and ledger releases from v1.43.0 onward. Use the **Agents** link to move between the three agent dashboards while keeping the selected time range and window.
+
+In a release window, **Release span** measures calendar time from the release's first dispatch to its PR merge, or to its latest land while the release is unmerged; its `end` label is `merge` or `last_land` accordingly. **Active time** unions each landed spec's first-start-to-last-land interval, so overlapping work counts once. Both panels show no data for time windows, and **Time to land** is the mean per spec.
 
 Agent-neutral task token totals include Codex's cumulative `codex_exit.tokens` and the sum of agy's per-run `agent_exit.usage.total_tokens`; agent runtime and run counts include exits from both agents.
 
@@ -88,8 +96,8 @@ The Agent dispatch **Per spec** table links each Spec name to its plan or bug do
 task's release branch; the link opens in a new tab. **Agent** names who landed the spec
 (`codex` or `agy`); the Codex columns stay empty for an agy row. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
-totals. **Dispatch-to-land elapsed (wall clock)** is `earliest(start.ts) → land.ts`, including retries,
-idle time and overnight waits; it is not worker runtime or active review. **Final worker exit → land**
+totals. **Dispatch-to-land elapsed (wall clock)** (column **Dispatch → land**) is `earliest(start.ts) → land.ts`, including retries,
+idle time and overnight waits; it is not worker runtime or active review. **Final worker exit → land** (column **Exit → land**)
 is the wall-clock gap from the final qualifying Codex exit to land, and missing exits remain N/A.
 Both values are means rather than footer sums because parallel dispatches overlap. The former
 includes the full dispatch-to-land interval; the latter is not proof of human waiting. Live

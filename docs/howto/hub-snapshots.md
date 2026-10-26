@@ -8,11 +8,23 @@ with `K3DM_SNAPSHOT_HOST` or set `K3DM_SNAPSHOT_DIR` for another remote store.
 
 `make snapshot-list` reports each timestamp, size, and verified/incomplete
 state. After a successful capture, `make snapshot` automatically prunes to the
-newest `K3DM_SNAPSHOT_KEEP` (default 3) verified snapshots. Set
+newest `K3DM_SNAPSHOT_KEEP` (default 3) verified snapshots, and removes older
+verified snapshots beyond that floor only when they exceed the age limit. Set
 `K3DM_SNAPSHOT_AUTO_PRUNE=0` to disable that automatic step. Auto-prune leaves
 incomplete uploads alone; `make snapshot-prune` deletes incomplete snapshots
-first and retains the newest verified snapshots. Change the ceiling with
-`K3DM_SNAPSHOT_KEEP`; pruning refuses to remove the last verified snapshot.
+first and applies the same age rule. Change the floor with `K3DM_SNAPSHOT_KEEP`
+and the age limit with `K3DM_SNAPSHOT_MAX_AGE_DAYS` (default 30 days).
+
+## Weekly schedule and retention
+
+`make snapshot-schedule` installs a LaunchAgent for Sunday at 02:30 local time;
+`make snapshot-unschedule` removes it. The run log is
+`~/Library/Logs/k3dm-hub-snapshot.log`. The newest three verified snapshots
+form a floor and are always retained, even when older than 30 days. Other
+verified snapshots are removed only after they are older than
+`K3DM_SNAPSHOT_MAX_AGE_DAYS`; younger snapshots remain regardless of count.
+`make status` warns when the newest snapshot is over 7 days old, making a
+broken or delayed weekly schedule visible.
 
 Before upload, the capture checks that the M2 has enough free space for the
 staging directory plus `K3DM_SNAPSHOT_MIN_FREE_GB` (default 20 GiB). A failed
