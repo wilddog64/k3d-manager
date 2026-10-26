@@ -689,3 +689,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-26: v1.43.9 credential-reuse fix dispatch running as `vectordb-retrieval-key-cache-retry2` from the approved P2 issue. Worker status: running, scope in-scope. Initial start failures (missing codex/node PATH) and the Files-heading parser correction recorded in the issue doc.
 
 - 2026-10-26: credential-reuse fix LANDED `8237c54d` via `k3dm-codex-dispatch` (issue/task `vectordb-retrieval-key-cache-retry2`). Reuses one in-memory API key per probe/live evaluation; standalone search retains prior lookup. Gates: prior_art/retrieval pytest 105 passed, 1 live skipped; VectorDB+negation BATS 18/18; Ruff clean; manifests 85/85; audit and diff checks passed. Live verification pending deploy + Hermes restart (explicitly excluded from dispatched task).
+
+## 2026-10-26 — Hermes LaunchAgent GitHub fetch investigation
+
+- [x] Compared interactive M4 GitHub access with LaunchAgent environment: interactive SSH agent present; `launchctl getenv SSH_AUTH_SOCK` empty; remote read without agent fails `Permission denied (publickey)`.
+- [x] Confirmed `_refresh_index` only runs the retrieval probe following successful/no-op indexing; fetch failure leaves previous metrics stale.
+- [x] Filed OPEN P2 `docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md` with exact terminal evidence and credential-safe follow-up.
+- [ ] Implement unattended, least-privilege GitHub read access and verify from the LaunchAgent context.
+- Commit pending; PR URL: none.
