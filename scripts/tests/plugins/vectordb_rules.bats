@@ -21,7 +21,8 @@ OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-c
 @test "automatic indexing alerts use the requested windows" {
   run grep -A4 -F -- 'alert: VectorDBIndexDrift' "${RULES}"
   [[ "${output}" == *"oldest_drift_age_seconds"* ]]
-  ! grep -A5 -F -- 'alert: VectorDBIndexDrift' "${RULES}" | grep -F -- 'for:'
+  run grep -A5 -F -- 'alert: VectorDBIndexDrift' "${RULES}"
+  [[ "${output}" != *"for:"* ]]
   run grep -A4 -F -- 'alert: VectorDBIndexFailing' "${RULES}"
   [[ "${output}" == *"for: 30m"* ]]
 }
