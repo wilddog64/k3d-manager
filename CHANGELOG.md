@@ -5,6 +5,7 @@
 ### Added
 
 - Agent Dispatch shows a release's calendar span to merge (or latest land) and unioned active time; `codex-release-merged` records the PR merge timestamp in the local ledger.
+- Schedule weekly Sunday 02:30 hub snapshots and retain verified snapshots by age with a three-snapshot floor.
 
 ### Changed
 

@@ -39,6 +39,7 @@ check writes its output under `${TMPDIR:-/tmp}/k3dm-smoke/<UTC-run>/`.
 | `make hub-data-export-setup` | `scripts/k3d-manager hub_data_export_setup` | One-time: service account and list-only Vault role for the unattended export, with a self-test. |
 | `make hub-data-export-schedule` / `make hub-data-export-unschedule` | hub data schedule functions | Install or remove the 03:30 daily export LaunchAgent on the M4. |
 | `make hub-data-prune` | `scripts/k3d-manager hub_data_prune` | Apply export retention (five days, newest, last drill-proven); `DRY_RUN=1` previews. |
+| `make snapshot-schedule` / `make snapshot-unschedule` | hub snapshot schedule functions | Install or remove the Sunday 02:30 weekly snapshot LaunchAgent on the M4. |
 | `make dr-drill` | `bin/dr-drill` | Restore and verify the newest export on the M2. |
 | `make dr-drill-publish` | `bin/dr-drill-publish` | Publish the M2 result and metrics from the M4. |
 
@@ -51,8 +52,9 @@ The capture includes the k3s server database and token, the PV/PVC metadata,
 Vault's file-backed data tree, Prometheus, Loki, Keycloak Postgres, OpenLDAP,
 and Trivy local-path trees. Use `make snapshot-list` to show each timestamp,
 size, and verification state. `make snapshot-prune` removes incomplete
-snapshots first and keeps the newest three verified snapshots by default; set
-`K3DM_SNAPSHOT_KEEP` to change that ceiling.
+snapshots first, then removes verified snapshots older than 30 days beyond the
+newest three snapshot floor; set `K3DM_SNAPSHOT_KEEP` or
+`K3DM_SNAPSHOT_MAX_AGE_DAYS` to change the floor or age limit.
 
 `make hub-retain-pvs` patches the mapped Hub PVs to `Retain`; rerun it after
 each rebuild. `DISCARD_HUB_DATA=1` explicitly bypasses the `make down`
