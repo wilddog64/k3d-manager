@@ -71,7 +71,7 @@ started as part of this diagnosis.
 
 ## Dispatch scope
 
-### Files
+## Files
 
 - `scripts/lib/hermes/prior_art.py`
 - `scripts/lib/hermes/retrieval_eval.py`
