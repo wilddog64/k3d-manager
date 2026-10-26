@@ -645,3 +645,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - 2026-10-25: operator ordered MacBook Air M5 32GB/1TB, arrives Wed 2026-10-28. Intent: new machine becomes the hub, work distributed to the other two machines; one-command k3d-manager setup; secrets re-entered/rotated (presence-checked by name, never copied). Planning deferred until it arrives (operator).
 - 2026-10-25: the other two machines for distributed work are the M4 Air and an M2 (operator).
 - 2026-10-25: M2 = 16GB/1TB, operator's daily browsing + Grafana machine.
+- 2026-10-25: operator SSHes from M2 into M4 (tmux work + Claude sessions run on M4).
