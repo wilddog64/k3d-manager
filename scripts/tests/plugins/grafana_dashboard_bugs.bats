@@ -230,14 +230,40 @@ PY
 import json, sys
 data = json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n", 1)[1])
 panels = {panel["id"]: panel for panel in data["panels"]}
-for panel_id in (9,10,11,12,13,16,17,23,24):
+for panel_id in (2,3,4,9,10,11,12,13,16,17,23,24):
     expr=panels[panel_id]["targets"][0]["expr"]
-    assert "and on(repo,release) k3dm_bug_current_release_info" in expr, (panel_id,expr)
+    assert "and on(repo,release) k3dm_bug_current_release_info" in expr or "and on(release,repo) k3dm_bug_current_release_info" in expr, (panel_id,expr)
     assert 'release=~"$release"' in expr, (panel_id,expr)
     assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr, (panel_id,expr)
 assert 'live_verified=~"$verified"' in panels[23]["targets"][0]["expr"]
-for panel_id in (2,3,4,5,6,7,8,14,15):
+for panel_id in (5,6,7,8,14,15):
     assert "$release_mode" not in " ".join(t["expr"] for t in panels[panel_id].get("targets",[])), panel_id
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "release summary tiles follow mode while repository-wide tiles do not" {
+  run python3 - "${dashboard}" <<'PY'
+import json, re, sys
+data=json.loads(open(sys.argv[1]).read().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["id"]:p for p in data["panels"]}
+assert panels[20]["title"] == "Release"
+for panel_id, metric in ((2,"k3dm_bug_release_docs"),(3,"k3dm_bug_status_docs"),(4,"k3dm_bug_fixed_in_release_docs")):
+    expr=panels[panel_id]["targets"][0]["expr"]
+    assert "vector($release_mode) == 1" in expr and "vector($release_mode) == 0" in expr
+    assert 'release=~"$release"' in expr and "or vector(0)" in expr
+    assert metric in expr
+assert "vector($release_mode) == 1" in panels[1]["targets"][0]["expr"]
+assert "vector($release_mode) == 0" in panels[1]["targets"][0]["expr"]
+assert '"${release:text}"' in panels[1]["targets"][0]["expr"]
+assert 'release=~"$release"' not in panels[1]["targets"][0]["expr"]
+for panel_id in (1,2,3,4):
+    auto=panels[panel_id]["targets"][0]["expr"].split("vector($release_mode) == 0",1)[0]
+    assert "k3dm_bug_current_release_info" in auto and not re.search(r"v\d+\.\d+\.\d+",auto), (panel_id,auto)
+assert "Release mode" in panels[1]["description"]
+assert "Repository-wide" in panels[5]["description"] and "Release mode" in panels[5]["description"]
+assert "Repository-wide" in panels[6]["description"] and "Release mode" in panels[6]["description"]
+assert panels[6]["targets"][0]["expr"] == 'sum(k3dm_bug_docs{repo="$repo",state=~"open|unknown",priority="unset"})'
 PY
   [ "${status}" -eq 0 ]
 }

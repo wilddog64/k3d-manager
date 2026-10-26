@@ -89,7 +89,7 @@ data:
         {
           "id": 20,
           "type": "row",
-          "title": "Current release",
+          "title": "Release",
           "collapsed": false,
           "gridPos": {
             "x": 0,
@@ -116,7 +116,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "k3dm_bug_current_release_info{repo=\"$repo\"}",
+              "expr": "(k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (label_replace(vector(1), \"release\", \"${release:text}\", \"\", \"\") and on() (vector($release_mode) == 0))",
               "instant": true,
               "legendFormat": "{{release}}"
             }
@@ -144,7 +144,7 @@ data:
               }
             }
           },
-          "description": "The release branch Hermes indexes. Bug docs count toward it by their **Branch:** line, else the first tag that contains them.",
+          "description": "Follows Release mode: Auto shows the current release; Manual shows the picked releases as the Manual releases box names them (All when All is picked). Bug docs count toward a release by their **Branch:** line, else the first tag that contains them.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -163,7 +163,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"})",
+              "expr": "sum((k3dm_bug_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_release_docs{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -207,7 +207,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_status_docs{repo=\"$repo\",status=~\"open|unknown\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"}) or vector(0)",
+              "expr": "sum((k3dm_bug_status_docs{repo=\"$repo\",status=~\"open|unknown\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_status_docs{repo=\"$repo\",status=~\"open|unknown\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -255,7 +255,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum(k3dm_bug_fixed_in_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"}) or vector(0)",
+              "expr": "sum((k3dm_bug_fixed_in_release_docs{repo=\"$repo\"} and on(release,repo) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_fixed_in_release_docs{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)",
               "instant": true
             }
           ],
@@ -326,7 +326,7 @@ data:
               }
             }
           },
-          "description": "Open bug docs whose **Branch:** line names a release after the current one (for example a patch release).",
+          "description": "Repository-wide count of open bug docs whose **Branch:** line names a release after the current one (for example a patch release); it does not follow Release mode.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -375,7 +375,7 @@ data:
               }
             }
           },
-          "description": "Open or unclear docs with no **Priority:** line. Should stay 0.",
+          "description": "Repository-wide count of open or unclear docs with no **Priority:** line. Should stay 0; it does not follow Release mode.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

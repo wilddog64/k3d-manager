@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Bug Tracking's Release tile and Bugs filed/open/fixed summaries now follow Auto or Manual release selection; the scheduled-later and untriaged counts are labeled repository-wide.
 - Alert analyses without a Slack response URL are posted to `K3DM_STATUS_CHANNEL_ID` by the bot, with the incoming webhook as fallback.
 - Bug Tracking plans now show dependency waves, timing notes, undeclared Component overlaps, separate spec and dispatch approval, actionable dependency links, and dispatch blockers.
 
