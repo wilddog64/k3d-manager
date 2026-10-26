@@ -95,3 +95,22 @@ started as part of this diagnosis.
 - Run the retrieval probe and live-evaluation offline suites, focused VectorDB BATS, Ruff, manifest validation, and `_agent_audit`.
 - Tests must not contact Keychain, Vault, Google, the vector store, Pushgateway, or a cluster.
 - Do not run the live evaluation, restart Hermes, or deploy as part of this task.
+
+## Dispatch startup record — 2026-10-26
+
+The first dispatcher start was rejected because the issue draft used `### Files`; the dispatcher requires a section named exactly `## Files`. After correcting the heading, the worker exited with code 127:
+
+```text
+env: codex: No such file or directory
+```
+
+An explicit Codex path reached the CLI but failed because Node was not on the dispatcher PATH:
+
+```text
+env: node: No such file or directory
+```
+
+After abandoning those failed startup attempts, the dispatcher was relaunched with
+`PATH=/opt/homebrew/bin:$PATH` and `K3DM_CODEX_BIN=/opt/homebrew/bin/codex`.
+Run `vectordb-retrieval-key-cache-retry2` started successfully and reported
+`state: running`, `scope: in-scope`.
