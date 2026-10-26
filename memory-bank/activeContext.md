@@ -410,3 +410,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Release-row P3 landed c567cc68 (Claude fixed Manual/All tile to ${release:text}); E2 screenshot pending after ArgoCD sync.
 - 2026-10-25: release-row P3 E2 live-verified (Manual v1.43.4: 29/0/30; Auto v1.43.8: 1/1/0, scan lag on this bug's status); bug doc 656c190e.
 - 2026-10-25: v1.43.8 release prep: Hostinger plan moved to v1.43.10 plan 5 (77cf1bc7, Claude split); plan statuses updated (release-duration + plans-table LIVE-VERIFIED; snapshot E2 verified, E3 after Sun 11-01; slack E2/E3 carried); CHANGELOG promoted, release rows, API rows (457c8f9b).
+- 2026-10-25: release prep found 2 red tests in test_dispatch_metrics.py from 56f0007d (duplicate Per spec overrides; that land skipped this suite). Fixed e535415a. Running full make test + pytest before PR.
