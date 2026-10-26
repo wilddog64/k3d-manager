@@ -612,6 +612,11 @@ function hub_data_unseal_dr() {
   done
 }
 
+function hub_data_repoint_vault() {
+  local context="${1:-${K3DM_HUB_DATA_CONTEXT:-k3d-k3d-cluster}}"
+  _hub_data_repoint_vault "$context"
+}
+
 function _hub_data_restore_one() {
   local ns="$1" claim="$2" encrypted node path identity source_dir source_name cluster="${DR_DRILL_CLUSTER:-${K3DM_HUB_DATA_CLUSTER:-k3d-cluster}}"
   encrypted="$3"; node="$4"; path="$5"; identity="${K3DM_HUB_DATA_AGE_IDENTITY:-}"; source_dir="${encrypted%/*}"; source_name="${encrypted##*/}"

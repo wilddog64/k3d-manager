@@ -32,7 +32,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -436,6 +436,10 @@ codex-release-merged:
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+## Run an operator-approved OrbStack upgrade and coordinated hub recovery
+orbstack-upgrade:
+	@DRY_RUN='$(if $(DRY_RUN),$(DRY_RUN),0)' FORCE='$(if $(FORCE),$(FORCE),0)' bin/k3dm-orbstack-upgrade
 
 dispatch-logs:
 	@bin/k3dm-dispatch-logs $(if $(filter 1,$(DRY_RUN)),--dry-run,)

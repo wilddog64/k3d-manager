@@ -1472,3 +1472,32 @@ def test_orbstack_metrics_publisher_runs_hourly(monkeypatch):
     k3dm_hermes._publish_orbstack_metrics(due, 4660)
     assert calls == [[str(ROOT / "bin" / "k3dm-orbstack-metrics")]]
     assert due["orbstack_last_run"] == 4660
+
+
+def test_orbstack_notice_names_and_deduplicates_available_version(monkeypatch):
+    posted = []
+    commands = []
+    monkeypatch.setattr(k3dm_hermes.urllib.request, "urlopen",
+                        lambda *_args, **_kwargs: type("Response", (), {
+                            "__enter__": lambda self: self,
+                            "__exit__": lambda self, *_: None,
+                            "read": lambda self: b'k3dm_orbstack_info{version="2.2.5"} 1\n'
+                            b'k3dm_orbstack_update_available 1\n'
+                            b'k3dm_orbstack_upgrade_last_success 0\n'
+                            b'k3dm_orbstack_upgrade_last_timestamp_seconds 12345\n'
+                        })())
+    def run(command, **_kwargs):
+        commands.append(command)
+        return type("Result", (), {"returncode": 3, "stdout": "Update available: 2.2.6",
+                                   "stderr": ""})()
+    monkeypatch.setattr(k3dm_hermes.subprocess, "run", run)
+    monkeypatch.setattr(k3dm_hermes, "post_summary", lambda _relay, text: posted.append(text))
+    state = {}
+    k3dm_hermes._orbstack_notice(state, "relay")
+    k3dm_hermes._orbstack_notice(state, "relay")
+    assert len(posted) == 2
+    assert "2.2.6" in posted[0] and "running 2.2.5" in posted[0]
+    assert "make orbstack-upgrade" in posted[0]
+    assert "failed recovery checks" in posted[1]
+    assert commands == [["orbctl", "update", "--check"], ["orbctl", "update", "--check"]]
+    assert sum("failed recovery checks" in message for message in posted) == 1

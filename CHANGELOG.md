@@ -5,6 +5,7 @@
 ### Added
 
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
+- Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.
 
 ## [1.43.8] - 2026-10-25
 

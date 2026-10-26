@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+ROOT="${ORBSTACK_UPGRADE_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck source=scripts/lib/system.sh
+source "$ROOT/scripts/lib/system.sh"
+set +eu
+DRY_RUN="${DRY_RUN:-0}"
+FORCE="${FORCE:-0}"
+CONTEXT="k3d-k3d-cluster"
+WATCHDOG_WAIT="${ORBSTACK_UPGRADE_WATCHDOG_WAIT:-300}"
+POLL_INTERVAL="${ORBSTACK_UPGRADE_POLL_INTERVAL:-10}"
+READY_TIMEOUT="${ORBSTACK_UPGRADE_READY_TIMEOUT:-900}"
+PUSHGATEWAY_URL="${K3DM_ORBSTACK_PUSHGATEWAY_URL:-http://localhost:19094}"
+PUSHGATEWAY_URL="${PUSHGATEWAY_URL%/}"
+REPORT_DIR="${HOME}/.k3dm/orbstack-upgrade"
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+REPORT="${REPORT_DIR}/${STAMP}.json"
+PHASES=()
+SNAPSHOT='{}'
+VERIFY='{}'
+
+write_report() {
+  mkdir -p "$REPORT_DIR" || return 1
+  {
+    printf '{"timestamp":"%s","result":"%s","preflight":%s,"verify":%s,"phases":[' "$STAMP" "$1" "$SNAPSHOT" "$VERIFY"
+    local i
+    for i in "${!PHASES[@]}"; do
+      [[ "$i" == 0 ]] || printf ','
+      printf '%s' "${PHASES[$i]}" | python3 -c 'import json,sys; p,s=sys.stdin.read().rstrip("\n").split(":",1); print(json.dumps({"phase":p,"status":s}),end="")'
+    done
+    printf ']}'
+  } > "$REPORT"
+  chmod 600 "$REPORT"
+}
+phase() { PHASES+=("$1:$2"); printf '[orbstack-upgrade] %s: %s\n' "$1" "$2"; write_report running || true; }
+refuse() { phase preflight "refused: $1"; write_report refused; exit 2; }
+
+check_rc=0
+orbctl update --check >/dev/null 2>&1 || check_rc=$?
+if [[ "$check_rc" != 3 ]]; then
+  if [[ "$check_rc" == 0 && "$FORCE" == 1 ]]; then
+    :
+  elif [[ "$check_rc" == 0 ]]; then
+    refuse 'no OrbStack update is available'
+  else
+    refuse 'orbctl update --check failed'
+  fi
+fi
+dispatch_bin="${ORBSTACK_DISPATCH_BIN:-$ROOT/bin/k3dm-codex-dispatch}"
+dispatch_status="$("$dispatch_bin" status 2>/dev/null || true)"
+grep -Eq '^state: (running|starting)$' <<< "$dispatch_status" && refuse 'a Codex dispatch task is running'
+# shellcheck disable=SC2009
+if ps -axo command= 2>/dev/null | grep -E '[b]in/cluster-up|[m]ake (up|refresh|platform-ops)( |$)' >/dev/null; then
+  refuse 'a cluster lifecycle or platform-ops command is running'
+fi
+current_context="$(kubectl config current-context 2>/dev/null || true)"
+[[ "$current_context" == "$CONTEXT" ]] || refuse "current Kubernetes context is ${current_context:-unknown}, expected ${CONTEXT}"
+security find-generic-password -s k3dm-vault-unseal-dr -a secrets/vault:count >/dev/null 2>&1 || refuse 'DR unseal copy is absent from Keychain'
+export_root="${K3DM_HUB_DATA_DIR:-${HOME}/.k3dm/hub-data}"
+last_success_file="$export_root/last-success"
+[[ -r "$last_success_file" ]] || refuse 'hub-data export timestamp is missing; run make hub-data-export'
+export_stamp="$(<"$last_success_file")"
+[[ "$export_stamp" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || refuse 'hub-data export timestamp is invalid; run make hub-data-export'
+export_epoch="$(TZ=UTC date -j -f '%Y%m%dT%H%M%SZ' "$export_stamp" +%s 2>/dev/null || TZ=UTC date -u -d "${export_stamp:0:8} ${export_stamp:9:2}:${export_stamp:11:2}:${export_stamp:13:2}" +%s 2>/dev/null || true)"
+[[ "$export_epoch" =~ ^[0-9]+$ ]] || refuse 'hub-data export timestamp could not be parsed; run make hub-data-export'
+export_age=$(( $(date -u +%s) - export_epoch ))
+(( export_age >= 0 && export_age <= 86400 )) || refuse 'newest hub-data export is older than 24 hours; run make hub-data-export'
+
+before_uid="$(_kubectl --no-exit --context "$CONTEXT" -n secrets get pod vault-0 -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+before_nodes="$(_kubectl --no-exit --context "$CONTEXT" get nodes -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+before_stores="$(_kubectl --no-exit --context "$CONTEXT" get secretstores,clustersecretstores -A -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+before_es="$(_kubectl --no-exit --context "$CONTEXT" get externalsecrets -A -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+before_apps="$(_kubectl --no-exit --context "$CONTEXT" -n cicd get applications.argoproj.io -o json | jq '[.items[] | select(.status.health.status=="Healthy")] | length')"
+before_hostnet="$(_kubectl --no-exit --context "$CONTEXT" get pods -A -o json | jq -c '[.items[] | select(.spec.hostNetwork==true) | {namespace:.metadata.namespace,name:.metadata.name,ip:.status.podIP}]')"
+SNAPSHOT="$(jq -cn --arg uid "$before_uid" --argjson hostnet "$before_hostnet" --argjson nodes "$before_nodes" --argjson stores "$before_stores" --argjson externalsecrets "$before_es" --argjson applications "$before_apps" '{vault_0_uid:$uid,host_network_pods:$hostnet,ready_nodes:$nodes,valid_secretstores:$stores,synced_externalsecrets:$externalsecrets,healthy_argocd_applications:$applications}')"
+phase preflight passed
+if [[ "$DRY_RUN" == 1 ]]; then
+  phase upgrade skipped-dry-run
+  phase recover skipped-dry-run
+  phase verify skipped-dry-run
+  write_report dry-run
+  printf '[orbstack-upgrade] plan: orbctl update; wait for Docker, hub API and Ready nodes; recover Vault/auth/host-network/metrics/port-forwards; compare health counts\n'
+  exit 0
+fi
+[[ -t 0 ]] || refuse 'interactive TTY required; no update was started'
+printf 'OrbStack update will restart the hub. Type yes to continue: ' >/dev/tty
+IFS= read -r answer </dev/tty
+answer="${answer%$'\r'}"
+[[ "$answer" == yes ]] || refuse 'confirmation was not yes'
+phase upgrade started
+_run_command -- orbctl update || { phase upgrade failed; write_report failed; exit 1; }
+deadline=$((SECONDS + READY_TIMEOUT))
+_orbstack_nodes_all_ready() {
+  _kubectl --no-exit --context "$CONTEXT" get nodes -o json |
+    jq -e '(.items | length) > 0 and ([.items[] | any(.status.conditions[]?; .type=="Ready" and .status=="True")] | all)' >/dev/null
+}
+hub_ready=0
+while true; do
+  if docker info >/dev/null 2>&1 && _kubectl --no-exit --context "$CONTEXT" get --raw=/readyz >/dev/null 2>&1 && _orbstack_nodes_all_ready; then
+    hub_ready=1
+    break
+  fi
+  (( SECONDS < deadline )) || break
+  sleep "$POLL_INTERVAL"
+done
+upgrade_failed=0
+if (( hub_ready == 0 )); then
+  phase upgrade failed
+  upgrade_failed=1
+else
+  phase upgrade 'done'
+fi
+
+manager_bin="${ORBSTACK_UPGRADE_MANAGER_BIN:-$ROOT/scripts/k3d-manager}"
+hostnet_bin="${ORBSTACK_UPGRADE_HOSTNET_BIN:-$ROOT/bin/k3dm-hostnet-drift}"
+step() { local name="$1"; shift; if "$@"; then phase "$name" 'done'; else phase "$name" failed; return 1; fi; }
+_orbstack_vault_sealed() {
+  local body sealed
+  body="$(_kubectl --no-exit --context "$CONTEXT" -n secrets exec vault-0 -- vault status -format=json 2>/dev/null)" || true
+  sealed="$(jq -r 'if has("sealed") then .sealed else true end' <<< "$body" 2>/dev/null || printf true)"
+  [[ "$sealed" != false ]]
+}
+failures="$upgrade_failed"
+if _orbstack_vault_sealed; then
+  sleep "$WATCHDOG_WAIT"
+  if _orbstack_vault_sealed; then step vault-unseal "$manager_bin" hub_data_unseal_dr || failures=1; else phase vault-unseal skipped-watchdog; fi
+else phase vault-unseal skipped; fi
+after_uid="$(_kubectl --no-exit --context "$CONTEXT" -n secrets get pod vault-0 -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+invalid_stores="$(_kubectl --no-exit --context "$CONTEXT" get secretstores,clustersecretstores -A -o json | jq '[.items[] | select((any(.status.conditions[]?; .type=="Ready" and .status=="True")) | not)] | length')"
+if [[ "$before_uid" != "$after_uid" && "$invalid_stores" -gt 0 ]]; then step vault-auth-repoint "$manager_bin" hub_data_repoint_vault "$CONTEXT" || failures=1; else phase vault-auth-repoint skipped; fi
+step host-network-drift "$hostnet_bin" --fix || failures=1
+step dispatch-metrics make dispatch-metrics || failures=1
+step hermes-kickstart launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.hermes" || failures=1
+while IFS= read -r label; do
+  [[ -n "$label" ]] || continue
+  service="${label%.plist}"
+  port="$(python3 - "$HOME/Library/LaunchAgents/$label" <<'PY'
+import plistlib, re, sys
+try:
+    args = plistlib.load(open(sys.argv[1], "rb")).get("ProgramArguments", [])
+except (OSError, ValueError):
+    args = []
+for arg in args:
+    match = re.fullmatch(r"(?:127\.0\.0\.1:)?(\d+):\d+", arg)
+    if match:
+        print(match.group(1))
+        break
+PY
+)"
+  if [[ -z "$port" ]]; then phase "$service" skipped-no-port; continue; fi
+  if nc -z 127.0.0.1 "$port" >/dev/null 2>&1; then
+    phase "$service" skipped-listening
+  elif launchctl kickstart -k "gui/$(id -u)/$service"; then
+    phase "$service" 'done'
+  else
+    phase "$service" failed
+    failures=1
+  fi
+done < <(find "$HOME/Library/LaunchAgents" -maxdepth 1 -type f -name 'com.k3d-manager.*-port-forward.plist' -exec basename {} \; 2>/dev/null)
+phase port-forwards 'done'
+
+after_nodes="$(_kubectl --no-exit --context "$CONTEXT" get nodes -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+after_stores="$(_kubectl --no-exit --context "$CONTEXT" get secretstores,clustersecretstores -A -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+after_es="$(_kubectl --no-exit --context "$CONTEXT" get externalsecrets -A -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
+after_apps="$(_kubectl --no-exit --context "$CONTEXT" -n cicd get applications.argoproj.io -o json | jq '[.items[] | select(.status.health.status=="Healthy")] | length')"
+vault_ok=0; _orbstack_vault_sealed || vault_ok=1
+forecast_ok=0; curl -fsS "$PUSHGATEWAY_URL/metrics" | grep -q '^k3dm_release_forecast' && forecast_ok=1
+regressions=()
+(( after_nodes >= before_nodes )) || regressions+=(nodes-ready)
+(( vault_ok == 1 )) || regressions+=(vault-unsealed)
+(( after_stores >= before_stores )) || regressions+=(secretstores-valid)
+(( after_es >= before_es )) || regressions+=(externalsecrets-synced)
+(( after_apps >= before_apps )) || regressions+=(argocd-healthy)
+(( forecast_ok == 1 )) || regressions+=(release-forecast)
+regression_json="$(jq -cn '$ARGS.positional' --args "${regressions[@]}")"
+VERIFY="$(jq -cn --argjson nodes "$after_nodes" --argjson stores "$after_stores" --argjson externalsecrets "$after_es" --argjson applications "$after_apps" --argjson vault_unsealed "$vault_ok" --argjson release_forecast "$forecast_ok" --argjson recovery_failures "$failures" --argjson regressions "$regression_json" '{ready_nodes:$nodes,valid_secretstores:$stores,synced_externalsecrets:$externalsecrets,healthy_argocd_applications:$applications,vault_unsealed:($vault_unsealed==1),release_forecast_present:($release_forecast==1),recovery_failures:$recovery_failures,regressions:$regressions}')"
+success=1; (( failures == 0 && ${#regressions[@]} == 0 )) || success=0
+now="$(date +%s)"
+if ! printf 'k3dm_orbstack_upgrade_last_success %s\nk3dm_orbstack_upgrade_last_timestamp_seconds %s\n' "$success" "$now" | \
+  curl -fsS -X PUT --data-binary @- "$PUSHGATEWAY_URL/metrics/job/k3dm-orbstack-upgrade" >/dev/null; then
+  failures=1
+  success=0
+fi
+if (( success )); then phase verify 'done'; result=success; else phase verify "failed:${regressions[*]}"; result=failed; fi
+write_report "$result"
+(( success == 1 )) || exit 1

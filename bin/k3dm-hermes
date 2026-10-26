@@ -4,6 +4,7 @@
 import json
 import os
 import random
+import re
 import secrets
 import subprocess
 import sys
@@ -696,6 +697,43 @@ def _publish_orbstack_metrics(state, now):
         print(f"OrbStack metrics publish skipped: {exc}", file=sys.stderr)
 
 
+def _orbstack_notice(state, relay):
+    """Report a newly available version and the latest coordinated-upgrade result."""
+    base = os.environ.get("K3DM_ORBSTACK_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    try:
+        with urllib.request.urlopen(f"{base}/metrics", timeout=5) as response:
+            body = response.read().decode()
+        version = re.search(r'^k3dm_orbstack_info\{version="([^"\\]+)"\} 1$', body, re.M)
+        available = re.search(r'^k3dm_orbstack_update_available 1(?:\.0+)?$', body, re.M)
+        if version:
+            state["orbstack_running_version"] = version.group(1)
+        if version and available:
+            check = subprocess.run(["orbctl", "update", "--check"], capture_output=True,
+                                   text=True, timeout=60, check=False)
+            update = re.search(r"(?:available|update to|version)\s*[:=]?\s*v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)",
+                               check.stdout + "\n" + check.stderr, re.I)
+            new_version = update.group(1) if update else None
+            announced = set(state.get("orbstack_notice_versions", []))
+            if check.returncode == 3 and new_version and new_version not in announced:
+                post_summary(relay, f"OrbStack {new_version} is available (running {version.group(1)}); installing it stops the hub. Run `make orbstack-upgrade` in a planned window.")
+                announced.add(new_version)
+                state["orbstack_notice_versions"] = sorted(announced)
+        if re.search(r'^k3dm_orbstack_upgrade_last_success 1(?:\.0+)?$', body, re.M):
+            stamp = re.search(r'^k3dm_orbstack_upgrade_last_timestamp_seconds ([0-9.]+)$', body, re.M)
+            key = stamp.group(1) if stamp else "unknown"
+            if state.get("orbstack_upgrade_notice") != key:
+                post_summary(relay, "OrbStack coordinated upgrade completed successfully; hub recovery checks passed.")
+                state["orbstack_upgrade_notice"] = key
+        elif re.search(r'^k3dm_orbstack_upgrade_last_success 0(?:\.0+)?$', body, re.M):
+            stamp = re.search(r'^k3dm_orbstack_upgrade_last_timestamp_seconds ([0-9.]+)$', body, re.M)
+            key = stamp.group(1) if stamp else "unknown"
+            if state.get("orbstack_upgrade_notice") != key:
+                post_summary(relay, "OrbStack coordinated upgrade completed with failed recovery checks; inspect the JSON report under ~/.k3dm/orbstack-upgrade/.")
+                state["orbstack_upgrade_notice"] = key
+    except Exception as exc:
+        print(f"OrbStack notice skipped: {exc}", file=sys.stderr)
+
+
 def _publish_cni_ipam_metrics():
     try:
         subprocess.run([str(ROOT / "bin" / "k3dm-cni-ipam-metrics")],
@@ -800,6 +838,7 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
     _publish_orbstack_metrics(state, now)
+    _orbstack_notice(state, relay)
     _publish_cni_ipam_metrics()
     _publish_pr_checks()
     _schedule_e2e(state)
