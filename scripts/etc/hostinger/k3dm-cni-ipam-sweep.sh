@@ -37,6 +37,9 @@ fi
 kept=0
 stale=0
 young=0
+skipped=0
+skipped_oldest_age_s=0
+now_s="$(date +%s)"
 for f in "${ipam_dir}"/*; do
   name="$(basename "${f}")"
   [[ "${name}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
@@ -47,6 +50,11 @@ for f in "${ipam_dir}"/*; do
   fi
   if printf '%s\n' "${running_ips}" | grep -xF -- "${name}" >/dev/null; then
     printf 'SKIP %s: no sandbox but a pod reports this IP\n' "${name}"
+    skipped=$((skipped + 1))
+    mtime_s="$(stat -c %Y -- "${f}" 2>/dev/null || stat -f %m -- "${f}")"
+    if (( now_s - mtime_s > skipped_oldest_age_s )); then
+      skipped_oldest_age_s=$((now_s - mtime_s))
+    fi
     kept=$((kept + 1))
     continue
   fi
@@ -81,11 +89,11 @@ alloc_errors="${alloc_errors:-0}"
 
 mkdir -p "$(dirname "${state_file}")"
 tmp="${state_file}.tmp"
-printf 'last_run=%s\nmode=%s\nkept=%s\nstale=%s\nyoung=%s\nreservations=%s\nrange_size=%s\nalloc_errors_1h=%s\n' \
-  "$(date +%s)" "${mode#--}" "${kept}" "${stale}" "${young}" "${reservations}" "${range_size}" "${alloc_errors}" \
+printf 'last_run=%s\nmode=%s\nkept=%s\nstale=%s\nyoung=%s\nreservations=%s\nrange_size=%s\nalloc_errors_1h=%s\nskipped=%s\nskipped_oldest_age_s=%s\n' \
+  "$(date +%s)" "${mode#--}" "${kept}" "${stale}" "${young}" "${reservations}" "${range_size}" "${alloc_errors}" "${skipped}" "${skipped_oldest_age_s}" \
   > "${tmp}"
 chmod 0644 "${tmp}"
 mv -f -- "${tmp}" "${state_file}"
 
-printf 'mode=%s kept=%s stale=%s young=%s reservations=%s range_size=%s alloc_errors_1h=%s\n' \
-  "${mode#--}" "${kept}" "${stale}" "${young}" "${reservations}" "${range_size}" "${alloc_errors}"
+printf 'mode=%s kept=%s stale=%s young=%s reservations=%s range_size=%s alloc_errors_1h=%s skipped=%s skipped_oldest_age_s=%s\n' \
+  "${mode#--}" "${kept}" "${stale}" "${young}" "${reservations}" "${range_size}" "${alloc_errors}" "${skipped}" "${skipped_oldest_age_s}"

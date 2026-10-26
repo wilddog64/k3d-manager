@@ -12,6 +12,7 @@ PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 STATE_PATH = "/var/lib/k3dm/cni-ipam-sweep.state"
 INTEGER_KEYS = ("last_run", "kept", "stale", "young", "reservations", "range_size", "alloc_errors_1h")
+OPTIONAL_INTEGER_KEYS = ("skipped", "skipped_oldest_age_s")
 
 
 def _ssh_destination():
@@ -37,6 +38,9 @@ def _read_state():
     for key in INTEGER_KEYS:
         if key not in values or not values[key].isdigit():
             raise ValueError(f"invalid {key}")
+    for key in OPTIONAL_INTEGER_KEYS:
+        if key in values and not values[key].isdigit():
+            raise ValueError(f"invalid {key}")
     return values
 
 
@@ -49,6 +53,10 @@ def _metrics(values):
         f"k3dm_cni_ipam_range_size{{{labels}}} {values['range_size']}",
         f"k3dm_cni_ipam_stale_last_run{{{labels}}} {values['stale']}",
         f"k3dm_cni_ipam_alloc_errors_1h{{{labels}}} {values['alloc_errors_1h']}",
+        f"k3dm_cni_ipam_kept{{{labels}}} {values['kept']}",
+        f"k3dm_cni_ipam_young{{{labels}}} {values['young']}",
+        *([f"k3dm_cni_ipam_skipped{{{labels}}} {values['skipped']}"] if "skipped" in values else []),
+        *([f"k3dm_cni_ipam_skipped_oldest_age_seconds{{{labels}}} {values['skipped_oldest_age_s']}"] if "skipped_oldest_age_s" in values else []),
         f"k3dm_cni_ipam_sweep_last_run_timestamp_seconds{{{labels}}} {values['last_run']}",
         f"k3dm_cni_ipam_probe_success{{{labels}}} 1",
     )) + "\n"

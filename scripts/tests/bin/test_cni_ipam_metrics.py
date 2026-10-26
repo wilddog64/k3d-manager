@@ -19,6 +19,8 @@ young=0
 reservations=45
 range_size=254
 alloc_errors_1h=2
+skipped=3
+skipped_oldest_age_s=4200
 """
 
 
@@ -38,6 +40,10 @@ def test_valid_state_emits_all_series(monkeypatch, capsys):
     assert "k3dm_cni_ipam_alloc_errors_1h{host=\"hostinger\"} 2" in output
     assert "k3dm_cni_ipam_sweep_last_run_timestamp_seconds{host=\"hostinger\"} 1700000000" in output
     assert "k3dm_cni_ipam_probe_success{host=\"hostinger\"} 1" in output
+    assert "k3dm_cni_ipam_kept{host=\"hostinger\"} 45" in output
+    assert "k3dm_cni_ipam_young{host=\"hostinger\"} 0" in output
+    assert "k3dm_cni_ipam_skipped{host=\"hostinger\"} 3" in output
+    assert "k3dm_cni_ipam_skipped_oldest_age_seconds{host=\"hostinger\"} 4200" in output
 
 
 
@@ -68,6 +74,26 @@ def test_non_integer_and_missing_key_emit_only_probe_failure(monkeypatch, capsys
     assert cni.main() == 0
     assert capsys.readouterr().out == 'k3dm_cni_ipam_probe_success{host="hostinger"} 0\n'
     monkeypatch.setattr(cni.subprocess, "run", lambda *_args, **_kwargs: _run(STATE.replace("range_size=254\n", "")))
+    assert cni.main() == 0
+    assert capsys.readouterr().out == 'k3dm_cni_ipam_probe_success{host="hostinger"} 0\n'
+
+
+def test_old_format_state_is_valid_without_optional_keys(monkeypatch, capsys):
+    monkeypatch.setenv("K3DM_CNI_IPAM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    old_state = STATE.replace("skipped=3\nskipped_oldest_age_s=4200\n", "")
+    monkeypatch.setattr(cni.subprocess, "run", lambda *_args, **_kwargs: _run(old_state))
+    monkeypatch.setattr(sys, "argv", [str(COLLECTOR), "--dry-run"])
+    assert cni.main() == 0
+    output = capsys.readouterr().out
+    assert 'k3dm_cni_ipam_probe_success{host="hostinger"} 1' in output
+    assert "k3dm_cni_ipam_skipped" not in output
+
+
+def test_non_digit_optional_key_emits_probe_failure(monkeypatch, capsys):
+    monkeypatch.setenv("K3DM_CNI_IPAM_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    invalid_state = STATE.replace("skipped=3", "skipped=nope")
+    monkeypatch.setattr(cni.subprocess, "run", lambda *_args, **_kwargs: _run(invalid_state))
+    monkeypatch.setattr(sys, "argv", [str(COLLECTOR), "--dry-run"])
     assert cni.main() == 0
     assert capsys.readouterr().out == 'k3dm_cni_ipam_probe_success{host="hostinger"} 0\n'
 
