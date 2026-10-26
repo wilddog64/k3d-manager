@@ -429,6 +429,15 @@ runs on the Hostinger node and serves `frontend.3ai-talk.org` directly, so an M4
 no longer a public outage (six drops 2026-10-12 to 10-22). Wave: after the 2026-10-29 hub rebuild.
 Critical: needs a dispatch go. v1.43.10 is now full.
 
+### Candidate milestone — v1.43.11 (patch)
+
+**One-command machine setup** (operator, 2026-10-25). Opened by Claude because v1.43.9 and v1.43.10 are
+full. Branch `k3d-manager-v1.43.11`, cut from `main` after v1.43.10 merges. Plan 1 of 5 is
+[`one-command-machine-setup`](plans/v1.43.11-one-command-machine-setup.md): `make machine-setup ROLE=hub|worker|console`
+and a read-only `make machine-check`, driven by per-role tool, secret, agent and repo lists, so the M5 Air
+(arrives 2026-10-28) can become the hub, the M4 a worker and the M2 a console. Secrets are re-entered on
+each machine and checked by name only. Approval pending: dispatch to Luna on the operator's go.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
