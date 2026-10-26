@@ -1060,6 +1060,53 @@ def _release_metrics(events, release, prices=None, repo_root=None):
                           repo_root=repo_root)
 
 
+def _render_release_duration(lines, window, events):
+    scoped = [event for event in events if _normalize_version(event.get("version")) == window]
+    lands = [event for event in scoped if event.get("event") == "land"]
+    if not lands:
+        return
+    starts_by_slug = defaultdict(list)
+    lands_by_slug = defaultdict(list)
+    for event in scoped:
+        slug = event.get("slug")
+        if not isinstance(slug, str) or slug == "release":
+            continue
+        if event.get("event") == "start" and isinstance(event.get("ts"), (int, float)):
+            starts_by_slug[slug].append(event["ts"])
+        elif event.get("event") == "land" and isinstance(event.get("ts"), (int, float)):
+            lands_by_slug[slug].append(event["ts"])
+    starts = [ts for values in starts_by_slug.values() for ts in values]
+    all_lands = [ts for values in lands_by_slug.values() for ts in values]
+    if not starts or not all_lands:
+        return
+    merged_events = [event for event in scoped if event.get("event") == "release_merged"
+                     and isinstance(event.get("merged_at"), (int, float))]
+    if merged_events:
+        end_ts = merged_events[-1]["merged_at"]
+        end_label = "merge"
+    else:
+        end_ts = max(all_lands)
+        end_label = "last_land"
+    lines.append(f'k3dm_dispatch_release_span_minutes{{window="{window}",end="{end_label}"}} '
+                 f'{(end_ts - min(starts)) / 60:g}')
+    intervals = sorted((min(starts_by_slug[slug]), max(task_lands))
+                       for slug, task_lands in lands_by_slug.items()
+                       if starts_by_slug.get(slug))
+    merged_seconds = 0
+    current_start = current_end = None
+    for start, end in intervals:
+        if current_start is None:
+            current_start, current_end = start, end
+        elif start <= current_end:
+            current_end = max(current_end, end)
+        else:
+            merged_seconds += current_end - current_start
+            current_start, current_end = start, end
+    if current_start is not None:
+        merged_seconds += current_end - current_start
+    lines.append(f'k3dm_dispatch_release_active_minutes{{window="{window}"}} {merged_seconds / 60:g}')
+
+
 def _render_scope(lines, window, metrics, events=None, prices=None, coverage=None, time_scope=False, now=None,
                   claude_records=None, claude_prices=None, cutoff=None):
     verification = metrics["verification"]
@@ -1118,6 +1165,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         scoped = [event for event in source_events if cutoff is None or event.get("ts", 0) >= cutoff]
     else:
         scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
+        _render_release_duration(lines, window, scoped)
     markers = [event for event in source_events if event.get("event") == "intervention_coverage_start"]
     if markers:
         marker_ts = min(event["ts"] for event in markers)

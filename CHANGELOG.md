@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Agent Dispatch shows a release's calendar span to merge (or latest land) and unioned active time; `codex-release-merged` records the PR merge timestamp in the local ledger.
+
 ## [1.43.7] - 2026-10-25
 
 ### Changed

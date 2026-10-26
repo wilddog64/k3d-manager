@@ -1127,3 +1127,31 @@ EOF
   run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
   [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }
+
+@test "codex dispatch: release-merged records one merge timestamp idempotently" {
+  local dispatch="${PRE_FIX_DISPATCH:-$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch}"
+  local root="$BATS_TEST_DIRNAME/../../.."
+  run make -s -n -C "$root" codex-release-merged VERSION=v1.43.8 PR=145 MERGED_AT=2026-10-18T19:01:51Z
+  [ "$status" -eq 0 ] && [[ "$output" == *"release-merged --version 'v1.43.8' --pr '145' --merged-at '2026-10-18T19:01:51Z'"* ]]
+  run "$dispatch" release-merged --version v1.43.8 --pr 145 --merged-at 2026-10-18T19:01:51Z
+  [ "$status" -eq 0 ] && [[ "$output" == *"recorded release merge"* ]]
+  [ "$(jq -s 'map(select(.event=="release_merged"))|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -r 'select(.event=="release_merged")|[.version,.slug,.pr,.merged_at]|@tsv' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = $'v1.43.8\trelease\t145\t1792350111' ]
+  before="$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl" | tr -d ' ')"
+  run "$dispatch" release-merged --version v1.43.8 --pr 145 --merged-at 2026-10-18T19:01:51Z
+  [ "$status" -eq 0 ] && [[ "$output" == *"already recorded"* ]]
+  [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl" | tr -d ' ')" -eq "$before" ]
+}
+
+@test "codex dispatch: invalid release-merged args leave ledger unchanged" {
+  local dispatch="${PRE_FIX_DISPATCH:-$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch}"
+  for args in \
+    "--version v1.43.8 --pr 145 --merged-at 2026-02-30T19:01:51Z" \
+    "--version v1.43.8 --pr 0 --merged-at 2026-10-18T19:01:51Z" \
+    "--version main --pr 145 --merged-at 2026-10-18T19:01:51Z"; do
+    before="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl" 2>/dev/null || true)"
+    run "$dispatch" release-merged $args
+    [ "$status" -eq 2 ]
+    [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl" 2>/dev/null || true)" = "$before" ]
+  done
+}

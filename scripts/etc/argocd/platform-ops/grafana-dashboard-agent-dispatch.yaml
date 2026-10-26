@@ -85,7 +85,7 @@ data:
           "description": "Landed tasks in the selected window.",
           "gridPos": {
             "h": 6,
-            "w": 5,
+            "w": 3,
             "x": 0,
             "y": 0
           },
@@ -131,8 +131,8 @@ data:
           "description": "Integration-test success: scope and rebase refusals are not counted because they are not integration results.",
           "gridPos": {
             "h": 6,
-            "w": 5,
-            "x": 5,
+            "w": 3,
+            "x": 3,
             "y": 0
           },
           "datasource": {
@@ -176,8 +176,8 @@ data:
           "description": "Added plus deleted lines between Codex's finished tree and what landed; this measures intervention, not active time.",
           "gridPos": {
             "h": 6,
-            "w": 5,
-            "x": 10,
+            "w": 3,
+            "x": 6,
             "y": 0
           },
           "datasource": {
@@ -222,8 +222,8 @@ data:
           "description": "Wall-clock waiting time from Codex exit to land, not Claude's active minutes.",
           "gridPos": {
             "h": 6,
-            "w": 5,
-            "x": 15,
+            "w": 3,
+            "x": 9,
             "y": 0
           },
           "datasource": {
@@ -507,12 +507,12 @@ data:
               "valueSize": 32
             }
           },
-          "title": "Dispatch-to-land elapsed (wall clock)",
-          "description": "Mean earliest start.ts → land.ts, including retries, idle time, overnight waits and verification. This is total wall-clock elapsed, not worker execution or active review; live verification happens after land.",
+          "title": "Time to land",
+          "description": "Mean per spec. Earliest start.ts → land.ts, including retries, idle time, overnight waits and verification. This is total wall-clock elapsed, not worker execution or active review; live verification happens after land.",
           "gridPos": {
             "h": 6,
-            "w": 4,
-            "x": 20,
+            "w": 3,
+            "x": 12,
             "y": 0
           },
           "datasource": {
@@ -544,6 +544,28 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "id": 14,
+          "type": "stat",
+          "options": {"text": {"valueSize": 32}},
+          "title": "Release span",
+          "description": "Calendar time from the release's first dispatch to its PR merge, or to its last land while unmerged. Time windows show no data.",
+          "gridPos": {"h": 6, "w": 3, "x": 15, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_release_span_minutes{window=\"$window\"}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
+        },
+        {
+          "id": 15,
+          "type": "stat",
+          "options": {"text": {"valueSize": 32}},
+          "title": "Active time",
+          "description": "Time at least one spec was in flight, with overlapping spec intervals counted once.",
+          "gridPos": {"h": 6, "w": 3, "x": 18, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_dispatch_release_active_minutes{window=\"$window\"}", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
         },
         {
           "id": 11,
