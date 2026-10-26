@@ -446,7 +446,7 @@ takes resources into account (battery, a memory reserve for the hub, the M4 pref
 Plan 3 of 5 is [`web-console-ssh-behind-cloudflare-access`](plans/v1.43.11-web-console-ssh-behind-cloudflare-access.md):
 a browser SSH console to the M5 and M4 for the operator only. Each machine has its own outbound `cloudflared` connector,
 and a Cloudflare Access app accepts only the operator's GitHub identity, with 2FA by authenticator app or GitHub Mobile.
-A dedicated `sshd` on 127.0.0.1:2222 (macOS Remote Login stays off) accepts only Access short-lived certificates. It includes a `revoke` emergency stop. Critical: dispatch needs the operator's go.
+A dedicated `sshd` on a loopback-only, uncommon port (default 42722; macOS Remote Login stays off) accepts only Access short-lived certificates. It includes a `revoke` emergency stop. Critical: dispatch needs the operator's go.
 
 ### Candidate milestone — v1.44.0
 
