@@ -2030,7 +2030,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 62
+                    "value": 72
                   }
                 ]
               },
@@ -2042,7 +2042,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 45
+                    "value": 58
                   }
                 ]
               },
@@ -2066,7 +2066,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 75
+                    "value": 72
                   }
                 ]
               },
@@ -2102,7 +2102,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 70
+                    "value": 67
                   }
                 ]
               },
@@ -2114,7 +2114,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 118
                   }
                 ]
               },
@@ -2138,7 +2138,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 52
+                    "value": 62
                   },
                   {
                     "id": "noValue",
@@ -2154,7 +2154,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 90
+                    "value": 100
                   },
                   {
                     "id": "links",
@@ -2176,7 +2176,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 130
+                    "value": 115
                   }
                 ]
               },
@@ -2188,7 +2188,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 180
+                    "value": 150
                   }
                 ]
               },

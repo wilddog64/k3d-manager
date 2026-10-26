@@ -743,7 +743,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 70
+                     "value": 80
                    }
                  ]
                },
@@ -755,7 +755,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 170
+                     "value": 200
                    }
                  ]
                },
@@ -875,7 +875,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 110
+                     "value": 90
                    }
                  ]
                },
@@ -887,7 +887,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 120
+                     "value": 100
                    }
                  ]
                },
