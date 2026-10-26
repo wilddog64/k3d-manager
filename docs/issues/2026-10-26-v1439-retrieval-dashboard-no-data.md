@@ -3,7 +3,7 @@
 **Status:** OPEN — **Priority:** P2
 **Date:** 2026-10-26
 **Release:** v1.43.9
-**Approval:** pending
+**Approval:** explicit 2026-10-26 (operator: "can you dispatch the fix?")
 **Observed on:** m4-air, Hermes LaunchAgent
 **Related:** `docs/plans/v1.43.9-vectordb-retrieval-quality-probe.md`
 
@@ -68,3 +68,30 @@ been written when checked.
 
 No process was killed or restarted and no live pytest, embedding request, or deployment was
 started as part of this diagnosis.
+
+## Dispatch scope
+
+### Files
+
+- `scripts/lib/hermes/prior_art.py`
+- `scripts/lib/hermes/retrieval_eval.py`
+- `scripts/tests/bin/test_retrieval_probe.py`
+- `scripts/tests/bin/test_find_similar_docs.py`
+- `bin/k3dm-hermes`
+
+### Required behavior
+
+- Resolve the embeddings credential once per retrieval evaluation and pass the same in-memory value to every search in that evaluation.
+- Keep the existing default search behavior for callers outside the probe; do not persist the credential beyond one evaluation.
+- Keep the credential out of process environments, child-process arguments, logs, metric labels, and test output.
+- The live pytest and Hermes probe must use the same cached-key ranking path.
+- A missing or unavailable credential remains advisory for Hermes: the tick continues and emits one concise failure line.
+
+### Tests and limits
+
+- Add offline tests showing an evaluation with multiple queries resolves the credential once and reuses it for each search.
+- Verify no metric or captured output contains the credential.
+- Keep existing recall, intrusion, stale/deleted filtering, index cadence, and dashboard behavior unchanged.
+- Run the retrieval probe and live-evaluation offline suites, focused VectorDB BATS, Ruff, manifest validation, and `_agent_audit`.
+- Tests must not contact Keychain, Vault, Google, the vector store, Pushgateway, or a cluster.
+- Do not run the live evaluation, restart Hermes, or deploy as part of this task.
