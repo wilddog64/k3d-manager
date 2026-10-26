@@ -553,6 +553,13 @@ go in:
   how it starts, which instruction file it follows, and how it hands live checks to the operator.
   Write the spec before Codex's period starts.
 
+Plan 5 (operator, 2026-10-26: private break-glass access while webhook is down) is
+[`tailscale-break-glass-access`](plans/v1.44.2-tailscale-break-glass-access.md): operator-only
+Tailscale access to m4 (then m2), restricted to macOS SSH over tcp:22 with explicit grants and
+negative-access tests, independent of webhook/cloud-bridge/Hostinger. This is a deliberate,
+restricted private management channel—not new public ingress or an AI-agent SSH path.
+The operator must separately approve enrollment and live rollout. **v1.44.2 is now at its five-plan cap.**
+
 ### Candidate milestone — v1.44.3 (patch)
 
 **Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
