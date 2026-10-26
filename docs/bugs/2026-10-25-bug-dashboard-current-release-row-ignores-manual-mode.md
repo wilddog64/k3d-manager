@@ -43,6 +43,13 @@ The test at `grafana_dashboard_bugs.bats` (`for panel_id in (2,3,4,5,6,7,8,14,15
 6. `docs/guides/grafana-dashboards.md`: the Auto/Manual paragraph names the Release row as
    following the mode, and names panels 5 and 6 as repository-wide.
 
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
+- `scripts/tests/plugins/grafana_dashboard_bugs.bats`
+- `docs/guides/grafana-dashboards.md`
+- `CHANGELOG.md`
+
 ## Acceptance
 
 ```yaml
