@@ -397,6 +397,26 @@ already happened in this repo. Similarity search catches the near-miss the glob 
 
 ## Measuring retrieval quality
 
+Hermes runs the same labelled evaluation used by the optional live pytest after a successful or
+no-op index refresh, at most once per 24 hours. The probe uses about 52 query embeddings per run.
+It checks each returned row against the indexed ref's corpus hashes, counts stale and deleted
+results, and excludes both from recall. The embedding credential stays in Hermes' indexing
+process; the metrics LaunchAgent does not run the probe.
+
+The VectorDB dashboard is organised around three questions. **Infrastructure health** shows
+reachability, index age, and corpus size. **Data consistency** shows missing, stale, and deleted
+documents, drift age, and backlog. **Retrieval quality** shows recall@5 and hard-negative
+intrusion@5 by directory, outdated returned rows, and time since the last probe. The existing
+**Ingestion** row shows indexing results and work per run.
+
+The `k3dm-vectordb-retrieval` Pushgateway job publishes `k3dm_vectordb_retrieval_recall_at5` and
+`k3dm_vectordb_retrieval_intrusion_at5` by directory, the corresponding
+`k3dm_vectordb_retrieval_recall_floor`, stale and deleted hit counts, total returned results, and
+the last successful probe timestamp. Labels contain only the directory on the three per-directory
+metrics. Prometheus warns when recall stays below its floor for an hour, outdated results persist
+for an hour, or the probe has not succeeded for 48 hours. Each alert directs operators to run the
+live evaluation; the outdated-documents alert also recommends `make index-docs DRY_RUN=1`.
+
 `scripts/tests/bin/test_find_similar_docs.py` scores hand-labelled pairs from the real corpus
 (`scripts/tests/fixtures/doc-dedup/pairs.jsonl`): 27 **positives** (the same defect filed twice,
 or a symptom and its root cause) and 26 **hard negatives** (same component, different defect).

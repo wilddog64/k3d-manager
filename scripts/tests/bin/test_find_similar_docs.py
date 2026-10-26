@@ -15,16 +15,15 @@ LIB = REPO_ROOT / "scripts" / "lib"
 sys.path.insert(0, str(LIB))
 
 from hermes import prior_art  # noqa: E402
-from hermes.prior_art import doc_embed_text, iter_corpus, search  # noqa: E402
+from hermes.prior_art import doc_embed_text, iter_corpus  # noqa: E402
+from hermes.retrieval_eval import LIVE_RECALL_FLOOR, _evaluate, _pairs  # noqa: E402
 
-PAIR_FILE = REPO_ROOT / "scripts/tests/fixtures/doc-dedup/pairs.jsonl"
 CLI = REPO_ROOT / "scripts/find-similar-docs.py"
 TOKEN = re.compile(r"[a-z0-9]+")
 # Measured 2026-10-01 on 27 positives: bugs 12/16, issues 5/6, plans 5/5, retro 5/5. Each floor
 # allows one more miss than measured, so the gate fails on a real regression, not on noise.
 RECALL_FLOOR = {"bugs": 0.60, "issues": 0.60, "plans": 0.80, "retro": 0.80}
 # Live embeddings, measured 2026-10-01: bugs 14/16, issues 5/6, plans 5/5, retro 5/5.
-LIVE_RECALL_FLOOR = {"bugs": 0.81, "issues": 0.66, "plans": 0.80, "retro": 0.80}
 
 
 @pytest.fixture(autouse=True)
@@ -117,14 +116,6 @@ def test_unavailable_and_empty_index_remain_advisory(cli_module, monkeypatch, ca
     assert "retrieval unavailable" in capsys.readouterr().err
 
 
-def _pairs():
-    return [json.loads(line) for line in PAIR_FILE.read_text().splitlines() if line.strip()]
-
-
-def _directory(path):
-    return path.split("/", 2)[1]
-
-
 class TfidfControl:
     """Small stdlib-only control over the same ``doc_embed_text`` strings as the indexer."""
 
@@ -159,24 +150,6 @@ class TfidfControl:
             score = sum(value * self.vectors[index].get(term, 0) for term, value in query_vector.items())
             ranked.append((score, path, title))
         return sorted(ranked, key=lambda item: (-item[0], item[1]))[:k]
-
-
-def _evaluate(rank, pairs, by_path):
-    """Return (recall, intrusion) per directory for ``rank(query_text, query_path)`` -> paths.
-
-    recall: share of positive pairs whose expected doc is in the top 5.
-    intrusion: share of hard-negative pairs whose expected doc is in the top 5 — the false
-    positives a gating retriever would act on. Reported, not gated: gating is out of scope.
-    """
-    counts = {"positive": defaultdict(int), "hard-negative": defaultdict(int)}
-    found = {"positive": defaultdict(int), "hard-negative": defaultdict(int)}
-    for item in pairs:
-        kind, directory = item["kind"], item["directory"]
-        counts[kind][directory] += 1
-        found[kind][directory] += item["expected"] in rank(by_path[item["query"]][1], item["query"])
-    def ratio(kind):
-        return {d: round(found[kind][d] / n, 3) for d, n in counts[kind].items()}
-    return ratio("positive"), ratio("hard-negative")
 
 
 def test_pairs_have_at_least_25_positive_and_hard_negative_pairs_and_all_paths_exist():
@@ -276,12 +249,14 @@ def test_live_embedding_recall_at_5_per_directory(capsys):
     by_path = {path: (title, text) for path, title, text, _hash in documents}
     returned = []
 
-    def rank(text, path):
-        results = [result for _score, result, _title in search(text, k=6) if result != path][:5]
+    from hermes.retrieval_eval import rank
+
+    def live_rank(text, path):
+        results = rank(text, path)
         returned.append(len(results))
         return set(results)
 
-    recall, intrusion = _evaluate(rank, _pairs(), by_path)
+    recall, intrusion = _evaluate(live_rank, _pairs(), by_path)
     print(f"embedding recall@5: {json.dumps(recall, sort_keys=True)}")
     print(f"embedding hard-negative intrusion@5: {json.dumps(intrusion, sort_keys=True)}")
     assert returned and all(count == 5 for count in returned), "search returned fewer than 5 results"

@@ -9,9 +9,10 @@ OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-c
   [ "${status}" -eq 0 ]
 }
 
-@test "both vectordb alerts are present" {
+@test "vectordb alerts are present" {
   local _alert
-  for _alert in VectorDBMetricsStale VectorDBIndexStale VectorDBIndexDrift VectorDBIndexFailing; do
+  for _alert in VectorDBMetricsStale VectorDBIndexStale VectorDBIndexDrift VectorDBIndexFailing \
+    VectorDBRetrievalRecallBelowFloor VectorDBRetrievalReturnsOutdatedDocs VectorDBRetrievalProbeStale; do
     run grep -F -- "alert: ${_alert}" "${RULES}"
     [ "${status}" -eq 0 ]
   done
@@ -48,10 +49,10 @@ by_id = {p["id"]: p for p in panels}
 assert len(by_id) == len(panels), "duplicate panel ids"
 p2, p5 = by_id[2], by_id[5]
 assert p2["targets"][0]["expr"] == "k3dm_vectordb_drift_docs_by_kind"
-assert p2["gridPos"] == {"x": 12, "y": 0, "w": 8, "h": 8}
+assert p2["gridPos"] == {"x": 12, "y": 10, "w": 8, "h": 8}
 assert p5["targets"][0]["expr"] == "max(k3dm_vectordb_oldest_drift_age_seconds)"
 assert p5["fieldConfig"]["defaults"]["unit"] == "s"
-assert p5["gridPos"] == {"x": 20, "y": 0, "w": 4, "h": 8}
+assert p5["gridPos"] == {"x": 20, "y": 10, "w": 4, "h": 8}
 for i, a in enumerate(panels):
   ga = a["gridPos"]
   for b in panels[i + 1:]:
@@ -116,12 +117,12 @@ panels = dashboard["panels"]
 row = next(panel for panel in panels if panel.get("title") == "Ingestion")
 assert row.get("collapsed") is False and row.get("panels") == [], "an expanded row must not nest its panels"
 below = [p for p in panels if p is not row and p["gridPos"]["y"] > row["gridPos"]["y"]]
-assert len(below) == 6, len(below)
+assert {p["id"] for p in below} == {11, 12, 16, 13, 15}
 assert all(p.get("gridPos") for p in panels)
 for stat in (p for p in below if p["type"] == "stat"):
     assert all(target.get("instant") is True for target in stat["targets"]), stat["title"]
 queries = " ".join(target["expr"] for panel in below for target in panel["targets"])
-metrics = open("bin/k3dm-hermes").read()
+metrics = open("bin/k3dm-hermes").read() + open("scripts/lib/hermes/retrieval_eval.py").read()
 for name in re.findall(r"k3dm_vectordb_[a-z_]+", queries):
     assert name in metrics or name == "k3dm_vectordb_drift_docs", name
 ' "${DASHBOARD}"
@@ -185,5 +186,53 @@ for group in document["spec"]["groups"]:
         assert "annotations" not in labels, rule["alert"]
         assert rule.get("annotations", {}).get("summary"), rule["alert"]
 ' "${RULES}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "dashboard has four ordered rows and unique panel ids" {
+  run python3 -c '
+import json, sys
+d = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
+p = d["panels"]
+rows = [x for x in p if x["type"] == "row"]
+assert [x["title"] for x in rows] == ["Infrastructure health — is pgvector available and accepting queries?", "Data consistency — are indexed documents synchronized with the repository?", "Retrieval quality — do agents retrieve the correct, current documents?", "Ingestion"]
+by = {x["id"]: x for x in p}
+assert len(by) == len(p)
+assert all(by[i].get("description") for i in (20, 21, 22, 23))
+for i, a in enumerate(p):
+  ga = a["gridPos"]
+  for b in p[i + 1:]:
+    gb = b["gridPos"]
+    assert not (ga["x"] < gb["x"] + gb["w"] and gb["x"] < ga["x"] + ga["w"] and ga["y"] < gb["y"] + gb["h"] and gb["y"] < ga["y"] + ga["h"]), (a["id"], b["id"])
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "retrieval alerts use the specified expressions and windows" {
+  run python3 -c '
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1]))
+r = {x["alert"]: x for g in d["spec"]["groups"] for x in g["rules"]}
+expected = {"VectorDBRetrievalRecallBelowFloor": ("k3dm_vectordb_retrieval_recall_at5 < on(directory) k3dm_vectordb_retrieval_recall_floor", "1h"), "VectorDBRetrievalReturnsOutdatedDocs": ("(k3dm_vectordb_retrieval_stale_hits + k3dm_vectordb_retrieval_deleted_hits) > 0", "1h"), "VectorDBRetrievalProbeStale": ("time() - k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds > 172800", "30m")}
+for name, (expr, window) in expected.items():
+  assert r[name]["expr"] == expr and r[name]["for"] == window, r[name]
+  assert r[name]["labels"] == {"severity": "warning", "cluster": "hub"}
+  assert "K3DM_RETRIEVAL_EVAL_LIVE=1 pytest scripts/tests/bin/test_find_similar_docs.py -k live" in r[name]["annotations"]["description"]
+assert "make index-docs DRY_RUN=1" in r["VectorDBRetrievalReturnsOutdatedDocs"]["annotations"]["description"]
+' "${RULES}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "existing dashboard panel queries and presentation are unchanged" {
+  run python3 -c '
+import hashlib, json, sys
+d = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
+expected = {1:"7f6ea5cb20329d56bb522cd5219f4e606e011b9fbc6eb7d940fa309e719c70f7", 2:"0c93c17f4c3fa87d86a63864db7f2798311c19097530ef7a6a1bad5c658d53e5", 3:"e4c7b45ffaf97d1f08c4b50fed271b9b9ba7f9f3a977de39b61266d7dbe6e1e4", 4:"5a7f0363b16d68abee61b324d884c110bbfcfc95336b4a5c49302ca7d62ced1c", 5:"8ddb381ddcc5c8efd42abc902e24d1331cf54410eb34799eec59aff19d13030c", 10:"689bec316858eaefeab9f16224fa64747893ae45b7468d11a1cb95b53a5c2b0b", 11:"bbfece3dcb2f7b405102897d33adbedd982205dc37b1e285ee7b0ff7e2bde64c", 12:"a49266f4cd87b889fb474aa6bb11bdcf9e91b5c239a85fe7314c910c0b4849d9", 13:"6ccef05b3eef9dd87baa50684e08191ae447eb366e42a7f48e34297906d446a8", 14:"e4bee98f895f14d73d11803cfa404346ef538a4059b8ed9174d2e01b60f25cc3", 15:"6dff8369e533917c2ba866634b173875e0fba760a7e13fc885dc975708ab3c86", 16:"afb10cd117b5f00e095383e82df2dc463dab5843f7637881a68bf00e907f0aca"}
+panels = {p["id"]: p for p in d["panels"]}
+for ident, digest in expected.items():
+  fields = {key: panels[ident].get(key) for key in ("targets", "fieldConfig", "options")}
+  actual = hashlib.sha256(json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+  assert actual == digest, (ident, actual)
+' "${DASHBOARD}"
   [ "${status}" -eq 0 ]
 }
