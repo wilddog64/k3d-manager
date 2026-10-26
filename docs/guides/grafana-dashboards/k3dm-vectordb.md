@@ -9,7 +9,8 @@ indexing activity.
 | Panel | Metric | Meaning |
 |---|---|---|
 | Rows vs corpus docs (last published) | `k3dm_vectordb_rows`, `k3dm_vectordb_corpus_docs` | Indexed rows compared with expected corpus documents. |
-| Drift docs (last published) | `k3dm_vectordb_drift_docs` | Documents whose indexed content differs from the corpus. |
+| Drift docs by kind (last published), panel 2 | `k3dm_vectordb_drift_docs_by_kind{kind=...}` | Missing: corpus path absent from index; stale: path in both with different hashes; deleted: index path absent from corpus. |
+| Oldest drift (last published), panel 5 | `max(k3dm_vectordb_oldest_drift_age_seconds)` | Age of the oldest drifted document, from the first exporter run that saw it. |
 | Index age (last published) | `time() - k3dm_vectordb_last_index_timestamp_seconds` | Age of the most recent index. |
 | Reachability and ExternalSecret sync | `k3dm_vectordb_reachable`, `k3dm_vectordb_external_secret_synced` | Last observed connection and credential-sync states; 1 is healthy and 0 is not. |
 | Last run result | `k3dm_vectordb_index_last_result` | Last index result (success, noop, paused, or failed). |

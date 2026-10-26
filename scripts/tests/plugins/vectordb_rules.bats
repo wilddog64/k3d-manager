@@ -19,9 +19,47 @@ OLD_DASHBOARD="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/k3dm-vectordb-c
 
 @test "automatic indexing alerts use the requested windows" {
   run grep -A4 -F -- 'alert: VectorDBIndexDrift' "${RULES}"
-  [[ "${output}" == *"for: 2h"* ]]
+  [[ "${output}" == *"oldest_drift_age_seconds"* ]]
+  ! grep -A5 -F -- 'alert: VectorDBIndexDrift' "${RULES}" | grep -F -- 'for:'
   run grep -A4 -F -- 'alert: VectorDBIndexFailing' "${RULES}"
   [[ "${output}" == *"for: 30m"* ]]
+}
+
+@test "drift alert uses kind counts and first-seen age" {
+  run python3 -c '
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+rule = next(r for g in doc["spec"]["groups"] for r in g["rules"] if r.get("alert") == "VectorDBIndexDrift")
+expr = " ".join(rule["expr"].split())
+assert "sum(k3dm_vectordb_drift_docs_by_kind) > 0" in expr, expr
+assert "max(k3dm_vectordb_oldest_drift_age_seconds) > 7200" in expr, expr
+assert "k3dm_vectordb_drift_docs != 0" not in expr, expr
+assert "for" not in rule, rule
+' "${RULES}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "drift dashboard panels show kind counts and oldest age without overlaps" {
+  run python3 -c '
+import json, sys
+doc = json.loads(open(sys.argv[1]).read().split("k3dm-vectordb.json: |", 1)[1])
+panels = doc["panels"]
+by_id = {p["id"]: p for p in panels}
+assert len(by_id) == len(panels), "duplicate panel ids"
+p2, p5 = by_id[2], by_id[5]
+assert p2["targets"][0]["expr"] == "k3dm_vectordb_drift_docs_by_kind"
+assert p2["gridPos"] == {"x": 12, "y": 0, "w": 8, "h": 8}
+assert p5["targets"][0]["expr"] == "max(k3dm_vectordb_oldest_drift_age_seconds)"
+assert p5["fieldConfig"]["defaults"]["unit"] == "s"
+assert p5["gridPos"] == {"x": 20, "y": 0, "w": 4, "h": 8}
+for i, a in enumerate(panels):
+  ga = a["gridPos"]
+  for b in panels[i + 1:]:
+    gb = b["gridPos"]
+    overlap = ga["x"] < gb["x"] + gb["w"] and gb["x"] < ga["x"] + ga["w"] and ga["y"] < gb["y"] + gb["h"] and gb["y"] < ga["y"] + ga["h"]
+    assert not overlap, (a["id"], b["id"])
+' "${DASHBOARD}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "VectorDBMetricsStale watches push age, not absence alone" {

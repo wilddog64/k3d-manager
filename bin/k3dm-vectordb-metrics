@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from collections import defaultdict
@@ -49,7 +50,44 @@ def _status():
         return {}
 
 
-def _metrics(payload):
+DRIFT_KINDS = ("missing", "stale", "deleted")
+
+
+def _drift_state_path():
+    configured = os.environ.get("K3DM_VECTORDB_DRIFT_STATE")
+    return Path(configured).expanduser() if configured else Path(
+        "~/.local/share/k3d-manager/state/vectordb-drift-first-seen.json").expanduser()
+
+
+def _update_drift_state(drift, now=None, state_path=None):
+    path = Path(state_path) if state_path is not None else _drift_state_path()
+    now = time.time() if now is None else float(now)
+    drifted = {item for kind in DRIFT_KINDS for item in drift.get(kind, [])}
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(previous, dict):
+            previous = {}
+    except (OSError, ValueError, TypeError):
+        previous = {}
+    state = {item: float(previous[item]) for item in drifted
+             if item in previous and isinstance(previous[item], (int, float))}
+    for item in drifted:
+        state.setdefault(item, now)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, sort_keys=True)
+            handle.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return state
+
+
+def _metrics(payload, now=None, state_path=None):
     lines = []
     values = {
         "k3dm_vectordb_rows": payload.get("rows"),
@@ -67,6 +105,15 @@ def _metrics(payload):
     for name, value in values.items():
         if value is not None:
             lines.append(f"{name} {value}")
+    drift = payload.get("drift")
+    if drift is not None:
+        state = _update_drift_state(drift, now=now, state_path=state_path)
+        now = time.time() if now is None else float(now)
+        for kind in DRIFT_KINDS:
+            paths = drift.get(kind, [])
+            lines.append(f'k3dm_vectordb_drift_docs_by_kind{{kind="{kind}"}} {len(paths)}')
+            age = max((now - state[path] for path in paths), default=0)
+            lines.append(f'k3dm_vectordb_oldest_drift_age_seconds{{kind="{kind}"}} {max(0, age)}')
     return "\n".join(lines) + "\n"
 
 

@@ -42,7 +42,7 @@ def test_status_offline_is_end_to_end_and_has_every_key():
     assert result.returncode == 0
     assert set(json.loads(result.stdout)) == {
         "available", "external_secret_synced", "pod_ready", "rows", "corpus_docs",
-        "last_indexed_epoch",
+        "last_indexed_epoch", "drift",
     }
 
 
