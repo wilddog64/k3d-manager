@@ -696,4 +696,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Confirmed `_refresh_index` only runs the retrieval probe following successful/no-op indexing; fetch failure leaves previous metrics stale.
 - [x] Filed OPEN P2 `docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md` with exact terminal evidence and credential-safe follow-up.
 - [ ] Implement unattended, least-privilege GitHub read access and verify from the LaunchAgent context.
-- Commit pending; PR URL: none.
+- Issue commit 49b73ced pushed to origin/k3d-manager-v1.43.9; PR URL: none.
