@@ -608,7 +608,7 @@ def _embed_one(text, task_type, key, attempts):
     raise EmbeddingsUnavailable(f"embeddings API gave up after {attempts} attempts")
 
 
-def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=6):
+def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=6, credential=None):
     """Embed up to ``EMBED_BATCH`` texts. Returns one vector per input, in order.
 
     The current embedding models expose ``embedContent`` only: ``batchEmbedContents`` was
@@ -622,7 +622,7 @@ def embed_batch(texts, task_type="RETRIEVAL_DOCUMENT", attempts=6):
         return []
     if len(texts) > EMBED_BATCH:
         raise ValueError(f"batch of {len(texts)} exceeds {EMBED_BATCH}")
-    key = api_key()
+    key = api_key() if credential is None else credential
     vectors = []
     for index, text in enumerate(texts):
         if index and EMBED_MIN_INTERVAL > 0:
@@ -700,7 +700,7 @@ def fetch_doc_meta(paths):
     return {path: tuple(value) for path, value in json.loads(out or "{}").items()}
 
 
-def search(text, k=5):
+def search(text, k=5, credential=None):
     """Return ``[(score, path, title)]`` most similar to ``text``, best first.
 
     ``score`` is cosine similarity in ``[-1, 1]``; 1.0 is identical. Raises
@@ -709,7 +709,8 @@ def search(text, k=5):
     if not text or not text.strip():
         return []
     k = max(1, min(int(k), 50))
-    literal = vector_literal(embed_batch([text], task_type="RETRIEVAL_QUERY")[0])
+    literal = vector_literal(embed_batch(
+        [text], task_type="RETRIEVAL_QUERY", credential=credential)[0])
     sql = (
         "SELECT coalesce(json_agg(row_to_json(t) ORDER BY t.score DESC)::text, '[]') FROM ("
         f"  SELECT round((1 - (embedding <=> '{literal}'))::numeric, 4)::float8 AS score,"

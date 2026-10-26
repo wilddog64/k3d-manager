@@ -251,8 +251,10 @@ def test_live_embedding_recall_at_5_per_directory(capsys):
 
     from hermes.retrieval_eval import rank
 
+    credential = prior_art.api_key()
+
     def live_rank(text, path):
-        results = rank(text, path)
+        results = rank(text, path, credential=credential)
         returned.append(len(results))
         return set(results)
 

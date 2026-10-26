@@ -12,6 +12,11 @@ sys.path.insert(0, str(LIB))
 from hermes import prior_art, retrieval_eval  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def offline_credential(monkeypatch):
+    monkeypatch.setattr(prior_art, "api_key", lambda: "test-secret")
+
+
 @pytest.fixture
 def push_lines(monkeypatch):
     captured = []
@@ -39,7 +44,8 @@ def test_probe_calculates_recall_and_publishes_only_directory_labels(push_lines)
                "expected": "docs/bugs/negative.md"} for i in range(4)]
     calls = []
 
-    def fake_search(text, k):
+    def fake_search(text, k, credential=None):
+        assert credential == "test-secret"
         calls.append((text, k))
         index = int(text.rsplit(" ", 1)[1])
         return [(1.0, f"docs/bugs/e{index}.md", "sensitive title")] if index < 3 else []
@@ -85,6 +91,29 @@ def test_fetch_hashes_runs_once_per_probe_regardless_of_query_count(push_lines):
         fetch_hashes=lambda: calls.append(1) or {}, push_url="http://127.0.0.1:9",
         pairs=pairs)
     assert len(calls) == 1
+
+
+def test_probe_resolves_credential_once_reuses_it_and_never_publishes_it(
+        push_lines, monkeypatch, capsys):
+    docs = [(f"docs/bugs/q{i}.md", f"Q{i}", f"query {i}", f"h{i}") for i in range(3)]
+    pairs = [{"kind": "positive", "directory": "bugs", "query": f"docs/bugs/q{i}.md",
+              "expected": "docs/bugs/expected.md"} for i in range(3)]
+    resolved = []
+    seen = []
+    monkeypatch.setattr(prior_art, "api_key", lambda: resolved.append(1) or "test-secret")
+
+    def fake_search(text, k, credential=None):
+        seen.append(credential)
+        return []
+
+    retrieval_eval.probe(
+        repo_root=ROOT, search=fake_search, iter_corpus=lambda *_a: docs,
+        fetch_hashes=lambda: {}, push_url="http://127.0.0.1:9", pairs=pairs)
+    assert len(resolved) == 1
+    assert seen == ["test-secret"] * 3
+    assert "test-secret" not in push_lines[0]
+    captured = capsys.readouterr()
+    assert "test-secret" not in captured.out + captured.err
 
 
 def test_hermes_probe_is_skipped_until_more_than_24_hours(monkeypatch):

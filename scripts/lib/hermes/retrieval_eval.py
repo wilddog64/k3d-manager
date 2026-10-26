@@ -32,9 +32,10 @@ def _evaluate(rank, pairs, by_path):
     return ratio("positive"), ratio("hard-negative")
 
 
-def rank(text, path):
+def rank(text, path, credential=None):
     """Search six rows, drop the query document, and retain the top five."""
-    results = [result for _score, result, _title in prior_art.search(text, k=6) if result != path]
+    results = [result for _score, result, _title in
+               prior_art.search(text, k=6, credential=credential) if result != path]
     return set(results[:5])
 
 
@@ -46,6 +47,7 @@ def probe(repo_root=None, ref=None, search=None, iter_corpus=None, fetch_hashes=
 
     root = Path(repo_root or ROOT)
     search = search or prior_art.search
+    credential = prior_art.api_key()
     iter_corpus = iter_corpus or prior_art.iter_corpus
     fetch_hashes = fetch_hashes or prior_art.fetch_hashes
     corpus = iter_corpus(root, ref)
@@ -58,7 +60,7 @@ def probe(repo_root=None, ref=None, search=None, iter_corpus=None, fetch_hashes=
 
     def current_rank(text, path):
         nonlocal stale_hits, deleted_hits, results_count
-        returned = search(text, k=6)
+        returned = search(text, k=6, credential=credential)
         kept = []
         candidates = [(result_path, title) for _score, result_path, title in returned
                       if result_path != path][:5]
