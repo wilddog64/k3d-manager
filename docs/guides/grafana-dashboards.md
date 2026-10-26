@@ -96,8 +96,8 @@ The Agent dispatch **Per spec** table links each Spec name to its plan or bug do
 task's release branch; the link opens in a new tab. **Agent** names who landed the spec
 (`codex` or `agy`); the Codex columns stay empty for an agy row. Its totals row sums Codex tokens, Codex time, Codex runs and
 API equiv. over the rows shown, so picking a release in the Window menu gives that release's
-totals. **Dispatch-to-land elapsed (wall clock)** is `earliest(start.ts) → land.ts`, including retries,
-idle time and overnight waits; it is not worker runtime or active review. **Final worker exit → land**
+totals. **Dispatch-to-land elapsed (wall clock)** (column **Dispatch → land**) is `earliest(start.ts) → land.ts`, including retries,
+idle time and overnight waits; it is not worker runtime or active review. **Final worker exit → land** (column **Exit → land**)
 is the wall-clock gap from the final qualifying Codex exit to land, and missing exits remain N/A.
 Both values are means rather than footer sums because parallel dispatches overlap. The former
 includes the full dispatch-to-land interval; the latter is not proof of human waiting. Live

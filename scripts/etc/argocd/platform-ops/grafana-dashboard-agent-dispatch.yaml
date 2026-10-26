@@ -617,7 +617,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch-to-land elapsed is earliest start.ts → land.ts including retries, idle time and overnight waits; Final worker exit → land is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land (dispatch-to-land elapsed, wall clock) is earliest start.ts → land.ts including retries, idle time and overnight waits; Exit → land (final worker exit → land) is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. The footer totals Tokens, Agent time, Runs and API equiv. over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
           "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
           "datasource": {
             "type": "prometheus",
@@ -721,8 +721,8 @@ data:
                   "agent": "Agent",
                   "Value #A": "Tokens",
                   "Value #B": "Agent time",
-                  "Value #C": "Dispatch-to-land elapsed (wall clock)",
-                  "Value #J": "Final worker exit → land",
+                  "Value #C": "Dispatch → land",
+                  "Value #J": "Exit → land",
                   "Value #D": "Runs",
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈",
@@ -735,6 +735,162 @@ data:
           "fieldConfig": {
             "defaults": {"custom": {"minWidth": 80}},
             "overrides": [
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Release"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 70
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Spec"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 170
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Repo"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 105
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Agent"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 70
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Tokens"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 85
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Agent time"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 95
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Dispatch → land"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 125
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Exit → land"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 110
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Runs"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 60
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "API equiv."
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 90
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Claude ≈"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 85
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Worker"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 110
+                   }
+                 ]
+               },
+               {
+                 "matcher": {
+                   "id": "byName",
+                   "options": "Coordinator"
+                 },
+                 "properties": [
+                   {
+                     "id": "custom.width",
+                     "value": 120
+                   }
+                 ]
+               },
               {
                 "matcher": {
                   "id": "byName",
@@ -762,7 +918,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch-to-land elapsed (wall clock)"
+                  "options": "Dispatch → land"
                 },
                 "properties": [
                   {
@@ -772,7 +928,7 @@ data:
                 ]
               },
               {
-                "matcher": {"id": "byName", "options": "Final worker exit → land"},
+                "matcher": {"id": "byName", "options": "Exit → land"},
                 "properties": [
                   {"id": "unit", "value": "s"},
                   {"id": "description", "value": "Wall-clock interval from the final valid Codex exit at or before land to land. N/A when no qualifying exit is available; this is not proof of human waiting or active review."}
