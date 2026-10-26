@@ -2851,7 +2851,7 @@ data:
           "type": "stat",
           "title": "Undeclared plan overlaps",
           "description": "Count of same-release plan pairs sharing Component paths without a dependency.",
-          "gridPos": {"x": 0, "y": 70, "w": 4, "h": 4},
+          "gridPos": {"x": 0, "y": 70, "w": 6, "h": 4},
           "targets": [{"refId": "A", "expr": "sum((k3dm_plan_undeclared_overlaps{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "datasource": {"type": "prometheus", "uid": "prometheus"}
