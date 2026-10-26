@@ -550,11 +550,11 @@ data:
           "type": "stat",
           "options": {"text": {"valueSize": 32}},
           "title": "Release span",
-          "description": "Calendar time from the release's first dispatch to its PR merge, or to its last land while unmerged. Time windows show no data.",
+          "description": "Calendar time from the release's first dispatch to its PR merge, or to its last land while unmerged. Pick a release in Window; a time window such as 7d has no release span.",
           "gridPos": {"h": 6, "w": 3, "x": 15, "y": 0},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_release_span_minutes{window=\"$window\"}", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
+          "fieldConfig": {"defaults": {"unit": "m", "noValue": "pick a release", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
         },
         {
           "id": 15,
@@ -565,7 +565,7 @@ data:
           "gridPos": {"h": 6, "w": 3, "x": 18, "y": 0},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_release_active_minutes{window=\"$window\"}", "instant": true}],
-          "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
+          "fieldConfig": {"defaults": {"unit": "m", "noValue": "pick a release", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
         },
         {
           "id": 11,

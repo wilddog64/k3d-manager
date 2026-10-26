@@ -414,8 +414,8 @@ assert overlap['title']=='Undeclared plan overlaps'
 assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==70 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==160 for p in overrides['Depends on'])
+assert order_props['custom.width']==55 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==75 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -729,7 +729,8 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 300 and widths["Dispatch task"] >= 150, widths
+assert widths["Title"] >= 230 and widths["Dispatch task"] >= 150, widths
+assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
 assert sum(widths.values()) + min_width * len(auto) <= 1350, (widths, auto, min_width)

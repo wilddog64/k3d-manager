@@ -2001,7 +2001,7 @@ data:
                   "overlaps": "Overlaps",
                   "blocked_by": "Blocked by",
                   "execution": "Execution",
-                  "verification": "Verification",
+                  "verification": "Verified",
                   "approval": "Spec approval",
                   "dispatch_approval": "Dispatch",
                   "dispatch_state": "Dispatch task",
@@ -2025,12 +2025,120 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Order"
+                  "options": "Release"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 65
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Wave"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 50
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Wave note"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 85
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Overlaps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Blocked by"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Execution"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 85
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Verified"
                 },
                 "properties": [
                   {
                     "id": "custom.width",
                     "value": 70
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spec approval"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 95
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dispatch"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Order"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 55
                   },
                   {
                     "id": "noValue",
@@ -2046,7 +2154,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 160
+                    "value": 75
                   },
                   {
                     "id": "links",
@@ -2068,7 +2176,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 250
+                    "value": 150
                   }
                 ]
               },
@@ -2080,7 +2188,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 300
+                    "value": 230
                   }
                 ]
               },

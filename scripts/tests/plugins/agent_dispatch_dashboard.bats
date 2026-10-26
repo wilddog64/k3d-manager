@@ -131,7 +131,7 @@ text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split(
 panels={p["title"]:p for p in d["panels"]}
 per=panels["Per spec"]
 assert any("k3dm_dispatch_task_post_exit_land_seconds" in t["expr"] for t in per["targets"])
-assert any(p["title"]=="Dispatch-to-land elapsed (wall clock)" for p in d["panels"])
+assert any(p["title"]=="Time to land" for p in d["panels"])
 assert "k3dm_dispatch_post_exit_land_minutes_per_landed" in panels["Final worker exit → land"]["targets"][0]["expr"]
 human=panels["Human continuation prompts"]
 assert any("k3dm_dispatch_intervention_tracking_tasks" in t["expr"] for t in human["targets"])
@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[83,84,85,86,87,88]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,14))|{40,41,84,85}|set(range(42,49))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 70 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 72 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (47,83,84,85,86,87,88):
+    if panel["id"] in (14,15,47,83,84,85,86,87,88):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
