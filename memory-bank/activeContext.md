@@ -399,3 +399,4 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: Dashboard fix f5076dfd — Plans headers fit, Release span/Active time hint 'pick a release' (7d window has no release data), agent_dispatch_dashboard.bats red since 8e0e9078 fixed. Full make test + pytest running.
 - 2026-10-25: Dashboard fit round 2 56f0007d — Plans value columns widened, Per spec fixed widths + headers Dispatch → land / Exit → land.
 - 2026-10-25: Dashboard fit round 3 373db9a3. Operator ran restart-webhook + snapshot-schedule from tmux; hub-snapshot agent loaded (Sun 02:30), webhook PID up.
+- 2026-10-25: 1aa97d29 overlaps stat w=6. Round 3 widths confirmed live in ConfigMap; E5 plans table read from operator screenshots: values correct (4 implemented/landed, Hostinger dispatch go needed + wave note, 0 undeclared overlaps).
