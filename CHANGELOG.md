@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.8] - 2026-10-25
+
 ### Added
 
 - Agent Dispatch shows a release's calendar span to merge (or latest land) and unioned active time; `codex-release-merged` records the PR merge timestamp in the local ledger.
@@ -12,6 +14,8 @@
 - Bug Tracking's Release tile and Bugs filed/open/fixed summaries now follow Auto or Manual release selection; the scheduled-later and untriaged counts are labeled repository-wide.
 - Alert analyses without a Slack response URL are posted to `K3DM_STATUS_CHANNEL_ID` by the bot, with the incoming webhook as fallback.
 - Bug Tracking plans now show dependency waves, timing notes, undeclared Component overlaps, separate spec and dispatch approval, actionable dependency links, and dispatch blockers.
+- Bug Tracking and Agent Dispatch columns and stats are sized so their headers, sort icons and titles fit (Plans value columns, Per spec Release/Spec columns, the Undeclared plan overlaps stat).
+- The Hostinger public-path plan moved from v1.43.8 to v1.43.10: it waits for the 2026-10-29 hub rebuild.
 
 ## [1.43.7] - 2026-10-25
 
