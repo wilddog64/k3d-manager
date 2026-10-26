@@ -399,10 +399,8 @@ Plan 4 of 5 is [`hub-snapshot-weekly-schedule-and-age-retention`](plans/v1.43.8-
 (operator, 2026-10-24): a LaunchAgent runs the hub snapshot every Sunday at 02:30, and retention changes from
 "newest three" to "purge verified snapshots older than 30 days, never the newest three". Dispatch go recorded 2026-10-24.
 
-Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.8-hostinger-public-path-on-node.md)
-(operator, 2026-10-24): cloudflared runs on the Hostinger node and serves `frontend.3ai-talk.org`
-directly, so an M4 → Hostinger path drop is no longer a public outage (six drops 2026-10-12 to
-10-22). Critical: needs a dispatch go. v1.43.8 is now full; the next plan goes to v1.43.9.
+Hostinger public path (was plan 5) moved to v1.43.10 on 2026-10-25 (Claude): it waits for the 10-29 hub
+rebuild, and v1.43.8 ships with plans 1–4.
 
 ### Candidate milestone — v1.43.9 (patch)
 
@@ -456,7 +454,13 @@ complexity plan.
 Plan 4 of 5 is [`dispatch-claude-cost-by-reference`](plans/v1.43.10-dispatch-claude-cost-by-reference.md)
 (operator, 2026-10-24; moved from v1.43.8 on 2026-10-25): each spec is charged with the Claude turns whose
 tool calls name it (spec file, worktree, `SLUG=`), including spec writing, instead of all Claude usage
-while it was dispatched. v1.43.10 has 4 of 5 plans.
+while it was dispatched.
+
+Plan 5 of 5 is [`hostinger-public-path-on-node`](plans/v1.43.10-hostinger-public-path-on-node.md)
+(operator, 2026-10-24; moved from v1.43.8 on 2026-10-25 by Claude, so v1.43.8 could ship): cloudflared
+runs on the Hostinger node and serves `frontend.3ai-talk.org` directly, so an M4 → Hostinger path drop is
+no longer a public outage (six drops 2026-10-12 to 10-22). Wave: after the 2026-10-29 hub rebuild.
+Critical: needs a dispatch go. v1.43.10 is now full.
 
 ### Candidate milestone — v1.44.0
 
