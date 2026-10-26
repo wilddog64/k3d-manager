@@ -553,6 +553,13 @@ go in:
   how it starts, which instruction file it follows, and how it hands live checks to the operator.
   Write the spec before Codex's period starts.
 
+Plan 5 (operator, 2026-10-26: private break-glass access while webhook is down) is
+[`tailscale-break-glass-access`](plans/v1.44.2-tailscale-break-glass-access.md): operator-only
+Tailscale access to m4 (then m2), restricted to macOS SSH over tcp:22 with explicit grants and
+negative-access tests, independent of webhook/cloud-bridge/Hostinger. This is a deliberate,
+restricted private management channel—not new public ingress or an AI-agent SSH path.
+The operator must separately approve enrollment and live rollout. **v1.44.2 is now at its five-plan cap.**
+
 ### Candidate milestone — v1.44.3 (patch)
 
 **Cloud-bridge Vault health** (operator, 2026-10-23, same request). Branch `k3d-manager-v1.44.3`, cut
@@ -592,6 +599,11 @@ Decisions for the spec:
   dispatch volume is a few tasks a week. The panels show `n` beside every rate, and the guide says to draw no
   conclusion below about 30 tasks per group.
 - **Same contract for every agent.** It applies to Luna, agy and the vendor-LLM trial, so they stay comparable.
+
+
+**Plan 4 of 5 — Host control-plane lifecycle management** (operator, 2026-10-26: "go ahead to do that"). [`host-control-plane-lifecycle-management`](plans/v1.44.3-host-control-plane-lifecycle-management.md) defines a deterministic launchd-supervised host controller independent of Hermes, webhook, cloud-bridge and OrbStack. Phase 1 collects functional evidence and permits only bounded local recovery; Phase 2 detects cloudflared security advisories, distinguishes installed/running versions, stages approved immutable Hermes/webhook/bridge revisions and package-manager cloudflared updates, requires operator approval for disruption, verifies routes and supports bounded rollback. Coordinates with the v1.43.9 heartbeat P2, v1.44.2 Tailscale break-glass and v1.46.0 HermesNotRunning plan, avoiding competing restart authorities. Documentation approval does not authorize deployment or unattended updates. **v1.44.3 has four planned slots assigned.**
+
+**Plan 5 of 5 — Platform component inventory and lifecycle intelligence** (operator, 2026-10-26). [`platform-component-inventory-lifecycle-intelligence`](plans/v1.44.3-platform-component-inventory-lifecycle-intelligence.md) inventories desired/installed/running versions and provenance across Mac hosts, hub, Hostinger, ACG and applications; correlates security advisories, support status and compatibility constraints; publishes source-freshness-aware read-only reports and Platform Lifecycle observability. All upgrades remain observe/recommend only in this initial slice; host-controller and GitOps executors require separately authorized deployment policies. **v1.44.3 is now at its five-plan cap.**
 
 ### Candidate milestone — v1.45.0
 
