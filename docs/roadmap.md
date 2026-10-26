@@ -438,6 +438,11 @@ and a read-only `make machine-check`, driven by per-role tool, secret, agent and
 (arrives 2026-10-28) can become the hub, the M4 a worker and the M2 a console. Secrets are re-entered on
 each machine and checked by name only. Approval pending: dispatch to Luna on the operator's go.
 
+Plan 2 of 5 is [`two-machine-work-distribution`](plans/v1.43.11-two-machine-work-distribution.md), which follows plan 1:
+jobs go through a git queue branch, so they keep flowing when either laptop is away from home. Machines claim jobs
+with leases, landing and the ACG sandbox stay one-at-a-time, and ledger data is stored and forwarded. Claiming
+takes resources into account (battery, a memory reserve for the hub, the M4 preferred for heavy work), and the M2 can opt in to light jobs.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
