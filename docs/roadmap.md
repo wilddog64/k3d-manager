@@ -600,6 +600,9 @@ Decisions for the spec:
   conclusion below about 30 tasks per group.
 - **Same contract for every agent.** It applies to Luna, agy and the vendor-LLM trial, so they stay comparable.
 
+
+**Plan 4 of 5 — Host control-plane lifecycle management** (operator, 2026-10-26: "go ahead to do that"). [`host-control-plane-lifecycle-management`](plans/v1.44.3-host-control-plane-lifecycle-management.md) defines a deterministic launchd-supervised host controller independent of Hermes, webhook, cloud-bridge and OrbStack. Phase 1 collects functional evidence and permits only bounded local recovery; Phase 2 detects cloudflared security advisories, distinguishes installed/running versions, stages approved immutable Hermes/webhook/bridge revisions and package-manager cloudflared updates, requires operator approval for disruption, verifies routes and supports bounded rollback. Coordinates with the v1.43.9 heartbeat P2, v1.44.2 Tailscale break-glass and v1.46.0 HermesNotRunning plan, avoiding competing restart authorities. Documentation approval does not authorize deployment or unattended updates. **v1.44.3 has four planned slots assigned; one remains.**
+
 ### Candidate milestone — v1.45.0
 
 **Docs drift detection.** Facts that can be derived from code (module tables, route tables,
