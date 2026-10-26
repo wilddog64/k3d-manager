@@ -738,30 +738,6 @@ data:
                {
                  "matcher": {
                    "id": "byName",
-                   "options": "Release"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 80
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "Spec"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 200
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
                    "options": "Repo"
                  },
                  "properties": [
@@ -786,84 +762,12 @@ data:
                {
                  "matcher": {
                    "id": "byName",
-                   "options": "Tokens"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 85
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "Agent time"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 95
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "Dispatch → land"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 125
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "Exit → land"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 110
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
                    "options": "Runs"
                  },
                  "properties": [
                    {
                      "id": "custom.width",
                      "value": 60
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "API equiv."
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 90
-                   }
-                 ]
-               },
-               {
-                 "matcher": {
-                   "id": "byName",
-                   "options": "Claude ≈"
-                 },
-                 "properties": [
-                   {
-                     "id": "custom.width",
-                     "value": 85
                    }
                  ]
                },
@@ -897,6 +801,7 @@ data:
                   "options": "Tokens"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 85},
                   {
                     "id": "unit",
                     "value": "short"
@@ -909,6 +814,7 @@ data:
                   "options": "Agent time"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 95},
                   {
                     "id": "unit",
                     "value": "s"
@@ -921,6 +827,7 @@ data:
                   "options": "Dispatch → land"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 125},
                   {
                     "id": "unit",
                     "value": "s"
@@ -930,6 +837,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Exit → land"},
                 "properties": [
+                  {"id": "custom.width", "value": 110},
                   {"id": "unit", "value": "s"},
                   {"id": "description", "value": "Wall-clock interval from the final valid Codex exit at or before land to land. N/A when no qualifying exit is available; this is not proof of human waiting or active review."}
                 ]
@@ -940,6 +848,7 @@ data:
                   "options": "Release"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 80},
                   {
                     "id": "links",
                     "value": [
@@ -958,6 +867,7 @@ data:
                   "options": "API equiv."
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 90},
                   {
                     "id": "unit",
                     "value": "currencyUSD"
@@ -974,6 +884,7 @@ data:
                   "options": "Claude ≈"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 85},
                   {
                     "id": "unit",
                     "value": "currencyUSD"
@@ -1006,6 +917,7 @@ data:
                   "options": "Spec"
                 },
                 "properties": [
+                  {"id": "custom.width", "value": 200},
                   {
                     "id": "links",
                     "value": [
