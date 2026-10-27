@@ -1,7 +1,8 @@
 # Bug: Release Plans hides whether a plan is live-verified
 
-**Status:** OPEN — operator explicitly reauthorizes this separate column enhancement in the 2026-10-27 Luna batch
+**Status:** VERIFIED — separate indicators restored without reverting dispatch fixes; live check queued after check 1
 **Priority:** P3
+**Fix commit:** `9893651f4fd4127db692bf2d1743e070a7683284`
 **Severity:** low — plan verification state was ambiguous in the dashboard
 **Release:** v1.43.9 (dashboard bug)
 **Branch:** `k3d-manager-v1.43.9`
@@ -84,3 +85,21 @@ reporting green. Run focused tests, syntax/lint, and git diff --check; report
 actual outputs and any unmet acceptance honestly. Use <=8 if blocks in new or
 refactored functions. Report legacy budget conflicts instead of raising limits.
 The coordinator will run audit/lint on staged changes before committing.
+
+## Independent batch review
+
+Implementation `9893651f` was independently reviewed within its allowlist,
+committed on its isolated task branch, rebased/tested/landed through the dispatcher.
+Full gate output and pre-fix regression evidence are recorded in
+`docs/issues/2026-10-27-six-bug-luna-batch.md`. No assistant dashboard sync or live
+probe was run. Operator live verification is strictly one fix at a time.
+
+Post-rebase: 111 Python tests passed including actual Prometheus lifecycle/
+verification fixtures, Ruff passed, all 38 dashboard BATS passed, staged audit/
+lint/diff passed. Both actual-query regressions fail on the original single-
+column panel. Raw verification is preserved; derived indicators include dash
+defaults and correct verified/live_verified behavior. Fixed widths total 1,347px.
+Existing Dispatch approval/task, stale-document blockers and filters/links remain
+intact. The old negative single-column assertion was replaced with projection
+checks plus exact raw-label fixtures, with the required audit marker explaining
+this legitimate replacement. Operator check is queued behind probe-age check 1.

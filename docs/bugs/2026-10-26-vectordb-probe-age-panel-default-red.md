@@ -1,7 +1,8 @@
 # VectorDB probe-age panel turns red while the daily probe is fresh
 
-**Status:** OPEN — Grafana panel color is misleading
+**Status:** VERIFIED — daily-probe color thresholds landed; operator live check 1 pending
 **Priority:** P3
+**Fix commit:** `74d2d4e2054aa52a162525fe0456df30ac5cd7d3`
 **Branch:** `k3d-manager-v1.43.9`
 **Dispatch:** go — operator batch 2026-10-27; model `gpt-6-luna`; task `vectordb-probe-age-thresholds-luna`
 **Date:** 2026-10-26
@@ -92,3 +93,17 @@ reporting green. Run focused tests, syntax/lint, and git diff --check; report
 actual outputs and any unmet acceptance honestly. Use <=8 if blocks in new or
 refactored functions. Report legacy budget conflicts instead of raising limits.
 The coordinator will run audit/lint on staged changes before committing.
+
+## Independent batch review
+
+Implementation `74d2d4e2` was independently reviewed within its allowlist,
+committed on its isolated task branch, rebased/tested/landed through the dispatcher.
+Full gate output and pre-fix regression evidence are recorded in
+`docs/issues/2026-10-27-six-bug-luna-batch.md`. No assistant dashboard sync or live
+probe was run. Operator live verification is strictly one fix at a time.
+
+Post-rebase: all 18 VectorDB BATS passed; ShellCheck and staged audit/lint/diff
+checks passed. The new threshold regression fails on the original panel.
+Thresholds are green below 24h, yellow from 24h, red from 48h; query/unit and
+48h/30m alert are unchanged. First live question sent: after normal rollout and
+refresh, is an age under 24h green? Do not force a retrieval probe.

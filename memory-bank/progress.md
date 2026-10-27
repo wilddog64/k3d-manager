@@ -826,3 +826,15 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Verification evidence update only; no new implementation/tests or live mutation. Existing offline full gate output is retained in the prior closeout issue; ShellCheck not applicable to Markdown/PNG changes.
 - [ ] Separately scoped follow-ups remain: source plan Status reconciliation, probe-age threshold fix, and dispatcher explicit-model preservation on resume.
 - PR URL: none.
+
+## 2026-10-27 — Six-bug Luna batch, sequential operator live checks
+
+- [x] Matched all six rows; scoped implementation in existing bug docs, no new plan files. GHCR compatible image/transport change explicitly approved.
+- [x] Started probe-age, Live verified column, GHCR, heartbeat and coordinator tasks; runtime gpt-6-luna confirmed. Source scope commits 0510c5d3/5dae466f.
+- [x] Probe-age landed 74d2d4e2: all18 BATS, ShellCheck, staged gates; pre-fix red. Offline VERIFIED.
+- [x] Live verified column landed 9893651f:111 pytest incl actual PromQL, Ruff,38 BATS, staged gates; pre-fix red. Offline VERIFIED. Raw source preserved, 1347px widths.
+- [ ] Live check1 awaiting user: probe age under24h green after normal dashboard rollout/refresh. Do not force a probe. All other live checks queued behind it.
+- [ ] GHCR diagnostics/compatible transport, independent heartbeats, coordinator attribution: workers running; independent review/landing pending.
+- [ ] Webhook incident doctor: scope committed, dispatch queued for worker capacity. No guessed root cause or live recovery delegated.
+- [x] Old failed127 rows are abandoned starts (missing codex, then node); retry2 landed8237c54d with passed tests.
+- Evidence: docs/issues/2026-10-27-six-bug-luna-batch.md. PR URL:none.
