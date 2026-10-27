@@ -19,3 +19,10 @@ EOF
 @test "heartbeat: templates contain no enrolled endpoint" {
   ! grep -R -E 'https://(hc-ping.com|healthchecks.io)/[[:xdigit:]-]{20,}' "$ROOT/scripts/etc/heartbeat" "$ROOT/scripts/etc/launchd/com.k3d-manager.heartbeat.plist.tmpl" "$ROOT/scripts/etc/systemd"
 }
+
+@test "heartbeat: documented commands execute directly" {
+  run "$ROOT/bin/k3dm-heartbeat" --help
+  [ "$status" -eq 0 ]
+  run "$ROOT/bin/k3dm-heartbeat-setup" --help
+  [ "$status" -eq 0 ]
+}
