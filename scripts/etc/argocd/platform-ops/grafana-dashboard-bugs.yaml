@@ -1927,7 +1927,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution and Verified come from plan Status. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution, Verified, and Live verified are status indicators from plan Status only; they do not identify a verifier or evidence record. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -1941,7 +1941,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(label_replace((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or ((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0)))))",
+              "expr": "label_replace(label_replace(label_replace(label_replace((label_replace((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or ((((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")) unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) (k3dm_plan_info{repo=\"$repo\",execution=~\"proposed|ready|in_progress\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\",execution=~\"proposed|ready|in_progress\"} and on() (vector($release_mode) == 0))))), \"verified\", \"-\", \"\", \"\"), \"live_verified\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified)\"), \"live_verified\", \"$1\", \"verification\", \"(live_verified)\")",
               "instant": true,
               "format": "table"
             }
@@ -1971,6 +1971,7 @@ data:
                   "instance": true,
                   "version": true,
                   "slug": true,
+                  "verification": true,
                   "depends_on_path": true
                 },
                 "indexByName": {
@@ -1984,11 +1985,13 @@ data:
                   "overlaps": 7,
                   "blocked_by": 8,
                   "execution": 9,
-                  "verification": 10,
-                  "approval": 11,
-                  "dispatch_approval": 12,
-                  "dispatch_state": 13,
-                  "slug": 14
+                  "verified": 10,
+                  "live_verified": 11,
+                  "approval": 12,
+                  "dispatch_approval": 13,
+                  "dispatch_state": 14,
+                  "slug": 15,
+                  "verification": 16
                 },
                 "renameByName": {
                   "release": "Release",
@@ -2001,7 +2004,8 @@ data:
                   "overlaps": "Overlaps",
                   "blocked_by": "Blocked by",
                   "execution": "Execution",
-                  "verification": "Verified",
+                  "verified": "Verified",
+                  "live_verified": "Live verified",
                   "approval": "Spec approval",
                   "dispatch_approval": "Dispatch approval",
                   "dispatch_state": "Dispatch task",
@@ -2078,7 +2082,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 140
+                    "value": 110
                   }
                 ]
               },
@@ -2103,6 +2107,58 @@ data:
                   {
                     "id": "custom.width",
                     "value": 67
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "verified": {
+                            "text": "✓",
+                            "color": "green"
+                          },
+                          "live_verified": {
+                            "text": "✓",
+                            "color": "green"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Live verified"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  },
+                  {
+                    "id": "noValue",
+                    "value": "-"
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "live_verified": {
+                            "text": "✓",
+                            "color": "green"
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -2114,7 +2170,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 100
                   }
                 ]
               },

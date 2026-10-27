@@ -782,22 +782,30 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "Plans table retains the original single verification column and dispatch labels" {
+@test "Plans table separates verified and live-verified status indicators" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
 data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panel=next(p for p in data["panels"] if p["id"]==107)
 org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
-assert org["renameByName"]["verification"] == "Verified"
-assert "live_verified" not in org["renameByName"]
+assert org["renameByName"]["verified"] == "Verified"
+assert org["renameByName"]["live_verified"] == "Live verified"
+assert org["excludeByName"]["verification"] is True
+assert '"verified", "$1", "verification", "(verified|live_verified)"' in panel["targets"][0]["expr"]
+assert '"live_verified", "$1", "verification", "(live_verified)"' in panel["targets"][0]["expr"]
+assert '"verified", "-", "", ""' in panel["targets"][0]["expr"]
+assert '"live_verified", "-", "", ""' in panel["targets"][0]["expr"]
 assert org["renameByName"]["dispatch_approval"] == "Dispatch approval"
 assert org["renameByName"]["dispatch_state"] == "Dispatch task"
 assert '"blocked_by", "landed; documentation stale"' in panel["targets"][0]["expr"]
 assert 'dispatch_state="landed"' in panel["targets"][0]["expr"]
 assert 'execution=~"proposed|ready|in_progress"' in panel["targets"][0]["expr"]
 assert ' unless on(plan) ' in panel["targets"][0]["expr"]
-assert '"live_verified", "$1", "verification"' not in panel["targets"][0]["expr"]
+for label in ("Verified", "Live verified"):
+    props=next(o["properties"] for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")==label)
+    assert any(p["id"]=="custom.width" for p in props)
+    assert any(p["id"]=="noValue" and p["value"]=="-" for p in props)
 PY
   [ "${status}" -eq 0 ]
 }

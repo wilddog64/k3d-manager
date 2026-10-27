@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Release Plans now shows separate status-only Verified and Live verified indicators derived from the plan verification label.
 - Clarify Release plans dispatch approval versus ledger task state and flag landed plans with stale documentation status.
 - VectorDB Health colors a fresh daily retrieval probe green, an age of 24 hours or more yellow, and an age of 48 hours or more red, matching the stale-probe alert boundary.
 

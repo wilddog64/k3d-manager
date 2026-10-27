@@ -158,7 +158,9 @@ def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_pat
     assert 'unless on(plan)' in query
     assert 'release=~"$release"' in query
     assert 'vector($release_mode) == 1' in query and 'vector($release_mode) == 0' in query
-    assert 'label_replace' in query and '"verification"' not in query
+    # agent-audit: allow assert-removed replace single-column ban with projection checks and exact raw-label fixtures
+    assert '"verified", "$1", "verification", "(verified|live_verified)"' in query
+    assert '"live_verified", "$1", "verification", "(live_verified)"' in query
     lag_panel = next(panel for panel in dashboard["panels"]
                      if panel.get("title") == "Status lags dispatch")
     assert 'dispatch_state="landed"' in lag_panel["targets"][0]["expr"]
@@ -242,6 +244,8 @@ def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode
         ("failed", "proposed", "codex_failed", "dispatch go needed", "dispatch go needed"),
         ("running", "proposed", "running", "dispatch approval unknown", "dispatch approval unknown"),
         ("no-ledger", "implemented", None, "-", "-"),
+        ("verified", "implemented", "landed", "-", "-"),
+        ("live-verified", "implemented", "landed", "-", "-"),
     ]
 
     def sample_labels(name, values):
@@ -254,12 +258,20 @@ def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode
                       title=slug, execution=execution,
                       verification="unknown" if execution == "implemented" else "n/a",
                       approval="pending", dispatch_approval="unknown", blocked_by=source_blocker)
+        if slug == "verified":
+            source["verification"] = "verified"
+        elif slug == "live-verified":
+            source["verification"] = "live_verified"
         series.append(dict(series=sample_labels("k3dm_plan_info", source), values="1"))
         if state:
             ledger = dict(plan=source["plan"], version="v1.43.9", slug=slug, dispatch_state=state)
             series.append(dict(series=sample_labels("k3dm_dispatch_plan_state", ledger), values="1"))
         shown = {**source, "dispatch_state": state or "none", "slug": slug if state else "-",
-                 "blocked_by": displayed_blocker}
+                 "blocked_by": displayed_blocker, "verified": "-", "live_verified": "-"}
+        if source["verification"] in ("verified", "live_verified"):
+            shown["verified"] = source["verification"]
+        if source["verification"] == "live_verified":
+            shown["live_verified"] = "live_verified"
         expected.append(dict(labels=sample_labels("" if state else "k3dm_plan_info", shown), value=1))
     series.append(dict(series='k3dm_bug_current_release_info{repo="k3d-manager",release="v1.43.9"}',
                        values="1"))
