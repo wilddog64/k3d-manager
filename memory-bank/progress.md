@@ -778,3 +778,12 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Explained separate sources: Status → Execution/Verified; Dispatch header → Dispatch approval; lifecycle ledger → Dispatch task. Missing headers and stale Status text explain the mismatch.
 - [x] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`: 38/38 passed; `_agent_lint`, `_agent_audit`, and staged diff checks passed. Markdown-only investigation; ShellCheck not applicable. No live query/deployment or plan/dashboard edits.
 - Evidence commit: `48db4ad7`; full output: `docs/issues/2026-10-26-plans-execution-versus-dispatch-task.md`. Existing P3 stays OPEN pending operator/Claude design decision. PR URL: none.
+
+## 2026-10-26 — Existing Plans status bug updated
+
+- [x] Found and updated the canonical OPEN/P3 bug; no duplicate bug created.
+- [x] Replaced the historical four-landed/one-awaiting description with the current five-landed screenshot/ledger evidence, retaining the historical distinction.
+- [x] Added all five source/Execution/Dispatch/task rows, including OrbStack's stale READY header and passed landing tests versus pending live acceptance.
+- [x] Clarified missing structured Dispatch approval versus ledger lifecycle, and linked the full prior investigation and 38/38 BATS output.
+- [x] Markdown-only gates passed: doc links, `_agent_lint`, `_agent_audit`, and diff check. BATS was not repeated because runtime/test inputs are unchanged; ShellCheck is not applicable. No dashboard/plan status changes or deployment.
+- Bug update commit: `ced8f0a0`; PR URL: none.
