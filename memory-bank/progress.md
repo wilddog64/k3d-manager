@@ -796,3 +796,13 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Coordinator Markdown gates passed: doc links, audit/lint, staged diff checks. Startup evidence: `docs/issues/2026-10-26-plans-p3-luna-dispatch.md`.
 - [ ] Worker implementation/regression test results and independent review remain pending; no commit/landing/deployment of worker code yet. No plan Status/approval mutation or separate Live verified column authorized.
 - PR URL: none.
+
+## 2026-10-26 — Completed dispatch review: Hermes landed, Plans resumed
+
+- [x] Hermes `hermes-launchagent-keychain-ssh` independently reviewed in its original three-file scope. New SSH environment regressions fail 3/3 on pre-fix source; fixed focused suite 11/11.
+- [x] Python retrieval/prior-art/all-Hermes suite 369 passed; Ruff passed; VectorDB + negation BATS 17/17; staged audit/lint/doc-link/diff gates passed.
+- [x] Committed on task branch and dispatcher landed/pushed `3aae7adc`. Canonical P2 is VERIFIED offline only; live installation, fetch, and LaunchAgent poll confirmation remain pending.
+- [x] Plans P3 initial exit-0 report explicitly incomplete: 36/38 BATS and missing M3/M4/fixture coverage. Resumed with concrete findings.
+- [x] Detected dispatcher resume changing Luna to gpt-6.1-sol; stopped task descendants and resumed with explicit temporary gpt-6-luna wrapper. Correct model confirmed in resume-3 runtime log. No dispatcher code changed.
+- [ ] Review completed Luna replacement and its gates before any commit/landing. Model-preserving dispatcher resume needs a separately scoped follow-up.
+- Evidence: `docs/issues/2026-10-26-dispatch-closeout-review.md`; PR URL: none.

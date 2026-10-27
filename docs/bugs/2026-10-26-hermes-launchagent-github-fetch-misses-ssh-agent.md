@@ -1,6 +1,6 @@
 # Hermes LaunchAgent cannot fetch GitHub without the interactive SSH agent
 
-**Status:** OPEN — unattended GitHub fetch fails
+**Status:** VERIFIED — offline fix landed in `3aae7adc`; LaunchAgent-context live verification pending
 **Priority:** P2
 **Date:** 2026-10-26
 **Branch:** `k3d-manager-v1.43.9`
@@ -125,3 +125,24 @@ LaunchAgent-context success test; verify that after the code change is installed
 - **evidence:** `pytest scripts/tests/bin/test_retrieval_probe.py -q` passes; Ruff passes for changed Python files; operator can verify `git ls-remote` from a LaunchAgent-like environment with `SSH_AUTH_SOCK` unset after install.
 
 No live fetch, LaunchAgent restart, live pytest, deployment, or cluster action is authorized by this dispatch.
+
+## Independent review and landing
+
+Implementation `3aae7adc` is landed on `k3d-manager-v1.43.9` and pushed. It sets
+macOS Keychain-backed noninteractive SSH options only for the tracked-branch
+fetch and only when `GIT_SSH_COMMAND` is absent. Explicit overrides and
+non-macOS behavior are preserved. No session socket, credential, or plist change.
+
+Independent gates after rebase: 369 Python tests passed (retrieval probe, prior
+art, and all Hermes tests); Ruff passed. The three new environment regressions
+failed on the pre-fix implementation and passed with the fix; the focused suite
+passed 11/11. VectorDB/negation BATS passed 17/17. Staged audit/lint, diff checks,
+and doc links passed. Full output and recovered tool/environment limitations:
+`docs/issues/2026-10-26-dispatch-closeout-review.md`.
+
+No live fetch, LaunchAgent restart, deployment, or live evaluation was performed.
+The earlier Keychain read diagnostic is historical evidence, not live verification
+of this installed fix. Operator follow-up: after installing/restarting the
+approved version, use the guide's no-agent `git ls-remote` check under the normal
+LaunchAgent account with an unlocked login Keychain, then confirm a Hermes poll
+fetch/index refresh. Keep VERIFIED until that runtime evidence is supplied.
