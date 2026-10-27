@@ -1,6 +1,7 @@
 # VectorDB probe-age panel turns red while the daily probe is fresh
 
-**Status:** VERIFIED — daily-probe color thresholds landed; operator live check 1 pending
+**Status:** LIVE-VERIFIED — operator screenshots confirm E2 on 2026-10-27
+**Live evidence:** 2026-10-27 · run operator-probe-age-fresh-green · env m4-hub-grafana · scenario probe-age-fresh-green · commit 74d2d4e2054aa52a162525fe0456df30ac5cd7d3 · proves E2
 **Priority:** P3
 **Fix commit:** `74d2d4e2054aa52a162525fe0456df30ac5cd7d3`
 **Branch:** `k3d-manager-v1.43.9`

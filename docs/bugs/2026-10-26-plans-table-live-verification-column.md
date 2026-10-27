@@ -1,6 +1,7 @@
 # Bug: Release Plans hides whether a plan is live-verified
 
-**Status:** VERIFIED — separate indicators restored without reverting dispatch fixes; live check queued after check 1
+**Status:** LIVE-VERIFIED — operator screenshots confirm E2 on 2026-10-27
+**Live evidence:** 2026-10-27 · run operator-plans-positive-and-unknown-indicators · env m4-hub-grafana · scenario plans-positive-and-unknown-indicators · commit 9893651f4fd4127db692bf2d1743e070a7683284 · proves E2
 **Priority:** P3
 **Fix commit:** `9893651f4fd4127db692bf2d1743e070a7683284`
 **Severity:** low — plan verification state was ambiguous in the dashboard

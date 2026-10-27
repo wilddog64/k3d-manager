@@ -202,3 +202,21 @@ Live check 1 is the only current operator question: refresh VectorDB Health
 after normal dashboard sync and report green for an age under 24 hours. No
 forced retrieval probe. Hold all later live checks until that evidence is
 resolved. No PR created.
+
+## Operator live checks 1 and 2 — accepted 2026-10-27
+
+1. Probe-age E2 passed: refreshed VectorDB Health shows **11.6 hours green**,
+   below the daily threshold. [Screenshot](../assets/2026-10-27-probe-age-green-live.png).
+   Fix: `74d2d4e2054aa52a162525fe0456df30ac5cd7d3`. No forced probe was requested.
+2. Plans E2 passed: v1.43.9 unknown/n/a rows show dashes in both indicators
+   ([screenshot](../assets/2026-10-27-plans-unknown-live.png)); Manual v1.43.8
+   shows two rows checked in both Verified and Live verified, two implemented-only
+   rows with dashes, and the summary Live-verified count is 2
+   ([screenshot](../assets/2026-10-27-plans-positive-live.png)).
+   Fix: `9893651f4fd4127db692bf2d1743e070a7683284`.
+
+Both canonical bugs are now LIVE-VERIFIED. Remaining live checks stay queued
+until independent review of their implementations completes. GHCR and heartbeat
+workers were resumed with concrete review findings and the Luna wrapper; the
+webhook doctor worker has completed and awaits independent review. No assistant
+live deployment/restart was performed.

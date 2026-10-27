@@ -838,3 +838,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [ ] Webhook incident doctor: scope committed, dispatch queued for worker capacity. No guessed root cause or live recovery delegated.
 - [x] Old failed127 rows are abandoned starts (missing codex, then node); retry2 landed8237c54d with passed tests.
 - Evidence: docs/issues/2026-10-27-six-bug-luna-batch.md. PR URL:none.
+
+## 2026-10-27 — Dashboard live checks and ask-docs count investigation
+
+- Operator live checks 1/2 passed: probe age 11.6h green (`74d2d4e2`); Plans Manual v1.43.8 has two positive Verified/Live verified rows and matching summary, while v1.43.9 unknown/n/a rows remain dashes (`9893651f`). Canonical bugs LIVE-VERIFIED; screenshots and evidence appended to docs/issues/2026-10-27-six-bug-luna-batch.md.
+- Exact ask-docs question `how many P1 open for v1.43.5` reproduces matcher None; adding bugs yields CountQuery(v1.43.5,P1,open). Filed OPEN P2 docs/bugs/2026-10-27-ask-docs-priority-count-requires-bugs-word.md and verbatim issue evidence. Existing v1.45.1 translation gate also requires bugs; no code fix/dispatch/live change yet.
+- GHCR and heartbeat resumed for review corrections; doctor completed awaiting review; remaining batch work is pending. Next live check waits for accepted implementation. PR URL: none. Evidence-record commit SHA is in git history for this entry.
