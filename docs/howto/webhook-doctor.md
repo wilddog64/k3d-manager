@@ -6,9 +6,9 @@
 processes, listeners, logs, or the network.
 
 On the m4 host, run `bin/k3dm-webhook-doctor --check` to collect timestamped
-JSON. It reports launchd job presence, parsed PID and last exit code, TCP/9000
+JSON. It reports launchd job presence, parsed PID and last exit code, the configured TCP
 listener presence, log modification time and bounded error categories, then
-probes only `http://127.0.0.1:9000/api/v1/health?quick=1` with the reader token held in
+probes only `http://127.0.0.1:7443/api/v1/health?quick=1` with the reader token held in
 memory. The dedicated opener bypasses proxy settings and refuses redirects, so
 the authorization header stays on the fixed loopback request. The reader token is read from `K3DM_WEBHOOK_TOKEN_READER` or macOS
 Keychain; no token, launchd environment, process arguments, or raw log lines
@@ -42,3 +42,7 @@ delivery does not, investigate ingress/bridge before considering a restart.
 The October 26 offsite incident remains unconfirmed until the operator records
 local evidence. This helper and its offline tests do not provide live E1/E2
 evidence and do not change the incident's status.
+
+The default port matches the webhook server (7443). An explicit loaded-job
+`K3DM_WEBHOOK_PORT` overrides it for both listener and authenticated health
+checks. Invalid port configuration is unknown and cannot recommend recovery.

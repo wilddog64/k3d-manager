@@ -4,7 +4,7 @@
   "state_dir": "~/.local/share/k3d-manager/heartbeat/state",
   "timeout_seconds": 5,
   "provider_timeout_seconds": 5,
-  "webhook_url": "http://127.0.0.1:9000/api/v1/health?quick=1",
+  "webhook_url": "http://127.0.0.1:7443/api/v1/health?quick=1",
   "webhook_reader_token_service": "k3dm-webhook-token-reader",
   "hermes_marker": "~/.k3dm/hermes/heartbeat.timestamp",
   "hermes_freshness_seconds": 1200,

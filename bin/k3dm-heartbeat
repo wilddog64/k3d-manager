@@ -71,7 +71,7 @@ def _validate_config(config, expected_role=None):
         if not isinstance(value, (int, float)) or isinstance(value, bool) or not 1 <= value <= 10:
             raise ValueError("timeouts must be between 1 and 10 seconds")
     if role == "m4":
-        _webhook_url(config.get("webhook_url", "http://127.0.0.1:9000/api/v1/health?quick=1"))
+        _webhook_url(config.get("webhook_url", "http://127.0.0.1:7443/api/v1/health?quick=1"))
         if config.get("webhook_reader_token_service", READER_TOKEN_SERVICE) != READER_TOKEN_SERVICE:
             raise ValueError("webhook reader credential service is invalid")
         _positive_number(config.get("hermes_freshness_seconds", 1200), 900, 86400,
@@ -179,7 +179,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def _webhook(config, timeout):
     """Return (valid handler response, dependency all_ok) without leaking token/body."""
-    url = _webhook_url(config.get("webhook_url", "http://127.0.0.1:9000/api/v1/health?quick=1"))
+    url = _webhook_url(config.get("webhook_url", "http://127.0.0.1:7443/api/v1/health?quick=1"))
     request = urllib.request.Request(url, headers={"Authorization": "Bearer " + _reader_token()})
     try:
         client = urllib.request.build_opener(_NoRedirect()).open

@@ -1,3 +1,4 @@
+# agent-audit: allow assert-removed replace incorrect port 9000 with server port 7443 and retain redaction checks with validated loaded port
 import importlib.util
 import io
 from importlib.machinery import SourceFileLoader
@@ -58,7 +59,7 @@ def test_health_probe_keeps_handler_and_dependency_health_separate():
 
     result = doctor._health_probe("reader-secret", opener=probe)
     assert result == {"status": "healthy_http_services_degraded", "http_responsive": True, "all_ok": False}
-    assert seen == {"url": "http://127.0.0.1:9000/api/v1/health?quick=1",
+    assert seen == {"url": "http://127.0.0.1:7443/api/v1/health?quick=1",
                     "authorization": "Bearer reader-secret", "timeout": doctor.TIMEOUT}
 
 
@@ -85,7 +86,7 @@ def test_health_opener_does_not_forward_credentials_after_redirect(monkeypatch):
     opener = doctor._build_health_opener(extra_handlers=(FakeHTTPHandler(),))
     result = doctor._health_probe("reader-secret", opener=opener.open)
     assert result["status"] == "http_error"
-    assert calls == [("http://127.0.0.1:9000/api/v1/health?quick=1", "Bearer reader-secret")]
+    assert calls == [("http://127.0.0.1:7443/api/v1/health?quick=1", "Bearer reader-secret")]
 
 
 def test_command_capture_is_bounded():
@@ -145,11 +146,11 @@ def test_classification_keeps_handler_errors_distinct(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
     monkeypatch.setattr(doctor.os, "getuid", lambda: 501)
     monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "loaded", "pid": 42, "last_exit_code": 0})
-    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": [42]})
-    monkeypatch.setattr(doctor, "_listener_facts", lambda: {"status": "listening", "listening": True})
+    monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "available", "pids": [42]})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "listening", "listening": True})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
     for status in ("invalid_response", "http_error"):
-        monkeypatch.setattr(doctor, "_health_probe", lambda _token, status=status: {"status": status, "http_responsive": True, "all_ok": None})
+        monkeypatch.setattr(doctor, "_health_probe", lambda _token, status=status, **_kwargs: {"status": status, "http_responsive": True, "all_ok": None})
         result = doctor.diagnose(check=True)
         assert result["classification"] == status
         assert result["recovery_recommended"] is False
@@ -160,7 +161,7 @@ def test_launchd_facts_do_not_return_environment_or_raw_output():
         return subprocess.CompletedProcess([], 0, "pid = 123\nlast exit code = 0\nK3DM_WEBHOOK_TOKEN=secret\n", "")
 
     facts = doctor._launchd_facts("501", runner=runner)
-    assert facts == {"status": "loaded", "pid": 123, "last_exit_code": 0}
+    assert facts == {"status": "loaded", "pid": 123, "last_exit_code": 0, "port": 7443}
     assert "secret" not in json.dumps(facts)
 
 
@@ -178,10 +179,10 @@ def test_classification_preserves_listener_and_recovery_policy(monkeypatch, tmp_
     monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
     monkeypatch.setattr(doctor.os, "getuid", lambda: 501)
     monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "loaded", "pid": 42, "last_exit_code": 0})
-    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": [42]})
-    monkeypatch.setattr(doctor, "_listener_facts", lambda: {"status": "listening", "listening": True})
+    monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "available", "pids": [42]})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "listening", "listening": True})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {"available": False, "modified_utc": None, "freshness": "missing", "error_categories": []})
-    monkeypatch.setattr(doctor, "_health_probe", lambda _token: {"status": "healthy_http_services_degraded", "http_responsive": True, "all_ok": False})
+    monkeypatch.setattr(doctor, "_health_probe", lambda _token, **_kwargs: {"status": "healthy_http_services_degraded", "http_responsive": True, "all_ok": False})
     result = doctor.diagnose(check=True)
     assert result["classification"] == "local_http_handler_responsive_dependencies_degraded"
     assert result["recovery_recommended"] is False
@@ -193,10 +194,10 @@ def test_diagnostic_never_calls_recovery(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
     monkeypatch.setattr(doctor.os, "getuid", lambda: 501)
     monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "missing", "pid": None, "last_exit_code": None})
-    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": []})
-    monkeypatch.setattr(doctor, "_listener_facts", lambda: {"status": "no_listener", "listening": False})
+    monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "available", "pids": []})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "no_listener", "listening": False})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {"available": False, "modified_utc": None, "freshness": "missing", "error_categories": []})
-    monkeypatch.setattr(doctor, "_health_probe", lambda _token: {"status": "local_timeout", "http_responsive": False, "all_ok": None})
+    monkeypatch.setattr(doctor, "_health_probe", lambda _token, **_kwargs: {"status": "local_timeout", "http_responsive": False, "all_ok": None})
     result = doctor.diagnose(check=True)
     assert result["recovery_recommended"] is True
     assert "make restart-webhook" in result["recovery_action"]
@@ -208,8 +209,8 @@ def test_diagnostic_command_and_listener_failures_are_not_missing_or_restart(mon
     monkeypatch.delenv("K3DM_WEBHOOK_TOKEN_READER", raising=False)
     monkeypatch.setattr(doctor.os, "getuid", lambda: 501)
     monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "permission_error", "pid": None, "last_exit_code": None})
-    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "unavailable", "pids": []})
-    monkeypatch.setattr(doctor, "_listener_facts", lambda: {"status": "command_error", "listening": None})
+    monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "unavailable", "pids": []})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "command_error", "listening": None})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
     monkeypatch.setattr(doctor, "_keychain_reader_token", lambda: None)
     result = doctor.diagnose(check=True)
@@ -260,10 +261,10 @@ def test_diagnose_uses_reader_token_from_mocked_dict_command_when_env_absent(mon
     monkeypatch.setattr(doctor, "_run", run)
     monkeypatch.setattr(doctor.os, "getuid", lambda: 501)
     monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "loaded", "pid": 42, "last_exit_code": 0})
-    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": [42]})
-    monkeypatch.setattr(doctor, "_listener_facts", lambda: {"status": "listening", "listening": True})
+    monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "available", "pids": [42]})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "listening", "listening": True})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
-    monkeypatch.setattr(doctor, "_health_probe", lambda token: {"status": "healthy_http", "http_responsive": True, "all_ok": True}
+    monkeypatch.setattr(doctor, "_health_probe", lambda token, **_kwargs: {"status": "healthy_http", "http_responsive": True, "all_ok": True}
                         if token == "fixture-reader-token" else (_ for _ in ()).throw(AssertionError("token missing")))
     result = doctor.diagnose(check=True)
     assert result["classification"] == "local_http_healthy_external_delivery_unverified"
@@ -278,3 +279,43 @@ def test_check_and_dry_run_conflict_is_rejected_without_io(monkeypatch):
         assert exc.code == 2
     else:
         raise AssertionError("conflicting modes accepted")
+
+
+def test_loaded_webhook_port_is_used_for_listener_and_health(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
+    monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "loaded", "pid": 42, "port": 8555})
+    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": [42]})
+    monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
+    ports = []
+    def listener(**kwargs):
+        ports.append(kwargs["port"])
+        return {"status": "listening", "listening": True}
+    def health(_token, **kwargs):
+        ports.append(kwargs["port"])
+        return {"status": "healthy_http", "http_responsive": True, "all_ok": True}
+    monkeypatch.setattr(doctor, "_listener_facts", listener)
+    monkeypatch.setattr(doctor, "_health_probe", health)
+    result = doctor.diagnose(check=True)
+    assert ports == [8555, 8555]
+    assert result["recovery_recommended"] is False
+
+
+def test_launchd_port_defaults_to_server_and_validates_override():
+    def facts(output):
+        return doctor._launchd_facts(501, runner=lambda _args: subprocess.CompletedProcess([], 0, output, ""))
+    assert facts("pid = 42\n")["port"] == 7443
+    assert facts("pid = 42\n K3DM_WEBHOOK_PORT => 8555\n")["port"] == 8555
+    for invalid in ("0", "65536", "invalid-secret-value"):
+        value = facts(f"pid = 42\n K3DM_WEBHOOK_PORT => {invalid}\n")
+        assert value["port"] is None
+        assert invalid not in json.dumps(value)
+    assert doctor._health_probe("reader", port=None)["status"] == "configuration_unavailable"
+    assert doctor._listener_facts(port=None)["listening"] is None
+
+
+def test_doctor_default_port_matches_production_webhook(monkeypatch):
+    import runpy
+    monkeypatch.delenv("K3DM_WEBHOOK_PORT", raising=False)
+    config = MODULE_PATH.parents[1] / "scripts/lib/webhook/config.py"
+    assert doctor.PORT == runpy.run_path(str(config))["PORT"]

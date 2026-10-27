@@ -384,3 +384,24 @@ def test_setup_rejects_cross_role_render_and_templates_validate(tmp_path):
     timer = (ROOT / "scripts/etc/systemd/k3dm-heartbeat.timer.tmpl").read_text()
     assert "Type=oneshot" in service and "{{PYTHON3}}" in service
     assert "OnUnitActiveSec=60s" in timer and "Persistent=true" in timer
+
+
+def test_webhook_default_and_enrollment_example_use_server_port(monkeypatch):
+    seen = []
+    monkeypatch.setattr(heartbeat, "_reader_token", lambda: "reader")
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def geturl(self): return "http://127.0.0.1:7443/api/v1/health?quick=1"
+        def read(self, _limit):
+            return b'{"services":[{"name":"api","ok":true,"detail":"ok"}],"all_ok":true}'
+    class Client:
+        def open(self, request, timeout):
+            seen.append(request.full_url)
+            return Response()
+    monkeypatch.setattr(heartbeat.urllib.request, "build_opener", lambda *_args: Client())
+    assert heartbeat._webhook({}, 4) == (True, True)
+    assert seen == ["http://127.0.0.1:7443/api/v1/health?quick=1"]
+    example = json.loads((ROOT / "scripts/etc/heartbeat/checks.example.json").read_text())
+    assert example["webhook_url"] == seen[0]

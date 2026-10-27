@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 LABEL = "com.k3d-manager.webhook"
-PORT = 9000
+PORT = 7443
 LOG_TAIL_BYTES = 65536
 TIMEOUT = 4
 COMMAND_OUTPUT_LIMIT = 16384
@@ -73,6 +73,17 @@ def _result_output(result):
     return f"{result.stdout or ''}{result.stderr or ''}"
 
 
+def _loaded_port(output):
+    match = re.search(r"^\s*K3DM_WEBHOOK_PORT\s*=>\s*(\S+)\s*$", output, re.MULTILINE)
+    if not match:
+        return PORT
+    value = match.group(1)
+    if not value.isascii() or not value.isdecimal() or len(value) > 5:
+        return None
+    port = int(value)
+    return port if 1 <= port <= 65535 else None
+
+
 def _launchd_facts(uid, runner=_run):
     result = runner(["launchctl", "print", f"gui/{uid}/{LABEL}"])
     command_status = _command_status(result)
@@ -84,13 +95,15 @@ def _launchd_facts(uid, runner=_run):
     if command_status == "complete":
         status = ("loaded" if rc == 0 else "missing" if re.search(r"could not find service|service not found", output, re.I)
                   else "command_error")
-    return {"status": status,
+    return {"status": status, "port": _loaded_port(output) if status == "loaded" else None,
             "pid": int(pid_match.group(1)) if pid_match else None,
             "last_exit_code": int(exit_match.group(1)) if exit_match else None}
 
 
-def _listener_facts(runner=_run):
-    result = runner(["lsof", "-nP", f"-iTCP:{PORT}", "-sTCP:LISTEN"])
+def _listener_facts(runner=_run, port=PORT):
+    if port is None:
+        return {"status": "configuration_unavailable", "listening": None}
+    result = runner(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"])
     command_status = _command_status(result)
     output = _result_output(result)
     rc = result.get("returncode") if isinstance(result, dict) else result.returncode if result else None
@@ -162,10 +175,12 @@ def _read_health_body(response, timeout):
     raise ValueError("health response too large")
 
 
-def _health_probe(token, timeout=TIMEOUT, opener=None):
+def _health_probe(token, timeout=TIMEOUT, opener=None, port=PORT):
+    if port is None:
+        return {"status": "configuration_unavailable", "http_responsive": False, "all_ok": None}
     if not token:
         return {"status": "auth_unavailable", "http_responsive": False, "all_ok": None}
-    request = urllib.request.Request(f"http://127.0.0.1:{PORT}/api/v1/health?quick=1",
+    request = urllib.request.Request(f"http://127.0.0.1:{port}/api/v1/health?quick=1",
                                     headers={"Authorization": f"Bearer {token}"})
     try:
         open_request = opener or _build_health_opener().open
@@ -202,17 +217,18 @@ def diagnose(check=False):
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     if not check:
         return {"timestamp_utc": now, "mode": "dry-run", "probes": [
-            "launchd job state and last exit code", "webhook process PID", "TCP/9000 listener",
+            "launchd job state and last exit code", "webhook process PID", "configured webhook TCP listener (default 7443)",
             "bounded redacted log summary", "reader-authenticated loopback /api/v1/health?quick=1"],
             "recovery": "No recovery is performed. Operator may run make restart-webhook once only when local evidence warrants it; it also restarts cloud-bridge."}
     home = Path(os.environ.get("HOME", str(Path.home())))
     job = _launchd_facts(os.getuid())
     process = _process_facts()
-    listener = _listener_facts()
+    port = job.get("port", PORT)
+    listener = _listener_facts(port=port)
     log = _log_facts(home / "Library/Logs/k3dm-webhook.log")
     token = os.environ.get("K3DM_WEBHOOK_TOKEN_READER")
     token = token or _keychain_reader_token()
-    probe = _health_probe(token)
+    probe = _health_probe(token, port=port)
     classification = _classify(job, listener, probe)
     reliable_unhealthy = job["status"] == "missing" or probe["status"] == "local_timeout"
     return {"timestamp_utc": now, "mode": "check", "launchd": job, "process": process, "listener": listener,
