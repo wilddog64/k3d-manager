@@ -527,6 +527,16 @@ alongside the outcomes: specs landed, bugs closed, rework rounds and defects fou
 stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
 **v1.44.1 is now at its five-plan cap.**
 
+**Quota-aware coordinator rotation amendment (2026-10-27):** The same v1.44.1
+[coordinator trial](plans/v1.44.1-coordinator-rotation-trial.md) and
+[session-window telemetry](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+now specify independent Claude/Codex quota pools, explicit shared Sol+Luna Codex
+capacity, advisory worker reserve, source-freshness-aware admission, and durable,
+idempotent operator-controlled Opus ↔ Sol handoffs with worker/worktree, approval,
+verification and run-state reconciliation. Missing reset/source data stays unknown;
+no automatic failover or vendor-side quota reservation is claimed. No additional
+v1.44.1 slot is consumed; implementation requires separate dispatch approval.
+
 **Multi-vendor Agent Dispatch telemetry amendment (2026-10-27):** The existing
 [session-window usage](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
 and [coordinator-rotation](plans/v1.44.1-coordinator-rotation-trial.md) plans
