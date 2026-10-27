@@ -911,6 +911,30 @@ Initial action contracts (each precondition is drawn from an incident on this pl
 | v2.3 | Execution of allowlisted reversible actions, with retest and audit |
 | v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
 
+### Candidate milestone — v2.2: Agent governance and policy safety baseline
+
+**Proposed 2026-10-27 (operator request; documentation only).** v2.2 already owns
+the deterministic policy-as-code and approval stage of the v2.x AI diagnostics
+and healing gateway. Reserve three of the maximum five plan slots for controls
+that apply to all coordinator/worker vendors, not just Codex. These are distinct
+from and must integrate with the existing v2.2 gateway policy contract.
+
+| Plan | Priority | Boundary |
+|---|---|---|
+| [Agent identity and capability enforcement](plans/v2.2-agent-identity-capability-enforcement.md) | P1 | OS/server-enforced per-task identity, least privilege, fail-closed adapter authorization and auditable operator approval |
+| [Agent execution budgets and circuit breakers](plans/v2.2-agent-execution-budget-circuit-breakers.md) | P1 | Bounded depth, retries, time, concurrency, tool actions and measurable spend; durable handoff and stopped-loop evidence |
+| [Agent evidence provenance and threat detection](plans/v2.2-agent-evidence-provenance-and-threat-detection.md) | P2 | Independent test/landing evidence, poisoned-RAG resistance, structured redacted lineage and bounded Hermes/Grafana alerts |
+
+**v2.2 now has 3 of up to 5 formal plan slots allocated by these proposals**;
+check any future v2.2 policy/approval specs against the five-plan cap rather than
+creating duplicate policy engines. Earlier prerequisites are v2.1 read-only gateway,
+existing Agent Dispatch, cloud-bridge authorization, VectorDB and Hermes. v2.3
+execute/retest/audit and v2.4 provider adapters consume these contracts. No
+worker dispatch, permission change or production rollout is authorized by these
+documents; separate operator approval and independent negative/E2E verification
+are required. The initial boundary is explicit: protect existing services rather
+than introduce a new agent-governance daemon or refactor lib-foundation.
+
 ### Candidate theme — v2.x: intent interpretation and planning engine
 
 **Proposed 2026-10-15 (operator; roadmap candidate only, not yet scoped or approved for implementation).**
