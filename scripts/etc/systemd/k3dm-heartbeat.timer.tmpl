@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule k3d-manager independent heartbeat probes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+Unit=k3dm-heartbeat.service
+
+[Install]
+WantedBy=timers.target

@@ -13,6 +13,7 @@
 - Release Plans now shows separate status-only Verified and Live verified indicators derived from the plan verification label.
 - Clarify Release plans dispatch approval versus ledger task state and flag landed plans with stale documentation status.
 - VectorDB Health colors a fresh daily retrieval probe green, an age of 24 hours or more yellow, and an age of 48 hours or more red, matching the stale-probe alert boundary.
+- Add optional independent outbound heartbeat probes for m4 services and Hostinger, with protected local credentials, maintenance suppression, launchd/systemd render support, and advisory Hermes/cloud-bridge freshness markers. No checks are installed or enabled by default; live alert delivery remains operator-verification work.
 
 ## [1.43.8] - 2026-10-25
 

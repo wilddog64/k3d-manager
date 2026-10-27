@@ -65,6 +65,23 @@ def test_job_id_metacharacter_is_rejected():
     assert reason == "invalid job_id"
 
 
+def test_successful_poll_marker_is_private_atomic_and_timestamped(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge, "STATE_DIR", tmp_path / "bridge-state")
+    bridge._write_heartbeat_marker(now=1234.5)
+    marker = bridge.STATE_DIR / "heartbeat.timestamp"
+    assert marker.read_text() == "1234.500\n"
+    assert marker.stat().st_mode & 0o777 == 0o600
+    assert sorted(path.name for path in bridge.STATE_DIR.iterdir()) == ["heartbeat.timestamp"]
+
+
+def test_bridge_marker_write_failure_is_advisory(tmp_path, monkeypatch, caplog):
+    invalid_parent = tmp_path / "not-a-directory"
+    invalid_parent.write_text("fixture")
+    monkeypatch.setattr(bridge, "STATE_DIR", invalid_parent / "bridge-state")
+    bridge._write_heartbeat_marker(now=1234.5)
+    assert "completion marker skipped" in caplog.text
+
+
 def test_extra_argument_is_rejected():
     value, reason = bridge.validate_request(
         request("cluster-status", {"unexpected": "value"}), now=NOW)

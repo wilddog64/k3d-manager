@@ -63,6 +63,20 @@ def _save_state(path, state):
     path.chmod(0o600)
 
 
+def _write_heartbeat_marker(timestamp):
+    """Publish a private completed-cycle timestamp without failing Hermes."""
+    try:
+        marker = Path(os.environ.get("K3DM_HERMES_HEARTBEAT_MARKER",
+                                    str(Path.home() / ".k3dm/hermes/heartbeat.timestamp")))
+        marker.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = marker.with_name(marker.name + f".{os.getpid()}.tmp")
+        temporary.write_text(f"{timestamp:.3f}\n")
+        temporary.chmod(0o600)
+        os.replace(temporary, marker)
+    except OSError as error:
+        print(f"Hermes completion marker skipped (non-fatal): {type(error).__name__}", file=sys.stderr)
+
+
 def _http_json(url, headers, timeout=None):
     if timeout is None:
         timeout = float(os.environ.get("K3DM_HERMES_HTTP_TIMEOUT", "90"))
@@ -866,7 +880,9 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _publish_cni_ipam_metrics()
     _publish_pr_checks()
     _schedule_e2e(state)
+    state["heartbeat_last_completed_cycle"] = time.time()
     _save_state(state_path, state)
+    _write_heartbeat_marker(state["heartbeat_last_completed_cycle"])
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
                       "pages": pages}))
     return 0

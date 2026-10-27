@@ -142,6 +142,32 @@ def test_hermes_probe_failure_is_advisory_and_does_not_escape(monkeypatch, capsy
     assert capsys.readouterr().err.splitlines() == ["vectordb retrieval probe skipped: offline noise"]
 
 
+def test_hermes_completed_cycle_marker_is_private_and_atomic(monkeypatch, tmp_path):
+    spec = importlib.util.spec_from_loader(
+        "k3dm_hermes_marker_test", SourceFileLoader("k3dm_hermes_marker_test", str(ROOT / "bin/k3dm-hermes")))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    marker = tmp_path / "state" / "heartbeat.timestamp"
+    monkeypatch.setenv("K3DM_HERMES_HEARTBEAT_MARKER", str(marker))
+    module._write_heartbeat_marker(1234.5)
+    assert marker.read_text() == "1234.500\n"
+    assert marker.stat().st_mode & 0o777 == 0o600
+    assert list(marker.parent.iterdir()) == [marker]
+
+
+def test_hermes_marker_write_failure_is_advisory(monkeypatch, capsys, tmp_path):
+    spec = importlib.util.spec_from_loader(
+        "k3dm_hermes_marker_failure_test", SourceFileLoader(
+            "k3dm_hermes_marker_failure_test", str(ROOT / "bin/k3dm-hermes")))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    parent = tmp_path / "not-a-directory"
+    parent.write_text("fixture")
+    monkeypatch.setenv("K3DM_HERMES_HEARTBEAT_MARKER", str(parent / "heartbeat.timestamp"))
+    assert module._write_heartbeat_marker(1234.5) is None
+    assert "non-fatal" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("changed", [False, True])
 def test_probe_failure_preserves_index_refresh_result(monkeypatch, capsys, changed):
     import subprocess
