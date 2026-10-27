@@ -116,3 +116,15 @@ command terminated with exit code 2
 ```
 
 The ConfigMap extraction and JSON parse immediately afterward succeeded and supplied the evidence above.
+
+After the bug/guide commit was pushed, the dashboard Application was hard-refreshed again. It reconciled the documentation-only release revision while remaining healthy:
+
+```text
+application.argoproj.io/hub-grafana-dashboards annotated
+reconciled=2026-10-27T00:47:15Z
+rev=35959fa02aae024e07411452abe0dea344241aa2
+sync=Synced health=Healthy
+operation=Succeeded
+```
+
+The dashboard ConfigMap itself is unchanged from the verified `1e44141` render; no Grafana provisioning rewrite was needed for this docs-only revision.

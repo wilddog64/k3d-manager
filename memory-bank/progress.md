@@ -738,4 +738,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] On M4 hub, hard-refreshed `hub-grafana-dashboards`; ArgoCD reconciled revision `1e44141ed9059df92223c9e2aee926fc84b89ef6`, `Synced`, `Healthy`, operation `Succeeded`.
 - [x] Live ConfigMap has both `Verified` and `Live verified`, separate projection/mapping, and 1,320 px configured width. Grafana sidecar wrote `k3dm-bugs.json`; Grafana provisioning logged start and finish.
 - [x] Browser screenshot/API-level verification was unavailable (Grafana API returned 401 without credentials); issue doc records this boundary and verbatim output. Live status is based on deployed ConfigMap + Grafana provisioning logs, not a screenshot.
-- [x] Offline BATS 38/38 and `_agent_audit` exit 0 were recorded with implementation commit `7ec87a73`; bug/docs commit and remote verification pending. PR URL: none.
+- [x] Offline BATS 38/38 and `_agent_audit` exit 0 were recorded with implementation commit `7ec87a73`; bug/guide record pushed in `35959fa0`; final memory closeout commit pending. PR URL: none.
