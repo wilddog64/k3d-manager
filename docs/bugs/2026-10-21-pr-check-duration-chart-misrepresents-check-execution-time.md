@@ -6,8 +6,8 @@
 **Severity:** low
 **Approval:** operator explicitly requested filing a P3 bug on 2026-10-21; implementation not yet approved
 **Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
-**Release:** v1.43.5 (bug; exempt from plan cap)
-**Branch:** `k3d-manager-v1.43.5`
+**Release:** v1.43.9 (reopened follow-up; originally filed against v1.43.5; bug exempt from plan cap)
+**Branch:** `k3d-manager-v1.43.9`
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`, `scripts/lib/hermes/pr_checks.py`, corresponding PR-check tests and dashboard guide
 **Related:** `docs/plans/v1.43.3-pr-checks-dashboard.md`, `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md`, `docs/plans/v1.45.2-pr-lifecycle-history-and-merge-visibility.md`
 **Found by:** operator, Grafana screenshot 2026-10-21 approximately 13:35 PDT
@@ -120,6 +120,8 @@ Landed as `b77a4093`. `python3 -m pytest -q -p no:cacheprovider scripts/tests/he
 ```
 
 ## Reopened scope — current-versus-historical visibility mismatch (2026-10-27)
+
+**Release history:** Originally filed and partially corrected in v1.43.5 (fix `b77a4093`, offline-verified). The newly observed operator-visible mismatch is reopened for v1.43.9, the active branch. The original fix history remains intact; the new regression must be independently verified before closure.
 
 **Operator evidence:** Screenshots captured 2026-10-27 around 10:24–10:28 PDT:
 - `wilddog64/shopping-cart-payment`: Open PRs = 0, Failing = 0 and Checks per PR = "No open PRs — no checks to show"; the 12-hour **Latest check duration (sampled)** panel still displays older #93/#94 series.
