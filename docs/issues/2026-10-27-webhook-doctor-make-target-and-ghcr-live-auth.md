@@ -1,0 +1,143 @@
+# Webhook doctor Make target and operator GHCR live-auth result
+
+## Requested Make entrypoint
+
+No webhook-doctor Make target existed. Operator asked for one while a CVE
+scan ran in tmux. Implemented47b4d740 (normal hooks):
+
+- `make webhook-doctor` calls the existing doctor --check, read-only.
+- `make webhook-doctor DRY_RUN=1` calls --dry-run (probe plan only).
+- Target is PHONY and listed in make help; howto/test guide updated.
+- No restart, scan, credential or extra dependency is wired to the wrapper.
+
+Actual verification:
+
+```text
+$ make -n webhook-doctor
+bin/k3dm-webhook-doctor --check
+$ make -n webhook-doctor DRY_RUN=1
+bin/k3dm-webhook-doctor --dry-run
+$ make webhook-doctor DRY_RUN=1
+{"mode": "dry-run", "probes": ["launchd job state and last exit code", "webhook process PID", "configured webhook TCP listener (default 7443)", "bounded redacted log summary", "reader-authenticated loopback /api/v1/health?quick=1"], "recovery": "No recovery is performed. Operator may run make restart-webhook once only when local evidence warrants it; it also restarts cloud-bridge.", "timestamp_utc": "2026-10-27T22:56:38.842360+00:00"}
+$ make help (checked target entry)
+make help: webhook-doctor listed
+$ bats scripts/tests/bin/restart_webhook.bats
+1..5
+ok 1 restart-webhook reloads the plist with bootout then bootstrap, never kickstarting the webhook
+ok 2 restart-webhook continues to bootstrap when bootout reports the job is not loaded
+ok 3 restart-webhook still restarts the cloud bridge
+ok 4 restart-webhook retries bootstrap twice then reports success
+ok 5 restart-webhook fails after five bootstrap attempts and skips cloud bridge
+```
+
+Thin wrapper adds no shell function/file: ShellCheck not applicable. Normal
+staged lint/audit, doc links and checkpoint hooks passed. No new mirror test
+was added; actual Make expansion, real no-I/O plan and existing adjacent
+restart suite were exercised. Existing doctor35 Python/5BATS results remain
+in the preceding health-budget issue; Python behavior unchanged here.
+
+## Operator scanner command completed
+
+Full supplied output:
+
+```text
+make app-cve-scan
+./scripts/k3d-manager app_cve_scan_trigger
+running under bash version 5.3.20(1)-release
+INFO: [observability] triggering app-cve-scan as job/app-cve-scan-manual-1793141593
+job.batch/app-cve-scan-manual-1793141593 created
+INFO: [observability] waiting up to 600s for job/app-cve-scan-manual-1793141593
+INFO: [observability] job/app-cve-scan-manual-1793141593 completed
+app-cve-scan-manual-1793141593   1     <none>
+INFO: [observability] most recent promotion requests:
+cve-remediation-qrwcd   2026-10-16T08:01:38Z
+cve-remediation-ldcpd   2026-10-19T10:55:21Z
+cve-remediation-26nt6   2026-10-20T08:01:23Z
+cve-remediation-594kd   2026-10-21T08:01:34Z
+cve-remediation-fck8q   2026-10-22T08:02:07Z
+cve-remediation-xxx4r   2026-10-22T19:11:48Z
+```
+
+These are historical promotion request records, not evidence of a new
+promotion by this run. No second scan was started by coordinator.
+
+## Actual new-job log, read-only
+
+Command: kubectl --context k3d-k3d-cluster -n platform-ops logs
+job/app-cve-scan-manual-1793141593 -c app-cve-scanner --tail=200
+
+```text
+[app-cve-scan] STAGE shopping-cart-basket: deployed image ghcr.io/wilddog64/shopping-cart-basket:sha-1404c74800bdb8f4cfdc90331790052c212773f6 has no HIGH/CRITICAL findings
+[app-cve-scan] STAGE shopping-cart-frontend: deployed image ghcr.io/wilddog64/shopping-cart-frontend:<none> has no HIGH/CRITICAL findings
+[app-cve-scan] STAGE shopping-cart-order: deployed image ghcr.io/wilddog64/shopping-cart-order:<none> has no HIGH/CRITICAL findings
+[app-cve-scan] STAGE shopping-cart-payment: deployed image ghcr.io/wilddog64/shopping-cart-payment:<none> has no HIGH/CRITICAL findings
+[app-cve-scan] STAGE shopping-cart-product-catalog: failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-product-catalog; reason=auth — promotion skipped
+[notify] Email skipped: SENDGRID_API_KEY or NOTIFICATION_EMAIL not set
+[notify] PagerDuty skipped: PAGERDUTY_ROUTING_KEY not set
+[app-cve-scan] Done
+```
+
+This run exercised the new auth diagnosis and deliberately skipped product
+catalog promotion. Successful Job exit does not mean private-package access
+or remediation succeeded. Optional email/PagerDuty notice delivery was skipped
+for missing config, so end-to-end notice delivery is not verified. Other
+report image tags include <none>; no independent claim about those workloads
+or unrelated parser fix was made.
+
+## Published resolution metric
+
+Read through hub API service proxy (GET only), filtering product-catalog:
+
+```text
+k3dm_app_cve_candidate_resolution{instance="shopping-cart-product-catalog",job="k3dm-app-cve-scan",reason="auth",service="shopping-cart-product-catalog"} 1
+```
+
+This confirms the per-service auth-resolution metric is published. It does
+not establish a later auth-to-ok transition or successful promotion.
+
+## Dedicated local PAT checked without disclosure
+
+Keychain lookup metadata only:
+
+```json
+{"service": "platform-ops-app-rebuild", "lookup_exit": 0, "credential_present": true}
+```
+
+PAT was held only in process memory and sent only to its intended GHCR/GitHub
+HTTPS endpoints, with proxy routes and redirects disabled. Token/Authorization
+never appeared in process arguments or outputs. No cluster Secret was read
+or decoded. No value, raw response body, profile or full permission list was
+logged. GHCR token request result:
+
+```json
+{"registry_token_http_status": 403, "pull_token_present": false}
+```
+
+No manifest request was made because no pull token was returned. A subsequent
+read-only GitHub /user authentication check of the same dedicated PAT:
+
+```json
+{"github_auth_http_status": 401}
+```
+
+The existing dedicated PAT is rejected by GitHub/GHCR. This is not explained
+by the prior Keychain lock, since retrieval now succeeds. We did not establish
+expired versus revoked versus another invalid-credential cause. Resyncing
+this rejected local credential alone would not validate package access.
+
+Next single operator action: replace/regenerate the dedicated PAT in GitHub
+and update the existing Keychain item platform-ops-app-rebuild / account k3dm
+through the operator's credential UI; never paste its value into chat. For
+GHCR pulls GitHub documents a classic PAT with read:packages and applicable
+package access:
+[GitHub Container registry authentication](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic).
+Preserve other permissions actually required by the existing dedicated
+rebuild workflow; do not substitute the operator's broad gh token. The
+coordinator did not generate, store, rotate or modify access to a credential.
+After operator confirms storage, recheck authentication before syncing the
+cluster Secret and rerunning the scan, one step at a time.
+
+GHCR live result is PARTIAL: deployed auth classification/metric verified;
+credential remediation, successful candidate resolution/promotion and
+notification delivery remain unverified. Canonical bug remains VERIFIED
+offline with these live observations, not a full LIVE-VERIFIED closeout.

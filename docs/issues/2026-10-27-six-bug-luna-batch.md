@@ -693,3 +693,18 @@ verification, not a failed corrected-scanner run. Exact output and rollout
 command source review: docs/issues/2026-10-27-ghcr-live-check-old-scanner-image.md.
 Next user step only make platform-ops; no assistant rollout, blind credential
 rotation or scan trigger. All subsequent live checks remain queued.
+
+## GHCR operator runtime result — partial, rejected dedicated PAT
+
+Job app-cve-scan-manual-1793141593 completed, new log product-catalog
+reason=auth/promotion skipped and per-service metric auth=1. Historical
+promotion records do not show new remediation. Dedicated local PAT retrievable
+(exit0), but GHCR token403 and GitHub auth401. Needs operator-owned credential
+replacement; no source/registry/cluster credential values disclosed. Email/
+PagerDuty notices skipped for missing config. Success path still pending.
+Full output docs/issues/2026-10-27-webhook-doctor-make-target-and-ghcr-live-auth.md.
+
+User-requested make webhook-doctor /DRY_RUN=1 wrapper47b4d740 implemented,
+help/docs updated, Make expansions/real plan/5 adjacent BATS and hooks pass.
+Only next operator credential replacement step requested; no second scan
+started, no broad gh token reused, no credential rotated by coordinator.
