@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "action": "diagnose-app",
+  "args": {
+    "name": "istio-base-ubuntu-hostinger"
+  },
+  "requested_by": "chatgpt-cloud",
+  "requested_at": "2026-10-27T18:26:08Z",
+  "expires_at": "2026-10-27T18:56:08Z"
+}
