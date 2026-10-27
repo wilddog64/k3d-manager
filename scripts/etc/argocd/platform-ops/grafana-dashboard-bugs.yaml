@@ -1927,7 +1927,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Blocked by explains why a proposed or ready plan cannot dispatch.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution and Verified come from plan Status. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -1941,7 +1941,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "label_replace(label_replace(((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\"), \"live_verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\")",
+              "expr": "(label_replace((label_replace(label_replace(((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\"), \"live_verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\") and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) k3dm_plan_info{execution=~\"proposed|ready|in_progress\"})), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or (label_replace(label_replace(((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\"), \"live_verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\") unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) k3dm_plan_info{execution=~\"proposed|ready|in_progress\"})))",
               "instant": true,
               "format": "table"
             }
@@ -2006,7 +2006,7 @@ data:
                   "execution": "Execution",
                   "verification": "Verified",
                   "approval": "Spec approval",
-                  "dispatch_approval": "Dispatch",
+                  "dispatch_approval": "Dispatch approval",
                   "dispatch_state": "Dispatch task",
                   "slug": "Dispatch task",
                   "verified": "Verified",
@@ -2126,12 +2126,26 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch"
+                  "options": "Dispatch approval"
                 },
                 "properties": [
                   {
                     "id": "custom.width",
                     "value": 110
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "unknown": {
+                            "text": "not recorded",
+                            "color": "gray"
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -2324,7 +2338,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch"
+                  "options": "Dispatch task"
                 },
                 "properties": [
                   {

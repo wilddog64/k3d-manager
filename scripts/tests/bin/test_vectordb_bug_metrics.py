@@ -121,9 +121,29 @@ def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_pat
     assert 'overlaps="-"' in rows["v1.50.0-h"]
     assert 'approval="approved",dispatch_approval="needed"' in rows["v1.50.0-g"]
     assert 'dispatch_approval="unknown"' in rows["v1.50.0-h"]
+    assert 'approval="approved",dispatch_approval="unknown"' not in rows["v1.50.0-h"]
     assert 'blocked_by="branch not cut; dispatch go needed"' in rows["v1.50.0-g"]
     assert len(re.search(r'wave_note="([^"]*)"', rows["v1.50.0-c"]).group(1)) <= 80
     assert 'k3dm_plan_undeclared_overlaps{repo="k3d-manager",release="v1.50.0"} 1' in output
+
+
+def test_landed_plan_document_states_remain_authoritative(metrics, tmp_path):
+    docs = {
+        "docs/plans/v1.54.0-proposed.md": "# Proposed\n**Status:** PROPOSED\n**Dispatch:** go\n",
+        "docs/plans/v1.54.0-ready.md": "# Ready\n**Status:** READY\n**Dispatch:** needed\n",
+        "docs/plans/v1.54.0-progress.md": "# Progress\n**Status:** IN PROGRESS\n**Dispatch:** not required\n",
+        "docs/plans/v1.54.0-malformed.md": "# Malformed\n**Status:** READY\n**Approval:** approved\n**Dispatch:** maybe\n",
+    }
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line for line in output.splitlines()
+            if line.startswith("k3dm_plan_info{")}
+    assert 'execution="proposed",verification="n/a"' in rows["v1.54.0-proposed"]
+    assert 'execution="ready",verification="n/a"' in rows["v1.54.0-ready"]
+    assert 'execution="in_progress",verification="n/a"' in rows["v1.54.0-progress"]
+    assert 'dispatch_approval="go"' in rows["v1.54.0-proposed"]
+    assert 'dispatch_approval="needed"' in rows["v1.54.0-ready"]
+    assert 'dispatch_approval="not required"' in rows["v1.54.0-progress"]
+    assert 'approval="approved",dispatch_approval="unknown"' in rows["v1.54.0-malformed"]
 
 
 def test_plan_overlap_cap_and_blocker_branches(metrics, tmp_path):

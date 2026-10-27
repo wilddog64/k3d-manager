@@ -430,7 +430,45 @@ assert options['renameByName']['wave_note']=='Wave note'
 assert options['renameByName']['overlaps']=='Overlaps'
 assert options['renameByName']['blocked_by']=='Blocked by'
 assert options['renameByName']['approval']=='Spec approval'
-assert options['renameByName']['dispatch_approval']=='Dispatch'
+bugs_table=next(p for p in data['panels'] if p['id']==23)
+assert any(o['matcher'].get('options')=='Dispatch' and any(p['id']=='mappings' for p in o['properties'])
+           for o in bugs_table['fieldConfig']['overrides'])
+assert not any(o['matcher'].get('options')=='Dispatch task' for o in bugs_table['fieldConfig']['overrides'])
+assert options['renameByName']['dispatch_approval']=='Dispatch approval'
+assert options['renameByName']['dispatch_state']=='Dispatch task'
+assert any(o['matcher'].get('options')=='Dispatch task' for o in table['fieldConfig']['overrides'])
+assert 'Dispatch approval comes only from the plan Dispatch header' in table['description']
+assert 'landed; documentation stale' in table['targets'][0]['expr']
+assert 'dispatch_state=\"landed\"' in table['targets'][0]['expr']
+assert 'execution=~\"proposed|ready|in_progress\"' in table['targets'][0]['expr']
+assert ' unless on(plan) ' in table['targets'][0]['expr']
+assert 'verification' in table['targets'][0]['expr'] and 'live_verified' in table['targets'][0]['expr']
+stale_execution={'proposed','ready','in_progress'}
+def blocked_by(row):
+    if row['dispatch_state']=='landed' and row['execution'] in stale_execution:
+        return 'landed; documentation stale'
+    return row['blocked_by']
+fixtures=[
+    {'dispatch_state':'landed','execution':'proposed','blocked_by':'dispatch approval not recorded','expected':'landed; documentation stale'},
+    {'dispatch_state':'landed','execution':'ready','blocked_by':'dispatch go needed','expected':'landed; documentation stale'},
+    {'dispatch_state':'landed','execution':'in_progress','blocked_by':'-','expected':'landed; documentation stale'},
+    {'dispatch_state':'awaiting_land','execution':'proposed','blocked_by':'dispatch approval not recorded','expected':'dispatch approval not recorded'},
+    {'dispatch_state':'refused','execution':'ready','blocked_by':'dependency not landed','expected':'dependency not landed'},
+    {'dispatch_state':'none','execution':'implemented','blocked_by':'-','expected':'-'},
+]
+assert [blocked_by(row) for row in fixtures] == [row['expected'] for row in fixtures]
+task_mapping=next(o for o in table['fieldConfig']['overrides']
+                  if o['matcher'].get('options')=='Dispatch task'
+                  and any(p['id']=='mappings' for p in o['properties']))
+values=next(p['value'][0]['options'] for p in task_mapping['properties'] if p['id']=='mappings')
+assert values['awaiting_land']['text']=='awaiting land'
+assert values['refused']['text']=='land refused'
+assert values['codex_failed']['text']=='codex failed'
+assert values['none']['text']=='no record'
+assert 'running' not in values and not any(v.get('text')=='verified' for v in values.values())
+assert any(p['id']=='mappings' and p['value'][0]['options']['unknown']['text']=='not recorded'
+           for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Dispatch approval'
+           for p in o['properties'])
 assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
            for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
            for p in o['properties'])

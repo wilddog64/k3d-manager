@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Release plans labels plan-header dispatch authorization separately from dispatch task state, displays unrecorded approval explicitly, and flags landed tasks whose plan status still lags.
+
 ### Added
 
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
