@@ -754,4 +754,4 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Reviewed worker output and landed commit `78ffa7d5` on `origin/k3d-manager-v1.43.9` using the dispatcher. The first land attempt found the worker diff uncommitted; `_agent_checkpoint` committed it before retry. Recovery is documented in `docs/issues/2026-10-27-dispatch-land-refused-dirty-worker.md`.
 - [x] Scoped gates: `/tmp/k3dm-test-venv/bin/python -m pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q` — `108 passed in 7.45s`; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` — 38/38 passed; Python 3.14 `py_compile` and `git diff --check` passed; `_agent_lint` and `_agent_audit` passed.
 - [ ] Live E3 remains pending approved dashboard sync/metrics refresh and operator screenshot. No runtime service was changed.
-- Commit: `78ffa7d5` implementation, with follow-up documentation commit pending. PR URL: none.
+- Commits: `78ffa7d5` implementation; `604bffa4` bug/memory closeout. Both pushed to `origin/k3d-manager-v1.43.9`. PR URL: none.
