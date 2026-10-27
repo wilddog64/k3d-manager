@@ -106,3 +106,20 @@ metric behavior remain untested. A manual `make app-cve-scan` is the existing
 operator runtime gate (can promote clean candidates); it was not executed
 by the coordinator or requested while doctor lookup recheck is pending.
 No new PAT, scan or Secret decoding.
+
+## Runtime scan readiness after doctor correction
+
+Current corrected doctor check is authenticated healthy with no restart
+needed (full result in webhook-doctor-health-timeout-restart-inference issue).
+Read-only hub Job list filtered by app-cve-scan owner/name and status.active:
+
+```json
+{"active_app_cve_scan_jobs": []}
+```
+
+No active scanner was observed. Previously confirmed main/init images,
+UID/fsGroup and ConfigMap script hash match the reviewed fix. Next single
+operator step is `make app-cve-scan`. This starts a real scan and may promote
+a clean candidate to the app cluster. The coordinator did not create a Job,
+promote an image or rotate a credential. Await command/job result before
+checking registry auth reasons/metrics and moving to remaining live items.
