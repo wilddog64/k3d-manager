@@ -1,6 +1,6 @@
 # Bug: Release Plans hides whether a plan is live-verified
 
-**Status:** LIVE-VERIFIED — 2026-10-27; separate plan verification columns loaded by Grafana provisioning on the hub
+**Status:** OPEN — plan table column reverted at operator request pending Claude review
 **Priority:** P3
 **Severity:** low — plan verification state was ambiguous in the dashboard
 **Release:** v1.43.9 (dashboard bug)
@@ -8,15 +8,15 @@
 **Filed:** 2026-10-26, following operator screenshot and request to restore the Live verified column
 **Approval:** explicit operator 2026-10-26: restore Live verified and verify it live
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (panel 107 Plans), `scripts/tests/plugins/grafana_dashboard_bugs.bats`, `docs/guides/grafana-dashboards/k3dm-bugs.md`
-**Fix commit:** `7ec87a73`
+**Historical fix commit:** `7ec87a73` (reverted by operator-requested dashboard restoration)
 **Related:** `docs/issues/2026-10-26-plans-live-verification-column.md`
-**Live evidence:** 2026-10-27 · run hub-grafana-dashboards-sync-1e44141 · env hub/k3d-k3d-cluster/monitoring · scenario k3dm-bugs/plans-live-verification-column-and-width · commit 1e44141ed9059df92223c9e2aee926fc84b89ef6 · proves fix
+**Historical live evidence:** 2026-10-27 · run hub-grafana-dashboards-sync-1e44141 · env hub/k3d-k3d-cluster/monitoring · scenario k3dm-bugs/plans-live-verification-column-and-width · commit 1e44141ed9059df92223c9e2aee926fc84b89ef6 · proves the prior dashboard version was provisioned; current state was later reverted
 
 ## Problem
 
 The Release Plans table had one **Verified** column backed by a mutually exclusive `verification` label. A plan with `LIVE-VERIFIED` status appeared only as verified; the table did not make its live verification state explicit. The Bugs table separately exposes Verified, Live-verified, timestamps, commits, and live evidence, while Plans only has the status indicators available from each plan document.
 
-## Fix
+## Previous implementation (reverted)
 
 Panel 107 now derives two display labels from the plan's existing `verification` value:
 

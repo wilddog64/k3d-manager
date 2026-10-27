@@ -1,6 +1,6 @@
 # Bug: Release plans confuses dispatch approval with task state and leaves landed execution stale
 
-**Status:** FIXED — offline implementation landed; live dashboard verification pending
+**Status:** OPEN — dashboard changes reverted at operator request; awaiting Claude's table design decision
 **Priority:** P3
 **Severity:** low — misleading Release plans metadata; Codex dispatch/landing is not blocked by this display issue
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
@@ -95,12 +95,12 @@ interface:
 
 ## Definition of Done
 
-- [x] Producer/consumer semantics reviewed; exact implementation approach preserves historical compatibility.
-- [x] E1/E2 offline tests green with fixture coverage; no live host side effects.
-- [x] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and `pytest scripts/tests/bin/test_vectordb_bug_metrics.py` pass.
-- [x] Grafana guide and CHANGELOG updated; scoped change reviewed.
+- [ ] Producer/consumer semantics reviewed; exact implementation approach preserves historical compatibility.
+- [ ] E1/E2 offline tests green with fixture coverage; no live host side effects.
+- [ ] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and `pytest scripts/tests/bin/test_vectordb_bug_metrics.py` pass.
+- [ ] Grafana guide and CHANGELOG updated; scoped change reviewed.
 - [ ] Approved live dashboard verification captured and E3 recorded before LIVE-VERIFIED.
-- [x] Landed commit: `78ffa7d5` (`checkpoint: before operation`; contains the reviewed task changes)
+- [ ] Implementation remains landed; current commit `78ffa7d5` was reverted by the operator-requested follow-up.
 
 ## What NOT to Do
 
@@ -114,6 +114,10 @@ interface:
 - The Plans panel now names `Dispatch approval` separately from ledger-derived `Dispatch task`, maps missing approval to `not recorded`, and reports landed tasks with stale plan execution as `landed; documentation stale` in Blocked by. The source Status/verification values remain unchanged.
 - Verification after rebase: `pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q` — 108 passed; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` — 38/38 passed; Python compilation and `git diff --check` passed; `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` passed.
 - E3 remains pending a dashboard sync/metrics refresh and operator screenshot; no live service was changed by this task.
+
+## Reversion — 2026-10-28
+
+The operator asked to restore the Plans table after finding the added lifecycle and verification fields confusing. The dashboard changes from this task were reverted: the synthetic `landed; documentation stale` Blocked by text, Dispatch approval rename/mapping, and related guide/test/changelog edits are removed. The single-column verification presentation is also restored to its pre-change form while the operator checks the design with Claude. The earlier implementation and verification evidence above are historical; they do not describe the current dashboard. No plan document Status, Approval, or Dispatch headers were changed.
 
 ## Follow-up diagnosis — stale execution statuses for three landed v1.43.9 plans
 

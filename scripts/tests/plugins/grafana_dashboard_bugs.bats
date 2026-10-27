@@ -430,45 +430,7 @@ assert options['renameByName']['wave_note']=='Wave note'
 assert options['renameByName']['overlaps']=='Overlaps'
 assert options['renameByName']['blocked_by']=='Blocked by'
 assert options['renameByName']['approval']=='Spec approval'
-bugs_table=next(p for p in data['panels'] if p['id']==23)
-assert any(o['matcher'].get('options')=='Dispatch' and any(p['id']=='mappings' for p in o['properties'])
-           for o in bugs_table['fieldConfig']['overrides'])
-assert not any(o['matcher'].get('options')=='Dispatch task' for o in bugs_table['fieldConfig']['overrides'])
-assert options['renameByName']['dispatch_approval']=='Dispatch approval'
-assert options['renameByName']['dispatch_state']=='Dispatch task'
-assert any(o['matcher'].get('options')=='Dispatch task' for o in table['fieldConfig']['overrides'])
-assert 'Dispatch approval comes only from the plan Dispatch header' in table['description']
-assert 'landed; documentation stale' in table['targets'][0]['expr']
-assert 'dispatch_state=\"landed\"' in table['targets'][0]['expr']
-assert 'execution=~\"proposed|ready|in_progress\"' in table['targets'][0]['expr']
-assert ' unless on(plan) ' in table['targets'][0]['expr']
-assert 'verification' in table['targets'][0]['expr'] and 'live_verified' in table['targets'][0]['expr']
-stale_execution={'proposed','ready','in_progress'}
-def blocked_by(row):
-    if row['dispatch_state']=='landed' and row['execution'] in stale_execution:
-        return 'landed; documentation stale'
-    return row['blocked_by']
-fixtures=[
-    {'dispatch_state':'landed','execution':'proposed','blocked_by':'dispatch approval not recorded','expected':'landed; documentation stale'},
-    {'dispatch_state':'landed','execution':'ready','blocked_by':'dispatch go needed','expected':'landed; documentation stale'},
-    {'dispatch_state':'landed','execution':'in_progress','blocked_by':'-','expected':'landed; documentation stale'},
-    {'dispatch_state':'awaiting_land','execution':'proposed','blocked_by':'dispatch approval not recorded','expected':'dispatch approval not recorded'},
-    {'dispatch_state':'refused','execution':'ready','blocked_by':'dependency not landed','expected':'dependency not landed'},
-    {'dispatch_state':'none','execution':'implemented','blocked_by':'-','expected':'-'},
-]
-assert [blocked_by(row) for row in fixtures] == [row['expected'] for row in fixtures]
-task_mapping=next(o for o in table['fieldConfig']['overrides']
-                  if o['matcher'].get('options')=='Dispatch task'
-                  and any(p['id']=='mappings' for p in o['properties']))
-values=next(p['value'][0]['options'] for p in task_mapping['properties'] if p['id']=='mappings')
-assert values['awaiting_land']['text']=='awaiting land'
-assert values['refused']['text']=='land refused'
-assert values['codex_failed']['text']=='codex failed'
-assert values['none']['text']=='no record'
-assert 'running' not in values and not any(v.get('text')=='verified' for v in values.values())
-assert any(p['id']=='mappings' and p['value'][0]['options']['unknown']['text']=='not recorded'
-           for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Dispatch approval'
-           for p in o['properties'])
+assert options['renameByName']['dispatch_approval']=='Dispatch'
 assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
            for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
            for p in o['properties'])
@@ -478,8 +440,8 @@ assert overlap['title']=='Undeclared plan overlaps'
 assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==55 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==90 for p in overrides['Depends on'])
+assert order_props['custom.width']==62 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==100 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -793,7 +755,7 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 120 and widths["Dispatch task"] >= 140 and widths["Live verified"] >= 90, widths
+assert widths["Title"] >= 150 and widths["Dispatch task"] >= 150, widths
 assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
@@ -820,25 +782,19 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "Plans separates ordinary verification from live verification" {
+@test "Plans table retains the original single verification column and dispatch labels" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
 data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panel=next(p for p in data["panels"] if p["id"]==107)
 org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
-assert org["renameByName"]["verified"]=="Verified"
-assert org["renameByName"]["live_verified"]=="Live verified"
-assert org["excludeByName"]["verification"] is True
-expr=panel["targets"][0]["expr"]
-assert '"verified", "$1", "verification"' in expr
-assert '"live_verified", "$1", "verification"' in expr
-for field, live_only in (("Verified", False), ("Live verified", True)):
-    override=next(o for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")==field and any(p["id"]=="mappings" for p in o["properties"]))
-    mappings=next(p["value"][0]["options"] for p in override["properties"] if p["id"]=="mappings")
-    assert mappings["live_verified"]["text"] == ("✓" if live_only else "✓")
-    assert mappings["verified"]["text"] == ("-" if live_only else "✓")
-assert sum(p["value"] for o in panel["fieldConfig"]["overrides"] for p in o["properties"] if p["id"]=="custom.width") <= 1350
+assert org["renameByName"]["verification"] == "Verified"
+assert "live_verified" not in org["renameByName"]
+assert org["renameByName"]["dispatch_approval"] == "Dispatch"
+assert org["renameByName"]["dispatch_state"] == "Dispatch task"
+assert '"blocked_by", "landed; documentation stale"' not in panel["targets"][0]["expr"]
+assert '"live_verified", "$1", "verification"' not in panel["targets"][0]["expr"]
 PY
   [ "${status}" -eq 0 ]
 }

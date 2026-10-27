@@ -127,7 +127,7 @@ def test_plan_waves_cycles_declared_waves_overlaps_and_dispatch(metrics, tmp_pat
     assert 'k3dm_plan_undeclared_overlaps{repo="k3d-manager",release="v1.50.0"} 1' in output
 
 
-def test_landed_plan_document_states_remain_authoritative(metrics, tmp_path):
+def test_plan_status_and_dispatch_headers_remain_independent(metrics, tmp_path):
     docs = {
         "docs/plans/v1.54.0-proposed.md": "# Proposed\n**Status:** PROPOSED\n**Dispatch:** go\n",
         "docs/plans/v1.54.0-ready.md": "# Ready\n**Status:** READY\n**Dispatch:** needed\n",

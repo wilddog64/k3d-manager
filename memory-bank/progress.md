@@ -755,3 +755,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Scoped gates: `/tmp/k3dm-test-venv/bin/python -m pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q` — `108 passed in 7.45s`; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` — 38/38 passed; Python 3.14 `py_compile` and `git diff --check` passed; `_agent_lint` and `_agent_audit` passed.
 - [ ] Live E3 remains pending approved dashboard sync/metrics refresh and operator screenshot. No runtime service was changed.
 - Commits: `78ffa7d5` implementation; `604bffa4` bug/memory closeout. Both pushed to `origin/k3d-manager-v1.43.9`. PR URL: none.
+
+## 2026-10-28 — Restore original Release Plans table
+
+- [x] Reverted the Plans panel changes from `78ffa7d5` and `7ec87a73` in a new forward commit; the dashboard manifest now matches its pre-`7ec87a73` version exactly.
+- [x] Restored the original single Verification column, Dispatch heading/mapping, and Blocked by query; removed the synthetic `landed; documentation stale` text and Live verified projection. No plan documents or dispatch ledger records were changed.
+- [x] Reopened both related dashboard bug records pending the operator's review with Claude; prior live-provisioning evidence is retained as historical evidence.
+- [ ] Hub ArgoCD hard refresh and live check remain pending; the operator needs to sync the pushed branch before the UI returns to the restored layout.
+- [x] `/tmp/k3dm-test-venv/bin/python -m pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q`: 108 passed; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`: 38/38 passed; `git diff --check` passed. The revert commit SHA will be added to the follow-up closeout record. PR URL: none.

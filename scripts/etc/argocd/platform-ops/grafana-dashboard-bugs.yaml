@@ -1927,7 +1927,7 @@ data:
           "id": 107,
           "type": "table",
           "title": "Plans",
-          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Spec approval comes from the plan Approval header; Dispatch approval comes only from the plan Dispatch header; Dispatch task comes from the dispatch ledger. Execution and Verified come from plan Status. Landed tasks with stale proposed/ready/in-progress Status show documentation stale; reconcile the plan after landing. Blocked by explains pre-dispatch requirements only.",
+          "description": "Order is the plan number. Wave is the earliest dependency wave; Wave note records a timing constraint. Overlaps flags shared Component paths without a dependency. Blocked by explains why a proposed or ready plan cannot dispatch.",
           "gridPos": {
             "x": 0,
             "y": 27,
@@ -1941,7 +1941,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(label_replace((label_replace(label_replace(((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\"), \"live_verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\") and on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) k3dm_plan_info{execution=~\"proposed|ready|in_progress\"})), \"blocked_by\", \"landed; documentation stale\", \"blocked_by\", \".*\") or (label_replace(label_replace(((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\"), \"verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\"), \"live_verified\", \"$1\", \"verification\", \"(verified|live_verified|unknown|n/a)\") unless on(plan) (k3dm_dispatch_plan_state{dispatch_state=\"landed\"} and on(plan) k3dm_plan_info{execution=~\"proposed|ready|in_progress\"})))",
+              "expr": "((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)) * on(plan) group_left(dispatch_state, slug) k3dm_dispatch_plan_state) or on(plan) label_replace(label_replace((k3dm_plan_info{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_info{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0)), \"dispatch_state\", \"none\", \"\", \"\"), \"slug\", \"-\", \"\", \"\")",
               "instant": true,
               "format": "table"
             }
@@ -1971,8 +1971,7 @@ data:
                   "instance": true,
                   "version": true,
                   "slug": true,
-                  "depends_on_path": true,
-                  "verification": true
+                  "depends_on_path": true
                 },
                 "indexByName": {
                   "release": 0,
@@ -1986,12 +1985,10 @@ data:
                   "blocked_by": 8,
                   "execution": 9,
                   "verification": 10,
-                  "approval": 12,
-                  "dispatch_approval": 13,
-                  "dispatch_state": 14,
-                  "slug": 15,
-                  "verified": 10,
-                  "live_verified": 11
+                  "approval": 11,
+                  "dispatch_approval": 12,
+                  "dispatch_state": 13,
+                  "slug": 14
                 },
                 "renameByName": {
                   "release": "Release",
@@ -2006,11 +2003,9 @@ data:
                   "execution": "Execution",
                   "verification": "Verified",
                   "approval": "Spec approval",
-                  "dispatch_approval": "Dispatch approval",
+                  "dispatch_approval": "Dispatch",
                   "dispatch_state": "Dispatch task",
-                  "slug": "Dispatch task",
-                  "verified": "Verified",
-                  "live_verified": "Live verified"
+                  "slug": "Dispatch task"
                 }
               }
             }
@@ -2035,7 +2030,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 65
+                    "value": 72
                   }
                 ]
               },
@@ -2047,7 +2042,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 50
+                    "value": 58
                   }
                 ]
               },
@@ -2059,7 +2054,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 85
+                    "value": 100
                   }
                 ]
               },
@@ -2071,7 +2066,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 65
+                    "value": 72
                   }
                 ]
               },
@@ -2083,7 +2078,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 80
+                    "value": 90
                   }
                 ]
               },
@@ -2095,7 +2090,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 90
+                    "value": 100
                   }
                 ]
               },
@@ -2107,7 +2102,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 70
+                    "value": 67
                   }
                 ]
               },
@@ -2119,33 +2114,19 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 118
                   }
                 ]
               },
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch approval"
+                  "options": "Dispatch"
                 },
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
-                  },
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "value",
-                        "options": {
-                          "unknown": {
-                            "text": "not recorded",
-                            "color": "gray"
-                          }
-                        }
-                      }
-                    ]
+                    "value": 95
                   }
                 ]
               },
@@ -2157,7 +2138,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 55
+                    "value": 62
                   },
                   {
                     "id": "noValue",
@@ -2173,7 +2154,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 90
+                    "value": 100
                   },
                   {
                     "id": "links",
@@ -2195,7 +2176,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 100
+                    "value": 115
                   }
                 ]
               },
@@ -2207,7 +2188,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 120
+                    "value": 150
                   }
                 ]
               },
@@ -2237,7 +2218,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 140
+                    "value": 150
                   },
                   {
                     "id": "links",
@@ -2300,7 +2281,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Verified"
+                  "options": "Verification"
                 },
                 "properties": [
                   {
@@ -2309,17 +2290,17 @@ data:
                       {
                         "type": "value",
                         "options": {
-                          "verified": {
-                            "text": "✓",
-                            "color": "green"
-                          },
                           "live_verified": {
-                            "text": "✓",
-                            "color": "green"
+                            "text": "✓ live",
+                            "color": "gray"
+                          },
+                          "verified": {
+                            "text": "✓ verified",
+                            "color": "gray"
                           },
                           "unknown": {
-                            "text": "-",
-                            "color": "gray"
+                            "text": "? unknown",
+                            "color": "yellow"
                           },
                           "n/a": {
                             "text": "-",
@@ -2328,17 +2309,13 @@ data:
                         }
                       }
                     ]
-                  },
-                  {
-                    "id": "noValue",
-                    "value": "-"
                   }
                 ]
               },
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dispatch task"
+                  "options": "Dispatch"
                 },
                 "properties": [
                   {
@@ -2370,56 +2347,6 @@ data:
                         }
                       }
                     ]
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Live verified"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 90
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Live verified"
-                },
-                "properties": [
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "value",
-                        "options": {
-                          "verified": {
-                            "text": "-",
-                            "color": "gray"
-                          },
-                          "live_verified": {
-                            "text": "✓",
-                            "color": "green"
-                          },
-                          "unknown": {
-                            "text": "-",
-                            "color": "gray"
-                          },
-                          "n/a": {
-                            "text": "-",
-                            "color": "gray"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "noValue",
-                    "value": "-"
                   }
                 ]
               }
