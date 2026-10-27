@@ -181,3 +181,5 @@ verification one check at a time.
 Focused offline gates passed and dispatcher landing reran them after rebase.
 Full outputs, review corrections, image compatibility and remaining live steps:
 `docs/issues/2026-10-27-six-bug-luna-batch.md`. No live rollout or enrollment was performed.
+
+Live-check follow-up: corrected the heartbeat default/example URL from9000 to the production default7443 in `2b93434e893ff0417946c550deecbecb1443021d`; configured custom URLs remain supported. Default-route regression passed. Monitoring enrollment and failure/recovery delivery are still unverified. See docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.

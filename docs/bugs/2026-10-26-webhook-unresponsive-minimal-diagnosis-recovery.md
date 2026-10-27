@@ -1,7 +1,7 @@
 # Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery
 
 **Filed:** 2026-10-26, operator report at approximately 07:20 PDT
-**Status:** OPEN — unverified incident; live host diagnostics and recovery pending
+**Status:** OPEN — current local E1 health confirmed; historical cause and end-to-end delivery unverified
 **Priority:** P2
 **Severity:** medium — Slack/cloud-bridge remote management degraded or unavailable; actual host and service state unknown
 **Release:** v1.43.9 (bug; no new plan slot)
@@ -163,3 +163,18 @@ crash before acceptance. No recovery or live diagnostics performed.
 The incident remains OPEN; helper completion does not establish an outage
 cause or recovery. Full outputs and remaining live steps are in
 `docs/issues/2026-10-27-six-bug-luna-batch.md`.
+
+## Live check3 — 2026-10-27
+
+Operator JSON at12:17:20Z reported auth_unavailable and recommended no restart.
+Coordinator found diagnostic port9000 was wrong; live PID4295 listens on7443.
+Corrected helper/defaults in `2b93434e893ff0417946c550deecbecb1443021d`.
+A fresh read-only direct check at12:24:33Z shows loaded PID4295, port7443
+listening, authenticated healthy_http/all_ok=true, recovery_recommended=false.
+This supersedes the earlier absence of current local evidence; it does not
+establish the historical offsite failure cause. No recovery was warranted or
+performed. Operator credential-context reason is unknown. Next check is
+completed Slack `/k3dm fix-list` delivery, one at a time.
+
+Full exact output and diagnostic regression:
+`docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md`.
