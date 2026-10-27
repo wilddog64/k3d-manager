@@ -319,3 +319,18 @@ def test_doctor_default_port_matches_production_webhook(monkeypatch):
     monkeypatch.delenv("K3DM_WEBHOOK_PORT", raising=False)
     config = MODULE_PATH.parents[1] / "scripts/lib/webhook/config.py"
     assert doctor.PORT == runpy.run_path(str(config))["PORT"]
+
+
+def test_command_waits_for_success_after_output_streams_close():
+    result = doctor._run([sys.executable, "-c",
+        "import os,time;os.write(1,b'fixture-reader-token\\n');os.close(1);os.close(2);time.sleep(.1)"])
+    assert result["returncode"] == 0
+    assert result["stdout"] == "fixture-reader-token\n"
+    assert result["timed_out"] is False
+
+
+def test_command_with_closed_streams_still_obeys_deadline():
+    result = doctor._run([sys.executable, "-c",
+        "import os,time;os.close(1);os.close(2);time.sleep(5)"], timeout=0.1)
+    assert result["timed_out"] is True
+    assert result["returncode"] != 0

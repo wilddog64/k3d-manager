@@ -17,6 +17,8 @@
 
 ### Changed
 
+- Webhook doctor waits for a bounded command exit after its output closes, avoiding premature credential-lookup termination.
+
 - Correct webhook doctor and heartbeat default probes to port 7443; doctor honors the loaded LaunchAgent port without exposing its environment.
 
 - Release Plans now shows separate status-only Verified and Live verified indicators derived from the plan verification label.

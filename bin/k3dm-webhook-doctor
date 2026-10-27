@@ -44,7 +44,12 @@ def _run(argv, timeout=TIMEOUT):
                     output_limited = True
                     process.terminate()
                     break
-    timed_out = time.monotonic() - started >= timeout
+    timed_out = False
+    if not output_limited:
+        try:
+            process.wait(timeout=max(0, timeout - (time.monotonic() - started)))
+        except subprocess.TimeoutExpired:
+            timed_out = True
     if process.poll() is None:
         process.terminate()
         try:
