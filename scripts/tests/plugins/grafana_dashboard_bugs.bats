@@ -430,7 +430,7 @@ assert options['renameByName']['wave_note']=='Wave note'
 assert options['renameByName']['overlaps']=='Overlaps'
 assert options['renameByName']['blocked_by']=='Blocked by'
 assert options['renameByName']['approval']=='Spec approval'
-assert options['renameByName']['dispatch_approval']=='Dispatch'
+assert options['renameByName']['dispatch_approval']=='Dispatch approval'
 assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
            for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
            for p in o['properties'])
@@ -440,8 +440,8 @@ assert overlap['title']=='Undeclared plan overlaps'
 assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==62 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==100 for p in overrides['Depends on'])
+assert order_props['custom.width']==55 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==90 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -791,9 +791,12 @@ panel=next(p for p in data["panels"] if p["id"]==107)
 org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
 assert org["renameByName"]["verification"] == "Verified"
 assert "live_verified" not in org["renameByName"]
-assert org["renameByName"]["dispatch_approval"] == "Dispatch"
+assert org["renameByName"]["dispatch_approval"] == "Dispatch approval"
 assert org["renameByName"]["dispatch_state"] == "Dispatch task"
-assert '"blocked_by", "landed; documentation stale"' not in panel["targets"][0]["expr"]
+assert '"blocked_by", "landed; documentation stale"' in panel["targets"][0]["expr"]
+assert 'dispatch_state="landed"' in panel["targets"][0]["expr"]
+assert 'execution=~"proposed|ready|in_progress"' in panel["targets"][0]["expr"]
+assert ' unless on(plan) ' in panel["targets"][0]["expr"]
 assert '"live_verified", "$1", "verification"' not in panel["targets"][0]["expr"]
 PY
   [ "${status}" -eq 0 ]

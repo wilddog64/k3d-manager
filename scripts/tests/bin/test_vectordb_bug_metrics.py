@@ -3,6 +3,7 @@ import json
 import re
 import runpy
 import subprocess
+import shutil
 import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -144,6 +145,138 @@ def test_plan_status_and_dispatch_headers_remain_independent(metrics, tmp_path):
     assert 'dispatch_approval="needed"' in rows["v1.54.0-ready"]
     assert 'dispatch_approval="not required"' in rows["v1.54.0-progress"]
     assert 'approval="approved",dispatch_approval="unknown"' in rows["v1.54.0-malformed"]
+
+
+def test_release_plans_lifecycle_rows_reconcile_only_blocked_by(metrics, tmp_path):
+    dashboard_path = ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"
+    dashboard = json.loads(dashboard_path.read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+    panel = next(panel for panel in dashboard["panels"] if panel["id"] == 107)
+    query = panel["targets"][0]["expr"]
+    assert '"blocked_by", "landed; documentation stale"' in query
+    assert 'dispatch_state="landed"' in query
+    assert 'execution=~"proposed|ready|in_progress"' in query
+    assert 'unless on(plan)' in query
+    assert 'release=~"$release"' in query
+    assert 'vector($release_mode) == 1' in query and 'vector($release_mode) == 0' in query
+    assert 'label_replace' in query and '"verification"' not in query
+    lag_panel = next(panel for panel in dashboard["panels"]
+                     if panel.get("title") == "Status lags dispatch")
+    assert 'dispatch_state="landed"' in lag_panel["targets"][0]["expr"]
+    assert 'execution=~"proposed|ready|in_progress"' in lag_panel["targets"][0]["expr"]
+    assert '"dispatch_approval": "Dispatch approval"' in json.dumps(
+        next(transform["options"] for transform in panel["transformations"]
+             if transform["id"] == "organize"))
+
+    dispatch = runpy.run_path(ROOT / "bin/k3dm-dispatch-metrics")
+    state = dispatch["_dispatch_state"]
+    lifecycle = {
+        "landed": [{"event": "start", "ts": 1}, {"event": "land", "ts": 3}],
+        "awaiting_land": [{"event": "start", "ts": 1},
+                           {"event": "codex_exit", "ts": 2, "exit": 0}],
+        "refused": [{"event": "start", "ts": 1},
+                    {"event": "codex_exit", "ts": 2, "exit": 0},
+                    {"event": "land_refused", "ts": 3}],
+        "failed": [{"event": "start", "ts": 1},
+                   {"event": "codex_exit", "ts": 2, "exit": 1}],
+        "running": [{"event": "start", "ts": 1}],
+    }
+    assert {name: state(events) for name, events in lifecycle.items()} == {
+        "landed": "landed", "awaiting_land": "awaiting_land", "refused": "refused",
+        "failed": "codex_failed", "running": "running"}
+
+    docs = {
+        f"docs/plans/v1.54.0-{slug}.md": f"# {slug}\n**Status:** {status}\n"
+        for slug, status in (("proposed", "PROPOSED"), ("ready", "READY"),
+                             ("progress", "IN PROGRESS"), ("implemented", "IMPLEMENTED"))
+    }
+
+    task_field = next(prop["value"][0]["options"]
+                      for override in panel["fieldConfig"]["overrides"]
+                      if override["matcher"].get("options") == "Dispatch task"
+                      for prop in override["properties"] if prop["id"] == "mappings")
+    assert task_field["awaiting_land"]["text"] == "awaiting land"
+    assert task_field["refused"]["text"] == "land refused"
+    assert task_field["codex_failed"]["text"] == "codex failed"
+    assert task_field["none"]["text"] == "no record"
+    assert task_field["running"]["text"] == "running"
+    assert task_field["landed"]["text"] == "landed"
+    approval_field = next(prop["value"][0]["options"]
+                          for override in panel["fieldConfig"]["overrides"]
+                          if override["matcher"].get("options") == "Dispatch approval"
+                          for prop in override["properties"] if prop["id"] == "mappings")
+    assert approval_field["unknown"]["text"] == "not recorded"
+    docs["docs/plans/v1.54.0-proposed.md"] += "**Approval:** pending review\n**Dispatch:** needed\n"
+    output = metrics._plan_metrics(tmp_path, texts=docs)
+    rows = {re.search(r'plan="([^"]+)"', line).group(1): line
+            for line in output.splitlines() if line.startswith("k3dm_plan_info{")}
+    for slug, execution in (("proposed", "proposed"), ("ready", "ready"),
+                            ("progress", "in_progress"), ("implemented", "implemented")):
+        assert f'execution="{execution}"' in rows[f"v1.54.0-{slug}"]
+    for slug in ("proposed", "ready", "progress"):
+        assert 'verification="n/a"' in rows[f"v1.54.0-{slug}"]
+    assert 'verification="unknown"' in rows["v1.54.0-implemented"]
+    assert 'approval="pending",dispatch_approval="needed"' in rows["v1.54.0-proposed"]
+    assert 'blocked_by="branch not cut; dispatch go needed"' in rows["v1.54.0-proposed"]
+    assert 'blocked_by="branch not cut; dispatch approval unknown"' in rows["v1.54.0-ready"]
+    assert 'blocked_by="-"' in rows["v1.54.0-progress"]
+    assert 'blocked_by="-"' in rows["v1.54.0-implemented"]
+    # A plan without a ledger series remains in the row inventory and keeps its own state.
+    assert 'dispatch_state", "none"' in query and '"slug", "-"' in query
+
+
+@pytest.mark.parametrize("release_mode", [0, 1])
+def test_release_plans_query_evaluates_lifecycle_fixtures(tmp_path, release_mode):
+    promtool = os.environ.get("PROMTOOL") or shutil.which("promtool")
+    if not promtool:
+        pytest.skip("promtool is required for offline Plans query evaluation")
+    dashboard = json.loads((ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml")
+                           .read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+    query = next(panel for panel in dashboard["panels"] if panel["id"] == 107)["targets"][0]["expr"]
+    scenarios = [
+        ("landed-proposed", "proposed", "landed", "dispatch approval unknown", "landed; documentation stale"),
+        ("landed-ready", "ready", "landed", "dependency not landed", "landed; documentation stale"),
+        ("landed-progress", "in_progress", "landed", "-", "landed; documentation stale"),
+        ("landed-implemented", "implemented", "landed", "-", "-"),
+        ("awaiting", "proposed", "awaiting_land", "dispatch go needed", "dispatch go needed"),
+        ("refused", "ready", "refused", "dependency not landed", "dependency not landed"),
+        ("failed", "proposed", "codex_failed", "dispatch go needed", "dispatch go needed"),
+        ("running", "proposed", "running", "dispatch approval unknown", "dispatch approval unknown"),
+        ("no-ledger", "implemented", None, "-", "-"),
+    ]
+
+    def sample_labels(name, values):
+        return name + "{" + ",".join(key + "=" + json.dumps(value)
+                                      for key, value in sorted(values.items())) + "}"
+
+    series, expected = [], []
+    for slug, execution, state, source_blocker, displayed_blocker in scenarios:
+        source = dict(repo="k3d-manager", release="v1.43.9", plan="v1.43.9-" + slug,
+                      title=slug, execution=execution,
+                      verification="unknown" if execution == "implemented" else "n/a",
+                      approval="pending", dispatch_approval="unknown", blocked_by=source_blocker)
+        series.append(dict(series=sample_labels("k3dm_plan_info", source), values="1"))
+        if state:
+            ledger = dict(plan=source["plan"], version="v1.43.9", slug=slug, dispatch_state=state)
+            series.append(dict(series=sample_labels("k3dm_dispatch_plan_state", ledger), values="1"))
+        shown = {**source, "dispatch_state": state or "none", "slug": slug if state else "-",
+                 "blocked_by": displayed_blocker}
+        expected.append(dict(labels=sample_labels("" if state else "k3dm_plan_info", shown), value=1))
+    series.append(dict(series='k3dm_bug_current_release_info{repo="k3d-manager",release="v1.43.9"}',
+                       values="1"))
+    # Neither another repo nor a release excluded by the selected mode may leak in.
+    for repo, release in [("other", "v1.43.9"), ("k3d-manager", "v1.99.0")]:
+        source = dict(repo=repo, release=release, plan=release + "-filtered",
+                      execution="proposed", verification="n/a", blocked_by="x")
+        series.append(dict(series=sample_labels("k3dm_plan_info", source), values="1"))
+    expr = query.replace("$repo", "k3d-manager").replace("$release_mode", str(release_mode))
+    expr = expr.replace("$release", "v1.43.9")
+    fixture = dict(rule_files=[], evaluation_interval="1m", tests=[dict(
+        name=f"Plans lifecycle mode={release_mode}", interval="1m", input_series=series,
+        promql_expr_test=[dict(expr=expr, eval_time="0m", exp_samples=expected)])])
+    path = tmp_path / "plans-query.json"
+    path.write_text(json.dumps(fixture))
+    result = subprocess.run([promtool, "test", "rules", str(path)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_plan_overlap_cap_and_blocker_branches(metrics, tmp_path):
