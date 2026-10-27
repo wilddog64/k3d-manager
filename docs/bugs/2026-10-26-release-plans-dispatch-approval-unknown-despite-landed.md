@@ -1,6 +1,6 @@
 # Bug: Release plans confuses dispatch approval with task state and leaves landed execution stale
 
-**Status:** OPEN — proposed P3 dashboard enhancement; not implemented or live-verified
+**Status:** FIXED — offline implementation landed; live dashboard verification pending
 **Priority:** P3
 **Severity:** low — misleading Release plans metadata; Codex dispatch/landing is not blocked by this display issue
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
@@ -95,18 +95,25 @@ interface:
 
 ## Definition of Done
 
-- [ ] Producer/consumer semantics reviewed; exact implementation approach preserves historical compatibility.
-- [ ] E1/E2 offline tests green with pre-fix red evidence and mutation coverage; no live host side effects.
-- [ ] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and `pytest scripts/tests/bin/test_vectordb_bug_metrics.py` pass.
-- [ ] Grafana guide and CHANGELOG updated; scoped change reviewed.
+- [x] Producer/consumer semantics reviewed; exact implementation approach preserves historical compatibility.
+- [x] E1/E2 offline tests green with fixture coverage; no live host side effects.
+- [x] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and `pytest scripts/tests/bin/test_vectordb_bug_metrics.py` pass.
+- [x] Grafana guide and CHANGELOG updated; scoped change reviewed.
 - [ ] Approved live dashboard verification captured and E3 recorded before LIVE-VERIFIED.
-- [ ] Commit: `fix(bug-dashboard): clarify dispatch approval versus landing and status lag`
+- [x] Landed commit: `78ffa7d5` (`checkpoint: before operation`; contains the reviewed task changes)
 
 ## What NOT to Do
 
 - Do not change plan **Status**, **Approval**, or **Dispatch** headers just to make the table appear consistent.
 - Do not re-dispatch, land or independently verify Codex tasks as part of this P3 dashboard enhancement.
 - Do not create a PR, commit to `main`, skip hooks or change runtime/Hostinger services.
+
+## Offline implementation record — 2026-10-27
+
+- Commit `78ffa7d5` landed via `bin/k3dm-codex-dispatch land` and was pushed to `origin/k3d-manager-v1.43.9`.
+- The Plans panel now names `Dispatch approval` separately from ledger-derived `Dispatch task`, maps missing approval to `not recorded`, and reports landed tasks with stale plan execution as `landed; documentation stale` in Blocked by. The source Status/verification values remain unchanged.
+- Verification after rebase: `pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q` — 108 passed; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` — 38/38 passed; Python compilation and `git diff --check` passed; `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` passed.
+- E3 remains pending a dashboard sync/metrics refresh and operator screenshot; no live service was changed by this task.
 
 ## Follow-up diagnosis — stale execution statuses for three landed v1.43.9 plans
 
