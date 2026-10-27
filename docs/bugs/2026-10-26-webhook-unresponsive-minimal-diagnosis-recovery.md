@@ -224,3 +224,13 @@ separate missing-credential state, safe action hint and no restart action
 for credential access failure alone.31 Python/5 BATS and staged gates passed.
 No automatic unlock or policy change. Historical incident status is unchanged.
 Full evidence: docs/issues/2026-10-27-webhook-doctor-keychain-aware-auth.md.
+
+At22:43:40Z operator credential was available but aggregate health timed out
+under the former4-second budget while7443 listened. Held recovery. Source
+quick endpoint permits8-second dependency probes; independent current401 in
+0.146s and authenticated healthy response in3.438s showed current handler
+responsiveness without restart. Budget/recovery inference fixed in
+eafe42da71f6243f9613dc85f53f92f9e7ae0182;35Python/5BATS gates passed.
+Fresh corrected direct check22:49:14Z is healthy/all_ok=true, credential
+available, no recovery action. Exact prior timeout cause is not inferred.
+Full evidence docs/issues/2026-10-27-webhook-doctor-health-timeout-restart-inference.md.
