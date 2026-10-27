@@ -684,3 +684,12 @@ deliverable/current functional verification passed.
 Next live item4 is GHCR; start by inspecting deployed scanner image read-only,
 then choose rollout/diagnostic steps based on observed state. Do not rotate
 credentials blindly or trigger a scan before prerequisites are reviewed.
+
+## GHCR live check4 — deployment prerequisite pending
+
+Operator main-container image read returned aquasec/trivy:0.63.0, exit0.
+The accepted main image alpine/k8s:1.31.4 is not deployed. This is partial
+verification, not a failed corrected-scanner run. Exact output and rollout
+command source review: docs/issues/2026-10-27-ghcr-live-check-old-scanner-image.md.
+Next user step only make platform-ops; no assistant rollout, blind credential
+rotation or scan trigger. All subsequent live checks remain queued.

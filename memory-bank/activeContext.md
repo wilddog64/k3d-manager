@@ -517,3 +517,8 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - Screenshot job a13d5831: /k3dm fix-list queued, started by operator, succeeded with actual fix-list output, all in same Slack thread. Archived docs/assets/2026-10-27-webhook-fix-list-live.png. Full evidence docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.
 - Current local7443 authenticated health +Slack result delivery confirmed. No restart warranted or performed. Historical offsite cause and operator reader-credential context remain unknown; original incident stays OPEN, and cloud-bridge path not separately tested. Diagnostic deliverable/current functionality live-confirmed. Implementation2b93434e; evidence1148a5c8 plus this record.
 - Next live item4 GHCR: first read-only inspect deployed scanner image; wait for result before choosing rollout or credential steps. No blind rotation, no scan triggered. Heartbeats/coordinator live checks queued. PR URL:none.
+
+## 2026-10-27 — GHCR live check4 waits for deployment
+
+- Operator CronJob main-container read exit0: aquasec/trivy:0.63.0. Expected accepted main image docker.io/alpine/k8s:1.31.4 with Trivy init. New fix is not deployed; live auth behavior untested, canonical bug remains VERIFIED offline.
+- Recorded PARTIAL prerequisite in docs/issues/2026-10-27-ghcr-live-check-old-scanner-image.md and canonical/batch docs. Reviewed make platform-ops target: applies CronJob and script ConfigMap from checkout through deploy_argocd_platform_ops --confirm. Next operator action only make platform-ops, then inspect result before advancing. No assistant mutation, blind PAT rotation or scan triggered. PR URL:none.
