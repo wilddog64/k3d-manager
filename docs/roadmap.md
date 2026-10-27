@@ -527,6 +527,34 @@ alongside the outcomes: specs landed, bugs closed, rework rounds and defects fou
 stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
 **v1.44.1 is now at its five-plan cap.**
 
+**Codex role-attribution telemetry (2026-10-27):** Extend v1.44.1's existing
+[session-window plan](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+with Coordinator / Worker / Unattributed views for independently linked Codex
+sessions and measured tokens; show shared Codex quota at pool level only (not a
+fabricated per-model split). Keep stale/missing readings, legacy sessions and
+unpriced sessions visible, with coverage denominators. No new plan slot or
+implementation approval.
+
+**Quota-aware coordinator rotation amendment (2026-10-27):** The same v1.44.1
+[coordinator trial](plans/v1.44.1-coordinator-rotation-trial.md) and
+[session-window telemetry](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+now specify independent Claude/Codex quota pools, explicit shared Sol+Luna Codex
+capacity, advisory worker reserve, source-freshness-aware admission, and durable,
+idempotent operator-controlled Opus ↔ Sol handoffs with worker/worktree, approval,
+verification and run-state reconciliation. Missing reset/source data stays unknown;
+no automatic failover or vendor-side quota reservation is claimed. No additional
+v1.44.1 slot is consumed; implementation requires separate dispatch approval.
+
+**Multi-vendor Agent Dispatch telemetry amendment (2026-10-27):** The existing
+[session-window usage](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+and [coordinator-rotation](plans/v1.44.1-coordinator-rotation-trial.md) plans
+now explicitly handle any vendor/runtime/model, distinguish coordinator from
+worker, preserve missing or stale usage as unknown, and enable evidence-grounded
+Sol → Luna versus Opus → Sonnet/Haiku comparisons. No new plan slot; no CLI
+credentials, provider APIs or live changes authorized. Retain backwards-compatible
+legacy metrics and avoid treating subscription quota as API token cost.
+
+
 ### Candidate milestone — v1.44.2 (patch)
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
@@ -637,6 +665,8 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 **Selective memory-bank RAG indexing** (operator, 2026-10-15): index allowlisted current `memory-bank/` context as stable, content-hashed chunks with source provenance, safety exclusions, advisory retrieval semantics, and correct file-vs-chunk metrics. Complements the same-release index provenance and Gemini quota specs. Scope: [`v1.45.2-memory-bank-selective-vector-indexing.md`](plans/v1.45.2-memory-bank-selective-vector-indexing.md). v1.45.2 is now **4 of 5 plans**; scheduling remains subject to operator triage.
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
+
+**PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.45.2-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.45.2-pr-lifecycle-history-and-merge-visibility.md). **v1.45.2 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
 
 ### Candidate milestone — v1.45.3 (patch)
 
@@ -910,6 +940,30 @@ Initial action contracts (each precondition is drawn from an incident on this pl
 | v2.2 | Policy engine as code, approval flow |
 | v2.3 | Execution of allowlisted reversible actions, with retest and audit |
 | v2.4 | Provider adapter (Claude, OpenAI, Gemini, local LLM) and the comparison |
+
+### Candidate milestone — v2.2: Agent governance and policy safety baseline
+
+**Proposed 2026-10-27 (operator request; documentation only).** v2.2 already owns
+the deterministic policy-as-code and approval stage of the v2.x AI diagnostics
+and healing gateway. Reserve three of the maximum five plan slots for controls
+that apply to all coordinator/worker vendors, not just Codex. These are distinct
+from and must integrate with the existing v2.2 gateway policy contract.
+
+| Plan | Priority | Boundary |
+|---|---|---|
+| [Agent identity and capability enforcement](plans/v2.2-agent-identity-capability-enforcement.md) | P1 | OS/server-enforced per-task identity, least privilege, fail-closed adapter authorization and auditable operator approval |
+| [Agent execution budgets and circuit breakers](plans/v2.2-agent-execution-budget-circuit-breakers.md) | P1 | Bounded depth, retries, time, concurrency, tool actions and measurable spend; durable handoff and stopped-loop evidence |
+| [Agent evidence provenance and threat detection](plans/v2.2-agent-evidence-provenance-and-threat-detection.md) | P2 | Independent test/landing evidence, poisoned-RAG resistance, structured redacted lineage and bounded Hermes/Grafana alerts |
+
+**v2.2 now has 3 of up to 5 formal plan slots allocated by these proposals**;
+check any future v2.2 policy/approval specs against the five-plan cap rather than
+creating duplicate policy engines. Earlier prerequisites are v2.1 read-only gateway,
+existing Agent Dispatch, cloud-bridge authorization, VectorDB and Hermes. v2.3
+execute/retest/audit and v2.4 provider adapters consume these contracts. No
+worker dispatch, permission change or production rollout is authorized by these
+documents; separate operator approval and independent negative/E2E verification
+are required. The initial boundary is explicit: protect existing services rather
+than introduce a new agent-governance daemon or refactor lib-foundation.
 
 ### Candidate theme — v2.x: intent interpretation and planning engine
 
