@@ -1,0 +1,1 @@
+{"action": "diagnose-app", "body": {"job_id": "00501f6f", "status": "queued"}, "completed_at": "2026-10-27T18:26:36.560370Z", "http_status": 202, "id": "20261027T182608Z-argocd-app-operation", "schema": 1, "status": "ok"}

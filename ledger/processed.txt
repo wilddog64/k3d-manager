@@ -133,3 +133,4 @@
 20261027T182121Z-diagnose-apps
 20261027T182505Z-argocd-ops-diagnose
 20261027T182535Z-argocd-ops-job-status
+20261027T182608Z-argocd-app-operation
