@@ -573,33 +573,7 @@ Plan 2 is [`feature-flags-first-slice`](plans/v1.44.3-feature-flags-first-slice.
 `shopping-cart-basket`, per-variant metrics and a rollout-health dashboard, and `make flag-set` recording
 each flip on the v1.44.2 command ledger. Depends on v1.44.2 and on v1.43.7's cross-repo dispatch.
 
-Plan 3 (roadmap only; spec not written) is **`dispatch-prior-art-usage`** (operator, 2026-10-24: "can we build
-this ... in the future/roadmap"). It makes prior-art lookup part of the dispatcher contract and measures whether
-agents use it. It waits for v1.43.7's dispatch dashboards and v1.43.9 plan 4 (retrieval quality probe), so usage is
-measured against a retriever already known to be healthy.
-
-| Step | What is recorded | Source |
-|---|---|---|
-| Prior-art lookup | `prior_art` ledger event: top 5 paths, scores, indexed revision; or `unavailable`/`skipped` with reason | dispatcher runs the existing `search()` on the spec's Problem text at `codex-dispatch`, excludes the spec itself, adds the list to the agent prompt |
-| Documents read | paths the agent reports reading | a `Prior-art-read:` section the prompt asks for, checked against the list |
-| References cited | paths named in the landed commit | `Prior-art:` commit trailer, parsed at `codex-land` |
-| Outcome | resumes (rework) and the verify result | already in the ledger |
-
-Metrics: share of tasks with a lookup, docs retrieved per task, docs read, docs cited, lookups unavailable or
-skipped, and resumes plus verify-pass rate split by "cited prior art" yes/no. A **Release knowledge usage** row
-goes on the Agent Dispatch dashboard, not Agent Activity, because the data exists only for dispatched tasks and
-should follow the release Window.
-
-Decisions for the spec:
-- **The lookup is advisory.** An unavailable store records `unavailable` and never blocks a dispatch, the same
-  rule as `make find-similar-docs`.
-- **"Read" is self-reported at first.** Observing it would mean parsing tool calls in `~/.codex` session files,
-  and the exporter is limited to model, usage, mode and repo. Widening that needs the operator's explicit go.
-- **The rework comparison is correlation, not proof.** Tasks with obvious prior art may simply be easier, and
-  dispatch volume is a few tasks a week. The panels show `n` beside every rate, and the guide says to draw no
-  conclusion below about 30 tasks per group.
-- **Same contract for every agent.** It applies to Luna, agy and the vendor-LLM trial, so they stay comparable.
-
+Plan 3 of 5 is [`dispatch-prior-art-usage`](plans/v1.44.3-dispatch-prior-art-usage.md) (operator, 2026-10-26). It records advisory lookup results in the task ledger, distinguishes agent-reported reads from retrieved candidates, validates citations in landed commit trailers, and adds release-scoped usage and outcome-correlation measures to Agent Dispatch. It depends on the v1.43.7 dispatch contract and v1.43.9 retrieval quality probe. Read reports are self-reported; agent session files are out of scope and require separate approval. Low-volume outcome comparisons are correlation only and show denominators, with no conclusions below n=30.
 
 **Plan 4 of 5 — Host control-plane lifecycle management** (operator, 2026-10-26: "go ahead to do that"). [`host-control-plane-lifecycle-management`](plans/v1.44.3-host-control-plane-lifecycle-management.md) defines a deterministic launchd-supervised host controller independent of Hermes, webhook, cloud-bridge and OrbStack. Phase 1 collects functional evidence and permits only bounded local recovery; Phase 2 detects cloudflared security advisories, distinguishes installed/running versions, stages approved immutable Hermes/webhook/bridge revisions and package-manager cloudflared updates, requires operator approval for disruption, verifies routes and supports bounded rollback. Coordinates with the v1.43.9 heartbeat P2, v1.44.2 Tailscale break-glass and v1.46.0 HermesNotRunning plan, avoiding competing restart authorities. Documentation approval does not authorize deployment or unattended updates. **v1.44.3 has four planned slots assigned.**
 
