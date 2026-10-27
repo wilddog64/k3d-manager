@@ -787,3 +787,12 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Clarified missing structured Dispatch approval versus ledger lifecycle, and linked the full prior investigation and 38/38 BATS output.
 - [x] Markdown-only gates passed: doc links, `_agent_lint`, `_agent_audit`, and diff check. BATS was not repeated because runtime/test inputs are unchanged; ShellCheck is not applicable. No dashboard/plan status changes or deployment.
 - Bug update commit: `ced8f0a0`; PR URL: none.
+
+## 2026-10-26 — Plans P3 dispatched to GPT-6-Luna
+
+- [x] Recorded the operator's explicit redispatch authorization in the existing bug; current implementation scope supersedes the previous hold while preserving historical reversion evidence.
+- [x] Authorization commit `a1ba5bf1` pushed; source spec clean at dispatch.
+- [x] Started `plans-dispatch-status-reconcile-luna` in an isolated task worktree; dispatcher reports running/in-scope. Runtime log confirms `model: gpt-6-luna`; start ledger records explicit model selection. Session `01a17b2f-6931-7a01-9672-72f648ece226`.
+- [x] Coordinator Markdown gates passed: doc links, audit/lint, staged diff checks. Startup evidence: `docs/issues/2026-10-26-plans-p3-luna-dispatch.md`.
+- [ ] Worker implementation/regression test results and independent review remain pending; no commit/landing/deployment of worker code yet. No plan Status/approval mutation or separate Live verified column authorized.
+- PR URL: none.
