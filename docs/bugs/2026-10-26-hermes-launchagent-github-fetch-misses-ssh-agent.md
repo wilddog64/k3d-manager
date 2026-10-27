@@ -86,3 +86,42 @@ LaunchAgent plist currently has no unattended GitHub credential strategy.
 
 No credentials were printed, copied, or changed. No live pytest, deployment, or cluster action was
 run during this investigation.
+
+## Keychain-backed SSH check
+
+A bounded M4 check showed that the macOS SSH client can read the GitHub branch from Keychain
+without the interactive agent when explicitly asked to use Keychain:
+
+```text
+$ env -u SSH_AUTH_SOCK GIT_SSH_COMMAND="/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes" git ls-remote --heads origin refs/heads/k3d-manager-v1.43.9
+fd745ac7275e3638879b47ae5fa77cdf3881957c	refs/heads/k3d-manager-v1.43.9
+use_keychain_only_rc=0
+```
+
+This narrows the candidate implementation: use Apple's `/usr/bin/ssh` with `UseKeychain=yes`
+for the LaunchAgent fetch when no explicit `GIT_SSH_COMMAND` override is supplied. Do not copy the
+interactive socket path into the plist. This was a direct remote-read diagnostic, not a Hermes
+LaunchAgent-context success test; verify that after the code change is installed.
+
+## Dispatch approval and scope
+
+**Dispatch approval:** explicit 2026-10-26 (operator: “can you dispatch this task?”)
+
+## Files
+
+- `bin/k3dm-hermes`
+- `scripts/tests/bin/test_retrieval_probe.py`
+- `docs/guides/hermes.md`
+
+## Acceptance
+
+- **must:** On macOS, Hermes' `git fetch` uses `/usr/bin/ssh` with `UseKeychain=yes` and noninteractive behavior when `GIT_SSH_COMMAND` is not already set.
+- **must:** Preserve an explicit caller-provided `GIT_SSH_COMMAND`; do not require or embed a session-specific `SSH_AUTH_SOCK` path.
+- **must:** Add offline tests proving the fetch environment uses the Keychain option without an agent and that explicit overrides are preserved.
+- **must:** Do not pass macOS-only SSH options on non-macOS test/runtime paths.
+- **must:** Keep fetch failure advisory to the Hermes cycle and keep its diagnostic concise.
+- **must:** Document the unattended Keychain-backed fetch behavior and a safe LaunchAgent-context verification command.
+- **must_not:** Put a private key, passphrase, GitHub token, or credential output in plist values, argv, logs, or metrics; tests must not contact GitHub, Keychain, Pushgateway, or a cluster.
+- **evidence:** `pytest scripts/tests/bin/test_retrieval_probe.py -q` passes; Ruff passes for changed Python files; operator can verify `git ls-remote` from a LaunchAgent-like environment with `SSH_AUTH_SOCK` unset after install.
+
+No live fetch, LaunchAgent restart, live pytest, deployment, or cluster action is authorized by this dispatch.

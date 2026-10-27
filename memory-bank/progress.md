@@ -697,3 +697,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Filed OPEN P2 `docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md` with exact terminal evidence and credential-safe follow-up.
 - [ ] Implement unattended, least-privilege GitHub read access and verify from the LaunchAgent context.
 - Issue commit 49b73ced pushed to origin/k3d-manager-v1.43.9; PR URL: none.
+
+## 2026-10-26 — Retrieval-age panel and Hermes SSH dispatch preparation
+
+- [x] Investigated screenshot: panel 23 omitted explicit thresholds, so Grafana's 80-second default red threshold colored a fresh daily probe red; stale alert remains at 48h. Filed P3 `docs/bugs/2026-10-26-vectordb-probe-age-panel-default-red.md`.
+- [x] Narrowed Hermes auth: Apple `/usr/bin/ssh -o UseKeychain=yes` can read the release branch with `SSH_AUTH_SOCK` unset; no credential value or socket path needed.
+- [x] Added explicit Files and Acceptance scope to P2 auth bug after operator requested dispatch. Proposed files: `bin/k3dm-hermes`, `scripts/tests/bin/test_retrieval_probe.py`, `docs/guides/hermes.md`. Offline tests only; no restart/live fetch/deployment.
+- [ ] Dispatch the auth fix task; screenshot threshold bug is separately filed and not in dispatch scope.
+- Commit pending; PR URL: none.
