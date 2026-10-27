@@ -705,3 +705,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Added explicit Files and Acceptance scope to P2 auth bug after operator requested dispatch. Proposed files: `bin/k3dm-hermes`, `scripts/tests/bin/test_retrieval_probe.py`, `docs/guides/hermes.md`. Offline tests only; no restart/live fetch/deployment.
 - [ ] Dispatch the auth fix task; screenshot threshold bug is separately filed and not in dispatch scope.
 - Commit pending; PR URL: none.
+
+## 2026-10-26 — Hermes fetch fix dispatched
+
+- [x] Updated the P2 bug with `UseKeychain=yes` no-agent reproduction and bounded Files/Acceptance scope.
+- [x] Dispatched task `hermes-launchagent-keychain-ssh`; dispatcher reports `state: running`, `scope: in-scope`.
+- [x] Pushed scope + separate screenshot-threshold P3 docs in commit `37eb2821`.
+- [ ] Review worker output, run offline gate, and land the code fix. Live LaunchAgent install/restart remains operator-owned.
+- Commit for dispatch: `37eb2821`; PR URL: none.
