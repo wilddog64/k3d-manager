@@ -129,3 +129,49 @@ items remain queued while this steering is investigated.
 This is an evidence-only update: implementation tests are unchanged (26
 Python/5 BATS recorded above); no additional code test or ShellCheck needed.
 Normal staged lint/audit, doc links and checkpoint hooks remain enabled.
+
+## Operator native lookup exit36 — session/access hypothesis
+
+The targeted metadata probe returned:
+
+```json
+{"security_path": "/usr/bin/security", "lookup_exit": 36, "credential_present": false, "elapsed_seconds": 0.03}
+```
+
+This was a quick native lookup failure, not the four-second command timeout.
+credential_present=false here is a success-gated boolean, so it does not
+prove that the item is missing. The binary path matches /usr/bin/security.
+
+Read-only local OS diagnostics:
+
+```text
+$ /usr/bin/security error -25308
+Error: 0xFFFF9D24 -25308 User interaction is not allowed.
+$ /usr/bin/security error 36
+Error: 0x00000024 36 unknown error 36=24
+$ Python integer calculation
+-25308 modulo 256 = 36
+```
+
+Installed Apple SDK SecBase.h also declares errSecInteractionNotAllowed as
+-25308. Apple primary references:
+[error definition](https://developer.apple.com/documentation/security/errsecinteractionnotallowed),
+[security CLI source](https://github.com/apple-oss-distributions/Security/blob/main/SecurityTool/macOS/security.c),
+[password lookup source](https://github.com/apple-oss-distributions/Security/blob/main/SecurityTool/macOS/keychain_find.c).
+
+Inference: exit36 is consistent with a truncated -25308 interaction-not-allowed
+status and a shell/security-session access restriction. Exit codes are
+truncated, so this alone does not prove the exact native OSStatus, a locked
+keychain, or tmux as the cause. Coordinator context previously retrieved the
+reader item successfully without disclosure. No additional code change or
+credential rotation is justified by the current evidence.
+
+Next single operator check: fresh local GUI iTerm2 tab outside tmux/remote
+session, run absolute security lookup with stdout redirected to /dev/null,
+then print exit status. Native stderr remains visible to confirm any error;
+token is never printed. No password in argv, no broad ACL change, no restart.
+The coordinator did not unlock a keychain, change permissions or run UI
+automation. GHCR runtime remains queued until this user steering is resolved.
+
+Evidence-only record; code/tests unchanged. Normal doc links and staged
+audit/lint/checkpoint gates apply.

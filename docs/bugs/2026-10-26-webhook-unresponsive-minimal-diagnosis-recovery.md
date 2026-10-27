@@ -203,3 +203,10 @@ metadata shows reader credential retrievable in its own context (exit0),
 without disclosure. Next operator step is a secret-safe lookup exit-status
 probe; shell-context cause remains unresolved. Full result in
 docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
+
+Operator targeted lookup returned native exit36 in0.03s at /usr/bin/security.
+This is consistent with truncated errSecInteractionNotAllowed(-25308), not
+a timeout; exact native error/session cause remains unconfirmed. Fresh local
+GUI-tab lookup with password output suppressed is the next single diagnostic.
+No token rotation, ACL change, keychain unlock or webhook restart performed.
+Full evidence/source distinction in docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
