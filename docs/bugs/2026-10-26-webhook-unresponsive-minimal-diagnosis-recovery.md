@@ -195,3 +195,11 @@ No outage/recovery inferred. A separately reproduced helper command-exit race
 was fixed offline in b591a13c803b44377fcea91207ea68142a9fdf5c; operator
 credential recheck remains pending, with no proven causal claim. Evidence:
 docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
+
+Operator22:30:13Z repeat still reports auth_unavailable after b591a13c,
+with7443 listening and no recovery recommended. Thus the independently fixed
+command race is not established as this symptom's cause. Coordinator lookup
+metadata shows reader credential retrievable in its own context (exit0),
+without disclosure. Next operator step is a secret-safe lookup exit-status
+probe; shell-context cause remains unresolved. Full result in
+docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.

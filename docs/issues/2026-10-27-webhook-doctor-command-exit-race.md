@@ -90,3 +90,42 @@ and committed merge21e235d1. No force push or shared-branch rebase.
 Next single operator check: rerun the doctor in the same shell. Actual local
 credential behavior remains pending this result; do not mark the helper's
 offline regression as live verification or restart the webhook.
+
+## Operator recheck after fix — credential context unresolved
+
+Operator supplied this result after the fix was pushed:
+
+```json
+{"classification": "auth_unavailable", "health": {"all_ok": null, "http_responsive": false, "status": "auth_unavailable"}, "launchd": {"last_exit_code": null, "pid": 4295, "port": 7443, "status": "loaded"}, "listener": {"listening": true, "status": "listening"}, "log": {"available": true, "error_categories": [], "freshness": "fresh", "modified_utc": "2026-10-27T22:29:14.735005+00:00"}, "mode": "check", "process": {"pids": [4295], "status": "available"}, "recovery_action": "make restart-webhook (operator-controlled; restarts cloud-bridge too; at most once initially)", "recovery_recommended": false, "timestamp_utc": "2026-10-27T22:30:13.088991+00:00"}
+```
+
+The command-exit fix did not resolve this operator credential symptom. Port
+7443 is listening and no recovery is recommended. This result did not test
+authenticated HTTP. The race remains independently reproduced/fixed but is
+not established as the cause of this context's unavailable credential.
+
+Coordinator then inspected only lookup metadata, never printing the value,
+using the same bounded runner against /usr/bin/security:
+
+```json
+{"security_path": "/usr/bin/security", "reader_env_present": false, "lookup_status": "complete", "lookup_exit": 0, "reader_value_present": true}
+```
+
+The reader item exists and is retrievable in the coordinator execution
+context; no value is recorded here. That does not prove accessibility from
+the operator shell. Source review confirms the doctor and server both look
+for service k3dm-webhook-token-reader / account k3dm, with the same reader env
+name. There is no admin-token fallback, by design. No credential was rotated,
+exported, copied to a file, or disclosed.
+
+Next single operator diagnostic uses /usr/bin/security with stdout/stderr
+captured in memory and prints only executable resolution, exit status,
+nonempty-success boolean and elapsed time (or a bounded timeout). This will
+distinguish a failed lookup from a helper-level issue without exposing a
+token. Actual operator lookup status/cause remains pending; no new code fix
+or whole-incident closure is claimed. GHCR runtime scan and subsequent live
+items remain queued while this steering is investigated.
+
+This is an evidence-only update: implementation tests are unchanged (26
+Python/5 BATS recorded above); no additional code test or ShellCheck needed.
+Normal staged lint/audit, doc links and checkpoint hooks remain enabled.
