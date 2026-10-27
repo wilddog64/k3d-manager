@@ -723,3 +723,10 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Hermes SSH worker exited successfully with in-scope diff; `pytest scripts/tests/bin/test_retrieval_probe.py -q`: 11 passed; Ruff unavailable. Review and landing pending.
 
 - 2026-10-26: Wrote `docs/plans/v1.44.3-dispatch-prior-art-usage.md` and placed it in roadmap Plan 3 of 5. Scope defines lookup ledger events, agent-reported reads, validated `Prior-art:` land trailers, bounded release dashboard metrics, missing-data handling, and no session-file parsing. v1.44.3 is now at its five-plan cap. Approved to write/place; dispatch not separately approved.
+
+## 2026-10-26 — Plans table live verification column
+
+- [x] Added separate `Verified` and `Live verified` columns in Grafana Plans; a live-verified plan shows both indicators, and other statuses show `-`.
+- [x] Rebalanced all fixed column widths to 1,320 px, under the 1,350 px panel budget.
+- [x] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`: 38/38 passed; dashboard JSON parse and `git diff --check` passed; `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` passed.
+- [x] Implementation commit `7ec87a73`; PR URL: none. Push and live dashboard verification pending.
