@@ -40,6 +40,7 @@ Do not automatically infer that `Agent=codex` means Codex was coordinating. A ta
 - `scripts/tests/bin/test_dispatch_metrics.py`
 - `scripts/tests/bin/codex_dispatch.bats`
 - `scripts/tests/bin/codex_land_pending.bats`
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats`
 - `docs/howto/codex-dispatch.md`
 - `docs/architecture/codex-dispatch.md`
 - `docs/guides/grafana-dashboards.md`
@@ -151,3 +152,15 @@ pytest, existing agent_dispatch_dashboard BATS and Python/Ruff/ShellCheck for
 touched code. Use isolated fixture ledgers only; never handoff/land/resume a
 real running task or inject synthetic identities into the production ledger.
 The operator's real E3 exercise is later and separate.
+
+## Coordinator scope clarification — 2026-10-27
+
+Explicit narrow scope exception: `scripts/tests/plugins/agent_dispatch_dashboard.bats`
+is allowed for regression assertions on this task's dashboard changes. The
+original focused gates already required this suite; the Files list omitted it.
+The immutable dispatch snapshot still lacks it, so landing may use
+`--allow-out-of-scope` only after confirming this is the sole exceptional path.
+No other scope is expanded. Initial review found hidden numeric Handoffs/Primary
+cost columns, possible duplicate normalized worker-history series and missing
+pre-commit validation of landing metadata; Luna is correcting these before
+acceptance. No live task identities were fabricated or changed.

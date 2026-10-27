@@ -1,7 +1,8 @@
 # P2 enhancement: independent outbound heartbeat monitoring for m4, webhook, Hermes, cloud-bridge, and Hostinger
 
 **Filed:** 2026-10-26, operator request after webhook became unresponsive while operator was away from home
-**Status:** OPEN — PROPOSED; not implemented or live-verified
+**Status:** VERIFIED — optional implementation landed; provider enrollment and live alert verification pending
+**Fix commit:** `233a4b1117645b1ea8506fb183fcd963756cd926`
 **Priority:** P2
 **Severity:** medium — an unavailable local control plane can prevent remote diagnosis and obscure component/host failures
 **Branch:** `k3d-manager-v1.43.9`
@@ -174,3 +175,9 @@ cloud_bridge pytest; Python syntax/Ruff and rendered plist/systemd contract chec
 No webhook/Hermes/bridge restart, Hostinger install, provider ping or account/secret
 provisioning is authorized for the worker. Prepare commands for later operator
 verification one check at a time.
+
+## Independent verification — 2026-10-27
+
+Focused offline gates passed and dispatcher landing reran them after rebase.
+Full outputs, review corrections, image compatibility and remaining live steps:
+`docs/issues/2026-10-27-six-bug-luna-batch.md`. No live rollout or enrollment was performed.

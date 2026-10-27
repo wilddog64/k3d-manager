@@ -220,3 +220,142 @@ until independent review of their implementations completes. GHCR and heartbeat
 workers were resumed with concrete review findings and the Luna wrapper; the
 webhook doctor worker has completed and awaits independent review. No assistant
 live deployment/restart was performed.
+
+## Remaining-task independent review and landings — 2026-10-27
+
+All four workers exited successfully before final independent review. Worker
+exit alone was not accepted as completion. GHCR landed/pushed `0cd39eb8`;
+heartbeat landed/pushed `79bd9eb5` plus CLI permissions `233a4b11`; doctor
+landed/pushed `e4f6823e`. Dispatcher verify pass recorded for all three.
+Coordinator correction resume remains pending.
+
+Review findings corrected before acceptance:
+- GHCR: real curl HEAD stdout, HTTP404 digest rejection, bounded transport
+  timeouts, per-service metric replacement/clearing. Real-curl fixture passed.
+- Heartbeat: dry-run side effects, deceptive URLs/redirects, role separation,
+  per-entry failures, locks across attempts, interpreter/path handling and
+  producer fixtures. Documented direct commands originally lacked executable
+  bits; corrected them and added a direct CLI BATS check (3/3 passed).
+- Doctor: quick mode, redirect/proxy protection, diagnostic unknown states and
+  body/command bounds; regression reproduced an additional production-path
+  crash before fixing the dictionary contract:
+
+```text
+AttributeError: 'dict' object has no attribute 'returncode'
+```
+
+Doctor also rejected malformed service rows lacking ok instead of raising
+KeyError. No real Keychain values were accessed by the review/tests.
+
+Container compatibility used cached public image IDs
+`sha256:6d56ed8aeae1c994932c5c4461193e48dc1b39ba02986fad799167a92b4c885b`
+(alpine/k8s:1.31.4) and
+`sha256:c686ab04db37acf145f52e19190fd737ec913c486c770b78107b84f4594cd93c`
+(trivy:0.63.0), UID/GID65534 and **--network none**, without credentials or
+cluster mounts. All shell tools/curl/kubectl were present and /tmp writable.
+The init-image copy into a temporary tools mount succeeded; the copied Trivy
+binary ran inside alpine/k8s and printed:
+
+```text
+Version: 0.63.0
+```
+
+The isolated heartbeat rebase hit a CHANGELOG-only conflict:
+
+```text
+error: could not apply 817c34bd... checkpoint: before reviewed-independent-heartbeats
+[codex-dispatch] ERROR: rebase of task/v1.43.9/independent-heartbeats-luna onto k3d-manager-v1.43.9 failed; resolve it in /Users/cliang/.local/share/k3d-manager/worktrees/v1.43.9/independent-heartbeats-luna
+```
+
+Retained both release entries, continued the isolated rebase, then repeated
+dispatcher landing and its tests successfully. No shared-branch rewrite.
+
+The earlier sandboxed status falsely showed workers terminated because ps was
+restricted; an approved read-only process check confirmed all were running at
+that time. Later actual exits were checked with permitted process visibility.
+
+### Actual independent focused gate output
+
+ghcr-candidate-auth-diagnostics-luna:
+
+```text
+1..36
+ok 1 all-skipped run exits 1 with the fatal zero-match diagnostic
+ok 2 vulnerable deployed image with vulnerable latest dispatches rebuild instead of promotion
+ok 3 rebuild dispatched within the cooldown is skipped without notifying
+ok 4 rebuild dispatched after the cooldown expires dispatches and records the time
+ok 5 vulnerable deployed image with clean latest promotes exact digest via application patch
+ok 6 COSIGN_VERIFY=1: signed clean candidate is cosign-verified then promoted
+ok 7 COSIGN_VERIFY=1: unsigned clean candidate is refused (no promotion)
+ok 8 COSIGN_VERIFY_ATTESTATION=1: signed + attested clean candidate is promoted
+ok 9 COSIGN_VERIFY_ATTESTATION=1: signed but unattested candidate is refused (no promotion)
+ok 10 registry-less trivy-operator repository form still matches and promotes
+ok 11 digest resolution reads busybox-style indented lowercase headers
+ok 12 clean frontend image is scanned and skipped
+ok 13 clean payment image is scanned and skipped
+ok 14 missing immutable candidate notifies without failing the batch
+ok 15 rebuild dispatch failure notifies without failing the batch
+ok 16 missing immutable sha candidate notifies without retrying the batch
+ok 17 GHCR credential failure is classified and reported without exposing the token
+ok 18 latest without a digest is classified no-latest
+ok 19 unavailable tags endpoint is not classified as a genuine no-match
+ok 20 manifest 404 is rejected even when it includes a digest header
+ok 21 manifest 401 with GH_TOKEN is classified auth instead of no-match
+ok 22 tags list 401 with GH_TOKEN is classified auth instead of no-match
+ok 23 registry transport keeps credentials in a private curl config and scanner image contract is pinned
+ok 24 candidate metric groups preserve two services and replace auth with ok per service
+ok 25 real curl HEAD returns only the status and writes digest headers separately
+ok 26 app_cve_scan_trigger rejects an unsupported cronjob name
+ok 27 app_cve_scan_trigger fails when the cronjob is absent
+ok 28 app_cve_scan_trigger creates a job from the cronjob
+ok 29 app_cve_scan_trigger defaults to app-cve-scan with no argument
+ok 30 app_cve_scan_trigger returns non-zero when the wait times out
+ok 31 app_cve_scan_trigger honours K3DM_CVE_SCAN_WAIT
+ok 32 missing Application logs a failed promotion and returns zero
+ok 33 missing Application emits no remediation event
+ok 34 successful Application patch emits one remediation event
+ok 35 git-persisted promotion clears the live image override
+ok 36 live-patch-only promotion keeps the live image override
+```
+
+independent-heartbeats-luna:
+
+```text
+........................................................................ [ 52%]
+................................................................         [100%]
+136 passed in 4.77s
+1..2
+ok 1 heartbeat: dry run renders intent without provider calls
+ok 2 heartbeat: templates contain no enrolled endpoint
+All checks passed!
+```
+
+webhook-incident-doctor-luna:
+
+```text
+.....................                                                    [100%]
+21 passed in 0.41s
+1..5
+ok 1 restart-webhook reloads the plist with bootout then bootstrap, never kickstarting the webhook
+ok 2 restart-webhook continues to bootstrap when bootout reports the job is not loaded
+ok 3 restart-webhook still restarts the cloud bridge
+ok 4 restart-webhook retries bootstrap twice then reports success
+ok 5 restart-webhook fails after five bootstrap attempts and skips cloud bridge
+All checks passed!
+{"mode": "dry-run", "probes": ["launchd job state and last exit code", "webhook process PID", "TCP/9000 listener", "bounded redacted log summary", "reader-authenticated loopback /api/v1/health?quick=1"], "recovery": "No recovery is performed. Operator may run make restart-webhook once only when local evidence warrants it; it also restarts cloud-bridge.", "timestamp_utc": "2026-10-27T11:56:55.604707+00:00"}
+```
+
+Additional heartbeat direct-command BATS:
+
+```text
+1..3
+ok 1 heartbeat: dry run renders intent without provider calls
+ok 2 heartbeat: templates contain no enrolled endpoint
+ok 3 heartbeat: documented commands execute directly
+```
+
+ShellCheck on GHCR scanner: clean (exit0). Heartbeat/doctor production code
+is Python; Ruff clean. All three staged _agent_lint/_agent_audit passed
+(exit0), normal hooks enabled. Curated `test all` is still running; no final
+claim for that gate yet. Live credentials, provider enrollment, deployment,
+alerts and original incident recovery remain unverified.

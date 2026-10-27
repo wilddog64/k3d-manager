@@ -150,3 +150,16 @@ The coordinator will run audit/lint on staged changes before committing.
 Focused gates: test_webhook_doctor pytest, restart_webhook BATS, syntax/Ruff,
 diff check. The worker must not execute --check against the real host or call
 make restart-webhook. Leave the original incident unverified for operator E1/E2.
+
+## Diagnostic deliverable independently verified — 2026-10-27
+
+Helper implementation `e4f6823ed52e8c070ccf516cb000af5fc2f5a6e9` is landed
+and pushed. Independent doctor pytest 21/21, restart BATS 5/5, Ruff, direct
+dry-run, diff check and staged audit/lint passed; dispatcher reran gates after
+rebase. Fixed quick request, redirect/proxy protection, truthful unknown/error
+states, command/output bounds, missing-ok schema and Keychain dict-contract
+crash before acceptance. No recovery or live diagnostics performed.
+
+The incident remains OPEN; helper completion does not establish an outage
+cause or recovery. Full outputs and remaining live steps are in
+`docs/issues/2026-10-27-six-bug-luna-batch.md`.
