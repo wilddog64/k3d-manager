@@ -713,3 +713,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Pushed scope + separate screenshot-threshold P3 docs in commit `37eb2821`.
 - [ ] Review worker output, run offline gate, and land the code fix. Live LaunchAgent install/restart remains operator-owned.
 - Commit for dispatch: `37eb2821`; PR URL: none.
+
+## 2026-10-26 — Retrieval usage attribution research
+
+- [x] Confirmed current search is vector-only cosine retrieval; current corpus includes bugs/issues/plans/retros/job-failures but not `docs/guides` or `docs/architecture`.
+- [x] Confirmed dispatch ledger tracks task lifecycle, while `scripts/find-similar-docs.py` records no retrieval event; “Used” requires a separate, explicit consumption signal and should not be inferred from retrieval alone.
+- [x] Research direction: expand authoritative corpus with lifecycle metadata; add PostgreSQL full-text + pgvector hybrid retrieval with RRF; soft, intent-aware current/authority ranking while retaining historical results; expand eval pairs for current-vs-history and exact identifiers.
+- [ ] v1.43.9 plan files are already 5/5. Per repository rule, no sixth plan was written; assign this proposal to a later milestone before drafting a plan spec.
+- [x] Hermes SSH worker exited successfully with in-scope diff; `pytest scripts/tests/bin/test_retrieval_probe.py -q`: 11 passed; Ruff unavailable. Review and landing pending.
