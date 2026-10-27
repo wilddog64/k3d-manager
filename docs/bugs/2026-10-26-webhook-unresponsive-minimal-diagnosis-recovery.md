@@ -1,7 +1,7 @@
 # Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery
 
 **Filed:** 2026-10-26, operator report at approximately 07:20 PDT
-**Status:** OPEN — current local E1 health confirmed; historical cause and end-to-end delivery unverified
+**Status:** OPEN — current local and Slack health confirmed; historical offsite cause remains unknown
 **Priority:** P2
 **Severity:** medium — Slack/cloud-bridge remote management degraded or unavailable; actual host and service state unknown
 **Release:** v1.43.9 (bug; no new plan slot)
@@ -178,3 +178,14 @@ completed Slack `/k3dm fix-list` delivery, one at a time.
 
 Full exact output and diagnostic regression:
 `docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md`.
+
+## Current end-to-end delivery confirmed — operator job a13d5831
+
+Operator screenshot shows `/k3dm fix-list` queued, started, succeeded, and
+returned its actual target list in the same Slack thread (job `a13d5831`).
+Current local health and Slack result delivery are confirmed. No restart was
+needed or performed. Historical offsite cause and operator reader-credential
+context remain unknown; cloud-bridge path was not separately exercised.
+This incident stays OPEN for that remaining investigation; diagnostic
+deliverable/current Slack functionality is live-confirmed. Full screenshot
+and evidence: `docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md`.

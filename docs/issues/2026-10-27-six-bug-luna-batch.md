@@ -670,3 +670,17 @@ credential rotation or assistant-run live diagnosis was performed.
 
 Separate new ask-docs routing and startup Log-link bugs are filed OPEN; they
 were not part of the selected six and were not silently implemented here.
+
+## Operator live check3 — current webhook/Slack passed
+
+Corrected doctor local health is healthy on7443; operator Slack job
+`a13d5831` queued/started/succeeded with returned fix list in the same thread.
+Screenshot/full details: `docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md`.
+No restart warranted/performed. This confirms the current local/Slack path,
+not the historical outage cause, operator credential context or a separate
+cloud-bridge probe. Historical incident remains OPEN; bounded diagnostic
+deliverable/current functional verification passed.
+
+Next live item4 is GHCR; start by inspecting deployed scanner image read-only,
+then choose rollout/diagnostic steps based on observed state. Do not rotate
+credentials blindly or trigger a scan before prerequisites are reviewed.

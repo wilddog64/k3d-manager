@@ -104,3 +104,34 @@ incident remains OPEN. Heartbeat enrollment/alert delivery remains untested.
 Next single operator check: Slack `/k3dm fix-list`, reader allowlisted and
 read-only; confirm actual completed result delivery rather than acknowledgment
 alone. Do not run recovery. Other batch live checks remain queued.
+
+## Operator end-to-end result — check3 completed
+
+Operator supplied [Slack thread screenshot](../assets/2026-10-27-webhook-fix-list-live.png).
+Verbatim visible lifecycle text:
+
+```text
+make fix-list queued — job a13d5831
+make fix-list started by slack:wilddog64:U4C9LDQP2 — job a13d5831
+make fix-list succeeded — job a13d5831
+```
+
+The succeeded reply includes the actual fix-target list (`fix-delete-pod`,
+`fix-eso-refresh`, `fix-force-sync`, `fix-list`, `fix-restart`, `fix-status`,
+`fix-sync`). Queued, started, succeeded and returned output are in the same
+thread with consistent job ID. This establishes current end-to-end Slack
+command handling and result delivery, rather than acknowledgment alone.
+
+Together with the corrected12:24:33Z local health result, current webhook local
+health and Slack delivery are live-confirmed. Recovery was skipped because
+local health was good, not because of an unperformed requested restart; no
+restart loop, credential change or recovery command was executed. The original
+October26 failure cause and operator reader-credential context remain unknown.
+The historical incident remains OPEN for that investigation; the bounded
+diagnostic deliverable/current functional path is now live-confirmed. This
+Slack check does not separately prove cloud-bridge request/reply delivery.
+
+Next selected item: GHCR candidate diagnostics. First read-only prerequisite
+checks the deployed scanner image; no credential rotation or scan trigger
+is requested before confirming runtime deployment. Heartbeat enrollment and
+coordinator E3 remain queued behind that item.

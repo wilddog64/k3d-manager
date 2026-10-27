@@ -873,3 +873,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Fixed doctor +heartbeat defaults/example and loaded LaunchAgent port override validation in `2b93434e893ff0417946c550deecbecb1443021d`.6 pre-fix failures; final161 Python +8 BATS, Ruff, ShellCheck, staged audit/lint pass; legitimate old-port assertion replacements documented, no bypass. New P2 diagnostic-port bug VERIFIED.
 - Corrected direct read-only live result12:24:33Z: PID4295 loaded/listening7443, HTTP healthy/all_ok=true, recovery_recommended=false. NO restart. Operator credential-context reason remains unknown; original incident OPEN (historical cause/external delivery unverified). Full outputs docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.
 - Next single operator step: Slack /k3dm fix-list, confirm completed reply (not just queue acknowledgment). Other batch live checks stay queued; no heartbeat enrollment or credential changes. PR URL:none.
+
+## 2026-10-27 — Operator Slack live check3 passed
+
+- Screenshot job a13d5831: /k3dm fix-list queued, started by operator, succeeded with actual fix-list output, all in same Slack thread. Archived docs/assets/2026-10-27-webhook-fix-list-live.png. Full evidence docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.
+- Current local7443 authenticated health +Slack result delivery confirmed. No restart warranted or performed. Historical offsite cause and operator reader-credential context remain unknown; original incident stays OPEN, and cloud-bridge path not separately tested. Diagnostic deliverable/current functionality live-confirmed. Implementation2b93434e; evidence1148a5c8 plus this record.
+- Next live item4 GHCR: first read-only inspect deployed scanner image; wait for result before choosing rollout or credential steps. No blind rotation, no scan triggered. Heartbeats/coordinator live checks queued. PR URL:none.
