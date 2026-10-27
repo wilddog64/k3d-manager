@@ -527,6 +527,16 @@ alongside the outcomes: specs landed, bugs closed, rework rounds and defects fou
 stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
 **v1.44.1 is now at its five-plan cap.**
 
+**Multi-vendor Agent Dispatch telemetry amendment (2026-10-27):** The existing
+[session-window usage](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+and [coordinator-rotation](plans/v1.44.1-coordinator-rotation-trial.md) plans
+now explicitly handle any vendor/runtime/model, distinguish coordinator from
+worker, preserve missing or stale usage as unknown, and enable evidence-grounded
+Sol → Luna versus Opus → Sonnet/Haiku comparisons. No new plan slot; no CLI
+credentials, provider APIs or live changes authorized. Retain backwards-compatible
+legacy metrics and avoid treating subscription quota as API token cost.
+
+
 ### Candidate milestone — v1.44.2 (patch)
 
 **Cloud-bridge offline test diagnostics** (operator, 2026-10-23: "update docs/roadmap to include
