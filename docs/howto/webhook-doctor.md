@@ -46,3 +46,11 @@ evidence and do not change the incident's status.
 The default port matches the webhook server (7443). An explicit loaded-job
 `K3DM_WEBHOOK_PORT` overrides it for both listener and authenticated health
 checks. Invalid port configuration is unknown and cannot recommend recovery.
+
+If `auth_unavailable` is reported, the HTTP probe did not run. A locked login
+Keychain can prevent the reader lookup even while the webhook is healthy.
+In an interactive local session, unlock your login Keychain using
+`security unlock-keychain ~/Library/Keychains/login.keychain-db`, enter its
+password only at the prompt, then rerun the doctor. Unlocking restores access
+to the existing credential; it does not require token rotation or a webhook
+restart. The 2026-10-27 operator verified lookup exit36 became0 after unlock.

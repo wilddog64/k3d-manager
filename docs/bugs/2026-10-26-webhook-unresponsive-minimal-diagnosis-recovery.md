@@ -210,3 +210,10 @@ a timeout; exact native error/session cause remains unconfirmed. Fresh local
 GUI-tab lookup with password output suppressed is the next single diagnostic.
 No token rotation, ACL change, keychain unlock or webhook restart performed.
 Full evidence/source distinction in docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
+
+Operator confirmed the login Keychain was locked. After interactive unlock,
+the same reader lookup returned exit0 instead of36, without exposing or
+rotating the token. This resolves the operator auth_unavailable lookup
+symptom; it does not explain the historical offsite incident or implicate
+tmux. A final doctor check in the unlocked session is next. Full terminal
+evidence in docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.

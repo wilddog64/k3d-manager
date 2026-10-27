@@ -175,3 +175,35 @@ automation. GHCR runtime remains queued until this user steering is resolved.
 
 Evidence-only record; code/tests unchanged. Normal doc links and staged
 audit/lint/checkpoint gates apply.
+
+## Operator confirmed and resolved locked login Keychain
+
+Operator identified the login Keychain as locked and unlocked it interactively.
+Supplied terminal output (password was not supplied in chat or recorded):
+
+```text
+security unlock-keychain ~/Library/Keychains/login.keychain-db
+password to unlock /Users/cliang/Library/Keychains/login.keychain-db:
+
+/usr/bin/security find-generic-password -s k3dm-webhook-token-reader -a k3dm -w >/dev/null
+printf 'lookup_exit=%s\n' "$?"
+lookup_exit=0
+```
+
+This before/after evidence confirms the locked Keychain caused the operator
+reader-lookup failure: native lookup changed from exit36 to exit0 after
+unlock. No credential was rotated or disclosed. The coordinator did not
+unlock the Keychain, modify access controls or restart services. This resolves
+the credential lookup symptom and supersedes the earlier unconfirmed session
+hypothesis; it does not establish tmux as the cause.
+
+The separately reproduced/fixed EOF race remains a real helper bug, but was
+not the observed locked-Keychain cause. Neither fact establishes the cause
+of the historical offsite webhook incident. Existing current local/Slack
+health evidence remains valid.
+
+Next single operator step: `bin/k3dm-webhook-doctor --check` in the now-unlocked
+session. Confirm authenticated HTTP result before moving to GHCR runtime scan.
+That final doctor result has not yet been supplied. GHCR deployment prerequisites
+remain passed; runtime auth, heartbeat enrollment and coordinator E3 pending.
+Evidence/doc update only; code regression gates unchanged.
