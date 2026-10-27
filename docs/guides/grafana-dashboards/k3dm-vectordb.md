@@ -27,7 +27,7 @@ runs it after a successful or no-op index refresh, at most once per day.
 | Recall@5 by directory | `k3dm_vectordb_retrieval_recall_at5{directory}` and `k3dm_vectordb_retrieval_recall_floor{directory}` | Share of labelled positive pairs retrieved in the top five and that directory's floor. |
 | Hard-negative intrusion@5 | `k3dm_vectordb_retrieval_intrusion_at5{directory}` | Share of labelled hard-negative pairs retrieved in the top five. |
 | Outdated results | `k3dm_vectordb_retrieval_stale_hits` + `k3dm_vectordb_retrieval_deleted_hits` | Returned rows whose content hash differs from the indexed corpus or whose path has been deleted. |
-| Time since last retrieval probe | `k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds` | Age of the last completed daily probe. |
+| Time since last retrieval probe | `k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds` | Age of the last completed daily probe; green below 24 hours, yellow from 24 to 48 hours, and red at 48 hours or more. |
 
 Prometheus alerts on recall below floor for one hour, outdated results for one hour, or a probe
 that has not succeeded in 48 hours. The probe uses about 52 query embeddings per run. See

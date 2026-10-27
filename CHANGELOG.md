@@ -10,6 +10,7 @@
 ### Changed
 
 - Clarify Release plans dispatch approval versus ledger task state and flag landed plans with stale documentation status.
+- VectorDB Health colors a fresh daily retrieval probe green, an age of 24 hours or more yellow, and an age of 48 hours or more red, matching the stale-probe alert boundary.
 
 ## [1.43.8] - 2026-10-25
 

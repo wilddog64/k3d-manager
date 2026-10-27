@@ -224,6 +224,32 @@ assert "make index-docs DRY_RUN=1" in r["VectorDBRetrievalReturnsOutdatedDocs"][
   [ "${status}" -eq 0 ]
 }
 
+@test "retrieval probe age panel keeps a daily probe green and matches the stale alert boundary" {
+  run python3 -c '
+import json, sys, yaml
+text = open(sys.argv[1]).read()
+dashboard = json.loads(text.split("k3dm-vectordb.json: |", 1)[1])
+panel = next(p for p in dashboard["panels"] if p["id"] == 23)
+defaults = panel["fieldConfig"]["defaults"]
+steps = defaults["thresholds"]["steps"]
+assert defaults["thresholds"]["mode"] == "absolute", defaults["thresholds"]
+assert steps == [
+    {"color": "green", "value": None},
+    {"color": "yellow", "value": 86400},
+    {"color": "red", "value": 172800},
+], steps
+assert defaults["unit"] == "s", defaults
+assert panel["targets"][0]["expr"] == "time() - k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds"
+assert panel["options"]["colorMode"] == "background"
+assert 3.25 * 3600 < 86400 < 172800
+rules = yaml.safe_load(open(sys.argv[2]))
+rule = next(r for g in rules["spec"]["groups"] for r in g["rules"] if r.get("alert") == "VectorDBRetrievalProbeStale")
+assert rule["expr"] == "time() - k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds > 172800", rule
+assert rule["for"] == "30m", rule
+' "${DASHBOARD}" "${RULES}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "existing dashboard panel queries and presentation are unchanged" {
   run python3 -c '
 import hashlib, json, sys
