@@ -127,3 +127,23 @@ The ledger location was then obtained directly from `bin/k3dm-dispatch-metrics`
 and read successfully as shown above. No live Prometheus query or deployment was
 attempted; evidence is the screenshot, current code/documents, and local ledger.
 ShellCheck is not applicable because this investigation changes Markdown only.
+
+The initial closeout staging/push ran inside the restricted sandbox and returned:
+
+```text
+fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted
+running under bash version 5.3.20(1)-release
+running under bash version 5.3.20(1)-release
+running under bash version 5.3.20(1)-release
+fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/index.lock': Operation not permitted
+ERROR: Failed to stage files for checkpoint
+ssh: Could not resolve hostname github.com: -65563
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+```
+
+Retry uses the required filesystem/network permission rather than changing hooks
+or bypassing the audit. These errors are environment restrictions, not evidence
+of a dashboard/ledger defect.

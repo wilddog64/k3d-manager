@@ -770,3 +770,11 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Confirmed the M4 origin tracking ref has `Status: OPEN` for `2026-10-26-plans-table-live-verification-column`.
 - [x] Queried Pushgateway and Prometheus directly; Prometheus's current-release join returns `open`, `fixed_in=-`, `fix_sha=-`, `verified=-`, `live_verified=-`. The `k3dm-bug-open` Pushgateway publication timestamp is current.
 - [ ] The supplied Grafana screenshot still displayed the old Fixed row. Browser refresh is needed; if it persists, inspect dashboard variable values and live query. Exact output is in `docs/issues/2026-10-28-plans-dashboard-revert-live-sync.md`.
+
+## 2026-10-26 — Plans Execution / Dispatch / Dispatch task recheck
+
+- [x] Reproduced every screenshot Execution/Dispatch value using current parser functions and five plan headers.
+- [x] Confirmed all five M4 ledger tasks are landed, each with landing `test_result=passed`; no malformed ledger lines.
+- [x] Explained separate sources: Status → Execution/Verified; Dispatch header → Dispatch approval; lifecycle ledger → Dispatch task. Missing headers and stale Status text explain the mismatch.
+- [x] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`: 38/38 passed; `_agent_lint`, `_agent_audit`, and staged diff checks passed. Markdown-only investigation; ShellCheck not applicable. No live query/deployment or plan/dashboard edits.
+- Evidence commit: `48db4ad7`; full output: `docs/issues/2026-10-26-plans-execution-versus-dispatch-task.md`. Existing P3 stays OPEN pending operator/Claude design decision. PR URL: none.
