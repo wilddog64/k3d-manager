@@ -33,3 +33,44 @@ No new duplicate bug or plan was filed. This evidence-only update needs no
 new BATS/ShellCheck run; existing implementation gate outputs remain in
 `docs/issues/2026-10-27-six-bug-luna-batch.md`. Staged audit/lint and doc links
 are checked by normal checkpoint hooks.
+
+## Operator rollout completion excerpt
+
+Operator ran the requested make platform-ops and supplied the following
+completion excerpt (not the complete terminal transcript; no numeric exit
+code was supplied):
+
+```text
+patched automatically.
+configmap/grafana-dashboard-e2e configured
+INFO: [argocd] Deploying Alertmanager delivery Grafana dashboard...
+Warning: resource configmaps/grafana-dashboard-alertmanager-delivery is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-alertmanager-delivery configured
+INFO: [argocd] Deploying VectorDB Grafana dashboard...
+Warning: resource configmaps/grafana-dashboard-vectordb is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-vectordb configured
+INFO: [argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)...
+WARN: [argocd] k3dm-webhook-token not found in Keychain (k3dm-webhook-token/k3dm) — run bin/k3dm-webhook-setup to create it, then re-run; skipping cluster Secret sync
+INFO: [argocd] platform-ops-app-rebuild not in Keychain (platform-ops-app-rebuild/k3dm) — Secret already present in platform-ops; leaving as-is
+INFO: [argocd] platform-ops-git-writer not in Keychain (platform-ops-git-writer/k3dm) — optional CVE git-writer PAT; skipping (store a dedicated fine-grained PAT scoped to wilddog64/k3d-manager contents:write ONLY — do NOT reuse a broad gh CLI token)
+INFO: [argocd] ArgoCD monthly credential rotator applied
+Success! Uploaded policy: argocd-rotationSuccess! Data written to: auth/kubernetes/role/argocd-rotationINFO: [argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m
+INFO: [argocd] Secrets still to create manually (no durable local source):
+INFO: [argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops
+INFO: [argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \
+INFO: [argocd]     -p '{"data":{"slack-incoming-webhook-url":"<base64-url>"}}'
+```
+
+The command reached its deployment-complete message. The annotation warnings
+state they were automatically patched. Existing app-rebuild cluster Secret
+was retained; its actual token validity is untested. Missing local Keychain
+items do not themselves establish that the existing registry Secret is bad.
+No credentials were printed, decoded or rotated by the coordinator. Optional
+Git-writer/OCI/notification setup was not undertaken as unrelated scope.
+
+Next single operator check reads both main and init images from the hub
+CronJob. Expected main docker.io/alpine/k8s:1.31.4, init aquasec/trivy:0.63.0.
+Only after deployed config is confirmed should the selected GHCR live check
+advance to runtime diagnostics. No scan was requested yet. GHCR remains
+VERIFIED offline / live pending. This evidence-only update reruns no code
+tests; normal doc links, staged lint/audit and commit hooks apply.
