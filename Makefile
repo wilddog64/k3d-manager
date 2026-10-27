@@ -6,6 +6,7 @@
 .PHONY: lint-python
 .PHONY: image-pin-drift
 .PHONY: check-bug-evidence
+.PHONY: webhook-doctor
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -484,6 +485,10 @@ provision: ssm
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 install-sudoers:
 	bin/install-sudoers.sh
+
+## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
+webhook-doctor:
+	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
@@ -1565,6 +1570,7 @@ help:
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
+	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"

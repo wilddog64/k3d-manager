@@ -23,3 +23,7 @@ listening or unknown socket with inconclusive health timeout, confirmed
 missing-listener recovery evidence, and a response body sharing the budget
 remaining after headers. Four new tests fail against the former four-second
 health timeout/restart classification.
+
+Make entrypoint checks: `make -n webhook-doctor` selects --check,
+`make -n webhook-doctor DRY_RUN=1` selects --dry-run, and executing the latter
+returns the existing no-I/O probe plan. `make help` lists the target.

@@ -5,7 +5,7 @@
 `--dry-run`) prints the probe plan and does not inspect Keychain, launchd,
 processes, listeners, logs, or the network.
 
-On the m4 host, run `bin/k3dm-webhook-doctor --check` to collect timestamped
+On the m4 host, run `make webhook-doctor` (or `bin/k3dm-webhook-doctor --check`) to collect timestamped
 JSON. It reports launchd job presence, parsed PID and last exit code, the configured TCP
 listener presence, log modification time and bounded error categories, then
 probes only `http://127.0.0.1:7443/api/v1/health?quick=1` with the reader token held in
@@ -92,3 +92,6 @@ a dead handler from slow dependency work. Unknown listener state also remains
 inconclusive. A verified missing launchd job, or missing listener without a
 responsive HTTP result, remains independent recovery evidence. Review the
 result; the doctor never executes recovery.
+
+`make webhook-doctor DRY_RUN=1` prints only the probe plan. Both Make forms
+run the existing doctor directly; neither calls restart or cluster scan targets.
