@@ -74,3 +74,35 @@ Only after deployed config is confirmed should the selected GHCR live check
 advance to runtime diagnostics. No scan was requested yet. GHCR remains
 VERIFIED offline / live pending. This evidence-only update reruns no code
 tests; normal doc links, staged lint/audit and commit hooks apply.
+
+## Deployed image and script confirmed
+
+Operator repeated the main-image read and received:
+
+```text
+docker.io/alpine/k8s:1.31.4
+```
+
+Coordinator supplemental read-only CronJob fields:
+
+```text
+main=docker.io/alpine/k8s:1.31.4
+init=aquasec/trivy:0.63.0
+uid=65534
+fsGroup=65534
+```
+
+Compared ConfigMap argocd-cve-scan-script data app-cve-scan.sh against the
+reviewed local script, without reading any Secret:
+
+```text
+deployed_script_sha256=c6762a033e4b6ad66a0d448debc47f4e26cde14a750fff1a0cd7825e850ea258
+local_script_sha256=c6762a033e4b6ad66a0d448debc47f4e26cde14a750fff1a0cd7825e850ea258
+matches=true
+```
+
+Deployment prerequisite PASSED. Runtime registry auth, candidate reason and
+metric behavior remain untested. A manual `make app-cve-scan` is the existing
+operator runtime gate (can promote clean candidates); it was not executed
+by the coordinator or requested while doctor lookup recheck is pending.
+No new PAT, scan or Secret decoding.

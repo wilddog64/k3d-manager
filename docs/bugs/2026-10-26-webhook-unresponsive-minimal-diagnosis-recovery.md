@@ -189,3 +189,9 @@ context remain unknown; cloud-bridge path was not separately exercised.
 This incident stays OPEN for that remaining investigation; diagnostic
 deliverable/current Slack functionality is live-confirmed. Full screenshot
 and evidence: `docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md`.
+
+Operator repeat12:42:06Z shows correct7443/listening but credential unavailable.
+No outage/recovery inferred. A separately reproduced helper command-exit race
+was fixed offline in b591a13c803b44377fcea91207ea68142a9fdf5c; operator
+credential recheck remains pending, with no proven causal claim. Evidence:
+docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.

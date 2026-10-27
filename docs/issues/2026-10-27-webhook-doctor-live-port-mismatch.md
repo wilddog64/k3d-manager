@@ -135,3 +135,8 @@ Next selected item: GHCR candidate diagnostics. First read-only prerequisite
 checks the deployed scanner image; no credential rotation or scan trigger
 is requested before confirming runtime deployment. Heartbeat enrollment and
 coordinator E3 remain queued behind that item.
+
+Operator repeat12:42:06Z confirms port7443/listening but still auth_unavailable,
+without recovery. Subsequent offline review reproduced/fixed a separate
+command-exit race in b591a13c; causal link to the operator credential context
+is unproven. Exact result/regressions: docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
