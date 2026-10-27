@@ -359,3 +359,82 @@ is Python; Ruff clean. All three staged _agent_lint/_agent_audit passed
 (exit0), normal hooks enabled. Curated `test all` is still running; no final
 claim for that gate yet. Live credentials, provider enrollment, deployment,
 alerts and original incident recovery remain unverified.
+
+## Curated regression findings — follow-up in progress
+
+The full curated run (`1..1895`) found these repository-wide guards:
+
+```text
+not ok 63 no bare '! cmd' assertions in BATS suites (set -e ignores them)
+# (in test file scripts/tests/lib/bats_negation_lint.bats, line 6)
+#   `[ "$status" -ne 0 ]' failed
+not ok 130 grep-q guard: no non-allowlisted pipeline retains -q
+# (in test file scripts/tests/lib/grep_q_pipe_guard.bats, line 13)
+#   `[ "$status" -eq 1 ]' failed
+```
+
+Bare-negation violations were introduced by the batch in heartbeat/CVE BATS.
+Replaced them with run+explicit status assertions. Review also found two token
+checks concatenated log filenames into one nonexistent path, hiding grep errors;
+corrected to separate existing files and require status1 (no match), not status2.
+A first partial guard rerun still failed because CVE bare-negation assertions
+remained; final affected-suite rerun is captured below once complete.
+
+The grep-q guard's actual remaining match is unrelated existing code:
+
+```text
+bin/k3dm-orbstack-upgrade:168:forecast_ok=0; curl -fsS "$PUSHGATEWAY_URL/metrics" | grep -q '^k3dm_release_forecast' && forecast_ok=1
+```
+
+Confirmed the same line with `git show adf2af4e:bin/k3dm-orbstack-upgrade`,
+before these three landings. Last file commit:
+
+```text
+2a729c11 feat(orbstack): coordinated upgrade with preflight, recovery and report
+```
+
+Recorded as out-of-scope follow-up; did not silently modify the OrbStack task.
+The full curated run is not claimed green.
+
+### Final affected BATS guard rerun
+
+```text
+1..29
+ok 1 no bare '! cmd' assertions in BATS suites (set -e ignores them)
+ok 2 heartbeat: dry run renders intent without provider calls
+ok 3 heartbeat: templates contain no enrolled endpoint
+ok 4 heartbeat: documented commands execute directly
+ok 5 all-skipped run exits 1 with the fatal zero-match diagnostic
+ok 6 vulnerable deployed image with vulnerable latest dispatches rebuild instead of promotion
+ok 7 rebuild dispatched within the cooldown is skipped without notifying
+ok 8 rebuild dispatched after the cooldown expires dispatches and records the time
+ok 9 vulnerable deployed image with clean latest promotes exact digest via application patch
+ok 10 COSIGN_VERIFY=1: signed clean candidate is cosign-verified then promoted
+ok 11 COSIGN_VERIFY=1: unsigned clean candidate is refused (no promotion)
+ok 12 COSIGN_VERIFY_ATTESTATION=1: signed + attested clean candidate is promoted
+ok 13 COSIGN_VERIFY_ATTESTATION=1: signed but unattested candidate is refused (no promotion)
+ok 14 registry-less trivy-operator repository form still matches and promotes
+ok 15 digest resolution reads busybox-style indented lowercase headers
+ok 16 clean frontend image is scanned and skipped
+ok 17 clean payment image is scanned and skipped
+ok 18 missing immutable candidate notifies without failing the batch
+ok 19 rebuild dispatch failure notifies without failing the batch
+ok 20 missing immutable sha candidate notifies without retrying the batch
+ok 21 GHCR credential failure is classified and reported without exposing the token
+ok 22 latest without a digest is classified no-latest
+ok 23 unavailable tags endpoint is not classified as a genuine no-match
+ok 24 manifest 404 is rejected even when it includes a digest header
+ok 25 manifest 401 with GH_TOKEN is classified auth instead of no-match
+ok 26 tags list 401 with GH_TOKEN is classified auth instead of no-match
+ok 27 registry transport keeps credentials in a private curl config and scanner image contract is pinned
+ok 28 candidate metric groups preserve two services and replace auth with ok per service
+ok 29 real curl HEAD returns only the status and writes digest headers separately
+
+```
+
+Plain ShellCheck on the BATS file reported its existing SC2030/SC2031
+BATS-subshell info diagnostics and SC2016 quoted-fixture info. The repository
+warning-level gate `shellcheck -S warning scripts/tests/bin/heartbeat.bats
+scripts/tests/plugins/app_cve_scan.bats` passed with no output (exit0).
+Production scanner ShellCheck remains clean at default severity. These
+BATS info findings do not indicate shared variable changes across test cases.

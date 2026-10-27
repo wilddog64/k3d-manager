@@ -383,7 +383,8 @@ EOF
 
   [ "${status}" -eq 0 ]
   grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${CURL_LOG}"
-  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}${WGET_LOG}"
+  run grep -qF "${GH_TOKEN}" "${CURL_LOG}" "${WGET_LOG}"
+  [ "$status" -eq 1 ]
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
 }
@@ -868,8 +869,10 @@ EOF
   if [ -n "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL:-}" ]; then
     grep -q 'k3dm_app_cve_candidate_resolution{service="shopping-cart-payment",reason="auth"} 1' "${METRIC_LOG}"
   fi
-  ! grep -qF "${GH_TOKEN}" <<<"${output}$(cat "${NOTIFY_LOG}")$(cat "${CURL_LOG}")"
-  ! grep -qF "${GH_TOKEN}" "${WGET_LOG}"
+  run grep -qF "${GH_TOKEN}" <<<"${output}$(cat "${NOTIFY_LOG}")$(cat "${CURL_LOG}")"
+  [ "$status" -eq 1 ]
+  run grep -qF "${GH_TOKEN}" "${WGET_LOG}"
+  [ "$status" -eq 1 ]
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
 }
 
@@ -915,7 +918,8 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"reason=auth"* ]]
   grep -q 'read:packages' "${NOTIFY_LOG}"
-  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  run grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  [ "$status" -eq 1 ]
 }
 
 @test "tags list 401 with GH_TOKEN is classified auth instead of no-match" {
@@ -927,18 +931,20 @@ EOF
   run /bin/sh "${TEST_SCAN_SCRIPT}"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"reason=auth"* ]]
-  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  run grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  [ "$status" -eq 1 ]
 }
 
 @test "registry transport keeps credentials in a private curl config and scanner image contract is pinned" {
   export GH_TOKEN="sentinel-ghcr-secret-value"
   _resolved="$(awk '/^# === MAIN ===/ { exit } { print }' "${TEST_SCAN_SCRIPT}")"
   [[ "${_resolved}" == *'"${_CURL_BIN}" --connect-timeout 5 --max-time 30 --config "${_config}"'* ]]
-  ! [[ "${_resolved}" == *'wget'* ]]
+  [[ "${_resolved}" != *'wget'* ]]
   grep -q 'chmod 600 "${_config}"' <<<"${_resolved}"
   grep -q -- '--connect-timeout 5 --max-time 30' <<<"${_resolved}"
   grep -q -- '--connect-timeout 5 --max-time 15' <<<"${_resolved}"
-  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  run grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  [ "$status" -eq 1 ]
   grep -q 'image: docker.io/alpine/k8s:1.31.4' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'mountPath: /tools' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
@@ -946,7 +952,7 @@ EOF
   grep -q 'PATH' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'runAsUser: 65534' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
   grep -q 'fsGroup: 65534' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
-  grep -A6 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml" | grep -q 'runAsNonRoot: true'
+  grep -A6 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml" | grep 'runAsNonRoot: true' >/dev/null
 }
 
 @test "candidate metric groups preserve two services and replace auth with ok per service" {
@@ -972,7 +978,8 @@ EOF
   [ "${status}" -eq 0 ]
   [ "$(wc -l <"${METRIC_STATE}" | tr -d ' ')" -eq 2 ]
   [ "$(grep -c 'reason="ok"' "${METRIC_STATE}")" -eq 2 ]
-  ! grep -q 'reason="auth"' "${METRIC_STATE}"
+  run grep -q 'reason="auth"' "${METRIC_STATE}"
+  [ "$status" -eq 1 ]
   [ "$(wc -l <"${METRIC_LOG}" | tr -d ' ')" -eq 4 ]
 
   export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
@@ -982,7 +989,8 @@ EOF
   grep -q '/instance/shopping-cart-product-catalog|k3dm_app_cve_candidate_resolution{service="shopping-cart-product-catalog",reason="ok"} 1' "${METRIC_STATE}"
   [ "$(grep -c '/instance/shopping-cart-product-catalog' "${METRIC_LOG}")" -eq 2 ]
   [ "$(wc -l <"${METRIC_LOG}" | tr -d ' ')" -eq 5 ]
-  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}${METRIC_LOG}${METRIC_STATE}"
+  run grep -qF "${GH_TOKEN}" "${CURL_LOG}" "${METRIC_LOG}" "${METRIC_STATE}"
+  [ "$status" -eq 1 ]
 }
 
 @test "real curl HEAD returns only the status and writes digest headers separately" {
