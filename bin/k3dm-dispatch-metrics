@@ -30,6 +30,11 @@ VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
+MODEL_IDENTITY_ALLOWLIST = {
+    "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
+    "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+}
 
 
 def _repo_root():
@@ -691,6 +696,27 @@ def _task_metrics(task_events, land_event, prices=None):
                              and event["coordinator_identity"].get("status") == "declared"]
     coordinator_identity = declared_coordinators[-1] if declared_coordinators else (
         latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {})
+    primary_assignments = [event for _, event in ordered
+                           if event.get("event") in {"start", "primary_coordinator"}
+                           and isinstance(event.get("primary_coordinator_identity"), dict)]
+    primary_identity = (primary_assignments[0].get("primary_coordinator_identity")
+                        if primary_assignments else {"vendor": "unknown", "model": "unknown", "source": "unknown", "status": "unknown"})
+    handoffs = [event for _, event in ordered if event.get("event") == "handoff"]
+    acting_identity = (handoffs[-1].get("acting_coordinator_identity") if handoffs
+                       and isinstance(handoffs[-1].get("acting_coordinator_identity"), dict)
+                       else {"vendor": "unknown", "model": "unknown", "source": "unknown", "status": "unknown"})
+    landing = land_event.get("landing_actor") if isinstance(land_event.get("landing_actor"), dict) else {}
+    landing_actor = landing.get("actor") if landing.get("actor") in {"human", "claude", "codex", "other_agent", "unknown"} else "unknown"
+    landing_identity = {"vendor": landing.get("vendor", "unknown"), "model": landing.get("model", "unknown"),
+                        "source": landing.get("source", "unknown"), "status": "declared" if landing_actor != "unknown" else "unknown"}
+    measured_coordinator_costs = [event for _, event in ordered
+                                  if event.get("event") == "primary_coordinator_cost"
+                                  and isinstance(event.get("source"), str)
+                                  and event.get("source") in {"declared", "runtime-reported"}
+                                  and isinstance(event.get("amount_usd"), (int, float))
+                                  and not isinstance(event.get("amount_usd"), bool)
+                                  and math.isfinite(event["amount_usd"]) and event["amount_usd"] >= 0]
+    primary_coordinator_cost = measured_coordinator_costs[-1]["amount_usd"] if measured_coordinator_costs else None
     elapsed = None
     if start_events:
         elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
@@ -718,6 +744,13 @@ def _task_metrics(task_events, land_event, prices=None):
         "worker_identity": worker_identity,
         "worker_runtime_identities": valid_identities,
         "coordinator_identity": coordinator_identity,
+        "primary_coordinator_identity": primary_identity,
+        "acting_coordinator_identity": acting_identity,
+        "landing_actor": landing_actor,
+        "landing_identity": landing_identity,
+        "handoff_count": len(handoffs),
+        "handoff_reason": (handoffs[-1].get("handoff_reason") if handoffs and handoffs[-1].get("handoff_reason") in {"quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown"} else "unknown"),
+        "primary_coordinator_cost_usd": primary_coordinator_cost,
     }
 
 
@@ -1027,7 +1060,9 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
                       task["agent_tokens"], task["agent_seconds"], repo,
                       task["worker_identity"], task["coordinator_identity"], task["post_exit_land_seconds"],
-                      task["worker_runtime_identities"]))
+                      task["worker_runtime_identities"], task["primary_coordinator_identity"],
+                      task["acting_coordinator_identity"], task["landing_identity"], task["landing_actor"],
+                      task["handoff_count"], task["handoff_reason"], task["primary_coordinator_cost_usd"]))
 
     return {
         "landed": len(landed),
@@ -1043,6 +1078,9 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         "run_outcomes": run_outcomes,
         "rework_ratio": rework["any"] / len(landed) if landed else None,
         "tasks": tasks,
+        "handoff_reasons": {reason: sum(1 for item in selected if item.get("event") == "handoff"
+                                         and item.get("handoff_reason") == reason)
+                            for reason in ("quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown")},
     }
 
 
@@ -1273,6 +1311,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if metrics["rework_ratio"] is not None:
         lines.append(f'k3dm_dispatch_rework_ratio{{window="{window}"}} '
                      f'{metrics["rework_ratio"]}')
+    for reason, count in metrics["handoff_reasons"].items():
+        lines.append(f'k3dm_dispatch_handoffs{{window="{window}",reason="{reason}"}} {count}')
     valid_tasks = []
     skipped = 0
     for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):
@@ -1284,23 +1324,48 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
          agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity, post_exit_land,
-         worker_runtime_identities) in valid_tasks[:TASK_CAP]:
+         worker_runtime_identities, primary_identity, acting_identity, landing_identity,
+         landing_actor, handoff_count, handoff_reason, primary_coordinator_cost) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
+        emitted_identity_labels = set()
         def identity_labels(identity, role):
-            source = identity.get("source") if identity.get("source") in {"explicit", "default", "inherited", "runtime", "unreported", "declared"} else "unreported"
-            vendor = identity.get("vendor") if identity.get("vendor") in {"openai", "google", "anthropic", "unknown"} else "unknown"
-            if source == "declared" and isinstance(identity.get("vendor"), str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", identity["vendor"]):
-                vendor = identity["vendor"]
+            raw_source = identity.get("source")
+            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "unknown"} else "unreported"
+            if source == "runtime-reported":
+                source = "runtime"
+            raw_vendor = identity.get("vendor")
+            vendor = raw_vendor if isinstance(raw_vendor, str) and raw_vendor in {"openai", "google", "anthropic", "other", "unknown"} else "unknown"
             model = identity.get("model")
             if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", model):
                 model = "unknown"
-            status = identity.get("status") if identity.get("status") in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
-            lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}"}} 1')
+            elif model != "unknown" and model not in MODEL_IDENTITY_ALLOWLIST:
+                model = "other"
+            raw_status = identity.get("status")
+            status = raw_status if isinstance(raw_status, str) and raw_status in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
+            display = "unknown" if vendor == "unknown" or model == "unknown" else f"{vendor}/{model} ({status})"
+            identity_labels_tuple = (role, vendor, model, source, status, display)
+            if identity_labels_tuple in emitted_identity_labels:
+                return
+            emitted_identity_labels.add(identity_labels_tuple)
+            lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}",display="{display}"}} 1')
         identity_labels(worker_identity, "worker")
         for reported_identity in worker_runtime_identities:
             if reported_identity != worker_identity:
                 identity_labels(reported_identity, "worker_history")
         identity_labels(coordinator_identity, "coordinator")
+        identity_labels(primary_identity, "primary_coordinator")
+        identity_labels(acting_identity, "acting_coordinator")
+        identity_labels(landing_identity, "landing_actor")
+        landing_actor = landing_actor if landing_actor in {"human", "claude", "codex", "other_agent", "unknown"} else "unknown"
+        lines.append(f'k3dm_dispatch_task_landing_actor{{{labels},actor="{landing_actor}"}} 1')
+        lines.append(f'k3dm_dispatch_task_handoff_count{{{labels}}} {handoff_count}')
+        if handoff_count:
+            safe_reason = handoff_reason if handoff_reason in {"quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown"} else "unknown"
+            lines.append(f'k3dm_dispatch_task_handoff_reason{{{labels},reason="{safe_reason}"}} 1')
+        cost_state = "measured" if primary_coordinator_cost is not None else "not measured"
+        lines.append(f'k3dm_dispatch_task_primary_coordinator_cost_state{{{labels},state="{cost_state}"}} 1')
+        if primary_coordinator_cost is not None:
+            lines.append(f'k3dm_dispatch_task_primary_coordinator_cost_usd{{{labels}}} {primary_coordinator_cost}')
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
         if agent == "codex" and tokens is not None:

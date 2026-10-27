@@ -86,7 +86,24 @@ The **Agent Run Log** dashboard shows the selected run's redacted test output fr
 
 The **Agent Cost** dashboard contains the per-spec cost table, Codex API-equivalent costs, subscription costs, model breakdown, projected monthly cost, and Claude usage totals. Its **Window** selector matches Agent Dispatch, including release scope.
 
-Agent Dispatch ledger events may include separate `worker_identity` and `coordinator_identity` objects. In the Per spec table, Worker is the model Codex reports in its log (`runtime`); if no valid runtime model is reported, it is the model selected by the dispatcher (`selected`); a task with neither leaves Worker blank. Coordinator is shown only when declared with `COORDINATOR=<vendor>/<model>` on dispatch or resume. The existing Claude edit measure describes an intervention, not coordinator identity. Model labels are validated and bounded before export.
+Agent Dispatch ledger events keep `worker_identity`, the legacy `coordinator_identity`, and
+`primary_coordinator_identity` separate. Primary coordinator is assigned with
+`PRIMARY_COORDINATOR=<vendor>/<model>` at dispatch; its first assignment is retained across
+resumes. Handoffs append `acting_coordinator_identity` with bounded reason and provenance. The
+Per spec table shows Primary coordinator, Acting coordinator, and Landed by; missing historical
+facts display `unknown`. The existing Coordinator (legacy) column retains the prior
+`COORDINATOR=<vendor>/<model>` semantics. The Claude edit measure describes intervention, not
+coordinator identity. Vendor labels use a finite normalized set, and model labels use a finite
+allowlist; valid but unlisted model names are exported as `other` while their bounded ledger
+identity remains intact. Invalid values render as `unknown`.
+
+`LANDING_ACTOR=human|claude|codex|other_agent|unknown` optionally identifies the landing actor;
+`LANDING_MODEL=<vendor>/<model>` records model details only when explicitly declared. The
+codex-land-pending wrapper records `review_pending` and does not create verification. No distinct
+primary coordination cost source is measured currently, so Per spec leaves Primary cost blank; an
+explicitly measured zero appears as `0`. Worker tokens and API cost are never reassigned as
+coordinator cost. Aggregate handoff counts use only the
+bounded reason label and contain no task identifiers.
 
 Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant transcript records under `~/.claude/projects`, including subagent transcripts. The exporter stores only message IDs, model, timestamp, speed and usage numbers in `~/.local/share/k3d-manager/claude-usage/rollup.json`, reading appended bytes incrementally so coverage survives transcript deletion. Transcripts older than Claude Code's retention period are gone unless the exporter saw them first. Time-window Claude totals count each retained message exactly once; the **Claude ≈** Per spec column attributes usage between each task's dispatch and land, splitting messages evenly across overlapping tasks. It is approximate because it misses spec writing and post-land verification and can include unrelated work during the task interval. Claude API-equivalent rates remain unpriced until confirmed.
 

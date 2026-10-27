@@ -404,7 +404,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',)
 
 ## Show Codex worktree task status
 codex-status:
@@ -412,15 +412,19 @@ codex-status:
 
 ## Land a verified Codex task (SLUG=slug)
 codex-land:
-	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,)
+	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,) $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',) $(if $(REVIEW_PENDING),--review-pending,)
 
 ## Land a finished Codex task while Claude is away; marks it review pending (SLUG=slug, TEST=cmd)
 codex-land-pending:
-	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)'
+	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)' $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',)
 
 ## Resume a Codex task (SLUG=slug, PROMPT=path)
 codex-resume:
 	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+
+## Record an explicit coordinator handoff (SLUG=slug, ACTING_COORDINATOR=vendor/model)
+codex-handoff:
+	@bin/k3dm-codex-dispatch handoff --slug '$(SLUG)' --acting-coordinator '$(ACTING_COORDINATOR)' $(if $(HANDOFF_REASON),--reason '$(HANDOFF_REASON)',) $(if $(HANDOFF_PROVENANCE),--provenance '$(HANDOFF_PROVENANCE)',)
 
 ## Abandon a Codex task (SLUG=slug, YES=1 to remove)
 codex-abandon:

@@ -99,6 +99,59 @@ AGY
 
 dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" "$@"); }
 
+@test "codex dispatch: explicit primary, handoff, and landing actor are separate ledger facts" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug primary --primary-coordinator openai/gpt-6-luna >/dev/null
+  sleep 1
+  dispatch handoff --slug primary --acting-coordinator openai/gpt-6-luna --reason quota_exhausted >/dev/null
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/primary" add -A
+  git -C "$K3DM_WORKTREE_ROOT/v9.9.9/primary" commit -qm candidate
+  dispatch land --slug primary --test true --landing-actor codex --landing-model openai/gpt-6-luna --review-pending >/dev/null
+  jq -s -e 'map(select(.slug=="primary")) as $e | ($e|map(select(.event=="primary_coordinator"))[0].primary_coordinator_identity.vendor) == "openai" and ($e|map(select(.event=="start"))[0].worker_identity.vendor) == "openai" and ($e|map(select(.event=="handoff"))[0].handoff_reason) == "quota_exhausted" and ($e|map(select(.event=="land"))[0].landing_actor.actor) == "codex" and ($e|map(select(.event=="review_pending"))[0].review_status) == "pending"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: omitted primary stays unknown and invalid handoff reason is rejected" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug unknown-primary >/dev/null
+  sleep 1
+  jq -e 'select(.event=="primary_coordinator" and .slug=="unknown-primary") | .primary_coordinator_identity.vendor == "unknown" and .primary_coordinator_identity.source == "unknown"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  run dispatch handoff --slug unknown-primary --acting-coordinator openai/gpt-6-luna --reason account_balance_guess
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"invalid handoff reason"* ]]
+}
+
+@test "codex dispatch: primary identity retains runtime-reported provenance" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug runtime-primary --primary-coordinator openai/gpt-6-luna --primary-coordinator-source runtime-reported >/dev/null
+  sleep 1
+  jq -e 'select(.event=="primary_coordinator" and .slug=="runtime-primary") | .primary_coordinator_identity.source == "runtime-reported" and .primary_coordinator_identity.status == "runtime_reported"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: invalid primary and handoff identity or provenance do not append" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-primary --primary-coordinator 'openai/not a model'
+  [ "$status" -eq 2 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/ledger.jsonl" ]
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug invalid-source --primary-coordinator openai/gpt-6-luna --primary-coordinator-source guessed
+  [ "$status" -eq 2 ]
+  [ ! -e "$K3DM_WORKTREE_ROOT/ledger.jsonl" ]
+
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug strict >/dev/null
+  [ "$status" -eq 0 ]
+  for _ in {1..50}; do
+    jq -e 'select(.event=="codex_exit" and .slug=="strict")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null 2>&1 && break
+    sleep 0.1
+  done
+  jq -e 'select(.event=="codex_exit" and .slug=="strict")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  before="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  run dispatch handoff --slug strict --acting-coordinator 'openai/not a model' --reason manual
+  [ "$status" -eq 2 ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before" ]
+  run dispatch handoff --slug strict --acting-coordinator openai/gpt-6-luna --reason manual --provenance guessed
+  [ "$status" -eq 2 ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$before" ]
+}
+
 @test "codex dispatch: start records spec size snapshot" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug spec-size >/dev/null
@@ -746,7 +799,8 @@ EOF
   [ "$(git -C "$WORK_REPO" rev-parse origin/fix/cross-repo)" = "$remote_before" ]
   [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$manager_before" ]
   [ "$(jq -r -s 'map(select(.slug=="cross"))[-1].repo' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = work-origin ]
-  [ "$(jq -r -s '[.[]|select(.slug=="cross" and .repo=="work-origin")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 3 ]
+  [ "$(jq -r -s '[.[]|select(.slug=="cross" and .repo=="work-origin")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 4 ]
+  jq -e -s 'map(select(.slug=="cross" and .event=="primary_coordinator"))[-1] | .repo=="work-origin" and .primary_coordinator_identity.source=="unknown"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   jq -e -s 'map(select(.slug=="cross" and .event=="land"))[-1] | has("verifier_lines") and has("wait_seconds")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   [ "$(jq -r -s 'map(select(.slug=="cross" and .event=="land"))[-1].target_moved_commits' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 0 ]
 }
@@ -989,12 +1043,13 @@ EOF
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   ledger="$K3DM_WORKTREE_ROOT/ledger.jsonl"
-  [ "$(jq -s 'length' "$ledger")" -eq 2 ]
+  [ "$(jq -s 'length' "$ledger")" -eq 3 ]
   [ "$(jq -r -s '.[0].event' "$ledger")" = start ]
-  [ "$(jq -r -s '.[1].event' "$ledger")" = codex_exit ]
-  [ "$(jq -r -s '.[1].tokens' "$ledger")" = 12345 ]
+  [ "$(jq -r -s '.[1].event' "$ledger")" = primary_coordinator ]
+  [ "$(jq -r -s '.[2].event' "$ledger")" = codex_exit ]
+  [ "$(jq -r -s '.[2].tokens' "$ledger")" = 12345 ]
   [ "$(jq -r -s '.[0].spec' "$ledger")" = docs/plans/v9.9.9-demo.md ]
-  [[ "$(jq -r -s '.[1].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
+  [[ "$(jq -r -s '.[2].tree' "$ledger")" =~ ^[0-9a-f]{40}$ ]]
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-tree" ]
   [ -z "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/one" diff --cached --name-only)" ]
 }
@@ -1182,6 +1237,14 @@ EOF
   local root="$BATS_TEST_DIRNAME/../../.."
   run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md COORDINATOR=anthropic/claude-test
   [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
+  run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md PRIMARY_COORDINATOR=openai/gpt-6-luna PRIMARY_COORDINATOR_SOURCE=runtime-reported
+  [ "$status" -eq 0 ] && [[ "$output" == *"--primary-coordinator 'openai/gpt-6-luna' --primary-coordinator-source 'runtime-reported'"* ]]
+  run make -s -n -C "$root" codex-handoff SLUG=x ACTING_COORDINATOR=openai/gpt-6-luna HANDOFF_REASON=manual
+  [ "$status" -eq 0 ] && [[ "$output" == *"handoff --slug 'x' --acting-coordinator 'openai/gpt-6-luna' --reason 'manual'"* ]]
+  run make -s -n -C "$root" codex-land SLUG=x TEST=true LANDING_ACTOR=codex LANDING_MODEL=openai/gpt-6-luna
+  [ "$status" -eq 0 ] && [[ "$output" == *"--landing-actor 'codex' --landing-model 'openai/gpt-6-luna'"* ]]
+  run make -s -n -C "$root" codex-land-pending SLUG=x TEST=true LANDING_ACTOR=human
+  [ "$status" -eq 0 ] && [[ "$output" == *"codex-land-pending --slug 'x' --test 'true' --landing-actor 'human'"* ]]
   run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
   [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }

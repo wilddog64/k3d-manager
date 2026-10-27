@@ -617,7 +617,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land (dispatch-to-land elapsed, wall clock) is earliest start.ts → land.ts including retries, idle time and overnight waits; Exit → land (final worker exit → land) is the wall-clock gap from the last qualifying Codex exit to land, not proven human wait or active review. N/A means exit timing is unavailable. Live verification occurs after landing and is not included. Human continuation prompts are explicitly recorded operator events only; the denominator is tasks in intervention tracking coverage, not a claim that all human effort is measured. API equiv. stays Codex-only because agy pricing is unavailable. Worker and Coordinator show reported identity evidence. Repo is the origin repository. Claude ≈ is Claude's intervention cost, not coordinator attribution. Release scope covers v1.43.0 onward. Only specs dispatched with `bin/k3dm-codex-dispatch` appear; a bare `codex exec` writes no ledger event. Spec files and Acceptance items are measured at dispatch from the spec as it was then; Files changed, Lines changed and Test lines are measured at land from the rebased task diff. Specs landed before this shipped are blank, never 0. The footer totals Tokens, Agent time, Runs, API equiv. and the size columns over the rows shown; elapsed columns are not totalled, because their means are the stats above.",
+          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land is wall-clock elapsed. Primary coordinator is the first explicit assignment; Acting coordinator is the latest handoff; Landed by is the explicit landing actor. Missing historic values are unknown. Primary cost is blank without a distinct measurement source; an explicitly measured zero appears as 0. Worker spend is never coordinator cost. API equiv. stays Codex-only because agy pricing is unavailable. The legacy Coordinator field retains its prior declared identity semantics. Live verification remains separate from landing. Claude ≈ is intervention cost, not coordinator attribution. Repo is the origin repository. Only specs dispatched with `bin/k3dm-codex-dispatch` appear. The footer totals measured worker and size fields; elapsed times are means.",
           "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
           "datasource": {
             "type": "prometheus",
@@ -673,17 +673,23 @@ data:
               "refId": "G"
             },
             {
-              "expr": "max by (version, slug, repo, worker) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"worker\",model!=\"unknown\"}, \"worker\", \" \", \"vendor\", \"model\", \"status\"))",
+              "expr": "max by (version, slug, repo, worker) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"worker\"}, \"worker\", \"\", \"display\"))",
               "format": "table",
               "instant": true,
               "refId": "H"
             },
             {
-              "expr": "max by (version, slug, repo, coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"coordinator\",model!=\"unknown\"}, \"coordinator\", \" \", \"vendor\", \"model\", \"status\"))",
+              "expr": "max by (version, slug, repo, coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"coordinator\"}, \"coordinator\", \"\", \"display\"))",
               "format": "table",
               "instant": true,
               "refId": "I"
             },
+            {"expr": "max by (version, slug, repo, primary_coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"primary_coordinator\"}, \"primary_coordinator\", \"\", \"display\"))", "format": "table", "instant": true, "refId": "P"},
+            {"expr": "max by (version, slug, repo, acting_coordinator) (label_join(k3dm_dispatch_model_identity{window=\"$window\",role=\"acting_coordinator\"}, \"acting_coordinator\", \"\", \"display\"))", "format": "table", "instant": true, "refId": "Q"},
+            {"expr": "max by (version, slug, repo, landed_by) (label_join(k3dm_dispatch_task_landing_actor{window=\"$window\"}, \"landed_by\", \"\", \"actor\"))", "format": "table", "instant": true, "refId": "R"},
+            {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_handoff_count{window=\"$window\"})", "format": "table", "instant": true, "refId": "S"},
+            {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_primary_coordinator_cost_usd{window=\"$window\"})", "format": "table", "instant": true, "refId": "T"},
+            {"expr": "max by (version, slug, repo, primary_cost_state) (label_join(k3dm_dispatch_task_primary_coordinator_cost_state{window=\"$window\"}, \"primary_cost_state\", \"\", \"state\"))", "format": "table", "instant": true, "refId": "U"},
             {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_spec_files{window=\"$window\"})", "format": "table", "instant": true, "refId": "K"},
             {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_spec_acceptance_items{window=\"$window\"})", "format": "table", "instant": true, "refId": "L"},
             {"expr": "max by (version, slug, repo) (k3dm_dispatch_task_change_files{window=\"$window\"})", "format": "table", "instant": true, "refId": "M"},
@@ -702,6 +708,9 @@ data:
                   "Value #E": true,
                   "Value #H": true,
                   "Value #I": true,
+                  "Value #P": true,
+                  "Value #Q": true,
+                  "Value #R": true,
                   "Value #K": true,
                   "Value #L": true,
                   "Value #M": true,
@@ -722,12 +731,18 @@ data:
                   "Value #G": 10,
                   "worker": 11,
                   "coordinator": 12,
-                  "spec": 13,
-                  "Value #K": 14,
-                  "Value #L": 15,
-                  "Value #M": 16,
-                  "Value #N": 17,
-                  "Value #O": 18
+                  "primary_coordinator": 13,
+                  "acting_coordinator": 14,
+                  "landed_by": 15,
+                  "Value #S": 16,
+                  "Value #T": 17,
+                  "primary_cost_state": 18,
+                  "spec": 19,
+                  "Value #K": 20,
+                  "Value #L": 21,
+                  "Value #M": 22,
+                  "Value #N": 23,
+                  "Value #O": 24
                 },
                 "renameByName": {
                   "version": "Release",
@@ -742,7 +757,13 @@ data:
                   "Value #F": "API equiv.",
                   "Value #G": "Claude ≈",
                   "worker": "Worker",
-                  "coordinator": "Coordinator",
+                  "coordinator": "Coordinator (legacy)",
+                  "primary_coordinator": "Primary coordinator",
+                  "acting_coordinator": "Acting coordinator",
+                  "landed_by": "Landed by",
+                  "Value #S": "Handoffs",
+                  "Value #T": "Primary cost USD",
+                  "primary_cost_state": "Primary cost status",
                   "Value #K": "Spec files",
                   "Value #L": "Acceptance items",
                   "Value #M": "Files changed",
@@ -763,7 +784,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 105
+                    "value": 55
                    }
                  ]
                },
@@ -775,7 +796,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 70
+                    "value": 45
                    }
                  ]
                },
@@ -787,7 +808,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 60
+                    "value": 45
                    }
                  ]
                },
@@ -799,7 +820,7 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 90
+                    "value": 70
                    }
                  ]
                },
@@ -811,17 +832,23 @@ data:
                  "properties": [
                    {
                      "id": "custom.width",
-                     "value": 100
+                    "value": 80
                    }
                  ]
                },
+              {"matcher": {"id": "byName", "options": "Primary coordinator"}, "properties": [{"id": "custom.width", "value": 100}]},
+              {"matcher": {"id": "byName", "options": "Acting coordinator"}, "properties": [{"id": "custom.width", "value": 100}]},
+              {"matcher": {"id": "byName", "options": "Landed by"}, "properties": [{"id": "custom.width", "value": 65}]},
+              {"matcher": {"id": "byName", "options": "Handoffs"}, "properties": [{"id": "custom.width", "value": 55}, {"id": "unit", "value": "short"}]},
+              {"matcher": {"id": "byName", "options": "Primary cost USD"}, "properties": [{"id": "custom.width", "value": 80}, {"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}]},
+              {"matcher": {"id": "byName", "options": "Primary cost status"}, "properties": [{"id": "custom.width", "value": 95}, {"id": "unit", "value": "string"}]},
               {
                 "matcher": {
                   "id": "byName",
                   "options": "Tokens"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 85},
+                  {"id": "custom.width", "value": 60},
                   {
                     "id": "unit",
                     "value": "short"
@@ -834,7 +861,7 @@ data:
                   "options": "Agent time"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 95},
+                  {"id": "custom.width", "value": 60},
                   {
                     "id": "unit",
                     "value": "s"
@@ -847,7 +874,7 @@ data:
                   "options": "Dispatch → land"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 125},
+                  {"id": "custom.width", "value": 75},
                   {
                     "id": "unit",
                     "value": "s"
@@ -857,7 +884,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Exit → land"},
                 "properties": [
-                  {"id": "custom.width", "value": 110},
+                  {"id": "custom.width", "value": 75},
                   {"id": "unit", "value": "s"},
                   {"id": "description", "value": "Wall-clock interval from the final valid Codex exit at or before land to land. N/A when no qualifying exit is available; this is not proof of human waiting or active review."}
                 ]
@@ -868,7 +895,7 @@ data:
                   "options": "Release"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 80},
+                  {"id": "custom.width", "value": 50},
                   {
                     "id": "links",
                     "value": [
@@ -887,7 +914,7 @@ data:
                   "options": "API equiv."
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 90},
+                  {"id": "custom.width", "value": 60},
                   {
                     "id": "unit",
                     "value": "currencyUSD"
@@ -904,7 +931,7 @@ data:
                   "options": "Claude ≈"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 85},
+                  {"id": "custom.width", "value": 65},
                   {
                     "id": "unit",
                     "value": "currencyUSD"
@@ -937,7 +964,7 @@ data:
                   "options": "Spec"
                 },
                 "properties": [
-                  {"id": "custom.width", "value": 200},
+                  {"id": "custom.width", "value": 85},
                   {
                     "id": "links",
                     "value": [

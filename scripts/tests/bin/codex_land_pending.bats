@@ -44,10 +44,10 @@ STUB
 
 @test "commits with the spec's message, lands, pushes and marks the spec review pending" {
   cd "$FIXTURE"
-  run "$SCRIPT" --slug demo --test "true"
+  run "$SCRIPT" --slug demo --test "true" --landing-actor codex --landing-model openai/gpt-6-luna
   [ "$status" -eq 0 ]
   [[ "$output" == *"review pending"* ]]
-  grep -q -- "land --slug demo --test true" "$STUB_LOG"
+  grep -q -- "land --slug demo --test true --review-pending --landing-actor codex --landing-model openai/gpt-6-luna" "$STUB_LOG"
   [ "$(git -C "$FIXTURE" log -1 --format=%s HEAD~1)" = "fix(demo): change a" ]
   grep -q '^\*\*Status:\*\* LANDED — Claude review pending (`' docs/bugs/demo.md
   run grep -c '^\*\*Status:\*\*' docs/bugs/demo.md
@@ -106,6 +106,34 @@ STUB
   cd "$FIXTURE"
   run "$SCRIPT" --slug demo
   [ "$status" -eq 2 ]
+}
+
+@test "rejects invalid landing metadata and missing values before task side effects" {
+  cd "$FIXTURE"
+  mkdir -p "$K3DM_WORKTREE_ROOT"
+  printf '{"ts":1,"event":"seed"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  original_head="$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" rev-parse HEAD)"
+  original_index="$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" diff --cached --binary)"
+  original_ledger="$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+
+  run "$SCRIPT" --slug demo --test true --landing-actor robot
+  [ "$status" -ne 0 ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" rev-parse HEAD)" = "$original_head" ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" diff --cached --binary)" = "$original_index" ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$original_ledger" ]
+
+  run "$SCRIPT" --slug demo --test true --landing-actor codex --landing-model 'openai/not a model'
+  [ "$status" -ne 0 ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" rev-parse HEAD)" = "$original_head" ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" diff --cached --binary)" = "$original_index" ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$original_ledger" ]
+
+  run "$SCRIPT" --slug demo --test true --landing-model
+  [ "$status" -eq 2 ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" rev-parse HEAD)" = "$original_head" ]
+  [ "$(git -C "$K3DM_WORKTREE_ROOT/v9.9.9/demo" diff --cached --binary)" = "$original_index" ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "$original_ledger" ]
+  [ ! -e "$STUB_LOG" ] || [ -z "$(cat "$STUB_LOG")" ]
 }
 
 @test "reads the 'Commit message:' form too" {

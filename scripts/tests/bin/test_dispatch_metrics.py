@@ -736,7 +736,7 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
     actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
-                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_")) and
+                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_", "k3dm_dispatch_task_landing_actor", "k3dm_dispatch_task_handoff_", "k3dm_dispatch_task_primary_coordinator_cost_")) and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -918,7 +918,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 72  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency, intervention, complexity columns and summary stats
+    assert sum("$window" in expr for expr in expressions) == 78  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1819,16 +1819,79 @@ def test_model_identity_exports_worker_and_coordinator_from_latest_start():
     assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
 
 
+def test_repeated_handoffs_preserve_claude_primary_and_human_landing_stays_review_pending(tmp_path):
+    spec = tmp_path / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("**Status:** LANDED — Claude review pending\n\n## Acceptance\n\n```yaml\nevidence:\n  - kind: offline\n```\n")
+    rows = [
+        event(1, "start", "handoff", agent="codex", spec="docs/plans/v9.9.9-demo.md",
+              primary_coordinator_identity={"vendor": "anthropic", "model": "claude-opus-5-5", "source": "declared", "status": "declared"},
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "explicit", "status": "selected"}),
+        event(2, "handoff", "handoff", acting_coordinator_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "declared", "status": "declared"}, handoff_reason="quota_exhausted"),
+        event(3, "handoff", "handoff", acting_coordinator_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "declared", "status": "declared"}, handoff_reason="manual"),
+        event(4, "resume", "handoff", primary_coordinator_identity={"vendor": "openai", "model": "wrong-later-primary", "source": "declared", "status": "declared"}),
+        event(5, "land", "handoff", landing_actor={"actor": "human", "vendor": "unknown", "model": "unknown", "source": "declared"}, review_status="pending"),
+        event(6, "review_pending", "handoff", landing_actor="human", review_status="pending"),
+    ]
+    output = dispatch_metrics.render(rows, 0, 100, repo_root=tmp_path)
+    assert 'role="primary_coordinator",vendor="anthropic",model="claude-opus-5-5"' in output
+    assert 'role="acting_coordinator",vendor="openai",model="gpt-6-luna"' in output
+    assert 'actor="human"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_landing_actor{"))
+    assert 'k3dm_dispatch_handoffs{window="1d",reason="manual"} 1' in output
+    assert 'k3dm_dispatch_handoffs{window="1d",reason="quota_exhausted"} 1' in output
+    assert 'k3dm_dispatch_task_handoff_reason' in output
+    assert 'k3dm_dispatch_delivered{window="30d"} 0' in output
+    assert 'k3dm_dispatch_awaiting_verification{window="30d"} 1' in output
+    assert not any(row.get("event") == "verify" for row in rows)
+
+
+def test_primary_cost_is_explicitly_unmeasured_not_zero():
+    output = dispatch_metrics.render([
+        event(1, "start", "cost"), event(2, "codex_exit", "cost", tokens=101), event(3, "land", "cost")
+    ], 0, 100)
+    assert 'k3dm_dispatch_task_primary_coordinator_cost_usd' not in output
+    measured = dispatch_metrics.render([
+        event(1, "start", "cost"),
+        event(1, "codex_exit", "cost", tokens=101),
+        event(2, "primary_coordinator_cost", "cost", amount_usd=0, source="runtime-reported"),
+        event(3, "land", "cost"),
+    ], 0, 100)
+    assert 'k3dm_dispatch_task_primary_coordinator_cost_usd{window="1d",version="9.9.9",slug="cost",agent="codex",repo="k3d-manager"} 0' in measured
+    assert 'state="not measured"' in output
+    assert 'state="measured"' in measured
+
+
+def test_unlisted_worker_history_collapses_duplicate_normalized_series_only():
+    rows = [
+        event(1, "start", "runtime-dedupe", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "runtime-dedupe", run=1,
+              worker_identity={"vendor": "openai", "model": "gpt-private-a", "source": "runtime", "status": "reported"}),
+        event(3, "identity", "runtime-dedupe", run=2,
+              worker_identity={"vendor": "openai", "model": "gpt-private-b", "source": "runtime", "status": "reported"}),
+        event(4, "identity", "runtime-dedupe", run=3,
+              worker_identity={"vendor": "openai", "model": "gpt-private-c", "source": "runtime", "status": "reported"}),
+        event(5, "land", "runtime-dedupe"),
+    ]
+    raw_models = [row["worker_identity"]["model"] for row in rows if row.get("event") == "identity"]
+    output = dispatch_metrics.render(rows, 0, 100)
+    history = _identity_lines(output, "worker_history")
+    assert raw_models == ["gpt-private-a", "gpt-private-b", "gpt-private-c"]
+    assert len(history) == 1 and len(set(history)) == 1
+    assert 'model="other"' in history[0]
+
+
 def test_model_identity_is_unknown_for_a_legacy_start_with_a_model_field():
     output = dispatch_metrics.render([
         event(1, "start", "legacy", agent="codex", model="gpt-5.6-luna", model_source="inherited"),
         event(2, "codex_exit", "legacy", tokens=10),
         event(3, "land", "legacy"),
     ], 0, 100)
-    for role in ("worker", "coordinator"):
+    for role in ("worker", "coordinator", "primary_coordinator"):
         lines = _identity_lines(output, role)
         assert len(lines) == 1
-        assert 'vendor="unknown",model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+        assert 'model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+    assert 'actor="unknown"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_landing_actor{"))
 
 
 def test_model_identity_rejects_unbounded_label_values():
@@ -1842,6 +1905,17 @@ def test_model_identity_rejects_unbounded_label_values():
     assert len(worker) == 1
     assert 'vendor="unknown",model="unknown",source="unreported",status="unknown"' in worker[0]
     assert "evil" not in output and "acme" not in output
+
+
+def test_unlisted_but_valid_model_is_normalized_for_bounded_cardinality():
+    output = dispatch_metrics.render([
+        event(1, "start", "unlisted", primary_coordinator_identity={
+            "vendor": "openai", "model": "one-off-private-model-123", "source": "declared", "status": "declared"}),
+        event(2, "land", "unlisted"),
+    ], 0, 100)
+    primary = _identity_lines(output, "primary_coordinator")
+    assert len(primary) == 1 and 'model="other"' in primary[0]
+    assert "one-off-private-model-123" not in output
 
 
 def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
@@ -1859,10 +1933,10 @@ def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
     workers = _identity_lines(output, "worker")
     worker_history = _identity_lines(output, "worker_history")
     coordinators = _identity_lines(output, "coordinator")
-    assert len(workers) == 1 and 'model="gpt-test-2",source="runtime",status="reported"' in workers[0]
-    assert len(worker_history) == 1 and 'model="gpt-test-1",source="runtime",status="reported"' in worker_history[0]
+    assert len(workers) == 1 and 'model="other",source="runtime",status="reported"' in workers[0]
+    assert len(worker_history) == 1 and 'model="other",source="runtime",status="reported"' in worker_history[0]
     assert len(coordinators) == 1
-    assert 'vendor="anthropic",model="claude-test",source="declared",status="declared"' in coordinators[0]
+    assert 'vendor="anthropic",model="other",source="declared",status="declared"' in coordinators[0]
 
 
 def test_invalid_runtime_identity_does_not_replace_legacy_value():
@@ -1884,10 +1958,16 @@ def test_per_spec_identity_queries_give_one_row_per_task():
     exprs = {t["refId"]: t["expr"] for t in per_spec["targets"]}
     assert 'role="worker"' in exprs["H"] and exprs["H"].startswith("max by (version, slug, repo, worker)")
     assert 'role="coordinator"' in exprs["I"] and exprs["I"].startswith("max by (version, slug, repo, coordinator)")
+    assert 'role="primary_coordinator"' in exprs["P"] and exprs["P"].startswith("max by (version, slug, repo, primary_coordinator)")
+    assert 'role="acting_coordinator"' in exprs["Q"] and exprs["Q"].startswith("max by (version, slug, repo, acting_coordinator)")
+    assert "k3dm_dispatch_task_landing_actor" in exprs["R"]
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
     assert organize["renameByName"]["worker"] == "Worker"
-    assert organize["renameByName"]["coordinator"] == "Coordinator"
+    assert organize["renameByName"]["coordinator"] == "Coordinator (legacy)"
+    assert organize["renameByName"]["primary_coordinator"] == "Primary coordinator"
+    assert organize["renameByName"]["acting_coordinator"] == "Acting coordinator"
+    assert organize["renameByName"]["landed_by"] == "Landed by"
 
 
 def test_claude_daily_tokens_by_kind_partition_local_dates_and_filter_records():

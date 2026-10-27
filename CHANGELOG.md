@@ -11,6 +11,7 @@
 ### Added
 
 - App CVE candidate resolution reports GHCR authentication failures separately, publishes bounded resolution metrics, and keeps registry credentials out of curl arguments.
+- Agent Dispatch records explicit primary coordinator assignments, append-only coordinator handoffs, and landing actors independently from implementation workers. The Per spec table shows Primary coordinator, Acting coordinator, Landed by, handoff count, and whether primary cost is measured; legacy identities stay unknown when absent.
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
 - Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.
 
@@ -43,7 +44,7 @@
 - **Every hub dashboard refreshes every five minutes by default** (was 1m on some). A `refresh=` value in the URL still overrides it.
 - **Bug Tracking and Agent Dispatch tables fit a laptop-width panel without horizontal scrolling** (a Magic Mouse has no wheel to scroll sideways). Per spec spans the full width with a smaller minimum column width; Bugs, Plans and Remaining releases use narrower fixed widths. Bugs' Verified at and Live-verified at, and Remaining releases' forecasts, show the date only; the forecast columns are headed Earliest, Expected and Latest; Plans drops the Dispatch task column, which repeated the plan name, and gives Dispatch room for its full status.
 - **Bug Tracking's nine summary tiles sit on one row**, and the narrow tiles no longer repeat the release-mode description that crowded out their titles.
-- **Agent Dispatch Per spec leaves Worker and Coordinator blank when the model is unknown**, instead of repeating `unknown` on every row.
+- Agent Dispatch Per spec now displays `unknown` when worker or coordinator identity is absent, preserving unknown provenance for legacy ledger rows.
 - Agent Cost and Agent Dispatch read better: **Claude cost per verified spec** is wider and as tall as its neighbours so its title fits, the per-day Claude bars use larger value labels, **Claude per landed spec** and **Claude tokens per landed spec** say *Release window only* instead of *No data* under a time window, and **Human continuation prompts** shows `continue` instead of a cut-off `continue_prompt`.
 
 ### Added

@@ -117,7 +117,7 @@ import json,sys
 text=open(sys.argv[1]).read(); panels=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))["panels"]
 panel5=next(p for p in panels if p["id"]==5); assert panel5["fieldConfig"]["defaults"]["unit"]=="short"
 panel12=next(p for p in panels if p["id"]==12); assert len(panel12["targets"])>=4
-assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)","max by (version, slug, repo, worker)","max by (version, slug, repo, coordinator)","max by (version, slug, repo) (")) for t in panel12["targets"])
+assert all(t["expr"].startswith(("sum by (version, slug, repo)","max by (version, slug, spec, agent, repo)","max by (version, slug, repo, worker)","max by (version, slug, repo, coordinator)","max by (version, slug, repo, primary_coordinator)","max by (version, slug, repo, acting_coordinator)","max by (version, slug, repo, landed_by)","max by (version, slug, repo, primary_cost_state)","max by (version, slug, repo) (")) for t in panel12["targets"])
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -524,7 +524,7 @@ PY
   [[ "$output" == *"ok"* ]]
 }
 
-@test "agent dispatch dashboard: Per spec leaves an unknown worker or coordinator blank" {
+@test "agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities" {
   run python3 - "$BASE" <<'PY'
 import json,sys
 from pathlib import Path
@@ -532,9 +532,39 @@ text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
 dispatch=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
 spec=[p for p in dispatch["panels"] if p["title"]=="Per spec"][0]
 exprs=[t["expr"] for t in spec["targets"] if "k3dm_dispatch_model_identity" in t["expr"]]
-assert len(exprs)==2,exprs
-for role in ("worker","coordinator"):
-  assert any(f'role="{role}",model!="unknown"' in e for e in exprs),role
+assert len(exprs)==4,exprs
+for role in ("worker","coordinator","primary_coordinator","acting_coordinator"):
+  assert any(f'role="{role}"' in e and '"display"' in e for e in exprs),role
+assert not any('model!="unknown"' in e for e in exprs)
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+}
+
+@test "agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1]) / "grafana-dashboard-agent-dispatch.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panel=next(p for p in d["panels"] if p["title"]=="Per spec")
+org=next(t["options"] for t in panel["transformations"] if t["id"]=="organize")
+for field,label in (("Value #S","Handoffs"),("Value #T","Primary cost USD"),("primary_cost_state","Primary cost status")):
+  assert not org["excludeByName"].get(field),field
+  assert org["renameByName"].get(field)==label,(field,org["renameByName"].get(field))
+overrides={}
+for item in panel["fieldConfig"]["overrides"]:
+  props={p["id"]:p["value"] for p in item["properties"]}
+  if "custom.width" in props:
+    overrides[item["matcher"]["options"]]=props
+assert overrides["Handoffs"]["custom.width"]>0
+assert overrides["Primary cost USD"]["custom.width"]>0
+assert overrides["Primary cost USD"]["unit"]=="currencyUSD"
+assert overrides["Primary cost status"]["custom.width"]>0
+width_sum=sum(props["custom.width"] for props in overrides.values())
+assert width_sum<=panel["gridPos"]["w"]*55,(width_sum,panel["gridPos"])
+assert panel["gridPos"]["w"]==24
 print("ok")
 PY
   [ "$status" -eq 0 ]

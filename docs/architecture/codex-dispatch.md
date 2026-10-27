@@ -164,6 +164,23 @@ make dispatch-metrics DRY_RUN=1
 
 `codex-land-pending` is an explicitly documented operator escape hatch when Claude is unavailable: it requires a successfully exited worker and clean/synchronized checkout, lands and pushes, records **Claude review pending**, but does not mark the task verified. Do not conflate it with authorization to run a live `platform-ops`, `appsets-reapply`, or webhook restart.
 
+Coordinator attribution is append-only telemetry. `start --primary-coordinator VENDOR/MODEL`
+records the first primary identity and provenance independently from `worker_identity`; omission
+records `unknown`. `handoff --acting-coordinator VENDOR/MODEL --reason REASON` adds a timestamped
+acting identity without replacing the primary. Supported reasons are `quota_exhausted`, `manual`,
+`unavailable`, `scheduled`, `other`, and `unknown`; quota exhaustion must be explicitly declared or
+runtime-reported. `land` records a separately supplied landing actor, and
+`codex-land-pending` records `review_pending` in addition to landing metadata. None of these events
+is a verifier event. Legacy ledger events remain readable with unknown attribution.
+
+Coordinator cost is blank without a distinct measured source; an explicitly measured zero is
+exported as numeric zero. Worker token or API-equivalent spend is never used as coordinator cost.
+Aggregate handoff counters use only the
+bounded reason label. Vendor labels use a finite normalized set and model labels use a finite
+allowlist (`other` for valid but unlisted models); per-task identity labels use validated
+repository/task labels under the existing capped task-series contract. Prompts, transcripts and
+session IDs are not added.
+
 In an outage or quota-limited handoff, first inspect status, run directory, ledger and Git refs. Do not re-dispatch blindly, discard a worktree, force a target branch, weaken tests, or mark tasks verified from a Codex zero exit. Record any independent reviewer and live evidence before advancing release-readiness status.
 
 ## Operational and security limitations
