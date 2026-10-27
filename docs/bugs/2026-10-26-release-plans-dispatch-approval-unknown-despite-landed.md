@@ -1,8 +1,9 @@
 # Bug: Release plans confuses dispatch approval with task state and leaves landed execution stale
 
-**Status:** VERIFIED — replacement landed in `608b90a1`; live dashboard E3 remains pending
+**Status:** LIVE-VERIFIED — 2026-10-27T03:17:46Z; refreshed operator Plans screenshot confirms E3
 **Priority:** P3
 **Fix commit:** `608b90a16a01c2009ce9da26646878bfffd6667c`
+**Live evidence:** 2026-10-27 · run grafana-v60 · env m4-hub-grafana · scenario plans-dispatch-approval-and-stale-document-display · commit 608b90a16a01c2009ce9da26646878bfffd6667c · proves E3
 **Severity:** low — misleading Release plans metadata; Codex dispatch/landing is not blocked by this display issue
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
 **Branch:** `k3d-manager-v1.43.9`
@@ -121,7 +122,7 @@ interface:
 - [x] E1/E2 offline tests green, including actual Prometheus lifecycle fixtures; no live host side effects.
 - [x] Dashboard BATS 38/38 and focused pytest 111/111 pass, including both PromQL engine tests.
 - [x] Grafana guide and current-release CHANGELOG updated; five-file change independently reviewed.
-- [ ] Approved live dashboard verification captured and E3 recorded before LIVE-VERIFIED.
+- [x] E3 operator screenshot captured after browser refresh; live ConfigMap, provisioned file, and Grafana API panel agree with the landed fix.
 - [x] Reviewed replacement `608b90a1` landed after the explicitly authorized GPT-6-Luna redispatch. The earlier `78ffa7d5` reversion remains historical.
 
 ## What NOT to Do
@@ -233,6 +234,29 @@ is unavailable, and neither was skipped in this verification.
 Full evidence, original partial-worker failures, and the corrected resume-model
 issue are recorded in `docs/issues/2026-10-26-dispatch-closeout-review.md`.
 The earlier OPEN/P3 findings describe the pre-replacement state. Current status
-is VERIFIED offline. E3 requires approved rollout and an operator screenshot
+was VERIFIED offline at that closeout. E3 required approved rollout and an operator screenshot
 showing Dispatch approval/task separation and stale-document blockers. No live
 refresh, dashboard sync, restart, or screenshot verification was performed here.
+
+## E3 live verification — refreshed operator screenshot
+
+The operator's first Plans screenshot still showed Dispatch/unknown and old
+blockers. Read-only checks found Argo CD already Synced/Healthy/Succeeded on
+`ef57b255` (which contains the fix). The live ConfigMap, Grafana sidecar file,
+and served dashboard API all contained the replacement. Grafana served
+`k3dm-bugs`, version 60, updated 2026-10-27T03:05:45Z. The served panel exactly
+matched the provisioned file. No assistant refresh/sync/restart was needed.
+
+After refreshing the page, the operator supplied a new screenshot showing:
+
+- Dispatch approval as not recorded and Dispatch task as landed for all five rows.
+- The documentation-stale marker (visually truncated by column width) on drift,
+  CNI, complexity, and OrbStack; retrieval quality keeps the dash blocker.
+- Original Execution values (three proposed, retrieval implemented, OrbStack
+  ready), independent approval values, and one Verified column.
+
+The old browser view, rather than failed deployment, explains the initial
+screenshot mismatch. E3 is now satisfied by the refreshed operator screenshot
+plus the independently inspected server panel. Source plan Status/approval
+headers remain unchanged. Evidence and API metadata are recorded in
+`docs/issues/2026-10-27-live-verification-hermes-and-plans.md`.

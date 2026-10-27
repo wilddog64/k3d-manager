@@ -46,3 +46,12 @@ and data beyond the 48-hour stale-alert boundary is red. Add a dashboard regress
 pins the query, unit, and threshold values. Keep the alert rule and daily probe cadence unchanged.
 
 No Grafana configuration was changed or deployed during this investigation.
+
+## Additional operator screenshot
+
+The operator's 2026-10-27 UTC VectorDB Health screenshot again shows the daily
+retrieval probe age in red, this time at 3.25 hours, while ingestion reports
+success and VectorDB is healthy. This supports the existing display-threshold
+finding; it does not reopen the independently verified Hermes SSH fix. No age
+threshold implementation was included in that SSH fix or the Plans P3. This
+bug remains OPEN. Evidence: `docs/issues/2026-10-27-live-verification-hermes-and-plans.md`.

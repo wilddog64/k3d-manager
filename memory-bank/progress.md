@@ -813,6 +813,16 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] GPT-6-Luna completed resumed P3; coordinator replaced copied display logic in tests with actual Prometheus query evaluations (9 lifecycle cases × Auto/Manual, exact source-label preservation and repo/release filtering).
 - [x] P3 implementation `608b90a1` dispatcher-landed. Post-rebase: 111 pytest passed, Ruff passed, 38 BATS passed; both actual-query tests red on original query. In-scope five-file patch, staged audit/lint/diff/doc links passed.
 - [x] Canonical bugs marked VERIFIED offline; full results and partial-worker/environment/model-resume findings recorded in `docs/issues/2026-10-26-dispatch-closeout-review.md`.
-- [ ] Live checks remain: installed Hermes no-agent fetch/poll; approved Grafana rollout and E3 screenshot. No live deployment/restart performed.
+- [x] Live checks completed with operator/runtime evidence recorded below; no assistant deployment/restart performed.
 - [ ] Separately scope dispatcher explicit-model preservation on resume; temporary wrapper corrected this run without modifying dispatcher source.
+- PR URL: none.
+
+## 2026-10-27 UTC — Hermes and Plans live evidence accepted
+
+- [x] Hermes P2 `3aae7adc` LIVE-VERIFIED: clean fixed source used by LaunchAgent, no launchd/plist SSH socket or Git SSH override, fresh successful index after process start.
+- [x] Plans P3 `608b90a1` LIVE-VERIFIED/E3: server panel matches landed fix; operator's refreshed screenshot shows distinct approval/task fields, not recorded approval, all landed, four stale-document blockers and retrieval dash. Source plan headers remain unchanged.
+- [x] Both canonical bugs have parseable Live evidence lines and real Fix commit headers. Screenshots archived under docs/assets; full operator terminal output, alias failure/recovery, and read-only runtime/API observations are in `docs/issues/2026-10-27-live-verification-hermes-and-plans.md`.
+- [x] Additional 3.25h red-probe-age screenshot added as evidence to the already OPEN threshold P3; no threshold fix implemented.
+- [x] Verification evidence update only; no new implementation/tests or live mutation. Existing offline full gate output is retained in the prior closeout issue; ShellCheck not applicable to Markdown/PNG changes.
+- [ ] Separately scoped follow-ups remain: source plan Status reconciliation, probe-age threshold fix, and dispatcher explicit-model preservation on resume.
 - PR URL: none.

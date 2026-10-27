@@ -1,8 +1,9 @@
 # Hermes LaunchAgent cannot fetch GitHub without the interactive SSH agent
 
-**Status:** VERIFIED — offline fix landed in `3aae7adc`; LaunchAgent-context live verification pending
+**Status:** LIVE-VERIFIED — 2026-10-27T03:13:07Z; fixed LaunchAgent fetched/indexed successfully without interactive SSH settings
 **Priority:** P2
 **Fix commit:** `3aae7adc182094630ca4d93a9e439fd262ce5f65`
+**Live evidence:** 2026-10-27 · run launchagent-77982 · env m4-air-launchd · scenario keychain-fetch-and-index-without-agent · commit 3aae7adc182094630ca4d93a9e439fd262ce5f65 · proves fix
 **Date:** 2026-10-26
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** explicit 2026-10-26 (operator: “can you deep dive into it and file a bug if necessary”)
@@ -147,3 +148,26 @@ of this installed fix. Operator follow-up: after installing/restarting the
 approved version, use the guide's no-agent `git ls-remote` check under the normal
 LaunchAgent account with an unlocked login Keychain, then confirm a Hermes poll
 fetch/index refresh. Keep VERIFIED until that runtime evidence is supplied.
+
+## Live verification — operator evidence and independent runtime correlation
+
+The operator supplied the VectorDB Health screenshot and terminal output showing
+`success=1`, `failed=0`, and healthy VectorDB with 2,304 rows matching 2,304 corpus
+documents. The terminal was an iTerm pane; the default tmux session contained
+older history and was not the source of those checks.
+
+Independent read-only correlation at 2026-10-27T03:13:07Z confirms the loaded
+LaunchAgent points to the unmodified fixed source (last code commit `3aae7adc`).
+Its PID 77982 started at 03:06:35 UTC. Both launchd and the plist have
+SSH_AUTH_SOCK and GIT_SSH_COMMAND unset. The published index run and last-success
+timestamps are both 03:07:05.180833 UTC, with success=1 and failed/noop/paused=0.
+The indexing path requires a successful fetch before that success result. This
+establishes an unattended successful run after process start, using the fixed
+code without an interactive SSH override. The evidence run ID records that
+actual LaunchAgent PID, not a fabricated scheduler job ID.
+
+Full supplied output, screenshot observations, runtime evidence, and the harmless
+grep-alias error are in `docs/issues/2026-10-27-live-verification-hermes-and-plans.md`.
+No restart, sync, credential change, or live test was initiated by the assistant
+during this evidence check. Prior SSH failures retained in the log are historical;
+the fresh post-start success above establishes this verification.
