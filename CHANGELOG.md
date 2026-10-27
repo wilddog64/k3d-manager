@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add a read-only webhook incident doctor with bounded, redacted local health
+  diagnostics and offline fixture coverage. Operator recovery and live incident
+  verification remain separate actions.
+
 ## [Unreleased]
 
 ### Added
