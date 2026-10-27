@@ -1,12 +1,13 @@
 # Bug: Release plans confuses dispatch approval with task state and leaves landed execution stale
 
-**Status:** OPEN — dashboard changes reverted at operator request; awaiting Claude's table design decision
+**Status:** OPEN — scoped redispatch to GPT-6-Luna approved by operator; previous dashboard changes remain reverted until reviewed replacement lands
 **Priority:** P3
 **Severity:** low — misleading Release plans metadata; Codex dispatch/landing is not blocked by this display issue
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
 **Branch:** `k3d-manager-v1.43.9`
 **Filed:** 2026-10-26, at operator request following v1.43.9 Grafana screenshot
 **Approval:** explicit operator 2026-10-26: "go ahead to file a P3 dashboard enhancement bug?"
+**Dispatch:** go — explicit operator 2026-10-26: "can you dispatch this P3 bug by using GPT-6-Luna?" Model `gpt-6-luna`; fresh task `plans-dispatch-status-reconcile-luna`.
 **Component:** `bin/k3dm-vectordb-metrics` (`_plan_dispatch`, plan state metadata), `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (panel 107 Plans), `docs/guides/grafana-dashboards.md`
 **Related:** `docs/plans/v1.43.5-release-plan-tracking.md`, `docs/bugs/2026-10-23-release-plans-table-hides-order-and-dependencies.md`, `bin/k3dm-dispatch-metrics`, `docs/howto/codex-dispatch.md`
 
@@ -27,6 +28,14 @@ This is an **information architecture and reconciliation gap**, not permission t
 
 ## Requested enhancement
 
+The latest operator instruction authorizes a fresh implementation of this P3's
+existing requirements with GPT-6-Luna, superseding the earlier hold pending a
+table-design decision. Keep the historical reversion and previous findings as
+context. This authorization covers the files and acceptance below; it does not
+authorize edits to source plan Status/Approval/Dispatch headers, changes to the
+live ledger, deployment, or restoration of the separate Live verified column.
+The prohibition on re-dispatching other Codex tasks below remains in force.
+
 1. Rename the panel 107 `dispatch_approval` display column from **Dispatch** to **Dispatch approval** (or `Dispatch authorization`). Keep `Dispatch task` as the ledger outcome field. Its description/tooltips must state the distinct sources.
 2. Render missing/nonstandard `**Dispatch:**` as **`not recorded`** or `approval unknown` rather than generic `unknown`; do not call it `approved` simply because a task was dispatched. Keep the underlying parse/mapping semantically distinct from `**Approval:**`, which authorizes a spec document.
 3. Explicitly present a **documentation/dispatch mismatch** when `dispatch_state=landed` but `execution=proposed|ready|in_progress`; preserve the actual document state and actual ledger outcome. Do not silently convert execution to `implemented` or verification to `verified`.
@@ -45,6 +54,18 @@ This is an **information architecture and reconciliation gap**, not permission t
 - `CHANGELOG.md`
 
 Avoid modifying plans just to make a dashboard go green. Inspect producer/consumer compatibility before changing any exporter label value, since `Blocked by` and other consumers may rely on `unknown`.
+
+## Rules gates
+
+- Implement only the Files/Acceptance scope above in the isolated task worktree.
+- Run `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and
+  `python3 -m pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q`; use an
+  existing test virtualenv if the default Python lacks pytest. Report the actual
+  interpreter and outputs. Do not install or restart live services to run tests.
+- Show the new regression checks failing against the pre-fix behavior, then
+  passing with the fix. Run `git diff --check` and the repository audit gates
+  applicable without staging or committing. Leave all changes uncommitted for
+  independent review; do not touch memory-bank, plan headers, or runtime services.
 
 ## Acceptance
 
