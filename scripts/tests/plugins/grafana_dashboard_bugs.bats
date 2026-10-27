@@ -440,8 +440,8 @@ assert overlap['title']=='Undeclared plan overlaps'
 assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==62 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==100 for p in overrides['Depends on'])
+assert order_props['custom.width']==55 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==90 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -755,7 +755,7 @@ widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"][
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
 visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
-assert widths["Title"] >= 150 and widths["Dispatch task"] >= 150, widths
+assert widths["Title"] >= 120 and widths["Dispatch task"] >= 140 and widths["Live verified"] >= 90, widths
 assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"
 auto = [k for k in visible if org["renameByName"].get(k, k) not in widths]
 min_width = table["fieldConfig"]["defaults"]["custom"]["minWidth"]
@@ -778,6 +778,29 @@ org = next(t for t in table["transformations"] if t["id"] == "organize")["option
 assert "not_before_reason" not in org["renameByName"] or "Not before reason" not in widths
 assert [org["renameByName"][k] for k in ("Value #B", "Value #C", "Value #D")] == ["Earliest", "Expected", "Latest"]
 assert sum(widths.values()) + 2 * table["fieldConfig"]["defaults"]["custom"]["minWidth"] <= 1100, widths
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "Plans separates ordinary verification from live verification" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
+assert org["renameByName"]["verified"]=="Verified"
+assert org["renameByName"]["live_verified"]=="Live verified"
+assert org["excludeByName"]["verification"] is True
+expr=panel["targets"][0]["expr"]
+assert '"verified", "$1", "verification"' in expr
+assert '"live_verified", "$1", "verification"' in expr
+for field, live_only in (("Verified", False), ("Live verified", True)):
+    override=next(o for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")==field and any(p["id"]=="mappings" for p in o["properties"]))
+    mappings=next(p["value"][0]["options"] for p in override["properties"] if p["id"]=="mappings")
+    assert mappings["live_verified"]["text"] == ("✓" if live_only else "✓")
+    assert mappings["verified"]["text"] == ("-" if live_only else "✓")
+assert sum(p["value"] for o in panel["fieldConfig"]["overrides"] for p in o["properties"] if p["id"]=="custom.width") <= 1350
 PY
   [ "${status}" -eq 0 ]
 }
