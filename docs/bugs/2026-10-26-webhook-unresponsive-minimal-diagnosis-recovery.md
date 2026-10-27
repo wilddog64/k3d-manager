@@ -6,7 +6,8 @@
 **Severity:** medium — Slack/cloud-bridge remote management degraded or unavailable; actual host and service state unknown
 **Release:** v1.43.9 (bug; no new plan slot)
 **Branch:** `k3d-manager-v1.43.9`
-**Approval:** operator 2026-10-26: "we also need to do minimal diagnoses and repair to bring back webhook server"
+**Approval:** operator 2026-10-26; renewed 2026-10-27 Luna batch for the bounded diagnostic deliverable and later one-at-a-time operator live checks
+**Dispatch:** go — model `gpt-6-luna`; task `webhook-incident-doctor-luna`
 **Component:** m4 host `com.k3d-manager.webhook` launchd LaunchAgent; associated cloud-bridge
 **Related:** `docs/bugs/2026-10-26-independent-heartbeat-healthchecks-monitoring.md`; `docs/bugs/2026-10-23-restart-webhook-kickstart-ignores-plist-env-changes.md`
 
@@ -49,9 +50,38 @@ If launchd bootstrapping fails, process dies repeatedly, or an HTTP listener sti
 
 ## Files
 
-- `docs/bugs/2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery.md`
-- Existing implementation (not changed in this filing): `Makefile` `restart-webhook`, `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl`
-- Follow-on recovery/monitoring implementation is separately scoped in the related Healthchecks P2 enhancement.
+- `bin/k3dm-webhook-doctor`
+- `scripts/tests/bin/test_webhook_doctor.py`
+- `scripts/tests/bin/restart_webhook.bats`
+- `docs/howto/webhook-doctor.md`
+- `docs/tests/webhook-doctor.md`
+- `CHANGELOG.md`
+
+## Offline implementation deliverable
+
+Operator selected this incident in the 2026-10-27 Luna batch. The historical
+root cause is still unknown; do not invent a code fix or perform recovery to
+make the task look complete. Implement a small read-only diagnostic entrypoint
+for the operator's later E1/E2 check, with fixture-tested classifications.
+
+- Default/--dry-run explains the probe plan without Keychain/network/process
+  access. Explicit --check collects timestamped, bounded, redacted JSON.
+- Read the installed webhook job state/PID/last exit, actual bind/port, listener
+  presence, and log freshness/error categories without dumping environment, raw
+  process argv, token values or unbounded logs. Keep secrets off subprocess argv.
+- Probe only the documented reader-authenticated loopback health endpoint, with
+  a bounded timeout and in-memory reader token. Validate response schema; separate
+  HTTP handler responsiveness from downstream service all_ok. Reject arbitrary
+  remote URLs. Auth failure, local timeout, missing job and healthy HTTP with bad
+  external delivery are distinct outcomes. No process-only healthy inference.
+- Recommend make restart-webhook only when local evidence warrants it; the doctor
+  must never restart/kill/reboot/bootstrap or mutate Kubernetes, launchd or secrets.
+  Explain that the existing recovery also restarts cloud-bridge and is operator-
+  controlled, at most once initially, followed by end-to-end evidence.
+- Fixtures prove redaction, timeout/auth/listener classification, healthy local
+  versus failed ingress distinction and zero recovery calls. Document the original
+  incident as unconfirmed until operator evidence; offline helper tests cannot
+  satisfy the original live E1/E2 or mark the incident LIVE-VERIFIED.
 
 ## Acceptance
 
@@ -101,3 +131,22 @@ interface:
 - Do NOT create a PR or push to `main`; documentation belongs on `k3d-manager-v1.43.9`.
 - Do NOT claim any m4 commands were executed by the GitHub connector.
 - Do NOT use a cloud-bridge job as evidence of functioning webhook while its transport is down.
+
+## Dispatch rules — operator batch 2026-10-27
+
+The operator explicitly selected this existing bug for implementation by
+GPT-6-Luna, independent offline review, and operator live verification one fix
+at a time. This is implementation authorization; no worker may deploy, restart
+services, contact live clusters/registries/providers, create accounts, rotate
+credentials, or run live tests. Work only in the isolated task worktree and the
+Files allowlist. Do not edit this spec, memory-bank, or source plan statuses.
+Do not stage, commit, push, or create PRs. Preserve DO NOT REMOVE comments.
+Add meaningful regressions and show them red on the original behavior before
+reporting green. Run focused tests, syntax/lint, and git diff --check; report
+actual outputs and any unmet acceptance honestly. Use <=8 if blocks in new or
+refactored functions. Report legacy budget conflicts instead of raising limits.
+The coordinator will run audit/lint on staged changes before committing.
+
+Focused gates: test_webhook_doctor pytest, restart_webhook BATS, syntax/Ruff,
+diff check. The worker must not execute --check against the real host or call
+make restart-webhook. Leave the original incident unverified for operator E1/E2.

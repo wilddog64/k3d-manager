@@ -6,7 +6,8 @@
 **Severity:** medium — an unavailable local control plane can prevent remote diagnosis and obscure component/host failures
 **Branch:** `k3d-manager-v1.43.9`
 **Release:** v1.43.9 (enhancement bug; no new release-plan slot)
-**Approval:** operator on 2026-10-26: "go ahead to do that. please follow docs/bugs format, and push to current active branch"
+**Approval:** original filing 2026-10-26; explicit implementation/verification selection in operator Luna batch 2026-10-27
+**Dispatch:** go — model `gpt-6-luna`; task `independent-heartbeats-luna`
 **Component:** m4 local webhook, Hermes, cloud-bridge; Hostinger heartbeat; independent external failure alerting
 **Affected:** local m4 management plane, offsite operational visibility; optional m2 expansion
 
@@ -30,9 +31,68 @@ This issue requests a small, independent, outbound-only heartbeat and alert path
 
 ## Files
 
-- `docs/bugs/2026-10-26-independent-heartbeat-healthchecks-monitoring.md`
-- Implementation paths to be selected only after inspecting actual m4 launchd, Hermes, webhook, cloud-bridge, Hostinger deployment, test and documentation layouts; do not invent a new service dependency.
-- Add focused automated tests and an operator runbook at the repository's established locations during implementation.
+- `bin/k3dm-heartbeat`
+- `bin/k3dm-heartbeat-setup`
+- `bin/k3dm-hermes`
+- `bin/k3dm-cloud-bridge`
+- `scripts/etc/launchd/com.k3d-manager.heartbeat.plist.tmpl`
+- `scripts/etc/systemd/k3dm-heartbeat.service.tmpl`
+- `scripts/etc/systemd/k3dm-heartbeat.timer.tmpl`
+- `scripts/etc/heartbeat/checks.example.json`
+- `scripts/tests/bin/test_heartbeat.py`
+- `scripts/tests/bin/heartbeat.bats`
+- `scripts/tests/bin/test_cloud_bridge.py`
+- `scripts/tests/bin/test_retrieval_probe.py`
+- `docs/howto/independent-heartbeats.md`
+- `docs/tests/heartbeat.md`
+- `CHANGELOG.md`
+
+## Bounded implementation decisions
+
+- Use standard-library Python for a standalone sender and setup renderer. Do not
+  add a daemon framework, web dependency, cloud account, or runtime package install.
+- Default disabled/unconfigured. Rendering or --dry-run must not read secrets,
+  install jobs, probe services or send pings. Installation/enabling is an explicit
+  later operator action, and tests use only fixture roots/fake local/provider I/O.
+- Five identities only: m4-host, m4-hermes, m4-webhook, m4-cloud-bridge, hostinger.
+  m4 sends its four checks directly; Hostinger runs the same standalone sender
+  locally for its one host check. No m4 SSH/remote calls and no proxy via Hostinger.
+- Healthchecks.io UUID HTTPS URLs are supplied via named Keychain items on m4
+  or protected owner-only files on Hostinger. No URL/key in argv, templates,
+  example values, logs, metrics or exceptions. Reject insecure file permissions,
+  malformed/non-HTTPS configuration and redirects leaking credentials.
+- Provider period/grace and destination enrollment are documented manual setup.
+  Do not auto-provision or modify accounts. Success and /fail follow the official
+  HTTPS ping API; rate limit retries and timeouts, avoid overlapping/duplicate runs.
+- Host means scheduler/outbound path observed, not proof a missing host is powered
+  off. Test clock-based freshness, failure/recovery/provider errors and maintenance
+  suppression; never simulate external alert delivery as real evidence.
+- Hermes currently runs every 300s and may take minutes. Add an advisory completed-
+  cycle timestamp to its existing private state, without changing index/SSH behavior.
+  Bridge gets a private atomic last-successful-poll marker under its existing
+  STATE_DIR only after successful ticks. Both marker writes are advisory, never
+  fatal to the original services, and do not call the heartbeat sender.
+- Sender reads those markers with documented configurable freshness bounds (allow
+  normal poll/jitter/run duration), rejects future/malformed/stale values, and
+  labels its result as last-completed-cycle/poll freshness. No process-only success.
+- The existing reader-authenticated loopback /api/v1/health?quick=1 can establish
+  bounded request/JSON handling. Retrieve the reader credential in memory using
+  the existing secure source; do not accept 401/403 as success or expose bodies.
+  Distinguish handler response from downstream all_ok; document that this health
+  route probes dependencies and timeout cannot identify host vs network cause.
+- Provide launchd and systemd timer/service templates and an explicit setup tool
+  with --dry-run; no implicit sudo, remote setup or execution on import. Setup must
+  preserve existing jobs/config and validate credentials before enabling.
+- No automatic restart/watchdog remediation is included. Recovery uses the
+  separate operator-run incident procedure; M5 is satisfied by this explicit
+  boundary and documented provider/power-loss limitations.
+
+Official sources checked 2026-10-27: [ping API](https://healthchecks.io/docs/http_api/),
+[states and grace](https://healthchecks.io/docs/), and
+[account limits](https://healthchecks.io/docs/autoprovisioning/). Current docs say
+20 checks on the free account, sufficient for five; operator must verify their
+actual account and alert channel at enrollment. Never enable auto-provisioning
+(create=1) or assume external alert delivery from a successful ping.
 
 ## Acceptance
 
@@ -93,3 +153,24 @@ interface:
 - Do NOT create a PR or commit to `main`; work on `k3d-manager-v1.43.9`.
 - Do NOT present the original 2026-10-26 webhook failure as diagnosed, fixed or live-verified.
 - Do NOT provision third-party accounts, configure secrets, or alter live m4/m2/Hostinger services while filing this enhancement.
+
+## Dispatch rules — operator batch 2026-10-27
+
+The operator explicitly selected this existing bug for implementation by
+GPT-6-Luna, independent offline review, and operator live verification one fix
+at a time. This is implementation authorization; no worker may deploy, restart
+services, contact live clusters/registries/providers, create accounts, rotate
+credentials, or run live tests. Work only in the isolated task worktree and the
+Files allowlist. Do not edit this spec, memory-bank, or source plan statuses.
+Do not stage, commit, push, or create PRs. Preserve DO NOT REMOVE comments.
+Add meaningful regressions and show them red on the original behavior before
+reporting green. Run focused tests, syntax/lint, and git diff --check; report
+actual outputs and any unmet acceptance honestly. Use <=8 if blocks in new or
+refactored functions. Report legacy budget conflicts instead of raising limits.
+The coordinator will run audit/lint on staged changes before committing.
+
+Focused gates: new heartbeat pytest/BATS plus existing retrieval_probe and
+cloud_bridge pytest; Python syntax/Ruff and rendered plist/systemd contract checks.
+No webhook/Hermes/bridge restart, Hostinger install, provider ping or account/secret
+provisioning is authorized for the worker. Prepare commands for later operator
+verification one check at a time.

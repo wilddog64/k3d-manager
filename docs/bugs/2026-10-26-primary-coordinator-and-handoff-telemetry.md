@@ -6,7 +6,8 @@
 **Release:** v1.43.9 (bug/enhancement; does not count toward the five-plan cap)
 **Branch:** `k3d-manager-v1.43.9`
 **Filed:** 2026-10-26, operator: "this need change to capture if codex is a primary cooridnator"
-**Approval:** operator requested the telemetry behavior; implementation requires normal dispatcher/review gates
+**Approval:** explicit operator selection in the 2026-10-27 Luna batch, with normal independent review and sequential operator live checks
+**Dispatch:** go — model `gpt-6-luna`; task `primary-coordinator-handoffs-luna`
 **Component:** `bin/k3dm-codex-dispatch`, `bin/k3dm-codex-land-pending`, `bin/k3dm-dispatch-metrics`, Agent Dispatch Grafana dashboard
 **Related:** `docs/plans/v1.43.7-dispatch-vendor-coordinator-model-telemetry.md`, `docs/howto/codex-dispatch.md`, `docs/architecture/codex-dispatch.md`
 
@@ -37,13 +38,15 @@ Do not automatically infer that `Agent=codex` means Codex was coordinating. A ta
 - `Makefile`
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
 - `scripts/tests/bin/test_dispatch_metrics.py`
-- `scripts/tests/plugins/codex_dispatch.bats` (confirm exact existing suite path)
+- `scripts/tests/bin/codex_dispatch.bats`
+- `scripts/tests/bin/codex_land_pending.bats`
 - `docs/howto/codex-dispatch.md`
 - `docs/architecture/codex-dispatch.md`
 - `docs/guides/grafana-dashboards.md`
 - `CHANGELOG.md`
 
-Inspect suite paths and narrow the files to exactly necessary ones before implementation dispatch.
+The existing suites are under scripts/tests/bin, confirmed before dispatch.
+Use only the paths above; leave untouched files unchanged.
 
 ## Acceptance
 
@@ -103,3 +106,48 @@ interface:
 - Do not change any live coordinator session or rescue an in-progress dispatch as part of filing.
 - Do not infer that an LLM was primary simply from the worker model, `Claude ≈ $0`, or the last person who pushed.
 - Do not create a PR or commit to `main`.
+
+## Bounded CLI and compatibility contract
+
+- Add explicit primary assignment at start (for example --primary-coordinator
+  VENDOR/MODEL). Keep current --coordinator behavior/legacy fields compatible.
+  Primary omission is unknown; never fill it from worker model, default config,
+  cost, verifier, or a later resume. Preserve the original primary on handoff.
+- Add handoff CLI accepting explicit acting identity/reason and append-only
+  task events. Explicit quota_exhausted is a declaration, not runtime detection.
+  Report declared/runtime-reported/unknown provenance truthfully.
+- Land and codex-land-pending accept explicit landing actor metadata, passing it
+  through without changing rebase/test/lock/scope/commit policies. Legacy/unmarked
+  land is unknown. Preserve the independent verifier and review-pending states.
+- Metrics/display add primary, acting, landed-by and bounded handoff details;
+  keep existing worker/agent/coordinator and costs compatible. Coordinator cost
+  remains not measured when no distinct measured source exists, not zero and
+  never worker spend. Avoid changing actual execution routing, including the
+  separately observed resume-model issue, as part of this telemetry patch.
+- Test strict identifiers, invalid enums, non-leaking labels, legacy/cross-repo
+  records, first-primary preservation, repeated handoffs, explicit land actor
+  passthrough, no false verifier and unknown-versus-zero costs.
+- Existing long shell functions must not grow new unbounded conditional logic;
+  extract new bounded helpers. Do not raise audit thresholds or bypass hooks.
+
+
+## Dispatch rules — operator batch 2026-10-27
+
+The operator explicitly selected this existing bug for implementation by
+GPT-6-Luna, independent offline review, and operator live verification one fix
+at a time. This is implementation authorization; no worker may deploy, restart
+services, contact live clusters/registries/providers, create accounts, rotate
+credentials, or run live tests. Work only in the isolated task worktree and the
+Files allowlist. Do not edit this spec, memory-bank, or source plan statuses.
+Do not stage, commit, push, or create PRs. Preserve DO NOT REMOVE comments.
+Add meaningful regressions and show them red on the original behavior before
+reporting green. Run focused tests, syntax/lint, and git diff --check; report
+actual outputs and any unmet acceptance honestly. Use <=8 if blocks in new or
+refactored functions. Report legacy budget conflicts instead of raising limits.
+The coordinator will run audit/lint on staged changes before committing.
+
+Focused gates: codex_dispatch and codex_land_pending BATS, dispatch metrics
+pytest, existing agent_dispatch_dashboard BATS and Python/Ruff/ShellCheck for
+touched code. Use isolated fixture ledgers only; never handoff/land/resume a
+real running task or inject synthetic identities into the production ledger.
+The operator's real E3 exercise is later and separate.
