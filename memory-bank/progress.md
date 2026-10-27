@@ -746,3 +746,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Verified implementation commits `dd53c17c`, `c292d69d`, and `8d7e00cd` omit their plan docs; `bin/k3dm-codex-dispatch land` records ledger state but does not edit Status headers.
 - [x] Confirmed exporter `_plan_state()` reads plan Status only; dispatch task state is a separate metric. Retrieval-quality was updated in a distinct post-land docs commit `f5c1a745`.
 - [x] Added exact root-cause evidence to `docs/bugs/2026-10-26-release-plans-dispatch-approval-unknown-despite-landed.md`. No plan docs changed pending operator confirmation with Claude.
+
+## 2026-10-27 — P3 Plans dispatch-status reconciliation dispatched
+
+- [x] Dispatched the approved existing P3 bug as `plans-dispatch-status-reconcile` from clean `k3d-manager-v1.43.9` worktree; state `running`, scope `in-scope`.
+- [x] Initial attempt from `codex/v1439-retrieval-land` was correctly refused because the dispatcher requires a release-branch name. Exact output and successful retry are in `docs/issues/2026-10-27-dispatch-from-release-branch.md`.
+- [ ] Review worker output, run scoped acceptance gates, and land offline fix. Live E3 remains operator screenshot after dashboard sync.
