@@ -739,3 +739,10 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Live ConfigMap has both `Verified` and `Live verified`, separate projection/mapping, and 1,320 px configured width. Grafana sidecar wrote `k3dm-bugs.json`; Grafana provisioning logged start and finish.
 - [x] Browser screenshot/API-level verification was unavailable (Grafana API returned 401 without credentials); issue doc records this boundary and verbatim output. Live status is based on deployed ConfigMap + Grafana provisioning logs, not a screenshot.
 - [x] Offline BATS 38/38 and `_agent_audit` exit 0 were recorded with implementation commit `7ec87a73`; bug/guide record pushed in `35959fa0`; final memory closeout commit pending. PR URL: none.
+
+## 2026-10-27 — Why three v1.43.9 Plans statuses stayed proposed
+
+- [x] Confirmed M4 ledger `start` + `land` events for `vectordb-drift-kinds-and-age`, `cni-ipam-reclaim-visibility`, and `dispatch-spec-and-change-complexity`.
+- [x] Verified implementation commits `dd53c17c`, `c292d69d`, and `8d7e00cd` omit their plan docs; `bin/k3dm-codex-dispatch land` records ledger state but does not edit Status headers.
+- [x] Confirmed exporter `_plan_state()` reads plan Status only; dispatch task state is a separate metric. Retrieval-quality was updated in a distinct post-land docs commit `f5c1a745`.
+- [x] Added exact root-cause evidence to `docs/bugs/2026-10-26-release-plans-dispatch-approval-unknown-despite-landed.md`. No plan docs changed pending operator confirmation with Claude.

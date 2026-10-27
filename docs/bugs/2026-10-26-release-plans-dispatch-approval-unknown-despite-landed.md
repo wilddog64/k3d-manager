@@ -107,3 +107,21 @@ interface:
 - Do not change plan **Status**, **Approval**, or **Dispatch** headers just to make the table appear consistent.
 - Do not re-dispatch, land or independently verify Codex tasks as part of this P3 dashboard enhancement.
 - Do not create a PR, commit to `main`, skip hooks or change runtime/Hostinger services.
+
+## Follow-up diagnosis — stale execution statuses for three landed v1.43.9 plans
+
+Investigated 2026-10-27 after the operator noticed that the Release Plans table marked only the retrieval-quality plan implemented, although three other dispatch tasks had landed.
+
+The three documents retain their pre-dispatch/pre-implementation `**Status:**` text:
+
+| Plan | Current document status | Landed implementation |
+|---|---|---|
+| `v1.43.9-vectordb-drift-kinds-and-age` | `PROPOSED — spec only` | `dd53c17c` |
+| `v1.43.9-cni-ipam-reclaim-visibility` | `PROPOSED — spec written ...; not dispatched` | `c292d69d` |
+| `v1.43.9-dispatch-spec-and-change-complexity` | `PROPOSED — ... not dispatched or implemented` | `8d7e00cd` |
+
+M4's dispatch ledger has `start` and `land` events for each slug. The implementation commits changed the code, tests, and guides but did not include their plan documents. `bin/k3dm-codex-dispatch land` records task integration in the ledger; it does not revise the source plan. The exporter `_plan_state()` reads only the plan's `**Status:**` line to produce execution and verification. The dashboard separately joins the dispatch ledger for `Dispatch task`; it does not turn `landed` into `implemented` or `verified`.
+
+The retrieval-quality plan is the contrasting case: a separate documentation follow-up, commit `f5c1a745`, changed its Status to `LANDED`, checked off its DoD, and recorded verification. No equivalent post-land documentation commit was made for these three plans. This is a missing post-land status reconciliation, not an intentional dashboard distinction and not evidence that the implementations failed to land.
+
+No plan Status headers were changed during this investigation; the operator is confirming with Claude whether to reconcile them.
