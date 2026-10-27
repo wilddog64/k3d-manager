@@ -1,4 +1,4 @@
-# agent-audit: allow assert-removed replace incorrect port 9000 with server port 7443 and retain redaction checks with validated loaded port
+# agent-audit: allow assert-removed align expected server port and health budget with production while retaining credential and redaction checks
 import importlib.util
 import io
 from importlib.machinery import SourceFileLoader
@@ -60,7 +60,7 @@ def test_health_probe_keeps_handler_and_dependency_health_separate():
     result = doctor._health_probe("reader-secret", opener=probe)
     assert result == {"status": "healthy_http_services_degraded", "http_responsive": True, "all_ok": False}
     assert seen == {"url": "http://127.0.0.1:7443/api/v1/health?quick=1",
-                    "authorization": "Bearer reader-secret", "timeout": doctor.TIMEOUT}
+                    "authorization": "Bearer reader-secret", "timeout": doctor.HEALTH_TIMEOUT}
 
 
 def test_health_transport_blocks_redirects_and_proxy_routes():
@@ -430,3 +430,49 @@ def test_keychain_unlock_is_observed_on_next_check_without_cached_token(monkeypa
     assert locked["recovery_action"] is None and unlocked["recovery_action"] is None
     assert len(calls) == 2 and all(argv[1] == "find-generic-password" for argv in calls)
     assert "private-unlocked-fixture" not in json.dumps(unlocked)
+
+
+def test_health_budget_covers_existing_eight_second_dependency_probes():
+    def endpoint(_request, timeout):
+        if timeout < 8:
+            raise TimeoutError("dependency snapshot still running")
+        return Response({"services": [{"name": "api", "ok": True}], "all_ok": True})
+    assert doctor._health_probe("reader", opener=endpoint)["status"] == "healthy_http"
+
+
+def test_health_timeout_with_listener_is_inconclusive_not_restart(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_args, **_kwargs: {"status": "local_timeout", "http_responsive": False, "all_ok": None})
+    result = doctor.diagnose(check=True)
+    assert result["classification"] == "health_check_timeout"
+    assert result["health"]["all_ok"] is None
+    assert result["recovery_recommended"] is False
+    assert result["recovery_action"] is None
+    assert result["health_timeout_seconds"] >= 8
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "command_error", "listening": None})
+    assert doctor.diagnose(check=True)["recovery_recommended"] is False
+
+
+def test_confirmed_missing_listener_remains_recovery_evidence(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "no_listener", "listening": False})
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_args, **_kwargs: {"status": "local_timeout", "http_responsive": False, "all_ok": None})
+    result = doctor.diagnose(check=True)
+    assert result["classification"] == "listener_missing"
+    assert result["recovery_recommended"] is True
+    assert "make restart-webhook" in result["recovery_action"]
+
+
+def test_health_header_and_body_share_one_deadline(monkeypatch):
+    ticks = iter((100.0, 107.0))
+    monkeypatch.setattr(doctor.time, "monotonic", lambda: next(ticks))
+    remaining = []
+    def body(_response, timeout):
+        remaining.append(timeout)
+        return b'{"services":[{"name":"api","ok":true}],"all_ok":true}'
+    monkeypatch.setattr(doctor, "_read_health_body", body)
+    result = doctor._health_probe("reader", timeout=10, opener=lambda *_args, **_kwargs: Response({}))
+    assert result["status"] == "healthy_http"
+    assert remaining == [3.0]

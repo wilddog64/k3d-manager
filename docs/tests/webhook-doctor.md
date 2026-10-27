@@ -17,3 +17,9 @@ item, lookup timeout/output cap/failure/empty value, environment-token bypass,
 secret redaction, no HTTP probe without credentials, no restart or unlock
 calls, and observing an unlock on the next check without a cached token.
 Four new credential-state tests fail on the prior generic-auth output.
+
+Health-budget regressions cover an eight-second downstream snapshot, a
+listening or unknown socket with inconclusive health timeout, confirmed
+missing-listener recovery evidence, and a response body sharing the budget
+remaining after headers. Four new tests fail against the former four-second
+health timeout/restart classification.

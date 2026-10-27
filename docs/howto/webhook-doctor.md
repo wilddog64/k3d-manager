@@ -12,9 +12,9 @@ probes only `http://127.0.0.1:7443/api/v1/health?quick=1` with the reader token 
 memory. The dedicated opener bypasses proxy settings and refuses redirects, so
 the authorization header stays on the fixed loopback request. The reader token is read from `K3DM_WEBHOOK_TOKEN_READER` or macOS
 Keychain; no token, launchd environment, process arguments, or raw log lines
-are included in output. The request timeout is four seconds and log inspection
+are included in output. The health request timeout is 15 seconds and log inspection
 is capped at 64 KiB / 80 lines. Command output capture is capped at 16 KiB and
-the health response body at 64 KiB with a total four-second deadline. The probe
+the health response body at 64 KiB; body reads use the remaining health-request budget. The probe
 does not accept a remote URL.
 
 `local_http_healthy_external_delivery_unverified` describes a valid handler
@@ -30,7 +30,7 @@ unavailable, timeout, permission/unknown errors are not treated as a verified
 missing job. A listener or process alone is never classified as healthy.
 
 The doctor never calls recovery. It recommends recovery only for a launchd job
-reported missing by launchctl or a timed-out local health request. Missing
+reported missing by launchctl or a confirmed missing listener without a responsive HTTP result. Missing
 credentials and diagnostic command failures do not recommend a restart. If
 reliable local evidence shows the webhook is unhealthy, an operator may choose to run
 `make restart-webhook` once from the repository on m4. That supported action
@@ -77,3 +77,18 @@ local evidence warrants recovery. The doctor never unlocks the Keychain,
 changes its lock settings, caches credentials or performs a restart. A new
 check retries the read and observes an operator unlock without a service
 restart.
+
+### Health-check timeouts
+
+The quick health route still runs parallel downstream service probes, each
+with an eight-second request timeout. The doctor gives this aggregate check
+a bounded15-second budget (`health_timeout_seconds`); local command probes
+retain four-second limits. Body reads use the health budget remaining after
+response headers rather than starting a second full timeout.
+
+A health request timing out with a listening socket is `health_check_timeout`,
+with `all_ok: null` and no restart recommendation. The diagnostic cannot infer
+a dead handler from slow dependency work. Unknown listener state also remains
+inconclusive. A verified missing launchd job, or missing listener without a
+responsive HTTP result, remains independent recovery evidence. Review the
+result; the doctor never executes recovery.

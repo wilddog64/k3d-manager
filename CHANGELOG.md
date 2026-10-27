@@ -17,6 +17,8 @@
 
 ### Changed
 
+- Webhook doctor gives aggregate health checks a 15-second budget and treats a timeout with a listening socket as inconclusive rather than recommending a restart.
+
 - Webhook doctor distinguishes Keychain interaction requirements from missing reader credentials, gives a safe next step and omits unwarranted restart actions.
 
 - Webhook doctor waits for a bounded command exit after its output closes, avoiding premature credential-lookup termination.
