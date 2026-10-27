@@ -9,6 +9,7 @@
 **Approval:** explicit operator 2026-10-26: restore Live verified and verify it live
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (panel 107 Plans), `scripts/tests/plugins/grafana_dashboard_bugs.bats`, `docs/guides/grafana-dashboards/k3dm-bugs.md`
 **Historical fix commit:** `7ec87a73` (reverted by operator-requested dashboard restoration)
+**Revert commit:** `915c55f4`
 **Related:** `docs/issues/2026-10-26-plans-live-verification-column.md`
 **Historical live evidence:** 2026-10-27 · run hub-grafana-dashboards-sync-1e44141 · env hub/k3d-k3d-cluster/monitoring · scenario k3dm-bugs/plans-live-verification-column-and-width · commit 1e44141ed9059df92223c9e2aee926fc84b89ef6 · proves the prior dashboard version was provisioned; current state was later reverted
 

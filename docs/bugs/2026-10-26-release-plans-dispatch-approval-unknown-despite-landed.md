@@ -117,7 +117,7 @@ interface:
 
 ## Reversion — 2026-10-28
 
-The operator asked to restore the Plans table after finding the added lifecycle and verification fields confusing. The dashboard changes from this task were reverted: the synthetic `landed; documentation stale` Blocked by text, Dispatch approval rename/mapping, and related guide/test/changelog edits are removed. The single-column verification presentation is also restored to its pre-change form while the operator checks the design with Claude. The earlier implementation and verification evidence above are historical; they do not describe the current dashboard. No plan document Status, Approval, or Dispatch headers were changed.
+The operator asked to restore the Plans table after finding the added lifecycle and verification fields confusing. Commit `915c55f4` reverted the dashboard changes from this task: the synthetic `landed; documentation stale` Blocked by text, Dispatch approval rename/mapping, and related guide/test/changelog edits are removed. The single-column verification presentation is also restored to its pre-change form while the operator checks the design with Claude. The earlier implementation and verification evidence above are historical; they do not describe the current dashboard. No plan document Status, Approval, or Dispatch headers were changed.
 
 ## Follow-up diagnosis — stale execution statuses for three landed v1.43.9 plans
 
