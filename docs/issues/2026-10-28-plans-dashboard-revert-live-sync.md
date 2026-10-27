@@ -72,3 +72,20 @@ The short host alias was not configured; `m4-air.local` is the working SSH alias
 ## Recommended follow-up
 
 Refresh the Grafana browser page to see the restored table. No pod restart was needed. The operator and Claude still need to decide which verification columns and status wording the Plans table should use before either P3 dashboard enhancement is resumed.
+
+## Follow-up — Bug Tracking row still appeared Fixed in screenshot
+
+The operator supplied a screenshot where `2026-10-26-plans-table-live-verification-column` still showed `Fixed`, `fixed_in=v1.43.9`, fix commit `7ec87a73`, and verification evidence. Read-only inspection confirmed the M4 checkout's `origin/k3d-manager-v1.43.9` contains the bug doc with `Status: OPEN`. The live Pushgateway and Prometheus were then checked directly. Prometheus returned the bug as `open` both by bug label and using the dashboard's Auto/current-release join. Exact output:
+
+```text
+open	v1.43.9	-	-	-	-	1
+```
+
+The Pushgateway had a current `k3dm-bug-open` publication:
+
+```text
+push_time_seconds{instance="",job="k3dm-bug-open"} 1.7930642165555031e+09
+push_time_seconds{instance="lib-foundation",job="k3dm-bug-open"} 1.7930642245756197e+09
+```
+
+The live source of truth now says Open, with `fixed_in`, `fix_sha`, `verified`, and `live_verified` all absent (`-`). Therefore the screenshot is consistent with an older rendered panel result; browser refresh is still needed to confirm the UI catches up. If it continues to show Fixed after refresh, inspect the live panel query and variable values.

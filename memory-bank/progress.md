@@ -764,3 +764,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] M4 hard-refreshed `hub-grafana-dashboards`; ArgoCD reports `Synced`/`Healthy`/`Succeeded` at revision `8f4cea4bb5ac5f4e1b2f31df86a424fb91cfbb28` for both sources. Live ConfigMap panel 107 has one `Verified` column, the `Dispatch` label, and neither the synthetic stale-blocker string nor `live_verified` projection. Exact output and the recovered alias/jq command issues are in `docs/issues/2026-10-28-plans-dashboard-revert-live-sync.md`. No browser screenshot captured; refresh the Grafana page to see the restored table.
 - [x] `/tmp/k3dm-test-venv/bin/python -m pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q`: 108 passed; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats`: 38/38 passed; `git diff --check`, `_agent_lint`, and `_agent_audit` passed. PR URL: none.
 - Commits `915c55f4` (revert) and `8f4cea4b` (documentation closeout) pushed to `origin/k3d-manager-v1.43.9`. PR URL: none.
+
+### Bug Tracking row status after the revert
+
+- [x] Confirmed the M4 origin tracking ref has `Status: OPEN` for `2026-10-26-plans-table-live-verification-column`.
+- [x] Queried Pushgateway and Prometheus directly; Prometheus's current-release join returns `open`, `fixed_in=-`, `fix_sha=-`, `verified=-`, `live_verified=-`. The `k3dm-bug-open` Pushgateway publication timestamp is current.
+- [ ] The supplied Grafana screenshot still displayed the old Fixed row. Browser refresh is needed; if it persists, inspect dashboard variable values and live query. Exact output is in `docs/issues/2026-10-28-plans-dashboard-revert-live-sync.md`.
