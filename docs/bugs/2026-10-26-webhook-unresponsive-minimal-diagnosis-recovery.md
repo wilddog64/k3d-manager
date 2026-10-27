@@ -217,3 +217,10 @@ rotating the token. This resolves the operator auth_unavailable lookup
 symptom; it does not explain the historical offsite incident or implicate
 tmux. A final doctor check in the unlocked session is next. Full terminal
 evidence in docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
+
+Recurring Keychain locks are now handled explicitly by the doctor in
+1ff3b09b2bda92fc20125253f5c7b365db320e46: interaction-required classification,
+separate missing-credential state, safe action hint and no restart action
+for credential access failure alone.31 Python/5 BATS and staged gates passed.
+No automatic unlock or policy change. Historical incident status is unchanged.
+Full evidence: docs/issues/2026-10-27-webhook-doctor-keychain-aware-auth.md.
