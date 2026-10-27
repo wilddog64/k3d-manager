@@ -17,6 +17,8 @@
 
 ### Changed
 
+- Webhook doctor distinguishes Keychain interaction requirements from missing reader credentials, gives a safe next step and omits unwarranted restart actions.
+
 - Webhook doctor waits for a bounded command exit after its output closes, avoiding premature credential-lookup termination.
 
 - Correct webhook doctor and heartbeat default probes to port 7443; doctor honors the loaded LaunchAgent port without exposing its environment.

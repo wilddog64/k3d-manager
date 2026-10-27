@@ -39,7 +39,7 @@ class Response:
 
 def test_dry_run_has_plan_without_subprocess(monkeypatch):
     monkeypatch.setattr(doctor, "_run", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("subprocess")))
-    monkeypatch.setattr(doctor, "_keychain_reader_token", lambda: (_ for _ in ()).throw(AssertionError("secret read")))
+    monkeypatch.setattr(doctor, "_keychain_reader_credential", lambda: (_ for _ in ()).throw(AssertionError("secret read")))
     monkeypatch.setattr(doctor, "_log_facts", lambda *_a: (_ for _ in ()).throw(AssertionError("log access")))
     monkeypatch.setattr(doctor, "_health_probe", lambda *_a: (_ for _ in ()).throw(AssertionError("network")))
     monkeypatch.setattr(doctor.Path, "home", lambda: (_ for _ in ()).throw(AssertionError("home access")))
@@ -212,7 +212,7 @@ def test_diagnostic_command_and_listener_failures_are_not_missing_or_restart(mon
     monkeypatch.setattr(doctor, "_process_facts", lambda **_kwargs: {"status": "unavailable", "pids": []})
     monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "command_error", "listening": None})
     monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
-    monkeypatch.setattr(doctor, "_keychain_reader_token", lambda: None)
+    monkeypatch.setattr(doctor, "_keychain_reader_credential", lambda: (None, {"source": "keychain", "status": "missing"}))
     result = doctor.diagnose(check=True)
     assert result["classification"] == "launchd_permission_error"
     assert result["recovery_recommended"] is False
@@ -334,3 +334,99 @@ def test_command_with_closed_streams_still_obeys_deadline():
         "import os,time;os.close(1);os.close(2);time.sleep(5)"], timeout=0.1)
     assert result["timed_out"] is True
     assert result["returncode"] != 0
+
+
+def _stub_local_facts(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("K3DM_WEBHOOK_TOKEN_READER", raising=False)
+    monkeypatch.setattr(doctor, "_launchd_facts", lambda _uid: {"status": "loaded", "pid": 42, "port": 7443})
+    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": [42]})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_kwargs: {"status": "listening", "listening": True})
+    monkeypatch.setattr(doctor, "_log_facts", lambda _path: {})
+    monkeypatch.setattr(doctor, "_build_health_opener", lambda: (_ for _ in ()).throw(AssertionError("HTTP must not run")))
+
+
+def test_locked_keychain_reports_access_action_without_http_or_restart(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    calls = []
+    def lookup(argv):
+        calls.append(argv)
+        return {"returncode": 36, "stdout": "User interaction is not allowed. private-fixture-value",
+                "timed_out": False, "output_limited": False}
+    monkeypatch.setattr(doctor, "_run", lookup)
+    result = doctor.diagnose(check=True)
+    assert result["classification"] == "keychain_interaction_required"
+    assert result["credential"]["status"] == "interaction_required"
+    assert result["health"]["status"] == "auth_unavailable"
+    assert result["health"]["http_responsive"] is False
+    assert "security unlock-keychain" in result["credential_action"]
+    assert result["recovery_recommended"] is False
+    assert result["recovery_action"] is None
+    assert "private-fixture-value" not in json.dumps(result)
+    assert len(calls) == 1 and calls[0][1] == "find-generic-password"
+
+
+def test_missing_reader_is_distinct_from_keychain_access_block(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    monkeypatch.setattr(doctor, "_run", lambda _args: {"returncode": 44, "stdout": "item missing private-fixture-value"})
+    result = doctor.diagnose(check=True)
+    assert result["classification"] == "auth_unavailable"
+    assert result["credential"]["status"] == "missing"
+    assert "k3dm-webhook-token-reader" in result["credential_action"]
+    assert "unlock-keychain" not in result["credential_action"]
+    assert result["recovery_recommended"] is False
+    assert result["recovery_action"] is None
+    assert "private-fixture-value" not in json.dumps(result)
+
+
+def test_keychain_statuses_are_bounded_and_never_return_partial_credentials(monkeypatch):
+    cases = [
+        (None, "command_unavailable"),
+        ({"returncode": -15, "stdout": "private", "timed_out": True}, "command_timeout"),
+        ({"returncode": -15, "stdout": "private", "output_limited": True}, "command_output_limit"),
+        ({"returncode": 51, "stdout": "private"}, "lookup_failed"),
+        ({"returncode": 0, "stdout": ""}, "empty"),
+    ]
+    for command, expected in cases:
+        monkeypatch.setattr(doctor, "_run", lambda _args, command=command: command)
+        token, facts = doctor._keychain_reader_credential()
+        assert token is None
+        assert facts["status"] == expected
+        assert "private" not in json.dumps(facts)
+
+
+def test_reader_environment_bypasses_keychain_and_is_not_exposed(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "private-env-fixture")
+    monkeypatch.setattr(doctor, "_run", lambda *_args: (_ for _ in ()).throw(AssertionError("Keychain lookup")))
+    monkeypatch.setattr(doctor, "_health_probe", lambda token, **_kwargs: {"status": "healthy_http", "http_responsive": True, "all_ok": True})
+    result = doctor.diagnose(check=True)
+    assert result["credential"] == {"source": "environment", "status": "available"}
+    assert result["credential_action"] is None
+    assert result["classification"] == "local_http_healthy_external_delivery_unverified"
+    assert "private-env-fixture" not in json.dumps(result)
+
+
+def test_keychain_unlock_is_observed_on_next_check_without_cached_token(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    command = {"returncode": 36, "stdout": "User interaction is not allowed."}
+    calls = []
+    def lookup(argv):
+        calls.append(argv)
+        return command.copy()
+    def health(token, **_kwargs):
+        return {"status": "healthy_http" if token else "auth_unavailable",
+                "http_responsive": bool(token), "all_ok": True if token else None}
+    monkeypatch.setattr(doctor, "_run", lookup)
+    monkeypatch.setattr(doctor, "_health_probe", health)
+    locked = doctor.diagnose(check=True)
+    command.update(returncode=0, stdout="private-unlocked-fixture\n")
+    unlocked = doctor.diagnose(check=True)
+    assert locked["classification"] == "keychain_interaction_required"
+    assert unlocked["classification"] == "local_http_healthy_external_delivery_unverified"
+    assert unlocked["credential"]["status"] == "available"
+    assert unlocked["credential_action"] is None
+    assert not locked["recovery_recommended"] and not unlocked["recovery_recommended"]
+    assert locked["recovery_action"] is None and unlocked["recovery_action"] is None
+    assert len(calls) == 2 and all(argv[1] == "find-generic-password" for argv in calls)
+    assert "private-unlocked-fixture" not in json.dumps(unlocked)

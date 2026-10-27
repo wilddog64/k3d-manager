@@ -54,3 +54,26 @@ In an interactive local session, unlock your login Keychain using
 password only at the prompt, then rerun the doctor. Unlocking restores access
 to the existing credential; it does not require token rotation or a webhook
 restart. The 2026-10-27 operator verified lookup exit36 became0 after unlock.
+
+### Credential-access diagnostics
+
+Each check reports a bounded `credential` summary and a separate
+`credential_action`; neither includes the token or raw command/error output.
+When native Keychain lookup returns exit36, the classification is
+`keychain_interaction_required` with credential status `interaction_required`.
+The action explains that the login Keychain may be locked or this session
+cannot request access, and gives the interactive unlock command above. The
+status does not assert that every access restriction is a locked Keychain.
+
+A missing item (exit44) remains `auth_unavailable` with credential status
+`missing` and a reader-credential setup hint. Timeout, unavailable command,
+output limit, empty value and other lookup failures are separate bounded
+statuses. An existing environment reader token bypasses Keychain lookup.
+
+With no credential, authenticated HTTP is not probed: `health.status` stays
+`auth_unavailable`, not healthy or an HTTP outage. Credential failures alone
+do not recommend service recovery; `recovery_action` is null unless independent
+local evidence warrants recovery. The doctor never unlocks the Keychain,
+changes its lock settings, caches credentials or performs a restart. A new
+check retries the read and observes an operator unlock without a service
+restart.

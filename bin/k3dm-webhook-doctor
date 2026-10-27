@@ -232,42 +232,71 @@ def diagnose(check=False):
     listener = _listener_facts(port=port)
     log = _log_facts(home / "Library/Logs/k3dm-webhook.log")
     token = os.environ.get("K3DM_WEBHOOK_TOKEN_READER")
-    token = token or _keychain_reader_token()
+    credential = {"source": "environment", "status": "available"}
+    if not token:
+        token, credential = _keychain_reader_credential()
     probe = _health_probe(token, port=port)
-    classification = _classify(job, listener, probe)
+    classification = _classify(job, listener, probe, credential)
     reliable_unhealthy = job["status"] == "missing" or probe["status"] == "local_timeout"
     return {"timestamp_utc": now, "mode": "check", "launchd": job, "process": process, "listener": listener,
             "log": log, "health": probe, "classification": classification,
+            "credential": credential, "credential_action": _credential_action(credential),
             "recovery_recommended": reliable_unhealthy,
-            "recovery_action": "make restart-webhook (operator-controlled; restarts cloud-bridge too; at most once initially)"}
+            "recovery_action": ("make restart-webhook (operator-controlled; restarts cloud-bridge too; at most once initially)"
+                                if reliable_unhealthy else None)}
 
 
-def _classify(job, listener, probe):
+def _classify(job, listener, probe, credential=None):
     if job["status"] == "missing":
         return "launchd_job_missing"
     if job["status"] != "loaded":
         return f"launchd_{job['status']}"
-    if probe["status"] in ("auth_failed", "auth_unavailable", "http_error", "invalid_response"):
-        return probe["status"]
-    if probe["status"] == "local_timeout":
-        return "local_http_unresponsive"
-    if probe["status"] == "healthy_http":
-        return "local_http_healthy_external_delivery_unverified"
-    if probe["status"] == "healthy_http_services_degraded":
-        return "local_http_handler_responsive_dependencies_degraded"
-    if probe["status"] == "healthy_http_dependencies_unknown":
-        return "local_http_handler_responsive_dependencies_unknown"
-    if listener["status"] == "no_listener":
-        return "listener_missing"
-    return probe["status"]
+    if probe["status"] == "auth_unavailable" and (credential or {}).get("status") == "interaction_required":
+        return "keychain_interaction_required"
+    states = {
+        "auth_failed": "auth_failed", "auth_unavailable": "auth_unavailable",
+        "http_error": "http_error", "invalid_response": "invalid_response",
+        "local_timeout": "local_http_unresponsive",
+        "healthy_http": "local_http_healthy_external_delivery_unverified",
+        "healthy_http_services_degraded": "local_http_handler_responsive_dependencies_degraded",
+        "healthy_http_dependencies_unknown": "local_http_handler_responsive_dependencies_unknown",
+    }
+    return states.get(probe["status"], "listener_missing" if listener["status"] == "no_listener" else probe["status"])
+
+
+def _keychain_reader_credential():
+    result = _run(["security", "find-generic-password", "-s", "k3dm-webhook-token-reader", "-a", "k3dm", "-w"])
+    status = _command_status(result)
+    facts = {"source": "keychain", "status": status}
+    if status != "complete":
+        return None, facts
+    code = result.get("returncode")
+    facts["lookup_exit"] = code
+    if code != 0:
+        facts["status"] = {36: "interaction_required", 44: "missing"}.get(code, "lookup_failed")
+        return None, facts
+    value = result.get("stdout")
+    token = value.strip() if isinstance(value, str) else ""
+    facts["status"] = "available" if token else "empty"
+    return token or None, facts
 
 
 def _keychain_reader_token():
-    result = _run(["security", "find-generic-password", "-s", "k3dm-webhook-token-reader", "-a", "k3dm", "-w"])
-    if not isinstance(result, dict) or _command_status(result) != "complete" or result.get("returncode") != 0:
-        return None
-    token = result.get("stdout")
-    return token.strip() if isinstance(token, str) and token.strip() else None
+    return _keychain_reader_credential()[0]
+
+
+def _credential_action(credential):
+    actions = {
+        "available": None,
+        "interaction_required": (
+            "Login Keychain may be locked or this session cannot request access. "
+            "Unlock it interactively: security unlock-keychain ~/Library/Keychains/login.keychain-db; "
+            "then rerun this check. HTTP health was not tested."),
+        "missing": "Check the existing k3dm-webhook-token-reader credential (account k3dm); the Keychain lookup did not find it.",
+        "empty": "The reader credential is empty; check the existing reader credential setup.",
+        "command_timeout": "Reader credential lookup timed out; HTTP health was not tested.",
+    }
+    return actions.get(credential["status"], "Check reader credential access in this local session; HTTP health was not tested.")
 
 
 def main(argv=None):
