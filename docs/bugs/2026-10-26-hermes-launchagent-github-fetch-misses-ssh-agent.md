@@ -2,6 +2,7 @@
 
 **Status:** VERIFIED — offline fix landed in `3aae7adc`; LaunchAgent-context live verification pending
 **Priority:** P2
+**Fix commit:** `3aae7adc182094630ca4d93a9e439fd262ce5f65`
 **Date:** 2026-10-26
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** explicit 2026-10-26 (operator: “can you deep dive into it and file a bug if necessary”)

@@ -806,3 +806,13 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - [x] Detected dispatcher resume changing Luna to gpt-6.1-sol; stopped task descendants and resumed with explicit temporary gpt-6-luna wrapper. Correct model confirmed in resume-3 runtime log. No dispatcher code changed.
 - [ ] Review completed Luna replacement and its gates before any commit/landing. Model-preserving dispatcher resume needs a separately scoped follow-up.
 - Evidence: `docs/issues/2026-10-26-dispatch-closeout-review.md`; PR URL: none.
+
+## 2026-10-26 — Both dispatches landed and verified offline
+
+- [x] Hermes implementation `3aae7adc` landed/pushed; independent pass recorded in dispatch ledger. 369 Python, Ruff, 17 BATS; 3 pre-fix red cases.
+- [x] GPT-6-Luna completed resumed P3; coordinator replaced copied display logic in tests with actual Prometheus query evaluations (9 lifecycle cases × Auto/Manual, exact source-label preservation and repo/release filtering).
+- [x] P3 implementation `608b90a1` dispatcher-landed. Post-rebase: 111 pytest passed, Ruff passed, 38 BATS passed; both actual-query tests red on original query. In-scope five-file patch, staged audit/lint/diff/doc links passed.
+- [x] Canonical bugs marked VERIFIED offline; full results and partial-worker/environment/model-resume findings recorded in `docs/issues/2026-10-26-dispatch-closeout-review.md`.
+- [ ] Live checks remain: installed Hermes no-agent fetch/poll; approved Grafana rollout and E3 screenshot. No live deployment/restart performed.
+- [ ] Separately scope dispatcher explicit-model preservation on resume; temporary wrapper corrected this run without modifying dispatcher source.
+- PR URL: none.

@@ -1,7 +1,8 @@
 # Bug: Release plans confuses dispatch approval with task state and leaves landed execution stale
 
-**Status:** OPEN — scoped redispatch to GPT-6-Luna approved by operator; previous dashboard changes remain reverted until reviewed replacement lands
+**Status:** VERIFIED — replacement landed in `608b90a1`; live dashboard E3 remains pending
 **Priority:** P3
+**Fix commit:** `608b90a16a01c2009ce9da26646878bfffd6667c`
 **Severity:** low — misleading Release plans metadata; Codex dispatch/landing is not blocked by this display issue
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
 **Branch:** `k3d-manager-v1.43.9`
@@ -116,12 +117,12 @@ interface:
 
 ## Definition of Done
 
-- [ ] Producer/consumer semantics reviewed; exact implementation approach preserves historical compatibility.
-- [ ] E1/E2 offline tests green with fixture coverage; no live host side effects.
-- [ ] `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` and `pytest scripts/tests/bin/test_vectordb_bug_metrics.py` pass.
-- [ ] Grafana guide and CHANGELOG updated; scoped change reviewed.
+- [x] Producer/consumer semantics reviewed; raw exporter dispatch approval values are preserved. UI mapping handles missing approval.
+- [x] E1/E2 offline tests green, including actual Prometheus lifecycle fixtures; no live host side effects.
+- [x] Dashboard BATS 38/38 and focused pytest 111/111 pass, including both PromQL engine tests.
+- [x] Grafana guide and current-release CHANGELOG updated; five-file change independently reviewed.
 - [ ] Approved live dashboard verification captured and E3 recorded before LIVE-VERIFIED.
-- [ ] Implementation remains landed; current commit `78ffa7d5` was reverted by the operator-requested follow-up.
+- [x] Reviewed replacement `608b90a1` landed after the explicitly authorized GPT-6-Luna redispatch. The earlier `78ffa7d5` reversion remains historical.
 
 ## What NOT to Do
 
@@ -204,3 +205,34 @@ reverted dashboard changes, automatic approval inference, or edits to plan
 Status headers. Source-document reconciliation should be reviewed against each
 plan's accepted implementation and remaining verification evidence as a
 separate scoped action.
+
+## Replacement reviewed and landed
+
+The operator-authorized replacement was completed in the Luna task, independently
+reviewed, and landed through the dispatcher as `608b90a1`. It changes only five
+of the original six allowlisted files. The exporter remains unchanged: raw
+`unknown` approval is mapped to `not recorded` in Grafana, while the renamed
+Dispatch approval and existing Dispatch task retain distinct sources.
+
+Only a landed task with proposed/ready/in-progress source execution receives
+`landed; documentation stale` in Blocked by. The actual plan Execution, Verified,
+and approvals are preserved, as are blockers for non-landed tasks, no-ledger
+rows, Auto/Manual/repo filters, links, and the single Verified column. Fixed
+widths total 1,312 px against the 1,350 px budget. No separate Live verified
+column, plan-header edit, or runtime deployment is included.
+
+Coordinator replaced a test that copied display logic with actual Prometheus
+query evaluation. Nine lifecycle cases run in both Auto and Manual modes with
+exact expected labels and additional excluded repo/release inputs. Both engine
+tests fail on the original query and pass on the replacement. Post-rebase gates:
+111 Python tests passed, Ruff passed, dashboard BATS 38/38; staged audit/lint,
+diff checks, and doc links passed. Promtool 3.2.1 was installed only under /tmp
+and supplied with `PROMTOOL`; the two engine tests explicitly skip when promtool
+is unavailable, and neither was skipped in this verification.
+
+Full evidence, original partial-worker failures, and the corrected resume-model
+issue are recorded in `docs/issues/2026-10-26-dispatch-closeout-review.md`.
+The earlier OPEN/P3 findings describe the pre-replacement state. Current status
+is VERIFIED offline. E3 requires approved rollout and an operator screenshot
+showing Dispatch approval/task separation and stale-document blockers. No live
+refresh, dashboard sync, restart, or screenshot verification was performed here.
