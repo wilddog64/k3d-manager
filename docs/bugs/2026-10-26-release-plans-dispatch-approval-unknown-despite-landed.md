@@ -12,13 +12,13 @@
 
 ## Problem and verified code-level diagnosis
 
-On the v1.43.9 **Release plans** Grafana table, four `Dispatch task` rows show `landed`, one shows `awaiting_land`, yet **every row's `Dispatch` column reads `unknown`**. Several landed rows still show `Execution = proposed` or `ready`, with `Verified = n/a`. The operator reasonably reads `Dispatch unknown` as missing worker/ledger state or failed dispatch.
+The initial v1.43.9 **Release plans** screenshot showed four `Dispatch task` rows as `landed` and one as `awaiting_land`. The latest operator screenshot and M4 ledger recheck show **all five tasks landed**, yet **every row's `Dispatch` column reads `unknown`**. Execution is `proposed` for three plans, `ready` for OrbStack, and `implemented` for retrieval quality. The operator reasonably reads `Dispatch unknown` as missing worker/ledger state or failed dispatch.
 
 This is **not** a failed join and is not evidence of a Codex failure:
 
 - In `bin/k3dm-vectordb-metrics`, `_plan_dispatch(text)` reads **only** the plan's `**Dispatch:**` header and matches `go|needed|not required`; no recognizable header returns `unknown`.
 - The metric label is already correctly named `dispatch_approval`, but panel 107 renames that label to the ambiguous display name **`Dispatch`**.
-- `Dispatch task` is the separate `dispatch_state` joined from `k3dm_dispatch_plan_state` in the dispatch ledger. That field correctly yields `landed` and `awaiting_land`.
+- `Dispatch task` is the separate `dispatch_state` joined from `k3dm_dispatch_plan_state` in the dispatch ledger. That field correctly yields lifecycle states such as `landed` and `awaiting_land`; all five current rows are `landed`.
 - `Execution` and `Verified` are derived independently from the plan document's `**Status:**` line; a landed ledger event does not rewrite a status still beginning `PROPOSED` or `READY`.
 - The existing `Status lags dispatch` stat is intended to call out these mismatches, but the table does not plainly explain the two axes and makes `unknown` seem like a task result.
 - The dashboard's `Blocked by` column can continue to say `dispatch approval unknown` on a **landed** task because blockers are calculated from stale plan execution plus missing `**Dispatch:**` header.
@@ -111,7 +111,7 @@ interface:
 ## Offline implementation record — 2026-10-27
 
 - Commit `78ffa7d5` landed via `bin/k3dm-codex-dispatch land` and was pushed to `origin/k3d-manager-v1.43.9`.
-- The Plans panel now names `Dispatch approval` separately from ledger-derived `Dispatch task`, maps missing approval to `not recorded`, and reports landed tasks with stale plan execution as `landed; documentation stale` in Blocked by. The source Status/verification values remain unchanged.
+- At that revision, the Plans panel named `Dispatch approval` separately from ledger-derived `Dispatch task`, mapped missing approval to `not recorded`, and reported landed tasks with stale plan execution as `landed; documentation stale` in Blocked by. Those presentation changes were subsequently reverted as recorded below. The source Status/verification values remained unchanged.
 - Verification after rebase: `pytest scripts/tests/bin/test_vectordb_bug_metrics.py -q` — 108 passed; `bats scripts/tests/plugins/grafana_dashboard_bugs.bats` — 38/38 passed; Python compilation and `git diff --check` passed; `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` passed.
 - E3 remains pending a dashboard sync/metrics refresh and operator screenshot; no live service was changed by this task.
 
@@ -136,3 +136,50 @@ M4's dispatch ledger has `start` and `land` events for each slug. The implementa
 The retrieval-quality plan is the contrasting case: a separate documentation follow-up, commit `f5c1a745`, changed its Status to `LANDED`, checked off its DoD, and recorded verification. No equivalent post-land documentation commit was made for these three plans. This is a missing post-land status reconciliation, not an intentional dashboard distinction and not evidence that the implementations failed to land.
 
 No plan Status headers were changed during this investigation; the operator is confirming with Claude whether to reconcile them.
+
+## Latest screenshot and five-task reconciliation
+
+At the operator's request, the follow-up investigation in `48db4ad7` reproduced
+the latest screenshot using the current parser functions, all five plan files,
+and M4's local dispatch ledger. Full terminal evidence and the 38/38 dashboard
+BATS result are in
+[`2026-10-26-plans-execution-versus-dispatch-task.md`](../issues/2026-10-26-plans-execution-versus-dispatch-task.md).
+
+| Plan | Source Status keyword | Execution | Dispatch header / display | Dispatch task |
+|---|---|---|---|---|
+| VectorDB drift kinds and age | PROPOSED | proposed | missing / unknown | landed |
+| VectorDB retrieval quality | LANDED | implemented | missing / unknown | landed |
+| CNI IPAM reclaim visibility | PROPOSED | proposed | missing / unknown | landed |
+| Dispatch spec and change complexity | PROPOSED | proposed | missing / unknown | landed |
+| Coordinated OrbStack upgrade | READY | ready | missing / unknown | landed |
+
+This expands the earlier three-plan finding to **four stale Status headers**,
+including OrbStack. Its ledger records implementation commit `2a729c11`; code
+landing does not establish that the operator-run hub upgrade has occurred. All
+five tasks have a land event with `test_result=passed`, and the ledger has zero
+malformed lines. Those are landing-test results, not live acceptance evidence.
+
+The column distinction is:
+
+- **Execution:** normalized leading keyword of the plan's `**Status:**` header.
+- **Dispatch:** approval metadata from a dedicated `**Dispatch:**` header beginning
+  `go`, `needed`, or `not required`. All five headers are absent. Approval or
+  dispatch instructions elsewhere in the prose do not populate this field;
+  `unknown` means the structured metadata is missing, not that permission was
+  necessarily absent. **Spec approval** independently reads `**Approval:**`.
+- **Dispatch task:** lifecycle outcome from the ledger, joined on plan. Landing
+  does not rewrite Status or approval headers.
+
+Retrieval's `LANDED — offline VERIFIED ...` Status maps to Execution `implemented`
+but Verified `unknown`, because `_plan_state` uses the leading keyword. That
+explains the additional verification discrepancy without claiming that its
+recorded offline evidence is absent.
+
+The source metadata and ledger currently disagree; refreshing the browser alone
+cannot reconcile them. The bug remains **OPEN / P3**. The previous presentation
+fix remains reverted pending operator/Claude design agreement. This update
+records findings only: it does not authorize redispatch, restoration of the
+reverted dashboard changes, automatic approval inference, or edits to plan
+Status headers. Source-document reconciliation should be reviewed against each
+plan's accepted implementation and remaining verification evidence as a
+separate scoped action.
