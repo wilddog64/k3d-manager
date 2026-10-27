@@ -2,6 +2,8 @@
 
 bats_require_minimum_version 1.5.0
 
+TEST_SYSTEM_CURL_BIN="$(command -v curl 2>/dev/null || true)"
+
 setup() {
   export TEST_BIN_DIR="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${TEST_BIN_DIR}" "${BATS_TEST_TMPDIR}/scripts"
@@ -9,10 +11,16 @@ setup() {
 
   export TRIVY_LOG="${BATS_TEST_TMPDIR}/trivy.log"
   export WGET_LOG="${BATS_TEST_TMPDIR}/wget.log"
+  export CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+  export METRIC_LOG="${BATS_TEST_TMPDIR}/metrics.log"
+  export METRIC_STATE="${BATS_TEST_TMPDIR}/metric-state.log"
   export NOTIFY_LOG="${BATS_TEST_TMPDIR}/notify.log"
   export KUBECTL_LOG="${BATS_TEST_TMPDIR}/kubectl.log"
   : >"${TRIVY_LOG}"
   : >"${WGET_LOG}"
+  : >"${CURL_LOG}"
+  : >"${METRIC_LOG}"
+  : >"${METRIC_STATE}"
   : >"${NOTIFY_LOG}"
   : >"${KUBECTL_LOG}"
 
@@ -127,10 +135,10 @@ case "${_url}" in
     esac
     case "${_url}" in
       *"/manifests/latest")
-        _digest="${TEST_LATEST_DIGEST:-sha256:testdigest}"
+        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"
         ;;
       *"/manifests/${TEST_SHA_TAG:-sha-new}")
-        _digest="${TEST_LATEST_DIGEST:-sha256:testdigest}"
+        _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"
         ;;
       *)
         _digest="sha256:olderdigest"
@@ -153,6 +161,73 @@ esac
 exit 1
 EOF
   chmod +x "${TEST_BIN_DIR}/wget"
+
+  cat >"${TEST_BIN_DIR}/curl" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"${CURL_LOG:-/dev/null}"
+_config=""
+_post_file=""
+_arg_url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --config) shift; _config="$1" ;;
+    --data-binary) shift; _post_file="${1#@}" ;;
+    --connect-timeout|--max-time) shift ;;
+    http*) _arg_url="$1" ;;
+  esac
+  shift
+done
+_url="$(sed -n 's/^url = "\(.*\)"$/\1/p' "${_config}" 2>/dev/null | head -n1)"
+[ -n "${_url}" ] || _url="${_arg_url}"
+_body="$(sed -n 's/^output = "\(.*\)"$/\1/p' "${_config}" 2>/dev/null | head -n1)"
+_headers="$(sed -n 's/^dump-header = "\(.*\)"$/\1/p' "${_config}" 2>/dev/null | head -n1)"
+if [ -n "${_url}" ]; then printf '%s\n' "${_url}" >>"${CURL_LOG:-/dev/null}"; fi
+case "${_url}" in
+  */metrics/job/*)
+    _payload="$(cat "${_post_file}")"
+    _metric_line="$(printf '%s\n' "${_payload}" | sed -n '/^k3dm_app_cve_candidate_resolution{/p')"
+    printf '%s|%s\n' "${_url}" "${_metric_line}" >>"${METRIC_LOG:-/dev/null}"
+    _state_tmp="${METRIC_STATE:-/dev/null}.tmp"
+    if [ -f "${METRIC_STATE:-}" ]; then awk -F'|' -v url="${_url}" '$1 != url' "${METRIC_STATE}" >"${_state_tmp}"; else : >"${_state_tmp}"; fi
+    printf '%s|%s\n' "${_url}" "${_metric_line}" >>"${_state_tmp}"
+    mv "${_state_tmp}" "${METRIC_STATE}"
+    printf 202
+    ;;
+  https://ghcr.io/token*)
+    if [ "${TEST_TOKEN_EMPTY:-0}" = 1 ]; then : >"${_body}"; printf 401
+    else printf '{"token":"registry-token"}' >"${_body}"; printf 200; fi
+    ;;
+  https://ghcr.io/v2/*/tags/list)
+    if [ "${TEST_TAGS_401:-0}" = 1 ]; then printf 401
+    elif [ "${TEST_TAGS_503:-0}" = 1 ]; then printf 503
+    elif [ "${TEST_NO_CANDIDATE:-0}" = 1 ]; then printf '{"name":"repo","tags":["latest"]}' >"${_body}"; printf 200
+    else printf '{"name":"repo","tags":["latest","%s","sha-old"]}' "${TEST_SHA_TAG:-sha-new}" >"${_body}"; printf 200; fi
+    ;;
+  https://ghcr.io/v2/*/manifests/*)
+    _tag="${_url##*/}"
+    if [ "${TEST_MANIFEST_401:-0}" = 1 ]; then printf 401
+    elif [ "${TEST_MANIFEST_404_WITH_DIGEST:-0}" = 1 ] && [ "${_tag}" = latest ]; then
+      printf 'HTTP/1.1 404 Not Found\r\nDocker-Content-Digest: sha256:deadbeef\r\n\r\n' >"${_headers}"
+      printf 404
+    elif [ "${TEST_NO_LATEST_DIGEST:-0}" = 1 ] && [ "${_tag}" = latest ]; then printf 404
+    else
+      if [ "${_tag}" = latest ] || [ "${_tag}" = "${TEST_SHA_TAG:-sha-new}" ]; then _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"; else _digest=sha256:abad1dea; fi
+      printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n\r\n' "${_digest}" >"${_headers}"
+      printf 200
+    fi
+    ;;
+  https://api.github.com/repos/*/actions/workflows/*/dispatches)
+    grep -q '^request = "POST"$' "${_config}" || exit 1
+    grep -q '^header = "Authorization: Bearer ' "${_config}" || exit 1
+    printf 204
+    ;;
+  *)
+    if [ -n "${_post_file}" ] && [ -f "${_post_file}" ]; then cat "${_post_file}" >>"${CURL_LOG:-/dev/null}"; fi
+    printf 200
+    ;;
+esac
+EOF
+  chmod +x "${TEST_BIN_DIR}/curl"
 
   cat >"${TEST_BIN_DIR}/kubectl" <<'EOF'
 #!/bin/sh
@@ -251,7 +326,7 @@ EOF
   export TEST_SECRET_CONFIG_B64
   TEST_SECRET_CONFIG_B64="$(printf '%s' '{"bearerToken":"remote-token","tlsClientConfig":{"insecure":true}}' | base64)"
 
-  export SCAN_SCRIPT="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan.sh"
+  export SCAN_SCRIPT="${SCAN_SCRIPT:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan.sh}"
   export TEST_SCAN_SCRIPT="${BATS_TEST_TMPDIR}/app-cve-scan.sh"
   sed "s|/scripts/notify.sh|${BATS_TEST_TMPDIR}/scripts/notify.sh|g" "${SCAN_SCRIPT}" >"${TEST_SCAN_SCRIPT}"
   chmod +x "${TEST_SCAN_SCRIPT}"
@@ -265,6 +340,7 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -291,6 +367,7 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -305,7 +382,8 @@ EOF
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
+  grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${CURL_LOG}"
+  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}${WGET_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
 }
@@ -315,6 +393,7 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -331,7 +410,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"within cooldown"* ]]
-  run grep -c 'dispatches' "${WGET_LOG}"
+  run grep -c 'dispatches' "${CURL_LOG}"
   [ "${output}" = "0" ]
   run grep -c 'App CVE: shopping-cart-order' "${NOTIFY_LOG}"
   [ "${output}" = "0" ]
@@ -342,6 +421,7 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -358,7 +438,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" != *"within cooldown"* ]]
-  run grep -c 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
+  run grep -c 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${CURL_LOG}"
   [ "${output}" -ge 1 ]
   run grep -c 'patch configmap app-cve-scan-rebuild-state' "${KUBECTL_LOG}"
   [ "${output}" -ge 1 ]
@@ -637,6 +717,7 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -648,7 +729,7 @@ EOF
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment — promotion skipped"* ]]
+  [[ "${output}" == *"failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment; reason=no-match — promotion skipped"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-payment|' "${NOTIFY_LOG}"
   run ! grep -q 'actions/workflows' "${WGET_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
@@ -749,17 +830,217 @@ EOF
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
     WGET_LOG="${WGET_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
     TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
     APP_SERVICES="${APP_SERVICES}" \
+    TEST_NO_CANDIDATE=1 \
     TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
     TEST_REPORT_DETAILS_product_catalog_report="${TEST_REPORT_DETAILS_product_catalog_report}" \
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"failed to resolve immutable sha-* candidate"* ]]
+  [[ "${output}" == *"reason=no-match"* ]]
   grep -q 'warning|App CVE Candidate Missing: shopping-cart-product-catalog|' "${NOTIFY_LOG}"
   run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-product-catalog' "${KUBECTL_LOG}"
+}
+
+@test "GHCR credential failure is classified and reported without exposing the token" {
+  export APP_SERVICES="shopping-cart-payment"
+  export GH_TOKEN="sentinel-ghcr-secret-value"
+  export TEST_TOKEN_EMPTY=1
+  if [ "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL+x}" != x ]; then
+    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://pushgateway.test/metrics/job/test"
+  fi
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=auth"* ]]
+  grep -q 'platform-ops-app-rebuild' "${NOTIFY_LOG}"
+  grep -q 'read:packages' "${NOTIFY_LOG}"
+  grep -q 'reason=auth' "${NOTIFY_LOG}"
+  if [ -n "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL:-}" ]; then
+    grep -q 'k3dm_app_cve_candidate_resolution{service="shopping-cart-payment",reason="auth"} 1' "${METRIC_LOG}"
+  fi
+  ! grep -qF "${GH_TOKEN}" <<<"${output}$(cat "${NOTIFY_LOG}")$(cat "${CURL_LOG}")"
+  ! grep -qF "${GH_TOKEN}" "${WGET_LOG}"
+  run ! grep -q 'patch application ubuntu-hostinger-shopping-cart-payment' "${KUBECTL_LOG}"
+}
+
+@test "latest without a digest is classified no-latest" {
+  export APP_SERVICES="shopping-cart-payment"
+  export TEST_NO_LATEST_DIGEST=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=no-latest"* ]]
+}
+
+@test "unavailable tags endpoint is not classified as a genuine no-match" {
+  export APP_SERVICES="shopping-cart-payment"
+  export TEST_TAGS_503=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=no-latest"* ]]
+  [[ "${output}" != *"reason=no-match"* ]]
+}
+
+@test "manifest 404 is rejected even when it includes a digest header" {
+  export APP_SERVICES="shopping-cart-payment"
+  export TEST_MANIFEST_404_WITH_DIGEST=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=no-latest"* ]]
+  [[ "${output}" != *"immutable candidate ghcr.io/wilddog64/shopping-cart-payment:sha-new"* ]]
+}
+
+@test "manifest 401 with GH_TOKEN is classified auth instead of no-match" {
+  export APP_SERVICES="shopping-cart-payment"
+  export GH_TOKEN="sentinel-manifest-auth"
+  export TEST_MANIFEST_401=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=auth"* ]]
+  grep -q 'read:packages' "${NOTIFY_LOG}"
+  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+}
+
+@test "tags list 401 with GH_TOKEN is classified auth instead of no-match" {
+  export APP_SERVICES="shopping-cart-payment"
+  export GH_TOKEN="sentinel-tags-auth"
+  export TEST_TAGS_401=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"reason=auth"* ]]
+  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+}
+
+@test "registry transport keeps credentials in a private curl config and scanner image contract is pinned" {
+  export GH_TOKEN="sentinel-ghcr-secret-value"
+  _resolved="$(awk '/^# === MAIN ===/ { exit } { print }' "${TEST_SCAN_SCRIPT}")"
+  [[ "${_resolved}" == *'"${_CURL_BIN}" --connect-timeout 5 --max-time 30 --config "${_config}"'* ]]
+  ! [[ "${_resolved}" == *'wget'* ]]
+  grep -q 'chmod 600 "${_config}"' <<<"${_resolved}"
+  grep -q -- '--connect-timeout 5 --max-time 30' <<<"${_resolved}"
+  grep -q -- '--connect-timeout 5 --max-time 15' <<<"${_resolved}"
+  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}"
+  grep -q 'image: docker.io/alpine/k8s:1.31.4' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'mountPath: /tools' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'cp /usr/local/bin/trivy /tools/trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'PATH' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'runAsUser: 65534' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -q 'fsGroup: 65534' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  grep -A6 'name: install-trivy' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml" | grep -q 'runAsNonRoot: true'
+}
+
+@test "candidate metric groups preserve two services and replace auth with ok per service" {
+  export APP_SERVICES="shopping-cart-payment shopping-cart-product-catalog"
+  export GH_TOKEN="sentinel-metric-secret"
+  export TEST_TOKEN_EMPTY=1
+  if [ "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL+x}" != x ]; then
+    export K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL="http://pushgateway.test/metrics/job/k3dm-app-cve-scan"
+  fi
+  [ -n "${K3DM_APP_CVE_SCAN_PUSHGATEWAY_URL:-}" ] || skip "task Pushgateway URL is empty"
+  export TEST_REPORT_ROWS=$'shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0\nshopping-cart-apps product-catalog-report ghcr.io/wilddog64/shopping-cart-product-catalog sha-old 1 0'
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+  export TEST_REPORT_DETAILS_product_catalog_report="CRITICAL|CVE-2|2.0.0"
+
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l <"${METRIC_STATE}" | tr -d ' ')" -eq 2 ]
+  grep -q '/instance/shopping-cart-payment|k3dm_app_cve_candidate_resolution{service="shopping-cart-payment",reason="auth"} 1' "${METRIC_STATE}"
+  grep -q '/instance/shopping-cart-product-catalog|k3dm_app_cve_candidate_resolution{service="shopping-cart-product-catalog",reason="auth"} 1' "${METRIC_STATE}"
+
+  unset TEST_TOKEN_EMPTY
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l <"${METRIC_STATE}" | tr -d ' ')" -eq 2 ]
+  [ "$(grep -c 'reason="ok"' "${METRIC_STATE}")" -eq 2 ]
+  ! grep -q 'reason="auth"' "${METRIC_STATE}"
+  [ "$(wc -l <"${METRIC_LOG}" | tr -d ' ')" -eq 4 ]
+
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  run /bin/sh "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [ "$(wc -l <"${METRIC_STATE}" | tr -d ' ')" -eq 2 ]
+  grep -q '/instance/shopping-cart-product-catalog|k3dm_app_cve_candidate_resolution{service="shopping-cart-product-catalog",reason="ok"} 1' "${METRIC_STATE}"
+  [ "$(grep -c '/instance/shopping-cart-product-catalog' "${METRIC_LOG}")" -eq 2 ]
+  [ "$(wc -l <"${METRIC_LOG}" | tr -d ' ')" -eq 5 ]
+  ! grep -qF "${GH_TOKEN}" "${CURL_LOG}${METRIC_LOG}${METRIC_STATE}"
+}
+
+@test "real curl HEAD returns only the status and writes digest headers separately" {
+  [ -n "${TEST_SYSTEM_CURL_BIN}" ] || skip "curl binary unavailable"
+  command -v python3 >/dev/null 2>&1 || skip "python3 unavailable for loopback HTTP fixture"
+  _fixture="${BATS_TEST_TMPDIR}/head-fixture.py"
+  _port_file="${BATS_TEST_TMPDIR}/head-fixture.port"
+  _headers_file="${BATS_TEST_TMPDIR}/head-fixture.headers"
+  cat >"${_fixture}" <<'PY'
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import sys
+
+class Handler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Docker-Content-Digest", "sha256:deadbeef")
+        self.end_headers()
+
+    def log_message(self, *_args):
+        pass
+
+try:
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+except OSError as exc:
+    print(f"BIND_UNAVAILABLE:{exc}", flush=True)
+    sys.exit(77)
+print(server.server_port, flush=True)
+server.timeout = 5
+server.handle_request()
+server.server_close()
+PY
+  python3 "${_fixture}" >"${_port_file}" 2>"${BATS_TEST_TMPDIR}/head-fixture.err" &
+  _server_pid=$!
+  for _attempt in $(seq 1 50); do
+    [ -s "${_port_file}" ] && break
+    sleep 0.1
+  done
+  if [ ! -s "${_port_file}" ]; then
+    wait "${_server_pid}" || true
+    fail "loopback fixture did not start: $(cat "${BATS_TEST_TMPDIR}/head-fixture.err")"
+  fi
+  _port="$(cat "${_port_file}")"
+  case "${_port}" in
+    BIND_UNAVAILABLE:*) wait "${_server_pid}" || true; skip "sandbox cannot bind loopback: ${_port#BIND_UNAVAILABLE:}" ;;
+  esac
+
+  run /bin/sh -c '
+    _functions="$(mktemp)"
+    awk "/^# === MAIN ===/ { exit } { print }" "$1" >"${_functions}"
+    . "${_functions}"
+    _CURL_BIN="$2"
+    _ghcr_request "$3" "" "$4" head ""
+    _rc=$?
+    rm -f "${_functions}"
+    exit "${_rc}"
+  ' _ "${SCAN_SCRIPT}" "${TEST_SYSTEM_CURL_BIN}" "http://127.0.0.1:${_port}/manifest" "${_headers_file}"
+  wait "${_server_pid}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "200" ]
+  grep -q '^Docker-Content-Digest: sha256:deadbeef' "${_headers_file}"
 }

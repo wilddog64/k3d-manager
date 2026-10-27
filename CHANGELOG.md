@@ -4,6 +4,7 @@
 
 ### Added
 
+- App CVE candidate resolution reports GHCR authentication failures separately, publishes bounded resolution metrics, and keeps registry credentials out of curl arguments.
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
 - Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.
 
