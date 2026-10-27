@@ -177,3 +177,38 @@ def test_probe_failure_preserves_index_refresh_result(monkeypatch, capsys, chang
     assert "vectordb retrieval probe skipped: offline" in capsys.readouterr().err
     module._refresh_index(state, now=100001)
     assert calls == ["origin/test"]
+
+
+@pytest.mark.parametrize(("platform", "override", "expected"), [
+    ("darwin", None, "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes"),
+    ("darwin", "ssh -F /tmp/custom-ssh-config", "ssh -F /tmp/custom-ssh-config"),
+    ("linux", None, None),
+])
+def test_index_fetch_uses_macos_keychain_without_overriding_caller(
+        monkeypatch, capsys, platform, override, expected):
+    import subprocess
+
+    spec = importlib.util.spec_from_loader(
+        "hermes_fetch_ssh", SourceFileLoader("hermes_fetch_ssh", str(ROOT / "bin/k3dm-hermes")))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "_index_ref", lambda: ("origin/test", "test"))
+    monkeypatch.setattr(module, "_push_index_metrics", lambda _metrics: None)
+    monkeypatch.setattr(module.sys, "platform", platform)
+    monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
+    if override is None:
+        monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    else:
+        monkeypatch.setenv("GIT_SSH_COMMAND", override)
+    captured = {}
+
+    def run(argv, **kwargs):
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(argv, 128, "", "Permission denied (publickey).")
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    assert module._refresh_index({}) is None
+    assert captured["env"].get("GIT_SSH_COMMAND") == expected
+    assert "SSH_AUTH_SOCK" not in captured["env"]
+    assert capsys.readouterr().err.splitlines() == [
+        "vectordb index refresh skipped: git fetch failed: Permission denied (publickey)."]

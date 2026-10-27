@@ -430,6 +430,24 @@ agent reads credentials from the Keychain at runtime. Polling is jittered: with 
 set (the template sets it), `bin/k3dm-hermes` sleeps a random 0–30s before sensing so runs do not
 align to a hard boundary.
 
+On macOS, Hermes' tracked-branch fetch uses `/usr/bin/ssh` with `BatchMode=yes`, an 8-second
+connection timeout, and `UseKeychain=yes` when `GIT_SSH_COMMAND` is not already set. An explicit
+caller setting is preserved. This lets the LaunchAgent use the login Keychain without relying on
+the interactive shell's `SSH_AUTH_SOCK`; Hermes does not place credentials in its plist or fetch
+diagnostics. Other platforms do not receive macOS-specific SSH options. Fetch failures remain
+advisory to the poll cycle and are reported as a concise diagnostic.
+
+After installing or changing the agent, verify GitHub read access with the same noninteractive
+Keychain SSH options while omitting only the interactive agent socket:
+
+```bash
+env -u SSH_AUTH_SOCK GIT_SSH_COMMAND='/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes' \
+    git ls-remote --heads origin refs/heads/k3d-manager-v1.43.9
+```
+
+Run this from the repository checkout with its normal LaunchAgent user account and unlocked login
+Keychain. A successful result prints the branch ref and its commit; it never prints credential data.
+
 ---
 
 ## Configuration

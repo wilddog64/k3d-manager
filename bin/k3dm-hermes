@@ -614,8 +614,13 @@ def _refresh_index(state, now=None):
     try:
         ref, branch = _index_ref()
         state["index_ref"] = ref
+        fetch_env = os.environ.copy()
+        if sys.platform == "darwin" and "GIT_SSH_COMMAND" not in fetch_env:
+            fetch_env["GIT_SSH_COMMAND"] = (
+                "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
         fetched = subprocess.run(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT,
-                                 capture_output=True, text=True, timeout=60, check=False)
+                                 capture_output=True, text=True, timeout=60, check=False,
+                                 env=fetch_env)
         if fetched.returncode != 0:
             raise RuntimeError(f"git fetch failed: {(fetched.stderr or '').strip()}")
         paused_until = float(state.get("index_paused_until", 0) or 0)
