@@ -1,6 +1,7 @@
 # Enhancement: capture Codex as primary coordinator and attribute coordinator handoffs
 
-**Status:** OPEN — proposed P3 telemetry enhancement; not implemented or live-verified
+**Status:** VERIFIED — independent offline gates and dispatcher landing passed; operator E3 pending
+**Fix commit:** `9424c32a9f0032797c7c803a9a7fc3d1d1651ab5`
 **Priority:** P3
 **Severity:** low — coordinator identity is incomplete or unknown in the Per spec table; worker and landing metrics remain intact
 **Release:** v1.43.9 (bug/enhancement; does not count toward the five-plan cap)
@@ -164,3 +165,18 @@ No other scope is expanded. Initial review found hidden numeric Handoffs/Primary
 cost columns, possible duplicate normalized worker-history series and missing
 pre-commit validation of landing metadata; Luna is correcting these before
 acceptance. No live task identities were fabricated or changed.
+
+## Independent acceptance — 2026-10-27
+
+Final correction passed independent136 metrics pytest, new CLI fixtures and
+landing/dashboard regressions. The dispatcher then reran136 pytest and all124
+BATS (88 dispatch,9 land-pending,27 dashboard), ShellCheck, Ruff and diff check
+after rebase. Staged lint/audit and normal hooks passed. The sole documented
+scope exception was the dashboard regression suite. CHANGELOG-only conflict
+was resolved retaining both additions on the isolated task branch.
+
+Handoffs/primary cost are visible; missing cost is explicitly not measured,
+normalized model history has no duplicate series, and invalid landing metadata
+is rejected before commits. Legacy primary/acting/landing remains unknown.
+No production ledger identities or live services were changed. E3 remains
+pending; full output is in docs/issues/2026-10-27-six-bug-luna-batch.md.

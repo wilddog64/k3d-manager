@@ -438,3 +438,235 @@ warning-level gate `shellcheck -S warning scripts/tests/bin/heartbeat.bats
 scripts/tests/plugins/app_cve_scan.bats` passed with no output (exit0).
 Production scanner ShellCheck remains clean at default severity. These
 BATS info findings do not indicate shared variable changes across test cases.
+
+## Completed broad regression run (before final coordinator landing)
+
+`./scripts/k3d-manager test all`: **1895 total; 1869 passed, 19 skipped,
+7 failed**. TAP reports 1888 ok including skips. It is not a green gate.
+[Full verbatim output](../assets/2026-10-27-six-bug-curated-tests.txt).
+
+All failure output:
+
+```text
+not ok 63 no bare '! cmd' assertions in BATS suites (set -e ignores them)
+# (in test file scripts/tests/lib/bats_negation_lint.bats, line 6)
+#   `[ "$status" -ne 0 ]' failed
+not ok 130 grep-q guard: no non-allowlisted pipeline retains -q
+# (in test file scripts/tests/lib/grep_q_pipe_guard.bats, line 13)
+#   `[ "$status" -eq 1 ]' failed
+not ok 470 smoke test ESO wiring samples app and hub through helper
+# (in test file scripts/tests/lib/webhook_hub_eso.bats, line 155)
+#   `[ "$status" -eq 0 ]' failed
+not ok 1261 recover B4-20: refused preflight prevents hub-recover
+# (in test file scripts/tests/plugins/hub_data.bats, line 929)
+#   `cp -R "$PWD" "$copy"' failed
+# cp: cannot create special file '/tmp/bats-run-SPTKOs/test/1261/root/repo/-e': Operation not permitted
+not ok 1272 recover B4-21: teardown precedes rebuild and resume
+# (in test file scripts/tests/plugins/hub_data.bats, line 1070)
+#   `chmod +x "$script" "$fake_make"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"' failed
+# cp: cannot create special file '/tmp/bats-run-SPTKOs/test/1272/root/repo/-e': Operation not permitted
+not ok 1274 recover B4-22: teardown failure prevents rebuild and resume
+# (in test file scripts/tests/plugins/hub_data.bats, line 1095)
+#   `chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"' failed
+# cp: cannot create special file '/tmp/bats-run-SPTKOs/test/1274/root/repo/-e': Operation not permitted
+not ok 1275 recover B4-23: keychain preflight refusal stops hub-recover-all before teardown
+# (in test file scripts/tests/plugins/hub_data.bats, line 1113)
+#   `chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"' failed
+# cp: cannot create special file '/tmp/bats-run-SPTKOs/test/1275/root/repo/-e': Operation not permitted
+```
+
+The batch's bare-negation defect was corrected and the affected suites plus
+negation guard subsequently passed 29/29 (output above). The remaining six
+failures are unchanged out-of-scope issues: OrbStack pipeline guard, one
+Python3.15 ESO loader test, and four recursive-copy fixtures encountering the
+operator's pre-existing Unix socket ./-e. Separate issue docs retain the cause
+and recommendation. No socket was deleted or unrelated implementation changed.
+
+The run also emitted BW02 for existing e2e_sandbox_preflight.bats line372
+missing bats_require_minimum_version before run flags; full warning and all19
+skips are retained in the full output. No live tests were substituted for
+skipped/offline fixtures. Do not infer a clean whole-repository test gate
+from the green scoped implementation checks.
+
+## Final coordinator acceptance and batch implementation closeout
+
+Coordinator landed `9424c32a9f0032797c7c803a9a7fc3d1d1651ab5` through dispatcher, after independent review and
+full post-rebase gates. The only snapshot scope exception was
+`scripts/tests/plugins/agent_dispatch_dashboard.bats`, explicitly documented
+in the canonical bug before landing. All13 changed files were reviewed.
+Luna corrections covered visible numeric columns, missing-vs-zero cost,
+normalized metric deduplication, metadata validation before task side effects,
+repeated handoffs, human landing, provenance and review-pending fixtures.
+Staged audit/lint passed; legitimate assertion replacements for normalized
+models/new columns were reported under the existing assertion-replacement
+marker; no hook bypass. New helpers remained within the audit threshold.
+
+The first coordinator landing encountered a CHANGELOG-only rebase conflict:
+
+```text
+error: could not apply 520d5604... checkpoint: before reviewed-primary-coordinator-handoffs
+[codex-dispatch] ERROR: rebase of task/v1.43.9/primary-coordinator-handoffs-luna onto k3d-manager-v1.43.9 failed; resolve it in /Users/cliang/.local/share/k3d-manager/worktrees/v1.43.9/primary-coordinator-handoffs-luna
+```
+
+Resolved on its isolated branch by retaining both independent additions, then
+reran dispatcher land successfully. No shared branch rewrite.
+
+### Actual full post-rebase coordinator gate output
+
+```text
+........................................................................ [ 52%]
+................................................................         [100%]
+136 passed in 12.50s
+1..124
+ok 1 codex dispatch: explicit primary, handoff, and landing actor are separate ledger facts
+ok 2 codex dispatch: omitted primary stays unknown and invalid handoff reason is rejected
+ok 3 codex dispatch: primary identity retains runtime-reported provenance
+ok 4 codex dispatch: invalid primary and handoff identity or provenance do not append
+ok 5 codex dispatch: start records spec size snapshot
+ok 6 codex dispatch: spec stats failure does not block dispatch or add a field
+ok 7 codex dispatch: land records commit and categorized change size
+ok 8 codex dispatch: numstat failure does not block land or record change size
+ok 9 codex dispatch: agy runs in its worktree with default model and ledger identity
+ok 10 codex dispatch: uncommitted agy work can be reviewed and landed
+ok 11 codex dispatch: unknown agy model fails before worktree creation
+ok 12 codex dispatch: agy model matching uses only exact model IDs
+ok 13 codex dispatch: explicit agy and Codex models are recorded and passed
+ok 14 codex dispatch: missing agy usage is recorded as null without token counts
+ok 15 codex dispatch: agy commit is a scope violation and cannot land
+ok 16 codex dispatch: default Codex command is unchanged and start identity is explicit
+ok 17 codex dispatch: runtime model is recorded for each attempt without copying other log text
+ok 18 codex dispatch: invalid runtime model and coordinator are rejected safely
+ok 19 codex dispatch: declared coordinator is recorded on start
+ok 20 codex dispatch: agy resume requires and uses its stored conversation
+ok 21 codex dispatch: network is refused for agy
+ok 22 codex dispatch: only one same-spec slug lands without explicit superseding
+ok 23 codex dispatch: start refuses a non-release branch
+ok 24 codex dispatch: start refuses changed spec and ahead HEAD
+ok 25 codex dispatch: start isolates operator checkout
+ok 26 codex dispatch: start records the spec path in the ledger
+ok 27 codex dispatch: piped start returns before Codex exits
+ok 28 codex dispatch: detached worker survives launcher SIGHUP
+ok 29 codex dispatch: detached worker survives launcher process-group SIGKILL
+ok 30 codex dispatch: plain background worker is killed by launcher group
+ok 31 codex dispatch: records nonzero Codex exit before bookkeeping
+ok 32 codex dispatch: missing Codex is a terminal nonzero exit
+ok 33 codex dispatch: bookkeeping failure does not hide the exit
+ok 34 codex dispatch: land completes when the ledger is unwritable
+ok 35 codex dispatch: a killed worker is unexpectedly terminated
+ok 36 codex dispatch: a reused PID identity is not reported running
+ok 37 codex dispatch: parallel starts isolate each edit
+ok 38 codex dispatch: argv has sandbox worktree and run dir
+ok 39 codex dispatch: state is isolated and HOME is unchanged
+ok 40 codex dispatch: status marks memory-bank changes out of scope
+ok 41 codex dispatch: land refuses running, out-of-scope, and dirty tasks
+ok 42 codex dispatch: land refuses a dirty operator checkout
+ok 43 codex dispatch: land fast-forwards without pushing
+ok 44 codex dispatch: abandon without yes changes nothing
+ok 45 codex dispatch: prune removes landed current and earlier release tasks and branch-only leftovers
+ok 46 codex dispatch: prune keeps unsafe tasks and preserves run research data
+ok 47 codex dispatch: prune rejects unknown options
+ok 48 codex dispatch: scope uses the recorded spec, not a root markdown file
+ok 49 codex dispatch: memory-bank is out of scope even when the spec lists it
+ok 50 codex dispatch: edited spec cannot widen scope
+ok 51 codex dispatch: records the release base at start
+ok 52 codex dispatch: scope ignores commits pushed after dispatch
+ok 53 codex dispatch: land refuses a missing recorded base
+ok 54 codex dispatch: tests the rebased task before merging
+ok 55 codex dispatch: land --no-test says the tests were skipped
+ok 56 codex dispatch: cross-repo start snapshots the spec and land targets only the named branch
+ok 57 codex dispatch: cross-repo start rejects incomplete and protected targets
+ok 58 codex dispatch: cross-repo scope uses the saved spec and refuses memory-bank
+ok 59 codex dispatch: cross-repo land refuses target rewritten since dispatch
+ok 60 codex dispatch: cross-repo land refuses a different target checkout and local divergence
+ok 61 codex dispatch: cross-repo land records a forward target move and catches movement during tests
+ok 62 codex dispatch: land requires exactly one test selector
+ok 63 codex dispatch: land test command sees isolated state
+ok 64 codex dispatch: landing lock is released after refusal
+ok 65 codex dispatch: network tasks are exclusive
+ok 66 codex dispatch: resume continues the same session
+ok 67 codex dispatch: resume accepts a dead worker whose PID identity is stale
+ok 68 codex dispatch: resume passes the state root and runs in the worktree
+ok 69 codex dispatch: resume refuses a landed task and a log without a session id
+ok 70 codex dispatch: a refused networked resume leaves the task finished
+ok 71 codex dispatch: ledger snapshots Codex output and restores the index
+ok 72 codex dispatch: verify records pass tokens only for a landed task
+ok 73 codex dispatch: verify refusals do not append ledger events
+ok 74 codex dispatch: ledger records verifier lines before a release rebase
+ok 75 codex dispatch: ledger records scope refusal and valid JSON
+ok 76 codex dispatch: resume records the latest token total
+ok 77 codex dispatch: ledger records a Codex exit with no token count
+ok 78 codex dispatch: start records session token usage from CODEX_HOME
+ok 79 codex dispatch: missing session usage warns but start succeeds
+ok 80 codex dispatch: usage-backfill is idempotent
+ok 81 codex dispatch: intervention records reason and starts explicit coverage once
+ok 82 codex dispatch: intervention refuses unknown task invalid reason and worker self-report
+ok 83 codex dispatch: metrics scheduling coalesces concurrent requests and preserves the last request
+ok 84 codex dispatch: metrics scheduling takes stale lock and respects fresh lock
+ok 85 codex dispatch: make codex-dispatch passes --branch only when BRANCH is given
+ok 86 codex dispatch: make targets pass a declared coordinator
+ok 87 codex dispatch: release-merged records one merge timestamp idempotently
+ok 88 codex dispatch: invalid release-merged args leave ledger unchanged
+ok 89 commits with the spec's message, lands, pushes and marks the spec review pending
+ok 90 never marks a task verified or fixed
+ok 91 refuses a task that has not exited successfully, before committing or landing
+ok 92 refuses when the checkout is not on a release branch
+ok 93 refuses a dirty main checkout
+ok 94 refuses a spec with no commit line
+ok 95 requires --test
+ok 96 rejects invalid landing metadata and missing values before task side effects
+ok 97 reads the 'Commit message:' form too
+ok 98 agent dispatch dashboard: valid ConfigMap JSON and datasource
+ok 99 agent dispatch dashboard: every queried metric is exported
+ok 100 agent dispatch dashboard: Claude context and compaction row panels exist below existing rows
+ok 101 agent dispatch dashboard: landing success aggregates both sides
+ok 102 agent dispatch dashboard: panel rectangles do not overlap
+ok 103 agent dispatch dashboard: Codex API cost shows priced total and excluded sessions
+ok 104 agent dispatch dashboard: per-spec panels use readable units and grouped targets
+ok 105 agent dispatch dashboard: final exit gap and operator coverage are exposed
+ok 106 agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d
+ok 107 agent dispatch dashboard: rework rate stat reads the selected window
+ok 108 agent dispatch dashboard: verified delivery stats use exported metrics without overlap
+ok 109 agent dispatch dashboard: stat and bar gauge panels use explicit colours
+ok 110 agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups
+ok 111 agent dashboards: panel targets, fieldConfig and options match the pre-split fixture
+ok 112 agent dashboards: each dashboard has unique panel ids and no overlapping rectangles
+ok 113 agent dashboards: all dashboards have the tag-based Agents link
+ok 114 agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable
+ok 115 agent activity: Claude row fills the width and bar gauge names read beside each bar
+ok 116 agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec
+ok 117 agent dispatch: per spec shows which agent landed each spec
+ok 118 agent dispatch dashboard: Log opens the filtered run log dashboard
+ok 119 agent cost: Claude tokens by kind splits the selected window by cache kind
+ok 120 agent cost: daily Claude tokens and cost panels split by kind
+ok 121 agent dashboards: labels and titles stay readable and release-only stats say why they are empty
+ok 122 agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities
+ok 123 agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget
+ok 124 agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling
+All checks passed!
+```
+
+ShellCheck command was `shellcheck -x -S warning bin/k3dm-codex-dispatch
+bin/k3dm-codex-land-pending`; clean exit0. Ruff printed All checks passed.
+Final dispatcher test result passed; independent verify pass recorded.
+
+### Current state (supersedes earlier running/queued notes)
+
+| Selected item | Implementation | Live evidence |
+|---|---|---|
+| Probe-age colors |74d2d4e2, independently verified/landed/pushed|LIVE-VERIFIED, operator11.6h green|
+| Plans Live verified column |9893651f, independently verified/landed/pushed|LIVE-VERIFIED, positive/unknown screenshots|
+| GHCR diagnostics/transport |0cd39eb8 plus assertion fix78073617, independently verified/landed/pushed|Pending operator credential/remediation check|
+| Independent heartbeats |79bd9eb5/233a4b11 plus assertion fix78073617, independently verified/landed/pushed|Pending enrollment and controlled failure/recovery alerts|
+| Primary coordinator/handoffs |9424c32a, independently verified/landed; push follows this record|Pending operator E3|
+| Webhook doctor |e4f6823e, independently verified/landed/pushed|Next live check3: operator `bin/k3dm-webhook-doctor --check`; no recovery until result reviewed|
+
+All six implementation deliverables are accepted. This is not a claim that
+all six underlying bugs are live-resolved: two are LIVE-VERIFIED, three are
+VERIFIED offline, and the original webhook incident remains OPEN although its
+diagnostic deliverable is verified. The full curated gate remains non-green
+for the explicitly recorded unrelated failures; the introduced assertion
+issue is corrected and affected29 tests pass. No deployment, enrollment,
+credential rotation or assistant-run live diagnosis was performed.
+
+Separate new ask-docs routing and startup Log-link bugs are filed OPEN; they
+were not part of the selected six and were not silently implemented here.

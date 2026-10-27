@@ -33,3 +33,5 @@ explanation or avoid offering an empty Loki link for unsupported evidence.
 If a startup diagnostic export is desired, separately scope bounded sanitized
 startup categories; never ship arbitrary worker transcripts. No log-shipping
 code or historic ledger records changed in this investigation.
+
+[Operator failed-attempt rows and Log links](../assets/2026-10-27-dispatch-startup-empty-log.png).

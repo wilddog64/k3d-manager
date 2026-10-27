@@ -25,3 +25,5 @@ that socket. No evidence of a production hub recovery failure. Recommended
 separate follow-up: use a controlled tracked-file fixture rather than copying
 arbitrary operator workspace state. Did not delete the socket or modify the
 out-of-scope recovery suite. Full suite failures remain reported honestly.
+
+The final run also failed B4-21 (test1272) and B4-23 (test1275) on the same socket-copy operation. All four full failures are captured in [the batch output](../assets/2026-10-27-six-bug-curated-tests.txt).
