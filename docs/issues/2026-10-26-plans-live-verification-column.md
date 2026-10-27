@@ -68,3 +68,51 @@ ok 38 Plans separates ordinary verification from live verification
 ```
 
 Recommended follow-up: sync the dashboard ConfigMap and inspect the Plans table on a laptop-width Grafana viewport. The change is not live-verified yet.
+
+## Live rollout evidence
+
+The M2 kube context pointed at an unavailable API endpoint, so I used M4 (`m4-air.local`), where the hub context is available. Argo CD was hard-refreshed after the dashboard commit.
+
+Actual output:
+
+```text
+application.argoproj.io/hub-grafana-dashboards annotated
+reconciled=2026-10-27T00:43:29Z
+rev=1e44141ed9059df92223c9e2aee926fc84b89ef6
+sync=Synced health=Healthy
+operation=Succeeded
+```
+
+The live ConfigMap was extracted from `monitoring/grafana-dashboard-bugs` and parsed:
+
+```text
+UID: k3dm-bugs
+Columns: ['Release', 'Order', 'Plan', 'Title', 'Depends on', 'Wave', 'Wave note', 'Overlaps', 'Blocked by', 'Execution', 'Spec approval', 'Dispatch', 'Dispatch task', 'Verified', 'Live verified']
+Width budget: 1320 px / 1350 px
+Separate live projection: True
+Live verified mapping: {'verified': {'text': '-', 'color': 'gray'}, 'live_verified': {'text': '✓', 'color': 'green'}, 'unknown': {'text': '-', 'color': 'gray'}, 'n/a': {'text': '-', 'color': 'gray'}}
+```
+
+Grafana sidecar and provisioning log output:
+
+```text
+{"time": "2026-10-27T00:43:28.657145+00:00", "taskName": null, "msg": "Writing /tmp/dashboards/k3dm-bugs.json (ascii)", "level": "INFO"}
+logger=provisioning.dashboard t=2026-10-27T00:43:28.778621957Z level=info msg="starting to provision dashboards"
+logger=provisioning.dashboard t=2026-10-27T00:43:29.285906802Z level=info msg="finished to provision dashboards"
+```
+
+The Grafana API request without credentials returned `wget: server returned error: HTTP/1.1 401 Unauthorized`; no credentials were exposed or used. A browser screenshot was not captured. The live verification proves ArgoCD synchronization and Grafana provisioning of the ConfigMap; it does not claim a visual screenshot check.
+
+Two read-only inspection commands had shell quoting mistakes. Their exact relevant output was:
+
+```text
+SyntaxError: unexpected EOF while parsing
+```
+
+```text
+grep: verified": No such file or directory
+/tmp/dashboards/k3dm-bugs.json:989:      "title": "Live-verified"
+command terminated with exit code 2
+```
+
+The ConfigMap extraction and JSON parse immediately afterward succeeded and supplied the evidence above.
