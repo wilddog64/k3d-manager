@@ -666,6 +666,8 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
 
+**PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.45.2-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.45.2-pr-lifecycle-history-and-merge-visibility.md). **v1.45.2 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
+
 ### Candidate milestone — v1.45.3 (patch)
 
 **Mac workstation protection for the two operator MacBooks** (operator, 2026-10-23). Everything
