@@ -527,6 +527,14 @@ alongside the outcomes: specs landed, bugs closed, rework rounds and defects fou
 stay with the operator or Claude, even in the agy period. Depends on plans 3 and 4.
 **v1.44.1 is now at its five-plan cap.**
 
+**Codex role-attribution telemetry (2026-10-27):** Extend v1.44.1's existing
+[session-window plan](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
+with Coordinator / Worker / Unattributed views for independently linked Codex
+sessions and measured tokens; show shared Codex quota at pool level only (not a
+fabricated per-model split). Keep stale/missing readings, legacy sessions and
+unpriced sessions visible, with coverage denominators. No new plan slot or
+implementation approval.
+
 **Quota-aware coordinator rotation amendment (2026-10-27):** The same v1.44.1
 [coordinator trial](plans/v1.44.1-coordinator-rotation-trial.md) and
 [session-window telemetry](plans/v1.44.1-dispatch-agent-five-hour-window-usage.md)
