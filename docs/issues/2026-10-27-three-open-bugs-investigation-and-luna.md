@@ -483,3 +483,33 @@ kubectl --context k3d-k3d-cluster -n monitoring apply -f scripts/etc/argocd/plat
 ```
 
 Applies only the reviewed dashboard ConfigMap. Inspect result, then independently compare deployed JSON before UI check. No coordinator apply/Secret read or mutation/restart performed. No code change or test rerun; prior offline138Python/28BATS/Ruff/PromQL remains. No deployment automation expansion silently added; canonical bug stays pending actual corrected-dashboard deployment/UI verification.
+
+## Correct dashboard applied — deployed JSON verified
+
+Operator applied the explicit Agent Dispatch ConfigMap; supplied output:
+
+```text
+-f scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml
+Warning: resource configmaps/grafana-dashboard-agent-dispatch is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-agent-dispatch configured
+```
+
+The apply warning describes adding missing apply-tracking metadata; the command configured the resource. Independent read-only ConfigMap comparison now returns:
+
+```json
+{
+  "dashboard_json_matches": true,
+  "panel_count": 31,
+  "plain_table": "Per run evidence",
+  "plain_log_actions": [],
+  "supported_table": "Supported landing logs",
+  "supported_log_actions": [
+    {
+      "title": "Open shipped landing-test log",
+      "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
+    }
+  ]
+}
+```
+
+Corrective dashboard0d180771 is now deployed, including31panels, plain Log configuration without links and supported-only link view. This verifies cluster content, not Grafana sidecar reload/browser click behavior. Next single operator UI check: refresh Agent Dispatch/Per run evidence and confirm failed key-cache Log path no longer navigates. Supported landing-log click follows separately. No coordinator apply/restart/credential read; no new code/tests. Canonical P3 remains VERIFIED pending full UI checks.
