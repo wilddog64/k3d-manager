@@ -1040,3 +1040,18 @@ Recoveryfixturecfb60be0alreadyremotepushed:116BATS/no skips, cleanrawShellCheck/
 audit/hooks. Nextoperatorfulltest-allfresh3stages/publicationstillpending.
 NoPR/URLnone(ClaudeownsPRs), nozonewrite/credentialaccess/metricspublication/
 restart/screenshotexport/newplan. PriorGUIincident/paymentPRchecksremainpending.
+
+## 2026-10-28 operator prefers tmux report reads; locator PARTIAL
+
+User explicitly asksreadpreviousCFpreflightfromtmux, avoidlargeJSONcopy.
+Read-onlytmuxinventory/captureauthorized; firstsandboxsocketdenied, permitted
+escalationreadsuccess. Localdefaultserveronlyworksession(attached0), panes
+work1.0%2/1.1%3/2.0%0/3.0%4/4.0%7. Scanned1000then6000lines, remaining%2
+fullhistory9241logicallines: nohelpercommand/reportmarkers/JSON. No unrelated
+contentsprinted, no keystrokes/probes/credentialreads/restarts/zonewrites.
+Optionalclarificationtoolaskswhichsession/window/pane/host/customserver;
+locationrequiredtocontinue, noJSONpasteorrerequestedrun. Previousoperator
+17:36:46Zreportalreadyrecorded; no newtmuxreportobtained. Exactoutputs in
+docs/issues/2026-10-28-preflight-tmux-report-location.md. Docs-onlyrecord,
+no BATS/ShellCheck rerun; gatesbeforecommit. NoPR(Claudeowns)/noactualfixclaim.
+Otherpendingfulltest-allfreshpublication/CFmanualreview/GUIacceptancespreserved.
