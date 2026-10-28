@@ -3,7 +3,7 @@
 **Filed:** 2026-10-28 (operator screenshot of Grafana Offline Tests dashboard and Alertmanager emails)
 **Priority:** P2 — offline test gate failing and incomplete; security guard failure requires inspection
 **Severity:** medium — confidence in test gate reduced; no established production or Hostinger outage
-**Status:** OPEN — scoped fixes independently verified and pushed; fresh complete three-stage test-all and published metrics acceptance pending
+**Status:** VERIFIED — complete operator test-all passed; fresh failed=0/complete=1 telemetry and offline warning resolution independently verified 2026-10-28
 **Release:** v1.43.9 bug (does not consume an enhancement plan slot)
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-28 explicitly requested review/dispatch to Luna; isolated focused implementation/testing authorized, full published rerun and live deployment remain operator-owned
@@ -320,3 +320,14 @@ toclosedloopbacklikeotherpublishers. Addregressionthatraisesifpollfixture
 reachesrealOrbStackhooks. No productionbehavior/tripwireallowlist/test
 assertionorPromQL evaluation removed. ValidatefullPythonstageusingexisting
 nativepromtool; currentfullthree-stageoperatoracceptance stillpending.
+
+## Full operator acceptance — 22:42:02Z
+
+Run1793225872 completed all3stages: main1913BATS(17skip), bin623BATS(no skip),
+pytest1661passed2skipped plus unittest; publisher4312cases0failed/exit0.
+FreshACGPushgateway andbothPrometheus backends confirmfailed0/complete1,
+lasttimestamp1793227322, successmarkerfresh. Both namedofflinewarnings absent
+from ALERTS. Initialstalesample andwrongACGservicename transparently recorded.
+[Full actual terminal and metric evidence](../issues/2026-10-28-test-all-complete-live-verification.md).
+M5/E3 satisfied; bugVERIFIED. Earlierunavailablehistoricalrawoutput remains
+explicitlyunavailable; no inventedcause. No production/CF/Kinechanges.

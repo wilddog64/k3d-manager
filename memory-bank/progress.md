@@ -1612,3 +1612,18 @@ Verification follow-up commit: 6578fb95. Required staged `_agent_lint`,
 Python/BATS transcripts in linked issue/assets; ShellCheck N/A Python-only.
 No PR created (repository rule); PR URL N/A. Pushing this commit and evidence
 record to origin/k3d-manager-v1.43.9; fresh full operator run remains pending.
+
+## 2026-10-28 Full test-all passed and telemetry accepted
+
+OperatorM4run1793225872 completed3stages, duration1450s, publisher4312cases
+0failed/exit0. Main1913BATS17skip; bin623BATS0skip; pytest1661pass2skip plus
+unittest. Fullverbatimasset andliveverificationissue recorded. No unsafe
+Docker/OrbStackattempt;8read-onlytripwireblocks retained. Fresh1793227322
+samplebothPrometheus backends failed0/total4312/complete1; ACGPushgateway
+exit0/classpassed/freshsuccess. BothOfflineSuiteFailing/RunIncomplete absent.
+Initialstale4fail andwrongACGservicenameNotFound documented/correctedwithout
+mutations. HubPushgatewaylocalmatchinggroupabsent, hubscrapedmetricpass; no
+inventedlocalgroup. P2nowVERIFIED/M5E3accepted. Fix6578fb95 andpriorcommits;
+verificationcheckout418ea8aa. Docs-onlygates/checkpoint/pushpending; PRN/A.
+CFrealSSO/Slack+separateTLS1.2 andKinereadiness/recovery remainopen; nolive
+changeauthorizedbytestpass.
