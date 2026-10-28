@@ -1178,3 +1178,21 @@ KineproperrecurrenceP2alreadyfiled/pushed4611543d withliveproof, no recovery
 approval/action. CFoperatorAIsettingsreportreviewed; pendingrecordofreported
 Full/HTTPSoff/min1.0/TLS1.3on+rewriteson andcaveats(noanalyticsnotproof, tunnel
 notredirect/clientcompatguarantee). NoCFwritego. No newplans/PR/CIreruns.
+
+## 2026-10-28 OrbStack fixture repair pushed; CF AI report reviewed
+
+Realtest-onlyfix a7b5e5dfpushed:30focusedBATS/no skips, rawShellCheckclean,
+stagedlint/audit/checkpointhooksPASS. OwnedPGtimeouts+explicitnonTTYprevent
+humanprompts; controlledPTYred/greenno upgrade spy. Productionunchanged;
+cleanupDarwininodeassertfixedportably. Fullproofissue/assets; freshoperator
+3-stagemake test-all remainsneeded; P2OPEN/latestoldfailed2complete0.
+KineproperP2filing4611543dpushed(no restart/rebuild authorized/performed).
+
+CloudflareAIscreenshotsreportFull,HTTPSOff,minTLS1.0,TLS1.3On,rewritesOn,
+7proxiedTunnelCNAMEs. Operator-source(notindependentAPIread), noHSTSvalue/
+actualruleinventoryshown. OfficialCFdocschecked: origin/edgeredirectrules
+needreview; Tunnelnotvisitorcompatibility/loopguarantee; missingTLSanalytics
+unknownnotzerolegacytraffic. ExistingCFoperatorissue/bugupdated, F0partial/
+noF1go. Recommendationafterrules/compatbaseline: HTTPSonlyfirst, validate
+7hosts+SSO/Slack, then separatelyTLS1.2; nootherzonechanges. NoCloudflare
+write/credentialread/probe/codechange. No newplan/PR/CIrerun.

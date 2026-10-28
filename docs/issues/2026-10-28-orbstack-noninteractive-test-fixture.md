@@ -204,3 +204,18 @@ clean. Production bin/k3dm-orbstack-upgrade and bin/k3dm-cleanup unchanged.
 No realOrbStack upgrade/install, hostrestart/Keychainlookup/metricspush/full
 publishedrerun by coordinator. Required lint/audit/checkpoint hooks before
 commit; P2remainsOPEN pending freshcomplete3-stage acceptance.
+
+## Pushed implementation proof
+
+Scoped test-only repair a7b5e5df pushed to releasebranch. Required staged
+_agent_lint, _agent_audit and normal checkpointhooks passed. Currentactual
+git log origin/k3d-manager-v1.43.9 --oneline -3:
+
+```text
+a7b5e5df checkpoint: before isolate and bound OrbStack offline fixtures and portable cleanup inode check
+4611543d checkpoint: before file live-confirmed October28 Kine compaction recurrence P2
+46a02628 docs(bugs): track OrbStack non-TTY BATS case 567 in offline suite P2
+```
+
+Fresh complete operator three-stage run/publication remainspending; latest
+failed2/complete0 belongs to the pre-repair run. No PR created (Claude ownsPRs).

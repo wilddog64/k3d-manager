@@ -242,3 +242,14 @@ settingsallunknown/no credential. Deprecation warnings reflect intentional
 legacy probes, not edge rejection. Fullactualoutput in existingoperatorreport
 issue. F0partial unchanged; nextreadcurrentzonevalues/rules viaCloudflareAI or
 dashboard. No additional probe rerun, warning suppression or live change.
+
+## Operator Cloudflare AI report review
+
+Screenshots reportFull/AlwaysHTTPSOff/minTLS1.0/TLS1.3On/rewritesOn andall7
+proxiedTunnelrecords. This suppliesoperator-reportedsettings, not an independent
+coordinatorAPIread. HSTS andactualruleinventory notshown. MissingTLSanalytics
+doesnotprovelegacyclientsabsent; TunnelconnectiondoesnotprovevisitorTLS
+compatibility orabsenceoforiginredirectloops. Officialdocs andremaining
+review inexistingoperatorreportissue. F0partial/no F1writego inferred.
+Recommendedsequence afteractualrule/compatcheck: approveHTTPSonly, validate,
+then separatelyapproveTLS1.2; keepFull/TLS1.3/HSTS/DNS/tunnel/auth unchanged.

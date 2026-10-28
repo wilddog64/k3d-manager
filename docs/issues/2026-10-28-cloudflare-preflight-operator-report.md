@@ -715,3 +715,44 @@ Full actual saved stdout (read verbatim, not reconstructed):
 This is live operator evidence with partial acceptance, not an offline helper
 code test. Runtime/helper unchanged; no BATS/ShellCheck rerun for this report
 read. Documentation lint/audit/hooks run before commit. Security bug OPEN.
+
+## Operator Cloudflare AI preflight screenshots reviewed
+
+Operator supplied three screenshots from Cloudflare AI. Text findings are
+recorded here; no screenshot copied/exported. The report states these zone
+values (not independently API-read by coordinator; report timestamp absent):
+
+| Setting | Reported value | Proposed target |
+| --- | --- | --- |
+| SSL/TLS mode | Full | Unchanged |
+| Always Use HTTPS | Off | On |
+| Minimum TLS | 1.0 | 1.2 |
+| TLS1.3 | On | Unchanged |
+| Automatic HTTPS Rewrites | On | Unchanged |
+
+It reports all seven named CNAMEs proxied through the same Cloudflare Tunnel.
+HSTS value and actual redirect-rule/hostname-override inventory are not shown
+in the screenshots. Earlier helperAPI fields remainunknown because it had no
+token; the operatorAI report is a separate source for these reported values.
+
+The recommendation contains unsupported assurances: a Tunnel does not remove
+application redirect risks, and modern Tunneltransport does not establish
+visitorclient TLScompatibility. Analytics returned no TLS protocoldata for
+seven days; that is missing evidence, not proof of zero legacyclients. The
+report itself separately warns about origin redirects, contradicting its
+stronger no-loop-risk claim. Do not accept all its conclusions as verified.
+
+Official primary documentation checked:
+
+- [Evaluate edge and origin redirects](https://developers.cloudflare.com/ssl/edge-certificates/encrypt-visitor-traffic/)
+- [Tunnel route and origin-protocol risks](https://developers.cloudflare.com/tunnel/troubleshooting/https-origins/)
+- [Minimum TLS applies to visitors](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/)
+
+Next review the actual enabledrule/hostnameexception list, especially any
+HTTPS-to-HTTP destination, and confirm application/SSO/Slack baseline. Then
+operator can explicitly approve only AlwaysUseHTTPS as the first change,
+leaving minimumTLS/Full/HSTS/DNS/tunnels/auth unchanged and recording rollback
+Off. Validate redirects/HTTPS/SSO/Slack before separately approving minTLS1.2,
+with rollback1.0 and TLS1.3 keptOn. No approval or live change is inferred
+from screenshots. No APIwrite, credential lookup, helperchange or extra probe
+performed by coordinator. SecuritybugremainsOPEN/F0partial.
