@@ -238,3 +238,70 @@ Discovery checks: argocd namespace Application list was empty; all-namespace lis
 located owner in cicd. Extraneous ubuntu-k3s owner query interrupted (exit130),
 ubuntu-hostinger query returned `Error from server (NotFound): namespaces "argocd" not found`.
 Those contexts were not modified and are not needed for this local owner.
+
+## Post-refresh deployment/rendering — PASS; click destination unconfirmed
+
+Operator screenshot1 shows Title blue links and no visible Plan column.
+Screenshot2 shows docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md,
+the previous Per run evidence task-name destination, rather than a docs/plans
+file. Click provenance is not established; do not treat as Plans Title success
+or assert wrong navigation. Need one unambiguous Title click, preferably first
+VectorDB drift row (expected docs/plans/v1.43.9-vectordb-drift-kinds-and-age.md).
+Actual read-only post-refresh output:
+```json
+{
+  "source_match": true,
+  "sync": "Synced",
+  "revisions": [
+    "1fc7680e25b7b87ea547e6dadfd26b28140289b4",
+    "1fc7680e25b7b87ea547e6dadfd26b28140289b4"
+  ],
+  "Plan_Title_overrides": [
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Plan"
+      },
+      "properties": [
+        {
+          "id": "custom.hidden",
+          "value": true
+        }
+      ]
+    },
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Title"
+      },
+      "properties": [
+        {
+          "id": "custom.width",
+          "value": 150
+        }
+      ]
+    },
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Title"
+      },
+      "properties": [
+        {
+          "id": "links",
+          "value": [
+            {
+              "title": "Open plan document",
+              "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md",
+              "targetBlank": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+Owner now Synced to1fc7680e and CM exactly matches source. Old deployment
+mismatch cleared; Title navigation remains pending. No runtime writes, screenshot
+export, implementation changes or test rerun. Canonical bug stays VERIFIED.

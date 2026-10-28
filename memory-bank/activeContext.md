@@ -726,3 +726,14 @@ singleoperator hard refresh owner via cicd annotation, then coordinator rechecks
 revision/CM before UI. No coordinator live writes or screenshot export/test rerun.
 Full actual read findings docs/issues/2026-10-28-plans-title-link-verification.md.
 Bug remains VERIFIED offline, livepending; no codechange/newplan/PR.
+
+## 2026-10-28 Plans Title rendering PASS; destination pending
+
+Operator screenshot shows hidden Plan and blue Title. Read-only CM exactly matches
+source; owner hub-grafana-dashboards now Synced to1fc7680e, stale revision cleared.
+Second screenshot is previous docs/issues retrieval-no-data destination, not a plan;
+click provenance unknown, so neither count as Title navigation pass nor assert bug.
+Next singleoperator click first Title (VectorDB drift) expecting
+ docs/plans/v1.43.9-vectordb-drift-kinds-and-age.md. Bug remains VERIFIED, livepartial.
+Evidence docs/issues/2026-10-28-plans-title-link-verification.md. No code/runtime
+changes, screenshot export or test rerun; no PR.
