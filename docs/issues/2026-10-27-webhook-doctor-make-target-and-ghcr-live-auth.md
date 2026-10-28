@@ -243,3 +243,25 @@ while the hub context is selected. Review output before one rescan. The
 coordinator has not synced the cluster Secret or created another scan Job.
 Local authentication passing does not prove the running cluster uses the
 replacement yet, or that candidate selection/promotion succeeds.
+
+## Operator synced the replacement to the hub Secret
+
+Operator ran the requested narrow sync target and supplied:
+
+```text
+running under bash version 5.3.20(1)-release
+INFO: [argocd] Syncing platform-ops-app-rebuild Secret (gh-token) into namespace platform-ops from Keychain...
+secret/platform-ops-app-rebuild configured
+```
+
+This confirms the apply path completed using the dedicated Keychain item.
+No token value was shown or cluster Secret decoded by coordinator. The
+previous local GitHub/GHCR checks passed, but cluster runtime auth-to-ok and
+candidate promotion remain pending a new scan. No new scan was launched
+by coordinator.
+
+Next single operator step: `make app-cve-scan` once, then report the new Job
+completion output. Review that new Job's log and per-service metrics before
+claiming live success; earlier promotion records remain historical evidence.
+Evidence-only update; prior code/BATS results remain unchanged and normal
+doc links/staged lint/audit/checkpoint hooks apply.
