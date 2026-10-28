@@ -359,23 +359,25 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "plan names link to the plan doc on the scanned branch, and bug tiles say bugs" {
+@test "plan titles link to the plan doc with redundant Plan hidden, and bug tiles say bugs" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels={p["id"]: p for p in d["panels"]}
 overrides={o["matcher"]["options"]: o["properties"] for o in panels[107]["fieldConfig"]["overrides"]}
-links=next(p["value"] for p in overrides["Plan"] if p["id"]=="links")
+links=next(p["value"] for p in overrides["Title"] if p["id"]=="links")
 assert links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md"
 assert links[0]["targetBlank"] is True
 assert next(p["value"] for p in overrides["branch"] if p["id"]=="custom.hidden") is True
 bug_overrides={o["matcher"]["options"]: o["properties"] for o in panels[23]["fieldConfig"]["overrides"]}
 assert next(p["value"] for p in bug_overrides["branch"] if p["id"]=="custom.hidden") is True
 width=lambda n: [p["value"] for o in panels[107]["fieldConfig"]["overrides"] if o["matcher"]["options"]==n for p in o["properties"] if p["id"]=="custom.width"]
-assert width("Plan") and width("Title")
+assert not width("Plan") and width("Title")
+assert next(p["value"] for p in overrides["Plan"] if p["id"]=="custom.hidden") is True
 organize=next(t for t in panels[107]["transformations"] if t["id"]=="organize")
 assert "branch" not in organize["options"]["excludeByName"]
+assert not organize["options"]["excludeByName"].get("plan"), "Title URL needs retained plan stem"
 assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed","Bugs open","Bugs fixed"]
 PY
   [ "${status}" -eq 0 ]
@@ -753,7 +755,9 @@ table = {p["id"]: p for p in data["panels"]}[107]
 assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
-visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
+hidden = {o["matcher"].get("options") for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.hidden" and p["value"] is True}
+visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k) and org["renameByName"].get(k, k) not in hidden]
+assert "plan" not in visible and "title" in visible
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
 assert widths["Title"] >= 150 and widths["Dispatch task"] >= 150, widths
 assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"

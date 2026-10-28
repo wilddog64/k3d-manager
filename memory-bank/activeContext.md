@@ -700,3 +700,15 @@ Dashboard line2000 blame attributes title→Title to release squash401e4eca
 (v1.43.5 PR148, 2026-10-24), preceding current hyperlink fixes. No UI/source changes.
 Original spec approval is recorded evidence, not a newly inferred approval.
 Documentation-only provenance check; no BATS/ShellCheck rerun applicable, no PR.
+
+## 2026-10-28 Plans table redundant Plan column P3
+
+Explicit operator amendment: keep Title, link to plan, remove visible Plan.
+Filed docs/bugs/2026-10-28-plans-table-redundant-plan-column.md; implemented
+panel107 field overrides only, retained hidden plan stem and branch for links.
+No queries/sort/layout/other panels changed. 38 dashboard BATS pass; regression
+against old dashboard fails as expected. Initial width fixture corrected for
+custom.hidden; full outputs docs/issues/2026-10-28-plans-title-link-verification.md.
+YAML/JSON and diff checks pass; no shell implementation (ShellCheck N/A).
+Operator deployment/reload/Title click pending, not LIVE-VERIFIED. No screenshot
+export, live writes, new plan doc or PR. Required commit SHA follows landing.

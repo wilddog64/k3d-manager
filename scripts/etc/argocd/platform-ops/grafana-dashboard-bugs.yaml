@@ -2245,8 +2245,8 @@ data:
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               },
@@ -2265,7 +2265,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Plan"
+                  "options": "Title"
                 },
                 "properties": [
                   {
