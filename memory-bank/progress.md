@@ -1606,3 +1606,9 @@ Initialwrongpython-mpytest(no module) recorded transparently. Evidenceissue
 2026-10-28-offline-python-promtool-and-orbstack-hooks.md +fullassets. RuffPASS;
 requiredgates/commitpending. Freshfullpublished3-stageoperatorrun stillneeded;
 P2OPEN. No productionchange/PR/newplan/recovery.
+
+Verification follow-up commit: 6578fb95. Required staged `_agent_lint`,
+`_agent_audit`, checkpoint hooks and doc-links passed (7 files OK). Actual
+Python/BATS transcripts in linked issue/assets; ShellCheck N/A Python-only.
+No PR created (repository rule); PR URL N/A. Pushing this commit and evidence
+record to origin/k3d-manager-v1.43.9; fresh full operator run remains pending.
