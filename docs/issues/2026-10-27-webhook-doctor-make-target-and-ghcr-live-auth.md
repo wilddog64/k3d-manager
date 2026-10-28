@@ -141,3 +141,27 @@ GHCR live result is PARTIAL: deployed auth classification/metric verified;
 credential remediation, successful candidate resolution/promotion and
 notification delivery remain unverified. Canonical bug remains VERIFIED
 offline with these live observations, not a full LIVE-VERIFIED closeout.
+
+## Credential selection clarification — existing Dependabot App
+
+Operator asked about regenerating k3dm-dependabot-merger. Repository source
+`docs/bugs/2026-10-17-dependabot-automerge-github-token-skips-main-ci.md`
+explicitly identifies that name as a GitHub App installed on the five
+shopping-cart repos, with private-key-based automation and live merge
+evidence attributed to app/k3dm-dependabot-merger. This source does not
+identify it as the scanner's dedicated PAT.
+
+No App key/client credential was generated, regenerated, revoked or modified.
+The next scanner credential action remains operator-owned: use Personal
+access tokens (classic), create/regenerate the dedicated scanner token with
+read:packages/package access and required existing rebuild permissions, then
+update Keychain platform-ops-app-rebuild / account k3dm. No value in chat.
+No unrelated Dependabot App credentials need to change for this step.
+
+Automatic approval review rejected archiving/pushing the user-supplied
+credential-management screenshot because its full contents were not verified
+non-sensitive and artifact export was not authorized. That image was omitted;
+no screenshot copy or indirect export was attempted after rejection. Only
+identification already supported by the existing repository document is
+recorded here. This safer evidence-only alternative requires no credential
+or artifact approval. No credential rotation has been completed.
