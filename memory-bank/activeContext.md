@@ -688,3 +688,15 @@ Log bug already LIVE-VERIFIED separately; underlying retrieval issue status unch
 Evidence docs/issues/2026-10-28-dispatch-run-spec-link-verification.md. No screenshot
 export/runtime mutation/test rerun; docs-only, existing 151 pytest/30 BATS retained.
 No PR created (repository policy). Other unrelated live items remain pending.
+
+## 2026-10-28 Plans Title column provenance — PASS
+
+Operator asked whether recent coordinator work invented the Plans Title column.
+Read-only git history confirms original spec commit a4e5d422 already required
+`title` → Title in the Plans organize transform (then line 191; current spec line195).
+Spec docs/plans/v1.43.5-release-plan-tracking.md lines6-8 records operator approval
+2026-10-17; current lines195-199 explicitly enumerate the Title column.
+Dashboard line2000 blame attributes title→Title to release squash401e4eca
+(v1.43.5 PR148, 2026-10-24), preceding current hyperlink fixes. No UI/source changes.
+Original spec approval is recorded evidence, not a newly inferred approval.
+Documentation-only provenance check; no BATS/ShellCheck rerun applicable, no PR.
