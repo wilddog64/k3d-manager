@@ -1,6 +1,6 @@
 # Bug: ask-docs misses an explicit priority count without the word bugs
 
-**Status:** OPEN — reproduced locally; implementation not dispatched
+**Status:** OPEN — operator approved GPT-6-Luna implementation; dispatch pending
 **Priority:** P2
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -20,3 +20,36 @@ use the deterministic tally, and retain ordinary non-bug count fallback.
 Required regressions: this exact wording selects P1/open/v1.43.5 and bypasses
 retrieval/model; existing bug wording retains its result; unrelated pod counts
 still fall through. No implementation or live deployment is included here.
+
+## Files
+
+- `scripts/lib/webhook/bug_count.py`
+- `scripts/tests/bin/test_bug_count.py`
+- `scripts/tests/bin/test_ask_docs.py`
+
+## Authorized bounded task
+
+Operator asked to investigate the three open screenshot bugs and dispatch
+accordingly. Implement this P2 in an isolated GPT-6-Luna worktree. Recognize
+the exact how many P1 open for v1.43.5 question as deterministic bug count
+CountQuery(v1.43.5,P1,open), without requiring nounbugs. Use bounded intent:
+count phrase + explicit P0-P3 priority + explicit bug-state context with
+release when needed to disambiguate. Do not greedily hijack unrelated pod,
+PR, issue, release-plan or other object counts merely mentioning priority.
+Existing explicit bug/bugs queries, release/current/lastN ranges and state
+normalization must retain behavior. Ordinary non-bug questions still fall
+through. Reuse deterministic bug-tally; do not count semantic results, add
+model/network calls or implement the broader v1.45.1 translation plan.
+
+Regression exact question bypasses retrieval/model and selects correct
+priority/state/release; explicitbugs result unchanged; unrelated pod counts
+including explicit P1/open context fall through. Include case/word-boundary/
+priority validity cases. Show relevant regression red on original matcher,
+then focused test_bug_count and test_ask_docs pytest, Ruff/Python syntax and
+diffcheck. No arbitrary count from a real mutable corpus asserted in fixtures.
+
+Read instructions/memory-bank first. Edit only Files; no spec/memory edits,
+stage/commit/push/PR, live Slack/webhook/cluster/provider/Keychain/network
+access, credential changes or restart. Coordinator reviews and runs actual
+staged lint/audit before landing/push. Operator live query follows separately.
+No new plans or broad refactor; new/refactored functions <=8ifs.
