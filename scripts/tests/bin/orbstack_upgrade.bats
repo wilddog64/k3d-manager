@@ -162,6 +162,37 @@ _fresh_stamp_ago() {
   fi
 }
 
+_run_bounded() {
+  run python3 - "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+child = subprocess.Popen(sys.argv[1:], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         start_new_session=True)
+try:
+    output, _ = child.communicate(timeout=float(os.environ.get("ORBSTACK_TEST_TIMEOUT_SECONDS", "30")))
+except subprocess.TimeoutExpired:
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        output, _ = child.communicate(timeout=2)
+    except subprocess.TimeoutExpired as error:
+        output = error.output or b""
+        child.stdout.close()
+        child.wait(timeout=2)
+    sys.stdout.buffer.write(output)
+    print("fixture command timed out", flush=True)
+    raise SystemExit(124)
+sys.stdout.buffer.write(output)
+raise SystemExit(child.returncode)
+PY
+}
+
 _run_tty() {
   local answer="$1"
   if ! command -v script >/dev/null 2>&1; then
@@ -172,9 +203,9 @@ _run_tty() {
   local feed='{ printf "%s\n" "$1"; for _ in $(seq 600); do [[ -e "$3" ]] && break; sleep 0.1; done; }'
   local child='"$0"; rc=$?; : > "$1"; exit "$rc"'
   if [[ "$(uname -s)" == Darwin ]]; then
-    run bash -c "$feed"' | script -q /dev/null bash -c '"'$child'"' "$2" "$3"' _ "$answer" "$SCRIPT" "$done_file"
+    _run_bounded bash -c "$feed"' | script -q /dev/null bash -c '"'$child'"' "$2" "$3"' _ "$answer" "$SCRIPT" "$done_file"
   else
-    run bash -c "$feed"' | script -q -c "bash -c '"'$child'"' \"$2\" \"$3\"" /dev/null' _ "$answer" "$SCRIPT" "$done_file"
+    _run_bounded bash -c "$feed"' | script -q -e -c "bash -c '"'$child'"' \"$2\" \"$3\"" /dev/null' _ "$answer" "$SCRIPT" "$done_file"
   fi
 }
 
@@ -233,11 +264,27 @@ _report() { find "$HOME/.k3dm/orbstack-upgrade" -type f -name '*.json' -print -q
 }
 
 @test "orbstack upgrade: refuses a real run without a TTY" {
-  run "$SCRIPT"
+  _run_bounded "$SCRIPT"
   [ "$status" -eq 2 ]
   [[ "$output" == *'interactive TTY required'* ]]
+  [[ "$output" != *'Type yes to continue'* ]]
+  [[ "$output" != *'confirmation was not yes'* ]]
   run grep '^orbctl update$' "$TEST_CALLS"
   [ "$status" -ne 0 ]
+}
+
+@test "orbstack upgrade: bounded fixture runner stops a stalled fake command" {
+  cat > "$HOME/bin/stall" <<'SH'
+#!/usr/bin/env bash
+printf 'started\n' > "$TEST_CALLS.stalled"
+sleep 60
+SH
+  chmod +x "$HOME/bin/stall"
+  export ORBSTACK_TEST_TIMEOUT_SECONDS=1
+  _run_bounded "$HOME/bin/stall"
+  [ "$status" -eq 124 ]
+  [[ "$output" == *'fixture command timed out'* ]]
+  [ -f "$TEST_CALLS.stalled" ]
 }
 
 @test "orbstack upgrade: typed no refuses without running orbctl update" {

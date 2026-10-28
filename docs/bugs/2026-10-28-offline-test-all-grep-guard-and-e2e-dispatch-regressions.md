@@ -134,6 +134,7 @@ Guardbaseline1failed/1passed. Fixproducer-drain implementation, notallowlist.
 - `scripts/tests/plugins/e2e_remote.bats`
 - `scripts/plugins/e2e_remote.sh`
 - `docs/tests/offline-test-all-regressions.md`
+- `scripts/tests/bin/k3dm_cleanup.bats` — same full run case413, replace GNU-only test inode lookup; production cleanup unchanged
 - `scripts/tests/plugins/hub_data.bats` — 2026-10-28 operator rerun follow-up: isolate four Make recipe fixtures from the arbitrary workspace/socket; production recovery unchanged
 
 ## Rules — current authorized Luna task
@@ -273,3 +274,31 @@ The BATS harness stubs `orbctl` under `$HOME/bin` and tracks calls. Other OrbSta
 - **E4 (offline):** Captured actual case-567 assertion and an isolated red/green test demonstrating both safe non-TTY rejection and bounded fake-TTY behavior. Report whether the failure was due to message mismatch, preflight ordering or accidental interactive input.
 
 **Status:** OPEN; case 567 added as an independent follow-up. No live OrbStack command or upgrade initiated by this filing.
+
+## Current case567 reproduction and case413 follow-up scope
+
+Coordinator watched M4run1793213637: main1913/no failures, bin622/two
+failures413and567; Pythonnotreached. A controlled syntheticPTY baseline with
+existingfakes andinputno reproduces567:status2, outputconfirmationwasnotyes,
+upgrade_spy_called=false. It printedtheconfirmationprompt tosyntheticTTY,
+not humanterminal. BATSrun inheritsstdinTTY inthatcontext, so its supposed
+nonTTYcasewasnotnonTTY. No realupgradeoccurred.
+
+Authorizedrepair: test-only bounded subprocessrunner detachesSTDIN/controlling
+TTY, nonTTYcase expectsmessage/status2/noprompt/no fakeupgrade; simulatedTTY
+yes/no remaininsidefakeenvironment, wholefixtureprocessgroupsbounded30s.
+One stalledfakecommandregressionproves timeout124. Linuxscript-returnflag
+preserves childstatus. Additionalcase413failsstat-c onDarwinbeforecleanup:
+useportablePythoninodeobservation, preservein-place-rotationassertion.
+No productionconfirmation/upgrade/cleanup behaviorchanged; freshpublished
+three-stageacceptance remainsoperator-owned afterfocusedverification.
+
+## OrbStack follow-up independent review result
+
+ControlledsyntheticTTY red/green capturedstatus2/output andspyfalse. Fixed
+fixture explicitlynonTTY+bounded; existingfakeTTYyes/no preserved andbounded.
+Productionupgradeconfirmationunchanged. Samefullrun'scleanup413fixedtestonly
+portableinodeobservation. Finalfocused30BATS/no skips/rawShellCheckPASS;
+fullactualproof in `docs/issues/2026-10-28-orbstack-noninteractive-test-fixture.md`.
+Latestpublishedfullrun1793216188stillfailed2/complete0/test-bin; no post-fix
+fullthree-stagepassclaimed. Operatorfreshacceptance remainsrequired.

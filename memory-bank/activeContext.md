@@ -1157,3 +1157,24 @@ fails:413cleanupstat-cDarwin,567OrbStacknonTTYmessageassert. Pythonnotrun.
 UserupdatedP2commit46a02628 preserved; nowreview/fixfakefixture isolation
 andboundednonTTY/PTY withproductiontypedyesguardkept. Kinedocscommitafter
 runfinished; test-allP2remainsOPEN/fresh3stagepending.
+
+## 2026-10-28 OrbStack automation follow-up reviewed/fixed offline
+
+UserupdatedP2commit46a02628preserved. M4fullruns1793213637and1793216188
+record2535cases/2fails:main1913green(1893pass20skip), bin622fails413cleanup
+GNUstat-cDarwin and567nonTTYmessage; Pythonskippedaftertest-bin. Latest
+metricsfailed2/complete0,laststepbin. Fullverbatimtextlogassets+actualterminal/
+Promstatus in docs/issues/2026-10-28-orbstack-noninteractive-test-fixture.md.
+ControlledfakePTYbaseline567 status2, confirmationnotyes, upgrade_spy=false;
+BATSruninheritedTTY. Test-onlyrunner nowDEVNULLstdin/newsession/30stimeout
+withownedPGkill+boundedcleanup; fakeTTYyes/no bounded, +1stalledfake regression
+exit124. SamePTYgreenexpectednonTTYrefusal/no humanprompt/no upgrade.
+CleanupinodeobservationusesportablePythonos.stat, identityassertionkept.
+Final30BATS/no skips +rawShellCheckclean +diffcheck; productionupgradeand
+cleanupunchanged. Linuxscript-e semanticsreadutil-linuxmanual, noLinuxexec
+claimed. Requiredgates/commit/pushpending; no fullpublishedrerun bycoordinator,
+P2OPENuntilfresh3stagesandfailed0/complete1.
+KineproperrecurrenceP2alreadyfiled/pushed4611543d withliveproof, no recovery
+approval/action. CFoperatorAIsettingsreportreviewed; pendingrecordofreported
+Full/HTTPSoff/min1.0/TLS1.3on+rewriteson andcaveats(noanalyticsnotproof, tunnel
+notredirect/clientcompatguarantee). NoCFwritego. No newplans/PR/CIreruns.

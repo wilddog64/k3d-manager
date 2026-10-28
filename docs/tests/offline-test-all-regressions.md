@@ -101,3 +101,20 @@ this touched test file are corrected without changing test behavior.
 
 See [full operator rerun evidence](../issues/2026-10-28-offline-rerun-hub-fixture-socket.md).
 A fresh full make test-all publication is still operator-owned.
+
+## OrbStack non-TTY and macOS cleanup follow-up
+
+A later fullM4run reachedtest-bin and exposed two different cases. The OrbStack
+nonTTYcase usedBATSrun with inheritedterminalstdin, so it reached typed
+confirmation rather than its expected nonTTYrefusal. Keepproductionconfirmation;
+usefakecommands with explicitlydetached stdin/session and30s outertimeout plus
+boundedcleanup for both nonTTY andsimulatedTTYcases. Added stalledfakecommand
+coverage requires timeout124. A syntheticPTY red/green check proves the fixed
+refusal works even when the surrounding BATS process has aTTY; no upgrade.
+
+The cleanup inode check usedGNUstat-c onDarwin. PortablePythonos.stat observes
+the realinode before/after; the in-place-rotationassertion remains intact.
+Focused30BATS pass, rawShellCheckclean. ActualLinuxscriptbranch execution was
+notperformed; -e childstatus behavior is verified againstutil-linuxmanual.
+Fulloutput/proof in [test-fixture review](../issues/2026-10-28-orbstack-noninteractive-test-fixture.md).
+Freshfullpublishedthree-stageacceptance stillrequired fromoperator.
