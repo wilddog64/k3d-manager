@@ -165,7 +165,7 @@ after_stores="$(_kubectl --no-exit --context "$CONTEXT" get secretstores,cluster
 after_es="$(_kubectl --no-exit --context "$CONTEXT" get externalsecrets -A -o json | jq '[.items[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))] | length')"
 after_apps="$(_kubectl --no-exit --context "$CONTEXT" -n cicd get applications.argoproj.io -o json | jq '[.items[] | select(.status.health.status=="Healthy")] | length')"
 vault_ok=0; _orbstack_vault_sealed || vault_ok=1
-forecast_ok=0; curl -fsS "$PUSHGATEWAY_URL/metrics" | grep -q '^k3dm_release_forecast' && forecast_ok=1
+forecast_ok=0; curl -fsS "$PUSHGATEWAY_URL/metrics" | grep '^k3dm_release_forecast' >/dev/null && forecast_ok=1
 regressions=()
 (( after_nodes >= before_nodes )) || regressions+=(nodes-ready)
 (( vault_ok == 1 )) || regressions+=(vault-unsealed)

@@ -13,6 +13,52 @@ _healthy_blob() {
     'mem_free=45' 'disk_gb=153'
 }
 
+_prepare_dispatch_fixture() {
+  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
+  export E2E_M2_GHCR_TOKEN_SOURCE=none
+  export E2E_M2_LOCK="$BATS_TEST_TMPDIR/runner.lock"
+  DISPATCH_FIXTURE_LOG="$BATS_TEST_TMPDIR/dispatch-fixture.log"
+  DISPATCH_SSH_RC=0
+  : > "$DISPATCH_FIXTURE_LOG"
+  _e2e_remote_load_conf() { :; }
+  _e2e_remote_preflight_with_retry() {
+    printf 'preflight\n' >> "$DISPATCH_FIXTURE_LOG"
+    printf 'status=available\n'
+    return 0
+  }
+  git() {
+    printf 'git %s\n' "$*" >> "$DISPATCH_FIXTURE_LOG"
+    case "$*" in
+      *'rev-parse HEAD'*) printf '0123456789abcdef\n' ;;
+      *'branch -r --contains 0123456789abcdef'*) printf 'origin/fixture\n' ;;
+      *) return 91 ;;
+    esac
+  }
+  _e2e_remote_ssh() {
+    printf 'remote-helper %s\n' "$*" >> "$DISPATCH_FIXTURE_LOG"
+    case "$*" in
+      'mkdir '* ) return "${DISPATCH_LOCK_RC:-0}" ;;
+      'cat '* ) printf 'owner=fixture pid=4242 ts=1\n'; return 0 ;;
+      *'grep -qxF'*'rm -rf'*) printf 'lock-release\n' >> "$DISPATCH_FIXTURE_LOG"; return 0 ;;
+      *) return 92 ;;
+    esac
+  }
+  _e2e_remote_resolve_ghcr_token() {
+    printf 'credential-resolver\n' >> "$DISPATCH_FIXTURE_LOG"
+    return 1
+  }
+  _e2e_remote_copy_results() {
+    printf 'copy-results\n' >> "$DISPATCH_FIXTURE_LOG"
+    return 1
+  }
+  _e2e_remote_ssh_opts() { printf '%s\n' -o BatchMode=yes; }
+  ssh() {
+    printf 'ssh %s\n' "$*" >> "$DISPATCH_FIXTURE_LOG"
+    return "$DISPATCH_SSH_RC"
+  }
+  scp() { printf 'scp %s\n' "$*" >> "$DISPATCH_FIXTURE_LOG"; return 93; }
+}
+
 @test "public runner functions are dispatchable (no leading underscore)" {
   for fn in e2e_runner_bootstrap e2e_runner_preflight e2e_runner_status \
             e2e_runner_dispatch e2e_result_publish e2e_result_publisher_install; do
@@ -120,7 +166,11 @@ _healthy_blob() {
     return 1
   }
   sleep() { :; }
+  # Consumed indirectly by the sourced retry helper.
+  # shellcheck disable=SC2034
   E2E_M2_CAPACITY_RETRIES=2
+  # Consumed indirectly by the sourced retry helper.
+  # shellcheck disable=SC2034
   E2E_M2_CAPACITY_RETRY_INTERVAL=0
   run _e2e_remote_preflight_with_retry
   [ "$status" -ne 0 ]
@@ -191,6 +241,8 @@ _healthy_blob() {
 }
 
 @test "cluster reconcile refuses to operate on the hub cluster name" {
+  # Consumed indirectly by the sourced reconcile helper.
+  # shellcheck disable=SC2034
   E2E_M2_RUNNER_CLUSTER="k3d-cluster"
   _e2e_remote_ssh() { return 1; }
   run _e2e_remote_reconcile_cluster
@@ -829,29 +881,48 @@ print("ok")' "$outf"
 }
 
 @test "dispatch refuses and never falls back locally when the lock is held" {
-  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
-  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
-  _e2e_remote_lock_acquire() { return 1; }
-  ssh() { echo "SSH SHOULD NOT RUN" >&2; return 0; }
+  _prepare_dispatch_fixture
+  DISPATCH_LOCK_RC=1
   run e2e_runner_dispatch "m2"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"busy"* ]]
+  [[ "$output" == *"busy (lock held)"* ]]
   [[ "$output" == *"no local fallback"* ]]
-  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+  run cat "$DISPATCH_FIXTURE_LOG"
+  [[ "$output" == *"preflight"* ]]
+  [[ "$output" == *"remote-helper mkdir "* ]]
+  [[ "$output" == *"remote-helper cat "* ]]
+  [[ "$output" != *$'\nssh '* ]]
+  [[ "$output" != *"credential-resolver"* ]]
+  [[ "$output" != *"copy-results"* ]]
+  [[ "$output" != *"scp "* ]]
+  [[ "$output" != *"e2e_verify_vcluster"* ]]
 }
 
-@test "dispatch chains publish-back after the E2E and preserves the exit code" {
-  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
-  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
-  _e2e_remote_lock_acquire() { return 0; }
-  _e2e_remote_lock_release() { return 0; }
-  SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"
-  ssh() { printf '%s\n' "$*" > "$SSH_LOG"; return 0; }
+@test "dispatch chains publish-back after E2E and returns zero after lock release" {
+  _prepare_dispatch_fixture
   run e2e_runner_dispatch "m2"
   [ "$status" -eq 0 ]
-  run cat "$SSH_LOG"
+  run cat "$DISPATCH_FIXTURE_LOG"
   [[ "$output" == *"e2e_verify_vcluster"* ]]
   [[ "$output" == *"e2e_runner_publish_back"* ]]
+  [[ "$output" == *"e2e_verify_vcluster "*'rc=$?;'*'e2e_runner_publish_back $rc || true; exit $rc'* ]]
+  [[ "$output" == *"credential-resolver"* ]]
+  [[ "$output" == *"copy-results"* ]]
+  [[ "$output" == *"lock-release"* ]]
+  [[ "$output" != *"scp "* ]]
+}
+
+@test "dispatch preserves a nonzero SSH exit after tee and failed result copy" {
+  _prepare_dispatch_fixture
+  DISPATCH_SSH_RC=23
+  run e2e_runner_dispatch "m2"
+  [ "$status" -eq 23 ]
+  run cat "$DISPATCH_FIXTURE_LOG"
+  [[ "$output" == *"ssh "*"e2e_verify_vcluster"* ]]
+  [[ "$output" == *"e2e_runner_publish_back"* ]]
+  [[ "$output" == *"e2e_verify_vcluster "*'rc=$?;'*'e2e_runner_publish_back $rc || true; exit $rc'* ]]
+  [[ "$output" == *"copy-results"* ]]
+  [[ "$output" == *"lock-release"* ]]
 }
 
 @test "newest_summary returns the latest run json and skips retention markers" {
@@ -899,7 +970,11 @@ print("ok")' "$f"
 }
 
 @test "publish_back_push uses the dedicated key and streams the file over stdin" {
+  # Consumed indirectly by the sourced publish-back helper.
+  # shellcheck disable=SC2034
   E2E_PUBLISH_BACK_HOST="m4host"
+  # Consumed indirectly by the sourced publish-back helper.
+  # shellcheck disable=SC2034
   E2E_PUBLISH_BACK_KEY="/keys/e2e-m4-publisher"
   SSH_LOG="$BATS_TEST_TMPDIR/ssh.log"; STDIN_LOG="$BATS_TEST_TMPDIR/stdin.log"
   ssh() { printf '%s\n' "$*" > "$SSH_LOG"; cat > "$STDIN_LOG"; return 0; }
@@ -1084,6 +1159,8 @@ print("ok")' "$f"
 }
 
 @test "health reports a hub outage as critical, distinct from runner state" {
+  # Consumed indirectly by the shared _kubectl mock.
+  # shellcheck disable=SC2034
   KUBECTL_EXIT_CODES=(1)
   e2e_runner_status() { printf 'status=available\n'; }
   run e2e_runner_health

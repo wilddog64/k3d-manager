@@ -126,12 +126,17 @@ exit 0
 SH
   cat >"$HOME/bin/curl" <<'SH'
 #!/usr/bin/env bash
+set -e
 printf 'curl %s\n' "$*" >> "$TEST_CALLS.curl-args"
 if [[ "$*" == *'/metrics/job/k3dm-orbstack-upgrade' ]]; then
   cat >> "$TEST_CALLS.curl-body"
   exit 0
 fi
 printf 'k3dm_release_forecast{release="v1.43.9"} 1\n'
+for ((i=0; i<${ORBSTACK_TEST_METRICS_LINES:-0}; i++)); do
+  printf 'fixture_metric{index="%s"} 1\n' "$i"
+done
+printf 'complete\n' > "$TEST_CALLS.metrics-complete"
 SH
   cat >"$HOME/bin/manager" <<'SH'
 #!/usr/bin/env bash
@@ -302,6 +307,16 @@ PLIST
   _run_tty yes
   [ "$status" -eq 0 ]
   [[ "$output" != *'upgrade failed'* ]]
+}
+
+@test "orbstack upgrade: forecast probe drains large metrics producer to completion" {
+  export ORBSTACK_TEST_METRICS_LINES=20000
+  _run_tty yes
+  [ -f "$TEST_CALLS.metrics-complete" ]
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TEST_CALLS.metrics-complete")" = complete ]
+  jq -e '.result == "success" and .verify.release_forecast_present == true and
+    (.verify.regressions | index("release-forecast")) == null' "$(_report)"
 }
 
 @test "orbstack upgrade: reports empty regressions for equal counts and names a count drop" {
