@@ -720,3 +720,24 @@ New bounded P2 scan-gate spec filed, no implementation/dispatch authorization
 inferred and no cause of exact live discrepancy asserted. Full outputs
 docs/issues/2026-10-27-app-cve-scan-auth-recovery-and-gate-followup.md.
 Operator scope choice pending before new fix; remaining live items queued.
+
+## Dashboard open-row clarification — three screenshot bugs
+
+Read-only record review; no new runtime test or implementation. Exact canonical status lines:
+
+```text
+2026-10-27-dispatch-startup-failure-log-link-empty.md
+**Status:** OPEN — source-level cause confirmed; implementation not dispatched
+2026-10-27-ask-docs-priority-count-requires-bugs-word.md
+**Status:** OPEN — reproduced locally; implementation not dispatched
+2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery.md
+**Status:** OPEN — current local and Slack health confirmed; historical offsite cause remains unknown
+```
+
+P3 Log-link bug: exit127 startup attempts have local codex.log error evidence but dashboard links to Loki, which only receives landing-test logs; startup attempts never reached landing. Follow-up should explain local-only/unavailable logs without shipping worker transcripts. Those historical attempts failed; later retry2 landed. No implementation dispatched.
+
+P2 ask-docs bug: exact question how many P1 open for v1.43.5 lacks nounbugs, misses deterministic tally and falls to irrelevant retrieval. Workaround addbugs to question. Recorded outside initial six; no implementation dispatched.
+
+P2 webhook incident: diagnostic helper and later port/Keychain/timeout corrections implemented and tested; current local health and Slack fix-list delivery confirmed. Locked Keychain explained later reader-auth symptom and was unlocked by operator, but is not established as original offsite outage cause. Historical cause still unknown and cloud-bridge route not independently exercised. OPEN is incident investigation status, not evidence the webhook is currently down or the doctor implementation is unfinished.
+
+No status was changed merely to make the dashboard green; no code changed, so no new BATS/ShellCheck run. Existing implementation test output remains linked in the canonical incident and batch evidence.
