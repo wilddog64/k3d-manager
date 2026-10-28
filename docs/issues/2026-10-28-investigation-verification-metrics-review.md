@@ -727,3 +727,19 @@ No fullcurated-suite rerun, prior unrelated failuresremainrecorded. No live
 publisher/provider/Keychain/serviceaction or screenshotexport. Firstoperatorstep
 bin/k3dm-vectordb-metrics; thenreadpublishedrowandoperatorUIoneatatime. Parent
 historicalcause remainsunconfirmed; thisfix verifiestrackingofrecoveryproof only.
+
+## Operator publication and independent live data check — PASS
+
+Operator confirmed publisher completed. Read-only Pushgateway query of exact
+incident returned one current row; observation recorded at 2026-10-28T12:57:54.018567+00:00:
+```text
+k3dm_bug_info{branch="k3d-manager-v1.43.9",bug="2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery",filed="2026-10-26",fix_sha="-",fixed_in="v1.43.9",instance="",job="k3dm-bug-open",live_evidence="ok",live_verified="true",live_verified_at="2026-10-28",priority="P2",release="v1.43.9",release_order="9998.9956.9990 v1.43.9",repo="k3d-manager",sort_key="9998.9956.9990 v1.43.9 P2 3 2026-10-26 2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery",status="fixed",title="Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery",verified="true",verified_at="2026-10-28",verified_sha="7ea1032f"} -2
+
+```
+Assertions passed: statusfixed, verifiedtrue, live_verifiedtrue, live_evidenceok,
+dates2026-10-28, actualproofrecordSHA7ea1032f, causalfix_sha'-', value-2 stops
+Openforcount. Existing parentmetadata remainedCLOSED/recovered; currentruntime
+proof is recognized without claiming a causal fix. Historicalcauseunconfirmed.
+DataflowlivePASS; operatorexistingrowvisualcheck stillpending beforefixP3closure.
+No coordinatorpublication/service/provider/credentialwrite or screenshotexport.
+Docs-onlyverificationrecord; no implementation test rerun required.

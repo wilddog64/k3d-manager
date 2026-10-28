@@ -1272,3 +1272,13 @@ auditpasswithoutbypass. Actualfulloutputs docs/issues/2026-10-28-investigation-v
 Operatorpublisher/rowcheckpending, notLIVE-VERIFIEDyet. Historicalcauseremains
 unknownfollowup; no livewrites/credentials/screenshotexports/PR. Firstsingle
 operator bin/k3dm-vectordb-metrics thenpublishedmetric/UIcheck.
+
+## 2026-10-28 investigation metrics published-data PASS
+
+Operator publisherdone; independent exactPushgatewayincidentrow: statusfixed,
+verifiedtrue/livetrue/evidenceok/date2026-10-28/record7ea1032f/fix_sha'-'/value-2.
+Onecurrentrow, allassertionspass. OriginalincidentCLOSED unchanged, historical
+causeunconfirmed; recoveryproofrecognized. Fullactualrow in investigationmetrics
+reviewissue. Nextsingleoperator refreshBugTracking andshowfilteredincidentrow;
+P3codefixremainsVERIFIED untilvisualacceptance. No runtimewrite/testrerun/image
+export/PR. NativeLunafixc96d0d13 alreadypushed with269Python/38BATS gates.
