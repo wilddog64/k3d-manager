@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""Read-only Cloudflare zone and public endpoint posture snapshot."""
+import json
+import os
+import re
+import socket
+import ssl
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from urllib.parse import urljoin, urlsplit
+
+API_HOST = "api.cloudflare.com"
+HOSTS = tuple(f"{name}.3ai-talk.org" for name in (
+    "alertmanager", "argocd", "frontend", "grafana", "keycloak",
+    "prometheus", "webhook",
+))
+SETTING_VALUES = {
+    "always_use_https": ("on", "off"),
+    "min_tls_version": ("1.0", "1.1", "1.2", "1.3"),
+    "ssl": ("off", "flexible", "full", "strict", "origin_pull"),
+    "tls_1_3": ("on", "off", "zrt"),
+}
+SETTING_NAMES = ("always_use_https", "min_tls_version", "ssl", "security_header", "tls_1_3")
+ZONE_RE = re.compile(r"^[0-9a-fA-F]{32}$")
+TIMEOUT = 8
+MAX_BYTES = 65536
+HELP = """usage: k3dm-cloudflare-posture [-h] [--check | --dry-run]
+                               [--zone-id ZONE_ID] [--settings-file FILE]
+                               [--timeout SECONDS]
+
+Read-only Cloudflare zone and public endpoint posture snapshot.
+
+options:
+  -h, --help            show this help message and exit
+  --check               perform read-only API and public endpoint probes
+  --dry-run             print the plan without access (default)
+  --zone-id ZONE_ID     Cloudflare zone ID (32 hexadecimal characters)
+  --settings-file FILE  existing sanitized snapshot; not a current API read
+  --timeout SECONDS     per-request timeout, 1-20 seconds (default: 8)
+"""
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _sanitize_setting(name, value):
+    """Allow only documented values; never echo server-supplied arbitrary text."""
+    if name in SETTING_VALUES:
+        return value if type(value) is str and value in SETTING_VALUES[name] else None
+    if name == "security_header" and isinstance(value, dict):
+        hsts = value.get("strict_transport_security")
+        enabled = hsts.get("enabled") if isinstance(hsts, dict) else None
+        if type(enabled) is bool:
+            return {"strict_transport_security": {"enabled": enabled}}
+    return None
+
+
+def _result_value(result, name):
+    if not isinstance(result, dict) or result.get("id") != name:
+        return None
+    return _sanitize_setting(name, result.get("value"))
+
+
+def _setting_value(payload, name):
+    if not isinstance(payload, dict) or payload.get("success") is not True:
+        return None
+    return _result_value(payload.get("result"), name)
+
+
+def _snapshot_items(payload):
+    """Accept Cloudflare single/list response envelopes or explicit setting maps."""
+    if "success" not in payload:
+        return payload.get("settings", payload)
+    if payload.get("success") is not True:
+        return {}
+    result = payload.get("result")
+    entries = result if isinstance(result, list) else [result]
+    items, seen = {}, set()
+    for item in entries:
+        if not isinstance(item, dict) or item.get("id") not in SETTING_NAMES:
+            continue
+        name = item["id"]
+        items[name] = None if name in seen else item
+        seen.add(name)
+    return items
+
+
+def _normalize_snapshot(payload):
+    source = _snapshot_items(payload) if isinstance(payload, dict) else {}
+    source = source if isinstance(source, dict) else {}
+    clean = {}
+    for name in SETTING_NAMES:
+        item = source.get(name)
+        if isinstance(item, dict) and "success" in item:
+            value = _setting_value(item, name)
+        elif isinstance(item, dict) and ("id" in item or "value" in item):
+            value = _result_value(item, name)
+        else:
+            value = _sanitize_setting(name, item)
+        clean[name] = value
+    return clean
+
+
+def read_snapshot(path):
+    try:
+        with open(path, "rb") as stream:
+            raw = stream.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise ValueError("snapshot too large")
+        return _normalize_snapshot(json.loads(raw)), None
+    except (OSError, ValueError, UnicodeError, RecursionError):
+        return dict.fromkeys(SETTING_NAMES), "snapshot unavailable or malformed"
+
+
+def _api_opener():
+    # Neither proxy environment variables nor redirect responses may forward Bearer.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+
+def read_api_setting(zone_id, token, name, timeout=TIMEOUT):
+    if not ZONE_RE.fullmatch(zone_id) or name not in SETTING_NAMES:
+        return None
+    url = f"https://{API_HOST}/client/v4/zones/{zone_id}/settings/{name}"
+    request = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/json",
+        "User-Agent": "k3dm-cloudflare-posture/1",
+    }, method="GET")
+    try:
+        with _api_opener().open(request, timeout=timeout) as response:
+            if response.geturl() != url or response.status != 200:
+                return None
+            raw = response.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            return None
+        return _setting_value(json.loads(raw), name)
+    except urllib.error.HTTPError as error:
+        error.close()
+        return None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, RecursionError):
+        return None
+
+
+def read_api(zone_id, token, timeout=TIMEOUT):
+    return {name: read_api_setting(zone_id, token, name, timeout) for name in SETTING_NAMES}
+
+
+def _location_parts(value, scheme, host):
+    if not isinstance(value, str) or len(value) > MAX_BYTES:
+        return None
+    try:
+        parsed = urlsplit(urljoin(f"{scheme}://{host}/", value))
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return None
+        # Accessing port validates it without retaining any arbitrary header content.
+        parsed.port
+        return parsed
+    except ValueError:
+        return None
+
+
+def sanitize_location(value, scheme, host):
+    if not value:
+        return None
+    parsed = _location_parts(value, scheme, host)
+    if parsed is None:
+        return "[redacted]"
+    destination = parsed.hostname if parsed.hostname in HOSTS else "[external-host]"
+    path = "/" if parsed.path in ("", "/") else "/[redacted]"
+    return f"{parsed.scheme}://{destination}{path}"
+
+
+def _redirect_flags(value, scheme, host):
+    parsed = _location_parts(value, scheme, host)
+    if parsed is None:
+        return None
+    default_port = 443 if parsed.scheme == "https" else 80
+    equivalent_root = (parsed.hostname == host and parsed.port in (None, default_port)
+                       and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
+                       and parsed.username is None and parsed.password is None)
+    return {
+        "https_equivalent": scheme == "http" and parsed.scheme == "https" and equivalent_root,
+        "self_redirect": parsed.scheme == scheme and equivalent_root,
+        "transport": "upgrade" if scheme == "http" and parsed.scheme == "https" else
+                     "downgrade" if scheme == "https" and parsed.scheme == "http" else "same_scheme",
+        "destination_host_known": parsed.hostname in HOSTS,
+    }
+
+
+def _http_observation(status, location, scheme, host):
+    return {"status": status, "location": sanitize_location(location, scheme, host),
+            "redirect": _redirect_flags(location, scheme, host) if 300 <= status < 400 else None,
+            "result": "response"}
+
+
+def probe_http(scheme, host, timeout=TIMEOUT):
+    request = urllib.request.Request(f"{scheme}://{host}/", headers={
+        "User-Agent": "k3dm-cloudflare-posture/1", "Accept": "*/*",
+    }, method="GET")
+    try:
+        with _api_opener().open(request, timeout=timeout) as response:
+            return _http_observation(response.status, response.headers.get("Location"), scheme, host)
+    except urllib.error.HTTPError as error:
+        result = _http_observation(error.code, error.headers.get("Location"), scheme, host)
+        error.close()
+        return result
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return {"status": None, "location": None, "redirect": None, "result": "unknown"}
+
+
+def _tls_error_kind(error):
+    if isinstance(error, ssl.SSLCertVerificationError):
+        return "certificate_error"
+    if isinstance(error, (socket.gaierror, TimeoutError)):
+        return "dns_or_timeout"
+    if isinstance(error, (ValueError, NotImplementedError)):
+        return "client_unsupported"
+    # Use structured OpenSSL reasons, never broad matches against exception text.
+    reason = getattr(error, "reason", None)
+    if isinstance(error, ssl.SSLError) and reason == "TLSV1_ALERT_PROTOCOL_VERSION":
+        return "edge_rejected"
+    if isinstance(error, ssl.SSLError) and reason in (
+        "VERSION_TOO_LOW", "UNSUPPORTED_PROTOCOL", "NO_PROTOCOLS_AVAILABLE",
+        "NO_CIPHERS_AVAILABLE", "NO_CIPHERS_SPECIFIED",
+    ):
+        return "client_unsupported"
+    return "inconclusive"
+
+
+def probe_tls(host, version, timeout=TIMEOUT):
+    versions = {
+        "1.0": getattr(ssl.TLSVersion, "TLSv1", None),
+        "1.1": getattr(ssl.TLSVersion, "TLSv1_1", None),
+        "1.2": getattr(ssl.TLSVersion, "TLSv1_2", None),
+        "1.3": getattr(ssl.TLSVersion, "TLSv1_3", None),
+    }
+    selected = versions[version]
+    if selected is None:
+        return {"result": "client_unsupported", "negotiated": None, "certificate_valid": None}
+    try:
+        context = ssl.create_default_context()
+        context.minimum_version = selected
+        context.maximum_version = selected
+        with socket.create_connection((host, 443), timeout=timeout) as raw:
+            with context.wrap_socket(raw, server_hostname=host) as secured:
+                negotiated = secured.version()
+                expected = {"1.0": "TLSv1", "1.1": "TLSv1.1", "1.2": "TLSv1.2", "1.3": "TLSv1.3"}[version]
+                observed = negotiated if negotiated in ("TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3") else None
+                return {"result": "negotiated" if observed == expected else "inconclusive",
+                        "negotiated": observed, "certificate_valid": True}
+    except (OSError, ValueError, NotImplementedError) as error:
+        return {"result": _tls_error_kind(error), "negotiated": None,
+                "certificate_valid": False if isinstance(error, ssl.SSLCertVerificationError) else None}
+
+
+def posture(settings):
+    https = _sanitize_setting("always_use_https", settings.get("always_use_https"))
+    tls = _sanitize_setting("min_tls_version", settings.get("min_tls_version"))
+    return {"https_enforcement": https or "unknown", "minimum_tls": tls or "unknown"}
+
+
+def run_check(args):
+    if args.settings_file:
+        settings, source_error = read_snapshot(args.settings_file)
+        source = "operator-supplied sanitized snapshot; not a current API read"
+    else:
+        token = os.environ.get("CLOUDFLARE_API_TOKEN")
+        if not token or not ZONE_RE.fullmatch(args.zone_id or ""):
+            settings, source_error, source = dict.fromkeys(SETTING_NAMES), "credential or valid zone id unavailable", "Cloudflare API"
+        else:
+            settings, source_error, source = read_api(args.zone_id, token, args.timeout), None, "Cloudflare API read attempted"
+    if any(value is None for value in settings.values()) and source_error is None:
+        source_error = "one or more settings unknown"
+    output = {"timestamp_utc": datetime.now(timezone.utc).isoformat(), "source": source,
+              "settings": settings, "posture": posture(settings), "source_error": source_error,
+              "f0_complete": False, "exit_status_meaning": "report completion only; F0 requires operator review",
+              "probes": {}}
+    for host in HOSTS:
+        output["probes"][host] = {
+            "http": probe_http("http", host, args.timeout),
+            "https": probe_http("https", host, args.timeout),
+            "tls": {version: probe_tls(host, version, args.timeout) for version in ("1.0", "1.1", "1.2", "1.3")},
+        }
+    print(json.dumps(output, indent=2, sort_keys=True))
+    return 0
+
+
+def _parse_args(argv):
+    # A small parser avoids argparse/gettext's implicit environment locale lookups.
+    values = {"check": False, "dry_run": False, "zone_id": None, "settings_file": None, "timeout": TIMEOUT}
+    options = {"--zone-id": "zone_id", "--settings-file": "settings_file", "--timeout": "timeout"}
+    index = 0
+    while index < len(argv):
+        argument = argv[index]
+        if argument in ("--check", "--dry-run"):
+            values[argument[2:].replace("-", "_")] = True
+        elif argument in options:
+            index += 1
+            if index >= len(argv):
+                raise ValueError("option requires a value")
+            values[options[argument]] = argv[index]
+        else:
+            raise ValueError("unsupported argument")
+        index += 1
+    if values["check"] and values["dry_run"]:
+        raise ValueError("--check and --dry-run are mutually exclusive")
+    values["timeout"] = float(values["timeout"])
+    if not 1 <= values["timeout"] <= 20:
+        raise ValueError("--timeout must be between 1 and 20 seconds")
+    return SimpleNamespace(**values)
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if "--help" in argv or "-h" in argv:
+        print(HELP, end="")
+        return 0
+    try:
+        args = _parse_args(argv)
+    except ValueError:
+        print("Invalid arguments; use --help. Timeout must be 1-20 seconds.", file=sys.stderr)
+        return 2
+    if args.check:
+        return run_check(args)
+    print("Read-only plan: optionally read Cloudflare zone settings and probe the seven fixed public hosts; no access performed. Use --check explicitly.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a bounded, read-only Cloudflare HTTPS/TLS posture and preflight helper with allowlisted snapshot/API values, redacted redirect observations, conservative TLS error classification, and offline fixture tests; live setting changes and endpoint acceptance remain operator-controlled.
+
 - Add a read-only webhook incident doctor with bounded, redacted local health
   diagnostics and offline fixture coverage. Operator recovery and live incident
   verification remain separate actions.
