@@ -386,15 +386,40 @@ assert org["renameByName"].get("evidence_summary")=="Result"
 assert org["renameByName"].get("evidence_path")=="Log"
 assert org["excludeByName"].get("evidence") is True
 assert "evidence_summary" in table["targets"][0]["expr"] and "evidence_path" in table["targets"][0]["expr"]
+assert ", loki_url," in table["targets"][0]["expr"]
+assert org["excludeByName"].get("loki_url") is True
 log_overrides=[o for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"}]
 assert len(log_overrides)==1
 log_properties={p["id"]:p["value"] for p in log_overrides[0]["properties"]}
 assert log_properties.get("custom.inspect") is True and log_properties.get("custom.width", 999)>0 and log_properties["custom.width"]<=160
+assert log_properties["links"][0]["title"]=="Open shipped landing-test log"
+assert log_properties["links"][0]["url"]=="${__data.fields.loki_url}"
+assert "Landing-test logs are shipped" in table["description"]
+assert "local and are labeled local only (not shipped)" in table["description"]
 assert "file://" not in text
 widths={o["matcher"]["options"]:p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]["id"]=="byName" for p in o["properties"] if p["id"]=="custom.width"}
 assert all(name in widths for name in ("version","run","outcome","Result","Log","Tokens")), widths
 assert "slug" not in widths
 assert sum(widths.values())<=table["gridPos"]["w"]*55-300, widths
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+table=next(p for p in d["panels"] if p["id"]==47)
+assert "codex.log files stay local" in table["description"]
+assert "not shipped" in table["description"]
+assert ", loki_url," in table["targets"][0]["expr"]
+assert next(t for t in table["transformations"] if t["id"]=="organize")["options"]["excludeByName"].get("loki_url") is True
+log=next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"})
+link=next(p["value"][0] for p in log["properties"] if p["id"]=="links")
+assert link["title"]=="Open shipped landing-test log"
+assert link["url"]=="${__data.fields.loki_url}"
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -437,8 +462,8 @@ props=log["properties"]
 assert any(p["id"]=="custom.inspect" and p["value"] for p in props)
 links=next(p["value"] for p in props if p["id"]=="links")
 url=links[0]["url"]
-assert links[0]["title"]=="Open log" and "/d/k3dm-agent-run-log" in url
-assert all(f"var-{key}=${{__data.fields.{key}}}" in url for key in ("version","slug","run")),url
+# agent-audit: allow assert-removed static log URL; supported rows carry a metric-generated target and unsupported rows have no target.
+assert links[0]["title"]=="Open shipped landing-test log" and url=="${__data.fields.loki_url}"
 assert "file://" not in json.dumps(d)
 runlog=load("grafana-dashboard-agent-run-log.yaml","agent-run-log.json")
 assert runlog["uid"]=="k3dm-agent-run-log"

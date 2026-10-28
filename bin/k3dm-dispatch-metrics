@@ -564,6 +564,7 @@ def _evidence_details(version, slug, evidence):
             summary = "; ".join(summaries) if summaries else "unknown"
     elif evidence == "codex_exit.exit":
         path = _display_path(run_dir / "codex.log")
+        summary = "local only (not shipped)"
     return summary, path
 
 
@@ -913,12 +914,15 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 continue
             evidence_summary, evidence_path = _evidence_details(version, slug, evidence)
             if evidence == "codex_exit.exit":
-                evidence_summary = f"exit {exit_event.get('exit', 'unknown')}"
+                evidence_summary = f"exit {exit_event.get('exit', 'unknown')}; {evidence_summary}"
             outcomes[outcome] += 1
             task_rows.append({"run": run_number, "outcome": outcome, "tokens": increment,
                               "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
                               "evidence": evidence, "evidence_summary": evidence_summary,
-                              "evidence_path": evidence_path})
+                              "evidence_path": evidence_path,
+                              "loki_url": (f"/d/k3dm-agent-run-log?var-version={version}&var-slug={slug}"
+                                           f"&var-run={run_number}&from=now-30d&to=now"
+                                           if evidence in {"land-test.log", "land_refused.tests"} else None)})
             if outcome in {"rework", "failed"} and evidence in {"land_refused.tests", "codex_exit.exit"}:
                 rejected_seen = True
                 if increment is not None:
@@ -1204,7 +1208,9 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         labels = f'window="{window}",version="{version}",slug="{slug}",run="{row["run"]}",repo="{repo}"'
         evidence_summary = _label_value(row.get("evidence_summary", "unknown"))
         evidence_path = _label_value(row.get("evidence_path", ""), limit=512)
-        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"}} 1')
+        loki_url = row.get("loki_url")
+        loki_label = f',loki_url="{_label_value(loki_url, limit=512)}"' if isinstance(loki_url, str) and loki_url else ""
+        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"{loki_label}}} 1')
         if type(row["tokens"]) is int:
             lines.append(f'k3dm_dispatch_task_run_codex_tokens{{{labels}}} {row["tokens"]}')
         if type(row.get("agent_tokens")) is int:

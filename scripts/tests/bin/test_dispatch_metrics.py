@@ -525,6 +525,8 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 100' in output
     assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="attempt",run="2",repo="k3d-manager"} 60' in output
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
+    refused = next(line for line in output.splitlines() if 'evidence="land_refused.tests"' in line)
+    assert 'loki_url="/d/k3dm-agent-run-log?var-version=9.9.9&var-slug=attempt&var-run=1&from=now-30d&to=now"' in refused
 
 
 @pytest.mark.parametrize(("log_text", "expected"), [
@@ -547,6 +549,7 @@ def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, monke
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
     assert f'evidence_summary="{expected}"' in line
     assert 'evidence_path="9.9.9/attempt.run/land-test.log"' in line
+    assert 'loki_url="/d/k3dm-agent-run-log?var-version=9.9.9&var-slug=attempt&var-run=1&from=now-30d&to=now"' in line
     assert str(tmp_path) not in line
     assert 'evidence="land-test.log"' in line
 
@@ -558,9 +561,36 @@ def test_run_outcome_missing_log_and_codex_exit_keep_metrics_valid(tmp_path):
         event(now - 10, "codex_exit", "missing", run=1, exit=7, tokens=10),
     ], 0, now, repo_root=tmp_path)
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
-    assert 'evidence_summary="exit 7"' in line
+    # agent-audit: allow assert-removed replace exact summary with exit plus local-only explanation
+    assert 'evidence_summary="exit 7; local only (not shipped)"' in line
     assert line.split('evidence_path="', 1)[1].split('"', 1)[0].endswith("/missing.run/codex.log")
     assert "\\n" not in line and "\\" not in line and line.count('"') % 2 == 0
+
+
+def test_failed_startup_exit127_is_local_only_and_retains_codex_log_path(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "startup", run=1),
+        event(now - 10, "codex_exit", "startup", run=1, exit=127, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'outcome="failed"' in line and 'evidence="codex_exit.exit"' in line
+    assert 'evidence_summary="exit 127; local only (not shipped)"' in line
+    assert 'evidence_path="9.9.9/startup.run/codex.log"' in line
+    assert 'loki_url=' not in line
+    assert str(tmp_path) not in line
+
+
+def test_legacy_unknown_run_evidence_does_not_claim_a_log(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "legacy", run=1),
+        event(now - 10, "codex_exit", "legacy", run=1, exit=0, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'evidence="none"' in line and 'evidence_summary="none"' in line
+    assert 'evidence_path=""' in line
+    assert 'loki_url=' not in line
 
 
 def test_accepted_missing_log_is_unknown_and_render_succeeds(tmp_path):
