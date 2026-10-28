@@ -567,7 +567,9 @@ def test_run_outcome_missing_log_and_codex_exit_keep_metrics_valid(tmp_path):
     assert "\\n" not in line and "\\" not in line and line.count('"') % 2 == 0
 
 
-def test_failed_startup_exit127_is_local_only_and_retains_codex_log_path(tmp_path):
+def test_failed_startup_exit127_is_local_only_and_retains_codex_log_path(tmp_path, monkeypatch):
+    # Keep path expectations independent of whether the runner TMPDIR is under the operator home.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     now = int(time.time())
     output = dispatch_metrics.render([
         event(now - 20, "start", "startup", run=1),
