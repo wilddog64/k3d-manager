@@ -2222,3 +2222,11 @@ Raw shellcheck -x -S warning scripts/tests/plugins/hub_data.bats exits0 without
 output; diff check clean. No fullpublishedtest-all rerun by coordinator.
 Operator still needs fresh all-three-stage completion/publication before the
 P2 or alerts can be considered resolved.
+
+## Remote implementation checkpoint
+
+Recovery fixture fix cfb60be0 is pushed on k3d-manager-v1.43.9. Required staged
+lint/audit and checkpoint hooks passed. Full116-case BATS and raw ShellCheck
+proof above; no PR created (Claude owns PRs). Socket remains untouched.
+Full fresh operator make test-all and published completion/alert acceptance
+remain pending; this record does not report the full pipeline green.

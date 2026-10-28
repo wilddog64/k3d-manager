@@ -351,3 +351,24 @@ Diff check exit0/no output. No actual --check executed by coordinator.
 BATS/Python helper logic unchanged, so existing helper169-case proof remains
 prior evidence rather than a claimed rerun. Required staged lint/audit/hooks
 run before commit. Cloudflare security bug remains OPEN.
+
+## Remote implementation proof and operator probe clarification
+
+Make shortcut committed/pushed7ce79b70. Staged lint/audit and normal checkpoint
+hooks/doc links passed; dry-run verification output above is actual, no live
+probe run by coordinator. Actual git log origin/k3d-manager-v1.43.9 --oneline -3
+at this checkpoint:
+
+```text
+7ce79b70 checkpoint: before add read-only Cloudflare preflight Make shortcut and record operator results
+cfb60be0 checkpoint: before isolate hub recovery recipe fixtures from workspace socket
+da59b50d checkpoint: before record both P2 Luna landings and pending operator acceptance
+```
+
+Operator asked whether HTTP probes should be updated to HTTPS. Keep both:
+HTTP tests whether the public entry redirects to HTTPS; HTTPS verifies the
+secure endpoint. Replacing HTTP would hide the enforcement gap. Cloudflare
+Always Use HTTPS is the intended edge change after remaining preflight review;
+afterward expect HTTP301/308 toHTTPS, with directHTTPS baseline preserved.
+Current API settings still unknown, clientunsupportedlegacyTLS inconclusive.
+No live change approved/performed and no historical502 cause inferred.

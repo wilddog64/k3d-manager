@@ -1026,3 +1026,17 @@ shortcutrequestimplementedcloudflare-preflight ZONE_ID=<zone>, DRY_RUN=1;
 make-n/dryrunPASS, no coordinatorliveprobes/credentials. Makecommitpending
 requiredgates/push. PriorCFhelper2e0be3f6verified169tests unchanged/norerun.
 IncidentGUI/payment-onlyPRChecks pending; no screenshotexport/newplan/PR.
+
+## 2026-10-28 Make preflight shortcut pushed / HTTP probes retained
+
+Make+howtoimplementation7ce79b70pushed, stagedlint/audit/checkpointhooks/docs
+pass; make-ncheck andrealDRY_RUN=1planpass(no accesses). No newmirroringtests,
+helperlogicunchanged. Currentoperatorpreflightpartial (APIcredentialabsent,
+legacyTLSclientunsupported), F0manualrules/SSO/Slackreviewstillpending, no live
+writego. AnsweredHTTPprobequestion: retainHTTPtoverifyredirectandHTTPSfor
+securebaseline; intendedremediationCFAlwaysUseHTTPSafterpreflight, notprobe
+replacement. Fulloperatorreport+remoteproof Cloudflareoperatorreportissue.
+Recoveryfixturecfb60be0alreadyremotepushed:116BATS/no skips, cleanrawShellCheck/
+audit/hooks. Nextoperatorfulltest-allfresh3stages/publicationstillpending.
+NoPR/URLnone(ClaudeownsPRs), nozonewrite/credentialaccess/metricspublication/
+restart/screenshotexport/newplan. PriorGUIincident/paymentPRchecksremainpending.
