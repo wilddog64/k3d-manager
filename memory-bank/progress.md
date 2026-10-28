@@ -1469,3 +1469,19 @@ metricspublication/runtimechange; fullresponse existinghub-fixtureissue.
 BugOPENuntiloperatorfreshmake test-all/usual3.13shell andall3stages+failed0/
 complete1 accepted. No PR(Claudeowns), no newcodeverificationclaimed.
 CFsavedreportalreadyreadpartial/APIcredentialunavailable, manualreviewpending.
+
+## 2026-10-28 tmux host mapping resolved; M2 old-branch run failed
+
+Usernewtmuxscreenshottitlem2-air.local; coordinatorlocalm4-air.local. SSH
+m2jump(existingaliasdirectm2-air.local) readonlyBatchMode/StrictHostKeyChecking
+works. RemotePATHlacktmux firstexit127; absolute/opt/homebrew/bin/tmuxworks.
+M2attachedsession20261012051512 window1/%10make, window2/%0SSH; workaliases
+samepanes. ActiveM2checkout cleanbranchk3d-manager-v1.43.1 HEAD71ef4dea
+Oct11; notcurrentv1.43.9fixcheckout. Watchedfinish1583cases/23fails, teststage
+exit1; missingyamlamongerrors, metrics3attemptsconnectionrefused/skipped.
+FullactualM2log1793212745retrievedandrecordednewM2watchissue; no mutations.
+Window2/%0SSHlatestprompthostm4-airconfirmed. No morelocatorquestionsneeded.
+Nextoperatorrunmake test-all inM4SSHpane(currentfixcfb60be0/usual3.13shell);
+oldM2resultnotcurrentfixvalidation. NoM2branchswitch/depsinstall/stop/restart/
+metricspush/credentialretrieval. Docs-onlywatch,no extraBATS/ShellCheckrerun,
+gatesbeforecommit. P2OPEN/currentfullrunpending, CFmanualreviewpending. NoPR.

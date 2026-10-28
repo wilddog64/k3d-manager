@@ -227,3 +227,13 @@ after1793208248. Prometheus still publishes the17:34:54UTC oldrun: failed4,
 complete0,laststep=test. No post-fix full run is established. Keep OPEN pending
 fresh operator full three-stage run/publication, rather than treating stale
 published values as a new regression or declaring all stages green.
+
+## Watched M2 rerun is an older branch, not current-fix acceptance
+
+Screenshot identified M2; read-onlySSH/tmuxwatch found localmakepane%10
+on k3d-manager-v1.43.1,HEAD71ef4dea(Oct11). Completed1583cases/23failed,
+including missingPyYAML, then metrics publisher connectionrefused. No tests
+or code in that oldcheckout modified. Fullactualoutput andhostmapping in
+`docs/issues/2026-10-28-m2-old-checkout-test-all-watch.md`.
+M2tmuxwindow2/%0SSHlatestpromptidentifiesM4, wherecurrentv1.43.9fixesexist.
+Nextoperatorcurrent-fix test-all should runthere; P2acceptance stillpending.
