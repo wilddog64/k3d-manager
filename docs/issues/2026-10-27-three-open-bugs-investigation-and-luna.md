@@ -355,3 +355,81 @@ Read-only deployed Grafana image: docker.io/grafana/grafana:11.4.0. Primary sour
 Other screenshot questions: coordinator/primary/acting/landing unknown values come from absent/unreported ledger declarations, not task failure. Selected recent start events have worker modelgpt-6-luna and coordinator_identity vendor/modelunknown sourceunreported. Land events omit actor or explicitly actorunknown because coordinator omitted optional flags. No old history rewritten/guessed. Correction task will declare known coordinator vendoropenai/modelunknown and landing actorcodex; exact coordinator model is not established here.
 
 Historical key-cache and-retry each have startagentcodex/modelnull then codex_exit127, no codex_usage. Recorded local startup errors were missingcodex then missingnode, before worker session; missing usage yields blank token field, not fabricated zero. Retry2successful usage stays independent. No worker costs inferred from failure status.
+
+## Corrective no-action dashboard task — independent review and landing
+
+GPT-6-Luna corrective task startup-log-noninteractive-cells supersedes prior startup-log-link-local-only. Commit `0d1807715691c0b21c344de7d0af724ff05c5e20`. The prior operator live click FAILED with Page not found; do not overwrite that evidence or call the previous patch live verified.
+
+Per run evidence preserves all rows and plain Log path width/inspection; its defaults/Log override have no data links. Supported landing logs(newpanel93) admits only anchored exact land-test.log/land_refused.tests evidence. Supported links use fixed /d/k3dm-agent-run-log with visible version/slug/run placeholders, not a hidden/removed loki_url. Token query is filtered to supported evidence too. The unused URL label was removed from the plain table query; no metric schema or shipper/history changed.29otherexistingpanels unchanged, grid has no overlap. No plugins/custom frontend/Grafanaupgrade.
+
+Worker initial corrective attempt reserialized unrelated JSON and still referenced a hidden URL field; coordinator rejected that and required a surgical diff and retained-field URL. Relevant mutation-red check output:
+
+```text
+not ok 1 agent dispatch dashboard: Log opens the filtered run log dashboard
+```
+
+It failed when previous loki_url interpolation was put back, then passed after the fixed retained-field link. Unsupported-field configuration regression also failed on prior configured-link table. Worker initially lacked Ruff executable; final existing temporary Ruff path used successfully. Final independent full Python output:
+
+```text
+........................................................................ [ 52%]
+..................................................................       [100%]
+138 passed in 16.12s
+```
+
+Final independent BATS output:
+
+```text
+1..28
+ok 1 agent dispatch dashboard: valid ConfigMap JSON and datasource
+ok 2 agent dispatch dashboard: every queried metric is exported
+ok 3 agent dispatch dashboard: Claude context and compaction row panels exist below existing rows
+ok 4 agent dispatch dashboard: landing success aggregates both sides
+ok 5 agent dispatch dashboard: panel rectangles do not overlap
+ok 6 agent dispatch dashboard: Codex API cost shows priced total and excluded sessions
+ok 7 agent dispatch dashboard: per-spec panels use readable units and grouped targets
+ok 8 agent dispatch dashboard: final exit gap and operator coverage are exposed
+ok 9 agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d
+ok 10 agent dispatch dashboard: rework rate stat reads the selected window
+ok 11 agent dispatch dashboard: verified delivery stats use exported metrics without overlap
+ok 12 agent dispatch dashboard: stat and bar gauge panels use explicit colours
+ok 13 agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups
+ok 14 agent dashboards: panel targets, fieldConfig and options match the pre-split fixture
+ok 15 agent dashboards: each dashboard has unique panel ids and no overlapping rectangles
+ok 16 agent dashboards: all dashboards have the tag-based Agents link
+ok 17 agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable
+ok 18 agent activity: Claude row fills the width and bar gauge names read beside each bar
+ok 19 agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec
+ok 20 agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs
+ok 21 agent dispatch: per spec shows which agent landed each spec
+ok 22 agent dispatch dashboard: Log opens the filtered run log dashboard
+ok 23 agent cost: Claude tokens by kind splits the selected window by cache kind
+ok 24 agent cost: daily Claude tokens and cost panels split by kind
+ok 25 agent dashboards: labels and titles stay readable and release-only stats say why they are empty
+ok 26 agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities
+ok 27 agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget
+ok 28 agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling
+```
+
+Additional independent validation output:
+
+```text
+All checks passed!
+unchanged existing panels: 29
+plain Log field: no configured data links
+Python/YAML/embedded JSON syntax: valid
+Checking /private/tmp/k3dm-noninteractive-query-rules.yaml
+  SUCCESS: 2 rules found
+```
+
+Actual staged lint/audit passed; expected-query-count assertion changed78to80 for the2newqueries, with an explicit legitimate replacement marker. Audit/checkpoint hooks passed, no bypass. No shell changes, ShellCheck not applicable. Required post-rebase landing repeated138Python/28BATS/Ruff/diff and returned:
+
+```text
+scope: in-scope
+tests: passed
+landed: startup-log-noninteractive-cells
+push: git -C /Users/cliang/src/gitrepo/personal/k3d-manager push origin k3d-manager-v1.43.9
+```
+
+A branch-SHA lookup after landing returned unknown revision because dispatcher had already removed its task branch; SHA above comes from landed release HEAD. No history rewrite. No production deployment/metric push/GUI click/restart by coordinator. First operator step make platform-ops to deploy dashboard; then recheck unsupported plain paths and separately a supported landing-log link. UI verification remains pending even though source-contract/query/fixture gates pass.
+
+Metadata clarification from actual ledger: previous recent tasks omitted optional coordinator/primary/landing declarations (sourceunreported or actorunknown); known workerLuna is independent. Blank token cells for historical exit127 match no codex_usage events after startup failures (missingcodex/node), not fabricated zero. Successfulretry2 is separate usage. No old metadata/costs backfilled. Corrective task declares coordinator and primary vendoropenai/modelunknown; landing actorcodex/vendoropenai/modelunknown. Acting coordinator remains unrecorded absent a handoff, and exact model/costs stay unknown. These metadata limits are independent of task success.

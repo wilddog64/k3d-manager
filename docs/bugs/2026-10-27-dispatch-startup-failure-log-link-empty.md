@@ -1,7 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
-**Status:** OPEN — live click verification failed; corrective Luna task required
-**Fix commit:** 61e1d9944ed19048975dc470d28e57f866a85e1e
+**Status:** VERIFIED — corrective offline checks passed after failed live click; redeployment/UI verification pending
+**Fix commit:** 0d1807715691c0b21c344de7d0af724ff05c5e20
 **Priority:** P3
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -87,3 +87,7 @@ remains operator verification, not proven by string/schema assertions alone.
 Worker offline only/no credentials/Grafana/cluster/network/stage/commit/push/
 memory/spec changes. Coordinator lands with --superseding startup-log-link-local-only,
 records failed live check and corrected evidence, then requests one redeploy.
+
+## Corrective implementation landed
+
+Corrective Luna task startup-log-noninteractive-cells supersedes startup-log-link-local-only. Per run evidence now has plain Log paths with width/inspection retained and no Log data link. New Supported landing logs panel admits only exact supported evidence types and uses version/slug/run links whose fields survive organize. Unsupported/unknown/legacy evidence cannot appear in that linked view. No metric schema/shipper/history changes;29otherexistingpanels unchanged. Independent138pytest/28BATS/Ruff/PromQL/staged gates passed; actual operator clicks remain unverified. Full outputs and prior failed live check retained in three-open-bugs issue.
