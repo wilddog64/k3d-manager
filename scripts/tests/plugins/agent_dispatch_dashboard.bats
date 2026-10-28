@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,93}|set(range(42,49))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 77 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 76 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,47,83,84,85,86,87,88,89,90,91,92,93):
+    if panel["id"] in (14,15,47,83,84,85,86,87,88,89,90,91,92):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -386,43 +386,21 @@ assert org["renameByName"].get("evidence_summary")=="Result"
 assert org["renameByName"].get("evidence_path")=="Log"
 assert org["excludeByName"].get("evidence") is True
 assert "evidence_summary" in table["targets"][0]["expr"] and "evidence_path" in table["targets"][0]["expr"]
-assert all("loki_url" not in target["expr"] for target in table["targets"])
-assert not org["excludeByName"].get("loki_url")
-plain=panels[93]
-assert not any(p["id"]=="links" and p["value"] for o in plain["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"} for p in o["properties"])
-supported=panels[47]
-assert 'evidence=~"^(land-test[.]log|land_refused[.]tests)$"' in supported["targets"][0]["expr"]
-assert all("loki_url" not in target["expr"] for target in supported["targets"])
-supported_org=next(t for t in supported["transformations"] if t["id"]=="organize")["options"]
-assert "loki_url" not in supported_org["excludeByName"]
-evidence_matcher=re.search(r'evidence=~"([^"]+)"',supported["targets"][0]["expr"])
-assert evidence_matcher
-supported_evidence={"land-test.log","land_refused.tests"}
-for evidence in ("land-test.log","land_refused.tests","codex_exit.exit","none","legacy",""):
-  assert (re.fullmatch(evidence_matcher.group(1),evidence) is not None) == (evidence in supported_evidence)
-log_overrides=[o for o in supported["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"}]
+assert all("loki_url" not in t["expr"] for t in table["targets"])
+assert "loki_url" not in org["excludeByName"]
+log_overrides=[o for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"}]
 assert len(log_overrides)==1
 log_properties={p["id"]:p["value"] for p in log_overrides[0]["properties"]}
 assert log_properties.get("custom.inspect") is True and log_properties.get("custom.width", 999)>0 and log_properties["custom.width"]<=160
-assert log_properties["links"][0]["title"]=="Open shipped landing-test log"
-url=log_properties["links"][0]["url"]
-placeholders=re.findall(r"\$\{__data\.fields\.([^}]+)\}",url)
-raw_fields={"version","slug","run","outcome","evidence","evidence_summary","evidence_path","doc","vsort","Value #A","Value #B"}
-visible_fields=raw_fields-set(supported_org["excludeByName"])
-visible_fields={supported_org["renameByName"].get(name,name) for name in visible_fields}
-assert url=="/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
-assert set(placeholders)=={"version","slug","run"} and set(placeholders)<=visible_fields
-assert "Log" in visible_fields
-for evidence in supported_evidence:
-  assert re.fullmatch(evidence_matcher.group(1),evidence)
-  assert set(placeholders)<=visible_fields
-assert "These logs are shipped to Loki" in supported["description"]
-assert "local and are labeled local only (not shipped)" in plain["description"]
+assert log_properties["links"][0]["title"]=="Open run log and availability"
+assert log_properties["links"][0]["url"]=="/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&var-result=${__data.fields.Result}&from=now-30d&to=now"
+assert "Landing-test logs are shipped" in table["description"]
+assert "local only (not shipped)" in table["description"]
 assert "file://" not in text
-widths={o["matcher"]["options"]:p["value"] for o in supported["fieldConfig"]["overrides"] if o["matcher"]["id"]=="byName" for p in o["properties"] if p["id"]=="custom.width"}
+widths={o["matcher"]["options"]:p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]["id"]=="byName" for p in o["properties"] if p["id"]=="custom.width"}
 assert all(name in widths for name in ("version","run","outcome","Result","Log","Tokens")), widths
 assert "slug" not in widths
-assert sum(widths.values())<=supported["gridPos"]["w"]*55-300, widths
+assert sum(widths.values())<=table["gridPos"]["w"]*55-300, widths
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -430,35 +408,29 @@ PY
 }
 
 @test "agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs" {
-  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
-import json,re,sys
-text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
-table=next(p for p in d["panels"] if p["id"]==93)
-assert "codex.log files stay local" in table["description"]
-assert "not shipped" in table["description"]
-assert not table["fieldConfig"]["defaults"].get("links")
-assert not any(p["id"]=="links" and p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"} for p in o["properties"])
-# agent-audit: allow assert-removed the all-run Log-link assertion moves to the filtered supported table; verify its fixed placeholders survive organize.
-supported=next(p for p in d["panels"] if p["id"]==47)
-assert supported["title"]=="Per run evidence"
-assert table["title"]=="Local-only run evidence"
-assert 'evidence!~"^(land-test[.]log|land_refused[.]tests)$"' in table["targets"][0]["expr"]
-
-assert 'evidence!~"^(land-test[.]log|land_refused[.]tests)$"' in table["targets"][1]["expr"]
-matcher=re.search(r'evidence!~"([^"]+)"',table["targets"][0]["expr"]).group(1)
-for evidence in ("land-test.log","land_refused.tests","codex_exit.exit","none","legacy","","land-testXlog"):
-  assert (re.fullmatch(matcher,evidence) is None)==(evidence not in {"land-test.log","land_refused.tests"})
-
-assert 'evidence=~"^(land-test[.]log|land_refused[.]tests)$"' in supported["targets"][0]["expr"]
-assert all("loki_url" not in target["expr"] for target in supported["targets"])
-supported_org=next(t for t in supported["transformations"] if t["id"]=="organize")["options"]
-assert "loki_url" not in supported_org["excludeByName"]
-log=next(o for o in supported["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"})
-link=next(p["value"][0] for p in log["properties"] if p["id"]=="links")
-assert link["title"]=="Open shipped landing-test log"
-assert link["url"]=="/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
+  run python3 - "$BASE" <<'PYTEST'
+import json,sys
+from pathlib import Path
+base=Path(sys.argv[1])
+def load(name,key):
+    text=(base/name).read_text()
+    return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
+d=load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")
+assert not any(p["id"]==93 for p in d["panels"])
+assert sum(p.get("title")=="Per run evidence" for p in d["panels"])==1
+panel=next(p for p in d["panels"] if p["id"]==47)
+assert all('evidence=~' not in t["expr"] and 'evidence!~' not in t["expr"] for t in panel["targets"])
+assert "local only (not shipped)" in panel["description"]
+runlog=load("grafana-dashboard-agent-run-log.yaml","agent-run-log.json")
+assert len(runlog["panels"])==1
+result=next(v for v in runlog["templating"]["list"] if v["name"]=="result")
+assert result["hide"]==2 and result["type"]=="textbox"
+assert result["current"]["value"]=="Evidence availability unknown"
+assert "${result}" in runlog["panels"][0]["title"]
+assert "local only (not shipped)" in runlog["panels"][0]["description"]
+assert "codex.log" in runlog["panels"][0]["description"]
 print("ok")
-PY
+PYTEST
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }
@@ -485,37 +457,41 @@ PY
 }
 
 @test "agent dispatch dashboard: Log opens the filtered run log dashboard" {
-  run python3 - "${BASE}" <<'PY'
+  run python3 - "$BASE" <<'PYTEST'
 import json,re,sys
 from pathlib import Path
+from urllib.parse import quote, urlsplit, parse_qs
 base=Path(sys.argv[1])
 def load(name,key):
     text=(base/name).read_text()
-    return json.loads("\n".join(line[4:] for line in text.split(f"  {key}: |\n",1)[1].splitlines()))
+    return json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
 d=load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")
 panel=next(p for p in d["panels"] if p["id"]==47)
-log=next(o for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")=="Log")
-props=log["properties"]
+props=next(o["properties"] for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")=="Log")
 assert any(p["id"]=="custom.inspect" and p["value"] for p in props)
-links=next(p["value"] for p in props if p["id"]=="links")
-url=links[0]["url"]
-assert links[0]["title"]=="Open shipped landing-test log"
-assert url=="/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
-organize=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
-retained={"version","slug","run","outcome","evidence_summary","evidence_path"}-set(organize["excludeByName"])
-retained={organize["renameByName"].get(field,field) for field in retained}
-placeholders=re.findall(r"\$\{__data\.fields\.([^}]+)\}",url)
-assert set(placeholders)=={"version","slug","run"} and set(placeholders)<=retained
+link=next(p["value"][0] for p in props if p["id"]=="links")
+assert link["title"]=="Open run log and availability"
+url=link["url"]
+assert url=="/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&var-result=${__data.fields.Result}&from=now-30d&to=now"
+org=next(t["options"] for t in panel["transformations"] if t["id"]=="organize")
+raw={"version","slug","run","evidence_summary","evidence_path"}-set(org["excludeByName"])
+visible={org["renameByName"].get(k,k) for k in raw}
+assert set(re.findall(r"\$\{__data.fields.([^}]+)\}",url))=={"version","slug","run","Result"}<=visible
+for summary in ("36/36 ok", "exit 127; local only (not shipped)", "none", "unknown & unavailable # test"):
+    row={"version":"v1.43.9","slug":"sample-run","run":"1","Result":summary}
+    resolved=re.sub(r"\$\{__data.fields.([^}]+)\}",lambda m:quote(row[m.group(1)],safe=""),url)
+    parsed=urlsplit(resolved); params=parse_qs(parsed.query)
+    assert parsed.path=="/d/k3dm-agent-run-log" and not parsed.fragment
+    assert params["var-result"]==[summary] and params["var-slug"]==["sample-run"]
 assert "file://" not in json.dumps(d)
 runlog=load("grafana-dashboard-agent-run-log.yaml","agent-run-log.json")
 assert runlog["uid"]=="k3dm-agent-run-log"
 p=runlog["panels"][0]
 assert p["type"]=="logs" and p["datasource"]["uid"]=="loki"
-expr=p["targets"][0]["expr"]
-assert 'job="k3dm-dispatch-run"' in expr and all(f'${key}' in expr for key in ("version","slug","run"))
+assert p["targets"][0]["expr"]=='{job="k3dm-dispatch-run", version="$version", slug="$slug", run="$run"}'
 assert runlog["time"]=={"from":"now-30d","to":"now"}
 print("ok")
-PY
+PYTEST
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
 }

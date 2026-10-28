@@ -23,6 +23,7 @@ Do not rewrite failed historical attempts as successful or ship transcripts.
 - `bin/k3dm-dispatch-metrics`
 - `scripts/tests/bin/test_dispatch_metrics.py`
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-run-log.yaml`
 - `scripts/tests/plugins/agent_dispatch_dashboard.bats`
 
 ## Authorized bounded task
@@ -95,3 +96,19 @@ Corrective Luna task startup-log-noninteractive-cells supersedes startup-log-lin
 ## User clarification: retain primary-table hyperlinks
 
 Operator rejected removing successful-row hyperlinks from Per run evidence. Coordinator correction19a56939 restores linked shipped logs in original panel47/title/position; only unshipped rows move to Local-only run evidence(panel93). Exact complementary selectors cover unsupported/absent/legacy evidence without loss; both tokenqueries partitioned. Main merge/layout retained,29otherpanels unchanged. Offline138Python/28BATS/4PromQL/staged gates passed. No schema/shipper/history/identity changes. Actual UI check pending explicit ConfigMap apply; make platform-ops does not install this dashboard. Full output and corrected test failures in three-open-bugs issue.
+
+## Current user-authorized correction: one evidence table
+
+Operator explicitly requested remove the added table and fix Per run evidence
+Log. This supersedes earlier two-table implementation proposals. Communicated
+before edits: remove panel93, include all evidence kinds in existing panel47,
+retain its Log hyperlinks. Every link opens existing k3dm-agent-run-log with
+visible version/slug/run/Result values. Existing log panel heading includes
+that Result via one hidden textbox variable, so local-only/unknown availability
+is explicit without adding a panel/table. Existing shipped Loki query remains
+unchanged. No new log shipping, raw transcript export, provider access or
+automation expansion. Existing run-log ConfigMap/UID verified present read-only.
+Run-log YAML added to Files for this communicated same-bug correction. Test
+one table/all categories, retained-field URL and escaping, hidden result value
+and existing heading/query, source compatibility, layout and no other panels.
+Deploy only the two affected dashboard ConfigMaps after offline gates.

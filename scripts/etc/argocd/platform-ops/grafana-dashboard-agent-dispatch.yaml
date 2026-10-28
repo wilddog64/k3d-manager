@@ -1465,7 +1465,7 @@ data:
           "id": 47,
           "type": "table",
           "title": "Per run evidence",
-          "description": "Published landing-test evidence with per-run Log hyperlinks. These logs are shipped to Loki. Local-only startup and other unshipped evidence is listed separately in Local-only run evidence.",
+          "description": "All Agent Dispatch run evidence with Log hyperlinks. Landing-test logs are shipped; startup logs remain local only (not shipped). The existing Agent Run Log page shows the selected Result so unavailable evidence is explicit.",
           "gridPos": {
             "h": 10,
             "w": 18,
@@ -1478,13 +1478,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\",evidence=~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
               "instant": true,
               "format": "table",
               "refId": "A"
             },
             {
-              "expr": "sum by (version, slug, run, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"} * on (version, slug, run) group_left() k3dm_dispatch_task_run_outcome{window=\"$window\",evidence=~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "expr": "sum by (version, slug, run, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
               "instant": true,
               "format": "table",
               "refId": "B"
@@ -1531,8 +1531,8 @@ data:
                     "id": "links",
                     "value": [
                       {
-                        "title": "Open shipped landing-test log",
-                        "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
+                        "title": "Open run log and availability",
+                        "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&var-result=${__data.fields.Result}&from=now-30d&to=now"
                       }
                     ]
                   }
@@ -1610,117 +1610,6 @@ data:
                   }
                 ]
               }
-            ]
-          },
-          "options": {
-            "showHeader": true
-          },
-          "transformations": [
-            {
-              "id": "merge",
-              "options": {}
-            },
-            {
-              "id": "sortBy",
-              "options": {
-                "sort": [
-                  {
-                    "field": "vsort",
-                    "desc": true
-                  }
-                ]
-              }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true,
-                  "__name__": true,
-                  "job": true,
-                  "window": true,
-                  "evidence": true,
-                  "Value #A": true,
-                  "vsort": true
-                },
-                "indexByName": {
-                  "version": 0,
-                  "slug": 1,
-                  "run": 2,
-                  "Value #B": 3,
-                  "outcome": 4,
-                  "evidence_summary": 5,
-                  "evidence_path": 6,
-                  "doc": 7
-                },
-                "renameByName": {
-                  "evidence_summary": "Result",
-                  "evidence_path": "Log",
-                  "Value #B": "Tokens"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": 93,
-          "type": "table",
-          "title": "Local-only run evidence",
-          "description": "Runs whose evidence was not shipped to Loki. Failed startup codex.log files stay local and are labeled local only (not shipped); the retained path is available only on the dispatch host. No Log navigation is offered here. Shipped landing logs and their hyperlinks remain in Per run evidence.",
-          "gridPos": {
-            "h": 10,
-            "w": 24,
-            "x": 0,
-            "y": 62
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\",evidence!~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
-              "instant": true,
-              "format": "table",
-              "refId": "A"
-            },
-            {
-              "expr": "sum by (version, slug, run, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"} * on (version, slug, run) group_left() k3dm_dispatch_task_run_outcome{window=\"$window\",evidence!~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
-              "instant": true,
-              "format": "table",
-              "refId": "B"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short"
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "slug"
-                },
-                "properties": [
-                  {
-                    "id": "links",
-                    "value": [
-                      {
-                        "title": "Open spec",
-                        "targetBlank": true,
-                        "url": "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
-                      }
-                    ]
-                  }
-                ]
-              },
-              {"matcher": {"id": "byName", "options": "Log"}, "properties": [{"id": "custom.width", "value": 150}, {"id": "custom.inspect", "value": true}]},
-              {"matcher": {"id": "byName", "options": "doc"}, "properties": [{"id": "custom.hidden", "value": true}]},
-              {"matcher": {"id": "byName", "options": "version"}, "properties": [{"id": "custom.width", "value": 70}]},
-              {"matcher": {"id": "byName", "options": "run"}, "properties": [{"id": "custom.width", "value": 45}]},
-              {"matcher": {"id": "byName", "options": "outcome"}, "properties": [{"id": "custom.width", "value": 85}]},
-              {"matcher": {"id": "byName", "options": "Result"}, "properties": [{"id": "custom.width", "value": 165}]},
-              {"matcher": {"id": "byName", "options": "Tokens"}, "properties": [{"id": "custom.width", "value": 75}]}
             ]
           },
           "options": {

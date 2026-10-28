@@ -16,7 +16,7 @@ data:
       "graphTooltip": 0,
       "title": "k3dm Agent Run Log",
       "uid": "k3dm-agent-run-log",
-      "description": "Redacted land-test.log output for one Agent Dispatch run. codex.log is never shipped.",
+      "description": "Run evidence availability and redacted land-test.log output. The selected Result appears in the log heading; codex.log is never shipped.",
       "links": [
         {
           "type": "dashboards",
@@ -95,6 +95,23 @@ data:
               }
             ],
             "hide": 0
+          },
+          {
+            "name": "result",
+            "type": "textbox",
+            "query": "Evidence availability unknown",
+            "current": {
+              "text": "Evidence availability unknown",
+              "value": "Evidence availability unknown"
+            },
+            "options": [
+              {
+                "selected": true,
+                "text": "Evidence availability unknown",
+                "value": "Evidence availability unknown"
+              }
+            ],
+            "hide": 2
           }
         ]
       },
@@ -102,7 +119,7 @@ data:
         {
           "id": 1,
           "type": "logs",
-          "title": "Run test log",
+          "title": "Run log — ${result}",
           "gridPos": {
             "h": 20,
             "w": 24,
@@ -130,7 +147,8 @@ data:
             "showTime": true,
             "sortOrder": "Ascending",
             "wrapLogMessage": true
-          }
+          },
+          "description": "The heading shows the selected Result. If it says local only (not shipped), no startup transcript is available in Loki: codex.log stays on the dispatch host. Shipped landing-test output appears below. Missing output may also mean it was not shipped or is outside the selected time range; it is not proof of success."
         }
       ]
     }
