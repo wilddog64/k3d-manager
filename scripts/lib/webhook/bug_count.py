@@ -9,8 +9,11 @@ from typing import NamedTuple
 from webhook import proc
 
 _COUNT_RE = re.compile(r"\b(?:how many|count|number of|tally)\b", re.IGNORECASE)
+_COUNT_PREFIX_RE = re.compile(r"^\s*(?:how many|count|number of|tally)\b", re.IGNORECASE)
 _BUG_RE = re.compile(r"\bbugs?\b", re.IGNORECASE)
 _RELEASE_RE = re.compile(r"\bv?(\d+\.\d+\.\d+)\b", re.IGNORECASE)
+_VERSION_TOKEN_RE = re.compile(r"\bv?\d+\.\d+\.\d+\b", re.IGNORECASE)
+_WORD_TOKEN_RE = re.compile(r"\b(?:p\d+|\d+|[a-z]+)\b", re.IGNORECASE)
 _PRIORITY_RE = re.compile(r"\b(P[0-3])\b", re.IGNORECASE)
 _STATE_RE = re.compile(r"\b(open|outstanding|fixed|closed|resolved|verified)\b", re.IGNORECASE)
 _NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
@@ -21,6 +24,12 @@ _CURRENT_RE = re.compile(r"\b(?:this|current|latest)\s+release\b", re.IGNORECASE
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 _BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_OMITTED_NOUN_WORDS = {
+    "are", "currently", "there", "the", "in", "for", "of", "on", "from", "this", "current", "latest",
+    "release", "releases", "last", "past", "previous", "recent", "we", "have", "do", "does", "is",
+    "and", "with", "status", "priority", "bug", "bugs", "one", "two", "three", "four", "five", "six",
+    "seven", "eight", "nine", "ten",
+}
 ALL_RELEASES_SHOWN = 10
 
 
@@ -31,7 +40,14 @@ class CountQuery(NamedTuple):
 
 
 def match(question):
-    if not _COUNT_RE.search(question or "") or not _BUG_RE.search(question or ""):
+    question = question or ""
+    if not _COUNT_RE.search(question):
+        return None
+    explicit_bug_query = _BUG_RE.search(question)
+    priority_match = _PRIORITY_RE.search(question)
+    state_match = _STATE_RE.search(question)
+    implicit_bug_query = _is_omitted_noun_bug_count(question, priority_match, state_match)
+    if not explicit_bug_query and not implicit_bug_query:
         return None
     release_match = _RELEASE_RE.search(question)
     last_match = _LAST_N_RE.search(question)
@@ -44,12 +60,28 @@ def match(question):
         release = "last:1"
     else:
         release = "*"
-    priority_match = _PRIORITY_RE.search(question)
-    state_match = _STATE_RE.search(question)
     state = None
     if state_match:
         state = "open" if state_match.group(1).lower() in ("open", "outstanding") else "closed"
     return CountQuery(release, priority_match.group(1).upper() if priority_match else None, state)
+
+
+def _is_omitted_noun_bug_count(question, priority_match, state_match):
+    if not priority_match or not state_match:
+        return False
+    remainder = _COUNT_PREFIX_RE.sub("", question, count=1)
+    remainder = _VERSION_TOKEN_RE.sub(" ", remainder)
+    tokens = [token.lower() for token in _WORD_TOKEN_RE.findall(remainder)]
+    priority_tokens = [token for token in tokens if re.fullmatch(r"p[0-3]", token)]
+    state_tokens = [token for token in tokens if token in {"open", "outstanding", "fixed", "closed", "resolved", "verified"}]
+    if len(priority_tokens) != 1 or len(state_tokens) != 1:
+        return False
+    return all(
+        token in _OMITTED_NOUN_WORDS
+        or token in {priority_tokens[0], state_tokens[0]}
+        or token.isdigit()
+        for token in tokens
+    )
 
 
 def _version(name):

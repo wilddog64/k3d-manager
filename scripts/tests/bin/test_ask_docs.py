@@ -115,6 +115,20 @@ def test_bug_count_question_bypasses_retrieval_recent_and_model(monkeypatch):
     assert calls == []
 
 
+def test_priority_state_count_without_bug_noun_uses_deterministic_tally(monkeypatch):
+    calls = []
+    queries = []
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda query: queries.append(query) or "counted")
+    reply = ask_docs.answer(
+        "how many P1 open for v1.43.5",
+        retrieve=lambda *_a, **_k: calls.append("retrieve"),
+        model=lambda _p: calls.append("model"),
+    )
+    assert reply.startswith("counted")
+    assert queries == [ask_docs.bug_count.CountQuery("v1.43.5", "P1", "open")]
+    assert calls == []
+
+
 def test_no_match_does_not_call_model():
     calls = []
     path = _real_source()
