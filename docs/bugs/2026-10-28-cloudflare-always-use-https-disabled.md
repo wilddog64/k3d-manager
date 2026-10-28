@@ -262,3 +262,11 @@ direct HTTPS matches baseline (200/302/401 by service). Full actual output in
 existing operator-report issue. Actual SSO/Slack and redirect-chain acceptance
 pending. MinimumTLS still1.0 per operator report; bug remainsOPEN. No coordinator
 credential read or settings write.
+
+## Operator browser smoke results
+
+Frontend SSO successful per operator report; authenticated Developer page shown.
+Grafana and ArgoCD existing authenticated sessions remain accessible. These
+are not fresh login/expiry tests for those services. Exact interpretation and
+remaining Slack/TLS acceptance recorded in the operator-report issue. No
+session regression inferred or live settings changed. Bug remainsOPEN.

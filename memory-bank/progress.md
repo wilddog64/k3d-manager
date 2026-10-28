@@ -1634,3 +1634,14 @@ passed, check-doc-links4filesOK. FullactualBATS/Python transcript is preserved
 in docs/assets/2026-10-28-test-all-1793225872.txt. Main17skips (not previous
 run20); bin0skip; pytest2skip. Documentation-only, ShellCheckN/A. NoPR per
 repositoryrule; PRURLN/A. No coordinator metrics publication or live mutation.
+
+## 2026-10-28 Cloudflare browser smoke evidence
+
+Operator reports frontendSSOlogin success; screenshotDeveloper/Logout. Grafana
+Tests andArgoCDApplications accessible inexistingauthenticatedsessions; user
+notesneitherloggedout. Thisprovescontinuedaccess, notfreshlogin/sessionexpiry;
+no sessionbug inferred. Fulltext evidence/limits inexistingCFoperatorissue,
+no screenshotexport. Slackcommandresponse stillpending, then separateTLS1.2
+change/verification. LatestminTLS1.0/securitybugOPEN. Docs-only; no credentials,
+logout/settingswrite/probes/runtimechange. BATS/ShellCheckN/A. Required
+lint/audit/checkpoint/push pending; noPR perrepositoryrule (URLN/A).

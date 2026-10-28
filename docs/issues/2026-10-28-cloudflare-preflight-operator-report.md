@@ -925,3 +925,23 @@ Security bug stays OPEN. No screenshot exported, no settings write.
   "timestamp_utc": "2026-10-28T22:02:51.507983+00:00"
 }
 ```
+
+## Operator browser acceptance after enabling Always Use HTTPS
+
+Operator reports: "login frontend via sso"; frontend screenshot shows the
+ShopCart home page authenticated as Developer with Logout available. Accept
+frontend SSO success as operator-reported live evidence; screenshot alone does
+not expose the complete authentication exchange. Grafana screenshot displays
+the Tests dashboard (failed cases0, last run2026-10-28 15:42:02); ArgoCD
+screenshot displays Applications including Healthy/Synced hub applications.
+Operator says Grafana "never logout" and ArgoCD "seem never logout anyway".
+Those two observations verify existing-session access, not a fresh SSO login
+or session expiry behavior. No logout/session change requested or performed.
+No authentication/session bug inferred from these screenshots.
+
+Remaining acceptance: one ordinary Slack command with its response, then
+separate operator approval/change of minimum TLS1.0 to1.2 and post-change
+verification. Minimum TLS remains1.0 in the latest supplied settings report;
+security bug staysOPEN. No screenshot files exported, credentials read,
+Cloudflare setting changes or additional live probes performed. This is
+documentation-only verification; BATS/ShellCheck not rerun (no code change).
