@@ -1,6 +1,7 @@
 # Bug: Bug Tracking ignores valid investigation-only recovery evidence
 
-**Status:** OPEN — operator-authorized Luna implementation pending
+**Status:** VERIFIED — Luna rework independently tested and landed; operator publication/row check pending
+**Fix commit:** c96d0d13
 **Priority:** P3
 **Filed:** 2026-10-28
 **Branch:** k3d-manager-v1.43.9
@@ -89,7 +90,7 @@ report legacy conflicts rather than raise budgets or add unjustified allowlist.
 Coordinator independently reviews staged audit/lint, commits/lands/pushes and
 requests operator live check one at a time. No new plan doc.
 
-Run python3 -m pytest -p no:cacheprovider on all five listed Python suites
+Run python3 -m pytest -p no:cacheprovider on the four listed Python suites
 (test_prior_art, test_check_bug_evidence, test_vectordb_bug_metrics,
 test_live_evidence_acceptance) plus scripts/tests/bin/test_bug_tally.py because
 shared status helper is involved. Run existing
@@ -97,3 +98,16 @@ bats scripts/tests/plugins/grafana_dashboard_bugs.bats (no layout change).
 Ruff: /private/tmp/k3dm-review-tools/bin/ruff check --no-cache on all touched
 Python files. Python syntax and git diff --check; relevant doc links.
 Report actual outputs, old-code red, any skipped/failed gates and exact files.
+
+## Independent implementation acceptance — 2026-10-28
+
+Luna investigation-verification-metrics-luna run2 landedc96d0d13 after independent
+269Python(zero skips/PROMTOOLenabled),38BATS,Ruff,Python syntax,stagedlint/audit,
+hooks and repeated post-rebase landing gates. Firstdraftinvalidproof/headerbugs
+rejectedandfixed; unrelatedassertionsrestored. RealGit/currentproofline/refcases
+coverdatesandrecordSHA, normalcodeproofancestryandlegacybehavior preserved.
+Original recovered incident remainsCLOSED and unchanged, nowrenders verifiedtrue/
+livetrue/evidenceok/date2026-10-28/verifiedSHA7ea1032f/FixSHA'-' offline.
+No dashboardlayout/query/columnchange, no rootcauseclaim, no networkprooflookup.
+[Full actual outputs and review](../issues/2026-10-28-investigation-verification-metrics-review.md).
+Operator must publishmetrics and inspectexistingrow; notLIVE-VERIFIEDyet.

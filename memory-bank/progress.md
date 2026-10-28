@@ -1257,3 +1257,18 @@ ResumedLunarun2; firstdraftnotaccepted/landed. Baseline232Python+2promtoolskips,
 38BATS; finalPROMTOOLsetwillrunskips. Fullactualoutputs
  docs/issues/2026-10-28-investigation-verification-metrics-review.md.
 No live writes/credentials/screenshotexports; parentCLOSEDunchanged, no PR.
+
+## 2026-10-28 investigation verification mapping fix VERIFIED
+
+Luna rework2 investigation-verification-metrics-luna landedc96d0d13. Independent
+269Python(zero skips/PROMTOOL3.2.1),38BATS,Ruff/syntax/stagedgates/hooks andlanding
+rerunpass. Nativeindependentverify recordedpass. ActualunchangedincidentCLOSED
+nowofflinerendersverifiedtrue/livetrue/evidenceok/date2026-10-28/record7ea1032f/
+causalFixSHA'-', stopsOpenforcount. Normalcodefixancestry/legacy/open caseskept;
+invalidtypedproof/headerconflictsfailclosed. No newlayout/query/panel/parentstatus.
+Coordinatorguideclarification neededexact-sentenceassertupdate andsupported
+reasonedallowmarker (semanticcodefixassertretained+investigationexceptionadded),
+auditpasswithoutbypass. Actualfulloutputs docs/issues/2026-10-28-investigation-verification-metrics-review.md.
+Operatorpublisher/rowcheckpending, notLIVE-VERIFIEDyet. Historicalcauseremains
+unknownfollowup; no livewrites/credentials/screenshotexports/PR. Firstsingle
+operator bin/k3dm-vectordb-metrics thenpublishedmetric/UIcheck.
