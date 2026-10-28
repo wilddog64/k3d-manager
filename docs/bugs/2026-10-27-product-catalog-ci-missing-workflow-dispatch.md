@@ -1,6 +1,6 @@
 # Bug: product-catalog CI cannot accept scanner rebuild dispatch
 
-**Status:** OPEN — application workflow configuration confirmed; implementation not authorized
+**Status:** OPEN — operator approved GPT-6-Luna implementation; dispatch pending
 **Priority:** P2
 **Filed:** 2026-10-27 (operator local date)
 **Repository:** wilddog64/shopping-cart-product-catalog
@@ -37,3 +37,45 @@ Workaround: a normal reviewed main-branch application fix triggers existing push
 The intended whole-Job success on per-service dispatch failure was recorded in docs/bugs/2026-08-01-app-cve-scan-nonzero-exit-and-missing-pod-labels.md; do not silently reverse it. Bounded dispatch-response diagnostics would be a separately scoped manager follow-up.
 
 [Full operator output and live verification](../issues/2026-10-27-app-cve-scan-fail-closed-verification.md). No application code or workflow was changed, no credential accessed or mutated, and no follow-up worker dispatched.
+
+## Files
+
+- `.github/workflows/ci.yml`
+
+## Authorized implementation and acceptance
+
+Operator approved GPT-6-Luna dispatch with “go ahead”. Target repository
+wilddog64/shopping-cart-product-catalog; isolated target branch
+fix/cve-manual-rebuild starts at origin/main ae982f0. Existing application
+checkout fix/automerge-app-token must remain untouched. Add workflow_dispatch
+with no required inputs, since scanner sends only refmain. Also adjust the
+publish job condition to allow push OR workflow_dispatch only on
+refs/heads/main. Leave pull-request publication and non-main publication
+blocked. Existing publish is push-only, so adding just the trigger is
+insufficient.
+
+Preserve lint/build/integration/security checks, job dependencies, reusable
+workflow SHA98b10f051bda5ffe28299dac288f11fe568a7a1c, signing/attestation secret
+forwarding, existing permissions, image metadata and push/pull_request
+triggers. Do not change application dependencies, reusable infra workflow,
+image pins, credentials, deployment manifests or any other file. No production
+scan, GitHub workflow dispatch, image push or rollout. The pinned reusable
+workflow already handles build/scan/push/sign/attest and promotion on valid
+inputs; do not bypass its gates. This narrowly enables intended manual main
+rebuild, not a promise that current dependencies are fixed.
+
+Read CLAUDE.md and both memory-bank files first. Worker must not stage,
+commit, push, create/merge PRs, or modify memory-bank/spec files. Coordinator
+will review, commit/push only to the fix branch, verify SHA via GitHub API,
+and leave merge to the repo owner/Claude under the session's no-PR rule.
+Application activeContext cannot be changed until CI completed success;
+record pending state in manager memory-bank meanwhile. No pytest/mypy/ruff
+needed for this YAML-only change; follow repo virtualenv restrictions.
+
+Run actionlint on the workflow; compare the parent workflow to prove only
+trigger/publication condition changed; evaluate publication truth table:
+main+push true, main+workflow_dispatch true, PR false, non-main push/manual
+false. Confirm all required upstream jobs remain required. Paste actual
+commands/results and list changed files. Offline only, no network/credential
+access. The parent code-review-graph tools are not available in this session
+(discovery returned none), so direct file review is the documented fallback.
