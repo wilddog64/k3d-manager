@@ -1,6 +1,6 @@
 # Bug: failed startup Log link opens an empty Loki view
 
-**Status:** VERIFIED — Luna implementation independently tested and pushed; operator live verification pending
+**Status:** OPEN — live click verification failed; corrective Luna task required
 **Fix commit:** 61e1d9944ed19048975dc470d28e57f866a85e1e
 **Priority:** P3
 **Filed:** 2026-10-27
@@ -53,3 +53,37 @@ lands/pushes and schedules operator dashboard live verification. No new plans.
 ## Independent implementation review
 
 Luna implementation landed and pushed after review follow-up. [Full test output, corrected fixture/gate failures and live limits](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md). Operator live check pending; no production deployment/restart by coordinator.
+
+## Live verification failed — corrective task
+
+Operator clicked a failed-startup Log cell after the new dashboard and metrics
+were deployed. Grafana showed Page not found. Failed Log cells remain blue.
+The prior missing loki_url metric label did not remove the field-level data
+link; the organize transform also excludes that referenced field. The screenshot
+does not expose the actual destination URL, so do not invent that URL. Deployed
+Grafana is11.4.0. Official v11.4 DefaultCell uses field links to decide whether
+to render a clickable cell, and fieldOverrides getLinksSupplier builds a link
+model for every configured link; missing/null target is not a no-link contract.
+Source reference and evidence are in the three-open-bugs issue.
+
+Correct this same P3, preserving previous metrics/local path/history fixes.
+Use a structural separation in Grafana11.4 rather than another null/interpolated
+link trick. Small safe option: retain a per-run evidence table with all rows
+and plain unlinked Log paths, plus a clearly labeled supported-landing-logs
+view/table filtered to evidence=land-test.log|land_refused.tests with real
+per-row links. Alternatively separate supported and unsupported tables with
+clear titles. Unsupported evidence must NEVER enter a table with a configured
+log action; supported logs must retain a usable filtered target. Preserve
+visible run/outcome/result/token data, readable layout, no overlap, no unrelated
+panels changed. Do not add UI plugins/custom frontend/downloads or upgradeGrafana.
+
+Files remain the same four above. Prefer dashboard/test changes; do not change
+metric schema without need or broaden log shipping. Add regression on actual
+field-link config plus supported/unsupported query partition, including absent
+and legacy evidence. Model transform field exclusion so links never refer to
+removed fields. Show relevant regression red on current11.4-incompatible patch,
+then full metrics pytest/dashboard BATS/Ruff/YAML+JSON/diff. Full UI behavior
+remains operator verification, not proven by string/schema assertions alone.
+Worker offline only/no credentials/Grafana/cluster/network/stage/commit/push/
+memory/spec changes. Coordinator lands with --superseding startup-log-link-local-only,
+records failed live check and corrected evidence, then requests one redeploy.
