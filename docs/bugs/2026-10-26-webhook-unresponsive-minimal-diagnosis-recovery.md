@@ -50,6 +50,7 @@ If launchd bootstrapping fails, process dies repeatedly, or an HTTP listener sti
 
 ## Files
 
+- `docs/issues/2026-10-28-webhook-incident-closeout-review.md`
 - `docs/issues/2026-10-28-webhook-incident-luna-review.md`
 - `bin/k3dm-webhook-doctor`
 - `scripts/tests/bin/test_webhook_doctor.py`
@@ -308,3 +309,38 @@ restart warranted/performed. Bridge auth follow-up now LIVE-VERIFIED to its
 bounded current-path acceptance; original historical incident remainsOPEN,
 not a claim that the October26cause is known or fixed. Full actual response:
 [batch evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
+
+## Authorized closeout review — 2026-10-28 (latest task instructions)
+
+Operator again selected the still-Open screenshot row and requested review and
+appropriate dispatch. The previous review predates the completed operator local
+and bridge live checks; do not repeat the implementation or full unit suites.
+Current authoritative task is GPT-6-Luna webhook-incident-closeout-luna.
+Only write `docs/issues/2026-10-28-webhook-incident-closeout-review.md`.
+All other historical Files entries, this bug doc, code and memory-bank are
+read-only to the worker. No stage/commit/push, live host/log/process/Keychain/
+network/provider requests, service changes, deployment, screenshots or newplan.
+
+Review actual evidence in docs/issues/2026-10-28-three-bug-luna-batch-verification.md
+and the prior offline review. At11:44:33Z operator doctor reported authenticated
+healthy/all_oktrue with PID4295/port7443 and no recovery recommended. Operator
+make restart-cloud-bridge was silent; coordinator filteredread-only state
+confirmed recentlystartedPID65583. Request20261028T114826Z-health returned completed
+HTTP200/statusok/all_oktrue/21checksok11:49:51Z. Prior Slackfix-list completed.
+Historical Oct26failure cause was not reproduced and remains unconfirmed.
+
+Map M1-M4/N1-N4/E1/E2/DefinitionofDone to actual evidence and explicitly identify
+what cannot be proved retrospectively, whether webhookrestart was indicated,
+and distinction between incident recovery and rootcause fix. Recommend whether
+parent can be operationally closed as recovered, with unknown cause carried in
+a separate docs/issues record rather than an activeP2outage, or give a concrete
+remaining blocker. Do not invent causal attribution or retrofit missing evidence.
+Read existing scripts/check-bug-evidence.py and prior_art parser: a typed
+investigation evidence line may be appropriate for verified recovery without
+a causal codefix. Recommend exact truthful metadata and evidence reference;
+do not change hooks or add a fake Fixcommit. Report source/parser limitations.
+Provide a bounded future-investigation checklist for recurrence, not a mandate
+for repeated healthy restarts. Only documented proven codebugs warrant another
+implementation dispatch. Coordinator independently reviews and decides/applies
+status after this audit. Rules gates: doclink check for newreport, diffcheck;
+no unit suite rerun necessary for docs-only work. Include actual output.

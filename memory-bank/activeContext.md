@@ -836,3 +836,14 @@ Nextsingleoperator paymentonlysame24h; exacttooltip/nohistoryrepo stillpending.
 UnexpectedGitHub94skippedcheck completed1secbeforestarted; outofscopefuturecollector
 followup, notfixed/usedcomparison. No screenshotexport/CIrun/livewrite/testrerun.
 PRbugVERIFIED notLIVE; normalAllviewPASSonly. No PRcreated.
+
+## 2026-10-28 webhook Open-row closeout review authorized
+
+Operator again asks review/dispatch screenshotP2incident. OPEN currently tracks
+unknownhistoriccause despite local+externalhealthy/reload+completedhealthproof.
+Communicated bounded Luna closeout/evidenceaudit, no duplicatecode/liveactions.
+Latest canonicalbug taskinstructions only docs/issues/2026-10-28-webhook-incident-closeout-review.md;
+mapacceptance/retrospectivelimits, recommend operationalclosure vsconcretegap,
+retainrootcauseunconfirmed separately, typedinvestigationmetadata/nofakeFixSHA.
+Coordinator independentlyreviews/appliestruthfulstatus. PRChecks payment-only
+liveview remains pending separately, not replaced by this investigation.
