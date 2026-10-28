@@ -1,7 +1,7 @@
 # Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery
 
 **Filed:** 2026-10-26, operator report at approximately 07:20 PDT
-**Status:** OPEN — current local and Slack health confirmed; historical offsite cause remains unknown
+**Status:** OPEN — current local, Slack and cloud-bridge delivery confirmed; historical offsite cause remains unknown
 **Priority:** P2
 **Severity:** medium — Slack/cloud-bridge remote management degraded or unavailable; actual host and service state unknown
 **Release:** v1.43.9 (bug; no new plan slot)
@@ -298,3 +298,13 @@ unverified and historical cause unknown. Full actual JSON in
 Next separate operator step: load previously reviewed bridge auth fix via
 make restart-cloud-bridge, then inspect its result before one benign health
 request. This is fix activation, not a claim that healthy webhook needs recovery.
+
+## Current cloud-bridge delivery confirmed — 2026-10-28
+
+Following operator bridge reload, request20261028T114826Z-health completed
+11:49:51.677857Z withHTTP200/statusok/all_oktrue, all21checksok. Together with
+local doctor11:44:33Z, current local and external health PASS. No webhook
+restart warranted/performed. Bridge auth follow-up now LIVE-VERIFIED to its
+bounded current-path acceptance; original historical incident remainsOPEN,
+not a claim that the October26cause is known or fixed. Full actual response:
+[batch evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).

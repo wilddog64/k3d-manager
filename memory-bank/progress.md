@@ -1157,3 +1157,15 @@ exit supplied, no fake exit0 inference; currentprocessPASS, externaldeliverypend
 Nextsingleoperator bin/k3dm-cloud-request --wait health; inspectdeliveredresponse.
 No coordinatorrestart/cloudrequest/credential/rawlogaccess; incidentOPEN.
 Fullactualoutput batchverificationissue; docs-only/no testsrerun/no PR.
+
+## 2026-10-28 bridge delivery live PASS
+
+Operator health request20261028T114826Z-health completed11:49:51.677857Z HTTP200/
+statusok/all_oktrue/all21checksok afterbridge reload. Localdoctor alreadyPASS.
+Currentexternaldelivery verified, bridgeauthbug f046763f LIVE-VERIFIED to bounded
+reload/health acceptance (no-agent not forcedlive); historicalincidentOPEN/cause
+unconfirmed, no webhookrestart. FullactualJSON in batchverificationissue.
+Read-only TargetstateCM nowtitle16/value40/querypreserved, ownerSynced2cbc24d0.
+Cleanrelease fast-forwarded concurrent unrelated2cbc24d0plan doc withoutedits.
+Nextsingleoperator reloadBugTracking normalzoom Targetstate screenshot, thennarrow
+check. No newruntime/coordinatorcloudrequest/screenshotexport/testrerun; no PR.

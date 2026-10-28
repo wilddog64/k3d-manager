@@ -1,6 +1,7 @@
 # Bug: cloud-bridge lacks unattended Keychain-backed GitHub SSH authentication
 
-**Status:** VERIFIED — Luna fix independently tested and pushed with evidence; operator reload/live check pending
+**Status:** LIVE-VERIFIED — operator bridge reload and completed health request pass; historical incident cause remains unconfirmed
+**Live evidence:** 2026-10-28 · run 20261028T114826Z-health · env m4-cloud-bridge · scenario post-reload-health-request-delivery · commit f046763ff2a45e8fe56b938a8f828658d0b05ebe · proves fix
 **Priority:** P2
 **Fix commit:** f046763ff2a45e8fe56b938a8f828658d0b05ebe
 **Filed:** 2026-10-27
@@ -75,3 +76,14 @@ follow-up. No new plan. [Sanitized investigation](../issues/2026-10-27-three-ope
 ## Implementation verification
 
 GPT-6-Luna implementation reviewed/landed; final independent107pytest, Ruff, staged lint/audit, hooks and repeated landing gates passed. Two new fallback cases red on original helper. Review strengthened no-direct-SSH guard and explicit no-agent/env-immutability/empty-override fixtures. No coordinator reload/live request performed; original incident cause still unconfirmed. [Full outputs](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md).
+
+## Operator live acceptance — 2026-10-28
+
+Operator make restart-cloud-bridge returned silently; independent read-only
+state running/PID65583/recentstart confirmed. Then bin/k3dm-cloud-request --wait
+health returned completed HTTP200/statusok/all_oktrue at11:49:51.677857Z,
+request20261028T114826Z-health, all21checksok. This satisfies documented current
+reload/request-path acceptance. No-agent condition was not forced in this live
+check; its bounded fallback remains covered by offline and prior controlled
+lookup evidence. Historical offsite cause remains unproven; no credentials,
+Keychain policy or SSH config changed. [Full actual output](../issues/2026-10-28-three-bug-luna-batch-verification.md).

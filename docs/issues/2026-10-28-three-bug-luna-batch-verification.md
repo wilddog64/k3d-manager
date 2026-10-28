@@ -232,3 +232,41 @@ not end-to-end delivery or historical cause. Next single operator request:
 bin/k3dm-cloud-request --wait health. Inspect completed response, not queued.
 No coordinator restart/cloud request, credentials or raw logs accessed. Docs-only;
 no test rerun or new failure. Original incident remains OPEN pending evidence.
+
+## Operator bridge health request — end-to-end PASS
+
+Full actual operator output:
+```text
+20261028T114826Z-health
+{"action": "health", "body": {"all_ok": true, "services": [{"detail": "HTTP 200", "name": "ArgoCD", "ok": true}, {"detail": "HTTP 200", "name": "Frontend", "ok": true}, {"detail": "HTTP 200", "name": "Keycloak", "ok": true}, {"detail": "HTTP 401 (auth enforced)", "name": "Prometheus", "ok": true}, {"detail": "HTTP 200", "name": "Grafana", "ok": true}, {"detail": "HTTP 200", "name": "Pushgateway", "ok": true}, {"detail": "20/20 have image_url", "name": "Product images", "ok": true}, {"detail": "Ready=True", "name": "ESO ClusterSecretStore", "ok": true}, {"detail": "20/20 synced", "name": "ESO ExternalSecrets", "ok": true}, {"detail": "Ready=True", "name": "Hub ESO ClusterSecretStore", "ok": true}, {"detail": "9/9 synced", "name": "Hub ESO ExternalSecrets", "ok": true}, {"detail": "4/4 ready", "name": "Data layer", "ok": true}, {"detail": "admin via identity/keycloak-secrets Secret: HTTP 200", "name": "Keycloak admin login", "ok": true}, {"detail": "admin via Vault keycloak/users: code received; developer via Vault keycloak/users: code received; operator via Vault keycloak/users: code received", "name": "Frontend SSO login", "ok": true}, {"detail": "admin via Vault argocd/admin: HTTP 200", "name": "ArgoCD login", "ok": true}, {"detail": "admin via Vault keycloak/users/admin: code received", "name": "ArgoCD SSO login", "ok": true}, {"detail": "admin via Vault k3d-manager/prometheus-basic-auth: HTTP 200", "name": "Prometheus login", "ok": true}, {"detail": "admin via ~/.local/share/k3d-manager/alertmanager-basic-auth.env: HTTP 200", "name": "Alertmanager login", "ok": true}, {"detail": "admin via Vault observability/grafana: HTTP 200", "name": "Grafana login", "ok": true}, {"detail": "k3dm-smoke-user via identity/k3dm-smoke-user Secret: HTTP 200", "name": "Keycloak smoke token (k3dm-smoke-user)", "ok": true}, {"detail": "k3dm-smoke-user via identity/k3dm-smoke-user Secret: HTTP 200 on /api/cart", "name": "Frontend API (smoke token)", "ok": true}]}, "completed_at": "2026-10-28T11:49:51.677857Z", "http_status": 200, "id": "20261028T114826Z-health", "schema": 1, "status": "ok"}
+```
+Completed response HTTP200/statusok/all_oktrue proves current request/reply path
+through cloud-bridge and webhook after operator bridge reload. All21servicechecks
+ok; Prometheus unauthenticated401 is explicitly expected auth enforcement.
+Together with local doctor11:44:33Z, current local and external functionality
+are verified. Bridge auth follow-up f046763f meets documented reload/benignhealth
+acceptance; it does not reproduce no-agent failure or establish October26cause.
+Original incident remains OPEN for historical cause uncertainty; current external
+delivery is no longer missing evidence. No webhook restart needed/performed.
+
+Read-only next-check preparation confirms deployed Target state fix:
+```json
+{
+  "target_state_text": {
+    "titleSize": 16,
+    "valueSize": 40
+  },
+  "source_query_preserved": true,
+  "revision": [
+    "2cbc24d0d51872aa03bd9cd7b087b124de563279",
+    "2cbc24d0d51872aa03bd9cd7b087b124de563279"
+  ],
+  "sync": "Synced"
+}
+```
+Owner Synced, title16/value40 and original query loaded. Concurrent remote
+2cbc24d0 added unrelated v2.0.0 plan only; clean local release fast-forwarded
+before this documentation record, preserving it without edits. Next single
+operator check: fully reload Bug Tracking and inspect Target state at normal
+zoom; full/narrow wrapping checks remain pending, no visual pass assumed.
+Docs-only, no implementation test rerun or live coordinator mutation/request.
