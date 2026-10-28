@@ -388,8 +388,9 @@ assert org["excludeByName"].get("evidence") is True
 assert "evidence_summary" in table["targets"][0]["expr"] and "evidence_path" in table["targets"][0]["expr"]
 assert all("loki_url" not in target["expr"] for target in table["targets"])
 assert not org["excludeByName"].get("loki_url")
-assert not any(p["id"]=="links" and p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"} for p in o["properties"])
-supported=panels[93]
+plain=panels[93]
+assert not any(p["id"]=="links" and p["value"] for o in plain["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"} for p in o["properties"])
+supported=panels[47]
 assert 'evidence=~"^(land-test[.]log|land_refused[.]tests)$"' in supported["targets"][0]["expr"]
 assert all("loki_url" not in target["expr"] for target in supported["targets"])
 supported_org=next(t for t in supported["transformations"] if t["id"]=="organize")["options"]
@@ -416,7 +417,7 @@ for evidence in supported_evidence:
   assert re.fullmatch(evidence_matcher.group(1),evidence)
   assert set(placeholders)<=visible_fields
 assert "These logs are shipped to Loki" in supported["description"]
-assert "local and are labeled local only (not shipped)" in table["description"]
+assert "local and are labeled local only (not shipped)" in plain["description"]
 assert "file://" not in text
 widths={o["matcher"]["options"]:p["value"] for o in supported["fieldConfig"]["overrides"] if o["matcher"]["id"]=="byName" for p in o["properties"] if p["id"]=="custom.width"}
 assert all(name in widths for name in ("version","run","outcome","Result","Log","Tokens")), widths
@@ -430,16 +431,24 @@ PY
 
 @test "agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs" {
   run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
-import json,sys
+import json,re,sys
 text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
-table=next(p for p in d["panels"] if p["id"]==47)
+table=next(p for p in d["panels"] if p["id"]==93)
 assert "codex.log files stay local" in table["description"]
 assert "not shipped" in table["description"]
 assert not table["fieldConfig"]["defaults"].get("links")
 assert not any(p["id"]=="links" and p["value"] for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"Log"} for p in o["properties"])
 # agent-audit: allow assert-removed the all-run Log-link assertion moves to the filtered supported table; verify its fixed placeholders survive organize.
-supported=next(p for p in d["panels"] if p["id"]==93)
-assert "supported landing logs" in supported["title"].lower()
+supported=next(p for p in d["panels"] if p["id"]==47)
+assert supported["title"]=="Per run evidence"
+assert table["title"]=="Local-only run evidence"
+assert 'evidence!~"^(land-test[.]log|land_refused[.]tests)$"' in table["targets"][0]["expr"]
+
+assert 'evidence!~"^(land-test[.]log|land_refused[.]tests)$"' in table["targets"][1]["expr"]
+matcher=re.search(r'evidence!~"([^"]+)"',table["targets"][0]["expr"]).group(1)
+for evidence in ("land-test.log","land_refused.tests","codex_exit.exit","none","legacy","","land-testXlog"):
+  assert (re.fullmatch(matcher,evidence) is None)==(evidence not in {"land-test.log","land_refused.tests"})
+
 assert 'evidence=~"^(land-test[.]log|land_refused[.]tests)$"' in supported["targets"][0]["expr"]
 assert all("loki_url" not in target["expr"] for target in supported["targets"])
 supported_org=next(t for t in supported["transformations"] if t["id"]=="organize")["options"]
@@ -484,7 +493,7 @@ def load(name,key):
     text=(base/name).read_text()
     return json.loads("\n".join(line[4:] for line in text.split(f"  {key}: |\n",1)[1].splitlines()))
 d=load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")
-panel=next(p for p in d["panels"] if p["id"]==93)
+panel=next(p for p in d["panels"] if p["id"]==47)
 log=next(o for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")=="Log")
 props=log["properties"]
 assert any(p["id"]=="custom.inspect" and p["value"] for p in props)
