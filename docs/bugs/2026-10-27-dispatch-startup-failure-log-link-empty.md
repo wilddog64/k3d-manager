@@ -1,7 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
 **Status:** VERIFIED — corrective offline checks passed after failed live click; redeployment/UI verification pending
-**Fix commit:** 0d1807715691c0b21c344de7d0af724ff05c5e20
+**Fix commit:** 19a56939e3c65f93d3ef293697ae76c63aacdaad
 **Priority:** P3
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -91,3 +91,7 @@ records failed live check and corrected evidence, then requests one redeploy.
 ## Corrective implementation landed
 
 Corrective Luna task startup-log-noninteractive-cells supersedes startup-log-link-local-only. Per run evidence now has plain Log paths with width/inspection retained and no Log data link. New Supported landing logs panel admits only exact supported evidence types and uses version/slug/run links whose fields survive organize. Unsupported/unknown/legacy evidence cannot appear in that linked view. No metric schema/shipper/history changes;29otherexistingpanels unchanged. Independent138pytest/28BATS/Ruff/PromQL/staged gates passed; actual operator clicks remain unverified. Full outputs and prior failed live check retained in three-open-bugs issue.
+
+## User clarification: retain primary-table hyperlinks
+
+Operator rejected removing successful-row hyperlinks from Per run evidence. Coordinator correction19a56939 restores linked shipped logs in original panel47/title/position; only unshipped rows move to Local-only run evidence(panel93). Exact complementary selectors cover unsupported/absent/legacy evidence without loss; both tokenqueries partitioned. Main merge/layout retained,29otherpanels unchanged. Offline138Python/28BATS/4PromQL/staged gates passed. No schema/shipper/history/identity changes. Actual UI check pending explicit ConfigMap apply; make platform-ops does not install this dashboard. Full output and corrected test failures in three-open-bugs issue.
