@@ -776,3 +776,13 @@ Full actualoutputs/failures docs/issues/2026-10-28-three-bug-luna-batch-verifica
 No live deployment/restart/credentials/cloudrequests/screenshotexport; no PR.
 First operatorlive step make webhook-doctor, inspectredactedJSON, thenoneatatime.
 Prior PlansTitle renderingPASS but exactplanTitleclick stillpending separately.
+
+## 2026-10-28 renewed webhook live step1 — PASS
+
+Operator doctor11:44:33.867109Z loadedPID4295/port7443, credentiallookup0,
+healthy_http/all_oktrue, freshlog/noerrors, no recoveryaction/recommendation.
+LocalhealthPASS; externaldeliveryunverified, originalincidentOPEN/historiccauseunknown.
+FullactualJSON docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+No webhookrestart. Nextsingleoperator make restart-cloud-bridge to activate
+previouslypendingf046763f, inspectresultthenbenigncloudhealth separately.
+Docs-only,no code/test rerun or coordinatorruntime/credential/externalwrites; no PR.

@@ -286,3 +286,15 @@ Coordinator corrected the opening manual port example9000→7443 based on curren
 implementation, retaining installed-override caution. Prefer doctor --check;
 no new health/restart/credential/provider action executed. Original incident
 remains OPEN pending current bridge-path live evidence/historical uncertainty.
+
+## Operator renewed live step1 — 2026-10-28
+
+make webhook-doctor JSON at2026-10-28T11:44:33.867109Z confirms loaded PID4295,
+7443 listening, reader lookup0/available, authenticated healthy_http/all_oktrue,
+fresh log/no categories, no recovery action/recommendation. Current local
+functional check PASS; do not restart webhook. External delivery remains
+unverified and historical cause unknown. Full actual JSON in
+[batch evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
+Next separate operator step: load previously reviewed bridge auth fix via
+make restart-cloud-bridge, then inspect its result before one benign health
+request. This is fix activation, not a claim that healthy webhook needs recovery.

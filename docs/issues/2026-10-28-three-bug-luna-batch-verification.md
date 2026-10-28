@@ -200,3 +200,19 @@ Operator live work begins with make webhook-doctor; inspect its redacted JSON
 before any recovery or cloud action. Subsequent dashboard live checks require
 fresh ArgoCD revision/ConfigMap and operator normal/narrow screenshots and PR
 GitHub timestamp cross-checks, one step at a time. No extra panels introduced.
+
+## Operator live step1 — local doctor PASS
+
+Actual operator output after make webhook-doctor:
+```json
+{"classification": "local_http_healthy_external_delivery_unverified", "credential": {"lookup_exit": 0, "source": "keychain", "status": "available"}, "credential_action": null, "health": {"all_ok": true, "http_responsive": true, "status": "healthy_http"}, "health_timeout_seconds": 15, "launchd": {"last_exit_code": null, "pid": 4295, "port": 7443, "status": "loaded"}, "listener": {"listening": true, "status": "listening"}, "log": {"available": true, "error_categories": [], "freshness": "fresh", "modified_utc": "2026-10-28T11:44:15.998184+00:00"}, "mode": "check", "process": {"pids": [4295], "status": "available"}, "recovery_action": null, "recovery_recommended": false, "timestamp_utc": "2026-10-28T11:44:33.867109+00:00"}
+```
+Authenticated local HTTP and downstream all_ok pass at11:44:33Z, loaded PID4295,
+port7443 listening, reader credential available, log fresh/no errors, recovery
+not recommended. No webhook restart warranted. External cloud-bridge delivery
+is explicitly unverified. Historical cause remains unknown; original P2 OPEN.
+No new test failure or code change; docs-only verification, no rerun needed.
+Next operator step is the previously pending one-time bridge reload to activate
+reviewed SSH-auth implementation f046763f, not webhook recovery. Use
+make restart-cloud-bridge, inspect result before a separate benign health request.
+No coordinator service mutation, credential access or external request performed.
