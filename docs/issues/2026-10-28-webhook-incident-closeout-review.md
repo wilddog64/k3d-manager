@@ -117,3 +117,18 @@ check-doc-links: 5 file(s) OK
 ```
 No BATS/ShellCheck rerun applicable to this docs-only closeout; prior actual
 implementation results remain in linked batch evidence. No PR created.
+
+## Operator metrics publication — PASS
+
+Operator confirmed bin/k3dm-vectordb-metrics completed. Read-only Pushgateway
+http://127.0.0.1:19094/metrics query returned exact incident row:
+```text
+k3dm_bug_info{branch="k3d-manager-v1.43.9",bug="2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery",filed="2026-10-26",fix_sha="7ea1032f",fixed_in="v1.43.9",instance="",job="k3dm-bug-open",live_evidence="-",live_verified="false",live_verified_at="false",priority="P2",release="v1.43.9",release_order="9998.9956.9990 v1.43.9",repo="k3d-manager",sort_key="9998.9956.9990 v1.43.9 P2 3 2026-10-26 2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery",status="fixed",title="Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery",verified="false",verified_at="false",verified_sha="-"} 2
+```
+Published statusfixed, v1.43.9: operational closeout reached data source.
+Code-fix verified/live flags remainfalse deliberately, rather than inventing
+causal-fix evidence. Automatic history lookup reports documentation closeoutSHA
+7ea1032f as fix_sha; this is the status-transition commit, not proven causalfix.
+Current runtime proof remains in typed investigation metadata and batch output.
+No new provider/service write or test rerun. Grafana display itself not observed;
+operator refresh should show Fixed or remove row under an open-only filter.

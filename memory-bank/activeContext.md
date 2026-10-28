@@ -865,3 +865,12 @@ No live/provider/restart/credential/screenshotexport/testrerun/PR. PRCheckspayme
 liveviewstillpending separately. Nextpublishbugmetrics thencheckOpenrowclears.
 
 Operational closeout commit: `7ea1032f`; independent consumer assertion, three-file links/whitespace and staged lint/audit passed; checkpoint hooks check-doc-links5filesOK. Docs-only, no PR URL (policy). Dashboard publication remains pending.
+
+## 2026-10-28 webhook closeout metrics publication PASS
+
+Operator publishercompleted. Read-onlyPushgateway exactparentrow nowstatusfixed/
+fixed_inv1.43.9/fix_sha7ea1032f(docstatustransition), notOpen. Codefix/liveflagsfalse
+bydesign; runtimecurrenthealthproofseparate, historicalcauseunconfirmed. Fullactual
+metric closeoutreviewissue. No newruntimewrite/testrerun. NextoperatorBugTracking
+refresh toconfirmFixed/removalifOpenfilter; PRCheckspaymentviewpendingseparately.
+No PRcreated.
