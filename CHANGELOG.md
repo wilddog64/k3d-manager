@@ -20,6 +20,8 @@
 
 ### Changed
 
+- Bug Tracking metrics recognize typed live investigation proof for closed recovery records without attributing a causal fix commit.
+
 - Release forecast keeps the Target state blocker reason readable with explicit supporting text sizing in the existing panel.
 
 - Webhook doctor gives aggregate health checks a 15-second budget and treats a timeout with a listening socket as inconclusive rather than recommending a restart.

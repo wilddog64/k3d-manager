@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import time
+from datetime import date
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -127,6 +128,16 @@ _LIVE_EVIDENCE_RE = re.compile(
     r"\s+(?:·|\|)\s+commit\s+([0-9a-f]{7,40})"
     r"\s+(?:·|\|)\s+proves\s+((?:E\d+)(?:,(?:E\d+))*|fix)\s*$"
 )
+_INVESTIGATION_EVIDENCE_RE = re.compile(
+    r"^\*\*Live investigation evidence:\*\*\s*(\d{4}-\d{2}-\d{2})"
+    r"\s+·\s+source\s+(\S+)\s+·\s+reference\s+(\S+)"
+    r"\s+·\s+env\s+(\S+)\s+·\s+scenario\s+(\S+)"
+    r"\s+·\s+proves\s+([a-z0-9][a-z0-9,-]*)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+_INVESTIGATION_TYPE_RE = re.compile(
+    r"^\*\*Verification type:\*\*\s*investigation\s*$", re.MULTILINE | re.IGNORECASE
+)
 
 
 def _status_value(text):
@@ -203,6 +214,35 @@ def doc_live_evidence(text):
             "proves": proves,
         })
     return evidence
+
+
+def doc_is_investigation(text):
+    """Detect the explicit, case-insensitive investigation type marker."""
+    return bool(_INVESTIGATION_TYPE_RE.search(text))
+
+
+def doc_has_fix_commit(text):
+    """Detect an explicit Fix commit header, including empty or malformed values."""
+    return bool(re.search(r"^\*\*Fix commit:\*\*", text, re.MULTILINE | re.IGNORECASE))
+
+
+def doc_has_investigation_evidence(text):
+    """Detect the original typed line syntax for consistent hook diagnostics."""
+    return bool(_INVESTIGATION_EVIDENCE_RE.search(text))
+
+
+def doc_investigation_evidence(text):
+    """Return valid typed recovery proof; this checks shape, not evidence truth."""
+    if not doc_is_investigation(text) or doc_has_fix_commit(text):
+        return None
+    for match in _INVESTIGATION_EVIDENCE_RE.finditer(text):
+        try:
+            date.fromisoformat(match.group(1))
+        except ValueError:
+            continue
+        keys = ("date", "source", "reference", "env", "scenario", "proves")
+        return dict(zip(keys, match.groups()), line=match.group(0).strip())
+    return None
 
 
 def doc_release(text, added_release=None):

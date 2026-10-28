@@ -188,6 +188,17 @@ def test_doc_status_classifies_without_changing_doc_meta(status, expected, verif
     assert pa.doc_meta(text) == ("P2", old_state)
 
 
+def test_investigation_evidence_shared_parser_validates_shape_and_calendar_date():
+    text = ("**Verification type:** investigation\n"
+            "**Live investigation evidence:** 2026-10-28 · source operator · "
+            "reference docs/issues/proof.md · env local · scenario health · proves m1,m3\n")
+    parsed = pa.doc_investigation_evidence(text)
+    assert parsed["date"] == "2026-10-28" and parsed["reference"] == "docs/issues/proof.md"
+    assert pa.doc_investigation_evidence(text.replace("2026-10-28", "2026-02-30")) is None
+    assert pa.doc_investigation_evidence(text.replace("Verification type:** investigation", "Verification type:** implementation")) is None
+    assert pa.doc_investigation_evidence(text + "**Fix commit:** `abcdef1234567`\n") is None
+
+
 def test_doc_status_classifies_missing_status_as_unknown():
     assert pa.doc_status("**Priority:** P1\nno status\n") == ("P1", "unknown", False)
 
@@ -729,3 +740,12 @@ class TestExecFailureDetail:
         monkeypatch.setattr(pa.subprocess, "run", lambda *_a, **_k: proc)
         with pytest.raises(pa.StoreUnavailable, match="syntax error"):
             pa.run_sql("SELECT 1;")
+
+
+@pytest.mark.parametrize("header", ["**Fix commit:** not-a-sha", "**Fix commit:**", "**FIX COMMIT:** broken", "**Fix commit:** `abcdef1234567`"])
+def test_investigation_rejects_any_explicit_fix_header(header):
+    text = ("**Verification type:** investigation\n"
+            "**Live investigation evidence:** 2026-10-28 · source operator · "
+            "reference opaque-proof · env local · scenario health · proves m1\n")
+    assert pa.doc_investigation_evidence(text + header + "\n") is None
+    assert pa.doc_has_fix_commit(text + header + "\n")

@@ -7,7 +7,7 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
-Open for counts from filed until the bug is LIVE-VERIFIED.
+Open for counts from filed until the bug is LIVE-VERIFIED, or a closed investigation has valid typed recovery proof.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
@@ -46,15 +46,15 @@ Fixed documents also have a Verified and Live-verified label:
 
 | Verified | When |
 |---|---|
-| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
-| `false` | fixed, release v1.43.2 or later, any other fixed status |
+| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED`, or a closed investigation has valid typed proof |
+| `false` | fixed, release v1.43.2 or later, any other fixed status without valid typed investigation proof |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
 | Live-verified | When |
 |---|---|
-| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
-| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
+| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED`, or a closed investigation has valid typed proof |
+| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` and has no valid typed investigation proof |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
@@ -76,6 +76,25 @@ The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verifi
 contain the first eight characters of the commit that marked the doc fixed (the commit used for
 **Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
 otherwise they are `-` and render as `—`.
+
+An investigation can verify recovery without identifying a causal code fix. Such a bug doc uses
+`**Verification type:** investigation` and a typed line, for example:
+`**Live investigation evidence:** 2026-10-28 · source operator · reference docs/issues/recovery-check.md · env m4-webhook · scenario health-check · proves m1,m3`.
+The parser checks the metadata shape and calendar date; it does not fetch the reference or claim
+that the cited evidence is true. The operator remains responsible for reviewing that evidence.
+When this proof is attached to a closed bug, the row reports Verified and Live-verified with
+`live_evidence="ok"`; `verified_sha` identifies the commit recording the proof, while `fix_sha`
+stays `-` because an operational recovery record is not a causal code fix. Both date labels use
+the typed proof date; the recording SHA is found in the history of the scanned Git ref, even
+when a later working tree contains different evidence. Legacy and unassigned releases retain
+their established `n/a` labels. Open investigations
+remain open and unverified. Do not add a Fix commit to an investigation-only proof; ordinary code
+fix evidence continues to require its Fix commit and ancestry check. Any explicit Fix commit
+header conflicts with investigation-only proof, including an empty or malformed value. Typed
+investigations with missing or invalid proof stay unverified even when their Status says
+LIVE-VERIFIED. Their inferred status-change commit is never displayed as a causal fix; a genuine
+explicit code-fix SHA remains visible, and ordinary live code-fix evidence retains its ancestry
+validation.
 
 It also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
 fix commit:

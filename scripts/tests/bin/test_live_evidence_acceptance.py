@@ -119,6 +119,58 @@ def test_investigation_live_evidence_passes_without_fix_commit(repo):
     res = _lint(r, "docs/bugs/2026-10-11-investigation.md", _investigation_doc())
     assert res.returncode == 0, res.stderr
 
+@pytest.mark.parametrize("status", ["CLOSED", "LIVE-VERIFIED"])
+def test_closed_investigation_publishes_live_proof_without_causal_fix_sha(repo, status):
+    r, *_ = repo
+    text = (REPO / "docs/bugs/2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery.md").read_text()
+    text = "\n".join(
+        "**Status:** " + status + " — operationally recovered" if line.startswith("**Status:") else line
+        for line in text.splitlines()
+    ) + "\n"
+    path = "docs/bugs/2026-10-10-x.md"
+    doc_path = r / path
+    doc_path.parent.mkdir(parents=True, exist_ok=True)
+    doc_path.write_text(text.replace("2026-10-28", "2026-10-27"))
+    _git(r, "add", path)
+    _git(r, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "-m", "earlier investigation proof")
+    doc_path.write_text(text)
+    _git(r, "add", path)
+    _git(r, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "-m", "record investigation proof")
+    record_sha = _git(r, "rev-parse", "HEAD")
+    metrics = _load()
+    # Later working tree and HEAD changes must not affect the scanned historical ref.
+    doc_path.write_text(text.replace("2026-10-28", "2026-10-29"))
+    _git(r, "add", path)
+    _git(r, "-c", "user.email=a@b", "-c", "user.name=t", "commit", "-q", "-m", "later investigation proof")
+    historical_texts = metrics._bug_texts(r, record_sha)
+    assert historical_texts[path] == text
+    verification_times = metrics._verification_times(r, record_sha, historical_texts)
+    tally = {"v1.43.9": {"open_paths": [], "unknown_paths": [], "closed_paths": [{"path": path}]}}
+    output = metrics._bug_status_metrics(
+        r, ref=record_sha, now=NOW, tally=tally, texts=historical_texts,
+        fixed_in={path: {"commit": "abcdef0123456789", "release": "v1.43.9"}},
+        verification_times=verification_times,
+    )
+    row = next(line for line in output.splitlines() if line.startswith("k3dm_bug_info{"))
+    assert 'verified="true"' in row and 'live_verified="true"' in row
+    assert 'live_evidence="ok"' in row and 'fix_sha="-"' in row
+    assert f'verified_sha="{record_sha[:8]}"' in row
+    assert 'verified_at="2026-10-28"' in row and 'live_verified_at="2026-10-28"' in row
+    assert row.endswith(" -2")
+
+def test_open_investigation_does_not_publish_verification(repo):
+    r, *_ = repo
+    text = _investigation_doc().replace("LIVE-VERIFIED — provider confirmed the cause", "OPEN — investigating")
+    row = _row(r, text, {})
+    assert 'status="open"' in row and 'verified="-"' in row and 'live_verified="-"' in row
+
+def test_old_release_investigation_keeps_historic_na_values(repo):
+    r, *_ = repo
+    text = _investigation_doc().replace("LIVE-VERIFIED — provider confirmed the cause", "CLOSED — operationally recovered")
+    row = _row(r, text, {}, release="v1.43.1")
+    assert 'verified="n/a"' in row and 'live_verified="n/a"' in row
+    assert 'live_evidence="n/a"' in row
+
 def test_investigation_evidence_requires_investigation_type(repo):
     r, *_ = repo
     res = _lint(
@@ -187,3 +239,57 @@ def test_N5_resolvable_non_ancestor_stays_stale(repo):
     r, old, fix, later = repo
     row = _row(r, _doc([_ev(old)]), {"docs/bugs/2026-10-10-x.md": {"commit": fix}})
     assert 'live_evidence="stale"' in row
+
+
+@pytest.mark.parametrize("status", ["CLOSED", "LIVE-VERIFIED"])
+@pytest.mark.parametrize("kind", ["valid", "missing", "malformed", "bad-date", "no-marker", "malformed-fix", "valid-fix"])
+def test_investigation_publisher_proof_matrix(repo, status, kind):
+    r, _, fix, _ = repo
+    text = _investigation_doc().replace("LIVE-VERIFIED — provider confirmed the cause", status)
+    if kind == "missing":
+        text = "\n".join(line for line in text.splitlines() if not line.startswith("**Live investigation evidence:"))
+    elif kind == "malformed":
+        text = text.replace(" · proves shutdown-cause", "")
+    elif kind == "bad-date":
+        text = text.replace("2026-10-20", "2026-02-30")
+    elif kind == "no-marker":
+        text = text.replace("**Verification type:** investigation\n", "")
+    elif kind in ("malformed-fix", "valid-fix"):
+        text += "**Fix commit:** " + (fix if kind == "valid-fix" else "not-a-sha") + "\n"
+    row = _row(r, text, {"docs/bugs/2026-10-10-x.md": {"commit": fix}})
+    if kind == "valid":
+        assert 'verified="true"' in row and 'live_verified="true"' in row
+        assert 'live_evidence="ok"' in row and row.endswith(" -2")
+    elif kind == "no-marker":
+        # An untyped doc retains the established status-based code-fix policy.
+        expected = "true" if status == "LIVE-VERIFIED" else "false"
+        assert f'verified="{expected}"' in row and 'live_evidence="ok"' not in row
+    else:
+        assert 'verified="false"' in row and 'live_verified="false"' in row
+        assert 'live_evidence="missing"' in row and not row.endswith(" -2")
+    expected_fix = fix[:8] if kind in ("valid-fix", "no-marker") else "-"
+    assert f'fix_sha="{expected_fix}"' in row
+
+
+@pytest.mark.parametrize("release", ["v1.43.1", "unassigned", "v1.43.3"])
+@pytest.mark.parametrize("valid", [True, False])
+def test_investigation_release_policy(repo, release, valid):
+    r, *_ = repo
+    text = _investigation_doc()
+    if not valid:
+        text = text.replace(" · proves shutdown-cause", "")
+    row = _row(r, text, {}, release=release)
+    flags = ("true" if valid else "false") if release == "v1.43.3" else "n/a"
+    assert f'verified="{flags}"' in row and f'live_verified="{flags}"' in row
+    assert 'live_evidence="n/a"' in row and 'fix_sha="-"' in row
+
+
+def test_typed_doc_can_use_ordinary_code_fix_proof_and_ancestry(repo):
+    r, old, fix, later = repo
+    text = _investigation_doc() + f"**Fix commit:** {fix}\n" + _ev(later) + "\n"
+    row = _row(r, text, {})
+    assert 'live_evidence="ok"' in row and f'fix_sha="{fix[:8]}"' in row
+    assert _lint(r, "docs/bugs/ordinary.md", text).returncode == 0
+    stale = text.replace(_ev(later), _ev(old))
+    assert 'live_evidence="stale"' in _row(r, stale, {})
+    assert _lint(r, "docs/bugs/ordinary.md", stale).returncode == 1
