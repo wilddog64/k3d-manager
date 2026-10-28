@@ -1283,3 +1283,7 @@ no screenshotexport. Slackcommandresponse stillpending, then separateTLS1.2
 change/verification. LatestminTLS1.0/securitybugOPEN. Docs-only; no credentials,
 logout/settingswrite/probes/runtimechange. BATS/ShellCheckN/A. Required
 lint/audit/checkpoint/push pending; noPR perrepositoryrule (URLN/A).
+
+Browser smoke evidence pushed: 01831bd2. Staged lint/audit and checkpoint
+hooks passed; check-doc-links4filesOK. Documentation-only; BATS/ShellCheck
+not applicable. PRURLN/A per repository rule. Slack/TLS acceptance pending.
