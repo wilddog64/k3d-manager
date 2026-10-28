@@ -93,3 +93,38 @@ preflight. No JSON copy or rerun requested. Location remains partial/pending.
 Previously provided preflight JSON remains available in the prior report;
 no new settings or TLS evidence was obtained here. No implementation change
 or BATS/ShellCheck rerun; documentation gates only.
+
+## Cause identified: operator terminal is outside tmux
+
+After operator said the run finished again, exact same socket/pane capture
+still returned:
+
+```text
+{"pane": "work:4.0", "logical_lines": 98, "preflight_command_lines": 0, "reports": 0}
+```
+
+Operator then ran the explicit environment check and supplied actual output:
+
+```text
+printf 'pane=%s\n' "${TMUX_PANE:-not-in-tmux}"
+pane=not-in-tmux
+```
+
+This explains the mismatch: the preflight terminal is outside tmux. Earlier
+display-message selected an unrelated old pane. Coordinator acknowledged
+the locator mistake; no repeated tmux reads are needed. The locator
+investigation is resolved; obtaining the latest report remains pending.
+
+One-time fallback, run in the operator's actual terminal: redirect the
+existing read-only Make check's JSON to a local file that coordinator can
+read, avoiding a large copy/paste.
+
+```sh
+make cloudflare-preflight ZONE_ID=faf14ba309c1626ef195ae31bd730dd1 > /tmp/k3dm-cloudflare-preflight.json
+```
+
+Wait for operator completion before reading this file as a new result. Do
+not infer that it exists or a new check passed. No credentials should be
+pasted or retrieved by coordinator. No new preflight result, API settings
+read, TLS enforcement proof, live approval or zone mutation in this turn.
+Docs-only record; no BATS/ShellCheck rerun, normal doc lint/audit/hooks apply.

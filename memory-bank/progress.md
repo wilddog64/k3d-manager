@@ -1429,3 +1429,15 @@ copy/newrunrequested. Previousfull17:36:46Zreportalreadyknown, no newsettings
 verification. Existingtmuxlocationissueupdated(actualcountoutput); docs-only
 no BATS/ShellCheck rerun, gatesbeforecommit, noPR/implementationcompleteclaim.
 Alltest-all/CFmanualreview/GUIacceptancespending preserved.
+
+## 2026-10-28 tmux mismatch explained: actual terminal outside tmux
+
+Operator reran/checkagain; exactwork4.0still98lines/0report/old05:42dispatch.
+ThenoperatorprintfTMUX_PANE actual pane=not-in-tmux. Causeidentified: previous
+display-message pickedunrelatedolddefaultpane; acknowledgedlocatorerror.
+Stoprepeatedtmuxreads. Latestreportstillpending; offerone-time actualterminal
+Makecheckredirectto/tmp/k3dm-cloudflare-preflight.json, thenreadfiledirectly,
+noJSONpaste. Do notassumefileexists/newcheckpassed. Previous17:36:46report
+alreadyknownpartial; no zonewrites/credentials/probesbycoordinator.
+Existinglocationissue recordsactualcounts+useroutput; docs-onlynotestsrerun.
+NoPR/implementationcompleteclaim; fulltest-allandCFmanualacceptancepending.
