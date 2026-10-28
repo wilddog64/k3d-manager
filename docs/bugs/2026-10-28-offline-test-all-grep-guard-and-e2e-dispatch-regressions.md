@@ -3,7 +3,7 @@
 **Filed:** 2026-10-28 (operator screenshot of Grafana Offline Tests dashboard and Alertmanager emails)
 **Priority:** P2 — offline test gate failing and incomplete; security guard failure requires inspection
 **Severity:** medium — confidence in test gate reduced; no established production or Hostinger outage
-**Status:** OPEN / INVESTIGATED STATICALLY — exact runtime causes not yet reproduced; fourth failing case not visible
+**Status:** OPEN — scoped fixes independently verified and pushed; fresh complete three-stage test-all and published metrics acceptance pending
 **Release:** v1.43.9 bug (does not consume an enhancement plan slot)
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-28 explicitly requested review/dispatch to Luna; isolated focused implementation/testing authorized, full published rerun and live deployment remain operator-owned
@@ -16,7 +16,7 @@ The operator's 2026-10-28 Grafana screenshot shows `Failed cases = 4` and three 
 - case 130: `grep-q guard: no non-allowlisted pipeline retains -q` — `[ "$status" -eq 1 ] failed`.
 - case 1015: `dispatch refuses and never falls back locally when the lock is held` — expected output containing `busy` absent.
 - case 1016: `dispatch chains publish-back after the E2E and preserves the exit code` — `[ "$status" -eq 0 ] failed`.
-- Fourth failed case is below/beyond the captured table view; **do not invent its identity**.
+- Follow-up Prometheus read and operator screenshot identify case 1194: `PR check duration legend uses a readable side layout without changing its query` — `table = next(panel for panel in data["panels"] if panel["id"] == 6)` failed. The historical checkout/raw log is still unavailable; current isolated and curated checks pass.
 
 Alertmanager's firing email on 2026-10-28 13:21 UTC reported `OfflineSuiteFailing`, `target=test-all`, instance `test-all-local`, with **4 offline test case(s) failing**, and a simultaneous `OfflineSuiteRunIncomplete` email. Both alert rules use `for: 30m`; Pushgateway retains the most recently published values, so firing does not prove ongoing test execution.
 
@@ -177,3 +177,27 @@ assertions/DO_NOT_REMOVE, new/refactoredfunctions<=8ifs; reportlegacyconflicts.
    Fullmake test-all not authorizedtoworker; don't overwrite recordedmetrics.
    Operator will runfreshfullpipelineafterindependentreview and check all3stage
    markers, failed0/complete1 andalertresolution separately. No falsecompletion.
+
+## 2026-10-28 Luna implementation and independent review
+
+Implementation commits on the remote release branch: `5a2a958f` (forecast
+producer-drain fix and safe E2E fixtures) and `0514e9d9` (remaining fixture
+checkout isolation found by native landing). Luna task
+`offline-test-all-regressions-luna`, gpt-6-luna; coordinator independently
+reviewed, strengthened command-order assertions and repaired two remaining
+fixture-only dependencies. Production E2E guards and allowlists unchanged.
+
+Final native landing gate: 116/116 BATS, 37/37 Python metric-contract tests,
+raw ShellCheck, actual Bash-script syntax, lint/audit/hooks all pass. PR Checks
+separate six-case BATS/promtool gate passes without skips. Broader curated stage:
+1,892 passed, 20 skipped, one known Python3.15 ESO loader P3 failed; same ESO
+case passes existing Python3.13.6. Full outputs, red/green checks and limitations
+are in [batch review](../issues/2026-10-28-two-new-p2-luna-batch.md) and
+[full curated output](../issues/2026-10-28-offline-p2-curated-verification.md).
+
+The original four cases pass in the current curated checkout. This does not
+establish the historical PR1194/E2E failure causes or complete all three
+make test-all stages. Operator next: fresh full make test-all in the usual
+Python3.13 shell, then confirm test/test-bin/test-python completion, failed0,
+complete1 and fresh publication. Alert resolution remains unverified; retain
+OPEN until those results are reviewed. No PR created; Claude owns PRs.

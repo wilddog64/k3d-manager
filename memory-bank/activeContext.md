@@ -988,3 +988,18 @@ K3DM_REPO_ROOT=$PWD, reusedLuna'ssafehelperinpreflight-refusal/SSHexit7 tests,
 E2EBATS+testguide. Newcheckpoint/native116BATS+37Pythonretry pending. Exact
 red/green andfailededitpermission retry recordedtwo-new-P2batchissue.
 No closure/liveclaims; broadknownESO3.15P3 and20skipsremainrecorded.
+
+## 2026-10-28 both new P2 Luna tasks landed; operator acceptance pending
+
+Offline native task finalnormalretryPASS:116BATS/37Python/rawShellCheck/Bash
+production-syntax/lint/audit/hooks. Pushed5a2a958f +0514e9d9, nativeverifiedpass.
+Includes coordinatorcommand-orderassertionsand2fixtureisolationrepairs. Full
+actualoutput two-new-P2batchissue. Broad1913stage:1892pass/20skip/knownESO3.15
+1fail; all4originalcasespass. ESOexisting3.13.6focusedpass; PR6withpromtoolpass.
+Offlinebug remainsOPENpending freshoperator3-stage make test-all/usual3.13shell,
+failed0/complete1/freshmetrics/alertreview; no historicalcauseinvented.
+Cloudflare nativehelper2e0be3f6 pushed/offline169pytest/Ruffverified; securitybug
+OPENpendingactualF0review/F1separatego/F2liveacceptance; no accountaccess/write.
+NoPRcreated/URLnone(ClaudeownsPRs), no screenshotexports/livepublication/restarts.
+PreviousoriginalincidentGUIrow andPRCheckspaymentview acceptance stillpending.
+Nextsingleoperatorstep freshmake test-all, noArgoCDrefreshneededforthesefixes.
