@@ -339,3 +339,9 @@ Operator reports make dispatch-metrics returned no output. Existing Make recipe 
 ```
 
 The two historical exit127 failures now carry the new local-only summary with no Loki target. Supported acceptedrun2 rows carry the precise per-row Loki target and real test summaries. Earlier run1 unknown rows remain historical attempts; no ledger rewritten. Current publication prerequisite passed. Still pending: actual Grafana rendering/click behavior. Next single operator check refresh Agent Dispatch/Per run evidence and show the two historical failed startup rows. No coordinator metric write, service restart, UI action or log export. Evidence-only update; prior326Python/28BATS and staged gate results remain, no code/test rerun.
+
+## Operator screenshot: local-only Result renders; click behavior pending
+
+[Supplied Per run evidence screenshot](../assets/2026-10-27-startup-log-local-only-render.png) shows both vectordb-retrieval-key-cache and -retry rows failed, run1, Result beginning exit127;localonly(not…); accepted retry2 remains accepted. Thus refreshed row status/Result visible. Local log paths still render blue in both failed rows, like the supported rows. The cropped image does not show a link destination or a click result; cannot infer the unwanted Loki action is absent from color or missing metric target alone.
+
+Next single operator UI check: click Log on failed vectordb-retrieval-key-cache and report actual action/destination. Do not mark the P3 LIVE-VERIFIED until unsupported row no longer opens empty Loki and a supported landing-log action is also confirmed. No coordinator click, new metric write, restart or ledger change. Offline138Python/28BATS remains valid; this is a limited rendering observation, not complete UI verification. If missing-field interpolation still provides an action, reopen implementation with actual click evidence rather than claiming the current patch complete.
