@@ -1148,3 +1148,12 @@ FullactualJSON docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
 No webhookrestart. Nextsingleoperator make restart-cloud-bridge to activate
 previouslypendingf046763f, inspectresultthenbenigncloudhealth separately.
 Docs-only,no code/test rerun or coordinatorruntime/credential/externalwrites; no PR.
+
+## 2026-10-28 bridge reload process verification
+
+Operator make restart-cloud-bridge silent (expected targetbehavior). Filtered
+read-only launchctl exit0/state running/PID65583/runs89; psage31s. No command
+exit supplied, no fake exit0 inference; currentprocessPASS, externaldeliverypending.
+Nextsingleoperator bin/k3dm-cloud-request --wait health; inspectdeliveredresponse.
+No coordinatorrestart/cloudrequest/credential/rawlogaccess; incidentOPEN.
+Fullactualoutput batchverificationissue; docs-only/no testsrerun/no PR.

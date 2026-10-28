@@ -216,3 +216,19 @@ Next operator step is the previously pending one-time bridge reload to activate
 reviewed SSH-auth implementation f046763f, not webhook recovery. Use
 make restart-cloud-bridge, inspect result before a separate benign health request.
 No coordinator service mutation, credential access or external request performed.
+
+## Operator bridge reload — process PASS, delivery pending
+
+Operator reports make restart-cloud-bridge returned no output. Makefile target
+suppresses command echo and directly calls launchctl kickstart -k; success is
+normally silent, while a missing installation emits an explicit skip warning.
+Read-only filtered launchd/process result (raw environment not emitted):
+```json
+{"launchctl_exit": 0, "state": "running", "pid": "65583", "runs": "89", "process": "65583 00:31 /opt/homebrew/Cellar/python@3.15/3.15.1/Frameworks/Python.framework/Versions/3.15/Resources/Python.app/Contents/MacOS/Python"}
+```
+Running process age31s is consistent with the operator reload. Operator did
+not supply an exit code, so do not invent one. This confirms current process,
+not end-to-end delivery or historical cause. Next single operator request:
+bin/k3dm-cloud-request --wait health. Inspect completed response, not queued.
+No coordinator restart/cloud request, credentials or raw logs accessed. Docs-only;
+no test rerun or new failure. Original incident remains OPEN pending evidence.
