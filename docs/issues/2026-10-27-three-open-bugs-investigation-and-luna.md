@@ -254,3 +254,88 @@ The dashboard is current but these metric rows have not acquired the new local-o
 ```
 
 The scheduler uses a directory lock and pending marker (no pid file is part of that contract); absent pid metadata is not proof of a dead process. No lock was deleted or process killed. Background publisher completion/cause of lag not established. Avoid treating missing Loki target on this old export as sufficient live proof of new behavior. Next single operator command make dispatch-metrics invokes existing publisher and ships supported landing-test logs; inspect its output, then selected published metrics, before dashboard UI check. No coordinator metric PUT, log shipping, synthetic ledger edit or production restart performed. Generic manual-secret reminder is not proof those Secrets are absent; none were read/decoded in this check. Canonical bug stays VERIFIED offline pending UI/live evidence.
+
+## Silent operator metrics refresh — publication verified
+
+Operator reports make dispatch-metrics returned no output. Existing Make recipe is quiet and publisher prints only failures; silence alone was not treated as success. Independent read-only localhost19094/metrics verification returned these selected7d rows (same5-slug selection as prior check):
+
+```json
+{
+  "selected_published_rows": [
+    {
+      "version": "v1.43.9",
+      "slug": "vectordb-retrieval-key-cache-retry",
+      "run": "1",
+      "outcome": "failed",
+      "evidence": "codex_exit.exit",
+      "evidence_summary": "exit 127; local only (not shipped)",
+      "loki_url": null
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "vectordb-retrieval-key-cache",
+      "run": "1",
+      "outcome": "failed",
+      "evidence": "codex_exit.exit",
+      "evidence_summary": "exit 127; local only (not shipped)",
+      "loki_url": null
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "ask-docs-priority-count-intent",
+      "run": "1",
+      "outcome": "unknown",
+      "evidence": "none",
+      "evidence_summary": "none",
+      "loki_url": null
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "cloud-bridge-keychain-git-auth",
+      "run": "1",
+      "outcome": "unknown",
+      "evidence": "none",
+      "evidence_summary": "none",
+      "loki_url": null
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "startup-log-link-local-only",
+      "run": "1",
+      "outcome": "unknown",
+      "evidence": "none",
+      "evidence_summary": "none",
+      "loki_url": null
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "ask-docs-priority-count-intent",
+      "run": "2",
+      "outcome": "accepted",
+      "evidence": "land-test.log",
+      "evidence_summary": "81 passed",
+      "loki_url": "/d/k3dm-agent-run-log?var-version=v1.43.9&var-slug=ask-docs-priority-count-intent&var-run=2&from=now-30d&to=now"
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "cloud-bridge-keychain-git-auth",
+      "run": "2",
+      "outcome": "accepted",
+      "evidence": "land-test.log",
+      "evidence_summary": "107 passed",
+      "loki_url": "/d/k3dm-agent-run-log?var-version=v1.43.9&var-slug=cloud-bridge-keychain-git-auth&var-run=2&from=now-30d&to=now"
+    },
+    {
+      "version": "v1.43.9",
+      "slug": "startup-log-link-local-only",
+      "run": "2",
+      "outcome": "accepted",
+      "evidence": "land-test.log",
+      "evidence_summary": "28/28 ok; 138 passed",
+      "loki_url": "/d/k3dm-agent-run-log?var-version=v1.43.9&var-slug=startup-log-link-local-only&var-run=2&from=now-30d&to=now"
+    }
+  ]
+}
+```
+
+The two historical exit127 failures now carry the new local-only summary with no Loki target. Supported acceptedrun2 rows carry the precise per-row Loki target and real test summaries. Earlier run1 unknown rows remain historical attempts; no ledger rewritten. Current publication prerequisite passed. Still pending: actual Grafana rendering/click behavior. Next single operator check refresh Agent Dispatch/Per run evidence and show the two historical failed startup rows. No coordinator metric write, service restart, UI action or log export. Evidence-only update; prior326Python/28BATS and staged gate results remain, no code/test rerun.
