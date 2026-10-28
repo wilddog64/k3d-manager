@@ -704,3 +704,40 @@ kubectl --context k3d-k3d-cluster -n monitoring apply \
 ```
 
 Inspect apply output and compare both definitions, then fully reload browser dashboard before testing a supported Log link and separately a local-only result. Grafana data-refresh button alone does not constitute evidence that the new dashboard definition loaded; do not infer a browser/sidecar cause from prior stale screenshot. Keep one-at-a-time operator checks. User-visible scope was communicated; no extra table or unrequested component remains.
+
+## Single-table dashboard deployment confirmed
+
+Operator applied both reviewed ConfigMaps, supplied output:
+
+```text
+Warning: resource configmaps/grafana-dashboard-agent-dispatch is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-agent-dispatch configured
+Warning: resource configmaps/grafana-dashboard-agent-run-log is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-agent-run-log configured
+```
+
+Independent read-only comparison result:
+
+```json
+{
+  "grafana-dashboard-agent-dispatch": {
+    "matches_committed_definition": true,
+    "panel_count": 30,
+    "extra_table_present": false,
+    "log_links": [
+      {
+        "title": "Open run log and availability",
+        "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&var-result=${__data.fields.Result}&from=now-30d&to=now"
+      }
+    ]
+  },
+  "grafana-dashboard-agent-run-log": {
+    "matches_committed_definition": true,
+    "panel_count": 1,
+    "log_panel_title": "Run log \u2014 ${result}",
+    "result_variable_hidden": true
+  }
+}
+```
+
+Both exactly match committed single-table fix0fc9d3ef, extra panel93 absent. Existing run-log panel carries selected Result through hidden variable; Log action uses visible data fields. Apply warnings are metadata patch notices; configured resource/JSON match establish deployment. No coordinator apply/restart/metric write or screenshot export. UI/sidecar reload and navigation not inferred from ConfigMap equality. Next single operator step fully reload Agent Dispatch browser page(CmdShiftR on macOS), click an accepted app-cve-scan-fail-closed Log in Per run evidence, report whether existing Agent Run Log opens with output. Startup local-only behavior follows separately. Canonical bug remains offline VERIFIED until functional UI evidence.
