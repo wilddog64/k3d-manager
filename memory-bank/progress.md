@@ -1457,3 +1457,15 @@ rules/hostnameexceptions, thenremainingF0compatreviewbeforeF1separatego.
 SecuritybugOPEN, noAPIcredentialsretrieved/zonewrites/restarts/newplan/PR.
 NoBATS/ShellCheck rerun(docs/live-reportreadonly); docgatesbeforecommit.
 Freshfulltest-allpublication/incidentGUI/paymentPRchecksremainpending.
+
+## 2026-10-28 test-all status check: fix pushed, old failed run still published
+
+Userasksstatus. Actualrootclean; latest/tmp/k3dm-test-all-*.log remains
+1793208248 (mtime17:34:54Z),1913cases/4hubfixturecopyfails. Read-onlyPrometheus
+source queryPASS:cases_failed4,run_complete0,laststep=test,lasttimestamp
+1793208894=17:34:54Z. No newer fullrun orpostfixfailure established.
+cfb60be0pushedfix, prior116BATS/rawShellCheck/audit/hookspass. No testrepeat/
+metricspublication/runtimechange; fullresponse existinghub-fixtureissue.
+BugOPENuntiloperatorfreshmake test-all/usual3.13shell andall3stages+failed0/
+complete1 accepted. No PR(Claudeowns), no newcodeverificationclaimed.
+CFsavedreportalreadyreadpartial/APIcredentialunavailable, manualreviewpending.

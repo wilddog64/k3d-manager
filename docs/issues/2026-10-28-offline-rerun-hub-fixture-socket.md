@@ -2230,3 +2230,82 @@ lint/audit and checkpoint hooks passed. Full116-case BATS and raw ShellCheck
 proof above; no PR created (Claude owns PRs). Socket remains untouched.
 Full fresh operator make test-all and published completion/alert acceptance
 remain pending; this record does not report the full pipeline green.
+
+## Subsequent operator status request: no fresh published acceptance
+
+Coordinator checked current /tmp/k3dm-test-all-*.log files. Latest is still
+/tmp/k3dm-test-all-1793208248.log, mtime2026-10-28T17:34:54.249307+00:00,
+1913cases/four recovery-copy failures. No newer local full-run log found.
+Implementation cfb60be0 remains pushed; prior116/116suite, cleanShellCheck,
+audit/hook proof above still applies. No unnecessary test rerun or publication.
+
+Read-only Prometheus query through Kubernetes API proxy succeeded. Query
+selects k3dm_test_cases_failed,run_complete,last_timestamp_seconds,
+last_step_reached for job=k3dm-tests,instance=test-all-local. Full actual
+response:
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "k3dm_test_cases_failed",
+          "instance": "test-all-local",
+          "job": "k3dm-tests",
+          "target": "test-all"
+        },
+        "value": [
+          1793212074.03,
+          "4"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "k3dm_test_last_step_reached",
+          "instance": "test-all-local",
+          "job": "k3dm-tests",
+          "step": "test",
+          "target": "test-all"
+        },
+        "value": [
+          1793212074.03,
+          "1"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "k3dm_test_last_timestamp_seconds",
+          "instance": "test-all-local",
+          "job": "k3dm-tests"
+        },
+        "value": [
+          1793212074.03,
+          "1793208894"
+        ]
+      },
+      {
+        "metric": {
+          "__name__": "k3dm_test_run_complete",
+          "instance": "test-all-local",
+          "job": "k3dm-tests",
+          "target": "test-all"
+        },
+        "value": [
+          1793212074.03,
+          "0"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "status": "success"
+}
+```
+
+Published timestamp resolves to 2026-10-28T17:34:54+00:00. Published failures4,
+complete0,laststep=test match the old log. This is not evidence of a new
+post-fix failure. Next operator make test-all in usualPython3.13shell; inspect
+fresh logfile/stage completion and published failed0/complete1 before closure.
+No code changes, metrics writes, live restarts or BATS/ShellCheck rerun during
+this status check. Docs lint/audit/checkpoint apply; issue remains OPEN.

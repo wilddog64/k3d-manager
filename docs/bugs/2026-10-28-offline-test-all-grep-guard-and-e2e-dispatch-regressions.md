@@ -216,5 +216,14 @@ fixtures to copy the actual Makefile and create empty scripts/bin destinations
 for existing fakes. Keep real Make recipe assertions, production guards, all
 existing tests and socket untouched. Add scripts/tests/plugins/hub_data.bats
 to this follow-up scope; no production, UI, Makefile or infrastructure changes.
-Full raw operator log and red/green verification will be recorded in
+Full raw operator log and red/green verification are recorded in
 `docs/issues/2026-10-28-offline-rerun-hub-fixture-socket.md`.
+
+## Current acceptance status after recovery fixture fix
+
+Recovery fixture follow-up cfb60be0 is pushed; full116/116hub_data BATS,
+rawShellCheck and audit/hooks pass. Status check finds no new test-all log
+after1793208248. Prometheus still publishes the17:34:54UTC oldrun: failed4,
+complete0,laststep=test. No post-fix full run is established. Keep OPEN pending
+fresh operator full three-stage run/publication, rather than treating stale
+published values as a new regression or declaring all stages green.
