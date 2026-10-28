@@ -134,6 +134,8 @@ Guardbaseline1failed/1passed. Fixproducer-drain implementation, notallowlist.
 - `scripts/tests/plugins/e2e_remote.bats`
 - `scripts/plugins/e2e_remote.sh`
 - `docs/tests/offline-test-all-regressions.md`
+- `scripts/tests/hermes/test_hermes.py` — isolate optional OrbStack hooks in poll fixtures and add a regression
+- `scripts/tests/hermes/conftest.py` — isolate the OrbStack Pushgateway URL like other optional publishers
 - `scripts/tests/bin/k3dm_cleanup.bats` — same full run case413, replace GNU-only test inode lookup; production cleanup unchanged
 - `scripts/tests/plugins/hub_data.bats` — 2026-10-28 operator rerun follow-up: isolate four Make recipe fixtures from the arbitrary workspace/socket; production recovery unchanged
 
@@ -302,3 +304,19 @@ portableinodeobservation. Finalfocused30BATS/no skips/rawShellCheckPASS;
 fullactualproof in `docs/issues/2026-10-28-orbstack-noninteractive-test-fixture.md`.
 Latestpublishedfullrun1793216188stillfailed2/complete0/test-bin; no post-fix
 fullthree-stagepassclaimed. Operatorfreshacceptance remainsrequired.
+
+## Python stage follow-up after green BATS stages
+
+Newoperatorrun1793222885 passed1913main and623bin cases (zero failures),
+thenPytestreported4failed/1654passed/4skipped. Allfour semanticPromQL
+failures attemptedDockerpromtool fallback because no nativepromtool was
+onoperatorPATH. Tripwireblockedthosecontainers; do not disableit. Existing
+localpromtool is available and can be supplied viaPATH without download.
+
+The same tripwiresummary exposed4unstubbedorbctlupdate-check attempts from
+Hermespollfixtures, plus4blockedDocker calls. Add missingoptionalOrbStack
+publisher/notice stubs to the existingpollfixture and pinitsPushgatewayURL
+toclosedloopbacklikeotherpublishers. Addregressionthatraisesifpollfixture
+reachesrealOrbStackhooks. No productionbehavior/tripwireallowlist/test
+assertionorPromQL evaluation removed. ValidatefullPythonstageusingexisting
+nativepromtool; currentfullthree-stageoperatoracceptance stillpending.

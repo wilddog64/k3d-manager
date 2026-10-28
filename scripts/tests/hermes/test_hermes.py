@@ -245,6 +245,8 @@ def _stub_status_poll(monkeypatch, payload):
     monkeypatch.setattr(k3dm_hermes, "_publish_disk_metrics", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_publish_cni_ipam_metrics", lambda: None, raising=False)
     monkeypatch.setattr(k3dm_hermes, "_publish_pr_checks", lambda: None, raising=False)
+    monkeypatch.setattr(k3dm_hermes, "_publish_orbstack_metrics", lambda *_: None)
+    monkeypatch.setattr(k3dm_hermes, "_orbstack_notice", lambda *_: None)
     monkeypatch.setattr(k3dm_hermes, "_page", lambda _state, texts, _relay: texts)
     monkeypatch.setattr(k3dm_hermes, "values_branch", lambda *_args, **_kwargs: sensor("values_branch", "healthy"))
     for name in ("eso", "argocd", "reachability", "node_pressure", "data_layer", "hostnet_drift", "kine", "ci",
@@ -410,6 +412,17 @@ def test_status_poll_advances_gate_only_when_sampled_and_defaults_off(monkeypatc
     monkeypatch.setenv("K3DM_HERMES_STATUS_ENABLED", "0")
     k3dm_hermes._poll(state, path, now=6000, status_runner=runner)
     assert len(calls) == 2
+
+
+def test_status_poll_fixture_blocks_optional_orbstack_side_effects(monkeypatch, tmp_path):
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("poll fixture reached a real OrbStack integration hook")
+
+    monkeypatch.setattr(k3dm_hermes, "_publish_orbstack_metrics", unexpected)
+    monkeypatch.setattr(k3dm_hermes, "_orbstack_notice", unexpected)
+    calls, runner = _stub_status_poll(monkeypatch, status_payload("healthy"))
+    k3dm_hermes._poll({}, tmp_path / "state.json", now=10000, status_runner=runner)
+    assert calls == [True]
 
 
 def test_unknown_status_poll_never_pages_or_files_and_preserves_open_groups(monkeypatch, tmp_path, capsys):

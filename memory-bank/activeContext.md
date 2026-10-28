@@ -1226,3 +1226,21 @@ CurrentM4fullrun1793222885 continues0fails sofar(mainstagegreen, bin~220);
 docs-onlyspec/reportcommits movedHEAD, runtimecodea7b5e5dfunchanged. Follow
 all3stages/freshpublicationbeforetestP2closure. NoPR/newplan/CIrerun, CFmanual
 review/authorizationstillpending.
+
+## 2026-10-28 HTTPS first change / Python follow-up
+
+Operator CF AI reports HTTPS On at22:00:41Z, minimumTLS1.0 unchanged. Public
+root probes22:02:51Z independently7/7HTTP301same-hostHTTPS; directHTTPSbaseline
+200/302/401 unchanged. FullactualJSON inexistingoperatorissue; no redirects
+followed/authflows/Slack tested, no credentials/settingswrite. CFbugOPEN;
+operator login/Slack acceptance before separateTLS1.2 approval.
+
+Fulloperatorrun1793222885: main1913(20skip) andbin623 green, Python4fail from
+Dockerpromtoolfallback; tripwirealso4OrbStackupdatechecks blocked. Fixture-only
+Hermespoll mocks optionalOrbStackhooks+closedpublisherURL, sentinelred/green.
+ExistingnativepromtoolPATH makes fullmake test-python1661pass2skip, only8blocked
+read-onlycalls, noDocker/OrbStackattempt. TwoE2EsemanticBATS pass/no skip.
+Initialwrongpython-mpytest(no module) recorded transparently. Evidenceissue
+2026-10-28-offline-python-promtool-and-orbstack-hooks.md +fullassets. RuffPASS;
+requiredgates/commitpending. Freshfullpublished3-stageoperatorrun stillneeded;
+P2OPEN. No productionchange/PR/newplan/recovery.

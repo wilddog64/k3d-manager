@@ -118,3 +118,14 @@ Focused30BATS pass, rawShellCheckclean. ActualLinuxscriptbranch execution was
 notperformed; -e childstatus behavior is verified againstutil-linuxmanual.
 Fulloutput/proof in [test-fixture review](../issues/2026-10-28-orbstack-noninteractive-test-fixture.md).
 Freshfullpublishedthree-stageacceptance stillrequired fromoperator.
+
+## Native promtool and Hermes poll isolation
+
+Offline semantic tests require native `promtool` on PATH. An environment variable
+`PROMTOOL` alone does not cover every helper. Without native promtool, Docker
+fallback is intentionally blocked by the tripwire. Preserve the semantic checks
+and tripwire; supply the existing native executable. Hermes poll fixtures stub
+both optional OrbStack hooks and close its publisher URL. A raising-sentinel
+regression verifies fixture isolation without reaching an installed OrbStack.
+
+See [actual Python-stage evidence](../issues/2026-10-28-offline-python-promtool-and-orbstack-hooks.md).

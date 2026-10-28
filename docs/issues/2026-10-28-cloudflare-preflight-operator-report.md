@@ -756,3 +756,172 @@ Off. Validate redirects/HTTPS/SSO/Slack before separately approving minTLS1.2,
 with rollback1.0 and TLS1.3 keptOn. No approval or live change is inferred
 from screenshots. No APIwrite, credential lookup, helperchange or extra probe
 performed by coordinator. SecuritybugremainsOPEN/F0partial.
+
+## Always Use HTTPS first change: 22:00:41Z
+
+Operator supplied Cloudflare AI confirmation: Always Use HTTPS Off to On at
+2026-10-28T22:00:41Z, minimum TLS remains 1.0, TLS1.3 On and SSL mode Full.
+HSTS/DNS/Tunnel unchanged according to that report. This is operator-source
+confirmation; coordinator did not read credentials or change zone settings.
+
+Independent bounded unauthenticated root GET probes at 22:02:51Z observed
+all seven HTTP roots return 301 with same-host HTTPS Location. Direct HTTPS
+responses match the prior baseline: frontend/ArgoCD 200; Grafana/Keycloak 302
+to HTTPS paths; Alertmanager/Prometheus/webhook 401. Actual output follows.
+No redirects followed: these checks do not prove complete redirect chains,
+actual SSO, Slack webhook delivery or legacy TLS rejection. Those remain
+operator live acceptance; minimum TLS1.2 is a separate subsequent change.
+Security bug stays OPEN. No screenshot exported, no settings write.
+
+```json
+{
+  "operator_reported_change_utc": "2026-10-28T22:00:41Z",
+  "probes": {
+    "alertmanager.3ai-talk.org": {
+      "http": {
+        "location": "https://alertmanager.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      }
+    },
+    "argocd.3ai-talk.org": {
+      "http": {
+        "location": "https://argocd.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      }
+    },
+    "frontend.3ai-talk.org": {
+      "http": {
+        "location": "https://frontend.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      }
+    },
+    "grafana.3ai-talk.org": {
+      "http": {
+        "location": "https://grafana.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": "https://grafana.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      }
+    },
+    "keycloak.3ai-talk.org": {
+      "http": {
+        "location": "https://keycloak.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": "https://keycloak.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      }
+    },
+    "prometheus.3ai-talk.org": {
+      "http": {
+        "location": "https://prometheus.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      }
+    },
+    "webhook.3ai-talk.org": {
+      "http": {
+        "location": "https://webhook.3ai-talk.org/",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade"
+        },
+        "result": "response",
+        "status": 301
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      }
+    }
+  },
+  "scope": "unauthenticated root GET headers; no redirects followed, credentials or setting reads/writes",
+  "timestamp_utc": "2026-10-28T22:02:51.507983+00:00"
+}
+```

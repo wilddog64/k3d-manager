@@ -253,3 +253,12 @@ compatibility orabsenceoforiginredirectloops. Officialdocs andremaining
 review inexistingoperatorreportissue. F0partial/no F1writego inferred.
 Recommendedsequence afteractualrule/compatcheck: approveHTTPSonly, validate,
 then separatelyapproveTLS1.2; keepFull/TLS1.3/HSTS/DNS/tunnel/auth unchanged.
+
+## First live setting change observed
+
+Operator Cloudflare AI reports Always Use HTTPS enabled 2026-10-28T22:00:41Z.
+Independent public probes 22:02:51Z: all seven HTTP roots301 to same-hostHTTPS;
+direct HTTPS matches baseline (200/302/401 by service). Full actual output in
+existing operator-report issue. Actual SSO/Slack and redirect-chain acceptance
+pending. MinimumTLS still1.0 per operator report; bug remainsOPEN. No coordinator
+credential read or settings write.
