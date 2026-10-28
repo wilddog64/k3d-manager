@@ -6,7 +6,7 @@
 **Severity:** medium (unenforced HTTP redirect and potentially permitted obsolete TLS protocols; confirm effective edge posture)
 **Release:** v1.43.9 security bug (not a new plan slot; fixes should be scheduled on the active release process after preflight approval)
 **Branch:** `k3d-manager-v1.43.9`
-**Approval:** operator requested higher-priority plan/bug filing; separate explicit go required for changing Cloudflare zone settings
+**Approval:** operator 2026-10-28 requested review/dispatch to Luna; offline implementation authorized, separate explicit go still required for live zone setting changes
 **Component:** Cloudflare zone `3ai-talk.org`, edge TLS/redirect settings; affected names: alertmanager, argocd, frontend, grafana, keycloak, prometheus, webhook
 **Related:** `docs/howto/public-endpoint-alerts.md`; `docs/howto/tunnel.md`; `docs/plans/v1.43.10-hostinger-public-path-on-node.md`; `docs/plans/v1.45.0-autonomous-incident-investigation.md`
 
@@ -125,3 +125,77 @@ interface:
 - Do not turn on HSTS in the same change; its browser persistence complicates rollback.
 - Do not change Cloudflare minimum TLS to 1.3 or confuse edge TLS with origin TLS.
 - Do not misclassify normal SSO 302 or expected unauthenticated 401 as proof of a working end-to-end application.
+
+## Authorized Luna offline deliverable — 2026-10-28
+
+Operator selected this P2 for Luna. Task cloudflare-https-tls-preflight-luna,
+modelgpt-6-luna. Implement bounded read-only posture/preflight helper and operator
+guidance for F0/F3; F1 account changes and F2 live acceptance remain pending.
+Do not claim the security bug fixed by tooling alone. No new Make target,
+periodic scheduler, Hermes automation, dashboard, account credential or applymode.
+
+### Files
+
+- `bin/k3dm-cloudflare-posture`
+- `scripts/tests/bin/test_cloudflare_posture.py`
+- `docs/howto/cloudflare-https-tls-preflight.md`
+- `docs/tests/cloudflare-posture.md`
+- `CHANGELOG.md`
+
+## Files
+
+- `bin/k3dm-cloudflare-posture`
+- `scripts/tests/bin/test_cloudflare_posture.py`
+- `docs/howto/cloudflare-https-tls-preflight.md`
+- `docs/tests/cloudflare-posture.md`
+- `CHANGELOG.md`
+
+## Rules — current bounded task
+
+- Pythonstdlib helper default/--dry-run prints plan without environmentcredential,
+  network, process or account access. Explicit --check is read-only; no --apply,
+  PATCH/POST/PUT/DELETE, mutationcommands, tokenretrieval/Keychain or tokenCLIarg.
+- Read fixed documented Cloudflare API GET settings paths for validated32hex
+  zoneid (always_use_https, min_tls_version, ssl, security_header/HSTS, tls_1_3)
+  with existing operator CLOUDFLARE_API_TOKEN onlyinmemory. Missingcredentials,
+  HTTP/APIerrors/malformedresults reportunknown, neverhealthy. Tokenneverargv,
+  plainHTTP, errorbody/log/output. AuthAPIredirects/proxies mustnotleakBearer;
+  denyredirects, fixedAPIhost/path, boundedtime/response, normalcertvalidation.
+- Optional --settings-file supports existing operator-supplied sanitized API
+  snapshot, labeledsnapshot/notequaltocurrentAPIread, no credentialneeded. Accept
+  documented setting shapes, output onlyknownsanitizedfields, unknowninvalidvalues.
+  Existing accountreport's Off/TLS1.0 claims are unverified until actualpreflight.
+- Fixed sevenhostnames alertmanager/argocd/frontend/grafana/keycloak/prometheus/
+  webhook.3ai-talk.org. Explicitcheck unauthenticatedHTTP/HTTPS GET, no redirects
+  followed, tokens/bodies/login submitted or rawresponsebodiesrecorded. Record
+  status/sanitizedLocation to distinguish transport/authredirects. Probes always
+  credentialfree; do not use -k or sendAuthorization outsidefixedCFAPI.
+- ForceTLS1.0/1.1/1.2/1.3 perhostname, boundedtimeouts, validatedcert/SNI. Distinguish
+  actualedgeprotocolrejection fromlocalclient/cipherunsupported, certificateerror,
+  DNS/timeout/otherinconclusive; unknown/unsupported is not a pass. Tests use
+  injected/mocknetwork/SSL/process only. No realendpointprobe in worker.
+- No setting shouldbe securebyabsence. Read-onlyposture reports enforcementon/
+  off/unknown and exactTLSminimum/unknown. No conclusion of end-to-endlogin from
+  HTTPS200/302/401 alone; keep baseline observations separate fromF0complete.
+- Guideprovides sevenhostbaseline, manualredirectrules/certcoverage/SSO/Slack/
+  hostnameexceptions checklist, existing least-privilege credentialuse, missing
+  telemetrylimitations, before/afterandrollback retaining previousvalues for
+  eachsetting, operatorapprovalbetweenpreflightandtwo separatezonechanges,
+  noHSTS/SSLmode/DNS/tunnel/authsideeffects. No credentialprovisioning required
+  justfortask; snapshotmode/workflow handlesabsence. No automateddriftalerting.
+- Document public officialsources cited above and API GET reference:
+  https://developers.cloudflare.com/api/resources/zones/subresources/settings/methods/get/
+  Cloudflare confirmsGET acceptsZoneSettingsRead; do not requireZoneSettingsWrite
+  forreadonlyhelper. TLSfloor andTLS1.3enablement are distinct settings.
+- Fixtures provezeroaccessdryrun, knownshapeon/off/unknown, auth/API/malformed
+  failure, noBearerleaks/redirectfollow/mutations, each7host protocolmatrix,
+  clientunsupportedvsedgereject, baseline/authredirectdistinction, timeoutbounds.
+  No livecalls in tests, no pipinstall/network/dependencies required. Fakevalues
+  musttestrealhelperbehavior, nottoyconstantassertions.
+- Only Files above; no spec/memory/statusedits, gitadd/commit/push/PR, newplan,
+  livehost/Keychain/cloud/provider/test-run/clusteraccess. Coordinatorownsreview,
+  stagedgates/landing/push and operatorlivechecks. Keepnewfunctions<=8ifs,
+  preserveDO_NOT_REMOVE, reportlegacyconflictsinstead ofrelaxinggates.
+- Gates: full newpytest suite, Ruff (/private/tmp/k3dm-review-tools/bin/ruff check
+  --no-cache), Python syntax, helperdryrun/help with noenvaccess, docslinks,
+  gitdiffcheck. E1/E3offline only; E2/livezoneposture remainsnotverified.

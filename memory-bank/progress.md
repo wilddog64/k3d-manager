@@ -1282,3 +1282,21 @@ causeunconfirmed; recoveryproofrecognized. Fullactualrow in investigationmetrics
 reviewissue. Nextsingleoperator refreshBugTracking andshowfilteredincidentrow;
 P3codefixremainsVERIFIED untilvisualacceptance. No runtimewrite/testrerun/image
 export/PR. NativeLunafixc96d0d13 alreadypushed with269Python/38BATS gates.
+
+## 2026-10-28 two new P2s authorized for Luna
+
+User selectsCloudflareHTTPS/TLS andofflinetestall fourfailures. CurrentrootHEAD
+concurrentd7b74077/docsfilingspreserved. Scopeamendedexplicitofflineimplementation:
+CFread-onlypreflight/posturehelper+rollbackguide, livezonewritesstillseparateF0/
+operatorgo; no applymode/credentialscheduler/newUI. Offlinefixgrep-q OrbStack
+producerhazard andE2Esafefixturepreconditions, preserveallguards, fakeSSH/scp/
+credentialboundarybeforerepro, no fullpublishedrerun byworker.
+Read-onlyPromsourcecase4=1194PRdurationlegend, currentfocused6pass butrecorded
+run12:41:14Zfailed; no causalguess/midrunstateinference. complete0,laststeptest.
+GuardexactscanOrbStackline168rc0, guard1fail/1pass. RawlognotfoundknownTMPDIR;
+optionaluserpathquestionpendingwithoutblockingwork. Fullsource/baselines in
+ docs/issues/2026-10-28-two-new-p2-luna-batch.md.
+PriorinvestigationfixPrometheusdatasourcealsoPASS(true/true/ok/date/dashFixSHA),
+finalincidentrowUIstillpending; PRCheckspaymentviewpending. No livewrite/restart/
+credentialaccess/screenshotexport/newplan/PR. Independentreviewthenoneatatime
+operatorvalidation continuesafterLunaworkers.

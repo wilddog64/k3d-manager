@@ -6,7 +6,7 @@
 **Status:** OPEN / INVESTIGATED STATICALLY — exact runtime causes not yet reproduced; fourth failing case not visible
 **Release:** v1.43.9 bug (does not consume an enhancement plan slot)
 **Branch:** `k3d-manager-v1.43.9`
-**Approval:** operator explicitly requested investigation and bug filing; implementation, live test rerun, and deployment not authorized by this filing
+**Approval:** operator 2026-10-28 explicitly requested review/dispatch to Luna; isolated focused implementation/testing authorized, full published rerun and live deployment remain operator-owned
 **Component:** `scripts/tests/lib/grep_q_pipe_guard.bats`, `scripts/tests/plugins/e2e_remote.bats`, `scripts/plugins/e2e_remote.sh`, offline test metrics/Alertmanager
 **Related:** `docs/bugs/2026-10-17-grep-q-pipeline-sigpipe-false-absent.md`, `docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md`, `docs/plans/v1.44.2-cloud-bridge-offline-test-run-diagnostics.md`
 
@@ -107,3 +107,73 @@ interface:
 - Do not dispatch, rerun full suite or repair runtime infrastructure under this filing.
 - Do not declare Hostinger down based on `cluster=ubuntu-hostinger`; this is where Prometheus sees the metrics, not the execution location.
 - Do not create PR, commit to main or bypass release gates.
+
+## Source metrics and coordinator reproduction — 2026-10-28
+
+Read-only Prometheus currentgroup test-all-local identifies case4:
+1194, PR check duration legend uses a readable side layout without changing
+its query. Recordedreason: `table = next(panel for panel in data["panels"] if panel["id"] == 6)' failed.
+Current source run timestamp1793191274 (2026-10-28T12:41:14Z), complete0,
+laststep test. Original fullrawlog notfound in coordinator temporaryroots;
+per-stage rawmarkersunavailable. These are currentpublishedterminalfacts,
+not evidence of ongoingexecution. Do not invent a rawtrace or fourthcause.
+Currentfocused PRChecks6BATS/promtoolpass; exactcauseofrecordedfailure/its
+runcheckout identity is notestablished. Do not callhistoricalfourth resolved
+solelyfromisolatedpass or makeanunnecessarynewPRdashboardpatch.
+
+Exactgrepguardscan reproducesrc0 (found forbiddenline):
+`bin/k3dm-orbstack-upgrade:168` curl -fsS metrics | grep -q forecastpattern.
+Guardbaseline1failed/1passed. Fixproducer-drain implementation, notallowlist.
+[Actual source and baseline](../issues/2026-10-28-two-new-p2-luna-batch.md).
+
+## Files
+
+- `bin/k3dm-orbstack-upgrade`
+- `scripts/tests/lib/grep_q_pipe_guard.bats`
+- `scripts/tests/bin/orbstack_upgrade.bats`
+- `scripts/tests/plugins/e2e_remote.bats`
+- `scripts/plugins/e2e_remote.sh`
+- `docs/tests/offline-test-all-regressions.md`
+
+## Rules — current authorized Luna task
+
+Task offline-test-all-regressions-luna, gpt-6-luna. Existingfiling-only/no-dispatch
+text is superseded for this boundedimplementation. No live fullsuite/metrics
+publication, SSH/scp/Gitnetwork/provider/credential/runner/clusteroperations.
+Only Files above; no spec/memory, stage/commit/push/PR/main/newplan; coordinator
+reviews/commits/lands/pushesandlateroperatorfullfreshvalidation. Preserveguards,
+assertions/DO_NOT_REMOVE, new/refactoredfunctions<=8ifs; reportlegacyconflicts.
+
+1. Guard exactscanreadingonlyrepo and fixturemutations is safe. Removeactual
+   curl|grep-q hazard inOrbStackforecastprobe; consumeproducer throughEOF and
+   testlarge matchingpayloadunderpipefail without realcurl/upgrade/services.
+   Do not broadenallowlist or removeassertions. Preserve existing guardtests
+   and add fixture mutation rejecting a forbiddennonallowlistedpipe.
+2. Before reproducingE2E tests, installfixturestubs/spies for all remote and
+   credential boundaries (_e2e_remote_ssh, ssh, scp, resolver, copyresults,
+   actualpreflighthelper), notjust e2e_runner_preflight. Existing fixtures can
+   reach unintendedboundariesonceearlierguardsfixed. Allcalls mustbe fakes;
+   fixtureGit orcontrolledGitstub simulatespushedHEAD, no realfetch/push.
+3. Diagnose exactpreconditionfailure from capturedoutput safely. Fix test
+   setup to reach realbusybranch and SSHdispatch. Keep productionpushedHEAD,
+   repo/digestvalidation, preflight, locks, no-localfallback, credentialhandling
+   and exitpreservation intact unless currentprovenimplementationbug requires
+   minimalchange. Don't stub away behaviorundertest.
+4. Busycase must allowonlyfakedreadonlyownerlookup whereexpected, andprove
+   noSSHdispatch/noexecution/nolocalfallback. Success andnonzeroSSHexitcases
+   provegeneratedremote E2E/publishback chain and originalexitcode survives
+   printf/tee/publishfailures, lockreleaseobserved; no actualremotecommandruns.
+   Stubcredentialresolver so no Keychain/ghauthread even in successfulpath.
+5. Do not alterPRChecksYAML/tests (currentisolatedpass); document #1194 and
+   currentpass pluslimits. If reproducibleorder/environmentfailure needsnew
+   files, report concretelybeforeexpanding scope. Rawfourthdetails/stagemarkers
+   unavailablemayremainexplicit. No quietnewfailurecauseclaims.
+6. Focused gates: bats scripts/tests/lib/grep_q_pipe_guard.bats
+   scripts/tests/plugins/e2e_remote.bats scripts/tests/bin/orbstack_upgrade.bats;
+   Python pytest scripts/tests/bin/test_orbstack_metrics.py and
+   scripts/tests/bin/test_k3dm_test_metrics.py to ensure reportcontractsunchanged;
+   ShellCheckalltouchshell/Bashandbash-n, docslinks/diffcheck. Negativeguardand
+   lock/exitfixtures redonoldbehavior, no weakerassertions/testcountreductions.
+   Fullmake test-all not authorizedtoworker; don't overwrite recordedmetrics.
+   Operator will runfreshfullpipelineafterindependentreview and check all3stage
+   markers, failed0/complete1 andalertresolution separately. No falsecompletion.
