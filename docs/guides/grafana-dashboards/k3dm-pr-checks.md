@@ -21,3 +21,19 @@ executions; in-progress durations grow between polls. For a completed check, the
 `k3dm_pr_check_completed_timestamp_seconds` metric carries GitHub's `completed_at` timestamp as
 epoch seconds. It is emitted only for the selected latest check of each currently open PR and
 uses the bounded `repo`, `pr`, and `check` labels. The chart's x-axis remains the scrape time.
+
+The **Historical sampled check durations (may include closed PRs)** chart preserves Prometheus
+history. Its x-axis is the Prometheus sample time, not the GitHub check's `started_at` or
+`completed_at`; repeated points are repeated observations of the same latest run. A PR that has
+closed or merged can therefore remain in the chart until Prometheus retention expires, even though
+it no longer appears in the current Open PRs or Checks per PR tables. The bounded
+`k3dm_pr_check_completed_timestamp_seconds{repo,pr,check}` metric records GitHub `completed_at`
+(epoch seconds) for the selected latest check on currently open PRs; it does not change the chart's
+scrape-time axis or provide durable closed-PR history.
+
+The Repo filter applies to both current panels and historical samples; **All** includes retained
+samples from every selected repository, including now-closed PRs. A repository with no samples in
+the selected time range can still have a successful GitHub read and no open PRs. Use **GitHub read**
+and **Last scrape** to distinguish normal absence of in-range history from a failed or stale read.
+A failed read retains last-known current rows, so those rows may also be stale; a successful read
+with `No open PRs` only describes the current open-PR set, not the historical chart.

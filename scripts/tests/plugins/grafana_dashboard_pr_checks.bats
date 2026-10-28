@@ -109,9 +109,12 @@ from pathlib import Path
 
 data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
 panel = next(panel for panel in data["panels"] if panel["id"] == 8)
-assert panel["title"] == "Latest check duration (sampled)"
-assert "Prometheus scrape times" in panel["description"]
+assert panel["title"] == "Historical sampled check durations (may include closed PRs)"
+assert "Prometheus sample time" in panel["description"]
 assert "completed_at" in panel["description"]
+assert "until Prometheus retention expires" in panel["description"]
+assert "No samples in the selected range" in panel["description"]
+assert "GitHub read and Last scrape" in panel["description"]
 assert panel["options"]["legend"] == {
     "showLegend": True,
     "displayMode": "list",
@@ -124,4 +127,124 @@ table = next(panel for panel in data["panels"] if panel["id"] == 6)
 assert all(target.get("instant") is True for target in table["targets"])
 PY
   [ "${status}" -eq 0 ]
+}
+
+
+@test "PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads" {
+  run python3 - "${dashboard}" <<'PY_PRESENTATION'
+import json, sys
+from pathlib import Path
+
+panels = {panel["id"]: panel for panel in json.loads(
+    Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1]
+)["panels"]}
+assert "may include closed PRs" in panels[8]["title"]
+assert "Closed or merged PRs disappear" in panels[5]["description"]
+assert "No open PRs means there are no current rows" in panels[6]["description"]
+assert "failed or stale read" in panels[6]["description"]
+assert "latest GitHub read succeeded" in panels[7]["description"]
+assert "Last scrape" in panels[7]["description"]
+PY_PRESENTATION
+  echo "$output"; [ "${status}" -eq 0 ]
+
+  if ! command -v promtool >/dev/null 2>&1; then skip "promtool not installed"; fi
+  test_file="${BATS_TEST_TMPDIR}/pr-checks-history.test.json"
+  run python3 - "${dashboard}" "${test_file}" <<'PY_PROMQL'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panels = {panel["id"]: panel for panel in data["panels"]}
+all_repos = data["templating"]["list"][0]["allValue"]
+opened = "wilddog64/lib-foundation"
+closed = "wilddog64/shopping-cart-payment"
+empty = "wilddog64/shopping-cart-e2e-tests"
+failed = "wilddog64/shopping-cart-frontend"
+stale = "wilddog64/shopping-cart-basket"
+inputs, checks = [], []
+
+
+def labels(metric="", **values):
+    return metric + "{" + ",".join(f"{key}={json.dumps(value)}" for key, value in values.items()) + "}"
+
+
+def query(panel_id, repo, target=0):
+    return panels[panel_id]["targets"][target]["expr"].replace("$repo", repo)
+
+
+def check(expr, expected, at="5m"):
+    checks.append({"expr": expr, "eval_time": at, "exp_samples": [
+        {"labels": name, "value": value} for name, value in expected
+    ]})
+
+
+# Closure removes the instant duration series at minute 2. Failed reads leave
+# last-known check data; the separate success/age metrics expose its freshness.
+for repo, pr, duration, values in (
+    (opened, "66", 45, "45+0x40"),
+    (closed, "93", 51, "51 51 stale"),
+    (failed, "133", 25, "25+0x40"),
+):
+    inputs.append({"series": labels("k3dm_pr_check_duration_seconds", repo=repo, pr=pr, check="lint"),
+                   "values": values})
+    check(query(8, repo), [] if repo == closed else [(
+        labels("k3dm_pr_check_duration_seconds", repo=repo, pr=pr, check="lint"), duration,
+    )])
+    # This range selector evaluates the actual unchanged panel8 selector over
+    # retained scrape samples, including those preceding the stale marker.
+    check(f"count_over_time({query(8, repo)}[10m])", [(
+        labels(repo=repo, pr=pr, check="lint"), 2 if repo == closed else 6,
+    )])
+
+check(query(8, closed), [(
+    labels("k3dm_pr_check_duration_seconds", repo=closed, pr="93", check="lint"), 51,
+)], at="1m")
+check(query(6, closed, target=1), [])
+check(query(6, opened, target=1), [(
+    labels(__join=f"{opened}:66:lint"), 45,
+)])
+check(query(8, all_repos), [
+    (labels("k3dm_pr_check_duration_seconds", repo=opened, pr="66", check="lint"), 45),
+    (labels("k3dm_pr_check_duration_seconds", repo=failed, pr="133", check="lint"), 25),
+])
+check(f"count_over_time({query(8, all_repos)}[10m])", [
+    (labels(repo=opened, pr="66", check="lint"), 6),
+    (labels(repo=closed, pr="93", check="lint"), 2),
+    (labels(repo=failed, pr="133", check="lint"), 6),
+])
+check(query(8, empty), [])
+check(f"count_over_time({query(8, empty)}[10m])", [])
+
+for repo, count, success, timestamp in (
+    (opened, "1+0x40", "1+0x40", "0+60x40"),
+    (closed, "1 1 0+0x38", "1+0x40", "0+60x40"),
+    (empty, "0+0x40", "1+0x40", "0+60x40"),
+    (failed, "1+0x40", "1 0+0x39", "0 60+0x39"),
+    (stale, "0+0x40", "1+0x40", "0 60+0x39"),
+):
+    for metric, values in (
+        ("k3dm_pr_checks_open_prs", count),
+        ("k3dm_pr_checks_scrape_success", success),
+        ("k3dm_pr_checks_last_scrape_timestamp_seconds", timestamp),
+    ):
+        inputs.append({"series": labels(metric, repo=repo), "values": values})
+    check(query(1, repo), [("{}", 0 if repo in (closed, empty, stale) else 1)])
+    check(query(7, repo), [("{}", 0 if repo == failed else 1)])
+    check(query(4, repo), [("{}", 240 if repo in (failed, stale) else 0)])
+
+# Read success and age remain independent: stale last-known data cannot be
+# mistaken for a fresh successful read, even when the duration still exists.
+check(query(7, failed), [("{}", 0)], at="40m")
+check(query(4, failed), [("{}", 2340)], at="40m")
+check(query(7, stale), [("{}", 1)], at="40m")
+check(query(4, stale), [("{}", 2340)], at="40m")
+check(query(7, all_repos), [("{}", 0)])
+Path(sys.argv[2]).write_text(json.dumps({
+    "rule_files": [], "evaluation_interval": "1m",
+    "tests": [{"interval": "1m", "input_series": inputs, "promql_expr_test": checks}],
+}))
+PY_PROMQL
+  echo "$output"; [ "${status}" -eq 0 ]
+  run promtool test rules "${test_file}"
+  echo "$output"; [ "${status}" -eq 0 ]
 }
