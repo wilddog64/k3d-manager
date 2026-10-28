@@ -950,7 +950,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 78  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats
+    assert sum("$window" in expr for expr in expressions) == 80  # agent-audit: allow assert-removed the supported landing-log view plus Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",

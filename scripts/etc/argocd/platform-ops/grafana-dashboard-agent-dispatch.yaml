@@ -1465,7 +1465,7 @@ data:
           "id": 47,
           "type": "table",
           "title": "Per run evidence",
-          "description": "Capped table of task/run number, outcome, test result, log path and known token increment (Codex or agy). Landing-test logs are shipped and open in the log dashboard. Failed startup codex.log files stay local and are labeled local only (not shipped); the retained path is available only on the dispatch host. Token values are absent when the cumulative counter baseline is unknown or reset.",
+          "description": "Capped table of task/run number, outcome, test result, evidence path and known token increment (Codex or agy). Landing-test logs are shipped. Failed startup codex.log files stay local and are labeled local only (not shipped); the retained path is available only on the dispatch host. Token values are absent when the cumulative counter baseline is unknown or reset. This all-run table has no Log action; supported shipped logs appear in the separate Supported landing logs table.",
           "gridPos": {
             "h": 10,
             "w": 18,
@@ -1478,7 +1478,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, loki_url, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
               "instant": true,
               "format": "table",
               "refId": "A"
@@ -1513,17 +1513,7 @@ data:
                   }
                 ]
               },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Log"
-                },
-                "properties": [
-                  {"id": "custom.width", "value": 150},
-                  {"id": "custom.inspect", "value": true},
-                  {"id": "links", "value": [{"title": "Open shipped landing-test log", "url": "${__data.fields.loki_url}"}]}
-                ]
-              },
+              {"matcher": {"id": "byName", "options": "Log"}, "properties": [{"id": "custom.width", "value": 150}, {"id": "custom.inspect", "value": true}]},
               {"matcher": {"id": "byName", "options": "doc"}, "properties": [{"id": "custom.hidden", "value": true}]},
               {"matcher": {"id": "byName", "options": "version"}, "properties": [{"id": "custom.width", "value": 70}]},
               {"matcher": {"id": "byName", "options": "run"}, "properties": [{"id": "custom.width", "value": 45}]},
@@ -1560,7 +1550,203 @@ data:
                   "job": true,
                   "window": true,
                   "evidence": true,
-                  "loki_url": true,
+                  "Value #A": true,
+                  "vsort": true
+                },
+                "indexByName": {
+                  "version": 0,
+                  "slug": 1,
+                  "run": 2,
+                  "Value #B": 3,
+                  "outcome": 4,
+                  "evidence_summary": 5,
+                  "evidence_path": 6,
+                  "doc": 7
+                },
+                "renameByName": {
+                  "evidence_summary": "Result",
+                  "evidence_path": "Log",
+                  "Value #B": "Tokens"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 93,
+          "type": "table",
+          "title": "Supported landing logs",
+          "description": "Only land-test.log and land_refused.tests evidence is shown here. These logs are shipped to Loki and each Log path opens the filtered run log dashboard. Unsupported, absent, or legacy evidence is excluded from this linked table and remains visible in Per run evidence without a Log action.",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 62
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_outcome{window=\"$window\",evidence=~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (version, slug, run, doc, vsort) (label_replace(label_replace(label_replace(label_replace(label_replace(label_join(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"} * on (version, slug, run) group_left() k3dm_dispatch_task_run_outcome{window=\"$window\",evidence=~\"^(land-test[.]log|land_refused[.]tests)$\"}, \"doc\", \"-\", \"version\", \"slug\"), \"doc\", \"plans/$1\", \"doc\", \"(v.*)\"), \"doc\", \"bugs/$1\", \"slug\", \"([0-9]{4}-[0-9]{2}-[0-9]{2}-.*)\"), \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "slug"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open spec",
+                        "targetBlank": true,
+                        "url": "https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Log"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 150
+                  },
+                  {
+                    "id": "custom.inspect",
+                    "value": true
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open shipped landing-test log",
+                        "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&from=now-30d&to=now"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "doc"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "version"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "run"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 45
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "outcome"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 85
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Result"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 165
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Tokens"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "vsort",
+                    "desc": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "job": true,
+                  "window": true,
+                  "evidence": true,
                   "Value #A": true,
                   "vsort": true
                 },
