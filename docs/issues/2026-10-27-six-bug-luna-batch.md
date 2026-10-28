@@ -708,3 +708,15 @@ User-requested make webhook-doctor /DRY_RUN=1 wrapper47b4d740 implemented,
 help/docs updated, Make expansions/real plan/5 adjacent BATS and hooks pass.
 Only next operator credential replacement step requested; no second scan
 started, no broad gh token reused, no credential rotated by coordinator.
+
+## GHCR live auth recovery passed; new scan-gate issue outside batch
+
+Operator1793149530 new scan resolves candidate, reasonauth->ok metric replacement,
+Git pin e35525bc persisted, ArgoSynced/Healthy/Succeeded, runningpod1/1 at target
+digest. Auth P2 LIVE-VERIFIED with E3 evidence. Fresh report0Critical/4HIGH
+with fixes: do NOT call image clean. Independent no-network Trivy-error
+fixture reports scan_count0 despite failure; same pre-batch helper logic.
+New bounded P2 scan-gate spec filed, no implementation/dispatch authorization
+inferred and no cause of exact live discrepancy asserted. Full outputs
+docs/issues/2026-10-27-app-cve-scan-auth-recovery-and-gate-followup.md.
+Operator scope choice pending before new fix; remaining live items queued.
