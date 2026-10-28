@@ -4,7 +4,7 @@ resources:
   - https://github.com/wilddog64/shopping-cart-product-catalog//k8s/base?ref=main
 images:
   - name: ghcr.io/wilddog64/shopping-cart-product-catalog
-    digest: sha256:167f060f7c53d9aefdedc1714c2598b574d05e908ce87c23f7eafb906cb54bed
+    digest: sha256:3e77ceae45ee93bff6bf3d964ef1366ac96c95739399e507b43f2541fb6779ee
 patches:
   - patch: |-
       apiVersion: v1
