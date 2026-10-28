@@ -245,3 +245,39 @@ Officialprimarysourceschecked:
 - https://developers.cloudflare.com/api/resources/zones/subresources/settings/methods/get/
 GET acceptsZoneSettingsRead; floor1.2 andTLS1.3enablementseparate; clientlegacy
 protocolunsupported cannotcountasedgerejection. No tokens/rawbodies/liveprobes.
+
+## Initial worker submissions — review/rework, not accepted
+
+Both nativeLuna tasks started/exitedrun1. Offlineworker madeactualone-line
+forecastproducerdrainfix andsaferdispatcherfakes; coordinatorrequestedrun2:
+mutationmustexerciseexactrealguardscan(withnegative-safe/standalonecases),
+largebodymustexerciseactualOrbStackforecastpath usingexistinglocalfakeharness,
+and cleanrawShellCheck ratherthanglobalSC2034suppression. Existing6indirectfixture
+SC2034warnings observed; finalsourcecommentsmustbe localandjustified. Current
+capture below mayreflectin-progressannotationedits, so it is not finalgateproof:
+```text
+
+```
+
+Cloudflareinitialdraft218lines/executable, read-only. Independentpurefunction
+probes(no network/credentials) exposedmalformedsettingecho andTLSmisclassification/
+client-configexception:
+```json
+{
+  "executable": true,
+  "unknown_setting_output": {
+    "always_use_https": null,
+    "min_tls_version": null,
+    "ssl": "sentinel-secret-value",
+    "security_header": null,
+    "tls_1_3": null
+  },
+  "local_version_error": "edge_rejected",
+  "local_config_error": "uncaught ValueError (no network called)"
+}
+```
+CloudflareLunarun2requestedstrictsettingnormalization/identity/size, no arbitrary
+Locationpathdisclosure, definitivepeer-alertclassification, localSSLunsupported
+handling, realhandler/noAuth/noRedirect/versionlimit tests. No liveproviderprobe,
+secretvalue, zonechange or automaticrecovery attempted. Firstdraftnotaccepted.
+Optionaloperatororiginaltestlogpathquestion remainsnonblocking/unanswered.

@@ -938,3 +938,17 @@ PriorinvestigationfixPrometheusdatasourcealsoPASS(true/true/ok/date/dashFixSHA),
 finalincidentrowUIstillpending; PRCheckspaymentviewpending. No livewrite/restart/
 credentialaccess/screenshotexport/newplan/PR. Independentreviewthenoneatatime
 operatorvalidation continuesafterLunaworkers.
+
+## 2026-10-28 new P2 workers rework2 in progress
+
+Nativegpt-6-luna offline-test-all-regressions-luna run2: initialprodgrepfix/SSH
+fixtures reviewed; require realguardsharedscanner/negativefixtures andactual
+largepayloadOrbStackforecastregression plusrawShellCheck(no blanketSC2034skip).
+cloudflare-https-tls-preflight-luna run2: initialreadonlyhelper rejectedunknown
+settingecho/localVERSION_TOO_LOW falselyedge_rejected/uncaughtSSLconfigValueError;
+requeststrictenums/redactedLocations/definitivealerts/fakeAPI/TLSnegativecoverage.
+Fullactualinitialfindingsbatchissue. Bothprivateworktreesuncommitted, no landing/
+no liveinfrastructure/account/credential/metricschanges. Optionaluserrawlogpath
+pending; all4failednames/stage0/source12:41:14ZalreadyknownfromPrometheus.
+OriginalinvestigationmetricsfixPrometheusPASS, finalGUIrowstillpending; preserve
+PRCheckspaymentviewpending. No newplan/PR, liveCFwriteapprovalstillseparate.
