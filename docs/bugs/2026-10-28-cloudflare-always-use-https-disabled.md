@@ -1,18 +1,18 @@
-# Bug: Cloudflare Always Use HTTPS disabled for 3ai-talk.org public entrypoints
+# Bug: Cloudflare HTTPS enforcement and obsolete minimum TLS version
 
 **Filed:** 2026-10-28 (operator request after reviewing Cloudflare configuration inventory)
 **Status:** OPEN — operator-approved filing only; edge configuration has not been changed or live-verified
 **Priority:** P2 — security hardening, higher priority than routine P3 enhancements; no demonstrated compromise
-**Severity:** medium (cleartext HTTP entry possible before redirect; actual exposure and HTTP handling require verification)
+**Severity:** medium (unenforced HTTP redirect and potentially permitted obsolete TLS protocols; confirm effective edge posture)
 **Release:** v1.43.9 security bug (not a new plan slot; fixes should be scheduled on the active release process after preflight approval)
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator requested higher-priority plan/bug filing; separate explicit go required for changing Cloudflare zone settings
 **Component:** Cloudflare zone `3ai-talk.org`, edge TLS/redirect settings; affected names: alertmanager, argocd, frontend, grafana, keycloak, prometheus, webhook
-**Related:** `docs/howto/public-endpoint-alerts.md`; `docs/howto/tunnel.md`; `docs/plans/v1.43.10-hostinger-public-path-on-node.md`; `docs/plans/v2.0.0-autonomous-incident-investigation.md`
+**Related:** `docs/howto/public-endpoint-alerts.md`; `docs/howto/tunnel.md`; `docs/plans/v1.43.10-hostinger-public-path-on-node.md`; `docs/plans/v1.45.0-autonomous-incident-investigation.md`
 
 ## Symptom / evidence
 
-Operator-supplied Cloudflare account analysis on 2026-10-28 reports **Always Use HTTPS = Off** while seven CNAME records are proxied to a single Cloudflare Tunnel, with SSL mode described as `Full`. The setting and actual edge behavior have **not** been independently read from the Cloudflare API in this investigation. Verify current configuration before mutation.
+Operator-supplied Cloudflare account analysis on 2026-10-28 reports **Always Use HTTPS = Off** while seven CNAME records are proxied to a single Cloudflare Tunnel, with SSL mode described as `Full`. A second operator-provided Cloudflare agent report states **Minimum TLS Version = 1.0**, potentially allowing TLS 1.0/1.1 at the visitor-facing edge. Both settings and actual edge behavior have **not** been independently read from the Cloudflare API in this investigation. Verify current configuration before mutation.
 
 Cloudflare documents that Always Use HTTPS redirects requests entering on HTTP to the equivalent HTTPS URL at the edge, applies zone-wide to all hostnames, and is available on Free. This is a defense-in-depth transport policy, **not** a fix for October 502s, a substitute for authentication, or proof of host compromise.
 
@@ -20,10 +20,11 @@ Sources:
 - https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/
 - https://developers.cloudflare.com/ssl/edge-certificates/encrypt-visitor-traffic/
 - https://developers.cloudflare.com/ssl/troubleshooting/too-many-redirects/
+- https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/
 
 ## Risk and scope
 
-Without edge HTTP-to-HTTPS enforcement, clients may initiate an unencrypted request to port 80, even when applications subsequently redirect. This risks exposure of data in an initial HTTP URL/request; actual behavior depends on edge and origin configuration. Main goal: prevent insecure public entry to the seven proxied names and verify no authentication or Slack callback flows regress.
+Without edge HTTP-to-HTTPS enforcement, clients may initiate an unencrypted request to port 80, even when applications subsequently redirect. This risks exposure of data in an initial HTTP URL/request; actual behavior depends on edge and origin configuration. Main goal: prevent insecure public entry to the seven proxied names, reject obsolete edge TLS negotiations, and verify no authentication or Slack callback flows regress. TLS minimum applies at the visitor-to-Cloudflare edge; origin-side TLS is a separate control.
 
 This has **no established causal connection** to the 7,360 historical HTTP 502s or malicious access to M4. It must not trigger SSH key rotation, WAF country blocking, or any live remediation automatically.
 
@@ -31,21 +32,25 @@ This has **no established causal connection** to the 7,360 historical HTTP 502s 
 
 ### F0. Preflight and immutable evidence (read-only)
 
-1. Read zone setting `always_use_https` through Cloudflare's documented API or dashboard, plus SSL/TLS mode, current redirect rules, HSTS status, edge certificate coverage and any hostname-specific exceptions. Collect timestamp and sanitized evidence; never store bearer/API tokens.
+1. Read zone settings `always_use_https` and `min_tls_version` through Cloudflare's documented API or dashboard, plus SSL/TLS mode, current redirect rules, HSTS status, edge certificate coverage and any hostname-specific exceptions. Collect timestamp and sanitized evidence; never store bearer/API tokens.
 2. Read-only test `http://` and `https://` for all seven hostnames, with **redirect following disabled**, recording response status and `Location` (without secrets). Do not submit credentials or POST bodies over HTTP. Check that 401, 302, 200 behavior on direct HTTPS remains baseline.
 3. Review Keycloak external URL/proxy scheme, ArgoCD SSO callback, Grafana login, frontend flows, Prometheus/Alertmanager/Webhook auth, Slack relay callback URLs, HTTP-01/DCV if relevant, and existing Cloudflare Redirect Rules for loops or forced HTTPS-to-HTTP redirects.
-4. If an exception is necessary for a hostname, stop zone-wide rollout and propose a narrowly scoped redirect rule instead; do not silently exclude a service.
+4. Inspect permitted TLS versions on each of seven HTTPS hostnames using a read-only client that forces TLS 1.0, 1.1, 1.2 and 1.3 (where supported); record handshake success/failure, negotiated protocol and certificate validity without authentication tokens. Separate local OpenSSL/client limitations from edge refusal.
+5. Check whether any legacy Slack/Cloudflare Worker callbacks, monitoring, authentication clients, or automation require TLS 1.0/1.1. Modern clients should support TLS 1.2+. Document any compatibility exception before rollout.
+6. If an exception is necessary for a hostname, stop zone-wide rollout and propose a narrowly scoped policy instead; do not silently exclude a service.
 
 ### F1. Controlled edge change (separate operator approval)
 
 - Prefer Cloudflare `Always Use HTTPS = On` for the entire zone **only after F0 passes**. Use dashboard or documented API with least-privilege credentials; do not write tokens into shell history, command arguments, logs, Git, CI or agent output.
-- Record prior value and exact rollback, `Always Use HTTPS = Off`, under operator control.
+- After explicit operator approval, set Cloudflare minimum TLS version to **1.2** as a separate controlled operation, keeping TLS 1.3 enabled. Do not raise the minimum to TLS 1.3 without separate compatibility review.
+- Record prior values and rollback paths for each setting (`always_use_https`, `min_tls_version`); restore only the setting that caused an observed regression, under operator control.
 - Do **not** change SSL/TLS mode, HSTS, DNS, tunnel connectors, origin routes, certificates, application authentication, or Worker settings as part of this change.
 - No automatic remediation or unattended agent action against account settings.
 
 ### F2. Acceptance / live validation
 
 - For each of seven names, plain HTTP GET with redirects disabled receives edge HTTP 301/308 to exactly the HTTPS equivalent, preserves safe path/query in test fixtures, and does not expose a response body from origin. Use non-sensitive paths and fixture-only query values.
+- Explicit protocol checks show TLS 1.0 and TLS 1.1 handshakes rejected, while TLS 1.2 and TLS 1.3 negotiate successfully when the client and edge support them. Test on all seven names and explain any client-side unsupported protocol case instead of claiming a pass.
 - Direct HTTPS responses stay within preflight expectations; tests explicitly distinguish edge redirect `http -> https` from auth redirects `https -> Keycloak`.
 - Bounded browser smoke validates Keycloak login + return, ArgoCD/Grafana SSO, frontend, and authenticated webhook behavior without sending real tokens over HTTP; use authorized test paths only.
 - Ensure Slack slash/events/interactive delivery paths remain functional at HTTPS URLs, including signature validation and return-thread behavior; document genuine failures rather than masking them behind an accepted 302.
@@ -54,7 +59,7 @@ This has **no established causal connection** to the 7,360 historical HTTP 502s 
 
 ### F3. Drift detection (separate, scoped implementation)
 
-Read-only periodic Cloudflare configuration posture check may alert when Always Use HTTPS reverts to Off; do not automatically change it. Reuse Hermes security-posture patterns if available. Avoid requiring a new credential solely for this task unless a documented minimally scoped API exists and the operator approves it.
+Read-only periodic Cloudflare configuration posture check may alert when Always Use HTTPS reverts to Off or minimum TLS falls below 1.2; do not automatically change it. Reuse Hermes security-posture patterns if available. Avoid requiring a new credential solely for this task unless a documented minimally scoped API exists and the operator approves it.
 
 ## Acceptance
 
@@ -70,6 +75,8 @@ must:
     text: The operator receives a documented rollback and sanitized before/after evidence.
   - id: M5
     text: A read-only drift check is specified and must show missing/unavailable telemetry as unknown.
+  - id: M6
+    text: Minimum edge TLS is confirmed at 1.2 or higher, with TLS 1.0/1.1 rejected and TLS 1.2 supported on all seven names; TLS 1.3 remains enabled where supported.
 must_not:
   - id: N1
     text: No live zone setting change without separate explicit operator go.
@@ -81,6 +88,8 @@ must_not:
     text: No redirect loop or regression in Slack callbacks, Keycloak login or public HTTPS probes.
   - id: N5
     text: Do not claim this prevents 502s or establishes that no attacker accessed M4.
+  - id: N6
+    text: Do not raise the minimum to TLS 1.3, change origin-side TLS, or label a client unsupported-protocol error as proof of an edge rejection.
 evidence:
   - id: E1
     kind: offline
@@ -88,24 +97,24 @@ evidence:
     text: Documented preflight checklist, sanitized baselines, rollback plan, and fake-response tests for redirect chains and error handling.
   - id: E2
     kind: live
-    proves: [M2, M3, N4]
-    text: After operator-approved change, seven HTTP redirect checks and authorized HTTPS/SSO/Slack flows are observed and recorded with timestamps.
+    proves: [M2, M3, M6, N4, N6]
+    text: After operator-approved changes, seven HTTP redirect checks, forced TLS 1.0/1.1/1.2/1.3 connection tests, and authorized HTTPS/SSO/Slack flows are observed with timestamps. Distinguish client capability from edge enforcement.
   - id: E3
     kind: offline
     proves: [M5]
-    text: Configuration posture check reports on/off/unknown, handles API errors and never attempts a write.
+    text: Configuration posture check reports HTTPS enforcement on/off/unknown and TLS minimum as exact version/unknown, handles API errors and never attempts a write.
 interface:
-  - Cloudflare documented always_use_https zone setting
+  - Cloudflare documented always_use_https and min_tls_version zone settings
   - public endpoint and SSO smoke checks
   - Hermes read-only security posture/drift reporting
 ```
 
 ## Definition of Done
 
-- [ ] F0 verified with captured settings, 7-host baseline and callback/redirect compatibility assessment.
+- [ ] F0 verified with captured HTTPS and TLS minimum settings, 7-host HTTP/HTTPS/TLS baseline and callback/redirect compatibility assessment.
 - [ ] Explicit approval received for the external setting change.
 - [ ] F1 applied with rollback documented and retained before/after record.
-- [ ] F2 real-world validation passing; failures kept open with observed evidence.
+- [ ] F2 real-world validation passing for HTTP redirects, TLS protocol enforcement and authenticated workflows; failures kept open with observed evidence.
 - [ ] F3 drift check planned or delivered separately with tests and no auto-repair.
 - [ ] Mark LIVE-VERIFIED only after E2; update bug status accordingly.
 
@@ -114,4 +123,5 @@ interface:
 - Do not file this as a new v1.43.9 feature plan that would consume its capped plan slots.
 - Do not create PR, write to main, skip hooks or perform an external configuration change from this filing.
 - Do not turn on HSTS in the same change; its browser persistence complicates rollback.
+- Do not change Cloudflare minimum TLS to 1.3 or confuse edge TLS with origin TLS.
 - Do not misclassify normal SSO 302 or expected unauthenticated 401 as proof of a working end-to-end application.
