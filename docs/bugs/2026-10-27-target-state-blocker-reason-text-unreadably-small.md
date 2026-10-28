@@ -1,7 +1,7 @@
 # Bug: Bug Tracking Target state blocker reason is too small to read and does not wrap
 
 **Filed:** 2026-10-27, operator screenshot and explicit P3 filing request
-**Status:** VERIFIED — Luna fix independently reviewed; operator full/narrow-width live verification pending
+**Status:** VERIFIED — operator normal-width rendering passed; narrow-width live check pending
 **Fix commit:** 2f551fc7090dea8416f7a008eb9881048a7d66ea
 **Priority:** P3
 **Severity:** low — readability/accessibility defect; target-state calculation remains correct
@@ -118,3 +118,14 @@ comparison, staged lint/audit, hooks and dispatcher post-rebase tests pass.
 Config tests reject old missing sizing. Actual full output and live checklist:
 [batch evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
 Full and narrow rendering/wrapping remain operator acceptance, not assumed.
+
+## Operator normal-width live rendering — PASS (2026-10-28)
+
+Screenshot shows full supporting reason across three visible lines:
+`blocked at v1.49.0:` / `TwinkleAI app M1 near` / `done (app repo)`.
+Reason is visibly larger than the original tiny annotation, wraps without
+truncation, and does not overlap the prominent orange `blocked` status.
+Other forecast tiles remain present (18 releases, median0.510, no-date labels).
+This verifies supplied normal-width rendering only; narrow layout remains E2
+acceptance before LIVE-VERIFIED. No screenshot export or runtime mutation.
+[Textual evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
