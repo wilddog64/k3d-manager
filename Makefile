@@ -7,6 +7,7 @@
 .PHONY: image-pin-drift
 .PHONY: check-bug-evidence
 .PHONY: webhook-doctor
+.PHONY: cloudflare-preflight
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -489,6 +490,10 @@ install-sudoers:
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
 	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
+
+## Check Cloudflare posture read-only (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)
+cloudflare-preflight:
+	@bin/k3dm-cloudflare-posture $(if $(filter 1,$(DRY_RUN)),--dry-run,--check) --zone-id '$(ZONE_ID)'
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
@@ -1642,6 +1647,7 @@ help:
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
+	@echo "    make cloudflare-preflight       Read-only HTTPS/TLS preflight (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)"
 	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
 	@echo "  Examples:"

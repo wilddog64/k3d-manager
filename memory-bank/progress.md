@@ -1365,3 +1365,26 @@ OPENpendingactualF0review/F1separatego/F2liveacceptance; no accountaccess/write.
 NoPRcreated/URLnone(ClaudeownsPRs), no screenshotexports/livepublication/restarts.
 PreviousoriginalincidentGUIrow andPRCheckspaymentview acceptance stillpending.
 Nextsingleoperatorstep freshmake test-all, noArgoCDrefreshneededforthesefixes.
+
+## 2026-10-28 operator test-all follow-up fixed; CF preflight partial
+
+Operator /tmp/k3dm-test-all-1793208248.log:1913cases,1889passed/4failed/20skipped.
+Original4casefixespass; new4HubrecoveryMakefixtures copiedPWD inclpreexisting
+Unixsocket ./-e. FixedtestonlyhelpercopiesactualMakefile+emptystubdirs; all
+assertions/countspreserved, socket/production/Makefileuntouchedbyrecoveryfix.
+Pushedrealcommitcfb60be0; focused4red/4green, full116hub_data BATS/no skipsPASS
+usingexistingPython3.13.6/tripwire; rawShellCheckclean after4legacywarningfixes,
+lint/audit/checkpointhookspass. Fullactualoperator+testoutput:
+docs/issues/2026-10-28-offline-rerun-hub-fixture-socket.md. Fresh3-stageoperator
+make test-all/publication stillpending; no alertresolutionclaimed. PRURLnone
+(ClaudeownsPRs).
+
+Operator CFpreflight timestamp2026-10-28T17:36:46.131214Z:all7TLS1.2/1.3certvalid;
+TLS1.0/1.1client_unsupported, HTTPnoHTTPSupgrades (200/401/302same-scheme),
+allAPIsettingsnull/noAPIcredential. ValidzoneIDsupplied, APIreadnotperformed.
+Fullreportedoutput+warnings in newCloudflareoperatorreportissue. F0partial,
+nozonewritesapproved; rules/SSO/Slack/configreadsremaining. UserexplicitMake
+shortcutrequestimplementedcloudflare-preflight ZONE_ID=<zone>, DRY_RUN=1;
+make-n/dryrunPASS, no coordinatorliveprobes/credentials. Makecommitpending
+requiredgates/push. PriorCFhelper2e0be3f6verified169tests unchanged/norerun.
+IncidentGUI/payment-onlyPRChecks pending; no screenshotexport/newplan/PR.

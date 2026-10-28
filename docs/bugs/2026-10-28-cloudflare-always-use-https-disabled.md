@@ -136,6 +136,7 @@ periodic scheduler, Hermes automation, dashboard, account credential or applymod
 
 ### Files
 
+- `Makefile` — operator-requested read-only preflight shortcut, 2026-10-28
 - `bin/k3dm-cloudflare-posture`
 - `scripts/tests/bin/test_cloudflare_posture.py`
 - `docs/howto/cloudflare-https-tls-preflight.md`
@@ -213,3 +214,22 @@ Current configuration, redirect-rule/certificate/SSO/Slack compatibility, F1
 operator go and F2 live acceptance remain pending. Full review output is in
 [the batch review](../issues/2026-10-28-two-new-p2-luna-batch.md). No PR created;
 Claude owns PR creation.
+
+## Operator preflight and Make shortcut follow-up
+
+Operator report timestamp2026-10-28T17:36:46.131214+00:00: all seven
+TLS1.2/1.3 handshakes negotiated with valid certificates; TLS1.0/1.1 are
+client_unsupported (not proof of edge rejection). No HTTP root probe upgraded
+to HTTPS: ArgoCD/frontend200, Alertmanager/Prometheus/webhook401, Grafana/
+Keycloak302 same-scheme destinations. All API settings null with credential
+or valid zone ID unavailable; supplied ID is valid32hex, so helper had no
+nonempty API token. F0 remains incomplete; no live change is authorized by
+this partial report. Redirect rules/certificate coverage/SSO/Slack and current
+zone values still need review. TLS deprecation warnings came from intentional
+legacy-version probes; no runtime warning filters added.
+
+Operator explicitly requested a Make target. Scope extends to Makefile plus
+existing preflight howto: cloudflare-preflight accepts ZONE_ID and follows
+existing DRY_RUN=1 convention. No helper, credential, scheduling, API-write or
+UI changes. Exact operator output and wrapper verification are recorded in
+`docs/issues/2026-10-28-cloudflare-preflight-operator-report.md`.

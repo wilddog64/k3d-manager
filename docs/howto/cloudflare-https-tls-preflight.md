@@ -11,6 +11,18 @@ bin/k3dm-cloudflare-posture
 bin/k3dm-cloudflare-posture --dry-run
 ```
 
+The Make shortcut runs the same read-only check, using the zone ID shown on
+Cloudflare's domain Overview page:
+
+```sh
+make cloudflare-preflight ZONE_ID=0123456789abcdef0123456789abcdef
+```
+
+Use `DRY_RUN=1` to print only the helper's plan, without probes or credential
+access. The Make target uses the existing `CLOUDFLARE_API_TOKEN` environment for
+API reads, just like the direct command. It does not retrieve credentials.
+Missing credentials leave settings unknown while public probes still run.
+
 For an actual bounded check, use an existing least-privilege Cloudflare API token with Zone Settings Read permission and the zone ID. Supply the token only through the already managed `CLOUDFLARE_API_TOKEN` environment; never put it in command arguments, shell history, logs, output, or a file. The helper sends it only to the fixed Cloudflare API HTTPS host, disables proxy inheritance and redirects, validates TLS normally, bounds response size/time, and makes GET requests only.
 
 ```sh
