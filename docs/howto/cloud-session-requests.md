@@ -51,6 +51,12 @@ After pulling changes, `make restart-webhook` restarts both the webhook and the 
 To restart only the bridge, run `make restart-cloud-bridge`; if it has not been installed, that
 target reports the skip and exits successfully.
 
+After deploying a bridge change that affects GitHub SSH authentication, the operator can run
+`make restart-cloud-bridge` and then submit one benign `health` request. Keep the macOS Keychain
+unlocked for the check. Review the sanitized health result for a normal response; this check
+confirms the current bridge request path only and does not establish the cause of any earlier
+SSH failures.
+
 ## What you can ask for
 
 The actions below, and only these (`ACTION_ALLOWLIST` in `scripts/lib/webhook/cloud_actions.py`). This list is a security boundary, not a convenience default — anything not on it

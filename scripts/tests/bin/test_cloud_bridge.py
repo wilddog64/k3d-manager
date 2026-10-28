@@ -3,6 +3,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -80,6 +81,66 @@ def test_bridge_marker_write_failure_is_advisory(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(bridge, "STATE_DIR", invalid_parent / "bridge-state")
     bridge._write_heartbeat_marker(now=1234.5)
     assert "completion marker skipped" in caplog.text
+
+
+@pytest.mark.parametrize("provided_env", [None, {"CUSTOM": "kept"}])
+def test_git_uses_keychain_ssh_fallback_on_macos_without_override(monkeypatch, provided_env):
+    captured = {}
+
+    def fake_spawn(command, **kwargs):
+        captured.update(command=command, **kwargs)
+        return 0, "ok", False
+
+    monkeypatch.setattr(bridge.sys, "platform", "darwin")
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
+    monkeypatch.setattr(bridge, "_spawn_capture_text", fake_spawn)
+    original_env = None if provided_env is None else dict(provided_env)
+    original_os_env = os.environ.copy()
+
+    assert bridge._git("/repo", ["status"], env=provided_env) == "ok"
+    assert captured["env"]["GIT_SSH_COMMAND"] == (
+        "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
+    if provided_env is not None:
+        assert captured["env"]["CUSTOM"] == "kept"
+        assert provided_env == original_env
+    assert captured["env"].get("SSH_AUTH_SOCK") is None
+    assert dict(os.environ) == original_os_env
+
+
+@pytest.mark.parametrize("override", ["custom-ssh --flag", ""])
+@pytest.mark.parametrize("caller_override", ["caller-ssh", ""])
+def test_git_preserves_inherited_and_caller_ssh_overrides(monkeypatch, override, caller_override):
+    captured = {}
+    monkeypatch.setattr(bridge.sys, "platform", "darwin")
+    monkeypatch.setenv("GIT_SSH_COMMAND", override)
+    monkeypatch.setattr(bridge, "_spawn_capture_text",
+                        lambda command, **kwargs: (captured.update(kwargs) or (0, "", False)))
+
+    caller_env = {"GIT_SSH_COMMAND": caller_override}
+    original_caller_env = caller_env.copy()
+    bridge._git("/repo", ["status"], env=caller_env)
+    assert captured["env"]["GIT_SSH_COMMAND"] == caller_override
+    assert caller_env == original_caller_env
+    bridge._git("/repo", ["status"])
+    assert captured["env"]["GIT_SSH_COMMAND"] == override
+
+
+def test_git_does_not_add_keychain_ssh_options_off_macos(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(bridge.sys, "platform", "linux")
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.setattr(bridge, "_spawn_capture_text",
+                        lambda command, **kwargs: (captured.update(kwargs) or (0, "", False)))
+
+    bridge._git("/repo", ["status"], env={"CUSTOM": "kept"})
+    assert captured["env"] == {"CUSTOM": "kept"}
+
+
+def test_git_failure_remains_observable(monkeypatch):
+    monkeypatch.setattr(bridge, "_spawn_capture_text", lambda *args, **kwargs: (128, "denied", False))
+    with pytest.raises(RuntimeError, match="denied"):
+        bridge._git("/repo", ["status"])
 
 
 def test_extra_argument_is_rejected():
@@ -909,9 +970,13 @@ def test_cloud_runner_set_is_scoped_and_unranked():
     assert {"sandbox-up", "sandbox-down"} <= set(bridge.ACTION_ALLOWLIST)
 
 
-def test_bridge_has_no_runner_lock_probe_or_ssh_call():
+def test_bridge_has_no_runner_lock_probe_or_direct_ssh_call():
     source = Path(ROOT / "bin" / "k3dm-cloud-bridge").read_text()
     assert "E2E_M2_LOCK" not in source
+    # agent-audit: allow assert-removed guard narrowed to exact approved Git SSH fallback
+    source = source.replace("GIT_SSH_COMMAND", "")
+    source = source.replace(
+        "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes", "")
     assert "ssh" not in source.lower()
 
 

@@ -254,7 +254,12 @@ def _recover_orphaned_claims(repo, ref, processed, claims):
 
 
 def _git(repo, args, env=None, timeout=30):
-    rc, output, timed_out = _spawn_capture_text(["git", *args], cwd=repo, env=env, timeout=timeout)
+    git_env = os.environ.copy() if env is None else dict(env)
+    if sys.platform == "darwin" and "GIT_SSH_COMMAND" not in git_env:
+        git_env["GIT_SSH_COMMAND"] = (
+            "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
+    rc, output, timed_out = _spawn_capture_text(
+        ["git", *args], cwd=repo, env=git_env, timeout=timeout)
     if timed_out or rc != 0:
         raise RuntimeError(output.strip() or "git command failed")
     return output
