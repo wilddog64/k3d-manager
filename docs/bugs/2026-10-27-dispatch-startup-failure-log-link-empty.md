@@ -1,7 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
 **Status:** VERIFIED — single-table correction independently tested; two-dashboard deployment/UI verification pending
-**Fix commit:** 0fc9d3ef34698e067d4045e287753bedc74e9cd8
+**Fix commit:** 0077b7b8f6cbc13b76a07c63bbd1b9286afa36f4
 **Priority:** P3
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -116,3 +116,7 @@ Deploy only the two affected dashboard ConfigMaps after offline gates.
 ## Single-table implementation complete offline
 
 Operator-requested removal implemented in0fc9d3ef: extra panel93 removed, existing Per run evidence again contains all run categories with Log hyperlinks. Link uses visible version/slug/run/Result, no hidden URL-field dependency. Existing Agent Run Log heading shows Result through a hidden textbox variable; local-only availability is explicit, shipped Loki query unchanged. No added table/panel/logshipping/transcript export. Independent138Python/28BATS/Ruff/2PromQL/staged gates passed;29otherdispatchpanels unchanged. Both existing dashboard ConfigMaps must be applied before UI checks. Full actual outputs in three-open-bugs issue.
+
+## Empty path label follow-up
+
+Operator screenshot showed earlier runs with outcomeunknown/evidencenone/pathblank. Configured link existed but empty displayed value made it invisible. Fix0077b7b8 maps only empty/null Log values to clickable Open run evidence; real paths unchanged. No newtable. Unverified/No landing-test evidence recorded distinguish earlier attempts without altering metric classifications. Accepted-run log existence independently confirmed viaLoki. [Findings/test output](../issues/2026-10-27-run-evidence-empty-link-and-attribution-findings.md). Publish metrics/applydashboard/UI verification still pending.

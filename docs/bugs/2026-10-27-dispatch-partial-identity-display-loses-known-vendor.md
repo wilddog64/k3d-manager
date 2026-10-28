@@ -1,7 +1,8 @@
 # Bug: dispatch identity display hides a recorded vendor when model is absent
 
-**Status:** OPEN — reproduced during screenshot investigation; bounded correction in progress
+**Status:** VERIFIED — regression and focused gates passed; publication/UI check pending
 **Priority:** P3
+**Fix commit:** 0077b7b8f6cbc13b76a07c63bbd1b9286afa36f4
 **Filed:** 2026-10-27
 **Branch:** k3d-manager-v1.43.9
 
@@ -32,3 +33,5 @@ bounded labels, runtime worker identities, allowlists, measurement state,
 known actors, ledger/history and panel structure. Unit regression red on old
 renderer; full metrics pytest, dashboard BATS, Ruff, syntax/diff and staged
 lint/audit. GUI behavior stays pending operator deployment/reload.
+
+[Full findings and actual test output](../issues/2026-10-27-run-evidence-empty-link-and-attribution-findings.md). No historical attribution/costs inferred or ledger edited.
