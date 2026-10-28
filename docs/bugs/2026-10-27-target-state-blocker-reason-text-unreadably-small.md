@@ -1,7 +1,8 @@
 # Bug: Bug Tracking Target state blocker reason is too small to read and does not wrap
 
 **Filed:** 2026-10-27, operator screenshot and explicit P3 filing request
-**Status:** VERIFIED — operator normal-width rendering passed; narrow-width live check pending
+**Status:** LIVE-VERIFIED — operator normal-width and supplied narrow-view readability checks passed
+**Live evidence:** 2026-10-28 · run operator-target-state-normal-and-narrow · env m4-grafana-v1.43.9 · scenario target-state-blocker-readable-wrapping · commit 2f551fc7090dea8416f7a008eb9881048a7d66ea · proves E2
 **Fix commit:** 2f551fc7090dea8416f7a008eb9881048a7d66ea
 **Priority:** P3
 **Severity:** low — readability/accessibility defect; target-state calculation remains correct
@@ -72,8 +73,8 @@ evidence:
 
 - [x] Operator approved implementation in the 2026-10-28 Luna batch.
 - [x] Independent 38/38 dashboard BATS; only panel31 text sizes changed, exact query/mappings/layout preserved.
-- [ ] Visual/operator acceptance demonstrates wrapped, readable blocker reason at normal zoom.
-- [ ] Record fix commit, live evidence, verified timestamp and update status after actual validation.
+- [x] Operator normal-width and requested narrow-view screenshots show complete wrapped reason without clipping or overlap.
+- [x] Fix SHA and structured live evidence recorded after operator screenshots, 2026-10-28.
 
 ## What NOT to Do
 
@@ -129,3 +130,13 @@ Other forecast tiles remain present (18 releases, median0.510, no-date labels).
 This verifies supplied normal-width rendering only; narrow layout remains E2
 acceptance before LIVE-VERIFIED. No screenshot export or runtime mutation.
 [Textual evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
+
+## Operator requested narrow-view check — PASS (2026-10-28)
+
+After the narrower-window request, operator supplied a cropped Target state
+panel. Complete reason `blocked at v1.49.0: TwinkleAI app M1 near done (app repo)`
+wraps across three visible lines. Orange blocked status remains below without
+clipping or overlap. This is acceptance of the supplied operator view, not a
+measurement of viewport width or a claim about every possible browser size.
+Together with the prior normal-width screenshot, E2 visual acceptance passes.
+No image copied/exported or live mutation. [Textual evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).

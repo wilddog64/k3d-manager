@@ -1177,3 +1177,14 @@ TwinkleAIappM1neardone/apprepo), prominentorangestatus/nooverlapclipping.
 NormalwidthPASS; narrowwidthE2stillpending, bugVERIFIED notLIVE-VERIFIED.
 Nextsingleoperator narrowbrowser atsamezoom andshowTargetstate. Fulltextual
 record batchverificationissue; no screenshotexport/runtimewrite/testrerun/PR.
+
+## 2026-10-28 Target state live acceptance complete
+
+Operator supplied croppedpanel in response to narrow-window check: fullreason
+wraps3lines/prominentorangestatus/nooverlapclipping. Acceptsuppliedview, viewport
+notmeasured. Prior normalwidthpassed; P3fix2f551fc7 nowLIVE-VERIFIED withE2line.
+No screenshotexport/testrerun/runtimewrite. Read-only PRChecksCM nowcorrect
+Historical sampled check durations (may include closed PRs), queryunchanged.
+Nextsingleoperator reloadPRChecks/paymentrepo/Last7days screenshot currenttables,
+readhealth+history; timestampcrosscheck/nohistoryrepo later. Fulltextualbatchissue;
+originalhistoricwebhookcause remainsOPEN, currentbridge livepassed; no PR.

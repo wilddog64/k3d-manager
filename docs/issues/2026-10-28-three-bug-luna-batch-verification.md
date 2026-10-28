@@ -282,3 +282,20 @@ pending; do not claim responsive acceptance yet or mark LIVE-VERIFIED.
 Next single operator action: narrow browser window at unchanged zoom and
 show Target state. No raw image copied/exported, no terminal output for UI
 check, no code/live mutation or test rerun (documentation-only record).
+
+## Target state requested narrow-view check — PASS
+
+Operator replied to narrower-window check with cropped Target state panel:
+full reason wraps across3lines, orange blocked remains clear below, no clipping
+or overlap. Viewport dimensions were not provided/measured; this verifies only
+the supplied operator view. Combined with prior normal-width view, E2 accepted;
+canonical P3 now LIVE-VERIFIED, fix2f551fc7. No image export or terminal output.
+
+Next-check read-only deployed PR Checks ConfigMap inspection:
+```json
+{"title": "Historical sampled check durations (may include closed PRs)", "query": "k3dm_pr_check_duration_seconds{repo=~\"$repo\"}"}
+```
+Correct PR-history fix deployed. Next operator single UI check: reload PR Checks,
+select shopping-cart-payment and Last7days, inspect current counts/readhealth and
+historical sampled durations together. Later GitHub timestamp cross-check and
+no-history repo remain pending. Docs-only record; no test rerun/live mutation.
