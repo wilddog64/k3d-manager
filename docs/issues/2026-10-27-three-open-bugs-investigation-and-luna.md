@@ -1,0 +1,141 @@
+# Three open screenshot bugs — investigation and Luna work
+
+Operator authorized investigation and task dispatch. Two initial bugs implemented by GPT-6-Luna, independently reviewed, committed/pushed; third incident investigation produced a separately reproducible bridge-auth gap scoped for Luna. No PRs, live mutations/restarts or external messages performed. Original incident cause remains unconfirmed.
+
+## Count routing
+
+Fix b6704d68e04da578bc060cda96e19fe0ae94e5f2. Initial denylist route still accepted release-plan/ticket/alert counts; review required a bounded omitted-noun word grammar. Exact target now bypasses retrieval/model, explicitbugs behavior unchanged, unrelated counts fall through. Relevant new tests were red on original matcher and overbroad first patch; final independent full output:
+
+```text
+........................................................................ [ 88%]
+.........                                                                [100%]
+81 passed in 4.21s
+```
+
+## Startup log link
+
+Fix61e1d9944ed19048975dc470d28e57f866a85e1e plus fixture7451280f6b98adc23779ef61da583315abbe7974. Initial patch merely relabeled an unconditional Loki link; review rejected it. Final per-row loki_url exists only for supported landing-test evidence. Exit127 retains failed outcome/localcodex.log path and says local only(not shipped), with no Loki target. Shipper/transcripts/ledger unchanged. New target tests red on cosmetic patch, then green. Final independent pytest:
+
+```text
+........................................................................ [ 52%]
+..................................................................       [100%]
+138 passed in 13.27s
+```
+
+Full independent BATS:
+
+```text
+1..28
+ok 1 agent dispatch dashboard: valid ConfigMap JSON and datasource
+ok 2 agent dispatch dashboard: every queried metric is exported
+ok 3 agent dispatch dashboard: Claude context and compaction row panels exist below existing rows
+ok 4 agent dispatch dashboard: landing success aggregates both sides
+ok 5 agent dispatch dashboard: panel rectangles do not overlap
+ok 6 agent dispatch dashboard: Codex API cost shows priced total and excluded sessions
+ok 7 agent dispatch dashboard: per-spec panels use readable units and grouped targets
+ok 8 agent dispatch dashboard: final exit gap and operator coverage are exposed
+ok 9 agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d
+ok 10 agent dispatch dashboard: rework rate stat reads the selected window
+ok 11 agent dispatch dashboard: verified delivery stats use exported metrics without overlap
+ok 12 agent dispatch dashboard: stat and bar gauge panels use explicit colours
+ok 13 agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups
+ok 14 agent dashboards: panel targets, fieldConfig and options match the pre-split fixture
+ok 15 agent dashboards: each dashboard has unique panel ids and no overlapping rectangles
+ok 16 agent dashboards: all dashboards have the tag-based Agents link
+ok 17 agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable
+ok 18 agent activity: Claude row fills the width and bar gauge names read beside each bar
+ok 19 agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec
+ok 20 agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs
+ok 21 agent dispatch: per spec shows which agent landed each spec
+ok 22 agent dispatch dashboard: Log opens the filtered run log dashboard
+ok 23 agent cost: Claude tokens by kind splits the selected window by cache kind
+ok 24 agent cost: daily Claude tokens and cost panels split by kind
+ok 25 agent dashboards: labels and titles stay readable and release-only stats say why they are empty
+ok 26 agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities
+ok 27 agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget
+ok 28 agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling
+```
+
+Independent Ruff output for each task:
+
+```text
+All checks passed!
+```
+
+Staged lint/audit were actually run, not inferred from worker unstaged gates. First startup audit correctly refused replaced assertion:
+
+```text
+WARN: Agent audit: assertions removed from Python test files (add '# agent-audit: allow assert-removed <reason>' on an added line in that file if intended):
+WARN: scripts/tests/bin/test_dispatch_metrics.py:
+-    assert 'evidence_summary="exit 7"' in line
+```
+
+Added local justified audit comment for replacement by stronger exit+local-only assertion; audit/checkpoint/hooks passed, no bypass. First landing then exposed a fixture assumption (normaltmp outsidehome vs dispatcher TMPDIR underhome), full actual failure:
+
+```text
+................................................F....................... [ 52%]
+..................................................................       [100%]
+=================================== FAILURES ===================================
+_____ test_failed_startup_exit127_is_local_only_and_retains_codex_log_path _____
+
+tmp_path = PosixPath('/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.9/startup-log-link-local-only.run/state/tmp/pytest-of-cliang/pytest-0/test_failed_startup_exit127_is0')
+
+    def test_failed_startup_exit127_is_local_only_and_retains_codex_log_path(tmp_path):
+        now = int(time.time())
+        output = dispatch_metrics.render([
+            event(now - 20, "start", "startup", run=1),
+            event(now - 10, "codex_exit", "startup", run=1, exit=127, tokens=10),
+        ], 0, now, repo_root=tmp_path)
+        line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+        assert 'outcome="failed"' in line and 'evidence="codex_exit.exit"' in line
+        assert 'evidence_summary="exit 127; local only (not shipped)"' in line
+>       assert 'evidence_path="9.9.9/startup.run/codex.log"' in line
+E       assert 'evidence_path="9.9.9/startup.run/codex.log"' in 'k3dm_dispatch_task_run_outcome{window="1d",version="9.9.9",slug="startup",run="1",repo="k3d-manager",outcome="failed"...only.run/state/tmp/pytest-of-cliang/pytest-0/test_failed_startup_exit127_is0/worktrees/9.9.9/startup.run/codex.log"} 1'
+
+scripts/tests/bin/test_dispatch_metrics.py:579: AssertionError
+=========================== short test summary info ============================
+FAILED scripts/tests/bin/test_dispatch_metrics.py::test_failed_startup_exit127_is_local_only_and_retains_codex_log_path
+1 failed, 137 passed in 9.07s
+```
+
+Coordinator isolated fake Path.home for that regression, retaining exact relative-path and no-absolute-path assertions. Focused rerun1 passed/137 deselected. Complete second landing passed138pytest/28BATS/Ruff/diff. Count landing passed81pytest/Ruff/diff. Worker Ruff was initially unavailable; coordinator supplied existing temporary Ruff path, both final checks clean. Python syntax/YAML+embeddedJSON validation passed. Curated full suite not rerun; prior unrelated failures remain in six-bug batch record, no whole-suite-green claim. No shell implementation changed; ShellCheck not applicable to these Python/YAML tasks.
+
+## Webhook/cloud-bridge investigation
+
+Current existing doctor --check output verbatim (read-only):
+
+```json
+{"classification": "local_http_healthy_external_delivery_unverified", "credential": {"lookup_exit": 0, "source": "keychain", "status": "available"}, "credential_action": null, "health": {"all_ok": true, "http_responsive": true, "status": "healthy_http"}, "health_timeout_seconds": 15, "launchd": {"last_exit_code": null, "pid": 4295, "port": 7443, "status": "loaded"}, "listener": {"listening": true, "status": "listening"}, "log": {"available": true, "error_categories": [], "freshness": "fresh", "modified_utc": "2026-10-28T01:59:14.316628+00:00"}, "mode": "check", "process": {"pids": [4295], "status": "available"}, "recovery_action": null, "recovery_recommended": false, "timestamp_utc": "2026-10-28T01:59:44.186435+00:00"}
+```
+
+Sanitized launchd bridge facts: lookup_exit0, state running, PID4315, no last-exit value. Process start output:
+
+```text
+ 4295 Sun Oct 25 17:59:40 2026
+ 4315 Sun Oct 25 17:59:40 2026
+```
+
+Read only fixed UTC log patterns, no raw messages/argv/env exported. Window2026-10-26T13:50:00Z–14:50:00Z (reported incident~07:20PDT). Webhook14structured INFO records13:51:37–14:45:50Z. Bridge60structured ERROR records13:50:26–14:49:52Z, all matched the fixed standard message:
+
+```text
+ssh: connect to host github.com port 22: Undefined error: 0
+```
+
+Other initially tested category patterns did not match; matching is restricted to fixed known patterns, no arbitrary exception content exported. Bridge540explicit ERROR records onOct26, latest explicit log22:17:21Z; missing advisory heartbeat marker is not current poll failure evidence (running process predates marker code).Webhook49820 and bridge2789 unstructured lines were NOT interpreted. Their absence of interpreted errors does not establish functional availability.
+
+Existing remote cloud-requests tree read via GitHub API: not truncated,124request/154response blobs, latest prefixes20261027. Five latest retained response metadata include job-status HTTP200/completed2026-10-27T18:27:03.313612Z and18:26:00.604186Z, and other actionsHTTP202 completed18:26:36.560370Z,18:25:31.174182Z,18:21:59.280782Z. These are retained later successful bridge responses, not a new current functional probe; request payload/body/user metadata not exported. No request was created.
+
+Controlled read-only Git branch lookups, same user/env except explicit SSH mode and no SSH_AUTH_SOCK; token/key material never printed:
+
+```json
+[
+  {"mode":"no_agent","exit":128,"branch_head_present":false,"permission_denied_publickey":true,"ssh_connect_failure":false},
+  {"mode":"keychain_no_agent","exit":0,"branch_head_present":true,"permission_denied_publickey":false,"ssh_connect_failure":false}
+]
+```
+
+No-agent SSH command /usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8. Successful mode adds -o UseKeychain=yes. Git ls-remote --heads origin refs/heads/cloud-requests is read-only; no Keychain mutation/credential export. The launchd-like auth gap reproduces; exact historical Undefined error:0 does NOT. Hermes already has fallback fix3aae7adc, bridge _git does not. Third bounded task in linked newP2; no speculative rewrite or claim original incident solved. Original incident stays OPEN.
+
+## Pending live verification
+
+No dashboard deployed, webhook/bridge restarted or Slack/cloud request sent by coordinator. Later operator checks remain one at a time after all offline review/landing: apply updated dashboard, verify unsupported/supported log rows; reload webhook for count route and ask exact wording; reload bridge then request one benign health result. Choose only one at each handoff, not a command bundle. Each current success has limits; retain historical incident/root-cause distinction.

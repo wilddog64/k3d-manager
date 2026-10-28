@@ -1,6 +1,7 @@
 # Bug: ask-docs misses an explicit priority count without the word bugs
 
-**Status:** OPEN — operator approved GPT-6-Luna implementation; dispatch pending
+**Status:** VERIFIED — Luna implementation independently tested and pushed; operator live verification pending
+**Fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2
 **Priority:** P2
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -53,3 +54,7 @@ stage/commit/push/PR, live Slack/webhook/cluster/provider/Keychain/network
 access, credential changes or restart. Coordinator reviews and runs actual
 staged lint/audit before landing/push. Operator live query follows separately.
 No new plans or broad refactor; new/refactored functions <=8ifs.
+
+## Independent implementation review
+
+Luna implementation landed and pushed after review follow-up. [Full test output, corrected fixture/gate failures and live limits](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md). Operator live check pending; no production deployment/restart by coordinator.

@@ -1,6 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
-**Status:** OPEN — operator approved GPT-6-Luna implementation; dispatch pending
+**Status:** VERIFIED — Luna implementation independently tested and pushed; operator live verification pending
+**Fix commit:** 61e1d9944ed19048975dc470d28e57f866a85e1e
 **Priority:** P3
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -48,3 +49,7 @@ Read repository instructions/memory-bank first. Edit only Files; no spec or
 memory edits, stage/commit/push/PR, cluster/provider/Keychain/network/live
 checks, credentials, or service restart. Coordinator stages/reviews/gates/
 lands/pushes and schedules operator dashboard live verification. No new plans.
+
+## Independent implementation review
+
+Luna implementation landed and pushed after review follow-up. [Full test output, corrected fixture/gate failures and live limits](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md). Operator live check pending; no production deployment/restart by coordinator.

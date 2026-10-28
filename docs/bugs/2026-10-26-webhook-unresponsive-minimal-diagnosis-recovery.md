@@ -234,3 +234,7 @@ eafe42da71f6243f9613dc85f53f92f9e7ae0182;35Python/5BATS gates passed.
 Fresh corrected direct check22:49:14Z is healthy/all_ok=true, credential
 available, no recovery action. Exact prior timeout cause is not inferred.
 Full evidence docs/issues/2026-10-27-webhook-doctor-health-timeout-restart-inference.md.
+
+## Follow-up investigation — 2026-10-27
+
+Current doctor01:59:44Z healthy/all_oktrue and no recovery. Retained bridge60 SSH github.com port22 Undefined error:0 messages correlate with13:50–14:50Z incident window; later Oct27 retained bridge responses HTTP200/202 show subsequent activity. A separate controlled no-agent lookup failspublickey, while UseKeychain=yes succeeds. This confirms unattended-auth gap, not exact historical network cause; [bounded bridge follow-up](2026-10-27-cloud-bridge-unattended-github-ssh-auth.md) dispatched after user authorized investigation/tasks. Original incident remains OPEN; no restart/new remote request performed. [Full sanitized evidence](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md).
