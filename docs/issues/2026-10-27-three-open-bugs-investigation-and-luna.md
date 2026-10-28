@@ -194,3 +194,63 @@ push: git -C /Users/cliang/src/gitrepo/personal/k3d-manager push origin k3d-mana
 Across the three tasks independent focused totals326Python tests and28BATS pass; complete outputs are above, with failures/skips explicitly recorded. No full curated rerun or claim its pre-existing failures resolved. All implementations committed to release, no PR created. No live service restart/Keychain change/deployment or remote request by coordinator. Historical offsite incident stays OPEN; bridge-auth follow-up VERIFIED offline only.
 
 First next operator live step: make platform-ops to apply updated Agent Dispatch dashboard, inspect deployment output, then view startup/supported log rows. Subsequent webhook/bridge reload is for installing the newly reviewed code, not inference that currently healthy webhook needs outage recovery. Keep remaining query/bridge checks separate and one at a time.
+
+## Operator platform-ops deployment — dashboard applied, metrics refresh pending
+
+Operator terminal tail verbatim:
+
+```text
+INFO: [argocd] Syncing k3dm-webhook-token Secret into namespace cicd from Keychain...
+secret/k3dm-webhook-token unchanged
+INFO: [argocd] Syncing platform-ops-app-rebuild Secret (gh-token) into namespace platform-ops from Keychain...
+secret/platform-ops-app-rebuild unchanged
+INFO: [argocd] Syncing platform-ops-git-writer Secret (git-token) into namespace platform-ops from Keychain...
+secret/platform-ops-git-writer unchanged
+INFO: [argocd] ArgoCD monthly credential rotator applied
+Success! Uploaded policy: argocd-rotationSuccess! Data written to: auth/kubernetes/role/argocd-rotationINFO: [argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m
+INFO: [argocd] Secrets still to create manually (no durable local source):
+INFO: [argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops
+INFO: [argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \
+INFO: [argocd]     -p '{"data":{"slack-incoming-webhook-url":"<base64-url>"}}'
+```
+
+Independent read-only monitoring ConfigMap JSON comparison result:
+
+```json
+{
+  "dashboard_json_matches": true,
+  "deployed_dashboard_sha256": "cf105d791db5954f33bfc06560fb8ee84e2c8cdbd3edecc3ae5aab3521d83b94",
+  "panel_title": "Per run evidence",
+  "query_retains_loki_url": true,
+  "log_links": [
+    {
+      "title": "Open shipped landing-test log",
+      "url": "${__data.fields.loki_url}"
+    }
+  ]
+}
+```
+
+Selected published7d row fields from read-only localhost19094/metrics (only these labels exported for review):
+
+```json
+{
+  "selected_published_rows": [
+    {"version":"v1.43.9","slug":"vectordb-retrieval-key-cache-retry","run":"1","outcome":"failed","evidence":"codex_exit.exit","evidence_summary":"exit 127","loki_url":null},
+    {"version":"v1.43.9","slug":"vectordb-retrieval-key-cache","run":"1","outcome":"failed","evidence":"codex_exit.exit","evidence_summary":"exit 127","loki_url":null},
+    {"version":"v1.43.9","slug":"startup-log-link-local-only","run":"1","outcome":"unknown","evidence":"none","evidence_summary":"none","loki_url":null}
+  ]
+}
+```
+
+The dashboard is current but these metric rows have not acquired the new local-only summary or final task state. Deployment does not itself run the host-side metric publisher. Local scheduler metadata:
+
+```json
+{
+  "metrics.lock": {"exists":true,"modified_epoch":1793153705.5586774,"pid_available":false},
+  "metrics.pending": {"exists":true,"modified_epoch":1793153798.176973},
+  "metrics.log": {"exists":true,"modified_epoch":1793017297.0247214}
+}
+```
+
+The scheduler uses a directory lock and pending marker (no pid file is part of that contract); absent pid metadata is not proof of a dead process. No lock was deleted or process killed. Background publisher completion/cause of lag not established. Avoid treating missing Loki target on this old export as sufficient live proof of new behavior. Next single operator command make dispatch-metrics invokes existing publisher and ships supported landing-test logs; inspect its output, then selected published metrics, before dashboard UI check. No coordinator metric PUT, log shipping, synthetic ledger edit or production restart performed. Generic manual-secret reminder is not proof those Secrets are absent; none were read/decoded in this check. Canonical bug stays VERIFIED offline pending UI/live evidence.
