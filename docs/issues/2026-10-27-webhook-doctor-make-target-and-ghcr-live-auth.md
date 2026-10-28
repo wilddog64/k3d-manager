@@ -197,3 +197,49 @@ and primary Apple source; actual storage/authentication remain pending
 operator confirmation. No code tests needed for this documentation update.
 
 [Apple source](https://github.com/apple-oss-distributions/Security/blob/main/SecurityTool/macOS/keychain_add.c).
+
+## Operator replacement stored — authentication passes; rotation recorded
+
+Operator confirmed the new PAT is stored and has90-day validity, then
+explicitly requested a note to rotate before expiry. No token value was
+provided in chat or recorded. Read-only in-memory checks of the updated
+Keychain item returned:
+
+```json
+{"github_auth_http_status": 200, "read_packages_scope": false, "owner_matches": true}
+{"registry_token_http_status": 200, "pull_token_present": true}
+{"latest_manifest_http_status": 200, "digest_present": true}
+```
+
+The scope boolean checks literal read:packages membership in the response
+header, not effective download permission; a write:packages grant includes
+download ability per GitHub Container registry docs. The successful actual
+GHCR token and manifest requests establish working package access. No scope
+list, profile or token value was output, and no invalid-credential claim
+remains for this new local value.
+
+At the operator's explicit rotation-note request, queried only the expiration
+header from the authenticated GitHub response:
+
+```json
+{"github_auth_http_status": 200, "token_expiration_header": "2027-01-26 01:55:50 UTC"}
+```
+
+Verified conversion:
+
+```text
+expiry_local=2027-01-25T17:55:50-08:00
+rotate_by_local_date=2027-01-18
+```
+
+Exact expiry and seven-day-early rotation target saved in
+`docs/howto/app-cve-scan-auth.md` and memory-bank. This is an explicitly
+authorized textual rotation note, not a credential-page screenshot export
+or a scheduled notification. No App keys or lock settings were changed.
+
+Next single operator step: sync the dedicated existing Secret from Keychain
+with `./scripts/k3d-manager argocd_sync_app_rebuild_secret platform-ops`
+while the hub context is selected. Review output before one rescan. The
+coordinator has not synced the cluster Secret or created another scan Job.
+Local authentication passing does not prove the running cluster uses the
+replacement yet, or that candidate selection/promotion succeeds.
