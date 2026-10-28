@@ -82,3 +82,22 @@ preflight-refusal and remote-exit-7 cases; the former now stubs the actual retry
 helper, proves no lock/SSH/credential/copy work, and the latter observes lock
 release. Production guard unchanged. Both fail on the previous fixtures and
 pass after this fixture-only repair in the same unpushed environment.
+
+## Operator rerun follow-up: controlled hub recovery Make fixtures
+
+The next operator run identified four different failures in hub_data.bats.
+All four copied the entire checkout and failed on an existing untracked Unix
+socket named -e before reaching their assertions. Their shared replacement
+fixture copies only the actual repository Makefile and creates empty scripts/
+and bin/ paths for the existing fake manager and hub-restore. Tests still
+execute the real hub-recover-all recipe and assert refusal/order/stop behavior.
+No production recovery code, Makefile, socket, assertions or test counts change.
+
+Targeted red/green runs keep the actual workspace socket in place; all four
+fail before the repair and pass after it. Run the full hub_data.bats suite
+under scripts/tests/tripwire.sh; BATS handles its own syntax. Raw ShellCheck
+checks the suite without global exclusions. Four existing lint warnings in
+this touched test file are corrected without changing test behavior.
+
+See [full operator rerun evidence](../issues/2026-10-28-offline-rerun-hub-fixture-socket.md).
+A fresh full make test-all publication is still operator-owned.

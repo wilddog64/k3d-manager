@@ -134,6 +134,7 @@ Guardbaseline1failed/1passed. Fixproducer-drain implementation, notallowlist.
 - `scripts/tests/plugins/e2e_remote.bats`
 - `scripts/plugins/e2e_remote.sh`
 - `docs/tests/offline-test-all-regressions.md`
+- `scripts/tests/plugins/hub_data.bats` — 2026-10-28 operator rerun follow-up: isolate four Make recipe fixtures from the arbitrary workspace/socket; production recovery unchanged
 
 ## Rules — current authorized Luna task
 
@@ -201,3 +202,19 @@ make test-all stages. Operator next: fresh full make test-all in the usual
 Python3.13 shell, then confirm test/test-bin/test-python completion, failed0,
 complete1 and fresh publication. Alert resolution remains unverified; retain
 OPEN until those results are reviewed. No PR created; Claude owns PRs.
+
+## Operator full rerun follow-up: recovery fixture socket copy
+
+Operator supplied `/tmp/k3dm-test-all-1793208248.log`: 1,913 BATS cases,
+four failures, test stage exit1; later stages not reached. Original four
+cases pass. Current failures are recovery B4-20, B4-21 teardown order, B4-22
+and B4-23. All fail while recursively copying PWD including untracked Unix
+socket `./-e`, before their intended recovery assertions.
+
+Coordinator scope communicated before implementation: only change these test
+fixtures to copy the actual Makefile and create empty scripts/bin destinations
+for existing fakes. Keep real Make recipe assertions, production guards, all
+existing tests and socket untouched. Add scripts/tests/plugins/hub_data.bats
+to this follow-up scope; no production, UI, Makefile or infrastructure changes.
+Full raw operator log and red/green verification will be recorded in
+`docs/issues/2026-10-28-offline-rerun-hub-fixture-socket.md`.
