@@ -1,6 +1,7 @@
 # Bug: Plans table repeats plan identity in Plan and Title columns
 
 **Status:** VERIFIED — 38 dashboard BATS pass; operator deployment/click pending
+**Fix commit:** b543cb91
 **Priority:** P3
 **Filed:** 2026-10-28
 **Branch:** k3d-manager-v1.43.9

@@ -712,3 +712,5 @@ custom.hidden; full outputs docs/issues/2026-10-28-plans-title-link-verification
 YAML/JSON and diff checks pass; no shell implementation (ShellCheck N/A).
 Operator deployment/reload/Title click pending, not LIVE-VERIFIED. No screenshot
 export, live writes, new plan doc or PR. Required commit SHA follows landing.
+
+Plans Title cleanup fix commit: `b543cb91`; staged `_agent_lint` and `_agent_audit` exited 0, checkpoint hooks passed. PR URL: none (repository policy). Operator live acceptance pending.

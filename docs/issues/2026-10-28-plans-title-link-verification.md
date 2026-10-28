@@ -121,3 +121,15 @@ ShellCheck not applicable: no shell implementation changed. Full curated suite
 not rerun for display-only edit; existing unrelated failures remain recorded.
 Operator next applies only grafana-dashboard-bugs.yaml, then reloads and clicks
 Title to verify document navigation and absence of visible Plan column.
+
+## Commit and required gates
+
+Fix commit b543cb91. Staged gates actual output (both exit0):
+```text
+$ ./scripts/k3d-manager _agent_lint
+running under bash version 5.3.20(1)-release
+$ ./scripts/k3d-manager _agent_audit
+running under bash version 5.3.20(1)-release
+check-doc-links: 4 file(s) OK
+[k3d-manager-v1.43.9 b543cb91] checkpoint: before fix: link plan titles and hide redundant Plan column
+```
