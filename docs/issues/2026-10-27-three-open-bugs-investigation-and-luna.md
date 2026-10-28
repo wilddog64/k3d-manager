@@ -139,3 +139,58 @@ No-agent SSH command /usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8. Successf
 ## Pending live verification
 
 No dashboard deployed, webhook/bridge restarted or Slack/cloud request sent by coordinator. Later operator checks remain one at a time after all offline review/landing: apply updated dashboard, verify unsupported/supported log rows; reload webhook for count route and ask exact wording; reload bridge then request one benign health result. Choose only one at each handoff, not a command bundle. Each current success has limits; retain historical incident/root-cause distinction.
+
+## Third task completed offline — cloud-bridge Keychain Git fallback
+
+Luna task cloud-bridge-keychain-git-auth landed implementation `f046763ff2a45e8fe56b938a8f828658d0b05ebe` on the release branch. _git copies the caller environment (or inherited env), adds the same established Hermes macOS default only if GIT_SSH_COMMAND is absent, and preserves explicit empty/custom overrides and other platforms. No credential/SSH/plist config or locking policy changed. The caller/env immutability checks and no-direct-SSH boundary were strengthened during review.
+
+Initial new regression against original bridge actual output:
+
+```text
+FAILED scripts/tests/bin/test_cloud_bridge.py::test_git_uses_keychain_ssh_fallback_on_macos_without_override[None]
+FAILED scripts/tests/bin/test_cloud_bridge.py::test_git_uses_keychain_ssh_fallback_on_macos_without_override[provided_env1]
+2 failed, 99 deselected in 0.56s
+```
+
+Initial source change also hit the old blanket no-ssh-string guard (expected given the new allowed Git SSH env string):
+
+```text
+>       assert "ssh" not in source.lower()
+E       assert 'ssh' not in '#!/usr/bin/...    main()\n'
+```
+
+Review rejected a weak replacement that only searched for a direct literal ssh argument. Final test removes only the exact approved env identifier/default string, then preserves the no-other-SSH assertion; explicit audit explanation records the legitimate replacement. No production SSH call was introduced outside Git transport.
+
+First independent105pytest passed; after review corrections final independent command python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_cloud_bridge.py scripts/tests/bin/test_restart_cloud_bridge.py -q output:
+
+```text
+........................................................................ [ 67%]
+...................................                                      [100%]
+107 passed in 3.48s
+```
+
+Ruff:
+
+```text
+All checks passed!
+```
+
+Actual staged lint/audit output exit0:
+
+```text
+running under bash version 5.3.20(1)-release
+running under bash version 5.3.20(1)-release
+```
+
+Python syntax/diffcheck clean; checkpoint hook doc links1fileOK. Dispatcher repeated107pytest/Ruff/diff and returned:
+
+```text
+scope: in-scope
+tests: passed
+landed: cloud-bridge-keychain-git-auth
+push: git -C /Users/cliang/src/gitrepo/personal/k3d-manager push origin k3d-manager-v1.43.9
+```
+
+Across the three tasks independent focused totals326Python tests and28BATS pass; complete outputs are above, with failures/skips explicitly recorded. No full curated rerun or claim its pre-existing failures resolved. All implementations committed to release, no PR created. No live service restart/Keychain change/deployment or remote request by coordinator. Historical offsite incident stays OPEN; bridge-auth follow-up VERIFIED offline only.
+
+First next operator live step: make platform-ops to apply updated Agent Dispatch dashboard, inspect deployment output, then view startup/supported log rows. Subsequent webhook/bridge reload is for installing the newly reviewed code, not inference that currently healthy webhook needs outage recovery. Keep remaining query/bridge checks separate and one at a time.

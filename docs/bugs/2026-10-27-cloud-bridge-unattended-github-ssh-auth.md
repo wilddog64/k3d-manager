@@ -1,7 +1,8 @@
 # Bug: cloud-bridge lacks unattended Keychain-backed GitHub SSH authentication
 
-**Status:** OPEN — controlled gap reproduced; operator-authorized Luna dispatch pending
+**Status:** VERIFIED — Luna fix independently tested and pushed with evidence; operator reload/live check pending
 **Priority:** P2
+**Fix commit:** f046763ff2a45e8fe56b938a8f828658d0b05ebe
 **Filed:** 2026-10-27
 **Branch:** k3d-manager-v1.43.9
 **Related:** docs/bugs/2026-10-26-webhook-unresponsive-minimal-diagnosis-recovery.md; docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md
@@ -70,3 +71,7 @@ edits, stage/commit/push/PR, provider/network/Keychain/SSH/log/live access,
 process/service changes, installing credentials or editing SSH/plist config.
 Coordinator owns actual staged lint/audit/review/landing and operator live
 follow-up. No new plan. [Sanitized investigation](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md).
+
+## Implementation verification
+
+GPT-6-Luna implementation reviewed/landed; final independent107pytest, Ruff, staged lint/audit, hooks and repeated landing gates passed. Two new fallback cases red on original helper. Review strengthened no-direct-SSH guard and explicit no-agent/env-immutability/empty-override fixtures. No coordinator reload/live request performed; original incident cause still unconfirmed. [Full outputs](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md).
