@@ -2160,3 +2160,18 @@ def test_claude_existing_series_keep_their_fixture_output():
                                             ("cache_read", "19.0"), ("output", "23.0")))
     expected.append('k3dm_dispatch_claude_daily_tokens{date="2027-01-15",model="m"} 83')
     assert existing == expected
+
+
+def test_partial_identity_keeps_recorded_vendor_without_inventing_model():
+    output = dispatch_metrics.render([
+        event(1, "start", "partial-identity", agent="codex",
+              coordinator_identity={"vendor": "openai", "model": "unknown",
+                                    "source": "declared", "status": "declared"}),
+        event(2, "codex_exit", "partial-identity", exit=0, tokens=10),
+        event(3, "land", "partial-identity"),
+    ], 0, 100)
+    lines = _identity_lines(output, "coordinator")
+    assert len(lines) == 1
+    assert 'vendor="openai"' in lines[0] and 'model="unknown"' in lines[0]
+    assert 'display="openai/model not recorded (declared)"' in lines[0]
+    assert 'display="unknown"' in _identity_lines(output, "primary_coordinator")[0]

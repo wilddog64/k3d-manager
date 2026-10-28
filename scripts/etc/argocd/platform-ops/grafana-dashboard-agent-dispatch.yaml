@@ -617,7 +617,7 @@ data:
           "id": 12,
           "type": "table",
           "title": "Per spec",
-          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land is wall-clock elapsed. Primary coordinator is the first explicit assignment; Acting coordinator is the latest handoff; Landed by is the explicit landing actor. Missing historic values are unknown. Primary cost is blank without a distinct measurement source; an explicitly measured zero appears as 0. Worker spend is never coordinator cost. API equiv. stays Codex-only because agy pricing is unavailable. The legacy Coordinator field retains its prior declared identity semantics. Live verification remains separate from landing. Claude ≈ is intervention cost, not coordinator attribution. Repo is the origin repository. Only specs dispatched with `bin/k3dm-codex-dispatch` appear. The footer totals measured worker and size fields; elapsed times are means.",
+          "description": "Each landed spec in the selected window or release, newest 50. Agent time is worker execution; Dispatch → land is wall-clock elapsed. Primary coordinator is the first explicit assignment; Acting coordinator is the latest handoff; Landed by is the explicit landing actor. Missing historic values are unknown. Primary cost is blank without a distinct measurement source; an explicitly measured zero appears as 0. Worker spend is never coordinator cost. API equiv. stays Codex-only because agy pricing is unavailable. The legacy Coordinator field retains its prior declared identity semantics. Live verification remains separate from landing. Claude ≈ is intervention cost, not coordinator attribution. Repo is the origin repository. Only specs dispatched with `bin/k3dm-codex-dispatch` appear. The footer totals measured worker and size fields; elapsed times are means. Not recorded means the attribution was not captured; it is not a task-failure state. Known vendors remain visible when only their model is unrecorded.",
           "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
           "datasource": {
             "type": "prometheus",
@@ -821,24 +821,29 @@ data:
                    {
                      "id": "custom.width",
                     "value": 70
-                   }
+                   },
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "not recorded"}}}]}
                  ]
                },
                {
                  "matcher": {
                    "id": "byName",
-                   "options": "Coordinator"
+                   "options": "Coordinator (legacy)"
                  },
                  "properties": [
                    {
                      "id": "custom.width",
                     "value": 80
-                   }
+                   },
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "not recorded"}}}]}
                  ]
                },
-              {"matcher": {"id": "byName", "options": "Primary coordinator"}, "properties": [{"id": "custom.width", "value": 100}]},
-              {"matcher": {"id": "byName", "options": "Acting coordinator"}, "properties": [{"id": "custom.width", "value": 100}]},
-              {"matcher": {"id": "byName", "options": "Landed by"}, "properties": [{"id": "custom.width", "value": 65}]},
+              {"matcher": {"id": "byName", "options": "Primary coordinator"}, "properties": [{"id": "custom.width", "value": 100},
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "not recorded"}}}]}]},
+              {"matcher": {"id": "byName", "options": "Acting coordinator"}, "properties": [{"id": "custom.width", "value": 100},
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "not recorded"}}}]}]},
+              {"matcher": {"id": "byName", "options": "Landed by"}, "properties": [{"id": "custom.width", "value": 65},
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "not recorded"}}}]}]},
               {"matcher": {"id": "byName", "options": "Handoffs"}, "properties": [{"id": "custom.width", "value": 55}, {"id": "unit", "value": "short"}]},
               {"matcher": {"id": "byName", "options": "Primary cost USD"}, "properties": [{"id": "custom.width", "value": 80}, {"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}]},
               {"matcher": {"id": "byName", "options": "Primary cost status"}, "properties": [{"id": "custom.width", "value": 95}, {"id": "unit", "value": "string"}]},
@@ -1465,7 +1470,7 @@ data:
           "id": 47,
           "type": "table",
           "title": "Per run evidence",
-          "description": "All Agent Dispatch run evidence with Log hyperlinks. Landing-test logs are shipped; startup logs remain local only (not shipped). The existing Agent Run Log page shows the selected Result so unavailable evidence is explicit.",
+          "description": "All Agent Dispatch run evidence with Log hyperlinks. Landing-test logs are shipped; startup logs remain local only (not shipped). The existing Agent Run Log page shows the selected Result so unavailable evidence is explicit. Blank Log paths display Open run evidence. Unverified means no accepted landing-test evidence for that attempt.",
           "gridPos": {
             "h": 10,
             "w": 18,
@@ -1535,7 +1540,8 @@ data:
                         "url": "/d/k3dm-agent-run-log?var-version=${__data.fields.version}&var-slug=${__data.fields.slug}&var-run=${__data.fields.run}&var-result=${__data.fields.Result}&from=now-30d&to=now"
                       }
                     ]
-                  }
+                  },
+                  {"id": "mappings","value": [{"type": "value","options": {"": {"text": "Open run evidence"}}},{"type": "special","options": {"match": "null","result": {"text": "Open run evidence"}}}]}
                 ]
               },
               {
@@ -1583,7 +1589,8 @@ data:
                   {
                     "id": "custom.width",
                     "value": 85
-                  }
+                  },
+                  {"id": "mappings","value": [{"type": "value","options": {"unknown": {"text": "unverified"}}}]}
                 ]
               },
               {
@@ -1595,7 +1602,8 @@ data:
                   {
                     "id": "custom.width",
                     "value": 165
-                  }
+                  },
+                  {"id": "mappings","value": [{"type": "value","options": {"none": {"text": "No landing-test evidence recorded"}}}]}
                 ]
               },
               {

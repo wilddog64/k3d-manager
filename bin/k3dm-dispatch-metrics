@@ -1348,7 +1348,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
                 model = "other"
             raw_status = identity.get("status")
             status = raw_status if isinstance(raw_status, str) and raw_status in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
-            display = "unknown" if vendor == "unknown" or model == "unknown" else f"{vendor}/{model} ({status})"
+            display = "unknown" if vendor == "unknown" else (
+                f"{vendor}/model not recorded ({status})" if model == "unknown" else f"{vendor}/{model} ({status})")
             identity_labels_tuple = (role, vendor, model, source, status, display)
             if identity_labels_tuple in emitted_identity_labels:
                 return

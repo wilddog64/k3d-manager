@@ -628,3 +628,39 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
 }
+
+@test "agent dispatch: blank evidence paths remain visible clickable links and gaps are explicit" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panel=next(p for p in d["panels"] if p["id"]==47)
+props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for o in panel["fieldConfig"]["overrides"]}
+mappings=props["Log"]["mappings"]
+assert next(m for m in mappings if m["type"]=="value")["options"][""]["text"]=="Open run evidence"
+assert any(m["type"]=="special" and m["options"]["match"]=="null" and m["options"]["result"]["text"]=="Open run evidence" for m in mappings)
+assert props["Log"]["links"][0]["url"].startswith("/d/k3dm-agent-run-log?")
+assert next(m for m in mappings if m["type"]=="value")["options"].keys()=={""}
+assert props["outcome"]["mappings"][0]["options"]["unknown"]["text"]=="unverified"
+assert props["Result"]["mappings"][0]["options"]["none"]["text"]=="No landing-test evidence recorded"
+assert all(p["id"]!=93 for p in d["panels"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch: unrecorded attribution is labeled without overwriting known identities" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panel=next(p for p in d["panels"] if p["id"]==12)
+props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for o in panel["fieldConfig"]["overrides"]}
+for field in ["Worker","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
+    opts=props[field]["mappings"][0]["options"]
+    assert opts=={"unknown":{"text":"not recorded"}}
+assert len(d["panels"])==30
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
