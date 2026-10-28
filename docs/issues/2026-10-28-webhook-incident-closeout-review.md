@@ -102,3 +102,18 @@ Minor CLI discovery output: `bin/k3dm-codex-dispatch verify --help` returned
 instead, no verify record fabricated because that command requires landedtask.
 No unittest/shellcheck rerun for documentation-only changes. Relevant existing
 142Python/5restartBATS remain in the earlier batch evidence, not claimed fresh.
+
+## Accepted closeout commit and gates
+
+Commit7ea1032f (coordinator documentation adoption and operational closure).
+Actual staged gate output, all exited0:
+```text
+$ ./scripts/k3d-manager _agent_lint
+running under bash version 5.3.20(1)-release
+$ ./scripts/k3d-manager _agent_audit
+running under bash version 5.3.20(1)-release
+check-doc-links: 5 file(s) OK
+[k3d-manager-v1.43.9 7ea1032f] checkpoint: before docs: close recovered webhook incident and retain cause investigation
+```
+No BATS/ShellCheck rerun applicable to this docs-only closeout; prior actual
+implementation results remain in linked batch evidence. No PR created.
