@@ -949,3 +949,9 @@ Compressed 2026-10-19. Detailed history before 2026-10-17 is summarized in `memo
 - Full actual user job,logs,metrics,rollout/report and offline proof docs/issues/2026-10-27-app-cve-scan-auth-recovery-and-gate-followup.md. Original six other live items remain pending; no extra production scan bycoordinator, no secret values read/decoded. ExpiryrotationJan18/Jan25PST retained. PR URL:none.
 
 - Operator approved separate scanner fail-open P2 dispatch to GPT-6-Luna ("go ahead"). Four-file scope and offline-only worker instructions finalized; coordinator review/gates/landing follow before operator live check. Prior evidence/spec commit e7287a13 is pushed; PR URL:none.
+
+## 2026-10-27 — Luna scanner fail-closed follow-up landed
+
+- User approved separateP2; GPT-6-Luna task app-cve-scan-fail-closed implemented four-file scope, review follow-up corrected test assertions/fixtures. Real implementation commit c3703fed3c4764a392e68c60be04db60c31d17f3. Unknown scan cannot promote/rebuild; batch nonzero with bounded reason. Temporary GHCR Docker config0700/0600 removed, no credentials in argv/notices.
+- Independent45BATS passed0skips plus same45 landing checks, ShellCheck/sh-n/diff and actual staged lint/audit/hooks passed. Old-code4 regressions fail as expected; cached nonroot network-disabled Trivy0.63 template/helper returned0/2. Fixture noexec/dedup/stale Docker bytes and initial test failures explicitly documented in docs/issues/2026-10-27-app-cve-scan-fail-closed-verification.md. Prior unrelated curated failures unchanged; not rerun.
+- Live pending; no coordinator deployment/job/credential mutation. Next single operator make platform-ops, inspect output before requesting scan. Current application4HIGH dependency remediation and exact prior live scan cause remain separate. Original remaining live items queued. PR URL:none.
