@@ -237,3 +237,39 @@ or code in that oldcheckout modified. Fullactualoutput andhostmapping in
 `docs/issues/2026-10-28-m2-old-checkout-test-all-watch.md`.
 M2tmuxwindow2/%0SSHlatestpromptidentifiesM4, wherecurrentv1.43.9fixesexist.
 Nextoperatorcurrent-fix test-all should runthere; P2acceptance stillpending.
+
+
+## 2026-10-28 follow-up — OrbStack non-TTY case 567 shown failing
+
+Operator's later Grafana screenshot shows BATS case **567**, `orbstack upgrade: refuses a real run without a TTY`, marked as failed. The screenshot truncates the failure reason at an assertion on `$output` containing `inter...`; **it does not establish that a real Yes/No prompt appeared**, nor does it show the exit status or complete output. This is a distinct, newly observed test failure, not evidence that the previously reviewed four cases have regressed again. The 567 case number is run-order dependent.
+
+Current branch source `scripts/tests/bin/orbstack_upgrade.bats` has the relevant test at approximately line 235:
+
+```bash
+@test "orbstack upgrade: refuses a real run without a TTY" {
+  run "$SCRIPT"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'interactive TTY required'* ]]
+  run grep '^orbctl update$' "$TEST_CALLS"
+  [ "$status" -ne 0 ]
+}
+```
+
+The BATS harness stubs `orbctl` under `$HOME/bin` and tracks calls. Other OrbStack test cases deliberately create a pseudo-terminal and feed `no`/`yes` through `_run_tty` to validate the production operator confirmation safely. Those tests must be finite, isolated, and unable to perform a real upgrade. The production specification `docs/plans/v1.43.9-orbstack-upgrade-coordinated.md` explicitly **requires** typed `yes` on a real TTY for the actual upgrade; this requirement should not be removed.
+
+### Investigation / repair criteria
+
+1. Capture the complete failure reason, `$status`, `$output` and whether the `orbctl update` spy was called for case 567 from the exact run. Check if an earlier preflight guard (e.g. no update, stale export, context, dispatch activity) exits before the non-TTY guard, or if CI/BATS inherits a pseudo-TTY unexpectedly. Do not assert the prompt was actually displayed without evidence.
+2. Reproduce in a controlled **non-TTY**, bounded offline test using a complete fake environment. If non-TTY behavior depends on a terminal, explicitly close/detach stdin and test `-t`/TTY detection; no real `orbctl` may run.
+3. Guarantee a deterministic refusal and clear diagnostic with a bounded timeout and exit code, without blocking or waiting for operator input. Keep operator-confirmed real upgrades interactive and guarded.
+4. Preserve the existing simulated TTY yes/no tests, but bound their runtime and assert only stubbed upgrade calls occur; do not route actual prompts to a human during `make test-all`.
+5. After the focused OrbStack tests pass, require a **fresh complete three-stage `make test-all`** and fresh Pushgateway metrics before closing the P2 alert bug. No full rerun was authorized by this documentation update.
+
+### Additional acceptance
+
+- **M6:** In fully non-interactive offline execution, case 567 terminates within a bounded interval, verifies the expected refusal status/message, and proves the upgrade command was not invoked.
+- **M7:** Simulated TTY `yes`/`no` coverage remains deterministic, uses fake commands only, and cannot block CI or mutate the real hub.
+- **N5:** Do not remove the required typed confirmation for real operator-driven `make orbstack-upgrade`.
+- **E4 (offline):** Captured actual case-567 assertion and an isolated red/green test demonstrating both safe non-TTY rejection and bounded fake-TTY behavior. Report whether the failure was due to message mismatch, preflight ordering or accidental interactive input.
+
+**Status:** OPEN; case 567 added as an independent follow-up. No live OrbStack command or upgrade initiated by this filing.
