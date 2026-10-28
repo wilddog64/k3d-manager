@@ -1327,3 +1327,16 @@ curated1913-case BATS stage running under tripwire, no metrics publication.
 Not yet landed/complete; original4th case1194 historicalcause still unknown,
 current PRChecks isolated6pass. Optional original rawlogpath still pending.
 Prior incident UI screenshot and PRChecks payment-only acceptance remain pending.
+
+## 2026-10-28 broad offline P2 verification PARTIAL
+
+Curated stage under tripwire complete:1892passed/20skipped/1failed (1913total),
+exit1; all4originalcasespass. SolefailESOload_module existingPython3.15P3;
+samecasepassesexisting3.13.6. No quietout-of-scopefix. Fullactualoutput and
+skip/tripwire545blockedcalls in docs/issues/2026-10-28-offline-p2-curated-verification.md.
+PRChecks actual6BATS withavailablepromtool rerunPASS/no skips. FinalE2Ecommand
+order assertions added;116focusedrerun inprogressbeforecommit/landing.
+Operator screenshot confirms all4names/assertions; originalrawlog stillabsent.
+Fullpublishedmake test-all/operatoracceptance pending, no alertclosure claim.
+Cloudflaretooling2e0be3f6 alreadypushed/offlineverified169pytest; securitybugOPEN.
+No PR (Claude), no runtimewrites/accountchanges/credentials/livepublication.

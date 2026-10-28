@@ -471,3 +471,44 @@ cat: docs/tests/cloudflare-posture.md: No such file or directory
 
 The read was repeated from the root tree containing the landed file and passed;
 no implementation/test effect. No skipped evidence is counted as a pass.
+
+## Operator screenshot confirms all four case names
+
+Operator supplied a second dashboard image during review. It visibly identifies
+1015 (busy-lock dispatch), 1016 (E2E/publish-back exit), 1194 (PR Checks legend
+layout) and 130 (grep-q guard), with exactly the same assertions recovered from
+Prometheus above. This confirms the case list; it provides no raw log path or
+historical checkout identity. No screenshot file copied or exported. Current
+focused checks pass; broader curated results and fresh published acceptance
+remain pending.
+
+## Curated-stage final result and PR Checks no-skip rerun
+
+Full curated stage completed exit1: 1,892 passed, 20 skipped, 1 failed;
+all 1,913 named cases and tripwire output are pasted in
+[full curated verification](2026-10-28-offline-p2-curated-verification.md).
+The sole failure is the already documented Python3.15 ESO SourceFileLoader
+load_module P3; isolated rerun passes with existing Python3.13.6. No out-of-scope
+fix made. Twenty skipped cases are explicitly recorded, not counted as passes.
+Tripwire blocked545 host-tool calls; none reached real binaries.
+
+The operator screenshot confirms the same source four-case list. All four
+pass in this current broad checkout; historical1194 cause remains unestablished.
+Broader run skipped PR promtool semantics due PATH; independent available-tool
+rerun command:
+
+```sh
+PATH=/private/tmp/k3dm-prometheus-review/prometheus-3.2.1.darwin-arm64:$PATH bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats
+```
+
+Actual output (exit0, no skips):
+
+```text
+1..6
+ok 1 PR checks dashboard YAML and embedded JSON are valid
+ok 2 PR checks dashboard has filtered panels and repo variable
+ok 3 PR checks tables say No open PRs instead of No data when nothing is open
+ok 4 PR checks tables join populated rows without duplicate label fields
+ok 5 PR check duration legend uses a readable side layout without changing its query
+ok 6 PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads
+```
