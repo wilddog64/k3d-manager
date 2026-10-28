@@ -76,6 +76,11 @@ assert "label_join" in blocked and '"version", "blocked_by"' in blocked
 assert 'and on(repo) k3dm_release_milestone_info{repo="$repo",target="true",state=~"blocked|after_blocked"})' in blocked.split(" or (2 *")[0], blocked
 assert p[31]["fieldConfig"]["defaults"]["displayName"] == "${__field.labels.blocker}"
 assert p[31]["options"]["textMode"] == "value_and_name"
+assert p[31]["options"]["text"] == {"titleSize": 16, "valueSize": 40}
+assert p[31]["fieldConfig"]["defaults"]["noValue"] == "-"
+assert 'label_join(k3dm_release_milestone_info{repo="$repo",state="blocked"}' in blocked
+assert 'state=~"blocked|after_blocked"' in blocked
+assert 'k3dm_release_milestone_info{repo="$repo",target="true",state="forecast"}' in blocked
 PY
   [ "${status}" -eq 0 ]
 }

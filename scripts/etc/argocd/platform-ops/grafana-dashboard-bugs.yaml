@@ -2624,6 +2624,10 @@ data:
             "graphMode": "none",
             "colorMode": "value",
             "textMode": "value_and_name",
+            "text": {
+              "titleSize": 16,
+              "valueSize": 40
+            },
             "reduceOptions": {
               "calcs": [
                 "lastNotNull"
