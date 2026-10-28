@@ -13,6 +13,7 @@
 - Add `make webhook-doctor` for read-only diagnostics and `DRY_RUN=1` for its probe plan.
 
 - App CVE candidate resolution reports GHCR authentication failures separately, publishes bounded resolution metrics, and keeps registry credentials out of curl arguments.
+- App CVE candidate scanning now fails closed on Trivy, registry, or malformed-result errors, skips unsafe per-service decisions, and reports an unsuccessful Job if any candidate scan is unknown.
 - Agent Dispatch records explicit primary coordinator assignments, append-only coordinator handoffs, and landing actors independently from implementation workers. The Per spec table shows Primary coordinator, Acting coordinator, Landed by, handoff count, and whether primary cost is measured; legacy identities stay unknown when absent.
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
 - Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.

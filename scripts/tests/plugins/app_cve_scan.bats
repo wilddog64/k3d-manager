@@ -31,6 +31,44 @@ _last=""
 for _arg in "$@"; do
   _last="${_arg}"
 done
+if [ -n "${TEST_TRIVY_AUTH_OBS_LOG:-}" ]; then
+  _auth_path="${DOCKER_CONFIG:-}/config.json"
+  _dir_mode="missing"
+  _file_mode="missing"
+  _credential_match="false"
+  if [ -d "${DOCKER_CONFIG:-}" ]; then
+    _dir_mode="$(stat -c '%a' "${DOCKER_CONFIG}" 2>/dev/null || stat -f '%Lp' "${DOCKER_CONFIG}" 2>/dev/null || true)"
+  fi
+  if [ -f "${_auth_path}" ]; then
+    _file_mode="$(stat -c '%a' "${_auth_path}" 2>/dev/null || stat -f '%Lp' "${_auth_path}" 2>/dev/null || true)"
+    _expected_auth="$(printf '%s:%s' "${GH_OWNER}" "${GH_TOKEN}" | base64 | tr -d '\n')"
+    if grep -qF "\"auth\":\"${_expected_auth}\"" "${_auth_path}"; then _credential_match="true"; fi
+  fi
+  printf '%s|%s|%s|%s|%s\n' "${DOCKER_CONFIG:-}" "${_dir_mode}" "${_file_mode}" "${_credential_match}" "$*" >>"${TEST_TRIVY_AUTH_OBS_LOG}"
+fi
+case "${_last}" in
+  *"${TEST_TRIVY_FAIL_MATCH:-}"*)
+    if [ "${TEST_TRIVY_MODE:-ok}" = "failure" ]; then
+      printf 'unauthorized: %s\n' "${GH_TOKEN:-secret-sentinel}" >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "execution" ]; then
+      printf 'scan engine failed unexpectedly\n' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "transport" ]; then
+      printf 'lookup failed: no such host\n' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "invalid" ]; then
+      printf 'unexpected scanner output\n'
+      exit 0
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "empty" ]; then
+      exit 0
+    fi
+    ;;
+esac
 case "${_last}" in
   *shopping-cart-basket:sha-*)
     _count="${TEST_LATEST_CVES_shopping_cart_basket:-0}"
@@ -51,9 +89,10 @@ case "${_last}" in
     _count=0
     ;;
 esac
+printf 'K3DM_SCAN_RESULT_V1\n'
 _i=0
 while [ "${_i}" -lt "${_count}" ]; do
-  printf 'HIGH\n'
+  printf '%s\n' "${TEST_LATEST_SEVERITY:-HIGH}"
   _i=$((_i + 1))
 done
 EOF
@@ -332,6 +371,26 @@ EOF
   chmod +x "${TEST_SCAN_SCRIPT}"
 }
 
+_assert_no_candidate_promotion_or_rebuild() {
+  run grep -q 'patch application' "${KUBECTL_LOG}"
+  [ "${status}" -eq 1 ]
+  run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
+  [ "${status}" -eq 1 ]
+}
+
+_run_basket_candidate_scan() {
+  _mode="$1"
+  _severity="$2"
+  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="shopping-cart-basket" GH_TOKEN="test-token" TEST_TRIVY_MODE="${_mode}" \
+    TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0" \
+    TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0" \
+    TEST_LATEST_CVES_shopping_cart_basket=1 TEST_LATEST_SEVERITY="${_severity}" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+}
+
 @test "all-skipped run exits 1 with the fatal zero-match diagnostic" {
   export APP_SERVICES="shopping-cart-basket"
   export TEST_REPORT_ROWS=""
@@ -474,6 +533,153 @@ EOF
   grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
   grep -q 'annotate application ubuntu-hostinger-shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
+}
+
+@test "failed Trivy execution skips promotion and rebuild and hides scanner output" {
+  export APP_SERVICES="shopping-cart-basket"
+  export GH_TOKEN="dedicated-test-token"
+  export TEST_TRIVY_MODE="failure"
+  export TEST_TRIVY_AUTH_OBS_LOG="${BATS_TEST_TMPDIR}/trivy-auth-observation.log"
+  : >"${TEST_TRIVY_AUTH_OBS_LOG}"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+
+  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" GH_OWNER="wilddog64" GH_TOKEN="${GH_TOKEN}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
+    TEST_TRIVY_AUTH_OBS_LOG="${TEST_TRIVY_AUTH_OBS_LOG}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=registry-auth)"* ]]
+  [[ "${output}" == *"FATAL: 1 candidate scan(s) failed"* ]]
+  [[ "${output}" != *"${GH_TOKEN}"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+  _credential_b64="$(printf '%s:%s' 'wilddog64' "${GH_TOKEN}" | base64 | tr -d '\n')"
+  [[ "${output}" != *"${_credential_b64}"* ]]
+  run grep -qF -- "${GH_TOKEN}" "${TRIVY_LOG}" "${CURL_LOG}" "${NOTIFY_LOG}" "${TEST_TRIVY_AUTH_OBS_LOG}"
+  [ "${status}" -eq 1 ]
+  run grep -qF -- "${_credential_b64}" "${TRIVY_LOG}" "${CURL_LOG}" "${NOTIFY_LOG}" "${TEST_TRIVY_AUTH_OBS_LOG}"
+  [ "${status}" -eq 1 ]
+  IFS='|' read -r _auth_config_path _auth_dir_mode _auth_file_mode _auth_matches _trivy_argv <"${TEST_TRIVY_AUTH_OBS_LOG}"
+  [ "${_auth_dir_mode}" = "700" ]
+  [ "${_auth_file_mode}" = "600" ]
+  [ "${_auth_matches}" = "true" ]
+  [ -n "${_auth_config_path}" ]
+  [[ "${_trivy_argv}" != *"${_auth_config_path}"* ]]
+  run grep -qF -- "${_auth_config_path}" "${TRIVY_LOG}"
+  [ "${status}" -eq 1 ]
+  [ ! -e "${_auth_config_path}" ]
+  grep -q 'App CVE Candidate Scan Failed: shopping-cart-basket' "${NOTIFY_LOG}"
+}
+
+@test "malformed Trivy result is unknown and cannot promote" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_TRIVY_MODE="invalid"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+
+  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=invalid-output)"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "empty Trivy output is unknown and cannot promote or rebuild" {
+  _run_basket_candidate_scan empty HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=invalid-output)"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "non-auth Trivy execution error is unknown and cannot promote or rebuild" {
+  _run_basket_candidate_scan execution HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=execution)"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy registry transport error is unknown and cannot promote or rebuild" {
+  _run_basket_candidate_scan transport HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=registry-transport)"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "missing Trivy binary fails closed" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+
+  run env -i PATH="${PATH}" TRIVY_BIN="missing-trivy-for-test" TRIVY_LOG="${TRIVY_LOG}" \
+    CURL_LOG="${CURL_LOG}" NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=scanner-unavailable)"* ]]
+  [ ! -s "${TRIVY_LOG}" ]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "valid zero candidate result retains promotion behavior" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  export TEST_LATEST_DIGEST="sha256:feedbeef"
+
+  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+}
+
+@test "valid CRITICAL candidate finding retains rebuild behavior" {
+  _run_basket_candidate_scan ok CRITICAL
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"immutable candidate ghcr.io/wilddog64/shopping-cart-basket:sha-new still vulnerable (1)"* ]]
+  run grep -q 'patch application' "${KUBECTL_LOG}"
+  [ "${status}" -eq 1 ]
+  run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "one unknown candidate does not authorize its promotion in a mixed-service run" {
+  export APP_SERVICES="shopping-cart-basket shopping-cart-frontend"
+  export TEST_TRIVY_MODE="failure"
+  export TEST_TRIVY_FAIL_MATCH="shopping-cart-basket:sha-new"
+  export TEST_REPORT_ROWS=$'shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0\nshopping-cart-apps frontend-report ghcr.io/wilddog64/shopping-cart-frontend sha-old 1 0'
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  export TEST_REPORT_DETAILS_frontend_report="HIGH|CVE-3|1.2.0"
+
+  run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" TEST_TRIVY_MODE="${TEST_TRIVY_MODE}" \
+    TEST_TRIVY_FAIL_MATCH="${TEST_TRIVY_FAIL_MATCH}" TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    TEST_REPORT_DETAILS_frontend_report="${TEST_REPORT_DETAILS_frontend_report}" /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=registry-auth)"* ]]
+  run grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
+  [ "${status}" -eq 1 ]
+  run grep -Eq 'actions/workflows/.*/dispatches' "${CURL_LOG}"
+  [ "${status}" -eq 1 ]
+  grep -q 'patch application ubuntu-hostinger-shopping-cart-frontend' "${KUBECTL_LOG}"
 }
 
 @test "COSIGN_VERIFY=1: signed clean candidate is cosign-verified then promoted" {
