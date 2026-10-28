@@ -1076,3 +1076,15 @@ Operator deployment/reload/Title click pending, not LIVE-VERIFIED. No screenshot
 export, live writes, new plan doc or PR. Required commit SHA follows landing.
 
 Plans Title cleanup fix commit: `b543cb91`; staged `_agent_lint` and `_agent_audit` exited 0, checkpoint hooks passed. PR URL: none (repository policy). Operator live acceptance pending.
+
+## 2026-10-28 Plans Title deployment mismatch — PARTIAL
+
+Operator apply configured but screenshot still old. Read-only liveCM RV1738551
+has Plan width110/link, no hiddenPlan/Titlelink, no last-applied annotation;
+tracking owner hub-grafana-dashboards in cicd (not argocd). Owner correctv1439
+branch but Synced to10c45a52, beforefixb543cb91; selfHeal enabled. Consistent
+with reconciliation of stale desired revision, exactwrite uncaptured. Next
+singleoperator hard refresh owner via cicd annotation, then coordinator rechecks
+revision/CM before UI. No coordinator live writes or screenshot export/test rerun.
+Full actual read findings docs/issues/2026-10-28-plans-title-link-verification.md.
+Bug remains VERIFIED offline, livepending; no codechange/newplan/PR.

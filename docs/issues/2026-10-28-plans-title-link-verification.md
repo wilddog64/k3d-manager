@@ -133,3 +133,108 @@ running under bash version 5.3.20(1)-release
 check-doc-links: 4 file(s) OK
 [k3d-manager-v1.43.9 b543cb91] checkpoint: before fix: link plan titles and hide redundant Plan column
 ```
+
+## Operator apply did not persist corrected presentation — live PARTIAL
+
+Operator applied ConfigMap successfully (missing last-applied annotation automatically
+patched), then screenshot still showed Plan and unlinked Title. Read-only inspection:
+```json
+{
+  "configmap_resource_version": "1738551",
+  "tracking": "hub-grafana-dashboards:/ConfigMap:monitoring/grafana-dashboard-bugs",
+  "last_applied_annotation_present": false,
+  "plan_title_overrides": [
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Plan"
+      },
+      "properties": [
+        {
+          "id": "custom.width",
+          "value": 110
+        }
+      ]
+    },
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Title"
+      },
+      "properties": [
+        {
+          "id": "custom.width",
+          "value": 150
+        }
+      ]
+    },
+    {
+      "matcher": {
+        "id": "byName",
+        "options": "Plan"
+      },
+      "properties": [
+        {
+          "id": "links",
+          "value": [
+            {
+              "title": "Open plan document",
+              "url": "https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md",
+              "targetBlank": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "application_namespace": "cicd",
+  "sources": [
+    {
+      "directory": {
+        "include": "grafana-dashboard-*.yaml"
+      },
+      "path": "scripts/etc/argocd/platform-ops",
+      "repoURL": "https://github.com/wilddog64/k3d-manager",
+      "targetRevision": "k3d-manager-v1.43.9"
+    },
+    {
+      "directory": {
+        "include": "k3dm-tests-configmap.yaml"
+      },
+      "path": "scripts/etc/grafana/dashboards",
+      "repoURL": "https://github.com/wilddog64/k3d-manager",
+      "targetRevision": "k3d-manager-v1.43.9"
+    }
+  ],
+  "syncPolicy": {
+    "automated": {
+      "allowEmpty": false,
+      "prune": true,
+      "selfHeal": true
+    },
+    "syncOptions": [
+      "CreateNamespace=true",
+      "ServerSideApply=true"
+    ]
+  },
+  "sync_revisions": [
+    "10c45a524a5285400dec42737de863b423f50109",
+    "10c45a524a5285400dec42737de863b423f50109"
+  ],
+  "sync_status": "Synced",
+  "reconciledAt": "2026-10-28T11:22:33Z"
+}
+```
+Live ConfigMap differs from corrected source; ArgoCD owner remains Synced to
+10c45a52, older than fix b543cb91, on the correct release branch with selfHeal.
+This is consistent with reconciliation restoring the old desired state; exact
+intervening write was not captured. Browser caching alone cannot explain the old
+live ConfigMap. Recommend operator hard refresh hub-grafana-dashboards in cicd;
+then inspect revision and ConfigMap before another UI check. No coordinator
+refresh/sync/restart or other live write. Implementation remains VERIFIED,
+not LIVE-VERIFIED. No screenshot export or test rerun (diagnostic/docs only).
+
+Discovery checks: argocd namespace Application list was empty; all-namespace list
+located owner in cicd. Extraneous ubuntu-k3s owner query interrupted (exit130),
+ubuntu-hostinger query returned `Error from server (NotFound): namespaces "argocd" not found`.
+Those contexts were not modified and are not needed for this local owner.
