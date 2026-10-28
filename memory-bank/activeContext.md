@@ -1196,3 +1196,16 @@ unknownnotzerolegacytraffic. ExistingCFoperatorissue/bugupdated, F0partial/
 noF1go. Recommendationafterrules/compatbaseline: HTTPSonlyfirst, validate
 7hosts+SSO/Slack, then separatelyTLS1.2; nootherzonechanges. NoCloudflare
 write/credentialread/probe/codechange. No newplan/PR/CIrerun.
+
+## 2026-10-28 Kine Luna dispatch authorized / new M4 full run active
+
+Userrunningnewtest-all andexplicitlyasksKineP2toLuna. Scopeamendedinexisting
+recurrencebug fornativegpt-6-luna taskkine-recurrence-readiness-luna: offline
+recorded-evidence/recovery-readiness audit, oneoutputreviewissue, no runtime
+commands/credentials/livepreflight/restart/rebuild/codeorupstreamguessing.
+Coordinatorwillindependentlyreviewreport andconcretechecklist; livego separate.
+Docs-onlyscope/memorycommitneededfordispatch, runtimecodeunchangeda7b5e5df.
+NewM4operatorlog/tmp/k3dm-test-all-1793222885.log active(first448cases0fails
+attaskstart), priorfull2535casesfailed2beforefix. Followall3stages/publication;
+no newpublisherbycoordinator. CFsettingsAIreportknown/F0rulesreviewpending.
+No newplan/PR/CIrerun orKineremediationauthorized.

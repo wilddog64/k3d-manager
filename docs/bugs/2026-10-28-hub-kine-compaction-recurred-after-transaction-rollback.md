@@ -80,9 +80,56 @@ its own evidence and approved scope; no enhancement plan is added by this bug.
 4. Verify `HubKineCompactionStalled` resolves in Prometheus/Alertmanager and remains resolved during that observation window. Missing/stale telemetry is not a pass.
 5. Record datastore and WAL before/after values without assuming the SQLite main file must shrink. Continue follow-up for a later recurrence; short recovery observation does not prove prevention.
 
-## Current authorization boundary
+## Original filing authorization boundary
 
 This is a live-confirmed incident filing only. No implementation task dispatched,
 new plan, PR, restart, database mutation or hub rebuild. The separate M4 test-all
 run is still being watched; its start is later than the compaction error and
 has not been established as a cause.
+
+## Authorized Luna dispatch — 2026-10-28
+
+Operator explicitly requested dispatch to Luna while a new M4 test-all run
+executes. This authorizes a bounded offline recurrence/recovery-readiness
+review, not a K3s restart, live preflight, rebuild, database or account change.
+
+Task: `kine-recurrence-readiness-luna`, model `gpt-6-luna`. Use the recorded
+live evidence and repository sources. Produce a concrete review report that
+coordinator can verify before presenting any operator recovery step.
+
+## Files
+
+- `docs/issues/2026-10-28-hub-kine-recurrence-luna-review.md`
+
+## Luna task requirements
+
+1. Read memory-bank and this bug, parent recurrence history, actual investigation
+   outputs, rebuild runbook, Make hub-recover-all recipe and relevant source/tests.
+   Use recorded timestamps/host context; do not treat M2's oldbranch run as M4
+   acceptance or confuse a recovered API with a recovered compactor.
+2. Distinguish confirmed proximate transaction failure/no successful cycles
+   from unproven trigger. Assess telemetry limitations and what can actually
+   be concluded; no claim of permanent prevention or upstream fix without proof.
+3. Audit the documented recovery path against actual code. Identify exact
+   prerequisites, backup/export freshness/integrity requirements, restore/
+   credential/approval boundaries, pause/rollback behavior and current missing
+   evidence. List proposed operator commands with their effects; do not execute.
+   Pay particular attention to commands called preflight that can write state,
+   access credentials or prompt for destructive approval.
+4. Produce a small readiness matrix (confirmed / pending / blocked) with source
+   file references, an ordered proposed recovery/verification checklist and
+   bounded observation criteria. Gate destructive recovery on explicit operator
+   go after concrete readiness review and the current full test-all outcome.
+   Existing October29 slot is a historical plan, not newly confirmed scheduling.
+5. If a code/runbook defect is found, describe a minimal proposed patch and
+   appropriate offline test in the report; do not change production/runbook files.
+   Report any additional research needed through coordinator. No new plans or
+   unrequested features/version upgrades. Current bug remains OPEN.
+6. Only write the one Files entry. Do not edit bug/memory, stage/commit/push/PR,
+   alter dispatch ledger or run live commands. No docker/kubectl/SSH/scp/security/
+   launchctl/brew/provider/Git-network/SQLite calls, no real make targets, live
+   preflight, installs/upgrades or credentials. No alert silence/metrics write.
+   The output is an offline report, not live test or recovery evidence.
+7. Validate report links with python3 scripts/check-doc-links.py on the report
+   and git diff --check; paste actual commands/results and skipped live work.
+   Coordinator handles independent review, normal gates and any commit/landing.
