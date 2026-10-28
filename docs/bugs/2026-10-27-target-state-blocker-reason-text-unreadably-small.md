@@ -1,7 +1,8 @@
 # Bug: Bug Tracking Target state blocker reason is too small to read and does not wrap
 
 **Filed:** 2026-10-27, operator screenshot and explicit P3 filing request
-**Status:** OPEN — implementation and live verification pending
+**Status:** VERIFIED — Luna fix independently reviewed; operator full/narrow-width live verification pending
+**Fix commit:** 2f551fc7090dea8416f7a008eb9881048a7d66ea
 **Priority:** P3
 **Severity:** low — readability/accessibility defect; target-state calculation remains correct
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
@@ -69,8 +70,8 @@ evidence:
 
 ## Definition of Done
 
-- [ ] Operator approves implementation separately.
-- [ ] Offline tests validate correct layout and preserve forecast/status contracts.
+- [x] Operator approved implementation in the 2026-10-28 Luna batch.
+- [x] Independent 38/38 dashboard BATS; only panel31 text sizes changed, exact query/mappings/layout preserved.
 - [ ] Visual/operator acceptance demonstrates wrapped, readable blocker reason at normal zoom.
 - [ ] Record fix commit, live evidence, verified timestamp and update status after actual validation.
 
@@ -107,3 +108,13 @@ Primary source: https://github.com/grafana/grafana/blob/v11.4.0/packages/grafana
 Rules gates: bats scripts/tests/plugins/grafana_dashboard_bugs.bats; parse
 YAML/JSON, confirm only panel31 changed and query/mappings unchanged; diffcheck.
 Use existing regression suite, meaningful pre-fix red, no broad refactoring.
+
+## Independent offline verification — 2026-10-28
+
+GPT-6-Luna task target-state-readable-reason-luna landed as2f551fc7.
+Existing stat sets supported options.text.titleSize16/valueSize40; no new
+panel or query/status/layout change. Independent38BATS, YAML/JSON structural
+comparison, staged lint/audit, hooks and dispatcher post-rebase tests pass.
+Config tests reject old missing sizing. Actual full output and live checklist:
+[batch evidence](../issues/2026-10-28-three-bug-luna-batch-verification.md).
+Full and narrow rendering/wrapping remain operator acceptance, not assumed.

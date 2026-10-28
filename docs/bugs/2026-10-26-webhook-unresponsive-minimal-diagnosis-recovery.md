@@ -25,11 +25,11 @@ Run from an authenticated shell on m4 when available. Capture timestamps and red
 date -u
 launchctl print "gui/$(id -u)/com.k3d-manager.webhook" | head -60
 pgrep -fl 'k3dm-webhook' || true
-lsof -nP -iTCP:9000 -sTCP:LISTEN || true
+lsof -nP -iTCP:7443 -sTCP:LISTEN || true
 tail -n 80 "$HOME/Library/Logs/k3dm-webhook.log"
 ```
 
-Caution: `launchctl print` might contain environment values; redact before sharing. `pgrep`/port 9000 confirm only process/listener existence, not HTTP correctness. Confirm actual local bind and endpoint from the installed plist before using a functional curl probe. A curl result must be interpreted by its documented authentication contract; 401 alone may mean HTTP is alive rather than healthy. No remote public endpoint failure by itself proves the local process is down.
+Caution: `launchctl print` might contain environment values; redact before sharing. `pgrep`/port 7443 confirm only process/listener existence, not HTTP correctness. Confirm actual local bind and endpoint from the installed plist before using a functional curl probe. A curl result must be interpreted by its documented authentication contract; 401 alone may mean HTTP is alive rather than healthy. No remote public endpoint failure by itself proves the local process is down.
 
 Record: launchd job state/last exit status, process PID, port listener, last log timestamp/error and local authenticated functional health result. If local health works but external Slack/Cloudflare does not, **do not restart blindly**: investigate the tunnel/ingress route instead.
 
@@ -275,3 +275,14 @@ Rules gates: python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhoo
 scripts/tests/bin/test_cloud_bridge.py scripts/tests/bin/test_restart_cloud_bridge.py;
 bats scripts/tests/bin/restart_webhook.bats; document-link/diff checks. Report full
 actual outputs, existing test failure details and no-live-action boundary.
+
+## Renewed Luna review — 2026-10-28
+
+Task webhook-incident-evidence-review-luna completed a bounded offline review;
+landed223bb879. Independent142doctor/bridge Python tests and5restartBATS pass,
+also rerun by landing gate. No new code bug or historical cause proven.
+[Review and remaining operator checklist](../issues/2026-10-28-webhook-incident-luna-review.md).
+Coordinator corrected the opening manual port example9000→7443 based on current
+implementation, retaining installed-override caution. Prefer doctor --check;
+no new health/restart/credential/provider action executed. Original incident
+remains OPEN pending current bridge-path live evidence/historical uncertainty.

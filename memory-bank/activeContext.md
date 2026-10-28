@@ -749,3 +749,16 @@ labels; blocker uses existing panel31 supported text controls, no extra panel.
 Worker isolated native gpt-6-luna tasks planned; coordinator independently tests,
 reviews/lands/pushes, then operator live checks one at a time. Prior Plans Title
 rendering passed; its exact plan click remains a separate pending acceptance.
+
+## 2026-10-28 Luna batch independent review progress
+
+Three native gpt-6-luna tasks dispatched360bf344. Target-state-readable-reason-luna
+landed2f551fc7 after independent38BATS/structural/stagedgates and landing rerun;
+only existingpanel31 title16/value40, no extraUI/query/status/layout change.
+webhook-incident-evidence-review-luna landed223bb879, independently142Python+5BATS;
+no new codebug proven, incident OPEN, bridge live path/historicalcause unconfirmed.
+Coordinator corrects original staleport9000→7443 docs, no live/credential/restart.
+PR history task rework2 replacing toyfixtures with realproducer/PromQL checks.
+Sandboxfalse terminated state resolved via permitted processview; no workerfailure.
+Full actualoutputs docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+Operator live checks after final offline review, one at a time; no PR.
