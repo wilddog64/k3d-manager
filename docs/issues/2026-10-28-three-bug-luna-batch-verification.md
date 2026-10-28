@@ -120,3 +120,83 @@ producer/query execution. Coordinator requested Luna rework2 for meaningful real
 collector and PromQL fixtures, retaining actual old-presentation regression.
 First PR worker test had wording assertion failure, corrected before green;
 record final exact outputs on acceptance. No live check counted from these tests.
+
+## PR Checks follow-up — offline PASS
+
+Commit2b21e8af (rebased private task ca4bf186 onto current release at landing).
+Independent YAML/JSON structural comparison:8originalpanels; queries/options/
+transforms/mappings/layout unchanged, only panel8title and5/6/7/8descriptions
+changed. Collector untouched; real newtests exercise collect/render/render_failure.
+Actual final independent outputs:
+```text
+============================= test session starts ==============================
+platform darwin -- Python 3.15.1, pytest-9.1.1, pluggy-1.7.0
+rootdir: /Users/cliang/.local/share/k3d-manager/worktrees/v1.43.9/pr-checks-history-semantics-luna
+collected 4 items
+
+scripts/tests/hermes/test_pr_checks.py ....                              [100%]
+
+============================== 4 passed in 0.09s ===============================
+1..6
+ok 1 PR checks dashboard YAML and embedded JSON are valid
+ok 2 PR checks dashboard has filtered panels and repo variable
+ok 3 PR checks tables say No open PRs instead of No data when nothing is open
+ok 4 PR checks tables join populated rows without duplicate label fields
+ok 5 PR check duration legend uses a readable side layout without changing its query
+ok 6 PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads
+All checks passed!
+```
+Ruff used installed /private/tmp/k3dm-review-tools/bin/ruff. BATS ran with
+promtool3.2.1 onPATH (zero skips); stale-marker/current/range/All/repo/no-history/
+failed/stale-age fixtures evaluate actual dashboard expressions, not toyconstants.
+Independent old-dashboard red (fix restored in finally block):
+```text
+1..2
+not ok 1 PR check duration legend uses a readable side layout without changing its query
+# (in test file scripts/tests/plugins/grafana_dashboard_pr_checks.bats, line 129)
+#   `[ "${status}" -eq 0 ]' failed
+not ok 2 PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads
+# (in test file scripts/tests/plugins/grafana_dashboard_pr_checks.bats, line 148)
+#   `echo "$output"; [ "${status}" -eq 0 ]' failed
+# Traceback (most recent call last):
+#   File "<stdin>", line 7, in <module>
+# AssertionError
+
+```
+Initial real-query fixture failure (test expectation, no production-query defect):
+```text
+1..6
+ok 1 PR checks dashboard YAML and embedded JSON are valid
+ok 2 PR checks dashboard has filtered panels and repo variable
+ok 3 PR checks tables say No open PRs instead of No data when nothing is open
+ok 4 PR checks tables join populated rows without duplicate label fields
+ok 5 PR check duration legend uses a readable side layout without changing its query
+not ok 6 PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads
+# (in test file scripts/tests/plugins/grafana_dashboard_pr_checks.bats, line 245)
+#   `echo "$output"; [ "${status}" -eq 0 ]' failed
+#
+#
+#   FAILED:
+#     expr: "max by (__join) (label_join(k3dm_pr_check_duration_seconds{repo=~\"wilddog64/lib-foundation\"},\"__join\",\":\",\"repo\",\"pr\",\"check\"))", time: 5m,
+#         exp: {__join="wilddog64/lib-foundation:66:lint", check="lint", pr="66", repo="wilddog64/lib-foundation"} 4.5E+01
+#         got: {__join="wilddog64/lib-foundation:66:lint"} 4.5E+01
+
+```
+max by(__join) drops other labels, so corrected fixture to actual expected
+__join-only shape. Worker first Ruff command was unavailable on defaultPATH;
+installed Ruff was then used successfully, no dependency installed. All final
+staged lint/audit/checkpoint hooks passed, landing reran4pytest+6BATS+Ruff green.
+ShellCheck N/A: no shell implementation changed. No full curated-suite rerun;
+previously recorded unrelated failures remain, no claim of repo-wide green.
+
+## Completion boundary and next live step
+
+Target-state fix2f551fc7 and PR-history fix2b21e8af are VERIFIED offline and landed.
+Incident review223bb879 is complete; original P2 incident stays OPEN because
+historical cause/current bridge live evidence is not established. Never claim
+allthreebugsclosed from worker exits. No coordinator deploy, service restart,
+Keychain access/rotation, cloud/Slack request or screenshot export performed.
+Operator live work begins with make webhook-doctor; inspect its redacted JSON
+before any recovery or cloud action. Subsequent dashboard live checks require
+fresh ArgoCD revision/ConfigMap and operator normal/narrow screenshots and PR
+GitHub timestamp cross-checks, one step at a time. No extra panels introduced.

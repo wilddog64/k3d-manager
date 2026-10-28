@@ -20,6 +20,8 @@
 
 ### Changed
 
+- Release forecast keeps the Target state blocker reason readable with explicit supporting text sizing in the existing panel.
+
 - Webhook doctor gives aggregate health checks a 15-second budget and treats a timeout with a listening socket as inconclusive rather than recommending a restart.
 
 - Webhook doctor distinguishes Keychain interaction requirements from missing reader credentials, gives a safe next step and omits unwarranted restart actions.

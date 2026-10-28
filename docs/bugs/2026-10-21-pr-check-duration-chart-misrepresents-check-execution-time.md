@@ -1,7 +1,8 @@
 # Bug: PR Checks duration chart repeats completed runs across scrape timestamps
 
 **Filed:** 2026-10-21 (operator screenshot; repository review)
-**Status:** REOPENED — 2026-10-27 operator evidence of remaining current-versus-history inconsistency; previous offline tests passed, live acceptance pending
+**Status:** VERIFIED — 2026-10-28 reopened follow-up implemented by Luna and independently tested; operator live acceptance pending
+**Fix commit:** 2b21e8af
 **Priority:** P3 — misleading observability visualization; check status and collection remain functional
 **Severity:** low
 **Approval:** explicit operator 2026-10-28 Luna follow-up implementation batch
@@ -215,3 +216,18 @@ Rules gates: python3 -m pytest -p no:cacheprovider scripts/tests/hermes/test_pr_
 bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats; JSON parse/diffcheck;
 Ruff on any touched Python. Demonstrate meaningful old-presentation red plus
 mixed open/historical/no-history/failed-stale fixtures and All/repo consistency.
+
+## Independent follow-up verification — 2026-10-28
+
+Luna pr-checks-history-semantics-luna rework2 landed2b21e8af. Existing panel8
+renamed Historical sampled check durations (may include closed PRs); descriptions
+and guide distinguish current rows, scrape-time history, empty samples and failed/
+stale reads. All8panels, production queries, collector behavior, mappings,
+transformations and layout unchanged. Real collect/render fixtures plus actual
+PromQL evaluation cover repeat completed polls, open→closed current cleanup,
+retained history, All/repo, no-history and failed/stale states. Initial toyfixture
+review rejected and replaced. Old dashboard fails both presentation contracts.
+Independent4pytest+6BATS (promtool enabled, zero skips), Ruff, JSON/YAML/structural
+checks, staged lint/audit/hooks and post-rebase landing gates pass. Operator live
+GitHub timestamp/chart comparison remains pending; do not mark LIVE-VERIFIED.
+[Full outputs and review](../issues/2026-10-28-three-bug-luna-batch-verification.md).

@@ -1124,3 +1124,17 @@ PR history task rework2 replacing toyfixtures with realproducer/PromQL checks.
 Sandboxfalse terminated state resolved via permitted processview; no workerfailure.
 Full actualoutputs docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
 Operator live checks after final offline review, one at a time; no PR.
+
+## 2026-10-28 selected Luna batch — offline work complete
+
+Target-state-readable-reason-luna fix2f551fc7 VERIFIED38BATS; PR-history task
+rework2 fix2b21e8af VERIFIED4pytest+6BATS/promtool(zero skips),Ruff/structural/
+stagedgates/post-rebase tests. PRproductionquery/collector unchanged, historykept.
+Olddashboard rejectsnewpresentationcontracts. Incident evidence review223bb879
+complete142pytest+5BATS; no newcodebug proven, originalP2incident remainsOPEN.
+Exact historiccause and currentbridge liveevidence stillmissing; do not claimall3
+closed. Rootcorrectedstale9000doc to7443 and added scopedTargetstatechangelog.
+Full actualoutputs/failures docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+No live deployment/restart/credentials/cloudrequests/screenshotexport; no PR.
+First operatorlive step make webhook-doctor, inspectredactedJSON, thenoneatatime.
+Prior PlansTitle renderingPASS but exactplanTitleclick stillpending separately.
