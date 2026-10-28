@@ -350,14 +350,17 @@ _prepare_dispatch_fixture() {
 }
 
 @test "dispatch refuses to run and never falls back locally when preflight fails" {
-  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
-  e2e_runner_preflight() { printf 'status=busy\n'; return 1; }
-  ssh() { echo "SSH SHOULD NOT RUN" >&2; return 0; }
+  _prepare_dispatch_fixture
+  _e2e_remote_preflight_with_retry() { printf 'status=busy\n'; return 1; }
   run e2e_runner_dispatch "m2"
   [ "$status" -ne 0 ]
   [[ "$output" == *"status=busy"* ]]
   [[ "$output" == *"no local fallback"* ]]
-  [[ "$output" != *"SSH SHOULD NOT RUN"* ]]
+  run cat "$DISPATCH_FIXTURE_LOG"
+  [[ "$output" != *"remote-helper"* ]]
+  [[ "$output" != *"ssh "* ]]
+  [[ "$output" != *"credential-resolver"* ]]
+  [[ "$output" != *"copy-results"* ]]
 }
 
 @test "dispatch reports the held lock holder and preserves the lock" {
@@ -566,11 +569,13 @@ _prepare_dispatch_fixture() {
 }
 
 @test "dispatch returns the remote exit code unchanged" {
-  export E2E_REPORT_DIR="$BATS_TEST_TMPDIR/report"
-  e2e_runner_preflight() { printf 'status=available\n'; return 0; }
-  ssh() { echo "remote failed"; return 7; }
+  _prepare_dispatch_fixture
+  DISPATCH_SSH_RC=7
   run e2e_runner_dispatch "m2"
   [ "$status" -eq 7 ]
+  run cat "$DISPATCH_FIXTURE_LOG"
+  [[ "$output" == *"ssh "* ]]
+  [[ "$output" == *"lock-release"* ]]
 }
 
 @test "publish-back host loads from the operator conf file and env wins" {

@@ -71,3 +71,14 @@ The full `make test-all` run and fresh metrics publication are operator-owned;
 no focused result establishes all three stage markers, complete status, or
 alert resolution. The original fourth-case raw output and stage markers remain
 unavailable.
+
+## Landing environment follow-up
+
+The first landing attempt exposed two additional fixture tests whose real Git
+reads passed only when REPO_ROOT pointed to a pushed checkout. With
+K3DM_REPO_ROOT set to the unpushed task commit, both stopped at the production
+pushed-HEAD guard. Coordinator reused the safe dispatch fixture for the
+preflight-refusal and remote-exit-7 cases; the former now stubs the actual retry
+helper, proves no lock/SSH/credential/copy work, and the latter observes lock
+release. Production guard unchanged. Both fail on the previous fixtures and
+pass after this fixture-only repair in the same unpushed environment.
