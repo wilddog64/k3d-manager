@@ -1,7 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
-**Status:** VERIFIED — corrective offline checks passed after failed live click; redeployment/UI verification pending
-**Fix commit:** 19a56939e3c65f93d3ef293697ae76c63aacdaad
+**Status:** VERIFIED — single-table correction independently tested; two-dashboard deployment/UI verification pending
+**Fix commit:** 0fc9d3ef34698e067d4045e287753bedc74e9cd8
 **Priority:** P3
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -112,3 +112,7 @@ Run-log YAML added to Files for this communicated same-bug correction. Test
 one table/all categories, retained-field URL and escaping, hidden result value
 and existing heading/query, source compatibility, layout and no other panels.
 Deploy only the two affected dashboard ConfigMaps after offline gates.
+
+## Single-table implementation complete offline
+
+Operator-requested removal implemented in0fc9d3ef: extra panel93 removed, existing Per run evidence again contains all run categories with Log hyperlinks. Link uses visible version/slug/run/Result, no hidden URL-field dependency. Existing Agent Run Log heading shows Result through a hidden textbox variable; local-only availability is explicit, shipped Loki query unchanged. No added table/panel/logshipping/transcript export. Independent138Python/28BATS/Ruff/2PromQL/staged gates passed;29otherdispatchpanels unchanged. Both existing dashboard ConfigMaps must be applied before UI checks. Full actual outputs in three-open-bugs issue.

@@ -604,3 +604,103 @@ Operator asked whether the added Supported landing logs table had an approved sp
 Standing preference: explain proposed user-visible behavior and scope before editing; keep bug fixes within the requested interface, avoid incidental new tables/components, and distinguish implementation proposals from approved requirements. Communication-first does not imply a new blanket approval ritual for routine work. No further dashboard code/deployment changes in this turn; existing layout/code remain until a clearly communicated scoped correction is chosen. The intended requirement remains one primary evidence table with working supported-log hyperlinks and truthful handling of unavailable startup evidence; single-table implementation not yet finalized or verified.
 
 Latest read-only ConfigMap check before this feedback showed deployed_matches_local=true, primary Log link configured with visible version/slug/run URL, secondarytitle Local-only run evidence. Operator screenshot still showed prior Supported landing logs title and plain main paths. Thus screenshot and cluster definition differ; browser/served-dashboard refresh cause not established, do not claim newly written link configuration failed. Computer-use inventory returned no browser providers; no browser refresh/click was performed, no alternate control bypass attempted. No screenshots copied/exported. UI validation and other pending live checks stay pending.
+
+## Explicit request fulfilled offline: remove duplicate table and repair one-table Log flow
+
+Operator explicitly requested removal of added table and fix existing Per run evidence Log. Coordinator communicated the intended behavior before editing: one original table with all run kinds and hyperlinks, existing Agent Run Log heading carries selected Result to explain unavailable startup evidence. No added panels/tables/shipping. This supersedes every earlier two-table design in this record.
+
+Implementation `0fc9d3ef34698e067d4045e287753bedc74e9cd8` removes panel93; original panel47 contains all evidence categories and unfiltered token query. Fixed route uses retained version/slug/run/Result fields; no missing/removed loki_url field. Existing Agent Run Log UID verified in deployed ConfigMap before implementation; no new destination. One hidden textbox result value defaults to Evidence availability unknown and is reflected in existing log-panel heading. Description explicitly says local only(not shipped) means codex.log is not in Loki. Existing Loki query/options/size remain unchanged; no raw worker transcript exported.29otherexistingdispatchpanels unchanged. No new visible controls; no screenshot export attempted.
+
+Grafana11.4 source compatibility reviewed: [dataMacros](https://github.com/grafana/grafana/blob/v11.4.0/public/app/features/templating/dataMacros.ts), [display-value proxy](https://github.com/grafana/grafana/blob/v11.4.0/packages/grafana-data/src/field/getFieldDisplayValuesProxy.ts), [rename transformer](https://github.com/grafana/grafana/blob/v11.4.0/packages/grafana-data/src/transformations/transformers/rename.ts). Field lookup supports display names, so Result remains accessible after organize renames evidence_summary. Fixtures model retained fields and URL-encode summaries including ampersand/hash so result cannot change run routing or create a URL fragment. No model/network call added to product flows.
+
+New one-table/availability contracts failed before implementation:
+
+```text
+1..2
+not ok 1 agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs
+# (in test file scripts/tests/plugins/agent_dispatch_dashboard.bats, line 434)
+#   `[ "$status" -eq 0 ]' failed
+# Last output:
+# Traceback (most recent call last):
+#   File "<stdin>", line 8, in <module>
+# AssertionError
+not ok 2 agent dispatch dashboard: Log opens the filtered run log dashboard
+# (in test file scripts/tests/plugins/agent_dispatch_dashboard.bats, line 495)
+#   `[ "$status" -eq 0 ]' failed
+# Last output:
+# Traceback (most recent call last):
+#   File "<stdin>", line 13, in <module>
+# AssertionError
+```
+
+Initial full test after implementation had one obsolete assertion expecting the unused loki_url field to be hidden:
+
+```text
+not ok 19 agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec
+# AssertionError
+```
+
+Updated that legacy assertion to require the field absent and the direct retained-field URL; fixture now reflects one-table requirement. No behavioral check weakened, no test count reduced. Final full BATS output:
+
+```text
+1..28
+ok 1 agent dispatch dashboard: valid ConfigMap JSON and datasource
+ok 2 agent dispatch dashboard: every queried metric is exported
+ok 3 agent dispatch dashboard: Claude context and compaction row panels exist below existing rows
+ok 4 agent dispatch dashboard: landing success aggregates both sides
+ok 5 agent dispatch dashboard: panel rectangles do not overlap
+ok 6 agent dispatch dashboard: Codex API cost shows priced total and excluded sessions
+ok 7 agent dispatch dashboard: per-spec panels use readable units and grouped targets
+ok 8 agent dispatch dashboard: final exit gap and operator coverage are exposed
+ok 9 agent dispatch dashboard: window is a query over the exported scopes and defaults to 7d
+ok 10 agent dispatch dashboard: rework rate stat reads the selected window
+ok 11 agent dispatch dashboard: verified delivery stats use exported metrics without overlap
+ok 12 agent dispatch dashboard: stat and bar gauge panels use explicit colours
+ok 13 agent dashboards: panel ids exactly match the pre-split dashboard and assigned groups
+ok 14 agent dashboards: panel targets, fieldConfig and options match the pre-split fixture
+ok 15 agent dashboards: each dashboard has unique panel ids and no overlapping rectangles
+ok 16 agent dashboards: all dashboards have the tag-based Agents link
+ok 17 agent dashboards: Activity has three time windows and Dispatch and Cost keep the query variable
+ok 18 agent activity: Claude row fills the width and bar gauge names read beside each bar
+ok 19 agent dispatch: run outcomes read beside each bar, first-pass verification bars with fixed fonts sit beside per run evidence, and each slug links to its spec
+ok 20 agent dispatch: failed startup evidence is local-only and the Loki link is scoped to shipped logs
+ok 21 agent dispatch: per spec shows which agent landed each spec
+ok 22 agent dispatch dashboard: Log opens the filtered run log dashboard
+ok 23 agent cost: Claude tokens by kind splits the selected window by cache kind
+ok 24 agent cost: daily Claude tokens and cost panels split by kind
+ok 25 agent dashboards: labels and titles stay readable and release-only stats say why they are empty
+ok 26 agent dispatch dashboard: Per spec exposes unknown worker and coordinator identities
+ok 27 agent dispatch dashboard: Per spec shows handoff and measured cost fields within width budget
+ok 28 agent dispatch dashboard: Per spec spans the full width and its columns fit without scrolling
+```
+
+Metrics pytest output:
+
+```text
+........................................................................ [ 52%]
+..................................................................       [100%]
+138 passed in 12.75s
+```
+
+Additional validation:
+
+```text
+All checks passed!
+Duplicate table removed; 29 other panels unchanged
+Existing log panel/query/layout retained; no added panels
+Both YAML/embedded JSON definitions valid
+Checking /private/tmp/k3dm-single-evidence-rules.yaml
+  SUCCESS: 2 rules found
+```
+
+Actual staged lint/audit/checkpoint hooks passed, including justified expression-count assertion80to78 for removing2duplicate-view queries. No shell implementation changed; ShellCheck not applicable. Curated full suite not rerun; prior unrelated failures unchanged. Coordinator did not deploy or perform live browser clicks; no browser provider available in this session. Original incident/other live checks remain pending.
+
+Next single operator command applies only the two existing reviewed dashboard ConfigMaps:
+
+```bash
+kubectl --context k3d-k3d-cluster -n monitoring apply \
+  -f scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml \
+  -f scripts/etc/argocd/platform-ops/grafana-dashboard-agent-run-log.yaml
+```
+
+Inspect apply output and compare both definitions, then fully reload browser dashboard before testing a supported Log link and separately a local-only result. Grafana data-refresh button alone does not constitute evidence that the new dashboard definition loaded; do not infer a browser/sidecar cause from prior stale screenshot. Keep one-at-a-time operator checks. User-visible scope was communicated; no extra table or unrequested component remains.
