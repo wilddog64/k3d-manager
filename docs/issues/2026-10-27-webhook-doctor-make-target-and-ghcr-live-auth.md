@@ -165,3 +165,35 @@ no screenshot copy or indirect export was attempted after rejection. Only
 identification already supported by the existing repository document is
 recorded here. This safer evidence-only alternative requires no credential
 or artifact approval. No credential rotation has been completed.
+
+## Native Keychain update command verified, operator execution pending
+
+User clarified the intended PAT entry has the already-documented scanner
+service name platform-ops-app-rebuild and asked for an update command. No
+credential-page screenshot, expiry, token value or additional scope metadata
+was archived. The prior artifact-export rejection remains respected.
+
+Read-only `security help add-generic-password` confirms -U updates an existing
+item, and its final help line says:
+
+```text
+Specify -w as the last option to be prompted.
+```
+
+Apple keychain_add.c handles a missing final -w argument by prompting for
+password data and confirmation through getpass. Provided command:
+
+```bash
+/usr/bin/security add-generic-password -U \
+  -s platform-ops-app-rebuild -a k3dm -w
+```
+
+No value follows -w: PAT entry/confirmation occurs at the native hidden
+prompts, keeping it out of history and argv. This updates the exact scanner
+service/account rather than a Dependabot App key. The coordinator did not
+execute add-generic-password, capture a new token, change an ACL, sync a
+Secret or trigger a scan. Guidance is concrete and verified from local help
+and primary Apple source; actual storage/authentication remain pending
+operator confirmation. No code tests needed for this documentation update.
+
+[Apple source](https://github.com/apple-oss-distributions/Security/blob/main/SecurityTool/macOS/keychain_add.c).
