@@ -1314,3 +1314,16 @@ no liveinfrastructure/account/credential/metricschanges. Optionaluserrawlogpath
 pending; all4failednames/stage0/source12:41:14ZalreadyknownfromPrometheus.
 OriginalinvestigationmetricsfixPrometheusPASS, finalGUIrowstillpending; preserve
 PRCheckspaymentviewpending. No newplan/PR, liveCFwriteapprovalstillseparate.
+
+## 2026-10-28 Cloudflare helper landed; offline broad gate running
+
+Luna cloudflare-https-tls-preflight-luna rework2 independently verified and
+landed/pushed 2e0be3f6; native verification pass. Actual169pytest/Ruff/direct
+help+dryrun/lint/audit/hooks pass. Security bug remains OPEN: no actual zone
+read/write, F0 compatibility review/F1 separate go/F2 live acceptance yet.
+No PR (Claude owns creation). Review fulloutput two-new-P2 batch issue.
+Offline Luna rework2 independent116BATS/37Python/rawShellCheck/syntax/diff pass;
+curated1913-case BATS stage running under tripwire, no metrics publication.
+Not yet landed/complete; original4th case1194 historicalcause still unknown,
+current PRChecks isolated6pass. Optional original rawlogpath still pending.
+Prior incident UI screenshot and PRChecks payment-only acceptance remain pending.

@@ -1,7 +1,7 @@
 # Bug: Cloudflare HTTPS enforcement and obsolete minimum TLS version
 
 **Filed:** 2026-10-28 (operator request after reviewing Cloudflare configuration inventory)
-**Status:** OPEN — operator-approved filing only; edge configuration has not been changed or live-verified
+**Status:** OPEN — read-only preflight tooling independently verified; live F0 review and separately approved edge changes remain pending
 **Priority:** P2 — security hardening, higher priority than routine P3 enhancements; no demonstrated compromise
 **Severity:** medium (unenforced HTTP redirect and potentially permitted obsolete TLS protocols; confirm effective edge posture)
 **Release:** v1.43.9 security bug (not a new plan slot; fixes should be scheduled on the active release process after preflight approval)
@@ -199,3 +199,17 @@ periodic scheduler, Hermes automation, dashboard, account credential or applymod
 - Gates: full newpytest suite, Ruff (/private/tmp/k3dm-review-tools/bin/ruff check
   --no-cache), Python syntax, helperdryrun/help with noenvaccess, docslinks,
   gitdiffcheck. E1/E3offline only; E2/livezoneposture remainsnotverified.
+
+## 2026-10-28 Luna implementation review
+
+Luna task `cloudflare-https-tls-preflight-luna` rework 2 landed as
+`2e0be3f6`. Coordinator independently ran 169 offline pytest cases, Ruff, direct
+executable help/dry-run and required lint/audit/checkpoint hooks; landing reran
+the same gates successfully. No real API, public endpoint, credential lookup,
+zone mutation or scheduled automation was used. The helper is read-only; this
+commit is tooling evidence, not a fix to the actual edge configuration.
+
+Current configuration, redirect-rule/certificate/SSO/Slack compatibility, F1
+operator go and F2 live acceptance remain pending. Full review output is in
+[the batch review](../issues/2026-10-28-two-new-p2-luna-batch.md). No PR created;
+Claude owns PR creation.
