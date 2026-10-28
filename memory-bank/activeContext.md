@@ -1209,3 +1209,20 @@ NewM4operatorlog/tmp/k3dm-test-all-1793222885.log active(first448cases0fails
 attaskstart), priorfull2535casesfailed2beforefix. Followall3stages/publication;
 no newpublisherbycoordinator. CFsettingsAIreportknown/F0rulesreviewpending.
 No newplan/PR/CIrerun orKineremediationauthorized.
+
+## 2026-10-28 Luna Kine report accepted/pushed, incident stillOPEN
+
+Nativegpt-6-luna kine-recurrence-readiness-luna rework2 done/in-scopeonefile.
+Independentreviewcaughtstalerunbook, missingcommandeffects/dryrun/volume
+proof limits. Correctedreport d4481849 normalcheckpoint/land/reportlinks/
+whitespace/lint/auditPASS, pushed/nativeverifiedpass. Fullworkerreport and
+coordinatorreviewissue documentactualoutputs, no BATS/ShellCheckrerun(report
+only). Local nonsecret exportmarker10:33:40Z/39602sageprelimonly, no remote
+integrity/decryptability/restoreproof. Rulesrequireconcretereadiness+operator
+go; no recoveryperformed/authorized. Proposedrunbookpatchseparatescope.
+MakegenericKEEP_LOCALcommentdoesnotoverrideproviderk3dexplicitdeletioninbin;
+DRY_RUNhub-recover-allnot safeendtoendpreview. No naiveK3srestart.
+CurrentM4fullrun1793222885 continues0fails sofar(mainstagegreen, bin~220);
+docs-onlyspec/reportcommits movedHEAD, runtimecodea7b5e5dfunchanged. Follow
+all3stages/freshpublicationbeforetestP2closure. NoPR/newplan/CIrerun, CFmanual
+review/authorizationstillpending.

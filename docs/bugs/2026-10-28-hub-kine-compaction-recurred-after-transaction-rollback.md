@@ -133,3 +133,15 @@ coordinator can verify before presenting any operator recovery step.
 7. Validate report links with python3 scripts/check-doc-links.py on the report
    and git diff --check; paste actual commands/results and skipped live work.
    Coordinator handles independent review, normal gates and any commit/landing.
+
+## Luna review accepted — recovery not executed
+
+Native GPT-6-Luna task kine-recurrence-readiness-luna rework2 independently
+reviewed, normalgatespassed andreportd4481849pushed. See
+[worker report](../issues/2026-10-28-hub-kine-recurrence-luna-review.md) and
+[coordinator review](../issues/2026-10-28-kine-luna-readiness-coordinator-review.md).
+The report flags stale runbook instructions, no safe end-to-end orchestration
+dry-run, limited volume proof and pending restore-readiness evidence.
+Local exportmarker10:33:40Z was about11hoursold at coordinator sample, not
+proof of remote integrity/decryptability. Currentfulltest-all remainsactive.
+No live preflight/restart/rebuild or database/account change. Bug staysOPEN.
