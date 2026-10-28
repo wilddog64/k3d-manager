@@ -839,6 +839,20 @@ def _live_status_commit_timestamp(repo_root, spec):
         return None
 
 
+def _run_spec_url(version, launches, launch):
+    """Link the recorded start document; resumes inherit that start's spec."""
+    start = next((event for event in reversed(launches)
+                  if event.get("event") == "start" and
+                  event.get("ts", 0) <= launch.get("ts", 0)), {})
+    spec = start.get("spec")
+    base = "https://github.com/wilddog64/k3d-manager"
+    branch = f"k3d-manager-{version}"
+    if (isinstance(spec, str) and len(spec) <= 256 and
+            re.fullmatch(r"docs/(?:plans|bugs|issues)/[A-Za-z0-9_-][A-Za-z0-9._-]*\.md", spec)):
+        return f"{base}/blob/{branch}/{spec}"
+    return f"{base}/tree/{branch}"
+
+
 def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     states = _task_states(events)
     outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unknown")}
@@ -920,6 +934,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                               "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
                               "evidence": evidence, "evidence_summary": evidence_summary,
                               "evidence_path": evidence_path,
+                              "spec_url": _run_spec_url(version, all_launches, matching_launch),
                               "loki_url": (f"/d/k3dm-agent-run-log?var-version={version}&var-slug={slug}"
                                            f"&var-run={run_number}&from=now-30d&to=now"
                                            if evidence in {"land-test.log", "land_refused.tests"} else None)})
@@ -1209,8 +1224,9 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         evidence_summary = _label_value(row.get("evidence_summary", "unknown"))
         evidence_path = _label_value(row.get("evidence_path", ""), limit=512)
         loki_url = row.get("loki_url")
+        spec_url = _label_value(row["spec_url"], limit=512)
         loki_label = f',loki_url="{_label_value(loki_url, limit=512)}"' if isinstance(loki_url, str) and loki_url else ""
-        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"{loki_label}}} 1')
+        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}",spec_url="{spec_url}"{loki_label}}} 1')
         if type(row["tokens"]) is int:
             lines.append(f'k3dm_dispatch_task_run_codex_tokens{{{labels}}} {row["tokens"]}')
         if type(row.get("agent_tokens")) is int:

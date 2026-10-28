@@ -365,7 +365,8 @@ fpo=panels[48]["options"]
 assert panels[48]["type"]=="bargauge" and fpo.get("orientation")=="horizontal" and fpo.get("namePlacement")=="left",fpo
 assert fpo.get("text")=={"titleSize":14,"valueSize":24},fpo
 for target in table["targets"]:
-  assert target["expr"].startswith("sum by (version, slug, run, ") and 'label_join(' in target["expr"] and '"doc", "plans/$1"' in target["expr"] and '"doc", "bugs/$1"' in target["expr"]
+  assert target["expr"].startswith("sum by (version, slug, run, ") and "label_join(" not in target["expr"] and "plans/" not in target["expr"] and "bugs/" not in target["expr"]
+assert "spec_url" in table["targets"][0]["expr"]
 ids=[t["id"] for t in table.get("transformations",[])]
 assert ids[:3]==["merge","sortBy","organize"],ids
 assert table["transformations"][1]["options"]["sort"]==[{"field":"vsort","desc":True}] and "sortBy" not in table["options"]
@@ -374,14 +375,14 @@ for target in table["targets"]:
 org=table["transformations"][2]["options"]
 for hidden in ("Time","__name__","job","window","Value #A","vsort"):
   assert org["excludeByName"].get(hidden) is True,hidden
-assert not org["excludeByName"].get("doc"),"doc feeds the slug link; excluding it empties the URL"
-assert any(o["matcher"]=={"id":"byName","options":"doc"} and {"id":"custom.hidden","value":True} in o["properties"] for o in table["fieldConfig"]["overrides"])
+assert not org["excludeByName"].get("spec_url"),"spec_url feeds the slug link; excluding it empties the URL"
+assert any(o["matcher"]=={"id":"byName","options":"spec_url"} and {"id":"custom.hidden","value":True} in o["properties"] for o in table["fieldConfig"]["overrides"])
 order=sorted(org["indexByName"],key=org["indexByName"].get)
 assert order[:4]==["version","slug","run","Value #B"],order
 assert org["renameByName"].get("Value #B")=="Tokens"
 assert "k3dm_dispatch_task_run_agent_tokens{" in next(x["expr"] for x in table["targets"] if x["refId"]=="B")
 links=[l for o in table["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"slug"} for p in o["properties"] if p["id"]=="links" for l in p["value"]]
-assert len(links)==1 and links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-${__data.fields.version}/docs/${__data.fields.doc}.md"
+assert len(links)==1 and links[0]["url"]=="${__data.fields.spec_url}"
 assert org["renameByName"].get("evidence_summary")=="Result"
 assert org["renameByName"].get("evidence_path")=="Log"
 assert org["excludeByName"].get("evidence") is True

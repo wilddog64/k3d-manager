@@ -2175,3 +2175,42 @@ def test_partial_identity_keeps_recorded_vendor_without_inventing_model():
     assert 'vendor="openai"' in lines[0] and 'model="unknown"' in lines[0]
     assert 'display="openai/model not recorded (declared)"' in lines[0]
     assert 'display="unknown"' in _identity_lines(output, "primary_coordinator")[0]
+
+
+def test_run_spec_link_uses_recorded_issue_instead_of_custom_slug(tmp_path):
+    output = dispatch_metrics.render([
+        event(1, "start", "vectordb-retrieval-key-cache", version="v1.43.9", run=1,
+              spec="docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md"),
+        event(2, "codex_exit", "vectordb-retrieval-key-cache", version="v1.43.9", run=1, exit=127),
+        event(3, "resume", "vectordb-retrieval-key-cache", version="v1.43.9", run=2),
+        event(4, "codex_exit", "vectordb-retrieval-key-cache", version="v1.43.9", run=2, exit=0),
+    ], 0, 100, repo_root=tmp_path)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{")]
+    expected = ('spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/'
+                'docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md"')
+    assert len(lines) > 1 and all(expected in line for line in lines)
+    assert not any('spec_url="' in line and 'docs/plans/v1.43.9-vectordb-retrieval-key-cache.md' in line
+                   for line in lines)
+
+
+@pytest.mark.parametrize("spec", [None, 9, "", "../private.md", "docs/issues/../private.md",
+                                  'docs/issues/unsafe".md', "docs/issues/unsafe\n.md", "/tmp/spec.md"])
+def test_run_spec_link_missing_or_unsafe_path_uses_release_branch(tmp_path, spec):
+    output = dispatch_metrics.render([
+        event(1, "start", "unrelated-slug", version="v1.43.9", run=1, spec=spec),
+        event(2, "codex_exit", "unrelated-slug", version="v1.43.9", run=1, exit=127),
+    ], 0, 100, repo_root=tmp_path)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{")]
+    assert lines and all('spec_url="https://github.com/wilddog64/k3d-manager/tree/k3d-manager-v1.43.9"'
+                         in line for line in lines)
+
+
+@pytest.mark.parametrize("directory", ["plans", "bugs", "issues"])
+def test_run_spec_link_accepts_recorded_doc_kinds(tmp_path, directory):
+    spec = f"docs/{directory}/different-from-slug.md"
+    output = dispatch_metrics.render([
+        event(1, "start", "custom-slug", version="v1.43.9", run=1, spec=spec),
+        event(2, "codex_exit", "custom-slug", version="v1.43.9", run=1, exit=0),
+    ], 0, 100, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert f'spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/{spec}"' in line

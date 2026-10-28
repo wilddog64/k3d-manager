@@ -652,3 +652,16 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - Operator destination screenshot verifiesdoctorrun2(unverified), not3: validAgentRunLogpage/versionv1439/slug/run2, headingNo landing-test evidence recorded, no404. Unverifiednavigation+availabilityPASS; acceptedtestoutputstillpending. Nextsingle returnviaAgentDispatchbutton and accepteddoctorrun3Log(5of5ok;21passed) soRun+Resultcontexttravelstogether, notmanualRun-onlyedit. No screenshotexport/code/runtime/testchange; prior139Python/30BATS. Fulltextfindingsissue, PR URL:none.
 
 - Operator accepteddoctorrun3Log destinationPASS: correctv1439/slug/run3, heading5of5ok;21passed and actualLoki21pytest+TAP1..5allok output. Historicshippedmarker2026-10-27T12:07:42Z; oldTCP9000dryruntextishistoricalartifact, notfreshdoctorstate/fixreversal. No screenshotexport. Supported+unverifiednavigationPASS; finalP3startup key-cachefailedrun1local-onlyheadingroutechecknextsingleoperatorstep. Doesnotverifywebhookservice/bridgehealth; otherliveitemsseparate. No code/runtime/tests rerun, prior139Python/30BATS; PR URL:none.
+
+## 2026-10-28 per-run task-name GitHub404 correction
+
+Operator screenshot showed the slug link guessing docs/plans/v1.43.9-vectordb-retrieval-key-cache.md.
+Recorded spec is docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md (remote API verified).
+Communicated scope first; use recorded start spec for all runs/resumes, release-branch fallback
+for absent/unsafe metadata, no extra panels or Log/layout changes. New per-run spec_url label
+retained with custom.hidden. Offline: 151 pytest, 30 BATS, Ruff, two PromQL rules pass.
+Evidence: docs/issues/2026-10-28-dispatch-run-spec-link-verification.md.
+Publication/click pending; first operator step make dispatch-metrics, then apply only Agent
+Dispatch dashboard and reload. Accepted doctor run3 Log is live verified; failed-startup Log
+availability remains pending, separate from this GitHub404. Commit SHA recorded after commit;
+no PR (repository policy).
