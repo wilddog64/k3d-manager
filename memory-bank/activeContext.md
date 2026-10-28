@@ -1137,3 +1137,23 @@ itsactualtestdependenciesneedverificationonchosenhost. ExistingM4 3.13test
 proofremainsvalidhistoricalcoordinatortest, notclaimofuserM2environment.
 M2watchissueupdatedactualoutputs; docs-onlynoBATS/ShellCheckrerun/hooksapply.
 Currentfulltest-all/CFmanualacceptancepending. NoPR/remotechanges.
+
+## 2026-10-28 Kine recurrence confirmed and proper P2 filing
+
+Operatoralert investigatedreadonlyM4: lastsuccessfulCOMPACTdeleted17:45:03Z,
+nextstart17:50:03/error17:50:14Z failedtorecordcompactrevision/transaction
+committedorrolledback; no latersuccessbounded120h/tail120klogs. Metricmatches
+lastsuccess, alertfiring, pushage627s/tick490s, APIready/all4nodesReady.
+DB583081984B(556MiB), WAL78090512B(74MiB). ContainerstartedOct25, image
+rancher/k3s:v1.32.0-k3s1/restartcount0. Underlyingtriggerunknown; nooutage or
+DBintegrityclaim. Userexplicitproperbugfilingapproved: newP2
+docs/bugs/2026-10-28-hub-kine-compaction-recurred-after-transaction-rollback.md,
+parentlinked; fullactualoutputsnewinvestigationissue. Filingonly/noimpltask/
+newplan/PR/restart/rebuild/SQLwrite/credentials. October29slotonlypriorrecord,
+needsreconfirm; controlledrecoverypreflight+explicitgo, no naivek3srestart.
+
+M4operatorrun1793213637finished:main1913/no fails(1893pass20skip), bin622/two
+fails:413cleanupstat-cDarwin,567OrbStacknonTTYmessageassert. Pythonnotrun.
+UserupdatedP2commit46a02628 preserved; nowreview/fixfakefixture isolation
+andboundednonTTY/PTY withproductiontypedyesguardkept. Kinedocscommitafter
+runfinished; test-allP2remainsOPEN/fresh3stagepending.
