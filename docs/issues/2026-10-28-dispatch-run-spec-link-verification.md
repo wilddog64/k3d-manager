@@ -308,3 +308,18 @@ Curated full-repository suite was not rerun for this focused change; previously
 recorded unrelated failures remain. Operator must publish metrics before applying
 the updated dashboard, then reload and click the reported task-name link. Failed
 startup Log local-only view remains a separate pending operator check.
+
+## Required gates and commit
+
+```text
+$ ./scripts/k3d-manager _agent_lint
+running under bash version 5.3.20(1)-release
+$ ./scripts/k3d-manager _agent_audit
+running under bash version 5.3.20(1)-release
+```
+Both exited 0 on staged changes. No shell implementation touched; ShellCheck not applicable.
+Correction commit fbb52f67, with checkpoint hooks passing:
+```text
+check-doc-links: 4 file(s) OK
+[k3d-manager-v1.43.9 fbb52f67] checkpoint: before fix: link dispatch runs to their recorded spec
+```

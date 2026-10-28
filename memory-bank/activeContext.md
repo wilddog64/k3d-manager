@@ -665,3 +665,5 @@ Publication/click pending; first operator step make dispatch-metrics, then apply
 Dispatch dashboard and reload. Accepted doctor run3 Log is live verified; failed-startup Log
 availability remains pending, separate from this GitHub404. Commit SHA recorded after commit;
 no PR (repository policy).
+
+Correction commit: `fbb52f67` on `origin/k3d-manager-v1.43.9`; no PR created. Required staged `_agent_lint` and `_agent_audit` exited 0; checkpoint hooks passed (check-doc-links: 4 file(s) OK).
