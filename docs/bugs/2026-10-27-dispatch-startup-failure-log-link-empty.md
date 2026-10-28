@@ -1,6 +1,7 @@
 # Bug: failed startup Log link opens an empty Loki view
 
-**Status:** VERIFIED — single-table correction independently tested; two-dashboard deployment/UI verification pending
+**Status:** LIVE-VERIFIED — failed-startup local-only navigation and accepted/unverified destinations confirmed
+**Live evidence:** 2026-10-28 · run 1 · env local-grafana-v1.43.9 · scenario vectordb-retrieval-key-cache-failed-startup-log-navigation · commit 0077b7b8f6cbc13b76a07c63bbd1b9286afa36f4 · proves fix
 **Fix commit:** 0077b7b8f6cbc13b76a07c63bbd1b9286afa36f4
 **Priority:** P3
 **Filed:** 2026-10-27
@@ -124,3 +125,15 @@ Operator screenshot showed earlier runs with outcomeunknown/evidencenone/pathbla
 Operator screenshot/report “fixed now” confirms the single-table rendering with visible hyperlinks for accepted, unverified(empty-path) and failed startup rows, and correct status/Result labels. Destination navigation/test output still requires the next single click check. Recorded in the empty-link/attribution findings issue; no screenshot export.
 
 Operator accepted-log check PASS: webhook-incident-doctor-luna/run3 opened correct Agent Run Log with5/5BATS and21Python output, correct Resultheading. Earlier unverifiedrun2 availability navigation also PASS. Final failed-startup local-only route check still pending before original P3liveclosure. Full textual evidence in empty-link/attribution findings issue; no image export.
+
+## 2026-10-28 final operator live check — PASS
+
+Operator screenshot shows Version v1.43.9, Slug vectordb-retrieval-key-cache,
+Run 1 and existing heading `Run log — exit 127; local only (not shipped)`.
+Correct failed-startup destination and explicit availability verified. Combined
+with accepted doctor run3 test output and unverified run2 availability checks,
+this completes the original Log-link live acceptance. No raw startup log shipping
+or historical outcome changes. The separate task-name GitHub404 fix fbb52f67
+still needs metrics publication/dashboard deployment/click verification.
+Screenshot inspected in conversation only; no image export or terminal output
+provided for this UI check. Documentation-only record; no test rerun needed.

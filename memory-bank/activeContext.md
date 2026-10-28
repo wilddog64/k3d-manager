@@ -667,3 +667,13 @@ availability remains pending, separate from this GitHub404. Commit SHA recorded 
 no PR (repository policy).
 
 Correction commit: `fbb52f67` on `origin/k3d-manager-v1.43.9`; no PR created. Required staged `_agent_lint` and `_agent_audit` exited 0; checkpoint hooks passed (check-doc-links: 4 file(s) OK).
+
+## 2026-10-28 failed-startup Log live verification — PASS
+
+Operator screenshot: Version v1.43.9; Slug vectordb-retrieval-key-cache;
+Run 1; heading `Run log — exit 127; local only (not shipped)`.
+Original startup Log bug now LIVE-VERIFIED, with accepted doctor run3 output
+and unverified run2 availability already passed. No screenshot export, runtime
+mutation or test rerun (documentation only). Separate task-name GitHub404 fix
+fbb52f67 remains offline verified, publication/click pending; next single step
+still operator make dispatch-metrics unless already completed. No PR.
