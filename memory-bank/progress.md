@@ -1247,3 +1247,13 @@ failclosedinvalid/open/mixed, preserve normalcodefix/ancestry/legacy and UI.
 Native gpt-6-luna isolated implementation planned, independent review/gates/
 landing/push then operator publisher/rowcheck. No new table, causeclaim, parent
 status rewrite or live actions; codefix scope now explicitly authorized.
+
+## 2026-10-28 investigation metrics Luna review/rework
+
+Task investigation-verification-metrics-luna run1exited; rootrejectedinvaliddate
+stilltrueflags andmalformedexplicitFixheaderaccepted (actualprobes recorded).
+Also restore unrelatedassertions, testrealGitdates/ref/record andlegacy/unassigned.
+ResumedLunarun2; firstdraftnotaccepted/landed. Baseline232Python+2promtoolskips,
+38BATS; finalPROMTOOLsetwillrunskips. Fullactualoutputs
+ docs/issues/2026-10-28-investigation-verification-metrics-review.md.
+No live writes/credentials/screenshotexports; parentCLOSEDunchanged, no PR.
