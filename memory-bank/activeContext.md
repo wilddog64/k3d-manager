@@ -847,3 +847,19 @@ mapacceptance/retrospectivelimits, recommend operationalclosure vsconcretegap,
 retainrootcauseunconfirmed separately, typedinvestigationmetadata/nofakeFixSHA.
 Coordinator independentlyreviews/appliestruthfulstatus. PRChecks payment-only
 liveview remains pending separately, not replaced by this investigation.
+
+## 2026-10-28 webhook incident operational closeout accepted
+
+Luna webhook-incident-closeout-luna auditcompleted, independentlyreviewed actual
+localhealthy11:44anddeliveredHTTP200/all21health11:49proof. No webhookrepair
+indicated, no newcodebugproven. ParentCLOSED—operationallyrecovered, notcausalfix.
+UnknownOct26cause split docs/issues/2026-10-28-webhook-offsite-historical-cause-followup.md.
+Existingheartbeatfollowuplink preserved; historicalE1unavailableexplicit.
+Sourceconsumerprobe: typedinvestigationLIVE statuswouldpublishlive_evidence=missing;
+useCLOSED(nofakeFixcommit/codeverificationflags), retainactualoperationalproof.
+Report docs/issues/2026-10-28-webhook-incident-closeout-review.md includesfullprobe.
+Review-onlyreportadoptedbycoordinator, notduplicateimplementationland: nativeguard
+onlysinglepriorspecslug but2alreadylanded; no guard/ledger/markers altered. Future
+review-only/multisupersedingtracking andtypedproofpublisher gap recordedoutofscope.
+No live/provider/restart/credential/screenshotexport/testrerun/PR. PRCheckspayment
+liveviewstillpending separately. Nextpublishbugmetrics thencheckOpenrowclears.

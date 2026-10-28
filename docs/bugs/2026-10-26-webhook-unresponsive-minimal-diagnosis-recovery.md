@@ -1,19 +1,22 @@
 # Incident: webhook unresponsive while operator offsite — minimal diagnosis and controlled recovery
 
 **Filed:** 2026-10-26, operator report at approximately 07:20 PDT
-**Status:** OPEN — current local, Slack and cloud-bridge delivery confirmed; historical offsite cause remains unknown
+**Status:** CLOSED — operationally recovered; current local and external delivery verified, October26 cause remains unconfirmed
+**Verification type:** investigation
+**Operational verification:** current local HTTP and completed cloud-bridge delivery passed on 2026-10-28
+**Live investigation evidence:** 2026-10-28 · source operator · reference docs/issues/2026-10-28-three-bug-luna-batch-verification.md · env m4-webhook-and-cloud-bridge · scenario current-local-and-delivered-health-check · proves m1,m3,m4
 **Priority:** P2
-**Severity:** medium — Slack/cloud-bridge remote management degraded or unavailable; actual host and service state unknown
+**Severity:** historical medium — offsite remote-management interruption; current local and external operation recovered
 **Release:** v1.43.9 (bug; no new plan slot)
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-26; renewed 2026-10-27 Luna batch for the bounded diagnostic deliverable and later one-at-a-time operator live checks
-**Dispatch:** go — model `gpt-6-luna`; task `webhook-incident-doctor-luna`
+**Dispatch:** complete — doctor and bridge follow-up already landed; Luna closeout review accepted, no new implementation required
 **Component:** m4 host `com.k3d-manager.webhook` launchd LaunchAgent; associated cloud-bridge
 **Related:** `docs/bugs/2026-10-26-independent-heartbeat-healthchecks-monitoring.md`; `docs/bugs/2026-10-23-restart-webhook-kickstart-ignores-plist-env-changes.md`
 
 ## Symptom and evidence
 
-Operator observed the webhook server unresponsive while away from home. There is currently **no** direct m4 process output, listener test, journal/log evidence or successful post-failure request. Unknown whether m4 is powered on, launchd has a job, a process exists, the loopback listener responds, the Cloudflare/network ingress fails, or the cloud-bridge is also affected. Do not attribute the incident to the October 23/24 restart fix without evidence.
+At initial filing the operator observed the webhook server unresponsive while away from home, without a contemporaneous m4 process/listener/local-HTTP snapshot. The historical failure state and cause remain unknown. Subsequent current local and external request/reply checks passed as recorded below. Do not attribute the historical incident to the October23/24 restart fix or bridge SSH fix without evidence.
 
 Repository inspection on `k3d-manager-v1.43.9` confirms that `make restart-webhook` invokes `launchctl bootout`, retries `launchctl bootstrap` up to five times, and then calls `restart-cloud-bridge`. Thus, it is an existing supported recovery action, but can interrupt both webhook and bridge and will not repair a down/offline host.
 
@@ -123,10 +126,10 @@ interface:
 
 ## Definition of Done
 
-- [ ] E1 collected (or clearly documented as unavailable if process was already restored).
-- [ ] Single controlled repair attempt, if indicated, with result documented.
-- [ ] Local webhook and external read-only request path independently live-verified.
-- [ ] Remaining failure/root-cause investigation linked or split; mark resolved only on evidence.
+- [x] Historical outage E1 unavailable; current redacted doctor snapshot and that retrospective limit documented.
+- [x] Webhook repair not indicated: authenticated local health passed. Separate operator bridge activation and process result recorded.
+- [x] Local doctor11:44:33Z and completed health request11:49:51Z independently confirm current operation.
+- [x] Historical cause split into linked investigation; operational closure based on actual local and delivered-response evidence.
 
 ## What NOT to Do
 
@@ -344,3 +347,19 @@ for repeated healthy restarts. Only documented proven codebugs warrant another
 implementation dispatch. Coordinator independently reviews and decides/applies
 status after this audit. Rules gates: doclink check for newreport, diffcheck;
 no unit suite rerun necessary for docs-only work. Include actual output.
+
+## Coordinator accepted Luna closeout review — 2026-10-28
+
+Latest [Luna closeout audit](../issues/2026-10-28-webhook-incident-closeout-review.md)
+recommends closing the active operational incident as recovered. Coordinator
+independently agrees: current localHTTPandexternaldelivery are proven, repair
+wasnotindicated, and unknownhistoricalcause alone is not a currentP2outage.
+[Historical investigation](../issues/2026-10-28-webhook-offsite-historical-cause-followup.md)
+remainsOPEN with evidencelimits and recurrencechecklist. Earlier OPEN statements
+are chronological records, superseded for operational status by this closeout.
+
+No causal Fixcommit is assigned and no existing rootcause claim is strengthened.
+Status CLOSED is deliberate: existing metrics do not support investigation-only
+LIVE-VERIFIED evidence consistently, so no codefix/livefix verification flags
+are fabricated. Current health verification remains in typed investigation
+metadata and full actual evidence. No newcode/restart/provider/credential action.
