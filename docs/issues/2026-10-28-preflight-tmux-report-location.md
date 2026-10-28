@@ -68,3 +68,28 @@ of read-only terminal inspection; no implementation acceptance or live security
 pass inferred. Required documentation lint/audit/checkpoint hooks run before
 commit. Cloudflare settings/F0 remain unverified as recorded in
 [the existing operator report](2026-10-28-cloudflare-preflight-operator-report.md).
+
+## Operator-supplied address: still a different terminal view
+
+Operator supplied `/private/tmp/tmux-501/default work:4.0`. Coordinator used
+that exact socket/address and complete available history. Actual extraction
+output (exit0):
+
+```text
+{"pane": "work:4.0", "logical_lines": 98, "preflight_command_lines": 0, "reports": 0}
+```
+
+A credential-redacted tail inspection showed older dispatch status output
+ending at a05:42:31 shell prompt, not a preflight run. Unrelated terminal
+contents are not copied into this record. Existing session metadata reported
+attached0. This does not identify the terminal containing the operator's
+preflight report. No keys were sent and no command was run in the pane.
+
+The earlier suggested tmux display-message locator can select the default
+pane when invoked outside tmux; it was insufficient to prove the user's
+actual terminal context. Acknowledge this and ask for the one-line result
+of printf 'pane=%s\n' "${TMUX_PANE:-not-in-tmux}" in the terminal showing
+preflight. No JSON copy or rerun requested. Location remains partial/pending.
+Previously provided preflight JSON remains available in the prior report;
+no new settings or TLS evidence was obtained here. No implementation change
+or BATS/ShellCheck rerun; documentation gates only.

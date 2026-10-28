@@ -1055,3 +1055,15 @@ locationrequiredtocontinue, noJSONpasteorrerequestedrun. Previousoperator
 docs/issues/2026-10-28-preflight-tmux-report-location.md. Docs-onlyrecord,
 no BATS/ShellCheck rerun; gatesbeforecommit. NoPR(Claudeowns)/noactualfixclaim.
 Otherpendingfulltest-allfreshpublication/CFmanualreview/GUIacceptancespreserved.
+
+## 2026-10-28 exact tmux address read: report still absent
+
+Operator supplied/private/tmp/tmux-501/default work:4.0. Exactcapturecomplete
+history98logicallines,0preflightcommands/0reports. Redactedtailendsold05:42:31
+dispatchstatus, sessionattached0; no newpreflight obtained/keys/probes/writes.
+Explainedearlierdisplay-message locatorcanpickdefaultpaneoutsideactualtmux;
+askoperator one-line printf pane=%s withTMUX_PANE fallbacknot-in-tmux. NoJSON
+copy/newrunrequested. Previousfull17:36:46Zreportalreadyknown, no newsettings
+verification. Existingtmuxlocationissueupdated(actualcountoutput); docs-only
+no BATS/ShellCheck rerun, gatesbeforecommit, noPR/implementationcompleteclaim.
+Alltest-all/CFmanualreview/GUIacceptancespending preserved.
