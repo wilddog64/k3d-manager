@@ -433,3 +433,53 @@ push: git -C /Users/cliang/src/gitrepo/personal/k3d-manager push origin k3d-mana
 A branch-SHA lookup after landing returned unknown revision because dispatcher had already removed its task branch; SHA above comes from landed release HEAD. No history rewrite. No production deployment/metric push/GUI click/restart by coordinator. First operator step make platform-ops to deploy dashboard; then recheck unsupported plain paths and separately a supported landing-log link. UI verification remains pending even though source-contract/query/fixture gates pass.
 
 Metadata clarification from actual ledger: previous recent tasks omitted optional coordinator/primary/landing declarations (sourceunreported or actorunknown); known workerLuna is independent. Blank token cells for historical exit127 match no codex_usage events after startup failures (missingcodex/node), not fabricated zero. Successfulretry2 is separate usage. No old metadata/costs backfilled. Corrective task declares coordinator and primary vendoropenai/modelunknown; landing actorcodex/vendoropenai/modelunknown. Acting coordinator remains unrecorded absent a handoff, and exact model/costs stay unknown. These metadata limits are independent of task success.
+
+## Correction: platform-ops does not install Agent Dispatch dashboard
+
+Operator followed coordinator's suggested make platform-ops and supplied this tail:
+
+```text
+secret/platform-ops-app-rebuild unchanged
+INFO: [argocd] Syncing platform-ops-git-writer Secret (git-token) into namespace platform-ops from Keychain...
+secret/platform-ops-git-writer unchanged
+INFO: [argocd] ArgoCD monthly credential rotator applied
+Success! Uploaded policy: argocd-rotationSuccess! Data written to: auth/kubernetes/role/argocd-rotationINFO: [argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m
+INFO: [argocd] Secrets still to create manually (no durable local source):
+INFO: [argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops
+INFO: [argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \
+INFO: [argocd]     -p '{"data":{"slack-incoming-webhook-url":"<base64-url>"}}'
+```
+
+Read-only verification unexpectedly found no panel93. First probe assumed it existed and failed:
+
+```text
+Traceback (most recent call last):
+  File "<stdin>", line 7, in <module>
+StopIteration
+```
+
+Follow-up safely queried existing content:
+
+```json
+{
+  "panel93_present": false,
+  "panel_count": 30,
+  "plain_table_title": "Per run evidence",
+  "plain_log_actions": [
+    {
+      "title": "Open shipped landing-test log",
+      "url": "${__data.fields.loki_url}"
+    }
+  ]
+}
+```
+
+Source deploy_argocd_platform_ops in scripts/plugins/argocd.sh applies dashboards argocd, cve-autopatch, e2e, alertmanager-delivery, vectordb only; it does not apply grafana-dashboard-agent-dispatch.yaml. Coordinator's prior deployment guidance was wrong for this dashboard. Prior matching ConfigMap did not prove that target installs it. This is an instruction/prerequisite failure, not new evidence that the corrective dashboard code failed live. Do not ask the operator to repeat platform-ops or mutate secrets to fix this.
+
+This section supersedes earlier make platform-ops instructions for Agent Dispatch. Correct next single operator command from repo root:
+
+```bash
+kubectl --context k3d-k3d-cluster -n monitoring apply -f scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml
+```
+
+Applies only the reviewed dashboard ConfigMap. Inspect result, then independently compare deployed JSON before UI check. No coordinator apply/Secret read or mutation/restart performed. No code change or test rerun; prior offline138Python/28BATS/Ruff/PromQL remains. No deployment automation expansion silently added; canonical bug stays pending actual corrected-dashboard deployment/UI verification.
