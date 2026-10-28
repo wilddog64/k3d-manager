@@ -6,8 +6,8 @@
 **Severity:** low — readability/accessibility defect; target-state calculation remains correct
 **Release:** v1.43.9 (bug; does not count toward the five-plan cap)
 **Branch:** `k3d-manager-v1.43.9`
-**Approval:** operator explicitly approved filing 2026-10-27; implementation and deployment not separately authorized
-**Dispatch:** not authorized
+**Approval:** explicit operator 2026-10-28 Luna implementation batch; live deployment remains operator-run
+**Dispatch:** go — gpt-6-luna, target-state-readable-reason-luna
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` — Bug Tracking / Release forecast, Target state (panel 31)
 **Related:** `docs/plans/v1.43.5-release-forecast.md`; `docs/bugs/2026-10-25-release-forecast-ignores-live-window-and-unnamed-blocker.md`
 **Found by:** operator, screenshot 2026-10-27 approximately 11:00 PDT
@@ -37,8 +37,8 @@ The existing October 25 bug fixed the **meaning** of the blocker (identify v1.49
 ## Files
 
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
-- Existing dashboard regression test in `scripts/tests/plugins/`
-- Existing Bug Tracking Grafana dashboard guide
+- `scripts/tests/plugins/grafana_dashboard_bugs.bats`
+- `docs/guides/grafana-dashboards.md`
 - `CHANGELOG.md` if a production-facing fix is landed
 
 ## Acceptance
@@ -79,3 +79,31 @@ evidence:
 - Do not change TwinkleAI milestone dependency or claim that v1.49.0 is unblocked.
 - Do not use browser zoom or a tooltip as the only readability solution.
 - Do not deploy, merge, create a PR or commit to `main` while filing this bug.
+
+## Authorized Luna batch — 2026-10-28 (current instructions)
+
+Operator explicitly requested dispatch of this screenshot bug to GPT-6-Luna,
+independent coordinator verification, then operator live checks one at a time.
+This authorizes the bounded implementation/review below and supersedes older
+filing-only/not-authorized wording. No deployment, live provider requests,
+service restarts, Keychain reads/writes, credential changes, screenshot exports,
+PRs or main-branch changes are authorized to the worker. Work in the isolated
+worktree only. Do not edit memory-bank, this spec or source plan statuses.
+Do not stage/commit/push. Preserve DO NOT REMOVE comments. Coordinator owns
+staged gates, commit/push/landing and records. New/refactored functions <=8ifs;
+never weaken audit or hooks. Report unexpected failures verbatim.
+
+Use existing panel31 stat, fixed supported title/value sizing and a readable
+wrapping layout; no new sibling panel/table/row, no unrelated layout/width or
+Plans changes. Current Grafana11.4.0 upstream BigValueLayout supports
+options.text.titleSize/valueSize; title div has ordinary wrapping CSS and
+flex container flexWrap wrap. Inspect before choosing sizing; do not invent
+unsupported options. Preserve main status, colors, exact query and blocked
+reason displayName. Aim title16px/value40px, fit normal/narrow panel without
+truncation; live width acceptance remains operator-owned. If existing stat
+cannot meet acceptance, report that limit and propose a bounded alternative
+instead of silently adding UI. Avoid stale reason in nonblocked fixtures.
+Primary source: https://github.com/grafana/grafana/blob/v11.4.0/packages/grafana-ui/src/components/BigValue/BigValueLayout.tsx
+Rules gates: bats scripts/tests/plugins/grafana_dashboard_bugs.bats; parse
+YAML/JSON, confirm only panel31 changed and query/mappings unchanged; diffcheck.
+Use existing regression suite, meaningful pre-fix red, no broad refactoring.

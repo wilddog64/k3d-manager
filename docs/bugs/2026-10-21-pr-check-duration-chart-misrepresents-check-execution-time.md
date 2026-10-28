@@ -4,7 +4,7 @@
 **Status:** REOPENED — 2026-10-27 operator evidence of remaining current-versus-history inconsistency; previous offline tests passed, live acceptance pending
 **Priority:** P3 — misleading observability visualization; check status and collection remain functional
 **Severity:** low
-**Approval:** operator explicitly requested filing a P3 bug on 2026-10-21; implementation not yet approved
+**Approval:** explicit operator 2026-10-28 Luna follow-up implementation batch
 **Dispatch approval:** operator requested review and dispatch of current-release P3 bugs, 2026-10-22
 **Release:** v1.43.9 (reopened follow-up; originally filed against v1.43.5; bug exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.9`
@@ -108,6 +108,7 @@ interface:
 
 ## Files
 
+- `docs/guides/grafana-dashboards/k3dm-pr-checks.md`
 - `scripts/lib/hermes/pr_checks.py`
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
 - `scripts/tests/hermes/test_pr_checks.py`
@@ -172,7 +173,7 @@ evidence:
     text: Operator screenshots showing one repo with 0 open PRs and historical checks, another with 0 and no samples, and a healthy GitHub read, cross-checked with actual GitHub completion times.
 ```
 
-**Dispatch:** not authorized by this documentation amendment; no dashboard deployment, code change or PR is included.
+**Dispatch:** go — gpt-6-luna, pr-checks-history-semantics-luna (2026-10-28); no worker deployment.
 
 ## Definition of Done
 
@@ -188,3 +189,29 @@ evidence:
 - Do NOT change code or deploy a dashboard as part of this filing.
 - Do NOT assume the horizontal traces mean GitHub ran a check continuously.
 - Do NOT add an unbounded run-ID label or equate a scrape timestamp with completion time.
+
+## Authorized Luna batch — 2026-10-28 (current instructions)
+
+Operator explicitly requested dispatch of this screenshot bug to GPT-6-Luna,
+independent coordinator verification, then operator live checks one at a time.
+This authorizes the bounded implementation/review below and supersedes older
+filing-only/not-authorized wording. No deployment, live provider requests,
+service restarts, Keychain reads/writes, credential changes, screenshot exports,
+PRs or main-branch changes are authorized to the worker. Work in the isolated
+worktree only. Do not edit memory-bank, this spec or source plan statuses.
+Do not stage/commit/push. Preserve DO NOT REMOVE comments. Coordinator owns
+staged gates, commit/push/landing and records. New/refactored functions <=8ifs;
+never weaken audit or hooks. Report unexpected failures verbatim.
+
+Implement reopened M5-M7/N3-N4 presentation scope, not new lifecycle history.
+Change existing panel8 title/description to clearly describe historical sampled
+check durations which may include now-closed PRs. Explain scrape time vs GitHub
+completed_at; current Open PRs/table and read-success/freshness panels clarify
+normal no-open/no-history vs read-failed/stale. No new panels or labels, no
+filtering away history and no invented per-series closed/merged status. Keep
+collector and queries unchanged unless a specific failing fixture proves need;
+retain original completed timestamp export. Exact guide path in Files above.
+Rules gates: python3 -m pytest -p no:cacheprovider scripts/tests/hermes/test_pr_checks.py;
+bats scripts/tests/plugins/grafana_dashboard_pr_checks.bats; JSON parse/diffcheck;
+Ruff on any touched Python. Demonstrate meaningful old-presentation red plus
+mixed open/historical/no-history/failed-stale fixtures and All/repo consistency.

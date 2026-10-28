@@ -50,6 +50,7 @@ If launchd bootstrapping fails, process dies repeatedly, or an HTTP listener sti
 
 ## Files
 
+- `docs/issues/2026-10-28-webhook-incident-luna-review.md`
 - `bin/k3dm-webhook-doctor`
 - `scripts/tests/bin/test_webhook_doctor.py`
 - `scripts/tests/bin/restart_webhook.bats`
@@ -240,3 +241,37 @@ Full evidence docs/issues/2026-10-27-webhook-doctor-health-timeout-restart-infer
 Current doctor01:59:44Z healthy/all_oktrue and no recovery. Retained bridge60 SSH github.com port22 Undefined error:0 messages correlate with13:50–14:50Z incident window; later Oct27 retained bridge responses HTTP200/202 show subsequent activity. A separate controlled no-agent lookup failspublickey, while UseKeychain=yes succeeds. This confirms unattended-auth gap, not exact historical network cause; [bounded bridge follow-up](2026-10-27-cloud-bridge-unattended-github-ssh-auth.md) dispatched after user authorized investigation/tasks. Original incident remains OPEN; no restart/new remote request performed. [Full sanitized evidence](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md).
 
 Bridge follow-up implementation f046763ff2a45e8fe56b938a8f828658d0b05ebe landed with107Python tests/Ruff/staged gates passed. This addresses the reproducible no-agent Git auth gap, not the un-reproduced historical Undefinederror0 cause. No service reload/remote request yet; incident OPEN pending remaining live evidence. Full outputs in three-open-bugs issue.
+
+## Authorized Luna batch — 2026-10-28 (current instructions)
+
+Operator explicitly requested dispatch of this screenshot bug to GPT-6-Luna,
+independent coordinator verification, then operator live checks one at a time.
+This authorizes the bounded implementation/review below and supersedes older
+filing-only/not-authorized wording. No deployment, live provider requests,
+service restarts, Keychain reads/writes, credential changes, screenshot exports,
+PRs or main-branch changes are authorized to the worker. Work in the isolated
+worktree only. Do not edit memory-bank, this spec or source plan statuses.
+Do not stage/commit/push. Preserve DO NOT REMOVE comments. Coordinator owns
+staged gates, commit/push/landing and records. New/refactored functions <=8ifs;
+never weaken audit or hooks. Report unexpected failures verbatim.
+
+This run is an independent offline review and evidence consolidation, not a
+repeat of the implemented helper or an invented historical root-cause fix.
+The earlier deliverable is already landed (doctor keychain/timeout fixes,
+bridge fallback f046763f). For this review ONLY write
+`docs/issues/2026-10-28-webhook-incident-luna-review.md` (the other historical
+Files entries are read-only for this task). Read current implementation, related
+cloud-bridge-unattended-github-ssh-auth bug and existing incident issue evidence.
+Run current doctor/restart and cloud-bridge/restart unit suites; no actual
+--check, network/provider/live logs/Keychain/launchctl/SSH access. Record exact
+outputs and remaining gaps. Check stale diagnostic documentation against current
+port/credential contracts; report discrepancies without expanding code scope.
+Provide safe one-at-a-time operator live checklist (local doctor, separately
+operator bridge reload if needed, then benign cloud request/delivered result),
+conditions to stop or avoid restart, and distinguish current health vs historical
+cause. Leave original incident OPEN pending evidence. If no remaining code
+bug is proven, say so rather than asserting all fixed. Do not edit any code.
+Rules gates: python3 -m pytest -p no:cacheprovider scripts/tests/bin/test_webhook_doctor.py
+scripts/tests/bin/test_cloud_bridge.py scripts/tests/bin/test_restart_cloud_bridge.py;
+bats scripts/tests/bin/restart_webhook.bats; document-link/diff checks. Report full
+actual outputs, existing test failure details and no-live-action boundary.

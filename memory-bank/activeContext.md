@@ -737,3 +737,15 @@ Next singleoperator click first Title (VectorDB drift) expecting
  docs/plans/v1.43.9-vectordb-drift-kinds-and-age.md. Bug remains VERIFIED, livepartial.
 Evidence docs/issues/2026-10-28-plans-title-link-verification.md. No code/runtime
 changes, screenshot export or test rerun; no PR.
+
+## 2026-10-28 three screenshot bugs — Luna dispatch authorized
+
+Operator selects webhook incident, PR duration history semantics and Target state
+reason readability. Existing bug docs amended with explicit current authorization
+and bounded worker rules (no live writes/credentials/PRs). Incident is offline
+review of existing landed doctor/bridge work and remaining evidence, not presumed
+new fix/rootcause. PR follow-up preserves history/current queries and clarifies
+labels; blocker uses existing panel31 supported text controls, no extra panel.
+Worker isolated native gpt-6-luna tasks planned; coordinator independently tests,
+reviews/lands/pushes, then operator live checks one at a time. Prior Plans Title
+rendering passed; its exact plan click remains a separate pending acceptance.
