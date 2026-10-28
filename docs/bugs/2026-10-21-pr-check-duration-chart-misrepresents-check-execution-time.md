@@ -231,3 +231,14 @@ Independent4pytest+6BATS (promtool enabled, zero skips), Ruff, JSON/YAML/structu
 checks, staged lint/audit/hooks and post-rebase landing gates pass. Operator live
 GitHub timestamp/chart comparison remains pending; do not mark LIVE-VERIFIED.
 [Full outputs and review](../issues/2026-10-28-three-bug-luna-batch-verification.md).
+
+## Operator All/24h view and GitHub comparison — 2026-10-28
+
+Screenshot shows new historical title, current5openPRs (catalog62/basket56/
+order103/104/105), healthok, and retained payment93/94lines. GitHub API confirms
+payment93/94mergedOct27; real Build and Test timestamps give92s/97s respectively.
+Current-versus-history distinction is supported; payment-only and no-history
+views plus exacttooltip value comparison remain pending before liveclosure.
+[Full actual API outputs and observations](../issues/2026-10-28-pr-checks-github-timestamp-comparison.md).
+One skippedrun source timestamp interval isnegative1s; outsidepresentation-only
+scope, reportedforfuturecollectorinvestigation, notchanged. No imageexport/CIrun.

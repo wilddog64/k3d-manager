@@ -299,3 +299,14 @@ Correct PR-history fix deployed. Next operator single UI check: reload PR Checks
 select shopping-cart-payment and Last7days, inspect current counts/readhealth and
 historical sampled durations together. Later GitHub timestamp cross-check and
 no-history repo remain pending. Docs-only record; no test rerun/live mutation.
+
+## PR Checks operator All/24h screenshot — partial live PASS
+
+Actual screenshot RepoAll/Last24hours, not requestedpayment/7days. Updatedtitle
+and currentPR5/failing0/running0/readok/lastscrape7.25min visible. Retainedpayment
+93/94lines coexistwithcatalog62/basket56/order103/104/105currentrows. Read-only
+GitHub metadata confirms paymentPRsmergedOct27, actual Build and Test92s/97s.
+[Full API outputs/comparison and source anomaly](2026-10-28-pr-checks-github-timestamp-comparison.md).
+Nextsingleoperator selectonlyshopping-cart-payment, keepLast24hours, sendcurrent
+counts/tables+history/readhealth. Exacttooltip comparison/no-historyrepo later.
+CanonicalbugremainsVERIFIED. No screenshotexport/runtimewrites/testsrerun.

@@ -1188,3 +1188,13 @@ Historical sampled check durations (may include closed PRs), queryunchanged.
 Nextsingleoperator reloadPRChecks/paymentrepo/Last7days screenshot currenttables,
 readhealth+history; timestampcrosscheck/nohistoryrepo later. Fulltextualbatchissue;
 originalhistoricwebhookcause remainsOPEN, currentbridge livepassed; no PR.
+
+## 2026-10-28 PR Checks All/24h presentation partial PASS
+
+Operator screenshotAll/24h(notpayment/7d): newhistorytitle/current5rows/readok/
+lastscrape7.25min, retainedpayment93/94history. Read-onlyGitHubAPI PRsmergedOct27,
+BuildandTest92s/97s timestamps. Fulloutputs docs/issues/2026-10-28-pr-checks-github-timestamp-comparison.md.
+Nextsingleoperator paymentonlysame24h; exacttooltip/nohistoryrepo stillpending.
+UnexpectedGitHub94skippedcheck completed1secbeforestarted; outofscopefuturecollector
+followup, notfixed/usedcomparison. No screenshotexport/CIrun/livewrite/testrerun.
+PRbugVERIFIED notLIVE; normalAllviewPASSonly. No PRcreated.
