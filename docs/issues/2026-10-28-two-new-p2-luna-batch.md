@@ -512,3 +512,192 @@ ok 4 PR checks tables join populated rows without duplicate label fields
 ok 5 PR check duration legend uses a readable side layout without changing its query
 ok 6 PR checks distinguish current rows, retained history, empty ranges, and failed or stale reads
 ```
+
+## Final E2E command-order assertion review
+
+Coordinator added explicit ordered matching for e2e_verify_vcluster, captured
+rc=$?, then e2e_runner_publish_back $rc || true; exit $rc in both success and
+nonzero-SSH fixtures. No production E2E code changed. Full 116 BATS rerun:
+
+```text
+1..116
+ok 1 grep-q guard: no non-allowlisted pipeline retains -q
+ok 2 grep-q guard: matching producer is read to EOF under pipefail
+ok 3 grep-q guard: rejects a forbidden non-allowlisted fixture pipeline
+ok 4 grep-q guard: standalone grep-q is not a forbidden pipeline
+ok 5 grep-q guard: draining pipeline is not forbidden
+ok 6 public runner functions are dispatchable (no leading underscore)
+ok 7 e2e_remote.sh sources cleanly under set -euo pipefail
+ok 8 eval_gates accepts a healthy runner
+ok 9 eval_gates reports docker_down when Docker is unresponsive
+ok 10 eval_gates reports busy when the runner lock is held
+ok 11 eval_gates fails when the mean CPU idle is below the floor
+ok 12 one dipped sample does not refuse a mostly idle runner
+ok 13 eval_gates refuses a blob with no CPU samples
+ok 14 preflight retry retries capacity refusal and then succeeds
+ok 15 preflight retry does not retry busy refusal
+ok 16 preflight retry stops after the configured capacity retries
+ok 17 dispatch uses retry preflight and probe takes six top samples
+ok 18 eval_gates fails on low memory
+ok 19 eval_gates fails on low disk
+ok 20 eval_gates treats missing metrics as a capacity stop, not available
+ok 21 num_lt compares decimals
+ok 22 SSH options never weaken host verification and keep BatchMode
+ok 23 remote SSH command injects the homebrew+local PATH so tools resolve
+ok 24 preflight reports unreachable when the probe yields nothing
+ok 25 preflight surfaces the pure gate verdict from a live probe
+ok 26 cluster reconcile refuses to operate on the hub cluster name
+ok 27 cluster reconcile targets the dedicated runner context, never the hub
+ok 28 bootstrap returns unreachable without mutating when SSH is down
+ok 29 valid_digest accepts empty, bare, and repo-qualified sha256 digests
+ok 30 valid_digest rejects malformed or injection-y digests
+ok 31 runner_allowed enforces the allowlist
+ok 32 dispatch rejects a runner outside the allowlist
+ok 33 denied runners get the right redirect at every allowlist entry point before work starts
+ok 34 unknown denied runner keeps allowlist error and allowlisted names stay permitted
+ok 35 dispatch rejects an invalid digest
+ok 36 dispatch refuses to run and never falls back locally when preflight fails
+ok 37 dispatch reports the held lock holder and preserves the lock
+ok 38 dispatch builds the correct remote command and records a transcript
+ok 39 dispatch streams the GHCR token on stdin and not in the command string
+ok 40 the dispatch transcript never contains the GHCR token
+ok 41 dispatch returns the remote exit code when a token is streamed
+ok 42 dispatch sends an empty credential when no token source is available
+ok 43 an empty forwarded credential is treated as absent by the env resolver
+ok 44 the token resolver never prints the token value
+ok 45 dispatch refuses an unpushed SHA before SSH
+ok 46 dispatch refuses a malformed runner repository URL
+ok 47 dispatch uses an explicit runner repository override
+ok 48 dispatch returns the remote exit code unchanged
+ok 49 publish-back host loads from the operator conf file and env wins
+ok 50 publish-back conf ignores shell metacharacters and warns when absent
+ok 51 dispatch copies remote result files and preserves a non-zero exit code
+ok 52 make e2e-remote requires RUNNER and wires to the dispatcher
+ok 53 publish_build accepts a valid m2 payload and emits a deterministic name
+ok 54 publish_build accepts a real null-heavy summary (no digest, unparsed results)
+ok 55 publish_build rejects the local-m4 runner (local publishes itself)
+ok 56 publish_build rejects unexpected keys (namespace/kubeconfig/labels injection)
+ok 57 publish_build rejects missing required fields
+ok 58 publish_build rejects a malformed digest and a bad exit code
+ok 59 publish_build rejects an invalid result value
+ok 60 publish_build rejects non-JSON payloads
+ok 61 e2e_result_publish applies to the hub context and audits the outcome
+ok 62 e2e_result_publish rejects an empty stdin payload
+ok 63 e2e_result_publish rejects a bad payload and does not apply
+ok 64 publisher install builds a restricted forced-command authorized_keys entry
+ok 65 publisher install refuses a non-key file
+ok 66 remote path never exfiltrates M4 kubeconfig, Vault, or Cloudflare secrets
+ok 67 public failure/ops functions are dispatchable (no leading underscore)
+ok 68 lock token carries only owner/pid/ts and no shell metacharacters
+ok 69 the runner lock is a directory (atomic mkdir), probed with -e
+ok 70 lock acquire records the owner token via mkdir + meta
+ok 71 lock release only removes when the owner meta matches (never blind rm)
+ok 72 dispatch refuses and never falls back locally when the lock is held
+ok 73 dispatch chains publish-back after E2E and returns zero after lock release
+ok 74 dispatch preserves a nonzero SSH exit after tee and failed result copy
+ok 75 newest_summary returns the latest run json and skips retention markers
+ok 76 synth_summary writes a schema-valid failed summary carrying the exit code
+ok 77 synth_summary clamps an out-of-range exit code
+ok 78 publish_back_push fails when no M4 target is configured
+ok 79 publish_back_push uses the dedicated key and streams the file over stdin
+ok 80 publish_back synthesizes a summary when the run left none, and returns 0
+ok 81 publish_back retains a publication_pending marker when M4 is unavailable
+ok 82 publish_replay pushes retained results and renames them published, idempotently
+ok 83 publish_replay reports still-pending (non-zero) when a push fails
+ok 84 M4 replay enforces the allowlist and the reachability guard
+ok 85 M4 replay drives the remote publish_replay when the runner is reachable
+ok 86 M4 republish keeps the newest result per service and tier in run order
+ok 87 M4 republish continues after a publish failure
+ok 88 M4 republish treats a failed fetch as nothing to do
+ok 89 M4 republish enforces the allowlist and reachability guard
+ok 90 unlock reports nothing to clear when no lock is present
+ok 91 unlock refuses while an E2E run is still active
+ok 92 unlock refuses a fresh (not-yet-stale) lock
+ok 93 unlock clears a stale lock past the max age with no live run
+ok 94 unlock enforces the allowlist
+ok 95 health reports a hub outage as critical, distinct from runner state
+ok 96 health is ok when the hub is up and the runner is available
+ok 97 an unavailable runner is a warning, but critical when a run was requested
+ok 98 the failure path never auto-restarts OrbStack, deletes a cluster, or blind-clears the lock
+ok 99 make targets wire the failure/ops entry points
+ok 100 orbstack upgrade: fresh compact last-success timestamp passes preflight
+ok 101 orbstack upgrade: refuses a compact last-success timestamp older than 24 hours
+ok 102 orbstack upgrade: refuses a missing or malformed last-success marker
+ok 103 orbstack upgrade: FORCE overrides only no-update status
+ok 104 orbstack upgrade: refuses active dispatch and lifecycle work
+ok 105 orbstack upgrade: refuses wrong context or absent DR copy
+ok 106 orbstack upgrade: refuses a real run without a TTY
+ok 107 orbstack upgrade: typed no refuses without running orbctl update
+ok 108 orbstack upgrade: watchdog unseals when Vault stays sealed and skips DR when it unseals
+ok 109 orbstack upgrade: repoints only after UID change and an invalid SecretStore
+ok 110 orbstack upgrade: repairs drift, republishes metrics, and kicks only dead port-forwards once
+ok 111 orbstack upgrade: a hub that is ready when the deadline passes is not a failed upgrade
+ok 112 orbstack upgrade: forecast probe drains large metrics producer to completion
+ok 113 orbstack upgrade: reports empty regressions for equal counts and names a count drop
+ok 114 orbstack upgrade: failed unseal does not stop later recovery and verification
+ok 115 orbstack upgrade: never deletes Kubernetes objects or reads Keychain values
+ok 116 orbstack upgrade: destructive and credential guard assertions are effective
+```
+
+Raw ShellCheck then exited0 without output. A subsequent check incorrectly
+applied plain bash -n to the BATS DSL file; actual exit2:
+
+```text
+scripts/tests/plugins/e2e_remote.bats: line 69: syntax error near unexpected token `}'
+scripts/tests/plugins/e2e_remote.bats: line 69: `}'
+```
+
+This is a verifier-command mistake: plain Bash does not parse @test declarations.
+BATS parsed and passed all116 cases above. Corrected bash -n checks target the
+actual Bash production scripts bin/k3dm-orbstack-upgrade and scripts/plugins/e2e_remote.sh;
+both and git diff --check exited0 with no output. No source workaround added.
+The initial blanket statement about Bash syntax should be read with this
+correction; BATS syntax is verified by BATS. Task checkpoint71fc494d hooks,
+_agent_lint and _agent_audit passed; final native rebase/landing gates running.
+
+## Landing attempt caught two remaining checkout-dependent E2E fixtures
+
+First native landing failed its tests and did not merge. Its isolated
+K3DM_REPO_ROOT points at the unpushed task commit, unlike the coordinator's
+pushed root checkout used implicitly by two older tests. Exact focused
+reproduction with K3DM_REPO_ROOT=$PWD (exit1):
+
+```text
+1..2
+not ok 1 dispatch refuses to run and never falls back locally when preflight fails
+# (in test file scripts/tests/plugins/e2e_remote.bats, line 358)
+#   `[[ "$output" == *"status=busy"* ]]' failed
+# Last output:
+# ERROR: [e2e-remote] HEAD 5d65fa7a0d2e8d2908331b5f1d92205b24b11c30 is not pushed; push the branch first
+not ok 2 dispatch returns the remote exit code unchanged
+# (in test file scripts/tests/plugins/e2e_remote.bats, line 573)
+#   `[ "$status" -eq 7 ]' failed
+# Last output:
+# ERROR: [e2e-remote] HEAD 5d65fa7a0d2e8d2908331b5f1d92205b24b11c30 is not pushed; push the branch first
+```
+
+Both stop at the real pushed-HEAD guard, before their intended preflight or
+remote-exit behavior. Coordinator reused Luna's safe fixture for these two
+in-scope tests and stubbed the actual retry helper in the preflight case.
+Assertions now prove no remote/credential/copy work on preflight refusal and
+lock release after SSH exit7. No production guards changed, no real remote
+command or credential lookup. Same unpushed environment after repair (exit0):
+
+```text
+1..2
+ok 1 dispatch refuses to run and never falls back locally when preflight fails
+ok 2 dispatch returns the remote exit code unchanged
+```
+
+One initial edit attempt lacked the external-worktree sandbox permission and
+failed before writing; final traceback line:
+
+```text
+PermissionError: [Errno 1] Operation not permitted: 'scripts/tests/plugins/e2e_remote.bats'
+```
+
+The same scoped edit was retried through the permitted escalated tool and
+succeeded; no approval rejection or guard bypass occurred. Raw ShellCheck
+and diff check exited0. Required checkpoint and native landing will rerun
+all116 focused cases plus37 Python contracts before acceptance. Broad1913-case
+output predates these two test-only repairs; production is unchanged since it.

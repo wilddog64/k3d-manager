@@ -1340,3 +1340,13 @@ Operator screenshot confirms all4names/assertions; originalrawlog stillabsent.
 Fullpublishedmake test-all/operatoracceptance pending, no alertclosure claim.
 Cloudflaretooling2e0be3f6 alreadypushed/offlineverified169pytest; securitybugOPEN.
 No PR (Claude), no runtimewrites/accountchanges/credentials/livepublication.
+
+## 2026-10-28 offline landing rework: fixture checkout dependency
+
+First nativeoffline landing refusedtests36/48 (notmerged): isolated taskHEAD
+notpushed triggeredrealguard in2olderfixtures usingrealGit. Captured2red with
+K3DM_REPO_ROOT=$PWD, reusedLuna'ssafehelperinpreflight-refusal/SSHexit7 tests,
+2green sameenv; rawShellCheck/diffpass. No productionguardrelaxed. Scopeonly
+E2EBATS+testguide. Newcheckpoint/native116BATS+37Pythonretry pending. Exact
+red/green andfailededitpermission retry recordedtwo-new-P2batchissue.
+No closure/liveclaims; broadknownESO3.15P3 and20skipsremainrecorded.
