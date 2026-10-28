@@ -1287,3 +1287,14 @@ lint/audit/checkpoint/push pending; noPR perrepositoryrule (URLN/A).
 Browser smoke evidence pushed: 01831bd2. Staged lint/audit and checkpoint
 hooks passed; check-doc-links4filesOK. Documentation-only; BATS/ShellCheck
 not applicable. PRURLN/A per repository rule. Slack/TLS acceptance pending.
+
+## 2026-10-28 HTTPS application checks accepted
+
+Operator freshGrafanalogout/loginpass (mechanismnotclaimedSSO), plus fresh
+Slackmakefix-listjob02be2e0bqueued/started/succeeded/reply. FrontendSSOpass,
+ArgoCDexistingaccesspass; no needforceArgoCDlogoutforagreedaccesscheck.
+FullSlacktranscription/limits inexistingCFoperatorissue, noscreenshotexport.
+FirstHTTPSchangesmokepass; recommendoperatorCF_AI minimumTLS1.0to1.2only,
+TLS1.3On/allotherskept; awaitoperatorchangeconfirmation+postverification.
+LatestminTLS1.0/securitybugOPEN; no coordinatorcredentials/writes/commands.
+Docs-onlyBATS/ShellCheckN/A; lint/audit/hooksrequired, noPR(URLN/A).

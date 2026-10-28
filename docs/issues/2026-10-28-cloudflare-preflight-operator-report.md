@@ -945,3 +945,45 @@ verification. Minimum TLS remains1.0 in the latest supplied settings report;
 security bug staysOPEN. No screenshot files exported, credentials read,
 Cloudflare setting changes or additional live probes performed. This is
 documentation-only verification; BATS/ShellCheck not rerun (no code change).
+
+## First-change application acceptance completed by operator
+
+Operator subsequently reports logout and successful re-login to Grafana;
+screenshot shows authenticated Grafana Home at grafana.3ai-talk.org. This
+supersedes the earlier existing-session-only limit for Grafana, but does not
+assert the login mechanism was SSO. Frontend SSO already passed per operator.
+ArgoCD remains verified for existing authenticated access only.
+
+A fresh Slack screenshot shows the k3d-manager app, all messages "Just now":
+
+```text
+make fix-list queued — job 02be2e0b
+make fix-list started by slack:wilddog64:U4C9LDQP2 — job 02be2e0b
+make fix-list succeeded — job 02be2e0b
+make fix-delete-pod          APP and NS are required
+make fix-eso-refresh         No arguments needed
+make fix-force-sync          APP is required
+make fix-list                List all fix targets with descriptions
+make fix-restart             APP and NS are required
+make fix-status              NS is required
+make fix-sync                APP is required
+```
+
+Operator-provided evidence verifies a fresh command/queue/execution/reply round
+trip after enabling Always Use HTTPS. No coordinator message sent or command
+triggered. Screenshots transcribed only, not exported. All seven HTTP upgrades
+and direct HTTPS baseline were independently checked earlier; frontendSSO,
+Grafana re-login and Slack round trip now pass. No forced ArgoCD logout required
+for the agreed access smoke check.
+
+Recommendation: operator may now ask Cloudflare AI to change only zone
+`3ai-talk.org` minimumTLS1.0 to1.2, retain TLS1.3On and all other settings,
+and report resulting settings/change time. This is guidance, not a claim of
+change authorization/execution by coordinator. MinimumTLS latestknown1.0;
+security bug remainsOPEN until post-change verification. Cloudflare docs
+confirm minimum version applies to visitor connections; client_unsupported
+legacy probes remain inconclusive about edge rejection.
+https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/
+
+Documentation-only acceptance update; no runtime tests/BATS/ShellCheck needed.
+No live probe, credential lookup, settings change, session change or publish.

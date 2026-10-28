@@ -270,3 +270,11 @@ Grafana and ArgoCD existing authenticated sessions remain accessible. These
 are not fresh login/expiry tests for those services. Exact interpretation and
 remaining Slack/TLS acceptance recorded in the operator-report issue. No
 session regression inferred or live settings changed. Bug remainsOPEN.
+
+## HTTPS application smoke acceptance
+
+Operator fresh Grafana logout/login succeeded; fresh Slack make fix-list
+job02be2e0b queued/started/succeeded with response. FrontendSSO alreadypass;
+ArgoCD existingaccesspass. FirstHTTPSchange smokeaccepted; separateTLS1.2
+change/postcheckpending, latestmin1.0. FullverbatimSlackscreenshottext in
+operatorreportissue. NoCloudflarewritebycoordinator; bugOPEN.
