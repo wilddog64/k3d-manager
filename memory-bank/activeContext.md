@@ -1123,3 +1123,17 @@ Nextoperatorrunmake test-all inM4SSHpane(currentfixcfb60be0/usual3.13shell);
 oldM2resultnotcurrentfixvalidation. NoM2branchswitch/depsinstall/stop/restart/
 metricspush/credentialretrieval. Docs-onlywatch,no extraBATS/ShellCheckrerun,
 gatesbeforecommit. P2OPEN/currentfullrunpending, CFmanualreviewpending. NoPR.
+
+## 2026-10-28 Python correction: active M2 is3.11.6
+
+Usercorrected3.13assumption. ReadactiveM2%10labelsPython3.11.6/python-3.11;
+existingpersonal/.direnv/python-3.11/bin/python3--version=3.11.6. Installed
+Homebrewdefault3.15.1/opt311binary3.11.18 differ; SSHnonlogin/usr/bin/python3
+3.9.6 notoperatorinteractiveenv. Optionalpythonabsentexit127diagnosticrecorded.
+Acknowledgedcorrection; no versionupgrade/depsinstall/checkoutchange.
+OldM2branchv1.43.1 HEAD71ef4dea andmissingyaml remainactualtestfindings.
+Don't require3.13merelyfrompriorrecommendation; currentv1.43.9checkoutand
+itsactualtestdependenciesneedverificationonchosenhost. ExistingM4 3.13test
+proofremainsvalidhistoricalcoordinatortest, notclaimofuserM2environment.
+M2watchissueupdatedactualoutputs; docs-onlynoBATS/ShellCheckrerun/hooksapply.
+Currentfulltest-all/CFmanualacceptancepending. NoPR/remotechanges.

@@ -68,7 +68,7 @@ latest_prompt_host=m4-air
 ```
 
 Recommended next operator action: run make test-all in tmux window2's M4 SSH
-shell, using the current configured v1.43.9 checkout/usual Python3.13. Do not
+shell, using the current configured v1.43.9 checkout and its verified test dependencies. Do not
 change M2's intentionally older branch/dependencies/publisher under this
 watch-only task. If M2 itself should be updated, that is separate requested
 work; current priority is current-fix acceptance on M4. No more pane-locator
@@ -1735,3 +1735,41 @@ Collected artifacts in scratch/test-logs/all/20261028-113906
       1 kubectl	config get-contexts ubuntu-k3s
 make[1]: *** [test] Error 1
 ```
+
+## Python environment correction after operator feedback
+
+Operator states Python3.11. Coordinator verified actual active M2 pane %10
+contains these version labels/output (filtered read-only capture):
+
+```text
+%10 visible_python_labels=['python-3.11', 'Python 3.11.6', 'python-3.11']
+```
+
+Existing interpreter binaries checked without installation or environment
+changes; actual output:
+
+```text
+/opt/homebrew/bin/python3 Python 3.15.1
+/opt/homebrew/opt/python@3.11/bin/python3.11 Python 3.11.18
+/Users/cliang/src/gitrepo/personal/.direnv/python-3.11/bin/python3 Python 3.11.6
+```
+
+Non-login SSH resolves /usr/bin/python3 as Python3.9.6, which is not the
+operator's active interactive environment. Its optional python command is
+absent; that diagnostic command exited127 after reporting python3:
+
+```text
+/usr/bin/python3
+Python 3.9.6
+zsh:4: command not found: python
+```
+
+Coordinator acknowledges the earlier3.13 instruction was an assumption.
+Active M2 uses3.11.6; no Python replacement is requested or performed. The
+old branch HEAD71ef4dea and missing yaml finding remain valid. Check each
+host's actual test environment; do not infer it from non-login SSH defaults
+or older prompt labels. M4 has no matching personal/.direnv/python-3.11
+path; that does not establish its active shell interpreter.
+
+No code, dependency installation, tests, metrics publication or terminal
+keystrokes during version verification. Docs lint/audit/hooks only.
