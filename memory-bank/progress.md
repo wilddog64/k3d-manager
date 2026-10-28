@@ -1441,3 +1441,19 @@ noJSONpaste. Do notassumefileexists/newcheckpassed. Previous17:36:46report
 alreadyknownpartial; no zonewrites/credentials/probesbycoordinator.
 Existinglocationissue recordsactualcounts+useroutput; docs-onlynotestsrerun.
 NoPR/implementationcompleteclaim; fulltest-allandCFmanualacceptancepending.
+
+## 2026-10-28 saved Cloudflare report read PASS; F0 remains PARTIAL
+
+Operator done; actual/tmp/k3dm-cloudflare-preflight.json exists7279bytes, valid
+JSON timestamp2026-10-28T18:16:57.631803Z. InlineobservationalassertsPASS:7hosts,
+allTLS1.2/1.3certvalidnegotiated,0HTTPHTTPSupgrades,1.0/1.1clientunsupported,
+APIallnull/sourceerrorcredentialunavailable/f0false. Fullactualstdout+operator
+stderr warnings in existingCFoperatorreportissue. Explainedlegacydeprecation
+warnings intentionalprobe/localunsupported, notedge-rejection orAPIcause;
+nohelperchanges/suppressions/newprobesbycoordinator. Filehandoffworks, tmux
+locatorresolvedactualterminaloutside; preferfileoutputoverbigJSONcopy.
+No identicalrerunneeded. NextCloudflareAI/dashboardreadonly currentsettings/
+rules/hostnameexceptions, thenremainingF0compatreviewbeforeF1separatego.
+SecuritybugOPEN, noAPIcredentialsretrieved/zonewrites/restarts/newplan/PR.
+NoBATS/ShellCheck rerun(docs/live-reportreadonly); docgatesbeforecommit.
+Freshfulltest-allpublication/incidentGUI/paymentPRchecksremainpending.

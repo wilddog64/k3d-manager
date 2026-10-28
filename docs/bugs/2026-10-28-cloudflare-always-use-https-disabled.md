@@ -233,3 +233,12 @@ existing preflight howto: cloudflare-preflight accepts ZONE_ID and follows
 existing DRY_RUN=1 convention. No helper, credential, scheduling, API-write or
 UI changes. Exact operator output and wrapper verification are recorded in
 `docs/issues/2026-10-28-cloudflare-preflight-operator-report.md`.
+
+## Latest saved operator report: 18:16:57Z
+
+Read actual /tmp/k3dm-cloudflare-preflight.json successfully:7hosts, valid
+TLS1.2/1.3 on all,0/7HTTP-to-HTTPS upgrades, legacyTLSclient_unsupported, API
+settingsallunknown/no credential. Deprecation warnings reflect intentional
+legacy probes, not edge rejection. Fullactualoutput in existingoperatorreport
+issue. F0partial unchanged; nextreadcurrentzonevalues/rules viaCloudflareAI or
+dashboard. No additional probe rerun, warning suppression or live change.

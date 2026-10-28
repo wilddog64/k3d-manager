@@ -128,3 +128,14 @@ not infer that it exists or a new check passed. No credentials should be
 pasted or retrieved by coordinator. No new preflight result, API settings
 read, TLS enforcement proof, live approval or zone mutation in this turn.
 Docs-only record; no BATS/ShellCheck rerun, normal doc lint/audit/hooks apply.
+
+## File handoff completed / locator resolved
+
+Operator said done after redirecting the check. Coordinator read
+/tmp/k3dm-cloudflare-preflight.json (7279bytes), validJSON, fresh timestamp
+2026-10-28T18:16:57.631803+00:00. Report extraction succeeded without JSON
+copy/paste or terminal access. Full actual stdout/stderr and assertion results
+are in [the operator report](2026-10-28-cloudflare-preflight-operator-report.md).
+Use this file path for future operator result handoff; normal terminal is not
+a tmux pane. No further locator question or rerun is needed for this result.
+Cloudflare preflight itself remains partial, not a live hardening pass.

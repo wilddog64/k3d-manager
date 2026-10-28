@@ -372,3 +372,346 @@ Always Use HTTPS is the intended edge change after remaining preflight review;
 afterward expect HTTP301/308 toHTTPS, with directHTTPS baseline preserved.
 Current API settings still unknown, clientunsupportedlegacyTLS inconclusive.
 No live change approved/performed and no historical502 cause inferred.
+
+## Saved-file handoff succeeds: 18:16:57Z operator report
+
+Operator completed the Make check redirected to /tmp/k3dm-cloudflare-preflight.json.
+Coordinator read the actual7279-byte file and parsed its JSON successfully.
+No new check was run by coordinator. Exact read-only verification output:
+
+```text
+report_read=PASS
+timestamp_utc=2026-10-28T18:16:57.631803+00:00
+hosts=7
+tls_1_2_and_1_3_valid=7/7
+http_https_upgrades=0/7
+tls_1_0_and_1_1=client_unsupported
+api_settings=unknown
+f0_complete=false
+```
+
+API settings remainunknown; helper receives no nonempty token for the valid
+zone ID. Do not rerun identical probes just to obtain the same missing-setting
+result. Next obtain a read-only Cloudflare AI/dashboard report of current
+settings and redirect rules/hostname exceptions; remaining F0 compatibility
+review still required before any separate F1 live go. No credential retrieval,
+API writes or new security acceptance inferred.
+
+Operator separately pasted these stderr warnings for that run:
+
+```text
+/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-cloudflare-posture:246: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+  context.minimum_version = selected
+/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-cloudflare-posture:247: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+  context.maximum_version = selected
+/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-cloudflare-posture:246: DeprecationWarning: ssl.TLSVersion.TLSv1_1 is deprecated
+  context.minimum_version = selected
+/Users/cliang/src/gitrepo/personal/k3d-manager/bin/k3dm-cloudflare-posture:247: DeprecationWarning: ssl.TLSVersion.TLSv1_1 is deprecated
+  context.maximum_version = selected
+```
+
+These arise from intentionally selecting deprecated TLS1.0/1.1 client protocol
+bounds. They do not prove Cloudflare rejected those protocols or cause the API
+credential error. Actual JSON correctly says client_unsupported. Keep the
+legacy probes and unknown handling; no unsolicited warning-filter/code changes.
+
+Full actual saved stdout (read verbatim, not reconstructed):
+
+```json
+{
+  "exit_status_meaning": "report completion only; F0 requires operator review",
+  "f0_complete": false,
+  "posture": {
+    "https_enforcement": "unknown",
+    "minimum_tls": "unknown"
+  },
+  "probes": {
+    "alertmanager.3ai-talk.org": {
+      "http": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "argocd.3ai-talk.org": {
+      "http": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "frontend.3ai-talk.org": {
+      "http": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 200
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "grafana.3ai-talk.org": {
+      "http": {
+        "location": "http://grafana.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      },
+      "https": {
+        "location": "https://grafana.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "keycloak.3ai-talk.org": {
+      "http": {
+        "location": "http://keycloak.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      },
+      "https": {
+        "location": "https://keycloak.3ai-talk.org/[redacted]",
+        "redirect": {
+          "destination_host_known": true,
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme"
+        },
+        "result": "response",
+        "status": 302
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "prometheus.3ai-talk.org": {
+      "http": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    },
+    "webhook.3ai-talk.org": {
+      "http": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "https": {
+        "location": null,
+        "redirect": null,
+        "result": "response",
+        "status": 401
+      },
+      "tls": {
+        "1.0": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.1": {
+          "certificate_valid": null,
+          "negotiated": null,
+          "result": "client_unsupported"
+        },
+        "1.2": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.2",
+          "result": "negotiated"
+        },
+        "1.3": {
+          "certificate_valid": true,
+          "negotiated": "TLSv1.3",
+          "result": "negotiated"
+        }
+      }
+    }
+  },
+  "settings": {
+    "always_use_https": null,
+    "min_tls_version": null,
+    "security_header": null,
+    "ssl": null,
+    "tls_1_3": null
+  },
+  "source": "Cloudflare API",
+  "source_error": "credential or valid zone id unavailable",
+  "timestamp_utc": "2026-10-28T18:16:57.631803+00:00"
+}
+```
+
+This is live operator evidence with partial acceptance, not an offline helper
+code test. Runtime/helper unchanged; no BATS/ShellCheck rerun for this report
+read. Documentation lint/audit/hooks run before commit. Security bug OPEN.
