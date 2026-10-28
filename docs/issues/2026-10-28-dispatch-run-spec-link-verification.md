@@ -323,3 +323,27 @@ Correction commit fbb52f67, with checkpoint hooks passing:
 check-doc-links: 4 file(s) OK
 [k3d-manager-v1.43.9 fbb52f67] checkpoint: before fix: link dispatch runs to their recorded spec
 ```
+
+## Operator publication and live click — PASS
+
+Operator confirmed make dispatch-metrics completed. Actual supplied apply output:
+```text
+Warning: resource configmaps/grafana-dashboard-agent-dispatch is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+configmap/grafana-dashboard-agent-dispatch configured
+```
+Annotation warning automatically handled by kubectl; apply succeeded.
+Following full-reload/click instructions, operator screenshot shows GitHub path
+k3d-manager / docs / issues / 2026-10-26-v1439-retrieval-dashboard-no-data.md,
+rendered Preview and title “VectorDB retrieval dashboard stays empty during probe.”
+Expected recorded document opens without a 404: task-name navigation PASS.
+The document's underlying retrieval issue status is not changed by this check.
+No new failure, screenshot export, live coordinator mutation or code change.
+Documentation only: implementation tests not rerun; prior 151 pytest/30 BATS,
+Ruff and PromQL results above remain applicable. No shell implementation touched.
+
+Recording checkpoint initially rejected missing explicit Fix commit metadata:
+```text
+docs/bugs/2026-10-28-dispatch-run-spec-link-guesses-filename.md: LIVE-VERIFIED needs a **Fix commit:** <sha> line naming the commit that fixed it
+ERROR: Checkpoint commit failed; resolve git errors and retry
+```
+Added Fix commit fbb52f67; retried normal hooks without bypass.

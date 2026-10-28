@@ -1,6 +1,8 @@
 # Bug: Per run evidence task-name link guesses a nonexistent spec filename
 
-**Status:** VERIFIED — offline regression checks pass; operator publication/click pending
+**Status:** LIVE-VERIFIED — operator task-name click opens the recorded issue document
+**Live evidence:** 2026-10-28 · run 1 · env local-grafana-v1.43.9 · scenario vectordb-retrieval-key-cache-slug-github-navigation · commit fbb52f67 · proves fix
+**Fix commit:** fbb52f67
 **Priority:** P3
 **Filed:** 2026-10-28
 **Branch:** k3d-manager-v1.43.9
@@ -36,3 +38,13 @@ hidden with custom.hidden rather than removed. Regression exact reported
 case red on old code, full metrics pytest/dashboard BATS/Ruff/PromQL and
 staged gates. No layout changes; existing Log tests remain. Deployment and
 operator click verification separate. No screenshot export.
+
+## Operator live result
+
+Operator confirmed make dispatch-metrics completed, applied the Agent Dispatch
+ConfigMap, then supplied a GitHub destination screenshot showing the expected
+breadcrumb docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md and rendered
+heading “VectorDB retrieval dashboard stays empty during probe.” No 404.
+This verifies the task-name link only; the underlying retrieval issue's status
+is unchanged. No screenshot copied/exported. Full textual record in
+[verification evidence](../issues/2026-10-28-dispatch-run-spec-link-verification.md).

@@ -677,3 +677,14 @@ and unverified run2 availability already passed. No screenshot export, runtime
 mutation or test rerun (documentation only). Separate task-name GitHub404 fix
 fbb52f67 remains offline verified, publication/click pending; next single step
 still operator make dispatch-metrics unless already completed. No PR.
+
+## 2026-10-28 recorded-spec task-name link live verification — PASS
+
+Operator confirmed metrics publication complete, supplied successful Agent Dispatch
+ConfigMap apply (missing last-applied annotation automatically patched), and GitHub
+screenshot of expected docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md
+with rendered title. GitHub404 link bug fbb52f67 now LIVE-VERIFIED. Original startup
+Log bug already LIVE-VERIFIED separately; underlying retrieval issue status unchanged.
+Evidence docs/issues/2026-10-28-dispatch-run-spec-link-verification.md. No screenshot
+export/runtime mutation/test rerun; docs-only, existing 151 pytest/30 BATS retained.
+No PR created (repository policy). Other unrelated live items remain pending.
