@@ -120,3 +120,5 @@ Operator-requested removal implemented in0fc9d3ef: extra panel93 removed, existi
 ## Empty path label follow-up
 
 Operator screenshot showed earlier runs with outcomeunknown/evidencenone/pathblank. Configured link existed but empty displayed value made it invisible. Fix0077b7b8 maps only empty/null Log values to clickable Open run evidence; real paths unchanged. No newtable. Unverified/No landing-test evidence recorded distinguish earlier attempts without altering metric classifications. Accepted-run log existence independently confirmed viaLoki. [Findings/test output](../issues/2026-10-27-run-evidence-empty-link-and-attribution-findings.md). Publish metrics/applydashboard/UI verification still pending.
+
+Operator screenshot/report “fixed now” confirms the single-table rendering with visible hyperlinks for accepted, unverified(empty-path) and failed startup rows, and correct status/Result labels. Destination navigation/test output still requires the next single click check. Recorded in the empty-link/attribution findings issue; no screenshot export.

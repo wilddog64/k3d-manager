@@ -149,3 +149,9 @@ All checks passed!
 ```
 
 Diffcheck, actual staged lint/audit/checkpoint hooks passed. No shell implementation changed; ShellCheck not applicable. Previous unrelated curated failures not rerun or claimed resolved. No production metric PUT, ConfigMap apply, service restart, browser click, raw transcript export or screenshot archival by coordinator. Pending: operator make dispatch-metrics to publish latest renderer/ledger facts, then apply only Agent Dispatch ConfigMap and fully reload existing dashboard. Verify visible Open run evidence on previously blank row; supported log output check remains separate. No new layout change.
+
+## Operator rendering check passed
+
+Operator supplied updated Per run evidence screenshot and explicitly reported “fixed now”. Visible rows confirm accepted webhook-incident-doctor-luna/run3 retains its log-path hyperlink and5/5ok;21passed summary. Earlier doctorrun1/run2 display unverified, No landing-test evidence… and clickable Open run evidence labels. Historical key-cache/-retry exit127 rows retain failed state/local-only result and log hyperlinks. Single original table visible; no duplicate table introduced. No image copied/exported, consistent with prior artifact rejection.
+
+This establishes successful table rendering of0077b7b8. The screenshot does not show a destination page or log contents. Next single operator check: click the accepted webhook-incident-doctor-luna/run3 Log and confirm existing Agent Run Log page displays test output. Local-only availability-heading navigation can follow separately. Previously direct Loki read independently established retained output for accepted app-cve-scan-fail-closed/run2, not this browser click. No new code/runtime mutation/tests; prior139Python/30BATS gates retained. Historical missing attribution remains not recorded; no guessed backfill.
