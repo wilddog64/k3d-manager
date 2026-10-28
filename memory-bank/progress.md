@@ -1236,3 +1236,14 @@ bydesign; runtimecurrenthealthproofseparate, historicalcauseunconfirmed. Fullact
 metric closeoutreviewissue. No newruntimewrite/testrerun. NextoperatorBugTracking
 refresh toconfirmFixed/removalifOpenfilter; PRCheckspaymentviewpendingseparately.
 No PRcreated.
+
+## 2026-10-28 investigation verification metrics fix authorized
+
+Operator asks dispatch fix for recovered incident's misleading notyet cells.
+New P3 docs/bugs/2026-10-28-bug-tracking-ignores-investigation-verification.md:
+share existing typed investigation contract hook/publisher, recognize valid
+closed recovery proof, suppress causalFixSHA, ground dates/verificationrecord,
+failclosedinvalid/open/mixed, preserve normalcodefix/ancestry/legacy and UI.
+Native gpt-6-luna isolated implementation planned, independent review/gates/
+landing/push then operator publisher/rowcheck. No new table, causeclaim, parent
+status rewrite or live actions; codefix scope now explicitly authorized.
