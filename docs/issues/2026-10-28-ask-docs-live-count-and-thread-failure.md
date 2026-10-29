@@ -393,3 +393,24 @@ This does not test whether an explicitly worded bug-tally question still
 times out. Coordinator did not send Slack messages, read response URL or
 credentials, or restart services. Count bug remainsOPEN. No runtime code
 changed; docs-only verification, BATS/ShellCheck N/A.
+
+## Post-rollback response timing
+
+Operator asks whether job87aacff5 response time is good. Read-only filesystem
+metadata:
+
+```text
+status birth_utc 2026-10-29T02:53:12.497454+00:00
+thread_ts birth_utc 2026-10-29T02:53:12.518693+00:00
+output mtime_utc 2026-10-29T02:54:33.820867+00:00
+status mtime_utc 2026-10-29T02:54:33.821378+00:00
+delivery.jsonl mtime_utc 2026-10-29T02:54:34.105340+00:00
+delivery: route=bot_thread delivered=True reason=None
+```
+
+Approximately81.6 seconds from job status-file creation to delivery log,
+including81.3 seconds to recorded answer. This is an estimate from file times,
+not full Slack button-to-render latency or exact delivery API timestamp. It
+is slow for an interactive question and returned no P1 count; not evidence of
+a good response or fixed tally timeout. No causal stage breakdown measured;
+no new code, live request, credentials, restart or screenshot export.

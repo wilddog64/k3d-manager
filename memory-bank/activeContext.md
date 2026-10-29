@@ -1504,3 +1504,13 @@ webhookand30403bridge start19:52:41PDT afterrollbackcommit19:49:42. Original
 missingnounbugconsistentwithobservedfallback, remainsOPEN. Explicitbugtally
 timeoutnotretested/provenfixed. No credential/responseURLread, Slacksend,
 coordinatorrestart orruntimecodechange. Docs-only; noBATS/ShellCheck/PR.
+
+## 2026-10-28 ask-docs post-rollback response time
+
+Operator asksresponse time forjob87aacff5. Readonlyfiletimestamps: status
+creation02:53:12.497454Z, output02:54:33.820867Z, deliverylog
+02:54:34.105340Z => about81.6s jobcreationtodeliveryrecord. Approximate,
+notfullSlackend-to-end/exactAPI timing. Slowinteractiveanswer andnoP1count;
+doesnotprove deterministic30stallytimeoutfixed. Actualtimestampoutput in
+existingask-docsissue; nocode/services/credentials/Slackmessage change.
+Docs-onlyBATS/ShellCheckN/A, noPR.
