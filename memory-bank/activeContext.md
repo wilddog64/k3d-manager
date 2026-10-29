@@ -1549,3 +1549,15 @@ Generalmodelsummarylatencyseparateenhancementunlessagreedtargetviolated.
 Userrequestedcommunicationbeforechange: docs-onlyscopeproposal, no new
 implementation/dispatch/credential/service/Slackaction authorized or performed.
 Evidence/live traces in existingissue. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 Luna dispatch authorized for ask-docs count P2
+
+User explicitlyrequestsLuna for existingupdatedP2; boundedtask
+ask-docs-count-tally-luna, gpt-6-luna. Scopeexisting matcher/count tests plus
+scripts/bug-tally.py and test_bug_tally.py to addressactualtally work while
+preserving existingCLI/fixed_in/release/status/countsemantics. No generic
+modelsummaryfeature/dashboard/newplan, externalruntime/secrets/Slack/restart
+orworkerGitmutations. Workerfocusedofflineequivalence/failure/work-reduction
+tests; coordinatorindependentreview/normalgates/landthenoperatorlive.
+OriginalcountbugOPEN; realtimeoutcause partiallyobserved, notclaimedknown.
+Needcommit/pushscopebefore native dispatch.

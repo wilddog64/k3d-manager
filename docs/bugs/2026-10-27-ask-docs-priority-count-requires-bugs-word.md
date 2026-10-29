@@ -25,6 +25,8 @@ still fall through. No implementation or live deployment is included here.
 ## Files
 
 - `scripts/lib/webhook/bug_count.py`
+- `scripts/bug-tally.py`
+- `scripts/tests/bin/test_bug_tally.py`
 - `scripts/tests/bin/test_bug_count.py`
 - `scripts/tests/bin/test_ask_docs.py`
 
@@ -142,3 +144,33 @@ for the earlier narrow Luna matcher task does not by itself cover shared
 tally performance changes. No new plan or duplicate bug created.
 
 [Actual trace, rollback and live output](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).
+
+## Authorized Luna follow-up — 2026-10-28
+
+Operator explicitly requested dispatch of this updated P2 to GPT-6-Luna.
+Task `ask-docs-count-tally-luna`: implement the updated acceptance above in
+an isolated worktree. This supersedes the earlier narrow Files list only by
+adding `scripts/bug-tally.py` and `scripts/tests/bin/test_bug_tally.py`, as
+listed under Files. Do not change `ask_docs.py` or general model summarization
+unless a specific necessity is reported to coordinator first. No dashboard,
+new plan, external service, dependency, credential, production action, restart,
+Slack message, staging/commit/push/PR or memory/spec edits by worker.
+
+Retain complete tally output/CLI contract and `fixed_in` for existing
+consumers; any optimized count path must preserve all release attribution,
+status/priority totals, source refs, missing metadata and error behavior.
+Do not blindly raise 30s timeout, cache mutable state without validation,
+remove fixed-in fields for existing consumers, or use semantic/model output
+as a count. Prove equivalence to existing full tally on realistic fixture Git
+histories including branch/tag attribution, missing metadata and status
+transitions. Regression tests must demonstrate real reduction in unnecessary
+work for count requests, not timing-only flaky checks or implementation-mirror
+assertions. Run focused `test_bug_tally.py`, `test_bug_count.py`,
+`test_ask_docs.py`, and relevant existing tests under offline tripwire, Ruff,
+syntax and diff checks. Record representative performance under appropriate
+bounded conditions and limitations; no fake live verification.
+
+Prior live process trace/Git profile evidence and rollback are in linked
+issue. Coordinator independently reviews and performs normal gates/landing;
+operator separately reloads and tests Slack after offline approval. User asked
+to handle one P2 at a time; general model-summary latency remains separate.
