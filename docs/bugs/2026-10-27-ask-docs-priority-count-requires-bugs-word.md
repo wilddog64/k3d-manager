@@ -201,3 +201,7 @@ No furtheroperatorretry before independentlyreviewed solution.
 ## Root-cause measurement — 2026-10-29 (Claude)
 
 The same `bug-tally.py --json --counts-only --ref HEAD` takes 1.8 s at normal priority and 13.0 s / 58.6 s under `taskpolicy -b` on the M4. The webhook LaunchAgent sets no `ProcessType`, so launchd applies its default CPU and I/O throttle to the webhook and its Git children. Next step: Phase 0 in [`v1.43.11-ask-docs-count-performance.md`](../plans/v1.43.11-ask-docs-count-performance.md) (`ProcessType Interactive` on the webhook only, then 20 live measurements) before any snapshot design. Status stays OPEN.
+
+### Phase 0 deployed — 2026-10-29 16:0x PDT
+
+The operator added `ProcessType Interactive` to the installed plist and ran `make restart-webhook` from the M4 tmux pane. Claude confirmed with read-only `launchctl print`: `spawn type = interactive (4)` (was `daemon (3)`), on new pid 87282. Remaining for closure: at least 20 live Slack count questions over a day of ordinary load, with timings and an answer comparison (plan E3). Status stays OPEN.
