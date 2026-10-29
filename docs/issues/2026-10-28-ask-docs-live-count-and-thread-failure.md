@@ -234,3 +234,35 @@ No running service policy was changed. The operator screenshot shows six open
 bugs overall for v1.43.5, not six open P1s; priority-specific check reported0.
 Further optimization needs equivalence tests and bounded performance evidence;
 no timeout increase or production change made. Bug remains OPEN.
+
+## Operator channel clarification and investigation-only review
+
+Operator explicitly requests investigation only, no code changes. They report
+that the first ask-docs reply threads only in acg-automation; new screenshot
+shows a bot-created thread with reply `Could not count bugs — tally failed
+(timeout).` and `Sources: scripts/bug-tally.py`. Read-only job metadata matches
+job2a85e015 output timestamp2026-10-29T02:36:43.714871Z, thread_ts file
+present; channel_id file absent. Thread delivery here is observed, count FAIL.
+Earlier jobs6812a3c7 and6f069edf timed out with no saved thread_ts.
+
+Source inspection: relay passes channel_id and response_url for /ask-docs.
+Webhook `_run_ask_docs` starts a bot thread only when bot token/default channel
+are configured and incoming channel_id equals SLACK_CHANNEL_ID. If not, or
+header posting fails, it posts through response_url. Installed nonsecret plist
+sets SLACK_CHANNEL_ID C0B7ZHG2LR4 and distinct K3DM_STATUS_CHANNEL_ID
+C4CAEH8HX. Operator experience is consistent with that explicit condition;
+no claim that the cause of any particular fallback was independently measured.
+The observed bot-created thread does not prove existing-thread follow-up logic.
+
+For counts `bug_count.reply` invokes bug-tally JSON with a30second timeout.
+Live process trace shows Git descendant running over22seconds but no argv;
+local background-profile reproduction spent28.523seconds in added-doc history
+and38.562seconds overall. An attempted root-only pathspec profile exceeded60s
+and is not evidence of a working optimization. Local non-background scan
+completed in5.137s, so scheduling/load is a plausible factor, not established
+as the running service's exact policy or root cause. The CLI screenshot shows
+6 open total for v1.43.5; local P1 bucket shows0 open. No live count returned.
+
+No code, test, configuration, credentials, services, Slack messages or user
+screenshots changed or exported. No new diagnostics needing an operator retry.
+Bug remains OPEN; proposed changes require separate authorization from user.

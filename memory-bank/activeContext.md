@@ -1439,3 +1439,14 @@ sandbox setpriority denial recorded in existing issue, escalation only changed
 disposable child. User tally screenshot six open total vs local zero open P1.
 No production code change or timeout increase; P2 OPEN, performance fix and
 thread route remain pending. Documentation-only; no BATS/ShellCheck rerun.
+
+## 2026-10-28 ask-docs investigation only
+
+Operator says threadsonlyacg-automation and providedpost screenshot: job
+2a85e015 at02:36:43Z createdthreadbutcounttimeout. Currentcodeexplicitly
+requiresincomingchannel==SLACK_CHANNEL_ID to createbotthread; otherchannels
+use response_url or fallback. Fullactualfinding in existingask-docsissue.
+30s tallytimeout; backgroundprofile38.562s, tracedGit>=22s, exactliveGitargv/
+schedulingunknown; rootonlycandidateexceeded60s. Userrequestsno codechanges;
+none made. No service/credential/Slackmessage mutation; bugOPEN. Docs-only
+BATS/ShellCheckN/A, no PR.
