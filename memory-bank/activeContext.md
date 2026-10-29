@@ -1589,3 +1589,20 @@ prior-landed-taskguard; no newplan/bug. No prodretry/restart/credential/Slack
 send bycoordinator. PreserveCLI/attribution/failure semantics and realistic
 coldwork reduction, independentreviewbeforeoperatorlive. Docs-onlyBATS/
 ShellCheckN/A; lint/audit/hooksbeforecommit; noPR.
+
+## 2026-10-29 ask-docs timeout follow-up unresolved
+
+Operatorrequestedcontinueafterinterruption. NativeLuna task
+ask-docs-count-timeout-followup-luna resumedafterusagelimit; candidate
+batchedtagancestry118focusedtests/RuffPASS butindependentbackground37.997s
+vsbaseline43.471s, equalbuckets; tagretargetrace, so rejected. Two-phase
+normal-renameverification matching64buckets but52.506/58.596s vsbaseline
+30.632s, rejected. No-renames31.235→18.179s current1124maps equal but fixture
+shows pathrestrictionchangesrenameattribution/visiblecount; not safe.
+Narrowed176relevantfallback paths Gitlog25–27s beforeotherwork. Packedclone
+comparisoninconclusive. Finalworkerinvestigation116tests/RuffPASS, no source
+changes/worktreeclean, no newfixlanded. Existingask-docsP2OPEN/live timeout.
+Fullactualoutputs/race/limitations inexistingverificationissue. Nextdesign
+directionvalidatedimmutable snapshot/index, first-miss/lifecycle/ref/tag races
+need concrete plan and discussion before implementation. No cache/scheduler/
+service/credentials/Slack action or newplan/PR. Docs-onlyShellCheckN/A.

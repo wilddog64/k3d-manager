@@ -136,3 +136,89 @@ Dispatcher initial start returned `spec has no backticked path in its ## Files
 section` because the heading was `## Files for bounded Luna follow-up`.
 Corrected to the required exact heading; the listed files and task scope did
 not change. No worker started during the failed attempt. Normal retry follows.
+
+## Continued follow-up — no safe performance fix established
+
+Operator later requested continuation after an interrupted turn. Native Luna
+follow-up attempt2 exited nonzero at its usage limit, leaving an isolated
+batched tag-ancestry candidate. Coordinator ran focused offline tripwire tests:
+
+```text
+........................................................................ [ 61%]
+..............................................                           [100%]
+118 passed in 5.95s
+```
+
+Independent Ruff: `All checks passed!`; git diff --check produced no output.
+Background-priority comparison against the same repository/ref produced:
+
+```text
+baseline exit 0 elapsed 43.471 stderr_bytes 0
+candidate exit 0 elapsed 37.997 stderr_bytes 0
+release_bucket_equivalence True
+```
+
+This candidate still exceeds the30s live deadline, leaves the expensive
+added-history walk in place, and a later fixture showed tag-retarget snapshot
+race. Not landed. Luna resumed after the usage window; a two-phase Git
+no-renames/normal-rename verification produced matching64release buckets in
+tested cases, but actual background runs52.506s and58.596s versus original
+30.632s. Earlier in-memory prototypes10.986–17.805s were not reliable evidence
+for actual implementation. Candidate removed by worker; no code landed.
+
+Coordinator independent background Git scans: normal31.235s, no-renames18.179s;
+current-corpus earliest addition maps matched1124paths. That observation alone
+is unsafe: the worker's rename fixture proves a path-restricted query can
+classify a rename as an addition and change the visible release/count answer.
+Output from that fixture:
+
+```text
+full answer:
+No bug tally found for v2.0.0.
+narrowed answer:
+v2.0.0: 1 open P1 bug docs — 0 fixed, 1 open, 0 with no Status line.
+visible_answers_equal=False
+```
+
+A disposable local bare packed-clone comparison was inconclusive; live repo
+1.796/0.565s and isolated clone5.371/0.208s in sequential warm samples.
+Diagnostic I/O-policy timings also varied; no service scheduling setting was
+changed or supported as root cause. No destructive change to user Git storage.
+
+The user's original P1 query needs selected-priority open/closed/unknown and
+missing-priority warning counts with complete release attribution. Current ref
+had176 fallback docs relevant to this answer (12P1,164unset); narrowing to
+those paths alone risks the demonstrated rename misattribution. Bounded
+background narrowed-history scans took27.649/25.085s before other work; full
+scan timed out after30.749s once, took14.564s another time. Agent found no
+validated query-specific shortcut or safe cache.
+
+Worker's final actual offline verification of unchanged source:
+
+```text
+invalid_ref rc=2 stdout_bytes=0 stderr_bytes=0
+........................................................................ [ 62%]
+............................................                             [100%]
+116 passed in 10.48s
+All checks passed!
+AST syntax: 5 files parsed
+```
+
+Git diff --check no output; task worktree clean. The P2 remains OPEN and
+live still times out. No additional code, timeout increase, cache, restart,
+Slack request, credential access, PR or plan was introduced.
+
+### Next design direction for discussion
+
+A precomputed count snapshot/index could move history work out of the
+interactive request, but is not yet an implementation proposal ready to ship.
+A safe design must bind data to repository identity, immutable resolved commit,
+branch fallback context, tag object identities and parser version; validate
+ref/tag snapshots before and after construction; publish atomically with
+private permissions and concurrent-writer handling; and fail closed on stale,
+missing, malformed or racing snapshots. It also needs a plan for the first
+cache miss and every later ref/tag change, without silently extending the
+30-second deadline or claiming partial counts. Any scheduling/lifecycle change
+is separate scope and must be communicated before implementation. Full/filtered
+count equivalence, rename/re-add/divergent merge/tag-retarget fixtures, actual
+background timing and live Slack confirmation remain required.
