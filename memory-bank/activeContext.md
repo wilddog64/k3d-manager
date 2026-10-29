@@ -1428,3 +1428,14 @@ stillOPEN, noperformancefixclaimed. Bounded300sread-onlychildtracearmedfor
 PID43179 insession43637/log/private/tmp/k3dm-ask-docs-service-child-trace.txt;
 onlyPID/state/exebasename,noargv/env/secrets. AwaitonesameoperatorSlack
 retry/context, noanotherrestart. PRURLN/A.
+
+## 2026-10-28 ask-docs repeated timeout trace
+
+Repeat failed. Nonsecret process trace showed Git child running >=22s inside
+30s request; exact argv unknown. Disposable background profile reproduced
+38.562s tally, initial history log28.523s. Root-only pathspec candidate initial
+18.228s but full run exceeded60s; not accepted. Taskpolicy wrong path and
+sandbox setpriority denial recorded in existing issue, escalation only changed
+disposable child. User tally screenshot six open total vs local zero open P1.
+No production code change or timeout increase; P2 OPEN, performance fix and
+thread route remain pending. Documentation-only; no BATS/ShellCheck rerun.

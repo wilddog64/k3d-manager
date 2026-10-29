@@ -214,3 +214,23 @@ Next collect bounded nonsecret process ancestry/stage timing duringoneoperator
 repeat; keeptimeoutfailclosed andP2OPEN. No live requestbycoordinator, no
 service/credential/Cloudflarechange. SeparateP3root-advicefiltertests6BATS
 pass; that fix doesnot repairthiscountfailure.
+
+## Repeat traced and background reproduction
+
+Operator repeated the live query; it again timed out. Read-only trace captured
+a Python child and Git descendant PID69412 running for at least22 seconds
+inside the 30-second request. Trace records only process metadata, not argv,
+so the exact Git command cannot be identified from this trace alone.
+
+A separate disposable background-scheduled local profile reproduced slow
+history work: `git log --diff-filter=A` 28.523s, full tally 38.562s; P1 tally
+remained0 open/6 closed. This is consistent with the live timeout but does not
+prove its scheduling policy or exact Git command. A candidate excluding archive
+paths took18.228s for the initial log but exceeded60s before the complete
+tally finished, so it is not an accepted fix. Original diagnostic mistakenly
+used /usr/bin/taskpolicy (not found); correct /usr/sbin/taskpolicy required
+escalation after sandbox returned `setpriority(): Operation not permitted`.
+No running service policy was changed. The operator screenshot shows six open
+bugs overall for v1.43.5, not six open P1s; priority-specific check reported0.
+Further optimization needs equivalence tests and bounded performance evidence;
+no timeout increase or production change made. Bug remains OPEN.
