@@ -94,3 +94,7 @@ queryexactfixSHAhas0runs. OfflineVERIFIED, liveNOTYET. Thisdoesnotestablish
 mainfixappliedorCIpassed. Claude/ownerPR+CI+mergeisnext, thenoneoperator
 scannerretryandactualdispatch/workflowevidence. No automaticliveaction.
 [Actual re-verification and handoff](../issues/2026-10-27-product-catalog-manual-rebuild-workflow-verification.md).
+
+### Fix merged — 2026-10-29
+
+Product-catalog PR #65 merged as `8e7b751a`: it adds the `workflow_dispatch` trigger, and publishing runs only on `refs/heads/main` for a push or a dispatch. The post-merge push run 40970611050-adjacent build (run 40970448931) passed every job, including `Build, Scan & Push / build-push`. Still open for closure: one `workflow_dispatch` run on `main`, triggered by the app-cve-scan rebuild path, with `build-push` succeeding.
