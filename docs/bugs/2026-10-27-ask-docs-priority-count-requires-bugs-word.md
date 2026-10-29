@@ -70,3 +70,13 @@ forliveretest, fix/evidencepreserved; notprovennewcoderegression. Threadroute
 unknownpendingoperatorinvocation/channelandcontrolledreload. No actual
 restart/credentialswrite/Slackmessage.
 [Actual output and one next operator step](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).
+
+## After operator reload: tally timeout, still OPEN
+
+NewwebhookPID43179startOct28 19:22:14/runningconfirmed. Exactcountquestion
+nowselectsdeterministicpathbutjob6f069edfreportsCouldnotcountbugs—tallyfailed
+(timeout), at02:24:14ZOct29. Semanticmatcherfixloaded; countnotverified. Local
+actualtally5.137s andsameposixspawnlauncherfromthread3.632s bothsucceed, so
+newlive30srootcauseunconfirmed. No blinddeadlineincrease/speculativecache.
+Processancestrytraceonnextoperatorrepeat needed; fullactualoutputinexisting
+livefailureissue. No needanotherrestart solelyforroot-adviceoutputfix.

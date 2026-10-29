@@ -166,3 +166,51 @@ its offline fix SHA/test evidence. Do not start the next P2 live test until
 reload/retest resolves this item. Reply-route regression remains suspected,
 not proven. Both memory-bank files updated; required staged lint/audit/hooks
 before commit/push; no PR or new plan. No service mutation or secret read.
+
+## Post-reload failure: deterministic tally timeout
+
+Operator supplied another screenshot after successful user-agent reload:
+
+```text
+Only visible to you
+19:23 k3d-manager Searching the docs…
+Could not count bugs — tally failed (timeout).
+Sources:
+scripts/bug-tally.py
+```
+
+Matched persisted job6f069edf, outputmtime2026-10-29T02:24:14.402766Z;
+thread_ts/channel_idfilesabsent. This differs from prior semanticfallback:
+the deterministic route now runs, but its30s subprocess budget expires. It
+is a new failed acceptance symptom after picking up the fix, not success.
+No inaccuratezero-count or resolvedclaim. WebhookPID43179 andbridge43185
+started2026-10-28T19:22:14PDT/running asindependentlyobserved. Exact old stale
+module hypothesis no longer explains this new failure. Threadroute remains
+unconfirmed until invocation/channel answer or traced request.
+
+Read-only installed/loaded configuration has no K3DM_INDEX_REF override; repo
+root is currentworkspace, git andpythonresolve/opt/homebrew/bin in bothtool
+andinstalledPATH. No full environment/secret output.
+
+Local bounded profile of actualscripts/bug-tally.py atHEAD:
+
+```text
+elapsed 5.137 git_stats {'ls-tree -r': [1, 0.025991875678300858], 'branch --show-current': [1, 0.022175582125782967], 'log --diff-filter=A': [1, 0.9430924169719219], 'tag --contains': [136, 2.824000097811222], 'log --reverse': [1, 0.628549000248313]} v1.43.5_P1 {'total': 6, 'closed': 6, 'open': 0, 'unknown': 0}
+```
+
+Same proc._spawn_capture_text launched fromaPythonthread, sameinterpreter,
+actualtallyCLI--json--refHEAD/cwdworkspace/timeout30:
+
+```text
+{'elapsed': 3.632, 'rc': 0, 'timed_out': False, 'output_bytes': 258198, 'valid_json': True}
+```
+
+This does not reproduce live timeout. 136 tag calls/fixedhistory are measurable
+work, not established cause of the30sfailure. No speculativeoptimization,
+cache, timeoutincrease, fabricated exception or code fix introduced. Corpus
+has909currentbugdocs,641explicitBranchreleases/268requiringfallback. Changing
+release fallback/count semantics without evidence would risk wrongcounts.
+Next collect bounded nonsecret process ancestry/stage timing duringoneoperator
+repeat; keeptimeoutfailclosed andP2OPEN. No live requestbycoordinator, no
+service/credential/Cloudflarechange. SeparateP3root-advicefiltertests6BATS
+pass; that fix doesnot repairthiscountfailure.

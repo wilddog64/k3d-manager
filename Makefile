@@ -499,10 +499,14 @@ cloudflare-preflight:
 restart-webhook:
 	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
-		if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; then \
+		if _bootstrap_output=$$(launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>&1); then \
+			[ -z "$${_bootstrap_output}" ] || printf '%s\n' "$${_bootstrap_output}"; \
 			echo "[restart-webhook] reloaded LaunchAgent definition"; \
 			exit 0; \
 		fi; \
+		while IFS= read -r _bootstrap_line; do \
+			[ "$${_bootstrap_line}" = 'Try re-running the command as root for richer errors.' ] || printf '%s\n' "$${_bootstrap_line}" >&2; \
+		done <<< "$${_bootstrap_output}"; \
 		if [ "$$_attempt" -lt 5 ]; then sleep 1; fi; \
 		_attempt=$$((_attempt + 1)); \
 	done; \

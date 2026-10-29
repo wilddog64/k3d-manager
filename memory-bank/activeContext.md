@@ -1403,3 +1403,21 @@ Failedliveask-docsdiagnosis/reopenedP2pushed58cd7581.87focusedtestsPASS;
 stagedlint/auditexit0, checkpoint/doclinks5filesOK. No runtimeedit/
 ShellCheckN/A; noPR(URLN/A). Operatorreload/retestandchannelcontextpending,
 no nextP2advanced or livepassclaimed.
+
+## 2026-10-28 user-agent reload succeeded / no-root hint fix / tally timeout
+
+OperatorrestartprintedbootstrapI/O5+genericrootadvice thenreloaded. Actual
+readonlyPIDs43179webhook/43185bridge start19:22:14/running. Rootnotneeded;
+userexplicitlyrequiresnorootadvice. SmallMakefilteronlyexactgenericline,
+errors/retries5/guiuser/bridgeorderingpreserved. NewBATSredonold; final6BATS
+PASS/rawShellCheckclean/diffclean, fakesonly/noservicerestart. P3bug+issue
+2026-10-28-restart-webhook-user-domain-diagnostics.md actualoutputrecorded.
+No secondrestartneededforMake-onlyoutputchange.
+
+Afterreloadoperatorask-docs nowdeterministictallytimeout—notsemanticfallback.
+Job6f069edf02:24:14ZOct29; no thread/channelpersisted. CountP2stillOPEN.
+Localactualtally5.137s(136tagcalls), samelauncherthread3.632s/rc0/json258198B,
+so live30snotreproduced/rootcauseunknown. No timeoutincrease/cache/refactor
+orfalsepass; collectboundednonsecretchildtraceononeoperatorrepeatnext.
+Detailedfulloutputinexistingask-docsfailedliveissue. No credentialread/
+servicewrite/Slacksend. Stagedlint/audit/hooksbeforecommit, noPR/newplan.
