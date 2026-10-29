@@ -1,6 +1,7 @@
 # Bug: ask-docs misses an explicit priority count without the word bugs
 
-**Status:** OPEN — omitted-noun routing fix was rolled back; deterministic tally timed out in live verification
+**Status:** OPEN — Luna count and tally follow-up independently verified offline; operator reload and live verification pending
+**Fix commit:** 67c26bdf0f8aa7c6340a422891a0247f3145abb8
 **Previous fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2 (rolled back by 2d88c7be)
 **Priority:** P2
 **Filed:** 2026-10-27
@@ -174,3 +175,15 @@ Prior live process trace/Git profile evidence and rollback are in linked
 issue. Coordinator independently reviews and performs normal gates/landing;
 operator separately reloads and tests Slack after offline approval. User asked
 to handle one P2 at a time; general model-summary latency remains separate.
+
+## Luna follow-up landed — live verification pending
+
+GPT-6-Luna taskask-docs-count-tally-luna supersedes the rolled-back earlier
+task. Independentfocused227pytestPASS/noskips with existingnativepromtool,
+Ruff/audit/hooks and native landing testsPASS; fix67c26bdf pushed. Count-only
+path avoids fixedhistory and unnecessaryexplicit-branch tag attribution while
+preservingdefaultCLI/fallbackrelease semantics; boundedintent restored.
+Independentbackgroundwarmcount3.093s; Luna variable11.765–26.048s, so no
+liveSLAclaim. Fullactualresults and gatehistory in
+[verification issue](../issues/2026-10-28-ask-docs-count-tally-luna-verification.md).
+Operatorreload andlivecount/threadverification required; P2 remainsOPEN.

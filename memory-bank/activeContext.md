@@ -1561,3 +1561,18 @@ orworkerGitmutations. Workerfocusedofflineequivalence/failure/work-reduction
 tests; coordinatorindependentreview/normalgates/landthenoperatorlive.
 OriginalcountbugOPEN; realtimeoutcause partiallyobserved, notclaimedknown.
 Needcommit/pushscopebefore native dispatch.
+
+## 2026-10-28 Luna ask-docs count follow-up landed
+
+NativeGPT-6-Lunatask ask-docs-count-tally-luna reworkedafterindependentreview
+andlanded67c26bdf, explicitnative superseding ask-docs-priority-count-intent;
+pushed/nativeverifyofflinepass. DefaultfullCLI/fixed_in retained; count-only
+skipsfixedhistory andunneededexplicitbranch ancestry, preservesfallback;
+boundedomittednounmatcher/unrelatednouns. Independent227pytestPASS/noskips
+usingexistingpromtool/tripwire; Ruffclean/audit/hooks/landingtestsPASS.
+Warmbackgroundcount3.093s; Luna11.765–26.048s variable, noliveguarantee.
+InitialLunaruffmissing/2skips, initialaudit assertionreplacement andland
+prior-taskguard resolvedthroughnormaldocumentedmechanisms/no bypass; actual
+output in issue2026-10-28-ask-docs-count-tally-luna-verification.md.
+P2OPEN untiloperatorrestart-webhook(alsobridge)+exactSlackcount/threadtest;
+no coordinatorliveaction/credentials. Python-onlyShellCheckN/A, noPR.
