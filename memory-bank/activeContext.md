@@ -1625,3 +1625,7 @@ Review checkpoint: 9a3561ff. Documentation-only: BATS and ShellCheck not applica
 ## 2026-10-29 operator doctor tmux lookup
 
 Operator ran doctor in tmux; approved read-only search of five default-socket panes found no matching command or diagnostic in 3000 scrollback lines. Initial sandbox socket access denied. Requested pane identifier or JSON; result remains pending, no live verification claimed. See docs/issues/2026-10-29-live-verification-queue-review.md. PR: none.
+
+## 2026-10-29 operator webhook doctor result
+
+Operator supplied /tmp/webhook-doctor.json on M4: lookup exit 0, available reader, authenticated healthy HTTP, port 7443 listening, no recovery recommended. Actual JSON in docs/issues/2026-10-29-live-verification-queue-review.md. Healthy-path evidence does not reproduce EOF race, locked Keychain or timeout; heartbeat remains unenrolled. No live-verified flag changed or restart performed. PR: none.
