@@ -80,3 +80,14 @@ actualtally5.137s andsameposixspawnlauncherfromthread3.632s bothsucceed, so
 newlive30srootcauseunconfirmed. No blinddeadlineincrease/speculativecache.
 Processancestrytraceonnextoperatorrepeat needed; fullactualoutputinexisting
 livefailureissue. No needanotherrestart solelyforroot-adviceoutputfix.
+
+## Operator-directed rollback
+
+Operator requested lastknownlivegood ask-docs only. ask_docs.py and
+bug_count.py restored byte-for-byte from ee456c83 (Oct22 generic tally live
+pass). Original missing-noun bug is again present and remains OPEN; old30s
+count timeout/history remains too. Shared webhook/tally script not reverted.
+Focused87tests pass with cases retained and explicitly historical expectations;
+full actual output/removed formatting+source detail and recommended next scope
+in [rollback evidence](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).
+No live restart performed.

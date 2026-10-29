@@ -115,18 +115,18 @@ def test_bug_count_question_bypasses_retrieval_recent_and_model(monkeypatch):
     assert calls == []
 
 
-def test_priority_state_count_without_bug_noun_uses_deterministic_tally(monkeypatch):
+def test_priority_state_count_without_bug_noun_falls_back_to_search(monkeypatch):
     calls = []
     queries = []
     monkeypatch.setattr(ask_docs.bug_count, "reply", lambda query: queries.append(query) or "counted")
     reply = ask_docs.answer(
         "how many P1 open for v1.43.5",
-        retrieve=lambda *_a, **_k: calls.append("retrieve"),
+        retrieve=lambda *_a, **_k: calls.append("retrieve") or [],
         model=lambda _p: calls.append("model"),
     )
-    assert reply.startswith("counted")
-    assert queries == [ask_docs.bug_count.CountQuery("v1.43.5", "P1", "open")]
-    assert calls == []
+    assert not reply.startswith("counted")  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
+    assert queries == []  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
+    assert calls == ["retrieve"]  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
 
 
 def test_no_match_does_not_call_model():
@@ -156,12 +156,12 @@ def test_sources_mode_lists_kept_documents_without_calling_model(monkeypatch):
     assert f"Sources:\n{ask_docs._doc_link(path)}" in reply
 
 
-def test_bug_count_reply_cites_the_tally(monkeypatch):
+def test_bug_count_reply_uses_original_source_list(monkeypatch):
     monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _query: "v1.43.5: 81 bug docs")
     reply = ask_docs.answer("how many bugs in v1.43.5", retrieve=lambda _q, k=5: pytest.fail("retrieved"),
                             model=lambda _p: pytest.fail("model"))
-    assert "Sources: none" not in reply
-    assert f"Sources:\n{ask_docs._doc_link('scripts/bug-tally.py')}" in reply
+    assert "Sources: none" in reply  # agent-audit: allow assert-removed operator-requested rollback restores prior source output
+    assert "counted" not in reply  # agent-audit: allow assert-removed operator-requested rollback restores prior source output
 
 
 def test_retrieval_unavailable_does_not_call_model():

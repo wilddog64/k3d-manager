@@ -316,3 +316,53 @@ count. Recommendation after a target is identified: protect count correctness,
 measure full-history cost under representative conditions, and review a bounded
 optimization with equivalence/failure tests; thread routing is separate. No
 implementation of that recommendation without resolving rollback target.
+
+## Operator-directed ask-docs rollback to October22 reference
+
+Operator clarified rollback scope: only ask-docs. Restored
+`scripts/lib/webhook/ask_docs.py` and `scripts/lib/webhook/bug_count.py`
+byte-for-byte from ee456c83, the Oct22 live-verified generic bug-tally answer.
+`cmp` actual output:
+
+```text
+bug_count.py matches ee456c83
+ask_docs.py matches ee456c83
+```
+
+The separate bug-tally script is unchanged from that reference. Shared
+`bin/k3dm-webhook` is not reverted: intervening changes cover other routes and
+thread safety; restoring the entire file would exceed the requested scope.
+No Git reset/rebase or workspace-wide rollback. Four test files/modules touched
+only within ask-docs scope; existing cases retained, expectations updated for
+explicitly requested historical behavior. No test skipped or removed.
+
+The reference routes `how many P1 open for v1.43.5` to document search, the
+original unfixed bug, and explicit `bugs` questions to the existing tally with
+its30second timeout. Rollback also restores prior reply format without commit
+SHA, denominator and tally source link. Existing fixed-history scan and live
+slowness remain, so this is a verified source restoration, not a claim that
+today's production count timeout is fixed. Thread default-channel behavior
+was not changed.
+
+Final focused tests, unchanged tripwire, actual output:
+
+```text
+........................................................................ [ 82%]
+...............                                                          [100%]
+87 passed in 8.05s
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+```
+
+Raw Ruff: `All checks passed!`; git diff --check no output. ShellCheck N/A
+Python-only code changes. No live service restart, Keychain access or Slack
+send; operator reload and live check remain separate.
+
+Original bug review / recommendation: keep it OPEN and first measure the
+actual count work across full repository history and production-like scheduling.
+Design a bounded count-only path that preserves release fallback and all count
+semantics, prove equivalence and failure behavior with meaningful fixtures,
+then separately restore the explicit priority/state no-noun routing. Avoid
+claiming success from search prose, suppressing timeout or silently raising
+the deadline. Discuss scope before any new feature/implementation.

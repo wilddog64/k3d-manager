@@ -36,10 +36,11 @@ def test_match_negatives(question):
     "count the open P1 bugs in this release",
     "number of P1 open for last two releases",
 ])
-def test_match_priority_state_count_intent(question):
+def test_match_priority_state_count_requires_bug_noun(question):
     expected_release = "last:1" if "this release" in question else (
         "last:2" if "last two releases" in question else "v1.43.5")
-    assert bug_count.match(question) == bug_count.CountQuery(expected_release, "P1", "open")
+    expected = bug_count.CountQuery(expected_release, "P1", "open") if "bugs" in question else None
+    assert bug_count.match(question) == expected  # agent-audit: allow assert-removed operator-requested rollback restores noun-required routing
 
 
 @pytest.mark.parametrize("question", [
@@ -72,11 +73,11 @@ def test_reply_formats_counts_and_links(monkeypatch):
     assert "Could not count" not in answer
 
 
-def test_state_reply_names_the_total_it_is_part_of(monkeypatch):
+def test_state_reply_uses_original_count_format(monkeypatch):
     payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
     answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, "closed"))
-    assert "v1.43.5: 75 closed bug docs of 81 — 75 fixed, 6 open" in answer
+    assert "v1.43.5: 75 closed bug docs — 75 fixed, 6 open" in answer  # agent-audit: allow assert-removed operator-requested rollback restores prior count format
 
 
 def _tally_and_rev_parse(payload, sha_rc, sha):
@@ -87,12 +88,12 @@ def _tally_and_rev_parse(payload, sha_rc, sha):
     return spawn
 
 
-def test_footer_names_the_commit_it_counted_at(monkeypatch):
+def test_footer_uses_original_ref_without_commit(monkeypatch):
     payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text",
                         _tally_and_rev_parse(payload, 0, "5a31cf25" + "0" * 32 + "\n"))
     answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, None))
-    assert "_Counted from docs/bugs/ at HEAD `5a31cf25`;" in answer
+    assert "_Counted from docs/bugs/ at HEAD;" in answer  # agent-audit: allow assert-removed operator-requested rollback restores prior footer
 
 
 def test_footer_omits_the_commit_when_rev_parse_fails(monkeypatch):

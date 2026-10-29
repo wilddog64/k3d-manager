@@ -1472,3 +1472,17 @@ intentionalchanges/tests. Askeduserwhichworkingrevision/example orpre-b670
 behavior; no codechange/revert/runtimeaction untiltargetclear. OriginalP2OPEN.
 Recommendaftertargetclarified preserveaccuratecounts, profileboundedhistory
 andtestequivalence; threadroutingseparate. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 operator-requested ask-docs-only rollback
+
+Userclarifiedask-docsonly; restoredask_docs.py/bug_count.py byte-exact
+ee456c83Oct22 generic-bugtallylivegood. Sharedwebhookandbug-tallyscript
+unchanged; no Gitreset/rebase. Four ask-docs source/testfiles only plus
+trackingdocs/memory. OriginalmissingnounbugOPEN (returnssearchfallback);
+30stallytimeoutpotentialremains. Oldreplylosesdenominator/commit/source
+link; all87focusedcasesretained, historicalexpectationschangedunderexplicit
+rollback, tripwire2blockedcredentialreads, norealbinary. RuffPASS, cmpPASS,
+diffcheckclean; fullactualoutputinask-docsfailedliveissue. No service
+restart; operator-controlledreload/liveverificationpending. Recommend
+profileandboundedcount-onlysemantics/equivalence thenrestoreintent separately
+afterdiscussion. Stagedlint/audit/hooksrequired; noPR.

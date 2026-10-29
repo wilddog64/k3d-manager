@@ -9,11 +9,8 @@ from typing import NamedTuple
 from webhook import proc
 
 _COUNT_RE = re.compile(r"\b(?:how many|count|number of|tally)\b", re.IGNORECASE)
-_COUNT_PREFIX_RE = re.compile(r"^\s*(?:how many|count|number of|tally)\b", re.IGNORECASE)
 _BUG_RE = re.compile(r"\bbugs?\b", re.IGNORECASE)
 _RELEASE_RE = re.compile(r"\bv?(\d+\.\d+\.\d+)\b", re.IGNORECASE)
-_VERSION_TOKEN_RE = re.compile(r"\bv?\d+\.\d+\.\d+\b", re.IGNORECASE)
-_WORD_TOKEN_RE = re.compile(r"\b(?:p\d+|\d+|[a-z]+)\b", re.IGNORECASE)
 _PRIORITY_RE = re.compile(r"\b(P[0-3])\b", re.IGNORECASE)
 _STATE_RE = re.compile(r"\b(open|outstanding|fixed|closed|resolved|verified)\b", re.IGNORECASE)
 _NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
@@ -23,13 +20,6 @@ _LAST_N_RE = re.compile(r"\b(?:last|past|previous|recent)\s+(\d+|" + "|".join(_N
 _CURRENT_RE = re.compile(r"\b(?:this|current|latest)\s+release\b", re.IGNORECASE)
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 _BRANCH_RE = re.compile(r"k3d-manager-(v\d+\.\d+\.\d+)$")
-_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-_OMITTED_NOUN_WORDS = {
-    "are", "currently", "there", "the", "in", "for", "of", "on", "from", "this", "current", "latest",
-    "release", "releases", "last", "past", "previous", "recent", "we", "have", "do", "does", "is",
-    "and", "with", "status", "priority", "bug", "bugs", "one", "two", "three", "four", "five", "six",
-    "seven", "eight", "nine", "ten",
-}
 ALL_RELEASES_SHOWN = 10
 
 
@@ -40,14 +30,7 @@ class CountQuery(NamedTuple):
 
 
 def match(question):
-    question = question or ""
-    if not _COUNT_RE.search(question):
-        return None
-    explicit_bug_query = _BUG_RE.search(question)
-    priority_match = _PRIORITY_RE.search(question)
-    state_match = _STATE_RE.search(question)
-    implicit_bug_query = _is_omitted_noun_bug_count(question, priority_match, state_match)
-    if not explicit_bug_query and not implicit_bug_query:
+    if not _COUNT_RE.search(question or "") or not _BUG_RE.search(question or ""):
         return None
     release_match = _RELEASE_RE.search(question)
     last_match = _LAST_N_RE.search(question)
@@ -60,28 +43,12 @@ def match(question):
         release = "last:1"
     else:
         release = "*"
+    priority_match = _PRIORITY_RE.search(question)
+    state_match = _STATE_RE.search(question)
     state = None
     if state_match:
         state = "open" if state_match.group(1).lower() in ("open", "outstanding") else "closed"
     return CountQuery(release, priority_match.group(1).upper() if priority_match else None, state)
-
-
-def _is_omitted_noun_bug_count(question, priority_match, state_match):
-    if not priority_match or not state_match:
-        return False
-    remainder = _COUNT_PREFIX_RE.sub("", question, count=1)
-    remainder = _VERSION_TOKEN_RE.sub(" ", remainder)
-    tokens = [token.lower() for token in _WORD_TOKEN_RE.findall(remainder)]
-    priority_tokens = [token for token in tokens if re.fullmatch(r"p[0-3]", token)]
-    state_tokens = [token for token in tokens if token in {"open", "outstanding", "fixed", "closed", "resolved", "verified"}]
-    if len(priority_tokens) != 1 or len(state_tokens) != 1:
-        return False
-    return all(
-        token in _OMITTED_NOUN_WORDS
-        or token in {priority_tokens[0], state_tokens[0]}
-        or token.isdigit()
-        for token in tokens
-    )
 
 
 def _version(name):
@@ -97,13 +64,6 @@ def _current_release(ref, root):
         branch = output.strip() if rc == 0 and not timed_out else ""
     match = _BRANCH_RE.search(branch)
     return match.group(1) if match else None
-
-
-def _commit(ref, root):
-    rc, output, timed_out = proc._spawn_capture_text(["git", "rev-parse", "--verify", f"{ref}^{{commit}}"], cwd=root,
-                                                     timeout=10)
-    sha = output.strip() if rc == 0 and not timed_out else ""
-    return sha[:8] if _SHA_RE.match(sha) else ""
 
 
 def _select(releases, release, ref, root):
@@ -174,8 +134,7 @@ def reply(query):
         lead = lead_of(data)
         noun = f" {query.priority}" if query.priority else ""
         state_lead = f" {query.state}" if query.state else ""
-        of_total = f" of {counts.get('total', 0)}" if query.state else ""
-        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs{of_total} — {counts.get('closed', 0)} fixed, "
+        lines.append(f"{release}: {lead}{state_lead}{noun} bug docs — {counts.get('closed', 0)} fixed, "
                      f"{counts.get('open', 0)} open, {counts.get('unknown', 0)} with no Status line.")
         open_items = data.get("open_paths", []) if query.priority else counts.get("open_paths", [])
         unknown_items = data.get("unknown_paths", []) if query.priority else counts.get("unknown_paths", [])
@@ -197,7 +156,5 @@ def reply(query):
             lines.append(f"Unknown: {_doc_link(path)}")
     if unset_total:
         lines.append(f"{unset_total} docs in these releases have no Priority line, so they are not counted here.")
-    commit = _commit(ref, root)
-    at = f"{ref} `{commit}`" if commit else ref
-    lines.append(f"_Counted from docs/bugs/ at {at}; release = Branch: line, else the release the doc was added in._")
+    lines.append(f"_Counted from docs/bugs/ at {ref}; release = Branch: line, else the release the doc was added in._")
     return "\n".join(lines)
