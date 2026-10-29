@@ -1973,3 +1973,7 @@ service/credentials/Slack action or newplan/PR. Docs-onlyShellCheckN/A.
 
 Operator requested a plan for later evaluation. Filed v1.43.11 plan 5 of 5: validated tally snapshot/index or another safe design, with freshness, cold-start, correctness and live performance criteria. No implementation or dispatch approved. Existing P2 remains open after live timeout; model-summary latency is separate. Plan and roadmap documentation only; no production action.
 Plan checkpoint: 7f0fdca3. PR: none (not requested). Documentation-only; BATS and ShellCheck not applicable.
+
+## 2026-10-29 Kine recurrence follow-up
+
+Operator requested review and possible Luna dispatch. Luna performed offline root-cause review: transaction trigger remains unknown, no safe fix or K3s upgrade scoped; matching Kine source/version and incident-window evidence needed. Read-only M4 checks: API ready, container has not restarted, no matching compaction events in bounded recent logs. Sandbox log access failed; approved retry worked. Full outputs and limits in docs/issues/2026-10-29-kine-recurrence-follow-up-review.md. P2 remains open; no recovery or restart performed. PR: none.
