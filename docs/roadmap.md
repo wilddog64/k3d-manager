@@ -431,12 +431,7 @@ Critical: needs a dispatch go. v1.43.10 is now full.
 
 ### Candidate milestone — v1.43.11 (patch)
 
-**One-command machine setup** (operator, 2026-10-25). Opened by Claude because v1.43.9 and v1.43.10 are
-full. Branch `k3d-manager-v1.43.11`, cut from `main` after v1.43.10 merges. Plan 1 of 5 is
-[`one-command-machine-setup`](plans/v1.43.11-one-command-machine-setup.md): `make machine-setup ROLE=hub|worker|console`
-and a read-only `make machine-check`, driven by per-role tool, secret, agent and repo lists, so the M5 Air
-(arrives 2026-10-28) can become the hub, the M4 a worker and the M2 a console. Secrets are re-entered on
-each machine and checked by name only. Approval pending: dispatch to Luna on the operator's go.
+**One-command machine setup** moved to v1.43.12 on 2026-10-29 (Claude), because the M5 hub build depends on it and v1.43.12 ships first. v1.43.11 now has 4 plans. Branch `k3d-manager-v1.43.11`, cut from `main` after v1.43.10 merges.
 
 Plan 2 of 5 is [`two-machine-work-distribution`](plans/v1.43.11-two-machine-work-distribution.md), which follows plan 1:
 jobs go through a git queue branch, so they keep flowing when either laptop is away from home. Machines claim jobs
@@ -452,12 +447,27 @@ Plan 4 of 5 is [`dev-staging-prod-promotion-path`](plans/v1.43.11-dev-staging-pr
 2026-10-25, "so we don't work on hostiger directly"). Phase 1: a persistent k3s staging cluster built like Hostinger, plus `env`
 labels, a read-only prod kubeconfig for agents and `make env-status`. Hostinger is unchanged. Phases 2 and 3 (`deploy/staging`
 and `deploy/prod` refs, pinned locks, gated `make promote`, rollback, CVE fixes through staging, prod self-heal) go to
-patch v1.43.12. Decisions D1–D3 pending.
+patch v1.43.13 (moved from v1.43.12 on 2026-10-29, when v1.43.12 became the M5 hub release). Decisions D1–D3 pending.
 
 Plan 5 of 5 is [`ask-docs-count-performance`](plans/v1.43.11-ask-docs-count-performance.md)
 (operator, 2026-10-29): evaluate a validated snapshot or another safe approach
 to avoid interactive Git-history timeouts while retaining authoritative counts.
 Proposed for later review, not dispatched; the existing P2 remains open.
+
+### Candidate milestone — v1.43.12 (special release: M5 hub)
+
+**M5 Air becomes the hub** (operator, 2026-10-29). Branch `k3d-manager-v1.43.12`, cut from `main` after v1.43.9
+merges. It ships **before** v1.43.10 and v1.43.11, so its tag lands out of numeric order. The operator chose that over
+renumbering. Plan 1 of 2 is [`one-command-machine-setup`](plans/v1.43.12-one-command-machine-setup.md) (moved from
+v1.43.11). Plan 2 of 2 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
+verifies a fresh hub on the M5 while the M4 keeps serving, and `make hub-cutover` moves the agents and the tunnels in one
+gated step, with rollback. Its live run is the recovery for the Kine compaction bug and the proof for the three
+2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending.
+
+**Follow-on, not scheduled: a local LLM (Ollama) on the M5.** It runs on the macOS host (Metal; containers have no GPU),
+as a LaunchAgent with a model memory cap. Size it only after the M5 has run as the hub for a week and its free memory is
+measured. First uses: local embeddings for ask-docs and `find-similar-docs`, and Hermes digest summaries. Gets a spec when
+scheduled.
 
 ### Candidate milestone — v1.44.0
 
