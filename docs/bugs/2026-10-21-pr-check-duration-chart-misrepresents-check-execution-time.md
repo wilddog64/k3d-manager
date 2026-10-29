@@ -1,8 +1,9 @@
 # Bug: PR Checks duration chart repeats completed runs across scrape timestamps
 
 **Filed:** 2026-10-21 (operator screenshot; repository review)
-**Status:** VERIFIED — 2026-10-28 reopened follow-up implemented by Luna and independently tested; operator live acceptance pending
+**Status:** LIVE-VERIFIED — 2026-10-29 operator screenshots and GitHub duration comparison
 **Fix commit:** 2b21e8af
+**Live evidence:** 2026-10-29 · run grafana-pr-checks-operator-screenshots · env hub-grafana · scenario empty-and-historical-repo-filters-and-github-duration · commit 858d6612 · proves E4
 **Priority:** P3 — misleading observability visualization; check status and collection remain functional
 **Severity:** low
 **Approval:** explicit operator 2026-10-28 Luna follow-up implementation batch
@@ -242,3 +243,13 @@ views plus exacttooltip value comparison remain pending before liveclosure.
 [Full actual API outputs and observations](../issues/2026-10-28-pr-checks-github-timestamp-comparison.md).
 One skippedrun source timestamp interval isnegative1s; outsidepresentation-only
 scope, reportedforfuturecollectorinvestigation, notchanged. No imageexport/CIrun.
+
+## Live verification — 2026-10-29
+
+Operator screenshots show k3d-manager with zero open PRs and no historical
+samples (24 hours), and shopping-cart-payment with zero open PRs and retained
+historical checks (7 days), both with GitHub read `ok`. The payment #93 Build
+and Test tooltip shows 1.53 minutes, consistent with GitHub's 92 seconds after
+rounding. The prior All view showed open and retained closed PRs together.
+The dashboard application was Healthy and Synced at revision `858d6612`, which
+contains fix `2b21e8af`. See [screenshots and full comparison](../issues/2026-10-28-pr-checks-github-timestamp-comparison.md).

@@ -1633,3 +1633,7 @@ Operator supplied /tmp/webhook-doctor.json on M4: lookup exit 0, available reade
 ## 2026-10-29 doctor command-exit live verification
 
 Operator requested controlled timing test. Current M4 helper waited for successful closed-stream child (exit 0, 0.156s) and timed out/terminated over-deadline child (0.204s); fix b591a13c present. Operator real doctor lookup and authenticated health passed. Bug marked live-verified with controlled-race limitation; original locked-Keychain symptom was separate. Full command/output in docs/issues/2026-10-29-live-verification-queue-review.md. No restart or Keychain lock. PR: none.
+
+## 2026-10-29 PR Checks chart live verification
+
+Operator screenshots show zero open/no history for k3d-manager and zero open/retained history for payment, GitHub read ok. PR93 Build and Test tooltip 1.53m matches recorded GitHub 92s rounded. Hub dashboard app Healthy/Synced at 858d6612 containing fix 2b21e8af. Bug marked LIVE-VERIFIED; failed-read case offline only. Full evidence/screenshots and read-only access issues in docs/issues/2026-10-28-pr-checks-github-timestamp-comparison.md. No live mutation. PR: none.
