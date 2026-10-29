@@ -1,6 +1,6 @@
 # Bug: product-catalog CI cannot accept scanner rebuild dispatch
 
-**Status:** IMPLEMENTED — fix branch pushed and offline verified; PR/CI/merge/live pending
+**Status:** VERIFIED — offline workflow checks passed; fix remains on unmerged branch, PR/CI/merge and live scanner dispatch verification pending
 **Priority:** P2
 **Fix commit:** 85945891b6234e5efcbd06b767baea4c84592816
 **Filed:** 2026-10-27 (operator local date)
@@ -84,3 +84,13 @@ access. The parent code-review-graph tools are not available in this session
 ## Implementation handoff
 
 GPT-6-Luna changed onlyci.yml: added workflow_dispatch and main-only push/manual publish. Actual current-main reusableSHA c7ff88aa… preserved (initial task text named an older checkout SHA98b10f…; corrected without changing application pin). Independently actionlint/6-case condition matrix/exact two-edit parent comparison and landing gates passed. Remote fix/cve-manual-rebuild SHA verified through GitHub API. No PR created/merged, no CI run on non-main push, no live dispatch. Claude/owner PR/merge precedes live scanner retry. [Full actual output](../issues/2026-10-27-product-catalog-manual-rebuild-workflow-verification.md).
+
+## 2026-10-28 verification recheck
+
+Coordinatorre-ranactionlint(exit0/nooutput), exacttwoeditparentcomparison and
+6eventpublicationmatrix(allPASS) on85945891. FreshGitHubmainstilllacks
+workflow_dispatch; branchonecommitahead/0behind, noPRfound, all-eventActions
+queryexactfixSHAhas0runs. OfflineVERIFIED, liveNOTYET. Thisdoesnotestablish
+mainfixappliedorCIpassed. Claude/ownerPR+CI+mergeisnext, thenoneoperator
+scannerretryandactualdispatch/workflowevidence. No automaticliveaction.
+[Actual re-verification and handoff](../issues/2026-10-27-product-catalog-manual-rebuild-workflow-verification.md).

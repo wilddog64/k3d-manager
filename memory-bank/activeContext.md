@@ -1344,3 +1344,15 @@ CloudflareLIVE-VERIFIEDclosure committedandpushede717ffab. Existingtyped
 operationalproofacceptedbynormalhooks; stagedlint/auditexit0, doclinks4filesOK.
 No runtimecodechange/BATS/ShellCheckN/A; noPR(URLN/A). AllagreedCloudflare
 checkscomplete; KineincidentremainsseparateOPEN/operatorrecoverypending.
+
+## 2026-10-28 product-catalog rebuild workflow offline re-verified
+
+Userflaggeddashboardnotyetverified/live. Recheck85945891actionlintclean,
+exacttwoeditparentcomparison+6eventmatrixPASS; bugnowVERIFIEDofflineonly.
+FreshGitHubmainae982f0stillmissingworkflow_dispatch; fixbranch1ahead0behind,
+PRsearchnone, exactbranch/SHAall-eventruns0 (CLIusedbecauseconnectorPRonly).
+Existingissuehasactualoutputs+handoffcomparelink. Noapplicationcode/memory
+change/PR/merge/trigger/scan/imagepush/rollout/credentials. Claude/ownerPR+
+requiredCI+mergebeforeoneoperatorscannerretry; livepending, noCIpassclaimed.
+BATS/ShellCheckN/AYAML-onlyreview; managerstagedlint/audit/hooksbeforecommit,
+PRURLnone perusernoPRrule. CloudflarealreadyLIVE-VERIFIED; Kinestillseparate.

@@ -67,3 +67,77 @@ This is expected because push CI remains main-only and no PR was created. Do not
 ## Pending handoff and live verification
 
 Claude creates PR and inspects CI; repo owner merges (session forbids coordinator PR creation and merge). Only after merged main, one operator scanner run can retry real workflow dispatch. Confirm exact HTTP outcome/CI run before claiming dispatch recovery. No production workflow dispatch/scan/registry mutation/credential access was performed during this implementation. The5 candidate findings and current4HIGH report remain separate application remediation work. Scanner fix c3703fed remains independently verified as recorded in its issue.
+
+## 2026-10-28 coordinator re-verification after dashboard report
+
+Result: offline verification PASS; live verification NOT YET. The fix has not
+been merged into main. The dashboard's Fixed status reflects an implemented
+branch fix, not production dispatch recovery. Update bug status to VERIFIED
+with explicit offline-only scope; do not label LIVE-VERIFIED.
+
+Fresh read-only GitHub connector results:
+
+```json
+{"repository_full_name":"wilddog64/shopping-cart-product-catalog","base":"main","head":"fix/cve-manual-rebuild","status":"ahead","ahead_by":1,"behind_by":0,"total_commits":1,"base_commit":{"sha":"ae982f08396906fd80ff32dad8f43b71831100a7"},"files":[{"filename":".github/workflows/ci.yml","status":"modified","additions":2,"deletions":1,"changes":3}]}
+{"issues":[]}
+{"workflow_runs":[]}
+```
+
+PR search was `head:fix/cve-manual-rebuild`, stateall, repository-scoped.
+No PR found. Connector's workflow helper is PR-only, so use read-only GitHub
+CLI for an all-event exactSHA/branch query; no workflow dispatch occurred:
+
+```sh
+gh api --method GET repos/wilddog64/shopping-cart-product-catalog/actions/runs -f branch=fix/cve-manual-rebuild -f head_sha=85945891b6234e5efcbd06b767baea4c84592816 -f per_page=30 --jq '{total_count, workflow_runs: [.workflow_runs[] | {id,event,status,conclusion,head_sha,html_url}]}'
+```
+
+Actual output:
+
+```json
+{"total_count":0,"workflow_runs":[]}
+```
+
+Fresh remote main workflow blob46280af60364a4d140dc0fa3b20848b0b950c6a7 still
+has onlypush/pull_request and push-onlypublication. Fixbranchworkflow blob
+cfc57a824c3d2b6ae4e06efb25333fb433afb0e4 includes workflow_dispatch and
+main-onlypush/manualpublication. Therefore live scannerretry cannot exercise
+this fix until reviewedmerge; do not retry merelytooverwritefailureevidence.
+
+Rechecked unchanged isolatedapplicationcheckout; gitstatusclean. Actual
+`git log origin/fix/cve-manual-rebuild --oneline -3` output:
+
+```text
+8594589 fix: enable scanner-triggered main rebuilds
+ae982f0 ci: update shopping-cart-product-catalog to sha-cf9263529a3316a6aa2eff6ab36e5ad2668182f2 [skip ci]
+99d35f2 ci: update shopping-cart-product-catalog to sha-240d0cf57078684f9d8bb6db2007b51dc3c3aad4 [skip ci]
+```
+
+`actionlint /private/tmp/k3dm-product-catalog-rebuild/.github/workflows/ci.yml`
+exit0/no output. Python independently compares actual85945891workflow against
+ae982f0parent with exactlytwoallowededits, assertsworktreeequalsfixedcommit,
+and evaluates the actual condition for six events. Actual output:
+
+```text
+parent comparison: PASS (only trigger and publish condition changed)
+publish ref=refs/heads/main event=push: True PASS
+publish ref=refs/heads/main event=workflow_dispatch: True PASS
+publish ref=refs/pull/1/merge event=pull_request: False PASS
+publish ref=refs/heads/main event=pull_request: False PASS
+publish ref=refs/heads/topic event=push: False PASS
+publish ref=refs/heads/topic event=workflow_dispatch: False PASS
+all other workflow content unchanged: PASS
+```
+
+BATS/ShellCheck not applicable to applicationYAML-onlyfix/documentationreview;
+no newapplicationcode/tests/dependencyinstall. PriorapplicationCI-success
+restriction respected: applicationmemory-bank untouched because noCI. Manager
+stagedlint/audit/checkpointhooksrequiredbeforecommit; nohookbypass.
+
+Next concretehandoff: Claude/owner createsPR fromfix/cve-manual-rebuild to
+main, observesrequiredCI, then merges. [Prepared branch comparison](https://github.com/wilddog64/shopping-cart-product-catalog/compare/main...fix/cve-manual-rebuild).
+SessionexplicitlyforbidscoordinatorPRcreation; PRURLnone. Aftermergeand
+requiredCIpass, operatorrunsoneauthorizedscannerretry andsuppliesjoblog.
+Verify rebuilddispatchaccepted andcorrespondingGitHubworkflowrun exists
+withworkflow_dispatch/refmain; inspectoutcomeandgates. JobCompletedalone
+isnotdispatchsuccess; unchangedvulnerabledependenciesmaystillblockpromotion.
+No liveworkflowtrigger/scan/imagepush/rollout/credentials/permissionchange.
