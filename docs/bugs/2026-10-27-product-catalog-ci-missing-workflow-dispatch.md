@@ -1,6 +1,6 @@
 # Bug: product-catalog CI cannot accept scanner rebuild dispatch
 
-**Status:** VERIFIED — fix merged in product-catalog `8e7b751a` (PR #65); live scanner `workflow_dispatch` on main pending
+**Status:** VERIFIED — fix merged (`8e7b751a`, PR #65); live operator `workflow_dispatch` build-push succeeded (run 40971794790); scanner-initiated rebuild pending
 **Priority:** P2
 **Fix commit:** 85945891b6234e5efcbd06b767baea4c84592816
 **Filed:** 2026-10-27 (operator local date)
@@ -98,3 +98,7 @@ scannerretryandactualdispatch/workflowevidence. No automaticliveaction.
 ### Fix merged — 2026-10-29
 
 Product-catalog PR #65 merged as `8e7b751a`: it adds the `workflow_dispatch` trigger, and publishing runs only on `refs/heads/main` for a push or a dispatch. The post-merge push run (40970448931) passed every job, including `Build, Scan & Push / build-push`. Still open for closure: one `workflow_dispatch` run on `main`, triggered by the app-cve-scan rebuild path, with `build-push` succeeding.
+
+### Live dispatch — 2026-10-29
+
+The operator ran `gh workflow run ci.yml --ref main`. Run 40971794790 had event `workflow_dispatch` on `main` at `5aee1f25` (the image-tag bump commit that followed `8e7b751a`), and every job succeeded, including `Build, Scan & Push / build-push`. The manual rebuild path now publishes. Remaining for closure: the first rebuild that app-cve-scan starts by itself.
