@@ -1629,3 +1629,7 @@ Operator ran doctor in tmux; approved read-only search of five default-socket pa
 ## 2026-10-29 operator webhook doctor result
 
 Operator supplied /tmp/webhook-doctor.json on M4: lookup exit 0, available reader, authenticated healthy HTTP, port 7443 listening, no recovery recommended. Actual JSON in docs/issues/2026-10-29-live-verification-queue-review.md. Healthy-path evidence does not reproduce EOF race, locked Keychain or timeout; heartbeat remains unenrolled. No live-verified flag changed or restart performed. PR: none.
+
+## 2026-10-29 doctor command-exit live verification
+
+Operator requested controlled timing test. Current M4 helper waited for successful closed-stream child (exit 0, 0.156s) and timed out/terminated over-deadline child (0.204s); fix b591a13c present. Operator real doctor lookup and authenticated health passed. Bug marked live-verified with controlled-race limitation; original locked-Keychain symptom was separate. Full command/output in docs/issues/2026-10-29-live-verification-queue-review.md. No restart or Keychain lock. PR: none.

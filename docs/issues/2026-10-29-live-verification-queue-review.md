@@ -63,3 +63,40 @@ healthy HTTP on port 7443 in the operator's session. It supersedes the sandbox
 result for that operator context. It does not reproduce the EOF exit race,
 locked-Keychain diagnosis or timeout; heartbeat enrollment and independent
 alerting remain unverified. No live-verified flag changed, no restart performed.
+
+## Controlled command-exit check on M4
+
+The operator requested this test. The current checkout contains `b591a13c`;
+`shasum -a 256 bin/k3dm-webhook-doctor` returned
+`8b296f6fb29d4d4d40f029ba2c2a413e9d77df3999e3922eca6ea7106a319b7e`.
+Actual command and output:
+
+```text
+$ python3 - <<'PY'
+import json, runpy, sys, time
+run = runpy.run_path('bin/k3dm-webhook-doctor')['_run']
+cases = [
+ ('closed-stream-success', "import os,time;os.write(1,b'fixture\\n');os.close(1);os.close(2);time.sleep(.1)", 2),
+ ('closed-stream-timeout', 'import os,time;os.close(1);os.close(2);time.sleep(5)', .2),
+]
+for name, code, deadline in cases:
+ started = time.monotonic()
+ result = run([sys.executable, '-c', code], timeout=deadline)
+ print(json.dumps({'case':name,'elapsed_seconds':round(time.monotonic()-started,3), **result}, sort_keys=True))
+ if name == 'closed-stream-success':
+  assert result['returncode'] == 0 and not result['timed_out'] and result['stdout'] == 'fixture\n'
+ else:
+  assert result['returncode'] != 0 and result['timed_out']
+print('controlled checks: PASS')
+PY
+{"case": "closed-stream-success", "elapsed_seconds": 0.156, "output_limited": false, "returncode": 0, "stdout": "fixture\n", "timed_out": false}
+{"case": "closed-stream-timeout", "elapsed_seconds": 0.204, "output_limited": false, "returncode": -15, "stdout": "", "timed_out": true}
+controlled checks: PASS
+$ git merge-base --is-ancestor b591a13c HEAD && printf 'fix commit is present in current checkout\n'
+fix commit is present in current checkout
+```
+
+Together with the operator's real healthy doctor result above, this establishes
+M4 verification of the helper fix using a controlled race. It does not claim
+the actual Keychain command encountered the race or that this race caused the
+earlier locked-Keychain symptom. No Keychain lock, restart or service mutation.
