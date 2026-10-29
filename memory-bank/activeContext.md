@@ -21,6 +21,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Latest live investigations and records
 
+- **2026-10-29 — v1.43.12 M5 hub special release opened** (out of order, operator choice). Plans: `v1.43.12-one-command-machine-setup.md` (moved from v1.43.11; now covers M4 workstation parity: the curated brew list, the agent config repos, the same `~/src` layout of 50 checkouts, the `~/.zsh` → zshdotfiles links, and the smartcd/direnv → `sync-*` agent-state backup chain) and `v1.43.12-m5-new-hub-one-command.md` (`make hub-new` / `hub-cutover`). Promotion phases 2–3 moved to v1.43.13. Open before implementation: tracked home for the untracked `.envrc` files, smartcd `bash_enter` scripts and the personal `CLAUDE.md`/`AGENTS.md`/`GEMINI.md`; sync scripts need `pull --rebase` before two machines run them. Commits 21c84360, 2eed97db, 2dfbc318, 105e3b90. PR #62 main build passed, including build-push.
+
 - 2026-10-29: operator approved two items. (1) product-catalog PR #65 opened (`fix/cve-manual-rebuild`, Copilot requested), awaiting CI and an operator merge, then a live manual dispatch. (2) ask-docs Phase 0 landed by Claude as `9fbc6051`: webhook template `ProcessType Interactive`, BATS red-before, N3 guard mutation-caught. The operator must add the key to the installed plist and run `make restart-webhook`; then E3 needs 20 live counts.
 
 - 2026-10-29 (Claude): ask-docs timeout root cause measured. Tally 1.8 s normal vs 13.0 / 58.6 s under `taskpolicy -b`. The webhook plist has no `ProcessType`, so launchd throttles it. Added Phase 0 (`ProcessType Interactive`, webhook only) and an Acceptance block to `v1.43.11-ask-docs-count-performance.md`. Noted in the P2 bug.
