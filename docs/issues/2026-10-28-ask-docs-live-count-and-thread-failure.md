@@ -366,3 +366,30 @@ semantics, prove equivalence and failure behavior with meaningful fixtures,
 then separately restore the explicit priority/state no-noun routing. Avoid
 claiming success from search prose, suppressing timeout or silently raising
 the deadline. Discuss scope before any new feature/implementation.
+
+## Operator live test after scoped rollback
+
+Operator triggered ask-docs from Slack and asked coordinator to monitor.
+Observed webhook PID30397 started2026-10-28 19:52:41 PDT, after rollback
+commit2d88c7be at19:49:42 PDT; bridge PID30403 started at same time.
+Job87aacff5 was running, then status success, actionask-docs. Thread delivery
+metadata route=bot_thread, delivered=true, reason=null. Statussuccess means
+worker produced a reply, not that the count was answered. Actual job output:
+
+```text
+The provided documentation excerpts do not contain information about how many P1 bugs exist or are open for v1.43.5.
+
+Sources:
+<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/docs/issues/2026-10-27-ask-docs-priority-count-misses-bug-noun.md|docs/issues/2026-10-27-ask-docs-priority-count-misses-bug-noun.md>
+<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/docs/plans/v1.43.6-dispatch-verified-delivery-cost.md|docs/plans/v1.43.6-dispatch-verified-delivery-cost.md>
+<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/docs/plans/v1.43.4-bug-dashboard-defaults.md|docs/plans/v1.43.4-bug-dashboard-defaults.md>
+<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/docs/plans/v1.43.6-claude-context-compaction-metrics.md|docs/plans/v1.43.6-claude-context-compaction-metrics.md>
+<https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/docs/bugs/2026-10-15-bug-tracking-stacked-chart-cross-comparison-readability.md|docs/bugs/2026-10-15-bug-tracking-stacked-chart-cross-comparison-readability.md> [P3 · open]```
+
+The answer is semantic fallback and does not contain the requested count;
+consistent with the known original missing-noun bug restored by the rollback.
+The precise input was not read from logs and is not inferred from the reply.
+This does not test whether an explicitly worded bug-tally question still
+times out. Coordinator did not send Slack messages, read response URL or
+credentials, or restart services. Count bug remainsOPEN. No runtime code
+changed; docs-only verification, BATS/ShellCheck N/A.

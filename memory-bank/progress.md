@@ -1856,3 +1856,13 @@ Operatornoted yesterday: actualrecordedliveee456c83 Oct22 is sixdays before
 Oct28; Oct27 pre-b670 version containslaterformatting/source improvements.
 Exact Oct27 live-good commit not independently established. OriginalbugOPEN,
 current timeout potential remains.
+
+## 2026-10-28 operator post-rollback ask-docs test
+
+OperatortriggeredSlack; readonlyjob87aacff5 completed, bot_threaddelivered
+true. Outputsemanticfallback saysdocscontainnoP1countforv1.43.5, no count;
+fullactualoutputinexistingask-docsissue. Exactinputnotread/inferred. PID30397
+webhookand30403bridge start19:52:41PDT afterrollbackcommit19:49:42. Original
+missingnounbugconsistentwithobservedfallback, remainsOPEN. Explicitbugtally
+timeoutnotretested/provenfixed. No credential/responseURLread, Slacksend,
+coordinatorrestart orruntimecodechange. Docs-only; noBATS/ShellCheck/PR.
