@@ -1616,3 +1616,7 @@ Plan checkpoint: 7f0fdca3. PR: none (not requested). Documentation-only; BATS an
 
 Operator requested review and possible Luna dispatch. Luna performed offline root-cause review: transaction trigger remains unknown, no safe fix or K3s upgrade scoped; matching Kine source/version and incident-window evidence needed. Read-only M4 checks: API ready, container has not restarted, no matching compaction events in bounded recent logs. Sandbox log access failed; approved retry worked. Full outputs and limits in docs/issues/2026-10-29-kine-recurrence-follow-up-review.md. P2 remains open; no recovery or restart performed. PR: none.
 Review checkpoint: 6e281548. Documentation-only: BATS and ShellCheck not applicable; doc links and agent audit passed.
+
+## 2026-10-29 live verification queue review
+
+Reviewed eight screenshot rows. First selected operator check: webhook doctor in unlocked GUI session. Coordinator sandbox check returned auth_unavailable/lookup_exit 44 and process command_error; does not prove missing credential in operator context and did not run authenticated HTTP. Actual output and remaining prerequisites in docs/issues/2026-10-29-live-verification-queue-review.md. No status marked live verified, service restart or credential change. PR: none.
