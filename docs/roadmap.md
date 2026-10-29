@@ -454,6 +454,11 @@ labels, a read-only prod kubeconfig for agents and `make env-status`. Hostinger 
 and `deploy/prod` refs, pinned locks, gated `make promote`, rollback, CVE fixes through staging, prod self-heal) go to
 patch v1.43.12. Decisions D1–D3 pending.
 
+Plan 5 of 5 is [`ask-docs-count-performance`](plans/v1.43.11-ask-docs-count-performance.md)
+(operator, 2026-10-29): evaluate a validated snapshot or another safe approach
+to avoid interactive Git-history timeouts while retaining authoritative counts.
+Proposed for later review, not dispatched; the existing P2 remains open.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
