@@ -22,6 +22,8 @@
 
 ### Changed
 
+- The webhook LaunchAgent now runs as `ProcessType Interactive`. With the key unset, launchd applies its default CPU and I/O throttle, and the ask-docs bug tally's Git children inherit it. The same tally took 0.85 s at normal priority, 13–59 s at background priority and 130 s I/O-throttled, so Slack count questions hit the 30 s deadline. Only the webhook changes; every other k3dm LaunchAgent keeps the default throttle, and a BATS guard enforces both.
+
 - Bug Tracking metrics recognize typed live investigation proof for closed recovery records without attributing a causal fix commit.
 
 - Release forecast keeps the Target state blocker reason readable with explicit supporting text sizing in the existing panel.
