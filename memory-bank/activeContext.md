@@ -21,6 +21,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Latest live investigations and records
 
+- 2026-10-29: operator approved two items. (1) product-catalog PR #65 opened (`fix/cve-manual-rebuild`, Copilot requested), awaiting CI and an operator merge, then a live manual dispatch. (2) ask-docs Phase 0 landed by Claude as `9fbc6051`: webhook template `ProcessType Interactive`, BATS red-before, N3 guard mutation-caught. The operator must add the key to the installed plist and run `make restart-webhook`; then E3 needs 20 live counts.
+
 - 2026-10-29 (Claude): ask-docs timeout root cause measured. Tally 1.8 s normal vs 13.0 / 58.6 s under `taskpolicy -b`. The webhook plist has no `ProcessType`, so launchd throttles it. Added Phase 0 (`ProcessType Interactive`, webhook only) and an Acceptance block to `v1.43.11-ask-docs-count-performance.md`. Noted in the P2 bug.
 - 2026-10-29 operator decision: the Kine P2 is recovered by building the new hub on the M5 (fresh datastore); the M4 is repurposed after cutover. Recorded in the Kine bug; acceptance is measured on the M5.
 - 2026-10-29: product-catalog CI fix `85945891` is on `fix/cve-manual-rebuild` in shopping-cart-product-catalog with NO PR. app-cve-scan next run 01:00 PDT 10-30 (job history is cleaned up after each run).
