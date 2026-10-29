@@ -1339,3 +1339,8 @@ ClosurehookinitiallyrefusedregularLiveevidencewithoutcodefixSHA; actualfixis
 externalCFsettings. Correctedtoexistingtypedoperational/investigationevidence
 withissue-ref/noFixcommit, no fabricatedSHA/bypass/parserchange. Actualhook
 output inexistingoperatorissue. Normalcheckpointretryrequired.
+
+CloudflareLIVE-VERIFIEDclosure committedandpushede717ffab. Existingtyped
+operationalproofacceptedbynormalhooks; stagedlint/auditexit0, doclinks4filesOK.
+No runtimecodechange/BATS/ShellCheckN/A; noPR(URLN/A). AllagreedCloudflare
+checkscomplete; KineincidentremainsseparateOPEN/operatorrecoverypending.
