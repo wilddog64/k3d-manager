@@ -2001,3 +2001,4 @@ Operator requested controlled timing test. Current M4 helper waited for successf
 Operator screenshots show zero open/no history for k3d-manager and zero open/retained history for payment, GitHub read ok. PR93 Build and Test tooltip 1.53m matches recorded GitHub 92s rounded. Hub dashboard app Healthy/Synced at 858d6612 containing fix 2b21e8af. Bug marked LIVE-VERIFIED; failed-read case offline only. Full evidence/screenshots and read-only access issues in docs/issues/2026-10-28-pr-checks-github-timestamp-comparison.md. No live mutation. PR: none.
 
 - [ ] 2026-10-29: P2 non-Claude coordinator attribution bug filed (`ad5cba50`), v1.43.10, approval pending.
+- [ ] 2026-10-29: ask-docs Phase 0 (webhook ProcessType Interactive) proposed; Kine → M5 rebuild decided; product-catalog fix needs PR.

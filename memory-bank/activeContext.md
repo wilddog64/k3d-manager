@@ -21,6 +21,10 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Latest live investigations and records
 
+- 2026-10-29 (Claude): ask-docs timeout root cause measured. Tally 1.8 s normal vs 13.0 / 58.6 s under `taskpolicy -b`. The webhook plist has no `ProcessType`, so launchd throttles it. Added Phase 0 (`ProcessType Interactive`, webhook only) and an Acceptance block to `v1.43.11-ask-docs-count-performance.md`. Noted in the P2 bug.
+- 2026-10-29 operator decision: the Kine P2 is recovered by building the new hub on the M5 (fresh datastore); the M4 is repurposed after cutover. Recorded in the Kine bug; acceptance is measured on the M5.
+- 2026-10-29: product-catalog CI fix `85945891` is on `fix/cve-manual-rebuild` in shopping-cart-product-catalog with NO PR. app-cve-scan next run 01:00 PDT 10-30 (job history is cleaned up after each run).
+
 - 2026-10-29 (Claude): filed P2 `docs/bugs/2026-10-29-non-claude-coordinator-work-unattributed.md` (`ad5cba50`, v1.43.10, approval pending). 31/32 dispatch starts since 10-26 record an unreported coordinator. No Sol/Terra commit carries a trailer. Fix: `K3DM_COORDINATOR` fallback, AGENTS.md rule, `Coordinator:` trailer, an unreported-share stat.
 
 - 2026-10-23 (cloud session): Added bridge action `diagnose-pods-all` (`provider` only → webhook `get-pods-all`) to `scripts/lib/webhook/cloud_actions.py`, so a cloud session can read every namespace's pods; howto table and CHANGELOG updated. `test_cloud_bridge.py` + `test_diagnostics_all_pods.py`: 99 passed. Fast-forwarded onto `k3d-manager-v1.43.5` (`b5ba7da8..fc2f335d`, no merge commit). Takes effect when the operator restarts the bridge on the release branch; not live-verified. Rechecked the other two 2026-09-29 follow-ups: the dashboard/alert-routing bug docs were filed 2026-09-29/30 and are FIXED, and the e2e payment auth decision (option b, Keycloak token) was made 2026-10-02; that bug waits only on a live Tier 1 rerun.

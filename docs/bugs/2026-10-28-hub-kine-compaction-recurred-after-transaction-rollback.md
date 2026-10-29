@@ -1,6 +1,6 @@
 # Hub Kine compaction stops again after revision-record transaction rollback
 
-**Status:** OPEN — live recurrence confirmed 2026-10-28; controlled recovery pending
+**Status:** OPEN — live recurrence confirmed 2026-10-28; recovery = M5 new-hub build (operator decision 2026-10-29)
 **Priority:** P2 — retention is stalled with a controlled rebuild workaround; API remains ready
 **Filed:** 2026-10-28
 **Release:** v1.43.9 bug; no new enhancement plan
@@ -145,3 +145,11 @@ dry-run, limited volume proof and pending restore-readiness evidence.
 Local exportmarker10:33:40Z was about11hoursold at coordinator sample, not
 proof of remote integrity/decryptability. Currentfulltest-all remainsactive.
 No live preflight/restart/rebuild or database/account change. Bug staysOPEN.
+
+## Operator decision — 2026-10-29: recover by building the new hub on the M5
+
+Operator: "let's build kine as we move to 5 then repurpose M4". The M4 hub will not get a controlled `make hub-recover-all`. The recovery is the M5 new-hub build, which starts with a fresh K3s/Kine datastore and restores hub data from snapshot. After cutover the M4 is repurposed, and its stalled datastore is retired with it.
+
+- The M4 hub stays as-is until cutover. It must not be restarted as a remedy, as before. `HubKineCompactionStalled` keeps firing on the M4 until then. This is a known and accepted state, not new noise.
+- Acceptance is unchanged, but measured on the M5 hub: at least 30 min of consecutive `COMPACT deleted` cycles, alert resolution, and datastore/WAL values. The M5 spec must carry this as live evidence.
+- Status stays OPEN until that evidence passes on the M5.
