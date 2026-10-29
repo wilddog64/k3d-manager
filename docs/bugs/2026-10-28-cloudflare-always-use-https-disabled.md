@@ -1,7 +1,10 @@
 # Bug: Cloudflare HTTPS enforcement and obsolete minimum TLS version
 
 **Filed:** 2026-10-28 (operator request after reviewing Cloudflare configuration inventory)
-**Status:** OPEN — operator reports both edge changes applied; seven-host HTTP and TLS enforcement independently verified; final post-TLS authenticated workflow smoke pending
+**Status:** LIVE-VERIFIED — HTTPS enforcement and minimum TLS1.2 independently probed on all seven hosts; final operator frontend login and Slack command round trip passed
+**Verification type:** investigation
+**Operational verification:** operator-managed Cloudflare settings remediation; public protocol enforcement and authenticated workflows verified, no repository code-fix SHA
+**Live investigation evidence:** 2026-10-28 · source operator-and-independent-probes · reference docs/issues/2026-10-28-cloudflare-preflight-operator-report.md · env cloudflare-3ai-talk-org · scenario post-minimum-tls12-frontend-sso-slack-roundtrip · proves m2,m3,m6,e2
 **Priority:** P2 — security hardening, higher priority than routine P3 enhancements; no demonstrated compromise
 **Severity:** medium (unenforced HTTP redirect and potentially permitted obsolete TLS protocols; confirm effective edge posture)
 **Release:** v1.43.9 security bug (not a new plan slot; fixes should be scheduled on the active release process after preflight approval)
@@ -112,11 +115,11 @@ interface:
 ## Definition of Done
 
 - [ ] F0 verified with captured HTTPS and TLS minimum settings, 7-host HTTP/HTTPS/TLS baseline and callback/redirect compatibility assessment.
-- [ ] Explicit approval received for the external setting change.
-- [ ] F1 applied with rollback documented and retained before/after record.
-- [ ] F2 real-world validation passing for HTTP redirects, TLS protocol enforcement and authenticated workflows; failures kept open with observed evidence.
-- [ ] F3 drift check planned or delivered separately with tests and no auto-repair.
-- [ ] Mark LIVE-VERIFIED only after E2; update bug status accordingly.
+- [x] Operator applied both settings separately through Cloudflare AI and supplied confirmation; coordinator made no external writes.
+- [x] F1 applied with rollback documented and retained before/after record; duplicated operator timestamp caveat retained.
+- [x] F2 seven-host HTTP/HTTPS/protocol checks and agreed frontend/Grafana/ArgoCD-access/Slack smoke passed; detailed coverage limits retained in the operator evidence issue.
+- [x] F3 read-only helper delivered and tested; unavailable settings remain unknown; no scheduler or auto-repair introduced.
+- [x] E2 post-TLS frontend logout/login and new Slack job e3c25194 passed; status LIVE-VERIFIED.
 
 ## What NOT to Do
 
@@ -290,3 +293,15 @@ wasprobe-localonly; no system/helper/appchange. FullactualJSON/method in
 existingoperatorreportissue. AI526claimcorrected: protocolhandshakealert.
 M2/M6PASS; finalpostsecondchangefrontendSSO+freshSlackresponsependingM3/E2,
 so bugOPEN. No coordinatorCloudflarecredential/write or screenshotexport.
+
+## Final post-TLS operator acceptance / closure
+
+Operator frontendlogout/login successful afterTLSchange, authenticatedDeveloper
+page shown. NewSlackmakefix-listjobe3c25194queued/started/succeeded withreply.
+All7publicredirects, exactTLS1.0/1.1edge-rejection andTLS1.2/1.3validnegotiation
+already independentlyverified in8297d54e. AgreedfinalM3/E2smokepass; now
+LIVE-VERIFIED. FullactualSlackscreenshottranscription/coverage/timelimits in
+[operator evidence](../issues/2026-10-28-cloudflare-preflight-operator-report.md).
+F0historicalcompleteinventoryproof remainslimited tooperatorAIreport+recorded
+publicprobes; no retrospectiveAPIread invented. FreshArgoCDSSO/allSlackcallback
+subtypes notclaimed. No scheduleddriftcheck or runtimechange added.

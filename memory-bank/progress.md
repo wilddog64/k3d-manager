@@ -1683,3 +1683,21 @@ commit, noPR(URLN/A).
 TLSsetting+sevenhostenforcement evidence pushed8297d54e; stagedlint/audit
 exit0, checkpoint/doclinks4filesOK. No codechange/BATS/ShellCheckN/A.
 NoPR(URLN/A). FinalpostTLSfrontendSSO+Slacksmokepending, securitybugOPEN.
+
+## 2026-10-28 Cloudflare security bug LIVE-VERIFIED
+
+FinaloperatorpostTLSfrontendlogout/loginpass; authenticatedDeveloper shown.
+FreshSlackmakefix-listjobe3c25194queued/started/succeeded/reply, distinctfrom
+preTLS02be2e0b. Combinedwith8297d54e all7HTTP301samehostHTTPS, validexact
+TLS1.2/1.3, explicitTLS1.0/1.1edgealerts +operatorCFminimum1.2/HTTPSOn/TLS1.3On
+confirmsagreedM3/E2smoke. BugnowLIVE-VERIFIED. Fulltext/coverage/timecaveatsin
+existingCFoperatorissue; no screenshotexport, coordinatorcredentials/writes/
+Slacksend/runtimemutation. Grafanaloginfirstchange, ArgoCDexistingaccess;
+freshArgoCDSSO/allcallbacksubtypesnotclaimed. F0historicalinventoryproof
+limitsremainexplicit; no scheduleddrift/auto-repairadded. Docs-onlyBATS/
+ShellCheckN/A; stagedlint/audit/checkpointhooksbeforecommit. NoPR(URLN/A).
+
+ClosurehookinitiallyrefusedregularLiveevidencewithoutcodefixSHA; actualfixis
+externalCFsettings. Correctedtoexistingtypedoperational/investigationevidence
+withissue-ref/noFixcommit, no fabricatedSHA/bypass/parserchange. Actualhook
+output inexistingoperatorissue. Normalcheckpointretryrequired.

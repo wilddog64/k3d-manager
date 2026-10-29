@@ -1330,3 +1330,69 @@ operator-only minTLS1.0 if an actual compatibility regression requires it,
 without undoingHTTPSenforcement. No rollbackperformed or recommended absent
 regression. No screenshot exported. No codechange; BATS/ShellCheckN/A for
 this liveverification. Documentation lint/audit/hooks required beforecommit.
+
+## Final operator post-TLS acceptance — LIVE-VERIFIED
+
+Evidence received 2026-10-29T00:11:45.555558+00:00. Operator explicitly reports
+"frontend logout and login back" after the TLS1.2 change; screenshot shows
+the ShopCart home page authenticated as Developer with Logout available.
+Accept this as operator-reported fresh frontend/Keycloak SSO return, not an
+independent browser trace. No credentials or unrelated background terminal
+content transcribed.
+
+Fresh Slack screenshot shows the k3d-manager app, messages "Just now":
+
+```text
+make fix-list queued — job e3c25194
+make fix-list started by slack:wilddog64:U4C9LDQP2 — job e3c25194
+make fix-list succeeded — job e3c25194
+make fix-delete-pod          APP and NS are required
+make fix-eso-refresh         No arguments needed
+make fix-force-sync          APP is required
+make fix-list                List all fix targets with descriptions
+make fix-restart             APP and NS are required
+make fix-status              NS is required
+make fix-sync                APP is required
+```
+
+This is a new job distinct from pre-TLS job02be2e0b. It establishes the
+operator's post-second-change command/queue/execution/reply round trip.
+Combined with confirmed minimumTLS1.2/HTTPSOn/TLS1.3On and all7independent
+HTTP/HTTPS/exactTLS1.0-1.3 probes, final agreed M3/E2 smoke acceptance passes.
+Cloudflare security bug is now LIVE-VERIFIED. No actual origin/app/config
+change performed by coordinator, no Slack message sent, no screenshot export.
+
+Validation limits retained: Grafana fresh login was tested after the first
+HTTPS change; ArgoCD existing-session access was observed. No separate fresh
+ArgoCD SSO or every Slack events/interactive subtype test claimed. The smoke
+window spans the recorded public probe and these subsequent operator checks,
+not continuous monitoring; no new regression reported. Cloudflare AI's repeated
+change timestamp remains operator-reported, not independently confirmed.
+No scheduled drift alert or autonomous repair added; existing read-only helper
+reports unknown when settings unavailable. No historical502/compromise claim.
+
+This closure changes documentation only; no BATS/ShellCheck rerun needed.
+Prior helper code tests, full recenttest-all results and independent live
+protocol output remain linked in this issue/bug; staged lint/audit/checkpoint
+hooks required before commit. No PR under repository rule.
+
+## Closure metadata hook correction
+
+First checkpoint failed before commit because the regular Live evidence
+format requires an actual code-fix commit. Actual hook output:
+
+```text
+docs/bugs/2026-10-28-cloudflare-always-use-https-disabled.md: LIVE-VERIFIED needs a **Fix commit:** <sha> line naming the commit that fixed it
+Pre-commit hook: newly LIVE-VERIFIED bug docs need a well-formed Live evidence line
+  format: **Live evidence:** YYYY-MM-DD · run <id> · env <value> · scenario <value> · commit <sha> · proves <ids>
+  guide:   docs/guides/grafana-dashboards.md
+ERROR: Checkpoint commit failed; resolve git errors and retry
+```
+
+The actual fix was external operator-managed settings, not repository code.
+Use the existing typed operational/investigation evidence path supported by
+check-bug-evidence.py and prior_art.py, with an issue reference and no Fix
+commit header. This records external remediation and independent observations
+without inventing a code fix. No hook bypass, parser change or test change.
+The failed command sequence also attempted gitpush, reporting Everything
+up-to-date; nothing from the failed commit was pushed. Retry normal hooks.
