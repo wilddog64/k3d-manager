@@ -1977,3 +1977,4 @@ Plan checkpoint: 7f0fdca3. PR: none (not requested). Documentation-only; BATS an
 ## 2026-10-29 Kine recurrence follow-up
 
 Operator requested review and possible Luna dispatch. Luna performed offline root-cause review: transaction trigger remains unknown, no safe fix or K3s upgrade scoped; matching Kine source/version and incident-window evidence needed. Read-only M4 checks: API ready, container has not restarted, no matching compaction events in bounded recent logs. Sandbox log access failed; approved retry worked. Full outputs and limits in docs/issues/2026-10-29-kine-recurrence-follow-up-review.md. P2 remains open; no recovery or restart performed. PR: none.
+Review checkpoint: 6e281548. Documentation-only: BATS and ShellCheck not applicable; doc links and agent audit passed.
