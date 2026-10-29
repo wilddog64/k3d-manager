@@ -1620,3 +1620,4 @@ Review checkpoint: 6e281548. Documentation-only: BATS and ShellCheck not applica
 ## 2026-10-29 live verification queue review
 
 Reviewed eight screenshot rows. First selected operator check: webhook doctor in unlocked GUI session. Coordinator sandbox check returned auth_unavailable/lookup_exit 44 and process command_error; does not prove missing credential in operator context and did not run authenticated HTTP. Actual output and remaining prerequisites in docs/issues/2026-10-29-live-verification-queue-review.md. No status marked live verified, service restart or credential change. PR: none.
+Review checkpoint: 9a3561ff. Documentation-only: BATS and ShellCheck not applicable; doc links and agent audit passed.
