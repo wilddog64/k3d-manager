@@ -1898,3 +1898,16 @@ timing and answerquality; shorterprompts/reasoning onlyifsupported. Google
 Gemini API docs say lower thinking may reduce latency; agyCLI support unproven.
 No model/credentials/livecodechange/benchmark. OriginalcountbugOPEN;
 deterministic count needsfullcorrectevidence. Docs-only, noPR.
+
+## 2026-10-28 existing ask-docs P2 updated for count timeout
+
+OperatorasksupdateexistingP2 andwhethercountbugnew. Existing
+2026-10-27-ask-docs-priority-count-requires-bugs-word.md alreadytracks
+missingnouncount; updatedsameOPENP2toincludeobserveddeterministictallytimeout
+andboundedaccuratecount/equivalence/liveacceptance. No duplicate/newplan.
+Correctedstaleheader(previousfixb670rolledback2d88) andunverifiedworkaround
+claim; livecurrentsemanticfallback, explicitbugsworkaroundnotproven.
+Generalmodelsummarylatencyseparateenhancementunlessagreedtargetviolated.
+Userrequestedcommunicationbeforechange: docs-onlyscopeproposal, no new
+implementation/dispatch/credential/service/Slackaction authorized or performed.
+Evidence/live traces in existingissue. Docs-onlyBATS/ShellCheckN/A; noPR.

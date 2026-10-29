@@ -1,7 +1,7 @@
 # Bug: ask-docs misses an explicit priority count without the word bugs
 
-**Status:** OPEN — operator live count check failed; committed matcher remains offline-verified, running webhook predates fix; controlled reload and retest pending
-**Fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2
+**Status:** OPEN — omitted-noun routing fix was rolled back; deterministic tally timed out in live verification
+**Previous fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2 (rolled back by 2d88c7be)
 **Priority:** P2
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
@@ -10,7 +10,7 @@
 `ask-docs how many P1 open for v1.43.5` returns unrelated documentation
 excerpts and cannot answer the count. The deterministic matcher requires the
 literal noun bugs; adding it selects the correct release/priority/state query.
-This degrades the question interface with a working rephrasing workaround.
+This degrades the question interface. Adding "bugs" selects the tally route, but a working live rephrasing workaround has not been established: that route timed out during the later verification.
 
 Evidence and exact reproduction:
 [Investigation](../issues/2026-10-27-ask-docs-priority-count-misses-bug-noun.md).
@@ -91,3 +91,54 @@ Focused87tests pass with cases retained and explicitly historical expectations;
 full actual output/removed formatting+source detail and recommended next scope
 in [rollback evidence](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).
 No live restart performed.
+
+## Updated P2 scope — 2026-10-28
+
+Operator requested this existing bug be updated with the count failure. It
+now tracks both related acceptance gaps:
+
+1. The exact priority/state/release question without the noun "bugs" falls
+   through to semantic search and can return no count. The earlier matcher
+   fix b6704d68 routed it correctly offline, but was rolled back in 2d88c7be
+   at operator request after live tally timeouts.
+2. During live verification of that matcher, the deterministic tally failed
+   at its 30-second subprocess deadline. A live trace saw a Git child for at
+   least22s without command arguments. A disposable background profile took
+   38.562s total, including28.523s on added-document history and5.904s on
+   fixed-history scanning. This is evidence of costly work, not proof of the
+   exact cause of the live timeout. Post-rollback explicit-bugs phrasing has
+   not been live-verified as a working workaround.
+
+The original count problem is already this P2, so no duplicate bug filed.
+The timeout is an additional observed failure of its intended count path; it
+may affect other tally consumers, but broader impact has not been established.
+General model-summary latency is separate enhancement work unless an agreed
+latency requirement establishes a defect. The one measured semantic-search
+response took approximately81.6s from job creation to delivery record, with
+45.568s in the agy candidate/CLI loop; these are single-sample observations,
+not a diagnosed general latency regression.
+
+### Updated acceptance for a future fix
+
+- The exact missing-noun P1/open/v1.43.5 question selects a correct deterministic
+  count; explicit-bugs questions retain correct behavior, and unrelated pod,
+  PR, alert and release-plan questions do not get misclassified.
+- The count path returns complete, accurate release/priority/status results
+  for tagged and branch/fallback documents. Any unavailable or incomplete
+  result is reported as a failure; search excerpts or a model do not invent
+  totals. Preserve existing tally consumers and fixed-release semantics.
+- Reproduce and measure the expensive path under representative scheduling
+  and history. Demonstrate a bounded count path with meaningful equivalence
+  and failure tests; do not merely extend the deadline, skip evidence, or
+  treat one favorable local timing as a live pass.
+- Independently review the implementation and test output; after operator
+  rollout, verify one live Slack question and the delivered correct count
+  against the same source revision. Keep the bug OPEN until live acceptance.
+
+This documentation update authorizes no implementation, new model selection,
+service restart or live test. User asked to communicate before scope changes;
+review the proposed implementation before dispatch. Existing authorization
+for the earlier narrow Luna matcher task does not by itself cover shared
+tally performance changes. No new plan or duplicate bug created.
+
+[Actual trace, rollback and live output](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).
