@@ -3,7 +3,9 @@
 **Filed:** 2026-10-28 (operator screenshot of Grafana Offline Tests dashboard and Alertmanager emails)
 **Priority:** P2 — offline test gate failing and incomplete; security guard failure requires inspection
 **Severity:** medium — confidence in test gate reduced; no established production or Hostinger outage
-**Status:** VERIFIED — complete operator test-all passed; fresh failed=0/complete=1 telemetry and offline warning resolution independently verified 2026-10-28
+**Status:** LIVE-VERIFIED — complete operator test-all passed; fresh failed=0/complete=1 telemetry and offline warning resolution independently verified 2026-10-28
+**Fix commit:** 6578fb95
+**Live evidence:** 2026-10-28 · run 1793225872 · env m4-test-all-acg-prometheus · scenario full-three-stage-offline-suite-and-published-metrics · commit 418ea8aa · proves E3
 **Release:** v1.43.9 bug (does not consume an enhancement plan slot)
 **Branch:** `k3d-manager-v1.43.9`
 **Approval:** operator 2026-10-28 explicitly requested review/dispatch to Luna; isolated focused implementation/testing authorized, full published rerun and live deployment remain operator-owned
@@ -331,3 +333,12 @@ from ALERTS. Initialstalesample andwrongACGservicename transparently recorded.
 [Full actual terminal and metric evidence](../issues/2026-10-28-test-all-complete-live-verification.md).
 M5/E3 satisfied; bugVERIFIED. Earlierunavailablehistoricalrawoutput remains
 explicitlyunavailable; no inventedcause. No production/CF/Kinechanges.
+
+## P2 verification queue review — live status correction
+
+Existingoperatorrun1793225872 andfreshtelemetryrecordalreadymeetE3/M5/N4;
+priorheaderVERIFIEDleftthelivecolumnfalse. CorrectedtoLIVE-VERIFIEDusing
+actualtestedcheckout418ea8aa, containingfinalfixturefix6578fb95 plusprevious
+repairs. No newrun/metricspublication/fabricatedtestrequired. Fullverbatim
+BATS/Python/metrics evidence inexisting2026-10-28-test-all-complete-live-verification
+issue. Thisisverificationmetadatacorrection, not newliveaction.

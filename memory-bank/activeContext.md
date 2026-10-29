@@ -1361,3 +1361,16 @@ Product-catalogofflineverification+unmergedlivegaterecordpusheddca4f988.
 Stagedlint/auditexit0, checkpoint/doclinks4filesOK. Actionlintclean+6cases
 PASS/fullactualoutputinexistingissue. Docs-onlyBATS/ShellCheckN/A; PRnone
 perrepositoryrule. RequiredCI/merge/operatorlivedispatchremainpending.
+
+## 2026-10-28 P2 sequential live-verification readiness review
+
+UserasksremainingP2liveoneatatime. Queueissue2026-10-28-p2-live-verification-
+readiness.md records9rows/evidence/limits. Firstitemtest-allalreadyE3passed;
+correctVERIFIEDtoLIVE-VERIFIEDusingtested418ea8aa/finalfix6578fb95/actual
+run1793225872 andexistingfullmetricsissue; no rerun/publish. Nextsingleoperator
+Slacktestask-docshowmanyP1openforv1.43.5 (omitbugs). LocalmatchCountQuery
+v1.43.5/P1/open; tally0open/6closed/6total atd4193471. LiveSlackreplypending,
+comparecorpus/refifdifferent. Doctorhappy-pathproofknown11:44:33Z; faultpaths
+remainoffline, heartbeatproviderenrollmentpending, no forcedprodtimeout/
+Keychainlock/restart/scan/accounts/secrets. ProductcatalogholdforClaude.
+Docs-onlyBATS/ShellCheckN/A; stagedlint/audit/hooksbeforecommit, noPR(URLN/A).
