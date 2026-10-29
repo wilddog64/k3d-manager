@@ -283,3 +283,36 @@ profile identified added-document history28.523s, fixed-history5.904s, total
 history work plus changed routing/current workload are plausible contributors;
 no controlled historical comparison establishes which edit or host condition
 caused the live timeout. Git blame/diff only; no code or service changes.
+
+## Operator-requested rollback: target ambiguity
+
+Operator requests restore known-good code and review original bug. Read-only
+comparison of `b6704d68^` and current matcher gives:
+
+```text
+'how many P1 open for v1.43.5'
+before: None
+current: CountQuery(release='v1.43.5', priority='P1', state='open')
+'how many P1 bugs open for v1.43.5'
+before: CountQuery(release='v1.43.5', priority='P1', state='open')
+current: CountQuery(release='v1.43.5', priority='P1', state='open')
+```
+
+Before b6704d68, exact missing-noun wording reproduced original bug: semantic
+search rather than correct count. A blind revert restores that known bad
+behavior and leaves the pre-existing30s tally for explicit-bugs queries.
+Existing Oct22 live evidence at ee456c83 reports `/ask-docs what is the bug
+tally` succeeded; git merge-base checks show both edfc9a5c added-history and
+881bb921 fixed-history changes are ancestors of that revision. This historical
+example does not prove current repository size/load will meet the timeout on
+that code, nor which later edits the operator means. Restoring whole old files
+would also discard later intentional changes and tests.
+
+Asked operator for specific working revision/example or confirmation of
+pre-b6704d68 behavior. No code reverted, tests removed, runtime restarted or
+status asserted LIVE-VERIFIED while target remains ambiguous. The original
+bug is still OPEN: exact phrase must route to correct priority/release/state
+count. Recommendation after a target is identified: protect count correctness,
+measure full-history cost under representative conditions, and review a bounded
+optimization with equivalence/failure tests; thread routing is separate. No
+implementation of that recommendation without resolving rollback target.

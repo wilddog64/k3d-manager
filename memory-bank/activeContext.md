@@ -1460,3 +1460,15 @@ Backgroundprofile38.562s/addedhistory28.523/fixedhistory5.904, livetrace
 Git>=22s noargv. Plausiblecontributors, no proofwhich change/workloadcaused
 regression or historical successfulanswer semantics. Userrequiresinvestigation
 only; no code/runtime changes. BugOPEN. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 requested known-good rollback: target unresolved
+
+Operatorrequestsrevert and originalbugreview. Beforeb6704d68 exactmissingnoun
+questionmatchNone→semanticfallback (originalbug); explicitbugsquerymatchesboth
+old/currentandusesexisting30stally. Oct22liveee456c83workedforgenericbugtally;
+bothOct11addedhistoryandOct16fixedhistoryareancestors. Doesnotprovewhichlater
+changeorcurrentworkloadcausedtimeout. Wholeoldfilewoulddiscardunrelated
+intentionalchanges/tests. Askeduserwhichworkingrevision/example orpre-b670
+behavior; no codechange/revert/runtimeaction untiltargetclear. OriginalP2OPEN.
+Recommendaftertargetclarified preserveaccuratecounts, profileboundedhistory
+andtestequivalence; threadroutingseparate. Docs-onlyBATS/ShellCheckN/A; noPR.
