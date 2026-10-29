@@ -1450,3 +1450,13 @@ use response_url or fallback. Fullactualfinding in existingask-docsissue.
 schedulingunknown; rootonlycandidateexceeded60s. Userrequestsno codechanges;
 none made. No service/credential/Slackmessage mutation; bugOPEN. Docs-only
 BATS/ShellCheckN/A, no PR.
+
+## 2026-10-28 ask-docs historical change investigation
+
+Read-only Gitdiff/blame: b6704d68 changed omitted-bug-noun question from
+semanticfallback to deterministic tally; timeout30s and added-doc history
+dateedfc9a5c Oct11; 881bb921 Oct16 added fixed-history scan for allJSON counts.
+Backgroundprofile38.562s/addedhistory28.523/fixedhistory5.904, livetrace
+Git>=22s noargv. Plausiblecontributors, no proofwhich change/workloadcaused
+regression or historical successfulanswer semantics. Userrequiresinvestigation
+only; no code/runtime changes. BugOPEN. Docs-onlyBATS/ShellCheckN/A; noPR.

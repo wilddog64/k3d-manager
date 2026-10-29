@@ -266,3 +266,20 @@ as the running service's exact policy or root cause. The CLI screenshot shows
 No code, test, configuration, credentials, services, Slack messages or user
 screenshots changed or exported. No new diagnostics needing an operator retry.
 Bug remains OPEN; proposed changes require separate authorization from user.
+
+## Read-only change history review
+
+Operator reports this used to return an answer before recent edits. Git history
+shows b6704d68 on Oct27 changed the matcher so an explicit priority+state
+count without the noun bugs now takes the deterministic tally route. Its parent
+required the word bugs and fell through to search for this exact wording.
+That is a concrete routing change, not proof why earlier answers succeeded.
+The tally command and30s timeout were introduced earlier in edfc9a5c (Oct11);
+the initial added-document Git history scan also dates to that release.
+Commit881bb921 (Oct16) added `_fixed_commits` and `_fixed_releases` to `_scan`
+so every JSON count also computes fixed-release history. Local background
+profile identified added-document history28.523s, fixed-history5.904s, total
+38.562s; live trace showed Git >=22s but did not capture argv. The older
+history work plus changed routing/current workload are plausible contributors;
+no controlled historical comparison establishes which edit or host condition
+caused the live timeout. Git blame/diff only; no code or service changes.
