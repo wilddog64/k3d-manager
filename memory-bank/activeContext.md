@@ -1524,3 +1524,15 @@ countusesdeterministictallybut30slivefailed, so no claimitworks. Recommend
 stage timingswithoutprompt/secrets, profile representativecount workload,
 then bounded accuratecount-onlypath/equivalence/failclosed tests before
 restoringomittednounrouting. No code/config/livechange; docs-only, noPR.
+
+## 2026-10-28 model summarization latency evidence
+
+Operatorasksmodelfaster. Existingjob87aacff5 metadata status success,
+elapsed_s45.568 candidateagy; `_call_gemini` measuresfullcandidate/CLI loop,
+notpureserverinference. Priorjobcreation-to-delivery~81.6s leaves~36s outside
+loopincludingretrieval/otheroverhead, stagesnotisolated. Single sample.
+Potentialbenchmarksamequestions/excerpts/candidates, startup/retrieval/model
+timing and answerquality; shorterprompts/reasoning onlyifsupported. Google
+Gemini API docs say lower thinking may reduce latency; agyCLI support unproven.
+No model/credentials/livecodechange/benchmark. OriginalcountbugOPEN;
+deterministic count needsfullcorrectevidence. Docs-only, noPR.

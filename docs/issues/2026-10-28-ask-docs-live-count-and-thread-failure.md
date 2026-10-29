@@ -431,3 +431,29 @@ logging prompts or secrets; profile real count path under representative load;
 then design bounded count-only work preserving release/state/priority semantics
 and truthful failures with equivalence tests. Restore omitted-noun intent only
 after the count path is reliable. No code/config/live request changed.
+
+## Model summarization latency evidence
+
+Operator asks whether model summarization can be made faster. Existing
+job87aacff5 metadata selected nonsecret fields:
+
+```text
+{'status': 'success', 'elapsed_s': 45.568, 'candidate': 'agy'}
+```
+
+`agent._call_gemini` measures elapsed_s across the candidate-selection and
+model-CLI attempt loop; it is not a pure model-inference measurement. The
+previous~81.6s job-creation-to-delivery estimate leaves roughly36s outside
+that model-call loop, including retrieval, source processing and other job/
+delivery overhead; exact stage timings absent. Single sample, no latency SLA.
+
+Potential next investigation: benchmark the same representative questions
+and excerpts using current CLI and available configured alternatives, record
+startup/attempt/retrieval/model timing and answer/source quality, then test
+shorter prompts or less reasoning only where the selected CLI/model supports
+it. Google's Gemini API docs say thinking increases latency and lower thinking
+can reduce it; this does not prove the current agy CLI exposes that setting.
+https://ai.google.dev/gemini-api/docs/troubleshooting
+No model change, benchmark invocations, credential lookup, live request or
+code edit was performed. Counts require deterministic complete evidence;
+a faster summarizer does not fix an incomplete corpus or tally timeout.
