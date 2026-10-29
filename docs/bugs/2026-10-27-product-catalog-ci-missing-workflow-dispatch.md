@@ -1,6 +1,6 @@
 # Bug: product-catalog CI cannot accept scanner rebuild dispatch
 
-**Status:** VERIFIED — offline workflow checks passed; fix remains on unmerged branch, PR/CI/merge and live scanner dispatch verification pending
+**Status:** VERIFIED — fix merged in product-catalog `8e7b751a` (PR #65); live scanner `workflow_dispatch` on main pending
 **Priority:** P2
 **Fix commit:** 85945891b6234e5efcbd06b767baea4c84592816
 **Filed:** 2026-10-27 (operator local date)
@@ -97,4 +97,4 @@ scannerretryandactualdispatch/workflowevidence. No automaticliveaction.
 
 ### Fix merged — 2026-10-29
 
-Product-catalog PR #65 merged as `8e7b751a`: it adds the `workflow_dispatch` trigger, and publishing runs only on `refs/heads/main` for a push or a dispatch. The post-merge push run 40970611050-adjacent build (run 40970448931) passed every job, including `Build, Scan & Push / build-push`. Still open for closure: one `workflow_dispatch` run on `main`, triggered by the app-cve-scan rebuild path, with `build-push` succeeding.
+Product-catalog PR #65 merged as `8e7b751a`: it adds the `workflow_dispatch` trigger, and publishing runs only on `refs/heads/main` for a push or a dispatch. The post-merge push run (40970448931) passed every job, including `Build, Scan & Push / build-push`. Still open for closure: one `workflow_dispatch` run on `main`, triggered by the app-cve-scan rebuild path, with `build-push` succeeding.
