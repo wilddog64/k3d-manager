@@ -99,7 +99,7 @@ This warm local success does not explain or supersede the live30s timeout;
 load/caches/scheduling differ. No Slack retry, extra restart, credential read,
 service mutation or screenshot export by coordinator. P2 staysOPEN.
 
-## Files for bounded Luna follow-up
+## Files
 
 - `scripts/bug-tally.py`
 - `scripts/lib/webhook/bug_count.py`
@@ -131,3 +131,8 @@ No new cache without clear ref/invalidation correctness; no extra model feature,
 new plan/dashboard, production tests, credentials, service/Slack changes or
 worker Git commit/push/PR. Coordinator independently reviews, lands via
 normal gates, then user conducts any separate live check.
+
+Dispatcher initial start returned `spec has no backticked path in its ## Files
+section` because the heading was `## Files for bounded Luna follow-up`.
+Corrected to the required exact heading; the listed files and task scope did
+not change. No worker started during the failed attempt. Normal retry follows.
