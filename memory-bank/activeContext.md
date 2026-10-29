@@ -1486,3 +1486,11 @@ diffcheckclean; fullactualoutputinask-docsfailedliveissue. No service
 restart; operator-controlledreload/liveverificationpending. Recommend
 profileandboundedcount-onlysemantics/equivalence thenrestoreintent separately
 afterdiscussion. Stagedlint/audit/hooksrequired; noPR.
+
+Ask-docs-onlyOctober22source restorationpushed2d88c7be. Finalfocused87passed,
+Ruffclean, audit/checkpointhookpass (explicit operator-authorized expectation
+changes noted), doclinks4filesOK; ShellCheckN/A. NoPR; no runtimerestart.
+Operatornoted yesterday: actualrecordedliveee456c83 Oct22 is sixdays before
+Oct28; Oct27 pre-b670 version containslaterformatting/source improvements.
+Exact Oct27 live-good commit not independently established. OriginalbugOPEN,
+current timeout potential remains.
