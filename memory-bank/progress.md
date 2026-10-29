@@ -1664,3 +1664,18 @@ Docs-onlyBATS/ShellCheckN/A; lint/audit/hooksrequired, noPR(URLN/A).
 HTTPS application acceptance evidence pushed62232504. Stagedlint/audit
 exited0, checkpoint/doclinks4filesOK. Docs-onlyBATS/ShellCheckN/A; noPR
 (URLN/A). MinimumTLSchange andpostverificationstillpending.
+
+## 2026-10-28 Minimum TLS1.2 confirmed / enforcement verified
+
+OperatorAI table1.0to1.2only; TLS1.3On/HTTPSOn/Full unchanged. Reported
+22:00:41Zduplicateseartimestamp, retainedasreportednotindependentlyconfirmed.
+Independent00:05:40ZOct29/17:05PDTOct28all7HTTP301samehostHTTPS, HTTPSbaseline
+unchanged, exactTLS1.2/1.3validcert/negotiate, TLS1.0/1.1explicitstructured
+protocolversionedgealerts. DiagnostictransientlegacySSLContextSECLEVEL0only
+allowedclienthandshake; certverifykept, no system/helper/appconfigurationchange.
+Unlikepriorclient_unsupportedthisprovesedgelegacyrejection. FullactualJSON+
+expecteddeprecationwarnings/method/AI526correctioninexistingoperatorissue.
+M2/M6PASS; firstchangeSSO/Grafana/Slackpassknown, finalpostTLSfrontendSSO+
+freshSlackstillpendingM3/E2, bugOPEN. Nocredentials/settingswrite/screenshot
+export. Liveverificationdocs-onlyBATS/ShellCheckN/A; lint/audit/hooksbefore
+commit, noPR(URLN/A).

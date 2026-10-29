@@ -1,7 +1,7 @@
 # Bug: Cloudflare HTTPS enforcement and obsolete minimum TLS version
 
 **Filed:** 2026-10-28 (operator request after reviewing Cloudflare configuration inventory)
-**Status:** OPEN — read-only preflight tooling independently verified; live F0 review and separately approved edge changes remain pending
+**Status:** OPEN — operator reports both edge changes applied; seven-host HTTP and TLS enforcement independently verified; final post-TLS authenticated workflow smoke pending
 **Priority:** P2 — security hardening, higher priority than routine P3 enhancements; no demonstrated compromise
 **Severity:** medium (unenforced HTTP redirect and potentially permitted obsolete TLS protocols; confirm effective edge posture)
 **Release:** v1.43.9 security bug (not a new plan slot; fixes should be scheduled on the active release process after preflight approval)
@@ -278,3 +278,15 @@ job02be2e0b queued/started/succeeded with response. FrontendSSO alreadypass;
 ArgoCD existingaccesspass. FirstHTTPSchange smokeaccepted; separateTLS1.2
 change/postcheckpending, latestmin1.0. FullverbatimSlackscreenshottext in
 operatorreportissue. NoCloudflarewritebycoordinator; bugOPEN.
+
+## Minimum TLS1.2 applied; public protocol enforcement PASS
+
+OperatorCF_AI tableconfirmsminimum1.0to1.2only, TLS1.3On/HTTPSOn/Full unchanged.
+Reported22:00:41ZchangetimerepeatsearlierHTTPSreport, notindependentlyconfirmed.
+Independent00:05:40ZOct29(17:05PDTOct28)7hosts: HTTP301samehostHTTPS, HTTPS
+baselineunchanged, pinnedTLS1.2/1.3validcert/pass andTLS1.0/1.1explicit
+TLSV1_ALERT_PROTOCOL_VERSION rejection. Temporarylegacyclientciphercompat
+wasprobe-localonly; no system/helper/appchange. FullactualJSON/method in
+existingoperatorreportissue. AI526claimcorrected: protocolhandshakealert.
+M2/M6PASS; finalpostsecondchangefrontendSSO+freshSlackresponsependingM3/E2,
+so bugOPEN. No coordinatorCloudflarecredential/write or screenshotexport.

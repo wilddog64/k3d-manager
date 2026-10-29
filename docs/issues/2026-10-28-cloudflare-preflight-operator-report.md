@@ -987,3 +987,346 @@ https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minim
 
 Documentation-only acceptance update; no runtime tests/BATS/ShellCheck needed.
 No live probe, credential lookup, settings change, session change or publish.
+
+## Minimum TLS second change and independent protocol verification
+
+Operator supplied Cloudflare AI table: Minimum TLS1.0 to1.2; TLS1.3On,
+AlwaysUseHTTPSOn, SSLmodeFull, HSTS/DNS/Tunnel unchanged. This confirms the
+previously cropped resulting minimum. Table says change timestamp
+2026-10-28T22:00:41Z, identical to the earlier HTTPS change report. Preserve
+as reported, not independently established time of the second change.
+No coordinator Cloudflare API credential read or settings write performed.
+
+Independent public probes completed 2026-10-29T00:05:40.256306Z
+(2026-10-28 17:05:40 PDT). Every host returns301same-hostHTTPS; directHTTPS
+baseline unchanged: frontend/ArgoCD200, Grafana/Keycloak302HTTPSpath, remaining
+three401. Exact-version handshakes on all7names: TLS1.2/1.3 negotiated with
+validcertificates; TLS1.0/1.1 rejected with structured OpenSSL reason
+TLSV1_ALERT_PROTOCOL_VERSION. This establishes actual edge rejection, unlike
+the earlier helper's client_unsupported results.
+
+The diagnostic used the existing helper for HTTP and modern TLS. For legacy
+versions only, a transient Python SSLContext used exact minimum=maximum
+TLSv1 orTLSv1_1 and `set_ciphers("DEFAULT:@SECLEVEL=0")` to permit the local
+client to send a legacy handshake. Certificate verification stayed enabled.
+No system configuration, application TLS policy, repository helper, dependency
+or runtime file changed. Each connection8sbound,4workers, fixed7hosts/443,
+no credentials/bodies/redirectfollowing. This client probe exception is not a
+recommendation to allow legacyTLS for applications. Its deprecationwarnings
+were expected from intentionally testing obsolete versions:
+
+```text
+<stdin>:8: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+<stdin>:8: DeprecationWarning: ssl.TLSVersion.TLSv1_1 is deprecated
+```
+
+Full actual sanitized results:
+
+```json
+{
+  "timestamp_utc": "2026-10-29T00:05:40.256306+00:00",
+  "scope": "read-only public HTTP/HTTPS roots and version-pinned TLS handshakes; no credentials/settings API/write; legacy diagnostic cipher compatibility scoped to transient probe SSLContext only",
+  "probes": {
+    "alertmanager.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://alertmanager.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 401,
+        "location": null,
+        "redirect": null,
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "argocd.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://argocd.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 200,
+        "location": null,
+        "redirect": null,
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "frontend.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://frontend.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 200,
+        "location": null,
+        "redirect": null,
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "grafana.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://grafana.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 302,
+        "location": "https://grafana.3ai-talk.org/[redacted]",
+        "redirect": {
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "keycloak.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://keycloak.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 302,
+        "location": "https://keycloak.3ai-talk.org/[redacted]",
+        "redirect": {
+          "https_equivalent": false,
+          "self_redirect": false,
+          "transport": "same_scheme",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "prometheus.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://prometheus.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 401,
+        "location": null,
+        "redirect": null,
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    },
+    "webhook.3ai-talk.org": {
+      "http": {
+        "status": 301,
+        "location": "https://webhook.3ai-talk.org/",
+        "redirect": {
+          "https_equivalent": true,
+          "self_redirect": false,
+          "transport": "upgrade",
+          "destination_host_known": true
+        },
+        "result": "response"
+      },
+      "https": {
+        "status": 401,
+        "location": null,
+        "redirect": null,
+        "result": "response"
+      },
+      "tls": {
+        "1.2": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.2",
+          "certificate_valid": true
+        },
+        "1.3": {
+          "result": "negotiated",
+          "negotiated": "TLSv1.3",
+          "certificate_valid": true
+        },
+        "1.0": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        },
+        "1.1": {
+          "result": "edge_rejected",
+          "openssl_reason": "TLSV1_ALERT_PROTOCOL_VERSION"
+        }
+      }
+    }
+  }
+}
+```
+
+Cloudflare AI's claim that old clients receive526 is incorrect for this
+control: visitor minimumTLS rejection prevents completion of the handshake.
+Official [minimum TLS testing documentation](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/minimum-tls/) describes a protocol alert.
+Also, curl `--tlsv1.2` specifies a minimum; exact1.2 testing needs an upper
+bound as well. The independent Python probes pinned both bounds and recorded
+negotiated versions, avoiding that ambiguity.
+
+M2/M6 public endpoint/protocol acceptance now PASS. FrontendSSO/Grafanarelogin/
+Slackroundtrip passed after the firstHTTPS change, but those operator samples
+precede confirmation of the secondTLS change. FinalpostTLS frontendlogin and
+freshSlackcommandresponse remainpending before closingM3/E2. No regression
+seen inpublicprobes; no end-to-end login/Slack result invented. Rollback remains
+operator-only minTLS1.0 if an actual compatibility regression requires it,
+without undoingHTTPSenforcement. No rollbackperformed or recommended absent
+regression. No screenshot exported. No codechange; BATS/ShellCheckN/A for
+this liveverification. Documentation lint/audit/hooks required beforecommit.
