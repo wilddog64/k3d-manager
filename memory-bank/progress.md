@@ -1876,3 +1876,13 @@ notfullSlackend-to-end/exactAPI timing. Slowinteractiveanswer andnoP1count;
 doesnotprove deterministic30stallytimeoutfixed. Actualtimestampoutput in
 existingask-docsissue; nocode/services/credentials/Slackmessage change.
 Docs-onlyBATS/ShellCheckN/A, noPR.
+
+## 2026-10-28 ask-docs latency options review
+
+Sourceinspection: restoredmissingnounquestionusesretrieval/excerpts/model;
+job81.6shasnostagetimings so bottleneckunknown. --sources bypassesmodel but
+returnslinksnotcount, retrievalstillruns; noguaranteedlatency. Explicitbugs
+countusesdeterministictallybut30slivefailed, so no claimitworks. Recommend
+stage timingswithoutprompt/secrets, profile representativecount workload,
+then bounded accuratecount-onlypath/equivalence/failclosed tests before
+restoringomittednounrouting. No code/config/livechange; docs-only, noPR.

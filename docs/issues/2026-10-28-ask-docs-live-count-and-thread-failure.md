@@ -414,3 +414,20 @@ not full Slack button-to-render latency or exact delivery API timestamp. It
 is slow for an interactive question and returned no P1 count; not evidence of
 a good response or fixed tally timeout. No causal stage breakdown measured;
 no new code, live request, credentials, restart or screenshot export.
+
+## Latency review after rollback
+
+Operator asks how to reduce measured ~81.6s response. Source inspection of
+restored ask_docs.answer shows omitted-noun count falls through to document
+retrieval, source/excerpt loading, and model summarization. There are no
+per-stage timings for job87aacff5; we cannot identify which consumed 81.6s.
+`--sources` bypasses model summarization but returns source links, not a count;
+retrieval still runs, so no guaranteed latency. Explicit bug-count queries
+run deterministic bug-tally, but current30s timeout has failed live and must
+not be suggested as an already-working speed fix.
+
+Recommended future scope: measure retrieval/source/model stages without
+logging prompts or secrets; profile real count path under representative load;
+then design bounded count-only work preserving release/state/priority semantics
+and truthful failures with equivalence tests. Restore omitted-noun intent only
+after the count path is reliable. No code/config/live request changed.
