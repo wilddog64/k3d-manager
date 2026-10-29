@@ -1,6 +1,6 @@
 # Bug: ask-docs misses an explicit priority count without the word bugs
 
-**Status:** VERIFIED — Luna implementation independently tested and pushed; operator live verification pending
+**Status:** OPEN — operator live count check failed; committed matcher remains offline-verified, running webhook predates fix; controlled reload and retest pending
 **Fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2
 **Priority:** P2
 **Filed:** 2026-10-27
@@ -58,3 +58,15 @@ No new plans or broad refactor; new/refactored functions <=8ifs.
 ## Independent implementation review
 
 Luna implementation landed and pushed after review follow-up. [Full test output, corrected fixture/gate failures and live limits](../issues/2026-10-27-three-open-bugs-investigation-and-luna.md). Operator live check pending; no production deployment/restart by coordinator.
+
+## 2026-10-28 failed live acceptance
+
+Exactmissingnounquestionfellthroughsemanticsearchagain; job58e47ff3answer
+saysdocumentationdoesnotcontaincount andoperatorreportsnothread. LiveFAIL,
+notzero-count. RuntimePID4295startedOct25beforeb6704d68Oct27, imports
+ask_docs/bug_countatstartup; staleloadedcode stronglysuspected. Freshimport
+correctcount0/modelretrievalsentinelsnotcalled;87focusedtestsPASS. Bugreopened
+forliveretest, fix/evidencepreserved; notprovennewcoderegression. Threadroute
+unknownpendingoperatorinvocation/channelandcontrolledreload. No actual
+restart/credentialswrite/Slackmessage.
+[Actual output and one next operator step](../issues/2026-10-28-ask-docs-live-count-and-thread-failure.md).

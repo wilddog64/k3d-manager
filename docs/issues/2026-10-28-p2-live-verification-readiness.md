@@ -67,3 +67,11 @@ Slack verification. Required staged lint/audit/checkpoint hooks run before
 commit. No PR, new plan, service mutation or dependency installation. Both
 memory-bank records updated. Dashboard publisher/refresh may lag tracked
 status; no ArgoCD hard-refresh is required by this metadata review.
+
+## First new live test failed: stop queue here
+
+Operatorask-docsquestionreturnedsemanticfallback/no thread. Countbugreopened;
+fixofflinepasses/current87testsPASS, processOct25predatesOct27fix. Fullactual
+outputandthreadambiguityin[failed live investigation](2026-10-28-ask-docs-live-count-and-thread-failure.md).
+Nextoperatorcontrolledwebhookreload(also bridge) thenexactretest/context.
+Do notadvanceotherP2checks ormarklivepassfromlocalcount.

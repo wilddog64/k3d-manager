@@ -1379,3 +1379,22 @@ P2queue/test-alllive-statuscorrectionpushed58368823; stagedlint/auditexit0,
 checkpoint/doclinks4filesOK. ExistingliveE3acceptedbynormalfix/evidencehook.
 No newruntimecode/BATS/ShellCheckN/A; PRURLN/A. Nextsingleoperatorask-docs
 Slackquestionpending; no otherlivecheckstarted or automatedmutation.
+
+## 2026-10-28 ask-docs live FAIL / stale runtime strongly suspected
+
+Operatorexactmissingnounquestionsemanticfallback/no thread; job58e47ff3
+00:26:05ZOct29statussuccessbutwronganswer, responseurlpresent(valueunread),
+thread/channelcontextabsent. ReadonlyPID4295startOct25 predatesb6704d68fix
+Oct27; startupimportsask_docs/bug_count so staleloadedcode stronglysuspected,
+notinprocesscodeinspection/newregressionproof. Freshimportreturns0P1open
+v1.43.5atsource322b4634withoutretrieval/model;87focusedpytestPASS/tripwire
+only2blockedcredentialreads/nonereachedbinary. Threadrouteentry/channelasked
+asyncpending; currentheaderthreadonlydefaultmatchingchannel+botconfig, header
+failureandoutsidechannelcanfallback. No blanketthreadpatch/guardweakening.
+ExistingcountbugreopenedOPENforfailedliveacceptance, offlinefixretained.
+Queuepausedatthisitem; nextsingleoperatorM4make restart-webhook(also bridge),
+thenexactquestioninSamechannel andnewPIDcheck. No coordinatorrestart/
+credentials/Slacksend.0persistedrunning/29historicalqueued(latestOct7)notlive
+workerproof; untouched. Fullactualoutput/limitsissue2026-10-28-ask-docs-live-
+count-and-thread-failure.md. Docs-onlyShellCheckN/A; stagedlint/audit/hooks
+beforecommit, noPR/newplan. ProductcatalogstillholdforClaude.
