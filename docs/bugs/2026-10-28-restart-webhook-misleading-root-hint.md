@@ -1,6 +1,7 @@
 # Bug: user LaunchAgent restart prints misleading root advice
 
 **Status:** VERIFIED — targeted output filter and stubbed retry/error tests pass; no new live restart required
+**Fix commit:** babdfe72
 **Priority:** P3
 **Filed:** 2026-10-28
 **Branch:** `k3d-manager-v1.43.9`

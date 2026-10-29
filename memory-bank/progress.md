@@ -1783,3 +1783,10 @@ so live30snotreproduced/rootcauseunknown. No timeoutincrease/cache/refactor
 orfalsepass; collectboundednonsecretchildtraceononeoperatorrepeatnext.
 Detailedfulloutputinexistingask-docsfailedliveissue. No credentialread/
 servicewrite/Slacksend. Stagedlint/audit/hooksbeforecommit, noPR/newplan.
+
+No-rootdiagnosticfixpushedevidencebabdfe72.6BATSgreen/redproof/rawShellCheck
+clean; stagedlint/auditexit0/checkpoint/doclinks6filesOK. Actualtallytimeout
+stillOPEN, noperformancefixclaimed. Bounded300sread-onlychildtracearmedfor
+PID43179 insession43637/log/private/tmp/k3dm-ask-docs-service-child-trace.txt;
+onlyPID/state/exebasename,noargv/env/secrets. AwaitonesameoperatorSlack
+retry/context, noanotherrestart. PRURLN/A.
