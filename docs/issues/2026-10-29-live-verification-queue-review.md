@@ -31,3 +31,21 @@ Keychain diagnoses require representative failure evidence; the PR chart needs
 repo-filter/empty-history screenshots and timestamp comparison. Do not force
 failures or deploy services merely to infer success. See the individual bug
 records for acceptance and prerequisites.
+
+## Operator tmux search
+
+The operator said the doctor was running in tmux. Coordinator was on
+`m4-air.local`. The first pane-list attempt returned:
+
+```text
+error connecting to /private/tmp/tmux-501/default (Operation not permitted)
+```
+
+An approved read-only retry listed `work:1.0`, `work:1.1`, `work:2.0`,
+`work:3.0`, and `work:4.0` on that socket. A search of the last 3,000
+scrollback lines in each for `k3dm-webhook-doctor`, `auth_unavailable`,
+`local_http_healthy`, and `health_check_timeout` returned no matching lines.
+This does not establish that the operator's command failed: it may be in a
+different or nested session, have fallen outside the scrollback, or not have
+completed. The operator was asked for the pane location or JSON. No status
+changed and no live verification is claimed.
