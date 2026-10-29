@@ -626,7 +626,7 @@ Scope: [`v1.45.0-docs-drift-detection.md`](plans/v1.45.0-docs-drift-detection.md
 v1.45.0: [`v1.45.0-cve-remediation-terminal-notifications.md`](plans/v1.45.0-cve-remediation-terminal-notifications.md),
 [`v1.45.0-node-tunnel-fault-drill.md`](plans/v1.45.0-node-tunnel-fault-drill.md),
 [`v1.45.0-alert-intake-draft-bugs.md`](plans/v1.45.0-alert-intake-draft-bugs.md) (a long-firing or recurring alert drafts a bug doc outside the repo for the operator to promote), and
-[`v1.45.0-test-metrics-log-retention.md`](plans/v1.45.0-test-metrics-log-retention.md) (moved from v1.43.0). v1.45.0 is at its five-plan cap.
+[`v1.45.0-autonomous-incident-investigation.md`](plans/v1.45.0-autonomous-incident-investigation.md) (advanced from v2.0.x). v1.45.0 is at its five-plan cap; test-metrics log retention moved to v1.45.4 on 2026-10-29.
 
 ### Candidate milestone — v1.45.1 (patch)
 
@@ -671,7 +671,7 @@ v1.45.1 is now **full at 5 of 5 plans**; branch `k3d-manager-v1.45.1` is cut fro
 
 Bug carried here (triage 2026-10-15): [`vectordb-corpus-axis-fractional-ticks`](bugs/2026-10-15-vectordb-corpus-axis-fractional-ticks.md) (P3), the same dashboard as the provenance spec.
 
-**PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.45.2-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.45.2-pr-lifecycle-history-and-merge-visibility.md). **v1.45.2 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
+PR lifecycle history moved to v1.45.4 on 2026-10-29 (over the five-plan cap).
 
 ### Candidate milestone — v1.45.3 (patch)
 
@@ -701,6 +701,13 @@ Constraints:
 Deliverables: a `docs/guides/` page for Mac workstation protection, and one plan doc. v1.45.3
 holds **1 of 5 plans** (spec not yet written). Branch `k3d-manager-v1.45.3` is cut from `main`
 after v1.45.2 merges.
+
+### Candidate milestone — v1.45.4 (patch)
+
+Split 2026-10-29 by Claude: v1.45.0 and v1.45.2 each held six active plans. Overflow from both, with no dependency on v1.45.3.
+
+- [`v1.45.4-test-metrics-log-retention.md`](plans/v1.45.4-test-metrics-log-retention.md): from v1.45.0. That release keeps the operator-advanced incident investigation instead.
+- **PR lifecycle history and merge visibility** (operator, 2026-10-27): extend the existing Hermes PR Checks dashboard with bounded 30-day Recently Merged and Closed Without Merge views. Retain current Open PR counts; track authoritative GitHub merge/close timestamps and final observed CI evidence with freshness, not CVE deployment `applied` state or guessed Copilot attribution. Scope: [`v1.45.4-pr-lifecycle-history-and-merge-visibility.md`](plans/v1.45.4-pr-lifecycle-history-and-merge-visibility.md). **v1.45.2 is now full at 5 of 5 plans.** Documentation only; implementation remains operator-gated.
 
 ### Candidate milestone — v1.46.0
 

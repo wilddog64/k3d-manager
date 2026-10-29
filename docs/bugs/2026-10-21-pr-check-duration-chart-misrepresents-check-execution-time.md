@@ -11,7 +11,7 @@
 **Release:** v1.43.9 (reopened follow-up; originally filed against v1.43.5; bug exempt from plan cap)
 **Branch:** `k3d-manager-v1.43.9`
 **Component:** `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`, `scripts/lib/hermes/pr_checks.py`, corresponding PR-check tests and dashboard guide
-**Related:** `docs/plans/v1.43.3-pr-checks-dashboard.md`, `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md`, `docs/plans/v1.45.2-pr-lifecycle-history-and-merge-visibility.md`
+**Related:** `docs/plans/v1.43.3-pr-checks-dashboard.md`, `docs/bugs/2026-10-18-pr-checks-dashboard-empty-tables-read-as-no-data.md`, `docs/plans/v1.45.4-pr-lifecycle-history-and-merge-visibility.md`
 **Found by:** operator, Grafana screenshot 2026-10-21 approximately 13:35 PDT
 
 ## Problem
