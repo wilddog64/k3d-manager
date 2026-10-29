@@ -1938,3 +1938,16 @@ prior-taskguard resolvedthroughnormaldocumentedmechanisms/no bypass; actual
 output in issue2026-10-28-ask-docs-count-tally-luna-verification.md.
 P2OPEN untiloperatorrestart-webhook(alsobridge)+exactSlackcount/threadtest;
 no coordinatorliveaction/credentials. Python-onlyShellCheckN/A, noPR.
+
+## 2026-10-28 ask-docs P2 live failure after Luna follow-up
+
+Operatorreloaded PID35701/bridge35707 20:25:11PDT after67c26bdf20:21:20.
+Jobcc203d78 03:26:27ZOct29 bot_threaddeliveredtrue but outputtallytimeout/
+Sourcesnone. LiveFAIL, P2OPEN; workerjobstatussuccessisnotcountsuccess.
+Separatewarmbackgroundcount13.486s variable/notliveproof. Existingverification
+issue records actualoutput and boundednewtask Files/scope. User LunaP2dispatch
+continuesas ask-docs-count-timeout-followup-luna, spec existingissue to avoid
+prior-landed-taskguard; no newplan/bug. No prodretry/restart/credential/Slack
+send bycoordinator. PreserveCLI/attribution/failure semantics and realistic
+coldwork reduction, independentreviewbeforeoperatorlive. Docs-onlyBATS/
+ShellCheckN/A; lint/audit/hooksbeforecommit; noPR.

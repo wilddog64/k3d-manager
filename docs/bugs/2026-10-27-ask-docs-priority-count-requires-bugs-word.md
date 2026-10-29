@@ -187,3 +187,13 @@ Independentbackgroundwarmcount3.093s; Luna variable11.765–26.048s, so no
 liveSLAclaim. Fullactualresults and gatehistory in
 [verification issue](../issues/2026-10-28-ask-docs-count-tally-luna-verification.md).
 Operatorreload andlivecount/threadverification required; P2 remainsOPEN.
+
+## Live check failed after 67c26bdf
+
+Operatorreloadedwebhook PID35701start20:25:11PDT afterfixcommit20:21:20.
+Slackjobcc203d78 at03:26:27ZOct29deliveredthreadreply `Could not count bugs —
+tally failed (timeout). Sources: none`. This is not a live pass. A separate
+warmbackgroundcount13.486s confirms variability, notlivecause. ExistingP2
+remainsOPEN; Luna follow-up specified in
+[verification issue](../issues/2026-10-28-ask-docs-count-tally-luna-verification.md).
+No furtheroperatorretry before independentlyreviewed solution.

@@ -78,3 +78,56 @@ Confirm a real deterministic count, source revision if provided, and threaded
 delivery; compare with the tally for the same ref. A single warm offline timing
 is not a live performance guarantee. No operator action was taken by the
 coordinator; no credentials/Slack messages/service deployment were invoked.
+
+## Operator live verification failed after first follow-up
+
+Operator supplied screenshot: `Could not count bugs — tally failed (timeout).
+Sources: none`. Read-only job metadata matches cc203d78 output at
+2026-10-29T03:26:27.311539Z, status success, bot_thread delivered true.
+Worker status success means it delivered an error text, not count success.
+Webhook PID35701 and bridge PID35707 started 2026-10-28 20:25:11 PDT, after
+fix67c26bdf committed20:21:20 PDT; strong evidence the fix was loaded.
+No actual in-process bytecode inspection. User screenshot supplied no count.
+
+A separate coordinator-owned bounded background count-only read returned:
+
+```text
+returncode 0 elapsed_s 13.486 stderr_bytes 0 output_bytes 113670
+```
+
+This warm local success does not explain or supersede the live30s timeout;
+load/caches/scheduling differ. No Slack retry, extra restart, credential read,
+service mutation or screenshot export by coordinator. P2 staysOPEN.
+
+## Files for bounded Luna follow-up
+
+- `scripts/bug-tally.py`
+- `scripts/lib/webhook/bug_count.py`
+- `scripts/tests/bin/test_bug_tally.py`
+- `scripts/tests/bin/test_bug_count.py`
+- `scripts/tests/bin/test_ask_docs.py`
+
+## Follow-up task and acceptance
+
+The user's explicit Luna P2 dispatch continues after failed live acceptance.
+Task `ask-docs-count-timeout-followup-luna` works offline in an isolated
+worktree. Investigate and optimize the remaining expensive added-history work
+without changing count correctness or existing full CLI/fixed_in behavior.
+The observed live trace saw a Git child >22s but did not record its argv;
+profile reproducibly before claiming a cause. Prior background runs were
+variable and root-only pathspec candidate exceeded60s; do not assume its
+selection solves the issue. Retain explicit branch/tag/untagged fallback,
+renames, deleted/re-added documents, lib-foundation behavior, state/priority
+and fail-closed error semantics. Preserve all previous tests and count routing.
+
+Demonstrate full vs count-only equivalence on real fixture history including
+relevant rename/re-add cases, and bounded performance with measured expensive
+work reduction under representative Git history/load. A warm one-shot success
+is not proof of a robust 30s bound; no deadline increase or synthetic success.
+Run focused pytest with tripwire and existing native promtool on PATH, Ruff,
+syntax and diff; document actual timing/environment and limits. If an optimization
+cannot preserve correctness or be supported by evidence, report that explicitly.
+No new cache without clear ref/invalidation correctness; no extra model feature,
+new plan/dashboard, production tests, credentials, service/Slack changes or
+worker Git commit/push/PR. Coordinator independently reviews, lands via
+normal gates, then user conducts any separate live check.
