@@ -94,3 +94,9 @@ interface:
 - `scripts/etc/dr/drill-freshness.sh`
 - `scripts/tests/plugins/dr_drill_freshness.bats`
 - `docs/howto/hub-dr-drill.md`
+
+## Live status — 2026-10-29 (Claude, read-only)
+
+- The workflow has failed every night from 10-24 through 10-29 (latest run 40849406726). Each time `drill-freshness.sh results` exits 1 with no diagnostic.
+- `wilddog64/k3dm-hub-data:main/drill-freshness.sh` is blob `72f1880e`; the fixed `scripts/etc/dr/drill-freshness.sh` is `dcf320de`. The fix was never installed in the data repo, so the live workflow still runs the pre-fix script.
+- Live verification needs two things: (1) operator-approved install of the fixed script into the data repo, after which the next run must name its failure class; (2) a fresh successful drill result, which clears the underlying staleness (last result 2026-10-10).
