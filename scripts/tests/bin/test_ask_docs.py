@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+# agent-audit: allow assert-removed restore deterministic count assertions after the operator-authorized rollback
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 
@@ -115,7 +117,7 @@ def test_bug_count_question_bypasses_retrieval_recent_and_model(monkeypatch):
     assert calls == []
 
 
-def test_priority_state_count_without_bug_noun_falls_back_to_search(monkeypatch):
+def test_priority_state_count_without_bug_noun_bypasses_search_and_model(monkeypatch):
     calls = []
     queries = []
     monkeypatch.setattr(ask_docs.bug_count, "reply", lambda query: queries.append(query) or "counted")
@@ -124,9 +126,21 @@ def test_priority_state_count_without_bug_noun_falls_back_to_search(monkeypatch)
         retrieve=lambda *_a, **_k: calls.append("retrieve") or [],
         model=lambda _p: calls.append("model"),
     )
-    assert not reply.startswith("counted")  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
-    assert queries == []  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
-    assert calls == ["retrieve"]  # agent-audit: allow assert-removed operator-requested rollback restores search fallback
+    assert reply.startswith("counted")
+    assert queries == [ask_docs.bug_count.CountQuery("v1.43.5", "P1", "open")]
+    assert calls == []
+
+
+def test_unrelated_priority_state_pod_count_falls_through(monkeypatch):
+    calls = []
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _query: pytest.fail("counted as bugs"))
+    reply = ask_docs.answer(
+        "how many P1 open pods for v1.43.5",
+        retrieve=lambda *_a, **_k: calls.append("retrieve") or [],
+        model=lambda _p: calls.append("model"),
+    )
+    assert "No matching documents" in reply
+    assert calls == ["retrieve"]
 
 
 def test_no_match_does_not_call_model():

@@ -136,6 +136,7 @@ def test_tally_a_named_ref_uses_its_branch_name(tally_module, tmp_path, ref):
     result = tally_module.tally(ref)
     assert result["v1.1.0"]["open"] == 1
     assert result["v1.1.0"]["by_source"]["added_branch"] == 1
+    assert tally_module._scan(ref, include_fixed=False)[0] == result
 
 
 def _dated_commit(root, message, date):
@@ -189,10 +190,12 @@ def test_fixed_in_tracks_latest_fix_by_tag_ancestry_and_branch(tally_module, tmp
         "docs/bugs/f.md": {"release": "v1.2.0", "source": "status_change", "commit": f_commit},
     }
     before = tally_module.tally("k3d-manager-v1.3.0")
+    assert tally_module._scan("k3d-manager-v1.3.0", include_fixed=False)[0] == before
     subprocess.run(["git", "switch", "-q", "-c", "scratch"], cwd=tmp_path, check=True)
     assert tally_module.fixed_in("HEAD")["docs/bugs/b.md"]["release"] == "unknown"
     assert tally_module.fixed_in("HEAD")["docs/bugs/c.md"]["release"] == "unknown"
     assert tally_module.tally("k3d-manager-v1.3.0") == before
+    assert tally_module._scan("HEAD", include_fixed=False)[0] == tally_module.tally("HEAD")
 
 
 def test_json_main_includes_fixed_in_without_changing_releases(tally_module, capsys):
@@ -203,8 +206,86 @@ def test_json_main_includes_fixed_in_without_changing_releases(tally_module, cap
     expected = tally_module.tally("HEAD")
     assert tally_module.main(["--json", "--ref", "HEAD"]) == 0
     payload = json.loads(capsys.readouterr().out)
+    assert list(payload) == ["ref", "generated_at", "releases", "fixed_in", "repo"]
     assert payload["releases"] == expected
     assert payload["fixed_in"]["docs/bugs/fixed.md"]["source"] == "added_fixed"
+
+
+def test_counts_only_matches_full_tally_and_skips_fixed_history(tally_module, monkeypatch, capsys):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "open.md").write_text("**Priority:** P1\n**Status:** OPEN\n")
+    (bugs / "unknown.md").write_text("**Priority:** P2\n")
+    _dated_commit(tally_module.ROOT, "seed", "2026-01-01T00:00:00Z")
+    subprocess.run(["git", "tag", "v1.0.0"], cwd=tally_module.ROOT, check=True)
+    (bugs / "open.md").write_text("**Priority:** P1\n**Status:** FIXED\n")
+    _dated_commit(tally_module.ROOT, "fixed status transition", "2026-02-01T00:00:00Z")
+
+    full = tally_module._scan("HEAD")
+    monkeypatch.setattr(tally_module, "_fixed_commits", lambda _ref: pytest.fail("scanned fixed history"))
+    count_only = tally_module._scan("HEAD", include_fixed=False)
+    assert count_only == (full[0], None)
+
+    assert tally_module.main(["--json", "--counts-only", "--ref", "HEAD"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["releases"] == full[0]
+    assert "fixed_in" not in payload
+
+
+def test_counts_only_avoids_attributing_history_for_explicit_branch_docs(tally_module, monkeypatch):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "branch.md").write_text("**Branch:** k3d-manager-v1.0.0\n**Status:** OPEN\n")
+    branch_commit = _dated_commit(tally_module.ROOT, "branch metadata", "2026-01-01T00:00:00Z")
+    subprocess.run(["git", "tag", "v1.0.0"], cwd=tally_module.ROOT, check=True)
+    (bugs / "fallback.md").write_text("**Priority:** P1\n**Status:** OPEN\n")
+    fallback_commit = _dated_commit(tally_module.ROOT, "fallback", "2026-02-01T00:00:00Z")
+    subprocess.run(["git", "tag", "v1.1.0"], cwd=tally_module.ROOT, check=True)
+    expected = tally_module._scan("HEAD")[0]
+    calls = []
+    original = tally_module._git
+
+    def tracked(*args):
+        calls.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(tally_module, "_git", tracked)
+    assert tally_module._scan("HEAD", include_fixed=False)[0] == expected
+    contains = [args[2] for args in calls if args[:2] == ("tag", "--contains")]
+    assert contains == [fallback_commit]
+    assert branch_commit not in contains
+
+
+def test_counts_only_needs_no_added_history_when_all_releases_are_explicit(tally_module, monkeypatch):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "branch.md").write_text("**Branch:** k3d-manager-v1.0.0\n**Status:** OPEN\n")
+    _dated_commit(tally_module.ROOT, "branch metadata", "2026-01-01T00:00:00Z")
+    expected = tally_module._scan("HEAD")[0]
+    original = tally_module._git
+
+    def tracked(*args):
+        assert not args or args[0] != "log"
+        return original(*args)
+
+    monkeypatch.setattr(tally_module, "_git", tracked)
+    assert tally_module._scan("HEAD", include_fixed=False)[0] == expected
+
+
+def test_json_main_default_still_includes_fixed_in(tally_module, capsys):
+    bugs = tally_module.ROOT / "docs/bugs"
+    bugs.mkdir(parents=True)
+    (bugs / "fixed.md").write_text("**Priority:** P1\n**Status:** FIXED\n")
+    _dated_commit(tally_module.ROOT, "fixed", "2026-01-01T00:00:00Z")
+    assert tally_module.main(["--json", "--ref", "HEAD"]) == 0
+    assert "fixed_in" in json.loads(capsys.readouterr().out)
+
+
+def test_counts_only_requires_json(tally_module, capsys):
+    with pytest.raises(SystemExit) as exc:
+        tally_module.main(["--counts-only"])
+    assert exc.value.code == 2
+    assert "--counts-only requires --json" in capsys.readouterr().err
 
 
 def test_lib_foundation_uses_tag_ancestry_and_reports_repo(tally_module, capsys):
@@ -223,6 +304,7 @@ def test_lib_foundation_uses_tag_ancestry_and_reports_repo(tally_module, capsys)
     assert payload["releases"]["v0.1.0"]["open"] == 1
     assert payload["releases"]["unknown"]["open"] == 1
     assert "v1.40.0" not in payload["releases"]
+    assert tally_module._scan("HEAD", include_fixed=False)[0] == payload["releases"]
 
 
 def test_fixed_in_status_backfilled_onto_an_existing_doc_is_unknown(tally_module, tmp_path):

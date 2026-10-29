@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+# agent-audit: allow assert-removed restore deterministic count assertions after the operator-authorized rollback
+
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
@@ -36,11 +38,10 @@ def test_match_negatives(question):
     "count the open P1 bugs in this release",
     "number of P1 open for last two releases",
 ])
-def test_match_priority_state_count_requires_bug_noun(question):
+def test_match_priority_state_count_with_or_without_bug_noun(question):
     expected_release = "last:1" if "this release" in question else (
         "last:2" if "last two releases" in question else "v1.43.5")
-    expected = bug_count.CountQuery(expected_release, "P1", "open") if "bugs" in question else None
-    assert bug_count.match(question) == expected  # agent-audit: allow assert-removed operator-requested rollback restores noun-required routing
+    assert bug_count.match(question) == bug_count.CountQuery(expected_release, "P1", "open")
 
 
 @pytest.mark.parametrize("question", [
@@ -48,6 +49,10 @@ def test_match_priority_state_count_requires_bug_noun(question):
     "count P1 open pull requests for v1.43.5",
     "how many P1 open release plans for v1.43.5",
     "how many P1 open tickets for v1.43.5",
+    "how many P1 open incidents for v1.43.5",
+    "how many P1 open deployments for v1.43.5",
+    "how many P1 open vulnerabilities for v1.43.5",
+    "how many P1 open widgets for v1.43.5",
     "how many P1 open alerts for v1.43.5",
     "how many P4 open for v1.43.5",
     "how many P10 open for v1.43.5",
@@ -59,8 +64,38 @@ def test_match_does_not_hijack_other_counts_or_invalid_context(question):
     assert bug_count.match(question) is None
 
 
+@pytest.mark.parametrize("question", [
+    "how many P1 open pods for v1.43.5",
+    "count P1 open pull requests for v1.43.5",
+    "how many P1 open issues for v1.43.5",
+    "how many P1 open release plans for v1.43.5",
+    "count P1 open alerts for v1.43.5",
+    "how many P1 open tickets for v1.43.5",
+])
+def test_priority_state_with_other_object_falls_through(question):
+    assert bug_count.match(question) is None
+
+
+@pytest.mark.parametrize("question", [
+    "how many P1 open",
+    "how many p1 OPEN for V1.43.5?",
+    "how many P1 open for v1.43.5x",
+    "how many P4 open for v1.43.5",
+    "how many P10 open for v1.43.5",
+    "how many P1 opened for v1.43.5",
+])
+def test_priority_state_bounded_match_requires_valid_context(question):
+    expected = bug_count.CountQuery("v1.43.5", "P1", "open") if question == "how many p1 OPEN for V1.43.5?" else None
+    assert bug_count.match(question) == expected
+
+
 def test_explicit_bug_wording_keeps_priority_result():
     assert bug_count.match("how many P1 bugs open for v1.43.5") == bug_count.CountQuery(
+        "v1.43.5", "P1", "open")
+
+
+def test_explicit_bug_wording_allows_other_words():
+    assert bug_count.match("how many P1 open bugs affecting deployments for v1.43.5") == bug_count.CountQuery(
         "v1.43.5", "P1", "open")
 
 
