@@ -2003,3 +2003,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] 2026-10-29: P2 non-Claude coordinator attribution bug filed (`ad5cba50`), v1.43.10, approval pending.
 - [ ] 2026-10-29: ask-docs Phase 0 (webhook ProcessType Interactive) proposed; Kine → M5 rebuild decided; product-catalog fix needs PR.
 - [ ] v1.43.12 M5 hub special release: 2 plans written (machine-setup parity + hub-new/cutover); approval pending; prerequisite platform-ops Slack URL bug.
+- [x] v1.43.9 release prep: guide split 34fd8f9b, CHANGELOG/README/releases bb601a38. PR pending.
