@@ -112,6 +112,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
+- 2026-10-30: aerospace tap fix be02d2de; Part 2 spec 8d9f3016; Part 2 DISPATCHED to Luna (slug machine-secrets-pull, gpt-6-luna). Hold operator make commands until reviewed + landed. The 18 machine_setup_acceptance failures were the stray `-e` socket in the repo root (cp -R cannot copy it), not the code: the socket belongs to the operator's live `dtach -A -e zsh` (PIDs 50842/50843, since 10-26 15:19). Clean worktree: 85/85. Ask the operator before removing it.
+
 - 2026-10-30: Hostinger upgraded to 4 CPU / 16 GB (operator; Claude confirmed read-only: 43% CPU / 32% mem requested, 47% mem in use). Roadmap revised: TwinkleAI runs beside shopping-cart on Hostinger for v1.49.0 -> v1.50.0; shopping-cart leaves Hostinger at the end of v1.50.0 (was: first, in v1.49.0). Follow-up to check: the Hostinger maxSurge=0 stopgap may be revertible.
 - 2026-10-30: machine-secrets Part 1 landed 2029f93c (Claude fixed: dump parser never emitted, zero-record runs accepted, fake-green real-keychain test). Part 2 (FROM= pull inside machine-setup) spec written, uncommitted until machine_setup_acceptance rerun explains 18 failures seen after the aerospace cask fix.
 

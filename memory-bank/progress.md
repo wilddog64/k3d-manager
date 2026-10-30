@@ -2033,3 +2033,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] 2026-10-30: v1.43.12 plan 4 machine-secrets-copy — spec written, dispatched to Luna (gpt-6-luna); Claude review + red checks pending; E3 live = operator export on M4, import on M5.
 - [x] 2026-10-30: roadmap — TwinkleAI beside shopping-cart on the upgraded Hostinger node (4 CPU / 16 GB); removal moved v1.49.0 -> end of v1.50.0.
 - [x] 2026-10-30: v1.43.12 plan 4 Part 1 landed 2029f93c (review: verify=fail, Claude fixes). Part 2 FROM= pending dispatch.
+- [x] 2026-10-30: aerospace cask from nikitabobko/tap be02d2de (setup suites 85/85 in a clean worktree).
+- [ ] 2026-10-30: v1.43.12 plan 4 Part 2 (FROM= pull) dispatched to Luna, slug machine-secrets-pull — review pending.
