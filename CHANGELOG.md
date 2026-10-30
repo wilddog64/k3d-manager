@@ -5,6 +5,7 @@
 ### Added
 
 - Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.
+- Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
 
 ## [1.43.9] - 2026-10-29
 

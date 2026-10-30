@@ -35,6 +35,15 @@ live-verified resolution** uses only the `live` count. Release branches are squa
 documents closed during a release branch are dated to the squash-merge commit; this can bunch
 resolutions into a single window.
 
+The **Whole system at API prices** row shows four combined views. **Claude + Codex at API prices**
+sums Claude, ledgered Codex and unledgered Codex costs for the selected window; a missing
+unledgered series contributes zero. **Claude + Codex per live-verified spec** divides that sum by
+the live-verified count in the window and shows No data when there are none. **API run rate /
+month** divides each 7d cost by its observed days and scales the result to 30 days; unledgered
+Codex uses the ledgered Codex observed-days metric. These totals use list API prices and include
+failed dispatches, rework and review. **API vs replaced plans** divides the monthly API run rate by
+the Claude and ChatGPT subscription plans only; Gemini, GitHub and Hostinger plans remain.
+
 ## Agent dispatch cost details
 
 Agent Dispatch measures two kinds of size separately. **Spec files** and **Acceptance items** are
