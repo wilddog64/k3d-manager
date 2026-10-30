@@ -1,6 +1,6 @@
 # Bug: machine setup installs live-hub agents on a new Mac before cut-over, and misses two Hermes credentials
 
-**Status:** OPEN
+**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `setup-agents-skip`
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("go ahead to file a bug and dispatch to Luna")
 **Filed:** 2026-10-30
