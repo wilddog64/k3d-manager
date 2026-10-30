@@ -188,6 +188,9 @@ runner is already in use, the job becomes `failed` and its output says `runner <
 run is named to resolve the contention. Never unlock the runner from a cloud session, and never
 retry by probing or clearing the lock.
 
+The CI `stage2` job takes the same lock and waits up to 30 minutes for it. Remote e2e never waits;
+it fails fast when another run holds the lock.
+
 ## Filing a request by hand
 
 The helper is preferred, but the format is plain git so you can do it directly. Branch

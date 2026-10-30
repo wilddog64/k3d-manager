@@ -198,9 +198,17 @@ jobs:
           contains(github.event.pull_request.labels.*.name,
             'ci:cluster-tests') }}
     runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Acquire M2 runner lock
+        id: runner_lock
+        run: |
+          set -euo pipefail
+          token="$(scripts/ci/runner_lock.sh acquire)"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
 
       - name: Cluster health check
         run: bash scripts/ci/check_cluster_health.sh
@@ -232,3 +240,9 @@ jobs:
           if [[ "$RUN_CERT_MANAGER" == "true" ]]; then
             ./scripts/k3d-manager test_cert_rotation
           fi
+
+      - name: Release M2 runner lock
+        if: ${{ always() && steps.runner_lock.outputs.token != '' }}
+        env:
+          TOKEN: ${{ steps.runner_lock.outputs.token }}
+        run: scripts/ci/runner_lock.sh release "$TOKEN"
