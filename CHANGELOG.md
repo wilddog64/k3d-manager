@@ -1,20 +1,13 @@
 # Changelog
 
-## Unreleased
-
-- Add a bounded, read-only Cloudflare HTTPS/TLS posture and preflight helper with allowlisted snapshot/API values, redacted redirect observations, conservative TLS error classification, and offline fixture tests; live setting changes and endpoint acceptance remain operator-controlled.
-
-- Add a read-only webhook incident doctor with bounded, redacted local health
-  diagnostics and offline fixture coverage. Operator recovery and live incident
-  verification remain separate actions.
-
 ## [Unreleased]
 
 ## [1.43.9] - 2026-10-29
 
 ### Added
 
-- Add `make webhook-doctor` for read-only diagnostics and `DRY_RUN=1` for its probe plan.
+- Add `make webhook-doctor` for read-only diagnostics and `DRY_RUN=1` for its probe plan. The doctor reports bounded, redacted local health checks and is covered by offline fixture tests; recovering the webhook and verifying a live incident remain separate operator actions.
+- Add a bounded, read-only Cloudflare HTTPS/TLS posture and preflight helper with allowlisted snapshot/API values, redacted redirect observations, conservative TLS error classification, and offline fixture tests; live setting changes and endpoint acceptance remain operator-controlled.
 
 - App CVE candidate resolution reports GHCR authentication failures separately, publishes bounded resolution metrics, and keeps registry credentials out of curl arguments.
 - App CVE candidate scanning now fails closed on Trivy, registry, or malformed-result errors, skips unsafe per-service decisions, and reports an unsuccessful Job if any candidate scan is unknown.
