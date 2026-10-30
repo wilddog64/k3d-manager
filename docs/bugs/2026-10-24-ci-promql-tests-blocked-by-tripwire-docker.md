@@ -67,3 +67,26 @@ interface:
 ```
 
 **CI evidence (E2):** CI run 40124898903 on `eae158cc` (2026-10-24, PR #148): `test_dashboard_queries.py .` passed; `test_dispatch_metrics.py` had no skips (the run's 3 skips are in `test_find_similar_docs.py` and `test_hermetic_guard.py`); BATS `ok 1081` balanced PromQL; pytest 1202 passed with no tripwire FAIL; `tripwire.sh` unchanged.
+
+## Recurrence — local `make test-pytest` (2026-10-30)
+
+**Priority:** P3 — local only; CI is green, and the per-suite counts still show real failures.
+
+The CI fix installs `promtool` in the `lint` job only. The operator's Mac has no `promtool`, so
+locally the tests still take the `docker run` fallback and the tripwire still blocks it (rc 97).
+`make test-pytest` on `28ad8fbc`: 1703 passed, 5 failed, tripwire FAIL on 4 blocked `docker run`
+calls, exit 2. The five:
+
+- `test_dashboard_queries.py::test_every_bug_dashboard_target_matches_producer_series`
+- `test_dispatch_metrics.py::test_dispatch_dashboard_window_variable_and_release_link`
+- `test_dispatch_metrics.py::test_by_model_promql_returns_one_series_per_model`
+- `test_orbstack_metrics.py::test_orbstack_rules_parse_and_fire_with_version`
+- `test_orbstack_metrics.py::test_upgrade_annotation_marks_a_version_change_only`
+
+Because of this, `make test-all` always exits non-zero locally, so its exit code is ignored and a
+real failure can hide behind it. An earlier note blamed this on `python3` lacking pytest; that has
+not been true since the pyenv fallback in `6f0fb4af` (2026-09-25).
+
+Under `tripwire.sh` the docker fallback can never succeed, so it is dead code in every offline run.
+Candidate fixes: install `promtool` 3.1.0 locally (as CI does), or have these tests skip with a
+named reason when no `promtool` is on PATH instead of falling back to docker.
