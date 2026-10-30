@@ -73,7 +73,7 @@ zplug
 zsh
 
 # M4 casks retained for agent/development workstations.
-cask:aerospace
+cask:nikitabobko/tap/aerospace
 cask:antigravity
 cask:claude
 cask:facescreen
