@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add encrypted Keychain secret export/import for Mac migration, with passphrase protection and a setup hint that avoids recreating live credentials.
 - Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.
 - Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
 

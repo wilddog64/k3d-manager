@@ -267,7 +267,7 @@ secret_present() {
 }
 
 check_secrets() {
-  local service account purpose command
+  local service account purpose command missing_hint=0
   while IFS='|' read -r service account purpose command <&3; do
     [[ -n "$service" && "$service" != \#* ]] || continue
     local lookup_account="$account"
@@ -275,6 +275,10 @@ check_secrets() {
     if secret_present "$service" "$lookup_account"; then report "secret:${service}:${account}" ok
     elif [[ "$command" == operator:* ]]; then record_failure "secret:${service}" "missing ($command)"
     elif [[ "$mode" == setup && -t 0 ]]; then
+      if (( ! missing_hint )); then
+        printf '%s\n' 'Moving from another Mac? Copy the Keychain items with make machine-secrets-export/import first (docs/howto/machine-setup.md).' >/dev/tty
+        missing_hint=1
+      fi
       printf 'Missing Keychain item %s (%s). Run setup command now? [y/N] ' "$service" "$purpose" >/dev/tty
       local answer; read -r answer </dev/tty
       if [[ "$answer" == y || "$answer" == Y ]]; then

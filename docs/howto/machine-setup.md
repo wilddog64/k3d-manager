@@ -16,13 +16,19 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 ## M5 hub cut-over
 
-1. Read and run the bootstrap, then `make machine-setup ROLE=hub` on the M5.
+1. Read and run the bootstrap. Before setup, copy Keychain secrets from the M4 as described below, then run `make machine-setup ROLE=hub` on the M5.
 2. Open OrbStack once (`open -a OrbStack`), accept its first-run screens and approve its helper with your admin password; setup installs the cask but cannot do this step, and `machine-check` does not test it. Wait for `orbctl status` to print `Running`.
 3. Re-enter secrets at the TTY when prompted. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
 4. Restore the hub by following [Hub snapshots](hub-snapshots.md). This tool does not move cluster data.
 5. Verify the restored hub services and operator access before moving responsibility from the M4. Only then explicitly retire the former hub services.
 
 ## Secrets and machine-only keys
+
+### Copy secrets from the old machine
+
+On the old Mac, run `make machine-secrets-export ROLE=hub` in a local terminal with the login Keychain unlocked. Enter and confirm a strong passphrase. Transfer the encrypted `.enc` file to the new Mac with AirDrop or `scp`, then run `make machine-secrets-import FILE=<path>` there and enter the passphrase. A successful import deletes the encrypted transfer file; if an item fails, the file is kept for another attempt. Add `FORCE=1` only when intentionally replacing an existing item.
+
+iCloud does not sync these credentials: `security add-generic-password` writes to each Mac's local file-based login Keychain. When setup later prompts to create missing secrets, answer **N** for secrets being copied; the transfer command copies existing values without rotating tokens or changing their live consumers.
 
 The script checks Keychain **presence only**; it never reads values. Missing credentials are re-entered or rotated on the new Mac, never copied from another Mac. Without a TTY, prompts are skipped and the report remains missing. Sign in to Claude (`/login`), Codex (`codex login`), Gemini/agy, and GitHub (`gh auth login`) at the terminal.
 
