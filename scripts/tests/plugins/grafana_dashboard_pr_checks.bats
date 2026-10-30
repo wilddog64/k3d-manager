@@ -114,7 +114,9 @@ assert [item["id"] for item in transformations] == ["joinByField", "sortBy", "or
 sort = transformations[1]
 assert sort["options"]["sort"] == [{"field": "__join", "desc": False}]
 organize = transformations[2]["options"]
-assert organize["indexByName"] == {"Repo": 0, "PR": 1, "Check": 2, "State": 3, "Duration": 4}
+index = organize["indexByName"]
+assert set(index) <= set(organize["renameByName"]), sorted(set(index) - set(organize["renameByName"]))
+assert [organize["renameByName"][name] for name in sorted(index, key=index.get)] == ["Repo", "PR", "Check", "State", "Duration"]
 PY
   [ "${status}" -eq 0 ]
 }

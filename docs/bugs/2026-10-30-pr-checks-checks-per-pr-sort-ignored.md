@@ -41,6 +41,13 @@ renamed columns depends on more than one key being honoured. PRs within a repo s
 (ascending), not as numbers descending. Panel 5 also changed, despite "no other panel" below,
 because it carried the same ignored `sortBy` and N1 covers every `organize` transformation.
 
+**Live check (2026-10-30).** After the hub reapply, PR 96's checks showed as one block, but the
+columns read Check, PR, Repo. `indexByName` was keyed by the display names (`Repo`, `PR`), and
+Grafana keys it by the original field names (`repo`, `pr`, `Value #B`), as every other dashboard here
+does. No key matched, so the columns stayed in label order. The test asserted the same wrong keys.
+Fixed: keys are now field names, and the test requires every `indexByName` key to be a
+`renameByName` source field. It fails against the display-name version.
+
 Update `scripts/tests/plugins/grafana_dashboard_pr_checks.bats` (the panel 6 test) and, if it names
 the column order, `docs/guides/grafana-dashboards/k3dm-pr-checks.md`. Takes effect after
 `make platform-ops`.
