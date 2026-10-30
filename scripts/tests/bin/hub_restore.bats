@@ -145,6 +145,25 @@ teardown() { rm -rf "${WORK}"; }
   [[ "$output" == *'Cloudflare tunnel check: SKIP'* ]]
 }
 
+@test "HUB_RESTORE_PLATFORM=skip defers observability, platform-ops and their checks on a hub with no data yet" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip GRAFANA_MODE=always-fail LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Grafana health: SKIP'* ]]
+  [[ "$output" == *'Alertmanager SMTP Secret exists: SKIP'* ]]
+  run grep -Eq '^make (observability|platform-ops)( |$)' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "without HUB_RESTORE_PLATFORM, observability and platform-ops run and a down Grafana fails the restore" {
+  export HUB_RESTORE_TUNNEL=skip GRAFANA_MODE=always-fail LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 1 ]
+  grep -q '^make observability' "$CALL_LOG"
+  grep -q '^make platform-ops' "$CALL_LOG"
+  [[ "$output" == *'Grafana health: FAIL'* ]]
+}
+
 @test "hub-restore Step 8 does not bootstrap already-loaded port-forward agents" {
   _run_noninteractive_restore
   [ "${status}" -eq 0 ]

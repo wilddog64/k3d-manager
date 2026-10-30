@@ -85,7 +85,10 @@ _step_start 2
 if "${_make}" restore-google-app-password; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 3
-if "${_make}" observability; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Observability: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_make}" observability; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 4
 _signing_output=""
@@ -150,7 +153,10 @@ else
 fi
 
 _step_start 7
-if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Platform ops: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
 
 _hub_restore_ensure_pf_agent() {
   local name="$1" label="com.k3d-manager.$1-port-forward" state_dir wrapper plist log
@@ -216,22 +222,27 @@ if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18
 else
   _info "[hub-restore] Vault :18200 health: FAIL"; _verify_ok=0
 fi
-_grafana_ok=0
-for _grafana_try in $(seq 1 15); do
-  if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
-    _grafana_ok=1; break
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Grafana health: SKIP"
+  _info "[hub-restore] Alertmanager SMTP Secret exists: SKIP"
+else
+  _grafana_ok=0
+  for _grafana_try in $(seq 1 15); do
+    if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
+      _grafana_ok=1; break
+    fi
+    sleep 1
+  done
+  if (( _grafana_ok )); then
+    _info "[hub-restore] Grafana health: PASS"
+  else
+    _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
   fi
-  sleep 1
-done
-if (( _grafana_ok )); then
-  _info "[hub-restore] Grafana health: PASS"
-else
-  _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
-fi
-if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smtp-secret >/dev/null 2>&1; then
-  _info "[hub-restore] Alertmanager SMTP Secret exists: PASS"
-else
-  _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
+  if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smtp-secret >/dev/null 2>&1; then
+    _info "[hub-restore] Alertmanager SMTP Secret exists: PASS"
+  else
+    _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
+  fi
 fi
 if [[ "${HUB_RESTORE_TUNNEL:-}" == skip ]]; then
   _info "[hub-restore] Cloudflare tunnel check: SKIP"

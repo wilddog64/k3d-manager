@@ -92,13 +92,13 @@ STUB
     chmod +x "$WORK/stub/$cmd"
   done
 
-  for script in bin/hub-restore bin/k3dm-webhook-setup bin/k3dm-hermes-setup scripts/k3d-manager; do
+  for script in bin/hub-up bin/hub-restore bin/k3dm-webhook-setup bin/k3dm-hermes-setup scripts/k3d-manager; do
     cat > "$ROOT/$script" <<STUB
 #!/usr/bin/env bash
 source "$WORK/record"
 STUB
     cat >> "$ROOT/$script" <<'STUB'
-record "$(basename "$0")" "$* HUB_RESTORE_TUNNEL=${HUB_RESTORE_TUNNEL:-unset} TUNNEL_SSH_HOST=${TUNNEL_SSH_HOST:-unset}"
+record "$(basename "$0")" "$* HUB_RESTORE_TUNNEL=${HUB_RESTORE_TUNNEL:-unset} HUB_RESTORE_PLATFORM=${HUB_RESTORE_PLATFORM:-unset} TUNNEL_SSH_HOST=${TUNNEL_SSH_HOST:-unset}"
 case "$(basename "$0") ${1:-}" in
   'k3dm-webhook-setup '*) plist webhook ;;
   'k3dm-hermes-setup '*) plist hermes ;;
@@ -130,8 +130,22 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   jq -e '.status == "pass" and ([.stages[].stage] | length) == 9 and .checks.kine_compaction_cycles == 6 and .checks.kine_datastore_bytes == "4096"' \
     "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
   grep -q '^make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip ' "$CALLS"
-  grep -q '^make hub-up ' "$CALLS"
-  grep -q '^hub-restore .*HUB_RESTORE_TUNNEL=skip' "$CALLS"
+  grep -q '^hub-up ' "$CALLS"
+  grep -q '^hub-restore .*HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip' "$CALLS"
+}
+
+@test "hub-up builds only the cluster; observability and platform-ops wait for the data stage" {
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  grep -q '^hub-up ' "$CALLS"
+  run grep -Eq '^make (hub-up|up)( |$)' "$CALLS"
+  [ "$status" -eq 1 ]
+  data_line="$(grep -n '^make hub-data-recover' "$CALLS" | head -1 | cut -d: -f1)"
+  obs_line="$(grep -n '^make observability' "$CALLS" | head -1 | cut -d: -f1)"
+  ops_line="$(grep -n '^make platform-ops' "$CALLS" | head -1 | cut -d: -f1)"
+  [ -n "$data_line" ] && [ -n "$obs_line" ] && [ -n "$ops_line" ]
+  [ "$obs_line" -gt "$data_line" ]
+  [ "$ops_line" -gt "$data_line" ]
 }
 
 @test "M1/N1: every child runs with K3DM_AGENT_LOAD=0 and every singleton plist is written" {
@@ -208,7 +222,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [[ "$output" == *"scp m4-air.local:.cloudflared/$TUNNEL_CREDS"* ]]
   grep -q '^secrets-present=fail ' "$HUB_NEW_STATE_DIR/state"
   grep -q '^make machine-setup ROLE=hub FROM=m4-air.local' "$CALLS"
-  run grep -q '^make hub-up' "$CALLS"
+  run grep -q '^hub-up ' "$CALLS"
   [ "$status" -eq 1 ]
 }
 
@@ -273,7 +287,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [[ "$output" == *'verify: running'* ]]
   [[ "$output" != *'data: running'* ]]
   grep -q '^make appsets-reapply ' "$CALLS"
-  run grep -q '^make hub-up' "$CALLS"
+  run grep -q '^hub-up ' "$CALLS"
   [ "$status" -eq 1 ]
 }
 

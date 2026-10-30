@@ -82,8 +82,8 @@ secrets_present() {
     [[ -s "$HOME/.cloudflared/$f" ]] || fail "Cloudflare tunnel file missing: ~/.cloudflared/$f" "machine-setup copies it from $OLD_HOST; check its output, or run: scp ${OLD_HOST}:.cloudflared/$f ~/.cloudflared/"
   done
 }
-hub_up() { make hub-up; }
-hub_restore() { HUB_RESTORE_TUNNEL=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
+hub_up() { bin/hub-up; }
+hub_restore() { HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
 prepare_singletons() {
   local label installer _note plist missing="" tunnel_done=0
   while IFS='|' read -r label installer _note; do

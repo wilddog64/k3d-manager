@@ -13,6 +13,18 @@
 
 ### Fixed
 
+- **`hub-new` no longer runs observability and platform-ops before the hub has its data.** On a new
+  machine Vault starts empty and is only filled by the `data` stage (`make hub-data-recover`), but the
+  `hub-up` stage ran `make hub-up` (which also runs `make observability`, `make platform-ops` and the
+  Pushgateway port-forward) and `hub-restore` ran both again and then checked Grafana and
+  `alertmanager-smtp-secret`. On the M5 that failed with `configSecret alertmanager-smtp-secret, which
+  does not exist`, because the Secret is rendered from Vault `secret/k3d-manager/alertmanager`. The
+  `hub-up` stage now runs `bin/hub-up` only. `hub-restore` takes `HUB_RESTORE_PLATFORM=skip`, which
+  reports its Observability and Platform ops steps and the Grafana and SMTP checks as `SKIP`; hub-new
+  sets it. The `platform` stage, after `data`, already runs `make platform-ops` and `make observability`,
+  and `hub-restore` Step 8 still installs the Pushgateway and Loki port-forwards. `make hub-up` and plain
+  `hub-restore` are unchanged.
+
 - **`deploy_observability` creates the `monitoring` namespace before applying the Grafana admin ExternalSecret.** On a fresh hub the namespace only appears once ArgoCD syncs `kube-prometheus-stack`, which races the observability step: the M5 `hub-new` run failed `namespaces "monitoring" not found` about 90 seconds before ArgoCD created it. The M4 hub always had the namespace. The later ServiceMonitor and scrape-timeout steps already wait for their CRDs. The new test fails on the pre-fix code and on a mutant that creates the namespace after the apply; it runs with a scratch `HOME` and a stubbed `curl`.
 
 - **`deploy_argocd` no longer dies silently on a hub with no app-rebuild PAT in the Keychain.** When `platform-ops-app-rebuild` is absent, `argocd_sync_app_rebuild_secret` asks the cluster whether the Secret or the `app-cve-scan` CronJob already exists. Both checks were plain `_kubectl get`, which exits the whole run on a non-zero result, and their output went to `/dev/null` — so on a fresh hub (the M5) `hub-up` step 5 failed right after the webhook-token sync with no error printed. The M4 always had the Keychain item and never reached the checks. Both now use `_kubectl --no-exit`, and the optional-PAT path returns 0 as designed. Tests run the real `_kubectl`/`_run_command` against a fake `kubectl` that returns NotFound; the missing-Secret test is red on the pre-fix code and on a mutant missing either `--no-exit`.
