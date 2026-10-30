@@ -206,3 +206,17 @@ The same `bug-tally.py --json --counts-only --ref HEAD` takes 1.8 s at normal pr
 ### Phase 0 deployed — 2026-10-29 16:0x PDT
 
 The operator added `ProcessType Interactive` to the installed plist and ran `make restart-webhook` from the M4 tmux pane. Claude confirmed with read-only `launchctl print`: `spawn type = interactive (4)` (was `daemon (3)`), on new pid 87282. Remaining for closure: at least 20 live Slack count questions over a day of ordinary load, with timings and an answer comparison (plan E3). Status stays OPEN.
+
+### E3 samples (Claude, read from job directories)
+
+Response time = job directory created → `output` written (excludes the Slack post). The webhook log's
+`duration_ms` is only the 202 accept, so it is not used. Count-route samples so far:
+
+| When (PDT) | Job | Route | Time | Note |
+|---|---|---|---|---|
+| 2026-10-30 04:45 | `1c3b1e84` | count | 3 s | v1.43.5 P1 |
+| 2026-10-30 11:01 | `a2edbce3` | count | 5 s | current release P2; first after the 10:57 restart |
+
+2 of 20. Both under the 30 s deadline; the 5 s sample is over the 3 s p95 target, so keep collecting
+before deciding. Search-route answers (typos, "list", "what are") took 39–48 s; that is the model, not
+the tally, and does not count toward E3.
