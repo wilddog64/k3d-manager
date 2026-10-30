@@ -11,6 +11,7 @@
 ### Fixed
 
 - Sort the PR Checks tables so each pull request's rows stay together: the sort was a `sortBy` key inside `organize`, which Grafana ignores, so rows came out grouped by check. Both tables now sort on the hidden `repo:pr:check` join key before `organize`, and Checks per PR orders its columns Repo, PR, Check, Duration, State. (`docs/bugs/2026-10-30-pr-checks-checks-per-pr-sort-ignored.md`)
+- Unlock this Mac's login Keychain before a secrets pull when it is locked, and add `SECRETS=skip` to machine setup so new Macs can copy existing credentials without running missing-secret setup commands. (`docs/bugs/2026-10-30-machine-secrets-pull-fails-on-locked-local-keychain.md`)
 - Link the fixed docs in an `/ask-docs` bug count: a named-release or last-N count now lists each fixed doc of the asked priority as a Slack link (capped at ten, with an "and N more" line), so a release where every bug is fixed no longer answers with a bare number and `Sources: none`. Open-only and all-releases counts stay short. (`docs/bugs/2026-10-30-ask-docs-bug-count-does-not-link-fixed-docs.md`)
 - Fix machine setup on a real terminal: the manifest loops read their lists on fd 3 so secret prompts, setup scripts, `brew install` and `sudo` see the terminal; install output goes to `~/.local/state/k3d-manager/machine-setup.log` instead of `/dev/null`. The setup guide adds OrbStack's first launch.
 

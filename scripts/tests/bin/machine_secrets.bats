@@ -16,6 +16,10 @@ printf 'argv:' >> "$SECURITY_LOG"
 printf ' <%s>' "$@" >> "$SECURITY_LOG"
 printf '\n' >> "$SECURITY_LOG"
 case "$1" in
+  show-keychain-info)
+    [[ -z "${LOCAL_LOCKED_KEYCHAIN:-}" ]] || { printf 'User interaction is not allowed.\n' >&2; exit 36; }
+    printf 'keychain settings for %s\n' "$2"
+    ;;
   unlock-keychain)
     IFS= read -r unlock_value
     printf 'unlock-keychain <%s>\n' "$*" >> "$SECURITY_LOG"
@@ -55,7 +59,38 @@ printf '\n' >> "$OPENSSL_LOG"
 exec "$REAL_OPENSSL" "$@"
 SH
   chmod +x "$TMP/bin/openssl"
-  SCRIPT="$ROOT/bin/k3dm-machine-secrets"
+  SCRIPT="${MACHINE_SECRETS_SOURCE:-$ROOT/bin/k3dm-machine-secrets}"
+}
+
+@test "N2: failed local keychain unlock exits before ssh" {
+  make_fake_ssh
+  export LOCAL_LOCKED_KEYCHAIN=1
+  : > "$UNLOCK_FAIL_FILE"
+  tty_run $'fixture-password\nfixture-password' "$SCRIPT" pull --from old-mac.local --role hub
+  [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox cannot read a silent password from its pseudo-terminal'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"could not unlock this Mac"* ]]
+  [ ! -s "$SSH_LOG" ]
+  ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG"
+}
+
+@test "M1/M2/N1: locked local keychain unlocks once before streaming; unlocked keychain does not prompt" {
+  make_fake_ssh
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  export LOCAL_LOCKED_KEYCHAIN=1
+  tty_run $'fixture-password\nfixture-password' "$SCRIPT" pull --from old-mac.local --role hub --force
+  [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox cannot read a silent password from its pseudo-terminal'
+  [ "$status" -eq 0 ] || { printf 'status=%s output=%s\\n' "$status" "$output"; cat "$SECURITY_LOG" "$SSH_LOG"; return 1; }
+  [[ "$output" == *"Login password for this Mac"* ]]
+  [ "$(grep -c '^argv: <unlock-keychain>' "$SECURITY_LOG")" -eq 2 ]
+  [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
+  grep -Fq 'add-generic-password -U -s k3dm-cloudflare-api-token -a k3dm -X 746f6b656e' "$SECURITY_LOG.stdin"
+  ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG" || false
+  export LOCAL_LOCKED_KEYCHAIN=''
+  : > "$SECURITY_LOG"
+  tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role hub
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Login password for this Mac's keychain"* ]]
 }
 
 tty_run() {
@@ -72,6 +107,7 @@ tty_run() {
   else
     run bash -c "{ /bin/sleep 1; cat '$TMP/tty-input'; /bin/sleep 2; } | script -qec '$wrapper' /dev/null"
   fi
+  [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox pseudo-terminal does not permit terminal reads'
 }
 
 make_fake_ssh() {
@@ -196,6 +232,9 @@ SH
   run make -n -C "$ROOT" machine-check ROLE=hub FROM=m4-air.local
   [ "$status" -eq 0 ]
   [[ "$output" != *'--from'* ]]
+  run make -n -C "$ROOT" machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'--from "m4-air.local" --secrets "skip"'* ]]
 }
 
 @test "machine secrets: export encrypts every matching account without plaintext output" {
@@ -302,6 +341,8 @@ SH
   grep -Fq 'Moving from another Mac? Rerun with FROM=<old Mac hostname>' "$ROOT/bin/k3dm-machine-setup"
   grep -Fq 'Copy secrets from the old machine' "$ROOT/docs/howto/machine-setup.md"
   grep -Fq 'iCloud does not sync' "$ROOT/docs/howto/machine-setup.md"
+  grep -Fq 'SECRETS=skip' "$ROOT/docs/howto/machine-setup.md"
+  grep -Fq "this Mac's login Keychain password if that Keychain is locked" "$ROOT/docs/howto/machine-setup.md"
 }
 
 @test "machine secrets: real throwaway keychain round trip is macOS only" {

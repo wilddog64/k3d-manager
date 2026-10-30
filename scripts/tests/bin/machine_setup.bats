@@ -287,6 +287,29 @@ run_machine() {
   ! grep -q '^make .*secret-setup' "$CALL_LOG"
 }
 
+@test "N3: secrets option rejects unsupported values" {
+  setup_machine_fixture
+  run_machine --role console --secrets never
+  [ "$status" -eq 2 ]
+}
+
+@test "M3/M4: secrets skip suppresses prompts and setup commands but still pulls" {
+  setup_machine_fixture
+  printf '%s\n' 'fixture|k3dm|purpose|make secret-setup' > "$FIXROOT/scripts/etc/machine/secrets.console.list"
+  tty_machine --role console --secrets skip --from old-mac.local
+  [ "$(grep -c '^secrets pull --from old-mac.local --role console$' "$CALL_LOG")" -eq 1 ]
+  [[ "$output" == *'missing (skipped: SECRETS=skip)'* ]]
+  [[ "$output" != *'[y/N]'* ]]
+  ! grep -q '^make secret-setup' "$CALL_LOG"
+}
+
+@test "N4: ask remains the default secret behavior" {
+  setup_machine_fixture
+  printf '%s\n' 'fixture|k3dm|purpose|make secret-setup' > "$FIXROOT/scripts/etc/machine/secrets.console.list"
+  tty_machine --role console
+  [[ "$output" == *'[y/N]'* ]]
+}
+
 @test "machine setup: safety N2 check and dry-run make no mutating calls" {
   setup_machine_fixture
   printf '%s\n' 'gitrepo/example|https://example.test/example.git|-|console' > "$FIXROOT/scripts/etc/machine/repos.list"
@@ -322,6 +345,7 @@ tty_machine() {
   else
     run bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
   fi
+  [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox pseudo-terminal does not permit terminal reads'
 }
 
 @test "M7: setup with FROM on a terminal pulls once before the per-item checks" {

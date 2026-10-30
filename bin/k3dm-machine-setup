@@ -7,12 +7,13 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/core.sh"
 
-usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--check|--dry-run]\n'; }
-role='' from_host='' mode=setup failed=0 brew_available=0
+usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--check|--dry-run]\n'; }
+role='' from_host='' secrets_mode=ask mode=setup failed=0 brew_available=0
 while (($#)); do
   case "$1" in
     --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
     --from) (($# >= 2)) || { usage >&2; exit 2; }; from_host="$2"; shift 2 ;;
+    --secrets) (($# >= 2)) || { usage >&2; exit 2; }; secrets_mode="$2"; shift 2 ;;
     --check) mode=check; shift ;;
     --dry-run) mode=dry-run; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -20,6 +21,7 @@ while (($#)); do
   esac
 done
 case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
+case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
 
@@ -287,6 +289,7 @@ check_secrets() {
     local lookup_account="$account"
     if [[ "$account" == USER ]]; then lookup_account="$(id -un)"; fi
     if secret_present "$service" "$lookup_account"; then report "secret:${service}:${account}" ok
+    elif [[ "$secrets_mode" == skip ]]; then record_failure "secret:${service}" 'missing (skipped: SECRETS=skip)'
     elif [[ "$command" == operator:* ]]; then record_failure "secret:${service}" "missing ($command)"
     elif [[ "$mode" == setup && -t 0 ]]; then
       if (( ! missing_hint )) && [[ -z "$from_host" ]]; then
