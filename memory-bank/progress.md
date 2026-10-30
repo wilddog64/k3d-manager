@@ -2005,3 +2005,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] v1.43.12 M5 hub special release: 2 plans written (machine-setup parity + hub-new/cutover); approval pending; prerequisite platform-ops Slack URL bug.
 - [x] v1.43.9 release prep: guide split 34fd8f9b, CHANGELOG/README/releases bb601a38. PR pending.
 - [x] PR #152 (v1.43.9) review: Copilot duplicate `## Unreleased` heading fixed in 2adab150 (thread resolved); CodeQL alert #35 (TLS probe) dismissed won't-fix. Findings in docs/issues/2026-10-29-copilot-pr152-review-findings.md.
+- [x] PR #152 CI red (8 orbstack_upgrade TTY tests timed out on Linux): Linux `_run_tty` quoting fixed in 481ce13d; 18/18 green in ubuntu:24.04 and on macOS.
