@@ -1,0 +1,155 @@
+# Hub Kine compaction stops again after revision-record transaction rollback
+
+**Status:** OPEN — live recurrence confirmed 2026-10-28; recovery = M5 new-hub build (operator decision 2026-10-29)
+**Priority:** P2 — retention is stalled with a controlled rebuild workaround; API remains ready
+**Filed:** 2026-10-28
+**Release:** v1.43.9 bug; no new enhancement plan
+**Branch:** `k3d-manager-v1.43.9`
+**Approval:** explicit operator 2026-10-28: "then you may file a proper bug for the recurrence kine issue". Filing/investigation only; no restart, rebuild or remediation authorization.
+**Component:** hub K3s/Kine datastore, `k3d-k3d-cluster-server-0` on M4
+**Related:** [earlier compaction incidents](2026-09-09-hub-kine-compaction-stall.md), [sensor/alert fix](2026-10-11-hermes-kine-sensor-misses-dead-compaction.md), [rebuild orchestration fix](2026-10-11-hub-recover-all-never-rebuilds-the-hub.md), [rebuild runbook](../howto/hub-rebuild-from-gitops-vault.md)
+
+## Observed recurrence
+
+Operator supplied a firing `HubKineCompactionStalled` email. Read-only Prometheus
+queries confirm the warning is currently firing. This is a new October28
+recurrence: successful compactions occurred today before the latest error,
+whereas the earlier parent record described the October24 episode.
+
+The last successful cycle was **2026-10-28 17:45:03 UTC (10:45:03 PDT)**.
+The next cycle started at17:50:03 and failed at **17:50:14 UTC (10:50:14 PDT)**:
+
+```text
+time="2026-10-28T17:45:03Z" level=info msg="COMPACT deleted 462 rows from 450 revisions in 70.683595ms - compacted to 1773483/1774483"
+time="2026-10-28T17:50:03Z" level=info msg="COMPACT compactRev=1773483 targetCompactRev=1773955 currentRev=1774955"
+time="2026-10-28T17:50:14Z" level=error msg="Compact failed: failed to record compact revision: sql: transaction has already been committed or rolled back"
+```
+
+No later successful compaction appeared in the bounded current Docker log
+window. The log search uses case-sensitive `msg="COMPACT` / `COMPACT deleted`,
+not a broad compact search that can match SQL text. Prometheus independently
+reports last-compaction epoch1793209503.378494, matching the successful log.
+
+## Current impact and telemetry
+
+- Alert expression: `time() - k3dm_hub_kine_last_compaction_timestamp_seconds > 1800`, held for15minutes; current state firing.
+- At the sampled query, compaction age4336seconds (about72minutes), Kine metrics push age627seconds, Hermes tick age490seconds. Direct logs corroborate the fault; this is not inferred only from an old email.
+- `state.db`:583081984bytes (556.07MiB); WAL:78090512bytes (74.47MiB), from read-only byte counts. Main-file size matches the published gauge.
+- `/readyz?verbose` passes, including etcd readiness. All four nodes report Ready=True. These checks establish current readiness, not database integrity or recovery.
+- Container running, image `rancher/k3s:v1.32.0-k3s1`, StartedAt `2026-10-25T12:40:00.428960292Z`, RestartCount0. No restart was performed during investigation.
+
+Full actual read-only outputs, query results and limits are in
+[the investigation evidence](../issues/2026-10-28-hub-kine-recurrence-investigation.md).
+
+## Diagnosis and remaining uncertainty
+
+The immediate failure is the revision-record transaction rollback at17:50:14,
+followed by no successful compaction cycles. This matches the prior stalled
+compaction signature. The underlying reason the transaction was cancelled is
+not established; sleep/wake, workload and other service actions are not proven
+causes for this occurrence. No goroutine inspection or SQLite write/query was
+performed. Database file allocation alone is not a reliable growth forecast.
+
+Retention remains impaired even while the API is ready. Unbounded history can
+increase control-plane pressure over time; current measurements do not show a
+control-plane outage. The alert should remain visible until recovery is proved.
+
+## Recovery scope and operator decision
+
+**Do not restart the K3s server as the remedy.** The parent incident documents
+bootstrap crash loops after restart against a backed-up datastore. Do not
+manually delete SQLite rows, vacuum/rewrite the live database or remove profile
+state as an attempted fix.
+
+Prepare a controlled `make hub-recover-all` recovery under the existing runbook:
+first validate current backups/export integrity, restore prerequisites and
+rollback/recovery readiness, then obtain explicit operator go for the operation.
+The parent record names an October29 rebuild slot; scheduling and readiness have
+not been independently reconfirmed here. This filing does not execute or approve
+that rebuild.
+
+Rebuild is a recovery workaround, not proof the underlying Kine transaction
+failure has been permanently corrected. A preventive fix/version change needs
+its own evidence and approved scope; no enhancement plan is added by this bug.
+
+## Acceptance evidence required
+
+1. Record explicit operator recovery authorization and the exact approved operation, with successful backup/restore preflight evidence.
+2. Record actual recovery/restore output and verify API/node readiness plus the runbook's service/data checks.
+3. Observe consecutive successful `COMPACT deleted` cycles over at least30minutes, with fresh Hermes/Pushgateway samples and last-compaction age remaining below the alert threshold.
+4. Verify `HubKineCompactionStalled` resolves in Prometheus/Alertmanager and remains resolved during that observation window. Missing/stale telemetry is not a pass.
+5. Record datastore and WAL before/after values without assuming the SQLite main file must shrink. Continue follow-up for a later recurrence; short recovery observation does not prove prevention.
+
+## Original filing authorization boundary
+
+This is a live-confirmed incident filing only. No implementation task dispatched,
+new plan, PR, restart, database mutation or hub rebuild. The separate M4 test-all
+run is still being watched; its start is later than the compaction error and
+has not been established as a cause.
+
+## Authorized Luna dispatch — 2026-10-28
+
+Operator explicitly requested dispatch to Luna while a new M4 test-all run
+executes. This authorizes a bounded offline recurrence/recovery-readiness
+review, not a K3s restart, live preflight, rebuild, database or account change.
+
+Task: `kine-recurrence-readiness-luna`, model `gpt-6-luna`. Use the recorded
+live evidence and repository sources. Produce a concrete review report that
+coordinator can verify before presenting any operator recovery step.
+
+## Files
+
+- `docs/issues/2026-10-28-hub-kine-recurrence-luna-review.md`
+
+## Luna task requirements
+
+1. Read memory-bank and this bug, parent recurrence history, actual investigation
+   outputs, rebuild runbook, Make hub-recover-all recipe and relevant source/tests.
+   Use recorded timestamps/host context; do not treat M2's oldbranch run as M4
+   acceptance or confuse a recovered API with a recovered compactor.
+2. Distinguish confirmed proximate transaction failure/no successful cycles
+   from unproven trigger. Assess telemetry limitations and what can actually
+   be concluded; no claim of permanent prevention or upstream fix without proof.
+3. Audit the documented recovery path against actual code. Identify exact
+   prerequisites, backup/export freshness/integrity requirements, restore/
+   credential/approval boundaries, pause/rollback behavior and current missing
+   evidence. List proposed operator commands with their effects; do not execute.
+   Pay particular attention to commands called preflight that can write state,
+   access credentials or prompt for destructive approval.
+4. Produce a small readiness matrix (confirmed / pending / blocked) with source
+   file references, an ordered proposed recovery/verification checklist and
+   bounded observation criteria. Gate destructive recovery on explicit operator
+   go after concrete readiness review and the current full test-all outcome.
+   Existing October29 slot is a historical plan, not newly confirmed scheduling.
+5. If a code/runbook defect is found, describe a minimal proposed patch and
+   appropriate offline test in the report; do not change production/runbook files.
+   Report any additional research needed through coordinator. No new plans or
+   unrequested features/version upgrades. Current bug remains OPEN.
+6. Only write the one Files entry. Do not edit bug/memory, stage/commit/push/PR,
+   alter dispatch ledger or run live commands. No docker/kubectl/SSH/scp/security/
+   launchctl/brew/provider/Git-network/SQLite calls, no real make targets, live
+   preflight, installs/upgrades or credentials. No alert silence/metrics write.
+   The output is an offline report, not live test or recovery evidence.
+7. Validate report links with python3 scripts/check-doc-links.py on the report
+   and git diff --check; paste actual commands/results and skipped live work.
+   Coordinator handles independent review, normal gates and any commit/landing.
+
+## Luna review accepted — recovery not executed
+
+Native GPT-6-Luna task kine-recurrence-readiness-luna rework2 independently
+reviewed, normalgatespassed andreportd4481849pushed. See
+[worker report](../issues/2026-10-28-hub-kine-recurrence-luna-review.md) and
+[coordinator review](../issues/2026-10-28-kine-luna-readiness-coordinator-review.md).
+The report flags stale runbook instructions, no safe end-to-end orchestration
+dry-run, limited volume proof and pending restore-readiness evidence.
+Local exportmarker10:33:40Z was about11hoursold at coordinator sample, not
+proof of remote integrity/decryptability. Currentfulltest-all remainsactive.
+No live preflight/restart/rebuild or database/account change. Bug staysOPEN.
+
+## Operator decision — 2026-10-29: recover by building the new hub on the M5
+
+Operator: "let's build kine as we move to 5 then repurpose M4". The M4 hub will not get a controlled `make hub-recover-all`. The recovery is the M5 new-hub build, which starts with a fresh K3s/Kine datastore and restores hub data from snapshot. After cutover the M4 is repurposed, and its stalled datastore is retired with it.
+
+- The M4 hub stays as-is until cutover. It must not be restarted as a remedy, as before. `HubKineCompactionStalled` keeps firing on the M4 until then. This is a known and accepted state, not new noise.
+- Acceptance is unchanged, but measured on the M5 hub: at least 30 min of consecutive `COMPACT deleted` cycles, alert resolution, and datastore/WAL values. The M5 spec must carry this as live evidence.
+- Status stays OPEN until that evidence passes on the M5.

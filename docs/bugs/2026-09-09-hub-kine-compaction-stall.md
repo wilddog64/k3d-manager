@@ -1,6 +1,6 @@
 # Hub Kine compaction stall causes control-plane saturation
 
-**Status:** RECURRED 2026-10-24 — compaction died again at 2026-10-24T17:08:49Z (10:08 PDT) with the known `Compact failed: failed to record compact revision` signature; no `COMPACT deleted` since 17:03:44Z. `HubKineCompactionStalled` fired. The 2026-10-26 close-out is void. Remedy: the 2026-10-29 hub rebuild; no restart. Earlier history below
+**Status:** RECURRED 2026-10-28 — last successful compaction17:45:03Z, transaction failure17:50:14Z; current alert firing. See the new October28 recurrence filing below. Controlled recovery pending; no K3s restart. Earlier October24 history and invalidated close-out retained below.
 **Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
 **Release:** v1.43.6 — verification-only; close-out check 2026-10-26 (14 clean days). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 
@@ -428,3 +428,14 @@ time="2026-10-24T17:08:49Z" level=error msg="Compact failed: failed to record co
 - Next check: `state.db` size again on 2026-10-25. If it grows by more than about 500 MiB a day,
   move the rebuild earlier rather than wait.
 
+
+## New recurrence confirmed — 2026-10-28
+
+Today's successful cycles stopped after17:45:03UTC; next cycle failed
+17:50:14UTC with the same revision-record transaction rollback. Read-only
+metrics/logs match, APIready/all4nodesReady, DB556MiB/WAL74MiB. Underlying
+trigger remains unknown. Operator explicitly requested a proper recurrence
+bug: [October28 filing](2026-10-28-hub-kine-compaction-recurred-after-transaction-rollback.md).
+Full actual outputs in [investigation evidence](../issues/2026-10-28-hub-kine-recurrence-investigation.md).
+No restart/rebuild or database modification authorized/performed. Prior
+record's October29 rebuild slot still needs scheduling/readiness confirmation.

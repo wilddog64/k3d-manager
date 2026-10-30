@@ -1,0 +1,6 @@
+[Unit]
+Description=k3d-manager independent heartbeat probes
+
+[Service]
+Type=oneshot
+ExecStart="{{PYTHON3}}" "{{K3DM_HEARTBEAT_BIN}}" --config "{{K3DM_HEARTBEAT_CONFIG}}"

@@ -14,7 +14,7 @@ import pytest
 ROOT = Path(__file__).parents[3]
 DASHBOARD = Path(os.environ.get(
     "BUG_DASHBOARD_PATH", ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"))
-GUIDE = ROOT / "docs/guides/grafana-dashboards.md"
+GUIDE = ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md"
 PROMETHEUS_IMAGE = "prom/prometheus:v3.1.0"
 
 
@@ -227,6 +227,6 @@ def test_every_bug_dashboard_target_matches_producer_series(tmp_path):
     assert len(plan_names) == 2
     assert "dispatch_state" in plan_rows[0][2]
     assert "release=~\"$release\"" in GUIDE.read_text(), (
-        "See docs/guides/grafana-dashboards.md: Bug Tracking panels must filter release; "
+        "See docs/guides/grafana-dashboards/k3dm-bugs.md: Bug Tracking panels must filter release; "
         "release_order is only for sorting."
     )

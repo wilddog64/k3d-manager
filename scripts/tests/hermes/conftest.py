@@ -25,5 +25,6 @@ def _no_live_pushgateway(monkeypatch):
     Pushgateway URL at a closed local port; tests that check the URL set their own."""
     for name in ("K3DM_VECTORDB_PUSHGATEWAY_URL", "K3DM_DISK_PUSHGATEWAY_URL",
                  "K3DM_PUSHGATEWAY_URL", "K3DM_KINE_PUSHGATEWAY_URL",
-                 "K3DM_PR_CHECKS_PUSHGATEWAY_URL", "K3DM_CNI_IPAM_PUSHGATEWAY_URL"):
+                 "K3DM_PR_CHECKS_PUSHGATEWAY_URL", "K3DM_CNI_IPAM_PUSHGATEWAY_URL",
+                 "K3DM_ORBSTACK_PUSHGATEWAY_URL"):
         monkeypatch.setenv(name, "http://127.0.0.1:9")

@@ -18,6 +18,8 @@ fi
 if [ "${1:-}" = bootstrap ]; then
   count=$(grep -c '^bootstrap ' "$STUB_CALLS")
   if [ "$count" -le "${BOOTSTRAP_FAIL_COUNT:-0}" ]; then
+    printf '%s\n' 'Bootstrap failed: 5: Input/output error' >&2
+    printf '%s\n' 'Try re-running the command as root for richer errors.' >&2
     exit 5
   fi
 fi
@@ -73,6 +75,17 @@ _run_restart_webhook() {
   [[ "${output}" == *'[restart-webhook] reloaded LaunchAgent definition'* ]]
 }
 
+@test "restart-webhook preserves bootstrap errors without suggesting root for a user agent" {
+  _restart_webhook_stubs
+  BOOTSTRAP_FAIL_COUNT=1
+  run --separate-stderr _run_restart_webhook
+  [ "${status}" -eq 0 ]
+  [[ "${stderr}" == *'Bootstrap failed: 5: Input/output error'* ]]
+  [[ "${stderr}" != *'Try re-running the command as root'* ]]
+  [ "$(grep -c '^bootstrap ' "${STUB_CALLS}")" -eq 2 ]
+  [[ "${output}" == *'[restart-webhook] reloaded LaunchAgent definition'* ]]
+}
+
 @test "restart-webhook fails after five bootstrap attempts and skips cloud bridge" {
   _restart_webhook_stubs
   BOOTSTRAP_FAIL_COUNT=5
@@ -80,6 +93,8 @@ _run_restart_webhook() {
   [ "${status}" -ne 0 ]
   [ "$(grep -c '^bootstrap ' "${STUB_CALLS}")" -eq 5 ]
   [[ "${stderr}" == *'[restart-webhook] ERROR: bootstrap failed after 5 attempts'* ]]
+  [[ "${stderr}" == *'Bootstrap failed: 5: Input/output error'* ]]
+  [[ "${stderr}" != *'Try re-running the command as root'* ]]
   if grep -q '^kickstart .*com.k3d-manager.cloud-bridge' "${STUB_CALLS}"; then
     return 1
   fi

@@ -1,11 +1,31 @@
 # Codex dispatch
 
+For component relationships, trust boundaries, task lifecycle, and Mermaid diagrams, see the [Codex Dispatch architecture](../architecture/codex-dispatch.md).
+
 `bin/k3dm-codex-dispatch` gives each spec a separate worktree and task branch. Run it from a clean, pushed release branch:
 
 ```bash
 make codex-dispatch SPEC=docs/plans/v1.43.0-example.md
 make codex-status
 ```
+
+Assign the primary coordinator explicitly when dispatching. The worker identity remains
+independent; this example records Codex as both coordinator and implementation worker:
+
+```bash
+make codex-dispatch SPEC=docs/plans/v1.43.0-example.md PRIMARY_COORDINATOR=openai/gpt-6-luna
+```
+
+An omitted primary assignment is recorded as `unknown`. To append a later coordinator handoff,
+record the acting identity and a bounded reason explicitly:
+
+```bash
+make codex-handoff SLUG=example ACTING_COORDINATOR=openai/gpt-6-luna HANDOFF_REASON=manual
+```
+
+`HANDOFF_REASON=quota_exhausted` is an operator declaration; the dispatcher does not detect or
+infer provider quota exhaustion. `HANDOFF_PROVENANCE` accepts `declared` or `runtime-reported`.
+Handoff events preserve the first primary assignment and do not count as verification.
 
 After a release PR merges, record its merge time once in the dispatch ledger (the command makes no network call):
 
@@ -49,6 +69,16 @@ with one command:
 ```bash
 make codex-land-pending SLUG=example TEST="bats scripts/tests/plugins/example.bats"
 ```
+
+When the landing actor is known, pass it separately from the worker:
+
+```bash
+make codex-land-pending SLUG=example TEST="bats scripts/tests/plugins/example.bats" LANDING_ACTOR=codex LANDING_MODEL=openai/gpt-6-luna
+```
+
+Supported actor labels are `human`, `claude`, `codex`, `other_agent`, and `unknown`. An omitted
+actor stays `unknown`. The pending wrapper appends a `review_pending` event; it never creates a
+verification event. Direct legacy land events without actor metadata also remain `unknown`.
 
 It refuses unless the main checkout is on a clean release branch that is not behind `origin` and
 the task's state is `exited successfully`. Then it:
@@ -112,6 +142,12 @@ and 30d windows for the `k3dm Agent Dispatch` dashboard:
   and slug labels only on these task series, with at most 50 newest landed tasks per window; the
   exporter exposes skipped and truncated counts. The two per-spec means cover all landed tasks,
   not only the displayed rows.
+- Per spec identifies the first primary coordinator assignment, latest acting coordinator handoff,
+  and explicit landing actor independently. Missing historical identity is shown as `unknown`.
+  Primary cost is blank unless a distinct source supplies a measurement; an explicitly measured
+  zero appears as `0`. Worker tokens and API cost are never relabeled as coordinator cost. The
+  existing `Coordinator (legacy)` field keeps
+  its earlier `--coordinator` semantics.
 
 ### Independent verification and delivered cost
 
@@ -152,6 +188,15 @@ be clean and on the target branch. The dispatcher checks target movement, rebase
 test command, and fast-forwards the target. It prints the push command; it never pushes for you.
 The Agent Dispatch ledger and Per spec table identify the work repository by its origin repository
 name.
+
+Dispatch start events snapshot spec complexity from the spec as it exists at dispatch: entries in
+`## Files` and the `must`, `must_not`, and `evidence` item counts in `## Acceptance`, including live
+evidence. Land events record the landed commit and the rebased task diff's changed-file count and
+added-plus-deleted lines. Test paths are under `scripts/tests/` or named `test_*.py` / `*.bats`;
+documentation paths are under `docs/` or `memory-bank/`, plus Markdown files; remaining paths are
+code. Binary files count as changed files and contribute no lines. These are separate size measures,
+not a combined complexity score. Missing spec sections and failed measurements stay blank. Specs
+landed before this measurement shipped are not backfilled.
 
 ## agy (Gemini 4 Argon)
 

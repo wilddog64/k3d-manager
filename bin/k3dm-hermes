@@ -4,6 +4,7 @@
 import json
 import os
 import random
+import re
 import secrets
 import subprocess
 import sys
@@ -60,6 +61,20 @@ def _save_state(path, state):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     path.write_text(json.dumps(state, sort_keys=True))
     path.chmod(0o600)
+
+
+def _write_heartbeat_marker(timestamp):
+    """Publish a private completed-cycle timestamp without failing Hermes."""
+    try:
+        marker = Path(os.environ.get("K3DM_HERMES_HEARTBEAT_MARKER",
+                                    str(Path.home() / ".k3dm/hermes/heartbeat.timestamp")))
+        marker.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = marker.with_name(marker.name + f".{os.getpid()}.tmp")
+        temporary.write_text(f"{timestamp:.3f}\n")
+        temporary.chmod(0o600)
+        os.replace(temporary, marker)
+    except OSError as error:
+        print(f"Hermes completion marker skipped (non-fatal): {type(error).__name__}", file=sys.stderr)
 
 
 def _http_json(url, headers, timeout=None):
@@ -565,6 +580,23 @@ def _push_index_metrics(metrics):
         print(f"vectordb index metrics push skipped (non-fatal): {exc}", file=sys.stderr)
 
 
+def _maybe_probe_retrieval(state, ref, now):
+    """Run one advisory retrieval probe per day; failures never affect indexing or the tick."""
+    try:
+        last_attempt = float(state.get("retrieval_probe_last_attempt", 0) or 0)
+    except (TypeError, ValueError):
+        last_attempt = 0
+    if now - last_attempt <= 86400:
+        return
+    state["retrieval_probe_last_attempt"] = now
+    try:
+        from hermes import retrieval_eval
+        retrieval_eval.probe(ROOT, ref=ref)
+    except Exception as exc:
+        detail = " ".join(str(exc).split()) or type(exc).__name__
+        print(f"vectordb retrieval probe skipped: {detail}", file=sys.stderr)
+
+
 def _push_hermes_heartbeat():
     """Publish the time of the most recent Hermes poll, without affecting the poll."""
     body = f"k3dm_hermes_last_tick_timestamp_seconds {time.time()}\n".encode()
@@ -596,8 +628,13 @@ def _refresh_index(state, now=None):
     try:
         ref, branch = _index_ref()
         state["index_ref"] = ref
+        fetch_env = os.environ.copy()
+        if sys.platform == "darwin" and "GIT_SSH_COMMAND" not in fetch_env:
+            fetch_env["GIT_SSH_COMMAND"] = (
+                "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
         fetched = subprocess.run(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT,
-                                 capture_output=True, text=True, timeout=60, check=False)
+                                 capture_output=True, text=True, timeout=60, check=False,
+                                 env=fetch_env)
         if fetched.returncode != 0:
             raise RuntimeError(f"git fetch failed: {(fetched.stderr or '').strip()}")
         paused_until = float(state.get("index_paused_until", 0) or 0)
@@ -665,6 +702,8 @@ def _refresh_index(state, now=None):
         print(f"vectordb index refresh skipped: {exc}", file=sys.stderr)
     finally:
         metrics["duration"] = time.monotonic() - started
+        if metrics["result"] in ("success", "noop"):
+            _maybe_probe_retrieval(state, state.get("index_ref"), now)
         _push_index_metrics(metrics)
 
 
@@ -694,6 +733,43 @@ def _publish_orbstack_metrics(state, now):
                        capture_output=True, text=True, timeout=120, check=False)
     except Exception as exc:
         print(f"OrbStack metrics publish skipped: {exc}", file=sys.stderr)
+
+
+def _orbstack_notice(state, relay):
+    """Report a newly available version and the latest coordinated-upgrade result."""
+    base = os.environ.get("K3DM_ORBSTACK_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+    try:
+        with urllib.request.urlopen(f"{base}/metrics", timeout=5) as response:
+            body = response.read().decode()
+        version = re.search(r'^k3dm_orbstack_info\{version="([^"\\]+)"\} 1$', body, re.M)
+        available = re.search(r'^k3dm_orbstack_update_available 1(?:\.0+)?$', body, re.M)
+        if version:
+            state["orbstack_running_version"] = version.group(1)
+        if version and available:
+            check = subprocess.run(["orbctl", "update", "--check"], capture_output=True,
+                                   text=True, timeout=60, check=False)
+            update = re.search(r"(?:available|update to|version)\s*[:=]?\s*v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)",
+                               check.stdout + "\n" + check.stderr, re.I)
+            new_version = update.group(1) if update else None
+            announced = set(state.get("orbstack_notice_versions", []))
+            if check.returncode == 3 and new_version and new_version not in announced:
+                post_summary(relay, f"OrbStack {new_version} is available (running {version.group(1)}); installing it stops the hub. Run `make orbstack-upgrade` in a planned window.")
+                announced.add(new_version)
+                state["orbstack_notice_versions"] = sorted(announced)
+        if re.search(r'^k3dm_orbstack_upgrade_last_success 1(?:\.0+)?$', body, re.M):
+            stamp = re.search(r'^k3dm_orbstack_upgrade_last_timestamp_seconds ([0-9.]+)$', body, re.M)
+            key = stamp.group(1) if stamp else "unknown"
+            if state.get("orbstack_upgrade_notice") != key:
+                post_summary(relay, "OrbStack coordinated upgrade completed successfully; hub recovery checks passed.")
+                state["orbstack_upgrade_notice"] = key
+        elif re.search(r'^k3dm_orbstack_upgrade_last_success 0(?:\.0+)?$', body, re.M):
+            stamp = re.search(r'^k3dm_orbstack_upgrade_last_timestamp_seconds ([0-9.]+)$', body, re.M)
+            key = stamp.group(1) if stamp else "unknown"
+            if state.get("orbstack_upgrade_notice") != key:
+                post_summary(relay, "OrbStack coordinated upgrade completed with failed recovery checks; inspect the JSON report under ~/.k3dm/orbstack-upgrade/.")
+                state["orbstack_upgrade_notice"] = key
+    except Exception as exc:
+        print(f"OrbStack notice skipped: {exc}", file=sys.stderr)
 
 
 def _publish_cni_ipam_metrics():
@@ -800,10 +876,13 @@ def _poll_cycle(state, state_path, now=None, status_runner=_status_run):
     _publish_health_metrics(state.get("index_ref"))
     _publish_disk_metrics()
     _publish_orbstack_metrics(state, now)
+    _orbstack_notice(state, relay)
     _publish_cni_ipam_metrics()
     _publish_pr_checks()
     _schedule_e2e(state)
+    state["heartbeat_last_completed_cycle"] = time.time()
     _save_state(state_path, state)
+    _write_heartbeat_marker(state["heartbeat_last_completed_cycle"])
     print(json.dumps({"records": records, "event": event, "approvals": approvals,
                       "pages": pages}))
     return 0

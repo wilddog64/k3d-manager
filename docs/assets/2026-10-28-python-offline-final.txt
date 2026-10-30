@@ -1,0 +1,178 @@
+[make] python3 scripts/tests/bin/webhook_agent.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.001s
+
+OK
+[make] python3 scripts/tests/bin/webhook_lifecycle.py
+............2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3db make=fix-list status=failed rc=1
+.2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3d9 make=fix-list status=success rc=0
+.2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3d5 make=fix-list status=success rc=0
+.2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3d4 make=app-cve-scan CRONJOB=app-cve-scan status=success rc=0
+.2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3da make=fix-list status=success rc=0
+.2026-10-28T21:59:23Z INFO webhook.lifecycle job=a1b2c3d8 make=fix-list status=failed rc=124
+..2026-10-28T21:59:24Z INFO webhook.lifecycle job=a1b2c3e0 make=test-all status=success rc=0
+.2026-10-28T21:59:24Z INFO webhook.lifecycle job=a1b2c3d6 make=test-all status=success rc=0
+.
+----------------------------------------------------------------------
+Ran 21 tests in 34.323s
+
+OK
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+[make] python3 scripts/tests/bin/webhook_make_targets.py
+............................................
+----------------------------------------------------------------------
+Ran 44 tests in 0.008s
+
+OK
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+[make] python3 scripts/tests/bin/webhook_policy.py
+...........................
+----------------------------------------------------------------------
+Ran 27 tests in 0.004s
+
+OK
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+[make] python3 scripts/tests/bin/webhook_redaction.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+[make] python3 scripts/tests/bin/webhook_request_hardening.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+[tripwire] blocked 2 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+[make] python3 scripts/tests/bin/webhook_status.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+[make] pytest (pytest suites)
+============================= test session starts ==============================
+platform darwin -- Python 3.13.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/cliang/src/gitrepo/personal/k3d-manager
+collected 1663 items
+
+scripts/tests/hermes/test_alert_delivery.py ........                     [  0%]
+scripts/tests/hermes/test_app_health.py .............                    [  1%]
+scripts/tests/hermes/test_approvals.py .............                     [  2%]
+scripts/tests/hermes/test_audit.py ..............                        [  2%]
+scripts/tests/hermes/test_e2e_bugs.py ...........                        [  3%]
+scripts/tests/hermes/test_e2e_corpus.py ............................     [  5%]
+scripts/tests/hermes/test_e2e_schedule.py ....                           [  5%]
+scripts/tests/hermes/test_e2e_triage.py ....                             [  5%]
+scripts/tests/hermes/test_hermes.py .................................... [  7%]
+..................................................                       [ 10%]
+scripts/tests/hermes/test_pager.py .............                         [ 11%]
+scripts/tests/hermes/test_pr_checks.py ....                              [ 11%]
+scripts/tests/hermes/test_preflight.py ......                            [ 12%]
+scripts/tests/hermes/test_publish_status.py .........                    [ 12%]
+scripts/tests/hermes/test_repairs.py ................................... [ 14%]
+..                                                                       [ 15%]
+scripts/tests/hermes/test_status_triage.py ...                           [ 15%]
+scripts/tests/hermes/test_superseded_jobs.py ....                        [ 15%]
+scripts/tests/hermes/test_vectordb_sensor.py ....................        [ 16%]
+scripts/tests/bin/test_ask_docs.py ..................................... [ 18%]
+......                                                                   [ 19%]
+scripts/tests/bin/test_bug_count.py .................................... [ 21%]
+..                                                                       [ 21%]
+scripts/tests/bin/test_bug_tally.py ............                         [ 22%]
+scripts/tests/bin/test_check_bug_evidence.py ............                [ 22%]
+scripts/tests/bin/test_check_doc_links.py ........................       [ 24%]
+scripts/tests/bin/test_cloud_artifacts.py ...........                    [ 25%]
+scripts/tests/bin/test_cloud_bridge.py ................................. [ 27%]
+......................................................................   [ 31%]
+scripts/tests/bin/test_cloudflare_posture.py ........................... [ 32%]
+........................................................................ [ 37%]
+......................................................................   [ 41%]
+scripts/tests/bin/test_cni_ipam_dashboard.py ..........                  [ 42%]
+scripts/tests/bin/test_cni_ipam_metrics.py ........                      [ 42%]
+scripts/tests/bin/test_cni_ipam_rules.py ..                              [ 42%]
+scripts/tests/bin/test_cve_scan_coverage.py ......                       [ 42%]
+scripts/tests/bin/test_dashboard_queries.py .                            [ 43%]
+scripts/tests/bin/test_describe_pod_env_masking.py .....                 [ 43%]
+scripts/tests/bin/test_diagnostics_all_pods.py ............              [ 44%]
+scripts/tests/bin/test_diagnostics_job_id.py ...                         [ 44%]
+scripts/tests/bin/test_disk_metrics.py .......                           [ 44%]
+scripts/tests/bin/test_dispatch_logs.py ..........                       [ 45%]
+scripts/tests/bin/test_dispatch_metrics.py ............................. [ 47%]
+........................................................................ [ 51%]
+..................................................                       [ 54%]
+scripts/tests/bin/test_embed_cache_cli.py ..........................     [ 55%]
+scripts/tests/bin/test_find_similar_docs.py .............s               [ 56%]
+scripts/tests/bin/test_harvest_job_failures.py .                         [ 56%]
+scripts/tests/bin/test_heartbeat.py .............................        [ 58%]
+scripts/tests/bin/test_hermetic_guard.py s.............                  [ 59%]
+scripts/tests/bin/test_host_disk_rules.py ..                             [ 59%]
+scripts/tests/bin/test_index_docs.py .........................           [ 61%]
+scripts/tests/bin/test_job_output.py .........                           [ 61%]
+scripts/tests/bin/test_k3dm_test_metrics.py ............................ [ 63%]
+                                                                         [ 63%]
+scripts/tests/bin/test_live_evidence_acceptance.py ..................... [ 64%]
+........................                                                 [ 65%]
+scripts/tests/bin/test_make_job_output.py ......                         [ 66%]
+scripts/tests/bin/test_open_for_acceptance.py ............               [ 67%]
+scripts/tests/bin/test_orbstack_metrics.py .........                     [ 67%]
+scripts/tests/bin/test_prior_art.py .................................... [ 69%]
+.....................................................                    [ 72%]
+scripts/tests/bin/test_redact.py ...........................             [ 74%]
+scripts/tests/bin/test_release_milestones_drift.py .                     [ 74%]
+scripts/tests/bin/test_restart_cloud_bridge.py ....                      [ 74%]
+scripts/tests/bin/test_retrieval_probe.py .............                  [ 75%]
+scripts/tests/bin/test_role_capabilities.py ............................ [ 77%]
+........................                                                 [ 78%]
+scripts/tests/bin/test_slack_bot_post_logging.py .....                   [ 79%]
+scripts/tests/bin/test_smoke_logins.py ..................                [ 80%]
+scripts/tests/bin/test_smoke_prometheus_auth.py .......                  [ 80%]
+scripts/tests/bin/test_test_tripwire.py .............                    [ 81%]
+scripts/tests/bin/test_vectordb_bug_metrics.py ......................... [ 82%]
+........................................................................ [ 87%]
+..............                                                           [ 88%]
+scripts/tests/bin/test_vectordb_drift.py ......                          [ 88%]
+scripts/tests/bin/test_webhook_ai_fallback.py .........                  [ 88%]
+scripts/tests/bin/test_webhook_analyze_routing.py ......                 [ 89%]
+scripts/tests/bin/test_webhook_ask_claude_argv.py .....                  [ 89%]
+scripts/tests/bin/test_webhook_ask_delivery.py .........                 [ 90%]
+scripts/tests/bin/test_webhook_ask_docs_thread.py ......                 [ 90%]
+scripts/tests/bin/test_webhook_cluster_status_thread.py ................ [ 91%]
+............                                                             [ 92%]
+scripts/tests/bin/test_webhook_doctor.py ............................... [ 94%]
+....                                                                     [ 94%]
+scripts/tests/bin/test_webhook_live_provider.py ......                   [ 94%]
+scripts/tests/bin/test_webhook_log.py ...                                [ 94%]
+scripts/tests/bin/test_webhook_pushgateway_provider.py .......           [ 95%]
+scripts/tests/bin/test_webhook_ssh_failure_analysis.py .                 [ 95%]
+scripts/tests/bin/test_webhook_stale_cleanup.py ...............          [ 96%]
+scripts/tests/bin/test_webhook_thread_actor.py .....                     [ 96%]
+scripts/tests/bin/test_webhook_thread_broadcast.py ..............        [ 97%]
+scripts/tests/bin/test_webhook_thread_dispatch.py ...................... [ 98%]
+......................                                                   [100%]
+
+---------------------- hermetic violations (report mode) -----------------------
+scripts/tests/bin/test_hermetic_guard.py::test_report_mode_records_violation: security (executable)
+================= 1661 passed, 2 skipped in 197.25s (0:03:17) ==================
+[tripwire] blocked 8 call(s) to host tools; none reached a real binary:
+      1 security	find-generic-password -s k3dm-slack-signing-secret -a k3dm -w
+      1 security	find-generic-password -s k3dm-slack-role-map -a k3dm -w
+      1 kubectl	--context k3d-k3d-cluster -n monitoring get jobs -o json --request-timeout=10s
+      1 kubectl	--context k3d-k3d-cluster -n monitoring get cronjobs -o json --request-timeout=10s
+      1 kubectl	--context k3d-k3d-cluster -n identity get jobs -o json --request-timeout=10s
+      1 kubectl	--context k3d-k3d-cluster -n identity get cronjobs -o json --request-timeout=10s
+      1 kubectl	--context k3d-k3d-cluster -n cicd get jobs -o json --request-timeout=10s
+      1 kubectl	--context k3d-k3d-cluster -n cicd get cronjobs -o json --request-timeout=10s

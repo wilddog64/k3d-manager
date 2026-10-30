@@ -525,6 +525,8 @@ def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     assert 'k3dm_dispatch_objectively_rejected_codex_tokens{window="30d"} 100' in output
     assert 'k3dm_dispatch_task_run_codex_tokens{window="30d",version="9.9.9",slug="attempt",run="2",repo="k3d-manager"} 60' in output
     assert 'evidence="land_refused.tests"' in output and 'evidence="land-test.log"' in output
+    refused = next(line for line in output.splitlines() if 'evidence="land_refused.tests"' in line)
+    assert 'loki_url="/d/k3dm-agent-run-log?var-version=9.9.9&var-slug=attempt&var-run=1&from=now-30d&to=now"' in refused
 
 
 @pytest.mark.parametrize(("log_text", "expected"), [
@@ -547,6 +549,7 @@ def test_run_outcome_exports_parsed_result_and_absolute_log_path(tmp_path, monke
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
     assert f'evidence_summary="{expected}"' in line
     assert 'evidence_path="9.9.9/attempt.run/land-test.log"' in line
+    assert 'loki_url="/d/k3dm-agent-run-log?var-version=9.9.9&var-slug=attempt&var-run=1&from=now-30d&to=now"' in line
     assert str(tmp_path) not in line
     assert 'evidence="land-test.log"' in line
 
@@ -558,9 +561,38 @@ def test_run_outcome_missing_log_and_codex_exit_keep_metrics_valid(tmp_path):
         event(now - 10, "codex_exit", "missing", run=1, exit=7, tokens=10),
     ], 0, now, repo_root=tmp_path)
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
-    assert 'evidence_summary="exit 7"' in line
+    # agent-audit: allow assert-removed replace exact summary with exit plus local-only explanation
+    assert 'evidence_summary="exit 7; local only (not shipped)"' in line
     assert line.split('evidence_path="', 1)[1].split('"', 1)[0].endswith("/missing.run/codex.log")
     assert "\\n" not in line and "\\" not in line and line.count('"') % 2 == 0
+
+
+def test_failed_startup_exit127_is_local_only_and_retains_codex_log_path(tmp_path, monkeypatch):
+    # Keep path expectations independent of whether the runner TMPDIR is under the operator home.
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "startup", run=1),
+        event(now - 10, "codex_exit", "startup", run=1, exit=127, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'outcome="failed"' in line and 'evidence="codex_exit.exit"' in line
+    assert 'evidence_summary="exit 127; local only (not shipped)"' in line
+    assert 'evidence_path="9.9.9/startup.run/codex.log"' in line
+    assert 'loki_url=' not in line
+    assert str(tmp_path) not in line
+
+
+def test_legacy_unknown_run_evidence_does_not_claim_a_log(tmp_path):
+    now = int(time.time())
+    output = dispatch_metrics.render([
+        event(now - 20, "start", "legacy", run=1),
+        event(now - 10, "codex_exit", "legacy", run=1, exit=0, tokens=10),
+    ], 0, now, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert 'evidence="none"' in line and 'evidence_summary="none"' in line
+    assert 'evidence_path=""' in line
+    assert 'loki_url=' not in line
 
 
 def test_accepted_missing_log_is_unknown_and_render_succeeds(tmp_path):
@@ -736,7 +768,7 @@ def test_time_window_output_matches_pre_release_scope_golden():
               "k3dm_dispatch_elapsed_minutes_per_landed", "k3dm_dispatch_codex_minutes_per_landed",
               "k3dm_dispatch_rework_landed", "k3dm_dispatch_rework_ratio", "k3dm_dispatch_task_")
     actual = "\n".join(line for line in output.splitlines() if line.startswith(legacy) and
-                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_")) and
+                        not line.startswith(("k3dm_dispatch_task_run_", "k3dm_dispatch_task_agent_", "k3dm_dispatch_task_post_exit_land_", "k3dm_dispatch_task_landing_actor", "k3dm_dispatch_task_handoff_", "k3dm_dispatch_task_primary_coordinator_cost_")) and
                         'window="' in line and any(f'window="{window}"' in line for window in ("1d", "7d", "30d")))
     expected = '''k3dm_dispatch_landed{window="1d"} 1
 k3dm_dispatch_land_attempts{window="1d",result="landed"} 1
@@ -918,7 +950,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 62  # agent-audit: allow assert-removed Codex and agy activity rows plus identity, latency and intervention series add nineteen $window expressions; Claude tokens by kind and cost by kind add two more; release duration adds two
+    assert sum("$window" in expr for expr in expressions) == 78  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1819,16 +1851,79 @@ def test_model_identity_exports_worker_and_coordinator_from_latest_start():
     assert 'vendor="anthropic",model="claude-opus-5-5",source="runtime",status="runtime_reported"' in coordinator[0]
 
 
+def test_repeated_handoffs_preserve_claude_primary_and_human_landing_stays_review_pending(tmp_path):
+    spec = tmp_path / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("**Status:** LANDED — Claude review pending\n\n## Acceptance\n\n```yaml\nevidence:\n  - kind: offline\n```\n")
+    rows = [
+        event(1, "start", "handoff", agent="codex", spec="docs/plans/v9.9.9-demo.md",
+              primary_coordinator_identity={"vendor": "anthropic", "model": "claude-opus-5-5", "source": "declared", "status": "declared"},
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "explicit", "status": "selected"}),
+        event(2, "handoff", "handoff", acting_coordinator_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "declared", "status": "declared"}, handoff_reason="quota_exhausted"),
+        event(3, "handoff", "handoff", acting_coordinator_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "declared", "status": "declared"}, handoff_reason="manual"),
+        event(4, "resume", "handoff", primary_coordinator_identity={"vendor": "openai", "model": "wrong-later-primary", "source": "declared", "status": "declared"}),
+        event(5, "land", "handoff", landing_actor={"actor": "human", "vendor": "unknown", "model": "unknown", "source": "declared"}, review_status="pending"),
+        event(6, "review_pending", "handoff", landing_actor="human", review_status="pending"),
+    ]
+    output = dispatch_metrics.render(rows, 0, 100, repo_root=tmp_path)
+    assert 'role="primary_coordinator",vendor="anthropic",model="claude-opus-5-5"' in output
+    assert 'role="acting_coordinator",vendor="openai",model="gpt-6-luna"' in output
+    assert 'actor="human"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_landing_actor{"))
+    assert 'k3dm_dispatch_handoffs{window="1d",reason="manual"} 1' in output
+    assert 'k3dm_dispatch_handoffs{window="1d",reason="quota_exhausted"} 1' in output
+    assert 'k3dm_dispatch_task_handoff_reason' in output
+    assert 'k3dm_dispatch_delivered{window="30d"} 0' in output
+    assert 'k3dm_dispatch_awaiting_verification{window="30d"} 1' in output
+    assert not any(row.get("event") == "verify" for row in rows)
+
+
+def test_primary_cost_is_explicitly_unmeasured_not_zero():
+    output = dispatch_metrics.render([
+        event(1, "start", "cost"), event(2, "codex_exit", "cost", tokens=101), event(3, "land", "cost")
+    ], 0, 100)
+    assert 'k3dm_dispatch_task_primary_coordinator_cost_usd' not in output
+    measured = dispatch_metrics.render([
+        event(1, "start", "cost"),
+        event(1, "codex_exit", "cost", tokens=101),
+        event(2, "primary_coordinator_cost", "cost", amount_usd=0, source="runtime-reported"),
+        event(3, "land", "cost"),
+    ], 0, 100)
+    assert 'k3dm_dispatch_task_primary_coordinator_cost_usd{window="1d",version="9.9.9",slug="cost",agent="codex",repo="k3d-manager"} 0' in measured
+    assert 'state="not measured"' in output
+    assert 'state="measured"' in measured
+
+
+def test_unlisted_worker_history_collapses_duplicate_normalized_series_only():
+    rows = [
+        event(1, "start", "runtime-dedupe", agent="codex",
+              worker_identity={"vendor": "openai", "model": "unknown", "source": "inherited", "status": "unknown"}),
+        event(2, "identity", "runtime-dedupe", run=1,
+              worker_identity={"vendor": "openai", "model": "gpt-private-a", "source": "runtime", "status": "reported"}),
+        event(3, "identity", "runtime-dedupe", run=2,
+              worker_identity={"vendor": "openai", "model": "gpt-private-b", "source": "runtime", "status": "reported"}),
+        event(4, "identity", "runtime-dedupe", run=3,
+              worker_identity={"vendor": "openai", "model": "gpt-private-c", "source": "runtime", "status": "reported"}),
+        event(5, "land", "runtime-dedupe"),
+    ]
+    raw_models = [row["worker_identity"]["model"] for row in rows if row.get("event") == "identity"]
+    output = dispatch_metrics.render(rows, 0, 100)
+    history = _identity_lines(output, "worker_history")
+    assert raw_models == ["gpt-private-a", "gpt-private-b", "gpt-private-c"]
+    assert len(history) == 1 and len(set(history)) == 1
+    assert 'model="other"' in history[0]
+
+
 def test_model_identity_is_unknown_for_a_legacy_start_with_a_model_field():
     output = dispatch_metrics.render([
         event(1, "start", "legacy", agent="codex", model="gpt-5.6-luna", model_source="inherited"),
         event(2, "codex_exit", "legacy", tokens=10),
         event(3, "land", "legacy"),
     ], 0, 100)
-    for role in ("worker", "coordinator"):
+    for role in ("worker", "coordinator", "primary_coordinator"):
         lines = _identity_lines(output, role)
         assert len(lines) == 1
-        assert 'vendor="unknown",model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+        assert 'model="unknown"' in lines[0] and 'status="unknown"' in lines[0]
+    assert 'actor="unknown"' in next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_landing_actor{"))
 
 
 def test_model_identity_rejects_unbounded_label_values():
@@ -1842,6 +1937,17 @@ def test_model_identity_rejects_unbounded_label_values():
     assert len(worker) == 1
     assert 'vendor="unknown",model="unknown",source="unreported",status="unknown"' in worker[0]
     assert "evil" not in output and "acme" not in output
+
+
+def test_unlisted_but_valid_model_is_normalized_for_bounded_cardinality():
+    output = dispatch_metrics.render([
+        event(1, "start", "unlisted", primary_coordinator_identity={
+            "vendor": "openai", "model": "one-off-private-model-123", "source": "declared", "status": "declared"}),
+        event(2, "land", "unlisted"),
+    ], 0, 100)
+    primary = _identity_lines(output, "primary_coordinator")
+    assert len(primary) == 1 and 'model="other"' in primary[0]
+    assert "one-off-private-model-123" not in output
 
 
 def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
@@ -1859,10 +1965,10 @@ def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
     workers = _identity_lines(output, "worker")
     worker_history = _identity_lines(output, "worker_history")
     coordinators = _identity_lines(output, "coordinator")
-    assert len(workers) == 1 and 'model="gpt-test-2",source="runtime",status="reported"' in workers[0]
-    assert len(worker_history) == 1 and 'model="gpt-test-1",source="runtime",status="reported"' in worker_history[0]
+    assert len(workers) == 1 and 'model="other",source="runtime",status="reported"' in workers[0]
+    assert len(worker_history) == 1 and 'model="other",source="runtime",status="reported"' in worker_history[0]
     assert len(coordinators) == 1
-    assert 'vendor="anthropic",model="claude-test",source="declared",status="declared"' in coordinators[0]
+    assert 'vendor="anthropic",model="other",source="declared",status="declared"' in coordinators[0]
 
 
 def test_invalid_runtime_identity_does_not_replace_legacy_value():
@@ -1884,10 +1990,16 @@ def test_per_spec_identity_queries_give_one_row_per_task():
     exprs = {t["refId"]: t["expr"] for t in per_spec["targets"]}
     assert 'role="worker"' in exprs["H"] and exprs["H"].startswith("max by (version, slug, repo, worker)")
     assert 'role="coordinator"' in exprs["I"] and exprs["I"].startswith("max by (version, slug, repo, coordinator)")
+    assert 'role="primary_coordinator"' in exprs["P"] and exprs["P"].startswith("max by (version, slug, repo, primary_coordinator)")
+    assert 'role="acting_coordinator"' in exprs["Q"] and exprs["Q"].startswith("max by (version, slug, repo, acting_coordinator)")
+    assert "k3dm_dispatch_task_landing_actor" in exprs["R"]
     organize = per_spec["transformations"][1]["options"]
     assert organize["excludeByName"]["Value #H"] and organize["excludeByName"]["Value #I"]
     assert organize["renameByName"]["worker"] == "Worker"
-    assert organize["renameByName"]["coordinator"] == "Coordinator"
+    assert organize["renameByName"]["coordinator"] == "Coordinator (legacy)"
+    assert organize["renameByName"]["primary_coordinator"] == "Primary coordinator"
+    assert organize["renameByName"]["acting_coordinator"] == "Acting coordinator"
+    assert organize["renameByName"]["landed_by"] == "Landed by"
 
 
 def test_claude_daily_tokens_by_kind_partition_local_dates_and_filter_records():
@@ -1954,6 +2066,85 @@ def test_claude_non_numeric_usage_does_not_break_render_or_emit_invalid_values()
     assert all(not line.rstrip().endswith((" nan", " inf", " -inf")) for line in claude_lines)
 
 
+def test_spec_stats_counts_files_and_acceptance_yaml(tmp_path):
+    spec = tmp_path / "spec.md"
+    spec.write_text(dedent("""\
+        ## Files
+        - `one.py`
+        - `two.py`
+        | File |
+        |---|
+        | `three.py` |
+
+        ## Acceptance
+        ```yaml
+        must:
+          - id: M1
+          - id: M2
+          - id: M3
+        must_not:
+          - id: N1
+          - id: N2
+        evidence:
+          - id: E1
+            kind: offline
+          - id: E2
+            kind: live
+        ```
+        """))
+    assert dispatch_metrics._spec_stats(spec) == {
+        "files": 3, "must": 3, "must_not": 2, "evidence": 2, "live_evidence": 1}
+    no_acceptance = tmp_path / "no-acceptance.md"
+    no_acceptance.write_text("## Files\n| File |\n|---|\n| `x.py` |\n")
+    assert dispatch_metrics._spec_stats(no_acceptance) == {
+        "files": 1, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+
+
+def test_complexity_series_omit_unmeasured_and_totals_cover_all_tasks():
+    now = 100
+    events = []
+    for index in range(dispatch_metrics.TASK_CAP + 1):
+        slug = f"task-{index:03}"
+        events.extend([
+            event(index + 1, "start", slug, version="v1.0.0", spec_stats={"files": 2, "must": 1, "must_not": 1}),
+            event(index + 2, "land", slug, version="v1.0.0", change={"files": 3, "code": 2, "tests": 3, "docs": 4}),
+        ])
+    events.extend([event(200, "start", "legacy", version="v1.0.0"), event(201, "land", "legacy", version="v1.0.0")])
+    output = dispatch_metrics.render(events, 0, now)
+    # The newest 50 displayed tasks include the unmeasured legacy task, so only 49 have change rows.
+    assert output.count('k3dm_dispatch_task_change_files{window="v1.0.0"') == dispatch_metrics.TASK_CAP - 1
+    assert 'k3dm_dispatch_change_files_total{window="v1.0.0"} 153' in output
+    assert 'k3dm_dispatch_change_lines_total{window="v1.0.0",kind="code"} 102' in output
+    assert 'k3dm_dispatch_change_lines_median{window="v1.0.0"} 9' in output
+    assert 'k3dm_dispatch_spec_acceptance_items_total{window="v1.0.0"} 102' in output
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="change"} 51' in output
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="spec"} 51' in output
+
+
+def test_null_spec_stats_are_not_counted_as_measured():
+    null_stats = {"files": None, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+    events = [
+        event(1, "start", "old-spec", version="v1.0.0", spec_stats=null_stats),
+        event(2, "land", "old-spec", version="v1.0.0"),
+        event(3, "start", "new-spec", version="v1.0.0", spec_stats={"files": 2, "must": 1, "must_not": 1}),
+        event(4, "land", "new-spec", version="v1.0.0"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_complexity_measured_tasks{window="v1.0.0",measure="spec"} 1' in output
+    assert 'slug="old-spec"' not in "".join(line for line in output.splitlines() if "task_spec_" in line)
+
+
+def test_dashboard_complexity_columns_and_stat_queries():
+    dashboard = load_dispatch_dashboard()
+    per_spec = next(panel for panel in dashboard["panels"] if panel.get("title") == "Per spec")
+    assert {"Spec files", "Acceptance items", "Files changed", "Lines changed", "Test lines"} <= set(
+        per_spec["transformations"][1]["options"]["renameByName"].values())
+    assert {"Spec files", "Acceptance items", "Files changed", "Lines changed", "Test lines"} <= set(
+        per_spec["options"]["footer"]["fields"])
+    stat_titles = {panel.get("title") for panel in dashboard["panels"] if panel.get("type") == "stat"}
+    assert {"Lines changed total", "Median lines / spec", "Acceptance items total", "Measured"} <= stat_titles
+
+
 def test_claude_existing_series_keep_their_fixture_output():
     now = 1_800_000_000
     record = _claude_message("stable", now, input=11, cache_5m=13, cache_1h=17, cache_read=19, output=23)
@@ -1969,3 +2160,57 @@ def test_claude_existing_series_keep_their_fixture_output():
                                             ("cache_read", "19.0"), ("output", "23.0")))
     expected.append('k3dm_dispatch_claude_daily_tokens{date="2027-01-15",model="m"} 83')
     assert existing == expected
+
+
+def test_partial_identity_keeps_recorded_vendor_without_inventing_model():
+    output = dispatch_metrics.render([
+        event(1, "start", "partial-identity", agent="codex",
+              coordinator_identity={"vendor": "openai", "model": "unknown",
+                                    "source": "declared", "status": "declared"}),
+        event(2, "codex_exit", "partial-identity", exit=0, tokens=10),
+        event(3, "land", "partial-identity"),
+    ], 0, 100)
+    lines = _identity_lines(output, "coordinator")
+    assert len(lines) == 1
+    assert 'vendor="openai"' in lines[0] and 'model="unknown"' in lines[0]
+    assert 'display="openai/model not recorded (declared)"' in lines[0]
+    assert 'display="unknown"' in _identity_lines(output, "primary_coordinator")[0]
+
+
+def test_run_spec_link_uses_recorded_issue_instead_of_custom_slug(tmp_path):
+    output = dispatch_metrics.render([
+        event(1, "start", "vectordb-retrieval-key-cache", version="v1.43.9", run=1,
+              spec="docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md"),
+        event(2, "codex_exit", "vectordb-retrieval-key-cache", version="v1.43.9", run=1, exit=127),
+        event(3, "resume", "vectordb-retrieval-key-cache", version="v1.43.9", run=2),
+        event(4, "codex_exit", "vectordb-retrieval-key-cache", version="v1.43.9", run=2, exit=0),
+    ], 0, 100, repo_root=tmp_path)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{")]
+    expected = ('spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/'
+                'docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md"')
+    assert len(lines) > 1 and all(expected in line for line in lines)
+    assert not any('spec_url="' in line and 'docs/plans/v1.43.9-vectordb-retrieval-key-cache.md' in line
+                   for line in lines)
+
+
+@pytest.mark.parametrize("spec", [None, 9, "", "../private.md", "docs/issues/../private.md",
+                                  'docs/issues/unsafe".md', "docs/issues/unsafe\n.md", "/tmp/spec.md"])
+def test_run_spec_link_missing_or_unsafe_path_uses_release_branch(tmp_path, spec):
+    output = dispatch_metrics.render([
+        event(1, "start", "unrelated-slug", version="v1.43.9", run=1, spec=spec),
+        event(2, "codex_exit", "unrelated-slug", version="v1.43.9", run=1, exit=127),
+    ], 0, 100, repo_root=tmp_path)
+    lines = [line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{")]
+    assert lines and all('spec_url="https://github.com/wilddog64/k3d-manager/tree/k3d-manager-v1.43.9"'
+                         in line for line in lines)
+
+
+@pytest.mark.parametrize("directory", ["plans", "bugs", "issues"])
+def test_run_spec_link_accepts_recorded_doc_kinds(tmp_path, directory):
+    spec = f"docs/{directory}/different-from-slug.md"
+    output = dispatch_metrics.render([
+        event(1, "start", "custom-slug", version="v1.43.9", run=1, spec=spec),
+        event(2, "codex_exit", "custom-slug", version="v1.43.9", run=1, exit=0),
+    ], 0, 100, repo_root=tmp_path)
+    line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
+    assert f'spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/{spec}"' in line

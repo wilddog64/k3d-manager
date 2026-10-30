@@ -30,6 +30,11 @@ VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
+MODEL_IDENTITY_ALLOWLIST = {
+    "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
+    "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
+    "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+}
 
 
 def _repo_root():
@@ -42,6 +47,35 @@ def _prices(path):
         return data.get("models", {}), data.get("subscriptions_usd_per_month", {}), data.get("checked"), data.get("claude_models", {})
     except (OSError, ValueError, TypeError):
         return {}, {}, None, {}
+
+
+def _spec_stats(path):
+    """Count declared spec scope and acceptance items without affecting dispatch."""
+    result = {"files": None, "must": None, "must_not": None, "evidence": None, "live_evidence": None}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError, TypeError):
+        return result
+    match = re.search(r"(?ms)^## Files\s*\n(.*?)(?=^## |\Z)", text)
+    if match:
+        body = match.group(1)
+        bullets = re.findall(r"(?m)^\s*[-*+]\s+", body)
+        rows = [line for line in body.splitlines() if line.strip().startswith("|")]
+        table_rows = [line for line in rows if not re.match(r"\s*\|\s*:?-{2,}", line)]
+        table_count = max(0, len(table_rows) - 1)
+        result["files"] = len(bullets) + table_count
+    acceptance = re.search(r"(?ms)^## Acceptance\s*\n```ya?ml\s*\n(.*?)^```", text)
+    if acceptance:
+        body = acceptance.group(1)
+        for key in ("must", "must_not", "evidence"):
+            section = re.search(rf"(?ms)^{key}:\s*\n(.*?)(?=^[A-Za-z_][A-Za-z0-9_]*:|\Z)", body)
+            if section:
+                items = re.findall(r"(?m)^\s+-\s+id\s*:", section.group(1))
+                result[key] = len(items)
+        if result["evidence"] is not None:
+            evidence_section = re.search(r"(?ms)^evidence:\s*\n(.*?)(?=^[A-Za-z_][A-Za-z0-9_]*:|\Z)", body)
+            result["live_evidence"] = len(re.findall(r"(?m)^\s+kind:\s*live\s*$", evidence_section.group(1))) if evidence_section else 0
+    return result
 
 
 def _claude_rollup(projects_dir, cache_path, context_out=None):
@@ -530,6 +564,7 @@ def _evidence_details(version, slug, evidence):
             summary = "; ".join(summaries) if summaries else "unknown"
     elif evidence == "codex_exit.exit":
         path = _display_path(run_dir / "codex.log")
+        summary = "local only (not shipped)"
     return summary, path
 
 
@@ -662,6 +697,27 @@ def _task_metrics(task_events, land_event, prices=None):
                              and event["coordinator_identity"].get("status") == "declared"]
     coordinator_identity = declared_coordinators[-1] if declared_coordinators else (
         latest_start.get("coordinator_identity") if isinstance(latest_start.get("coordinator_identity"), dict) else {})
+    primary_assignments = [event for _, event in ordered
+                           if event.get("event") in {"start", "primary_coordinator"}
+                           and isinstance(event.get("primary_coordinator_identity"), dict)]
+    primary_identity = (primary_assignments[0].get("primary_coordinator_identity")
+                        if primary_assignments else {"vendor": "unknown", "model": "unknown", "source": "unknown", "status": "unknown"})
+    handoffs = [event for _, event in ordered if event.get("event") == "handoff"]
+    acting_identity = (handoffs[-1].get("acting_coordinator_identity") if handoffs
+                       and isinstance(handoffs[-1].get("acting_coordinator_identity"), dict)
+                       else {"vendor": "unknown", "model": "unknown", "source": "unknown", "status": "unknown"})
+    landing = land_event.get("landing_actor") if isinstance(land_event.get("landing_actor"), dict) else {}
+    landing_actor = landing.get("actor") if landing.get("actor") in {"human", "claude", "codex", "other_agent", "unknown"} else "unknown"
+    landing_identity = {"vendor": landing.get("vendor", "unknown"), "model": landing.get("model", "unknown"),
+                        "source": landing.get("source", "unknown"), "status": "declared" if landing_actor != "unknown" else "unknown"}
+    measured_coordinator_costs = [event for _, event in ordered
+                                  if event.get("event") == "primary_coordinator_cost"
+                                  and isinstance(event.get("source"), str)
+                                  and event.get("source") in {"declared", "runtime-reported"}
+                                  and isinstance(event.get("amount_usd"), (int, float))
+                                  and not isinstance(event.get("amount_usd"), bool)
+                                  and math.isfinite(event["amount_usd"]) and event["amount_usd"] >= 0]
+    primary_coordinator_cost = measured_coordinator_costs[-1]["amount_usd"] if measured_coordinator_costs else None
     elapsed = None
     if start_events:
         elapsed = land_event["ts"] - min(event["ts"] for event in start_events)
@@ -689,6 +745,13 @@ def _task_metrics(task_events, land_event, prices=None):
         "worker_identity": worker_identity,
         "worker_runtime_identities": valid_identities,
         "coordinator_identity": coordinator_identity,
+        "primary_coordinator_identity": primary_identity,
+        "acting_coordinator_identity": acting_identity,
+        "landing_actor": landing_actor,
+        "landing_identity": landing_identity,
+        "handoff_count": len(handoffs),
+        "handoff_reason": (handoffs[-1].get("handoff_reason") if handoffs and handoffs[-1].get("handoff_reason") in {"quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown"} else "unknown"),
+        "primary_coordinator_cost_usd": primary_coordinator_cost,
     }
 
 
@@ -776,6 +839,20 @@ def _live_status_commit_timestamp(repo_root, spec):
         return None
 
 
+def _run_spec_url(version, launches, launch):
+    """Link the recorded start document; resumes inherit that start's spec."""
+    start = next((event for event in reversed(launches)
+                  if event.get("event") == "start" and
+                  event.get("ts", 0) <= launch.get("ts", 0)), {})
+    spec = start.get("spec")
+    base = "https://github.com/wilddog64/k3d-manager"
+    branch = f"k3d-manager-{version}"
+    if (isinstance(spec, str) and len(spec) <= 256 and
+            re.fullmatch(r"docs/(?:plans|bugs|issues)/[A-Za-z0-9_-][A-Za-z0-9._-]*\.md", spec)):
+        return f"{base}/blob/{branch}/{spec}"
+    return f"{base}/tree/{branch}"
+
+
 def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     states = _task_states(events)
     outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unknown")}
@@ -851,12 +928,16 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 continue
             evidence_summary, evidence_path = _evidence_details(version, slug, evidence)
             if evidence == "codex_exit.exit":
-                evidence_summary = f"exit {exit_event.get('exit', 'unknown')}"
+                evidence_summary = f"exit {exit_event.get('exit', 'unknown')}; {evidence_summary}"
             outcomes[outcome] += 1
             task_rows.append({"run": run_number, "outcome": outcome, "tokens": increment,
                               "agent_tokens": increment if exit_event.get("event") == "codex_exit" else agent_token_count,
                               "evidence": evidence, "evidence_summary": evidence_summary,
-                              "evidence_path": evidence_path})
+                              "evidence_path": evidence_path,
+                              "spec_url": _run_spec_url(version, all_launches, matching_launch),
+                              "loki_url": (f"/d/k3dm-agent-run-log?var-version={version}&var-slug={slug}"
+                                           f"&var-run={run_number}&from=now-30d&to=now"
+                                           if evidence in {"land-test.log", "land_refused.tests"} else None)})
             if outcome in {"rework", "failed"} and evidence in {"land_refused.tests", "codex_exit.exit"}:
                 rejected_seen = True
                 if increment is not None:
@@ -998,7 +1079,9 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
                       task["elapsed_seconds"], task["runs"], task["api_cost_usd"], task["spec"], task["agent"],
                       task["agent_tokens"], task["agent_seconds"], repo,
                       task["worker_identity"], task["coordinator_identity"], task["post_exit_land_seconds"],
-                      task["worker_runtime_identities"]))
+                      task["worker_runtime_identities"], task["primary_coordinator_identity"],
+                      task["acting_coordinator_identity"], task["landing_identity"], task["landing_actor"],
+                      task["handoff_count"], task["handoff_reason"], task["primary_coordinator_cost_usd"]))
 
     return {
         "landed": len(landed),
@@ -1014,6 +1097,9 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
         "run_outcomes": run_outcomes,
         "rework_ratio": rework["any"] / len(landed) if landed else None,
         "tasks": tasks,
+        "handoff_reasons": {reason: sum(1 for item in selected if item.get("event") == "handoff"
+                                         and item.get("handoff_reason") == reason)
+                            for reason in ("quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown")},
     }
 
 
@@ -1137,7 +1223,10 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         labels = f'window="{window}",version="{version}",slug="{slug}",run="{row["run"]}",repo="{repo}"'
         evidence_summary = _label_value(row.get("evidence_summary", "unknown"))
         evidence_path = _label_value(row.get("evidence_path", ""), limit=512)
-        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}"}} 1')
+        loki_url = row.get("loki_url")
+        spec_url = _label_value(row["spec_url"], limit=512)
+        loki_label = f',loki_url="{_label_value(loki_url, limit=512)}"' if isinstance(loki_url, str) and loki_url else ""
+        lines.append(f'k3dm_dispatch_task_run_outcome{{{labels},outcome="{row["outcome"]}",evidence="{row["evidence"]}",evidence_summary="{evidence_summary}",evidence_path="{evidence_path}",spec_url="{spec_url}"{loki_label}}} 1')
         if type(row["tokens"]) is int:
             lines.append(f'k3dm_dispatch_task_run_codex_tokens{{{labels}}} {row["tokens"]}')
         if type(row.get("agent_tokens")) is int:
@@ -1166,6 +1255,63 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     else:
         scoped = [event for event in source_events if _normalize_version(event.get("version")) == window]
         _render_release_duration(lines, window, scoped)
+    complexity = {}
+    complexity_events = source_events if time_scope else scoped
+    for task_events in _task_states(complexity_events).values():
+        starts = [event for event in task_events if event.get("event") == "start"]
+        lands = [event for event in task_events if event.get("event") == "land"]
+        if time_scope and not any(cutoff is None or land.get("ts", 0) >= cutoff for land in lands):
+            continue
+        if not time_scope and not lands:
+            continue
+        if not starts or not lands:
+            continue
+        start = max(starts, key=lambda event: event.get("ts", 0))
+        land = max(lands, key=lambda event: event.get("ts", 0))
+        key = (land.get("version"), land.get("slug"))
+        if not isinstance(key[0], str) or not VERSION_RE.fullmatch(key[0]) or not isinstance(key[1], str) or not SLUG_RE.fullmatch(key[1]):
+            continue
+        complexity[key] = (start.get("spec_stats"), land.get("change"))
+    measured_specs = []
+    measured_acceptance = []
+    measured_changes = []
+    shown_complexity = []
+    shown_task_keys = {(task[1], task[2]) for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True)[:TASK_CAP]}
+    for (version, slug), (spec_stats, change) in sorted(complexity.items(), key=lambda item: item[0], reverse=True):
+        repo = next((event.get("repo") for event in scoped if event.get("slug") == slug and event.get("version") == version and event.get("event") == "land"), "k3d-manager")
+        repo = repo if isinstance(repo, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", repo) else "k3d-manager"
+        labels = f'window="{window}",version="{version}",slug="{slug}",repo="{repo}"'
+        if isinstance(spec_stats, dict):
+            files, must, must_not = spec_stats.get("files"), spec_stats.get("must"), spec_stats.get("must_not")
+            if type(files) is int and files >= 0:
+                measured_specs.append(spec_stats)
+            if (version, slug) in shown_task_keys and type(files) is int and files >= 0:
+                lines.append(f'k3dm_dispatch_task_spec_files{{{labels}}} {files}')
+            if type(must) is int and must >= 0 and type(must_not) is int and must_not >= 0:
+                measured_acceptance.append(must + must_not)
+                if (version, slug) in shown_task_keys:
+                    lines.append(f'k3dm_dispatch_task_spec_acceptance_items{{{labels}}} {must + must_not}')
+        if isinstance(change, dict) and type(change.get("files")) is int and change["files"] >= 0:
+            values = {kind: change.get(kind) for kind in ("code", "tests", "docs")}
+            if all(type(value) is int and value >= 0 for value in values.values()):
+                measured_changes.append((change["files"], values))
+                shown_complexity.append((change["files"], values))
+                if (version, slug) in shown_task_keys:
+                    lines.append(f'k3dm_dispatch_task_change_files{{{labels}}} {change["files"]}')
+                    for kind, value in values.items():
+                        lines.append(f'k3dm_dispatch_task_change_lines{{{labels},kind="{kind}"}} {value}')
+    lines.append(f'k3dm_dispatch_complexity_measured_tasks{{window="{window}",measure="spec"}} {len(measured_specs)}')
+    lines.append(f'k3dm_dispatch_complexity_measured_tasks{{window="{window}",measure="change"}} {len(measured_changes)}')
+    if measured_acceptance:
+        lines.append(f'k3dm_dispatch_spec_acceptance_items_total{{window="{window}"}} {sum(measured_acceptance)}')
+    if measured_changes:
+        for kind in ("code", "tests", "docs"):
+            lines.append(f'k3dm_dispatch_change_lines_total{{window="{window}",kind="{kind}"}} {sum(item[1][kind] for item in measured_changes)}')
+        lines.append(f'k3dm_dispatch_change_files_total{{window="{window}"}} {sum(item[0] for item in measured_changes)}')
+        totals = sorted(sum(item[1].values()) for item in measured_changes)
+        mid = len(totals) // 2
+        median = totals[mid] if len(totals) % 2 else (totals[mid - 1] + totals[mid]) / 2
+        lines.append(f'k3dm_dispatch_change_lines_median{{window="{window}"}} {median:g}')
     markers = [event for event in source_events if event.get("event") == "intervention_coverage_start"]
     if markers:
         marker_ts = min(event["ts"] for event in markers)
@@ -1187,6 +1333,8 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if metrics["rework_ratio"] is not None:
         lines.append(f'k3dm_dispatch_rework_ratio{{window="{window}"}} '
                      f'{metrics["rework_ratio"]}')
+    for reason, count in metrics["handoff_reasons"].items():
+        lines.append(f'k3dm_dispatch_handoffs{{window="{window}",reason="{reason}"}} {count}')
     valid_tasks = []
     skipped = 0
     for task in sorted(metrics["tasks"], key=lambda item: item[0], reverse=True):
@@ -1198,23 +1346,49 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         valid_tasks.append(task)
     for (_, version, slug, tokens, codex_seconds, elapsed_seconds, runs, api_cost, spec, agent,
          agent_tokens, agent_seconds, repo, worker_identity, coordinator_identity, post_exit_land,
-         worker_runtime_identities) in valid_tasks[:TASK_CAP]:
+         worker_runtime_identities, primary_identity, acting_identity, landing_identity,
+         landing_actor, handoff_count, handoff_reason, primary_coordinator_cost) in valid_tasks[:TASK_CAP]:
         labels = f'window="{window}",version="{version}",slug="{slug}",agent="{agent}",repo="{repo}"'
+        emitted_identity_labels = set()
         def identity_labels(identity, role):
-            source = identity.get("source") if identity.get("source") in {"explicit", "default", "inherited", "runtime", "unreported", "declared"} else "unreported"
-            vendor = identity.get("vendor") if identity.get("vendor") in {"openai", "google", "anthropic", "unknown"} else "unknown"
-            if source == "declared" and isinstance(identity.get("vendor"), str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", identity["vendor"]):
-                vendor = identity["vendor"]
+            raw_source = identity.get("source")
+            source = raw_source if isinstance(raw_source, str) and raw_source in {"explicit", "default", "inherited", "runtime", "runtime-reported", "unreported", "declared", "unknown"} else "unreported"
+            if source == "runtime-reported":
+                source = "runtime"
+            raw_vendor = identity.get("vendor")
+            vendor = raw_vendor if isinstance(raw_vendor, str) and raw_vendor in {"openai", "google", "anthropic", "other", "unknown"} else "unknown"
             model = identity.get("model")
             if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", model):
                 model = "unknown"
-            status = identity.get("status") if identity.get("status") in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
-            lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}"}} 1')
+            elif model != "unknown" and model not in MODEL_IDENTITY_ALLOWLIST:
+                model = "other"
+            raw_status = identity.get("status")
+            status = raw_status if isinstance(raw_status, str) and raw_status in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
+            display = "unknown" if vendor == "unknown" else (
+                f"{vendor}/model not recorded ({status})" if model == "unknown" else f"{vendor}/{model} ({status})")
+            identity_labels_tuple = (role, vendor, model, source, status, display)
+            if identity_labels_tuple in emitted_identity_labels:
+                return
+            emitted_identity_labels.add(identity_labels_tuple)
+            lines.append(f'k3dm_dispatch_model_identity{{{labels},role="{role}",vendor="{vendor}",model="{model}",source="{source}",status="{status}",display="{display}"}} 1')
         identity_labels(worker_identity, "worker")
         for reported_identity in worker_runtime_identities:
             if reported_identity != worker_identity:
                 identity_labels(reported_identity, "worker_history")
         identity_labels(coordinator_identity, "coordinator")
+        identity_labels(primary_identity, "primary_coordinator")
+        identity_labels(acting_identity, "acting_coordinator")
+        identity_labels(landing_identity, "landing_actor")
+        landing_actor = landing_actor if landing_actor in {"human", "claude", "codex", "other_agent", "unknown"} else "unknown"
+        lines.append(f'k3dm_dispatch_task_landing_actor{{{labels},actor="{landing_actor}"}} 1')
+        lines.append(f'k3dm_dispatch_task_handoff_count{{{labels}}} {handoff_count}')
+        if handoff_count:
+            safe_reason = handoff_reason if handoff_reason in {"quota_exhausted", "manual", "unavailable", "scheduled", "other", "unknown"} else "unknown"
+            lines.append(f'k3dm_dispatch_task_handoff_reason{{{labels},reason="{safe_reason}"}} 1')
+        cost_state = "measured" if primary_coordinator_cost is not None else "not measured"
+        lines.append(f'k3dm_dispatch_task_primary_coordinator_cost_state{{{labels},state="{cost_state}"}} 1')
+        if primary_coordinator_cost is not None:
+            lines.append(f'k3dm_dispatch_task_primary_coordinator_cost_usd{{{labels}}} {primary_coordinator_cost}')
         if isinstance(spec, str) and SPEC_PATH_RE.fullmatch(spec):
             lines.append(f'k3dm_dispatch_task_spec{{{labels},spec="{spec}"}} 1')
         if agent == "codex" and tokens is not None:
@@ -1635,6 +1809,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument("--spec-stats", metavar="PATH")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--prices", default=str(_repo_root() / "scripts/etc/agent/codex-model-prices.json"))
     parser.add_argument("--codex-home", default=os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
@@ -1642,6 +1817,9 @@ def main(argv=None):
     parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
     parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
     args = parser.parse_args(argv)
+    if args.spec_stats is not None:
+        print(json.dumps(_spec_stats(args.spec_stats), separators=(",", ":")))
+        return 0
     events, bad_lines = read_ledger(_root() / "ledger.jsonl")
     model_prices, subscriptions, checked, claude_prices = _prices(args.prices)
     claude_context = {} if Path(args.claude_projects).is_dir() else None

@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [1.43.9] - 2026-10-29
+
+### Added
+
+- Add `make webhook-doctor` for read-only diagnostics and `DRY_RUN=1` for its probe plan. The doctor reports bounded, redacted local health checks and is covered by offline fixture tests; recovering the webhook and verifying a live incident remain separate operator actions.
+- Add a bounded, read-only Cloudflare HTTPS/TLS posture and preflight helper with allowlisted snapshot/API values, redacted redirect observations, conservative TLS error classification, and offline fixture tests; live setting changes and endpoint acceptance remain operator-controlled.
+
+- App CVE candidate resolution reports GHCR authentication failures separately, publishes bounded resolution metrics, and keeps registry credentials out of curl arguments.
+- App CVE candidate scanning now fails closed on Trivy, registry, or malformed-result errors, skips unsafe per-service decisions, and reports an unsuccessful Job if any candidate scan is unknown.
+- Agent Dispatch records explicit primary coordinator assignments, append-only coordinator handoffs, and landing actors independently from implementation workers. The Per spec table shows Primary coordinator, Acting coordinator, Landed by, handoff count, and whether primary cost is measured; legacy identities stay unknown when absent.
+- Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
+- Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.
+- The Host Pod IP Pool dashboard splits kept reservations into in use, starting (grace period) and held without a sandbox, with the age of the oldest held reservation. The Hostinger sweep writes the skipped counts, and `HostCniIpamOrphanNotReclaimed` fires when a reservation stays held without a sandbox for over an hour. Before this, the dashboard showed how full the pool was but not whether the sweep was keeping up.
+- VectorDB drift is published by kind (missing, stale hash, deleted) with the age of the oldest drifted document in each kind, kept in a first-seen state file. The net `drift_docs` count could read 0 while documents were wrong, because missing and deleted documents cancel and stale hashes do not change the row count. `VectorDBIndexDrift` now fires when any kind stays drifted for over two hours.
+
+### Changed
+
+- The Grafana dashboards guide is now an index with one page per dashboard: Agent Run Log, Agent Cost and Agent Activity have their own pages, and the Release plans, Release forecast, Host Disk and CVE triage notes moved to the pages of the dashboards they describe.
+
+- The webhook LaunchAgent now runs as `ProcessType Interactive`. With the key unset, launchd applies its default CPU and I/O throttle, and the ask-docs bug tally's Git children inherit it. The same tally took 0.85 s at normal priority, 13–59 s at background priority and 130 s I/O-throttled, so Slack count questions hit the 30 s deadline. Only the webhook changes; every other k3dm LaunchAgent keeps the default throttle, and a BATS guard enforces both.
+
+- Bug Tracking metrics recognize typed live investigation proof for closed recovery records without attributing a causal fix commit.
+
+- Release forecast keeps the Target state blocker reason readable with explicit supporting text sizing in the existing panel.
+
+- Webhook doctor gives aggregate health checks a 15-second budget and treats a timeout with a listening socket as inconclusive rather than recommending a restart.
+
+- Webhook doctor distinguishes Keychain interaction requirements from missing reader credentials, gives a safe next step and omits unwarranted restart actions.
+
+- Webhook doctor waits for a bounded command exit after its output closes, avoiding premature credential-lookup termination.
+
+- Correct webhook doctor and heartbeat default probes to port 7443; doctor honors the loaded LaunchAgent port without exposing its environment.
+
+- Release Plans now shows separate status-only Verified and Live verified indicators derived from the plan verification label.
+- Clarify Release plans dispatch approval versus ledger task state and flag landed plans with stale documentation status.
+- VectorDB Health colors a fresh daily retrieval probe green, an age of 24 hours or more yellow, and an age of 48 hours or more red, matching the stale-probe alert boundary.
+- Add optional independent outbound heartbeat probes for m4 services and Hostinger, with protected local credentials, maintenance suppression, launchd/systemd render support, and advisory Hermes/cloud-bridge freshness markers. No checks are installed or enabled by default; live alert delivery remains operator-verification work.
+
 ## [1.43.8] - 2026-10-25
 
 ### Added
@@ -24,7 +62,7 @@
 - **Every hub dashboard refreshes every five minutes by default** (was 1m on some). A `refresh=` value in the URL still overrides it.
 - **Bug Tracking and Agent Dispatch tables fit a laptop-width panel without horizontal scrolling** (a Magic Mouse has no wheel to scroll sideways). Per spec spans the full width with a smaller minimum column width; Bugs, Plans and Remaining releases use narrower fixed widths. Bugs' Verified at and Live-verified at, and Remaining releases' forecasts, show the date only; the forecast columns are headed Earliest, Expected and Latest; Plans drops the Dispatch task column, which repeated the plan name, and gives Dispatch room for its full status.
 - **Bug Tracking's nine summary tiles sit on one row**, and the narrow tiles no longer repeat the release-mode description that crowded out their titles.
-- **Agent Dispatch Per spec leaves Worker and Coordinator blank when the model is unknown**, instead of repeating `unknown` on every row.
+- Agent Dispatch Per spec now displays `unknown` when worker or coordinator identity is absent, preserving unknown provenance for legacy ledger rows.
 - Agent Cost and Agent Dispatch read better: **Claude cost per verified spec** is wider and as tall as its neighbours so its title fits, the per-day Claude bars use larger value labels, **Claude per landed spec** and **Claude tokens per landed spec** say *Release window only* instead of *No data* under a time window, and **Human continuation prompts** shows `continue` instead of a cut-off `continue_prompt`.
 
 ### Added

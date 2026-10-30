@@ -11,22 +11,827 @@ data:
     {
       "title": "k3dm VectorDB Health",
       "uid": "k3dm-vectordb",
-      "tags": ["k3dm"],
+      "tags": [
+        "k3dm"
+      ],
       "schemaVersion": 38,
       "version": 1,
       "refresh": "5m",
-      "time": { "from": "now-30d", "to": "now" },
+      "time": {
+        "from": "now-30d",
+        "to": "now"
+      },
       "panels": [
-        { "id": 1, "type": "timeseries", "title": "Rows vs corpus docs (last published)", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }, "fieldConfig": { "defaults": { "unit": "none", "decimals": 0 }, "overrides": [{ "matcher": { "id": "byName", "options": "rows (last published)" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }, { "id": "custom.drawStyle", "value": "line" }, { "id": "custom.lineWidth", "value": 3 }, { "id": "custom.showPoints", "value": "never" }] }, { "matcher": { "id": "byName", "options": "corpus docs (last published)" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }, { "id": "custom.drawStyle", "value": "points" }, { "id": "custom.showPoints", "value": "always" }, { "id": "custom.pointSize", "value": 4 }, { "id": "custom.lineWidth", "value": 0 }] }] }, "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } }, "targets": [{ "expr": "k3dm_vectordb_rows", "legendFormat": "rows (last published)" }, { "expr": "k3dm_vectordb_corpus_docs", "legendFormat": "corpus docs (last published)" }] },
-        { "id": 2, "type": "timeseries", "title": "Drift docs (last published)", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }, "targets": [{ "expr": "k3dm_vectordb_drift_docs", "legendFormat": "drift docs (last published)" }] },
-        { "id": 3, "type": "timeseries", "title": "Index age (last published)", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }, "targets": [{ "expr": "time() - k3dm_vectordb_last_index_timestamp_seconds", "legendFormat": "age seconds (last published)" }] },
-        { "id": 4, "type": "stat", "title": "Reachability and ExternalSecret sync (last published)", "description": "1 = the vector store answered / its ExternalSecret is synced; 0 = it did not. Values are the last ones the hub publisher pushed.", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }, "options": { "graphMode": "none" }, "targets": [{ "expr": "k3dm_vectordb_reachable", "legendFormat": "reachable (last published)" }, { "expr": "k3dm_vectordb_external_secret_synced", "legendFormat": "ExternalSecret synced (last published)" }] },
-        {"id": 10, "type": "row", "title": "Ingestion", "collapsed": false, "gridPos": {"x": 0, "y": 16, "w": 24, "h": 1}, "panels": []},
-        {"id": 11, "type": "stat", "title": "Last run result (last published)", "gridPos": {"x": 0, "y": 17, "w": 8, "h": 6}, "options": {"textMode": "name", "colorMode": "background", "graphMode": "none"}, "fieldConfig": {"defaults": {}, "overrides": [{"matcher": {"id": "byName", "options": "success"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}, {"matcher": {"id": "byName", "options": "noop"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}, {"matcher": {"id": "byName", "options": "paused"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}, {"matcher": {"id": "byName", "options": "failed"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}]}, "targets": [{"expr": "k3dm_vectordb_index_last_result == 1", "instant": true, "range": false, "legendFormat": "{{result}}"}]},
-        {"id": 12, "type": "stat", "title": "Time since last successful index (last published)", "gridPos": {"x": 8, "y": 17, "w": 8, "h": 6}, "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 3600}, {"color": "red", "value": 21600}]}}, "overrides": []}, "options": {"colorMode": "background", "graphMode": "none"}, "targets": [{"expr": "time() - k3dm_vectordb_index_last_success_timestamp_seconds", "instant": true, "range": false, "legendFormat": "age (last published)"}]},
-        {"id": 16, "type": "stat", "title": "Paused on daily quota until (last published)", "gridPos": {"x": 16, "y": 17, "w": 8, "h": 6}, "fieldConfig": {"defaults": {"unit": "dateTimeAsIso", "mappings": [{"type": "value", "options": {"0": {"text": "not paused"}}}]}, "overrides": []}, "options": {"colorMode": "none", "graphMode": "none"}, "targets": [{"expr": "k3dm_vectordb_index_paused_until_timestamp_seconds * 1000", "instant": true, "range": false, "legendFormat": "paused until (last published)"}]},
-        {"id": 13, "type": "timeseries", "title": "Docs embedded (API) / from cache / pruned per run (last published)", "gridPos": {"x": 0, "y": 23, "w": 8, "h": 8}, "targets": [{"expr": "k3dm_vectordb_index_embedded_last", "legendFormat": "embedded via API (last published)"}, {"expr": "k3dm_vectordb_index_from_cache_last", "legendFormat": "from cache (last published)"}, {"expr": "k3dm_vectordb_index_pruned_last", "legendFormat": "pruned (last published)"}]},
-        {"id": 14, "type": "timeseries", "title": "Backlog (last published)", "gridPos": {"x": 8, "y": 23, "w": 8, "h": 8}, "targets": [{"expr": "k3dm_vectordb_index_backlog_docs", "legendFormat": "backlog (last published)"}, {"expr": "k3dm_vectordb_drift_docs", "legendFormat": "drift (last published)"}]},
-        {"id": 15, "type": "timeseries", "title": "Run duration (last published)", "gridPos": {"x": 16, "y": 23, "w": 8, "h": 8}, "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}, "targets": [{"expr": "k3dm_vectordb_index_duration_seconds", "legendFormat": "duration (last published)"}]}
+        {
+          "id": 30,
+          "type": "row",
+          "title": "Infrastructure health \u2014 is pgvector available and accepting queries?",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 31,
+          "type": "row",
+          "title": "Data consistency \u2014 are indexed documents synchronized with the repository?",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 9,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 32,
+          "type": "row",
+          "title": "Retrieval quality \u2014 do agents retrieve the correct, current documents?",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 26,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 10,
+          "type": "row",
+          "title": "Ingestion",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 33,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Reachability and ExternalSecret sync (last published)",
+          "description": "1 = the vector store answered / its ExternalSecret is synced; 0 = it did not. Values are the last ones the hub publisher pushed.",
+          "gridPos": {
+            "x": 0,
+            "y": 1,
+            "w": 12,
+            "h": 8
+          },
+          "options": {
+            "graphMode": "none"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_reachable",
+              "legendFormat": "reachable (last published)"
+            },
+            {
+              "expr": "k3dm_vectordb_external_secret_synced",
+              "legendFormat": "ExternalSecret synced (last published)"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Index age (last published)",
+          "gridPos": {
+            "x": 12,
+            "y": 1,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "time() - k3dm_vectordb_last_index_timestamp_seconds",
+              "legendFormat": "age seconds (last published)"
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Rows vs corpus docs (last published)",
+          "gridPos": {
+            "x": 0,
+            "y": 10,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "rows (last published)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  },
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "line"
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "never"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "corpus docs (last published)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "yellow"
+                    }
+                  },
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 4
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_rows",
+              "legendFormat": "rows (last published)"
+            },
+            {
+              "expr": "k3dm_vectordb_corpus_docs",
+              "legendFormat": "corpus docs (last published)"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Drift docs by kind (last published)",
+          "description": "Missing: in corpus, absent from index. Stale: in both, but content hashes differ. Deleted: in index, absent from corpus.",
+          "gridPos": {
+            "x": 12,
+            "y": 10,
+            "w": 8,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "missing"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "stale"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "yellow"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "deleted"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_drift_docs_by_kind",
+              "legendFormat": "{{kind}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Oldest drift (last published)",
+          "description": "Age counts from the first exporter run that saw each drifted document.",
+          "gridPos": {
+            "x": 20,
+            "y": 10,
+            "w": 4,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 7200
+                  },
+                  {
+                    "color": "red",
+                    "value": 86400
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "graphMode": "none",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "max(k3dm_vectordb_oldest_drift_age_seconds)",
+              "instant": true,
+              "range": false,
+              "legendFormat": "oldest drift age"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "timeseries",
+          "title": "Backlog (last published)",
+          "gridPos": {
+            "x": 0,
+            "y": 18,
+            "w": 24,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_index_backlog_docs",
+              "legendFormat": "backlog (last published)"
+            },
+            {
+              "expr": "k3dm_vectordb_drift_docs",
+              "legendFormat": "drift (last published)"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "type": "stat",
+          "title": "Recall@5 by directory",
+          "description": "Share of positive pairs retrieved in the top five; thresholds match the published per-directory recall floor.",
+          "gridPos": {
+            "x": 0,
+            "y": 27,
+            "w": 6,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.66
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "bugs"
+                },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 0.81
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "issues"
+                },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 0.66
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "plans"
+                },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 0.8
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "retro"
+                },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 0.8
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "graphMode": "none",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_retrieval_recall_at5",
+              "instant": true,
+              "range": false,
+              "legendFormat": "{{directory}}"
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "type": "stat",
+          "title": "Hard-negative intrusion@5",
+          "description": "Share of hard-negative pairs retrieved in the top five, by directory.",
+          "gridPos": {
+            "x": 6,
+            "y": 27,
+            "w": 6,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "options": {
+            "graphMode": "none",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_retrieval_intrusion_at5",
+              "instant": true,
+              "range": false,
+              "legendFormat": "{{directory}}"
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "type": "stat",
+          "title": "Outdated results",
+          "description": "Stale and deleted documents returned by the probe.",
+          "gridPos": {
+            "x": 12,
+            "y": 27,
+            "w": 6,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.0001
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "graphMode": "none",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_retrieval_stale_hits + k3dm_vectordb_retrieval_deleted_hits",
+              "instant": true,
+              "range": false
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "type": "stat",
+          "title": "Time since last retrieval probe",
+          "description": "Age of the last completed retrieval-quality probe.",
+          "gridPos": {
+            "x": 18,
+            "y": 27,
+            "w": 6,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 86400
+                  },
+                  {
+                    "color": "red",
+                    "value": 172800
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "graphMode": "none",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "time() - k3dm_vectordb_retrieval_probe_last_success_timestamp_seconds",
+              "instant": true,
+              "range": false
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "Last run result (last published)",
+          "gridPos": {
+            "x": 0,
+            "y": 34,
+            "w": 8,
+            "h": 6
+          },
+          "options": {
+            "textMode": "name",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "success"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "noop"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "paused"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "failed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_index_last_result == 1",
+              "instant": true,
+              "range": false,
+              "legendFormat": "{{result}}"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "Time since last successful index (last published)",
+          "gridPos": {
+            "x": 8,
+            "y": 34,
+            "w": 8,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 3600
+                  },
+                  {
+                    "color": "red",
+                    "value": 21600
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "targets": [
+            {
+              "expr": "time() - k3dm_vectordb_index_last_success_timestamp_seconds",
+              "instant": true,
+              "range": false,
+              "legendFormat": "age (last published)"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "type": "stat",
+          "title": "Paused on daily quota until (last published)",
+          "gridPos": {
+            "x": 16,
+            "y": 34,
+            "w": 8,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dateTimeAsIso",
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "not paused"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_index_paused_until_timestamp_seconds * 1000",
+              "instant": true,
+              "range": false,
+              "legendFormat": "paused until (last published)"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "Docs embedded (API) / from cache / pruned per run (last published)",
+          "gridPos": {
+            "x": 0,
+            "y": 40,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_index_embedded_last",
+              "legendFormat": "embedded via API (last published)"
+            },
+            {
+              "expr": "k3dm_vectordb_index_from_cache_last",
+              "legendFormat": "from cache (last published)"
+            },
+            {
+              "expr": "k3dm_vectordb_index_pruned_last",
+              "legendFormat": "pruned (last published)"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "Run duration (last published)",
+          "gridPos": {
+            "x": 12,
+            "y": 40,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "expr": "k3dm_vectordb_index_duration_seconds",
+              "legendFormat": "duration (last published)"
+            }
+          ]
+        }
       ]
     }

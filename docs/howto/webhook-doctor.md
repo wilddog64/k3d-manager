@@ -1,0 +1,97 @@
+# Webhook incident doctor
+
+`bin/k3dm-webhook-doctor` provides a read-only local snapshot for the
+`com.k3d-manager.webhook` LaunchAgent. The default invocation (same as
+`--dry-run`) prints the probe plan and does not inspect Keychain, launchd,
+processes, listeners, logs, or the network.
+
+On the m4 host, run `make webhook-doctor` (or `bin/k3dm-webhook-doctor --check`) to collect timestamped
+JSON. It reports launchd job presence, parsed PID and last exit code, the configured TCP
+listener presence, log modification time and bounded error categories, then
+probes only `http://127.0.0.1:7443/api/v1/health?quick=1` with the reader token held in
+memory. The dedicated opener bypasses proxy settings and refuses redirects, so
+the authorization header stays on the fixed loopback request. The reader token is read from `K3DM_WEBHOOK_TOKEN_READER` or macOS
+Keychain; no token, launchd environment, process arguments, or raw log lines
+are included in output. The health request timeout is 15 seconds and log inspection
+is capped at 64 KiB / 80 lines. Command output capture is capped at 16 KiB and
+the health response body at 64 KiB; body reads use the remaining health-request budget. The probe
+does not accept a remote URL.
+
+`local_http_healthy_external_delivery_unverified` describes a valid handler
+response with all named service checks true. A successful handler response
+with a false service check is classified as dependencies degraded; an empty
+service list or any `ok: null` result is dependencies unknown. `all_ok` must
+match the service checks, and empty or inconsistent responses cannot be
+classified as healthy. A responsive handler does not establish that Slack or
+external delivery works. A public endpoint failure alone does not establish a
+local webhook failure. Authentication failures, invalid responses, HTTP
+errors, timeouts, and launchd command errors remain distinct. Command
+unavailable, timeout, permission/unknown errors are not treated as a verified
+missing job. A listener or process alone is never classified as healthy.
+
+The doctor never calls recovery. It recommends recovery only for a launchd job
+reported missing by launchctl or a confirmed missing listener without a responsive HTTP result. Missing
+credentials and diagnostic command failures do not recommend a restart. If
+reliable local evidence shows the webhook is unhealthy, an operator may choose to run
+`make restart-webhook` once from the repository on m4. That supported action
+reloads the webhook LaunchAgent and also restarts cloud-bridge. Do not loop it.
+Capture the command result, then repeat local functional health and verify a
+benign end-to-end Slack/cloud-bridge response. If local HTTP works but external
+delivery does not, investigate ingress/bridge before considering a restart.
+
+The October 26 offsite incident remains unconfirmed until the operator records
+local evidence. This helper and its offline tests do not provide live E1/E2
+evidence and do not change the incident's status.
+
+The default port matches the webhook server (7443). An explicit loaded-job
+`K3DM_WEBHOOK_PORT` overrides it for both listener and authenticated health
+checks. Invalid port configuration is unknown and cannot recommend recovery.
+
+If `auth_unavailable` is reported, the HTTP probe did not run. A locked login
+Keychain can prevent the reader lookup even while the webhook is healthy.
+In an interactive local session, unlock your login Keychain using
+`security unlock-keychain ~/Library/Keychains/login.keychain-db`, enter its
+password only at the prompt, then rerun the doctor. Unlocking restores access
+to the existing credential; it does not require token rotation or a webhook
+restart. The 2026-10-27 operator verified lookup exit36 became0 after unlock.
+
+### Credential-access diagnostics
+
+Each check reports a bounded `credential` summary and a separate
+`credential_action`; neither includes the token or raw command/error output.
+When native Keychain lookup returns exit36, the classification is
+`keychain_interaction_required` with credential status `interaction_required`.
+The action explains that the login Keychain may be locked or this session
+cannot request access, and gives the interactive unlock command above. The
+status does not assert that every access restriction is a locked Keychain.
+
+A missing item (exit44) remains `auth_unavailable` with credential status
+`missing` and a reader-credential setup hint. Timeout, unavailable command,
+output limit, empty value and other lookup failures are separate bounded
+statuses. An existing environment reader token bypasses Keychain lookup.
+
+With no credential, authenticated HTTP is not probed: `health.status` stays
+`auth_unavailable`, not healthy or an HTTP outage. Credential failures alone
+do not recommend service recovery; `recovery_action` is null unless independent
+local evidence warrants recovery. The doctor never unlocks the Keychain,
+changes its lock settings, caches credentials or performs a restart. A new
+check retries the read and observes an operator unlock without a service
+restart.
+
+### Health-check timeouts
+
+The quick health route still runs parallel downstream service probes, each
+with an eight-second request timeout. The doctor gives this aggregate check
+a bounded15-second budget (`health_timeout_seconds`); local command probes
+retain four-second limits. Body reads use the health budget remaining after
+response headers rather than starting a second full timeout.
+
+A health request timing out with a listening socket is `health_check_timeout`,
+with `all_ok: null` and no restart recommendation. The diagnostic cannot infer
+a dead handler from slow dependency work. Unknown listener state also remains
+inconclusive. A verified missing launchd job, or missing listener without a
+responsive HTTP result, remains independent recovery evidence. Review the
+result; the doctor never executes recovery.
+
+`make webhook-doctor DRY_RUN=1` prints only the probe plan. Both Make forms
+run the existing doctor directly; neither calls restart or cluster scan targets.

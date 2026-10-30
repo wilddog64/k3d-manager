@@ -31,6 +31,7 @@ general `severity = critical` SMS route.
 | `HostPodIPPoolHigh` fires | On Hostinger run `sudo /usr/local/sbin/k3dm-cni-ipam-sweep --dry-run` and check `systemctl status k3dm-cni-ipam-sweep.timer`; inspect the reservation count and stale files. |
 | `HostPodIPAllocationFailing` fires | Check the Hostinger k3s journal for `no IP addresses available`, run the sweep dry-run, and confirm new pods can start after stale reservations are removed. |
 | `HostCniIpamSweepStale` fires | Check the timer, the sweep state file, Hermes, and the hub Pushgateway port-forward; verify `mode=apply` and a recent `last_run`. |
+| `HostCniIpamOrphanNotReclaimed` fires | On Hostinger run `sudo /usr/local/sbin/k3dm-cni-ipam-sweep --dry-run`; the `SKIP` lines name the IPs. Find the pod with `kubectl get pods -A -o wide`, then delete or restart it so its sandbox is recreated. The sweep never removes these itself. |
 
 ## Verification
 

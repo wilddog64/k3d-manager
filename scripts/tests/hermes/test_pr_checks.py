@@ -1,3 +1,5 @@
+import pytest
+
 from hermes import pr_checks
 
 
@@ -71,3 +73,66 @@ def test_overall_render_and_failure_output():
     failure = pr_checks.render_failure(250, "wilddog64/lib-foundation")
     assert "scrape_success" in failure and " 0" in failure
     assert "k3dm_pr_info" not in failure and "last_scrape_timestamp_seconds" in failure
+
+
+def test_completed_polls_keep_execution_identity_and_close_removes_current_metrics():
+    repo = "wilddog64/shopping-cart-payment"
+    pulls_path = f"/repos/{repo}/pulls?state=open&per_page=20"
+    responses = {
+        pulls_path: [{"number": 93, "title": "payment", "head": {"sha": "abcdef"}}],
+        f"/repos/{repo}/commits/abcdef/check-runs?per_page=100": {
+            "check_runs": [{
+                "id": 123, "name": "lint", "status": "completed", "conclusion": "success",
+                "started_at": "2026-10-16T00:02:00Z",
+                "completed_at": "2026-10-16T00:03:00Z",
+            }],
+        },
+    }
+    labels = f'repo="{repo}",pr="93",check="lint"'
+    expected_checks = [
+        f'k3dm_pr_check_state{{{labels},state="success"}} 1',
+        f"k3dm_pr_check_duration_seconds{{{labels}}} 60.0",
+        f"k3dm_pr_check_completed_timestamp_seconds{{{labels}}} 1792108980.0",
+    ]
+    for now in (1792109000, 1792109300, 1792109600):
+        rendered = pr_checks.render(pr_checks.collect(responses.__getitem__, repo), now, repo)
+        # Exact producer output forbids poll/run IDs or scrape time replacing completed_at.
+        assert [line for line in rendered.splitlines()
+                if line.startswith("k3dm_pr_check_")] == expected_checks
+        assert f'k3dm_pr_checks_last_scrape_timestamp_seconds{{repo="{repo}"}} {now}' in rendered
+
+    # The open-only endpoint no longer returns the PR after it closes or merges.
+    responses[pulls_path] = []
+    closed = pr_checks.render(pr_checks.collect(responses.__getitem__, repo), 1792109900, repo)
+    assert closed.splitlines() == [
+        f'k3dm_pr_checks_open_prs{{repo="{repo}"}} 0',
+        f'k3dm_pr_checks_last_scrape_timestamp_seconds{{repo="{repo}"}} 1792109900',
+        f'k3dm_pr_checks_scrape_success{{repo="{repo}"}} 1',
+    ]
+
+
+def test_no_pr_repo_and_failed_read_emit_distinct_health_without_fabricated_checks():
+    repo = "wilddog64/shopping-cart-e2e-tests"
+    seen = []
+
+    def no_prs(path):
+        seen.append(path)
+        return []
+
+    empty = pr_checks.render(pr_checks.collect(no_prs, repo), 300, repo)
+    assert seen == [f"/repos/{repo}/pulls?state=open&per_page=20"]
+    assert empty.splitlines() == [
+        f'k3dm_pr_checks_open_prs{{repo="{repo}"}} 0',
+        f'k3dm_pr_checks_last_scrape_timestamp_seconds{{repo="{repo}"}} 300',
+        f'k3dm_pr_checks_scrape_success{{repo="{repo}"}} 1',
+    ]
+
+    def failed_read(_path):
+        raise OSError("GitHub unavailable")
+
+    with pytest.raises(OSError, match="GitHub unavailable"):
+        pr_checks.collect(failed_read, repo)
+    assert pr_checks.render_failure(600, repo).splitlines() == [
+        f'k3dm_pr_checks_last_scrape_timestamp_seconds{{repo="{repo}"}} 600',
+        f'k3dm_pr_checks_scrape_success{{repo="{repo}"}} 0',
+    ]

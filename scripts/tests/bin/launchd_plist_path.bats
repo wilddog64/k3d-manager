@@ -72,3 +72,20 @@ _plist_path_value() {
   [[ "${output}" == *"python@3.14 is not installed; run: brew install python@3.14"* ]]
   [ ! -e "${_home}/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist" ]
 }
+
+@test "webhook template runs at Interactive priority so tally Git children are not throttled" {
+  run /usr/bin/awk '/<key>ProcessType<\/key>/ {getline; gsub(/^[ \t]+|[ \t]+$/, ""); print; exit}' "${LAUNCHD_DIR}/com.k3d-manager.webhook.plist.tmpl"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "<string>Interactive</string>" ]
+}
+
+@test "no launchd template other than the webhook sets ProcessType" {
+  local _tmpl
+  for _tmpl in "${LAUNCHD_DIR}"/*.plist.tmpl; do
+    [[ "$(basename "${_tmpl}")" == com.k3d-manager.webhook.plist.tmpl ]] && continue
+    if /usr/bin/grep -q '<key>ProcessType</key>' "${_tmpl}"; then
+      echo "$(basename "${_tmpl}") sets ProcessType"
+      return 1
+    fi
+  done
+}

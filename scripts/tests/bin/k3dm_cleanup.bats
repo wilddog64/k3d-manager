@@ -47,6 +47,10 @@ _touch_old() {
   touch -t 202507010101 "$1"
 }
 
+_inode_for_file() {
+  python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_ino)' "$1"
+}
+
 @test "k3dm-cleanup prunes old finished jobs but keeps stale running jobs" {
   local jobs="${HOME_ROOT}/.local/share/k3d-manager/webhook-jobs"
   mkdir -p "${jobs}/deadbeef" "${jobs}/feedface"
@@ -86,12 +90,12 @@ _touch_old() {
   mkdir -p "${logs}"
   dd if=/dev/zero of="${log}" bs=1048576 count=11 >/dev/null 2>&1
   local inode
-  inode="$(stat -c '%i' "${log}")"
+  inode="$(_inode_for_file "${log}")"
   run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_LOG_DIR="${logs}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [ -f "${log}.1.gz" ]
   [ ! -s "${log}" ]
-  [ "$(stat -c '%i' "${log}")" -eq "${inode}" ]
+  [ "$(_inode_for_file "${log}")" -eq "${inode}" ]
   [ ! -e "${log}.6.gz" ]
 }
 

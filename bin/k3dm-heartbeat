@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+"""Run independent, outbound Healthchecks.io probes for one machine role."""
+import argparse
+import fcntl
+import json
+import math
+import os
+import re
+import stat
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from contextlib import contextmanager
+from pathlib import Path
+from urllib.parse import urlsplit
+
+IDENTITIES = {"m4-host", "m4-hermes", "m4-webhook", "m4-cloud-bridge", "hostinger"}
+ROLE_IDENTITIES = {
+    "m4": {"m4-host", "m4-hermes", "m4-webhook", "m4-cloud-bridge"},
+    "hostinger": {"hostinger"},
+}
+PERIODS = {"m4-host": 60, "m4-hermes": 60, "m4-webhook": 60,
+           "m4-cloud-bridge": 120, "hostinger": 120}
+GRACES = {"m4-host": 180, "m4-hermes": 1800, "m4-webhook": 180,
+          "m4-cloud-bridge": 360, "hostinger": 360}
+UUID_RE = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\Z")
+DEFAULT_CONFIG = Path("/etc/k3d-manager/heartbeat.json")
+READER_TOKEN_SERVICE = "k3dm-webhook-token-reader"
+
+
+def _webhook_url(value):
+    """Validate the exact loopback health route before looking up its token."""
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+        hostname = parsed.hostname
+    except (TypeError, ValueError):
+        raise ValueError("invalid webhook URL") from None
+    if (parsed.scheme != "http" or hostname not in {"127.0.0.1", "::1"} or
+            parsed.username is not None or parsed.password is not None or
+            parsed.netloc.count("@") or port is None or not 1 <= port <= 65535 or
+            parsed.path != "/api/v1/health" or parsed.query != "quick=1" or parsed.fragment):
+        raise ValueError("invalid webhook URL")
+    return value
+
+
+def _validate_config(config, expected_role=None):
+    """Validate every identity and option before any local or external side effect."""
+    if not isinstance(config, dict):
+        raise ValueError("configuration must be an object")
+    role = config.get("role")
+    if not isinstance(role, str) or role not in ROLE_IDENTITIES or (expected_role and role != expected_role):
+        raise ValueError("invalid role/platform configuration")
+    if not isinstance(config.get("enabled"), bool):
+        raise ValueError("enabled must be a boolean")
+    checks = config.get("checks")
+    if not isinstance(checks, list) or not checks or any(not isinstance(item, dict) for item in checks):
+        raise ValueError("checks must be a nonempty array of objects")
+    identities = [entry.get("id") for entry in checks]
+    if any(not isinstance(name, str) for name in identities):
+        raise ValueError("each check needs a supported identity")
+    if len(identities) != len(set(identities)):
+        raise ValueError("check identities must be unique")
+    if set(identities) != ROLE_IDENTITIES[role]:
+        raise ValueError("check identities do not match configured role")
+    timeout = config.get("timeout_seconds", 5)
+    provider_timeout = config.get("provider_timeout_seconds", 5)
+    for value in (timeout, provider_timeout):
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not 1 <= value <= 10:
+            raise ValueError("timeouts must be between 1 and 10 seconds")
+    if role == "m4":
+        _webhook_url(config.get("webhook_url", "http://127.0.0.1:7443/api/v1/health?quick=1"))
+        if config.get("webhook_reader_token_service", READER_TOKEN_SERVICE) != READER_TOKEN_SERVICE:
+            raise ValueError("webhook reader credential service is invalid")
+        _positive_number(config.get("hermes_freshness_seconds", 1200), 900, 86400,
+                        "Hermes freshness")
+        _positive_number(config.get("bridge_freshness_seconds", 180), 120, 3600,
+                        "bridge freshness")
+        for key in ("hermes_marker", "bridge_marker"):
+            value = config.get(key)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"{key} must be configured")
+    state_dir = config.get("state_dir")
+    if (not isinstance(state_dir, str) or not state_dir or
+            not Path(state_dir).expanduser().is_absolute()):
+        raise ValueError("state_dir must be configured")
+    for entry in checks:
+        name = entry.get("id")
+        if name not in IDENTITIES or not isinstance(entry.get("disabled"), bool):
+            raise ValueError("each check needs a supported id and disabled boolean")
+        if entry.get("period_seconds") != PERIODS[name] or entry.get("grace_seconds") != GRACES[name]:
+            raise ValueError(f"invalid schedule for {name}")
+        source = entry.get("secret_source")
+        if not isinstance(source, dict):
+            raise ValueError(f"invalid secret source for {name}")
+        if role == "m4":
+            if source.get("type") != "keychain" or source.get("service") != f"k3dm-heartbeat-{name}":
+                raise ValueError(f"invalid secret source for {name}")
+        elif (source.get("type") != "file" or not isinstance(source.get("path"), str) or
+              not Path(source["path"]).is_absolute()):
+            raise ValueError("invalid Hostinger secret source")
+        until = entry.get("maintenance_until")
+        if until is not None and (not isinstance(until, (int, float)) or isinstance(until, bool)
+                                  or not math.isfinite(until) or until < 0):
+            raise ValueError(f"invalid maintenance time for {name}")
+    return config
+
+
+def _positive_number(value, minimum, maximum, label):
+    if (not isinstance(value, (int, float)) or isinstance(value, bool) or
+            not math.isfinite(value) or not minimum <= value <= maximum):
+        raise ValueError(f"invalid {label}")
+
+
+def _healthcheck_endpoint(value):
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        raise ValueError("invalid heartbeat endpoint") from None
+    try:
+        hostname = parsed.hostname
+    except ValueError:
+        raise ValueError("invalid heartbeat endpoint") from None
+    pieces = parsed.path.split("/")
+    valid_path = ((hostname == "hc-ping.com" and len(pieces) == 2 and pieces[0] == "" and
+                   UUID_RE.fullmatch(pieces[1])) or
+                  (hostname == "healthchecks.io" and len(pieces) == 3 and pieces[0] == "" and
+                   pieces[1] == "ping" and UUID_RE.fullmatch(pieces[2])))
+    if (parsed.scheme != "https" or not valid_path or parsed.username is not None or
+            parsed.password is not None or parsed.query or parsed.fragment or
+            parsed.netloc.count("@") or parsed.netloc.endswith(":") or port not in (None, 443)):
+        raise ValueError("invalid heartbeat endpoint")
+    return value
+
+
+def _secret(entry):
+    source = entry["secret_source"]
+    if source["type"] == "file":
+        path = Path(source["path"])
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or
+                stat.S_IMODE(info.st_mode) & 0o077):
+            raise ValueError("unsafe secret file permissions")
+        value = path.read_text(encoding="utf-8").strip()
+    else:
+        result = subprocess.run(["/usr/bin/security", "find-generic-password", "-a", "k3dm",
+                                 "-s", source["service"], "-w"],
+                                capture_output=True, text=True, timeout=5, check=False)
+        if result.returncode:
+            raise ValueError("credential unavailable")
+        value = result.stdout.strip()
+    return _healthcheck_endpoint(value)
+
+
+def _reader_token():
+    result = subprocess.run(["/usr/bin/security", "find-generic-password", "-a", "k3dm",
+                             "-s", READER_TOKEN_SERVICE, "-w"],
+                           capture_output=True, text=True, timeout=5, check=False)
+    if result.returncode or not result.stdout.strip():
+        raise ValueError("reader credential unavailable")
+    return result.stdout.strip()
+
+
+def _marker_fresh(path, max_age, now):
+    try:
+        value = float(Path(path).expanduser().read_text(encoding="ascii").strip())
+        return math.isfinite(value) and 0 <= now - value <= max_age
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        return None
+
+
+def _webhook(config, timeout):
+    """Return (valid handler response, dependency all_ok) without leaking token/body."""
+    url = _webhook_url(config.get("webhook_url", "http://127.0.0.1:7443/api/v1/health?quick=1"))
+    request = urllib.request.Request(url, headers={"Authorization": "Bearer " + _reader_token()})
+    try:
+        client = urllib.request.build_opener(_NoRedirect()).open
+        with client(request, timeout=timeout) as response:
+            if response.status != 200 or response.geturl() != url:
+                return False, None
+            payload = json.loads(response.read(65536))
+    except Exception:
+        return False, None
+    if not isinstance(payload, dict) or not isinstance(payload.get("all_ok"), bool):
+        return False, None
+    services = payload.get("services")
+    if not isinstance(services, list) or not services:
+        return False, None
+    for item in services:
+        status = item.get("ok") if isinstance(item, dict) else "invalid"
+        if (not isinstance(item, dict) or not isinstance(item.get("name"), str) or
+                not item["name"] or (status is not None and not isinstance(status, bool)) or
+                not isinstance(item.get("detail"), str)):
+            return False, None
+    return True, payload["all_ok"]
+
+
+def probe(name, config, now):
+    timeout = config.get("timeout_seconds", 5)
+    if name in ("m4-host", "hostinger"):
+        return True, "scheduler/outbound path observed"
+    if name == "m4-webhook":
+        responsive, downstream_ok = _webhook(config, timeout)
+        return responsive, f"handler response; downstream all_ok={downstream_ok}"
+    if name == "m4-hermes":
+        return _marker_fresh(config["hermes_marker"], config.get("hermes_freshness_seconds", 1200), now), "last-completed-cycle freshness"
+    if name == "m4-cloud-bridge":
+        return _marker_fresh(config["bridge_marker"], config.get("bridge_freshness_seconds", 180), now), "last-successful-poll freshness"
+    return False, "unsupported check"
+
+
+def send(url, failed, timeout=5, opener=None):
+    target = url.rstrip("/") + ("/fail" if failed else "")
+    request = urllib.request.Request(target, method="GET")
+    try:
+        client = opener or urllib.request.build_opener(_NoRedirect()).open
+        with client(request, timeout=timeout) as response:
+            return 200 <= response.status < 300 and response.geturl() == target
+    except Exception:
+        return False
+
+
+@contextmanager
+def _interval_attempt(config, entry, now):
+    """Hold a per-identity advisory lock until probe and provider reporting finish."""
+    state_dir = Path(config["state_dir"]).expanduser()
+    try:
+        info = state_dir.lstat()
+    except FileNotFoundError:
+        state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        info = state_dir.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        raise ValueError("unsafe heartbeat state directory")
+    if stat.S_IMODE(info.st_mode) & 0o077:
+        state_dir.chmod(0o700)
+    lock = state_dir / f"{entry['id']}.lock"
+    with lock.open("a", encoding="ascii") as handle:
+        os.chmod(lock, 0o600)
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        marker = state_dir / f"{entry['id']}.last-attempt"
+        try:
+            previous = float(marker.read_text(encoding="ascii").strip())
+        except (OSError, ValueError):
+            previous = None
+        if previous is not None and not math.isfinite(previous):
+            previous = None
+        period = PERIODS[entry["id"]]
+        if previous is not None and (previous > now or now - previous < period):
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            temporary = state_dir / f".{entry['id']}.{os.getpid()}.tmp"
+            temporary.write_text(f"{now:.3f}\n", encoding="ascii")
+            temporary.chmod(0o600)
+            os.replace(temporary, marker)
+
+
+def _safe_reason(error):
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, ValueError):
+        return "invalid local configuration or response"
+    if isinstance(error, OSError):
+        return "local I/O unavailable"
+    return "check failed"
+
+
+def run(config_path, identity=None, dry_run=False, now=None):
+    """Return (per-check outcomes, aggregate-success) after validating all config."""
+    try:
+        config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("configuration unavailable or invalid JSON") from error
+    _validate_config(config)
+    current = time.time() if now is None else now
+    if (not isinstance(current, (int, float)) or isinstance(current, bool) or
+            not math.isfinite(current) or current < 0):
+        raise ValueError("invalid clock value")
+    checks = config["checks"]
+    if identity is not None:
+        if identity not in ROLE_IDENTITIES[config["role"]]:
+            raise ValueError("identity does not belong to configured role")
+        checks = [entry for entry in checks if entry["id"] == identity]
+    outcomes = []
+    for entry in checks:
+        name = entry["id"]
+        if not config["enabled"] or entry["disabled"]:
+            outcomes.append((name, "suppressed: disabled"))
+            continue
+        if _is_maintained(entry, current):
+            outcomes.append((name, "suppressed: maintenance"))
+            continue
+        if dry_run:
+            outcomes.append((name, "dry-run: would probe and report"))
+            continue
+        try:
+            with _interval_attempt(config, entry, current) as acquired:
+                if not acquired:
+                    outcomes.append((name, "not due or another probe is already running"))
+                    continue
+                try:
+                    endpoint = _secret(entry)
+                except Exception as error:
+                    outcomes.append((name, f"failed: {_safe_reason(error)}"))
+                    continue
+                try:
+                    ok, label = probe(name, config, current)
+                except Exception as error:
+                    ok, label = False, _safe_reason(error)
+                try:
+                    reported = send(endpoint, not ok, config.get("provider_timeout_seconds", 5))
+                except Exception:
+                    reported = False
+                if not reported:
+                    outcomes.append((name, "failed: provider report unavailable"))
+                elif ok:
+                    outcomes.append((name, f"healthy: {label}; report sent"))
+                else:
+                    outcomes.append((name, f"failed: {label}; failure report sent"))
+        except Exception as error:
+            outcomes.append((name, f"failed: {_safe_reason(error)}"))
+    success = all(not result.startswith("failed:") for _, result in outcomes)
+    return outcomes, success
+
+
+def validate_credentials(config_path, identity=None):
+    """Validate enrolled local URLs without probing or contacting the provider."""
+    try:
+        config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("configuration unavailable or invalid JSON") from error
+    _validate_config(config)
+    checks = config["checks"]
+    if identity is not None:
+        if identity not in ROLE_IDENTITIES[config["role"]]:
+            raise ValueError("identity does not belong to configured role")
+        checks = [entry for entry in checks if entry["id"] == identity]
+    results = []
+    for entry in checks:
+        try:
+            _secret(entry)
+            results.append((entry["id"], "credential valid"))
+        except Exception as error:
+            results.append((entry["id"], f"credential invalid: {_safe_reason(error)}"))
+    if config["role"] == "m4":
+        try:
+            _reader_token()
+            results.append(("m4-webhook-reader", "credential valid"))
+        except Exception as error:
+            results.append(("m4-webhook-reader", f"credential invalid: {_safe_reason(error)}"))
+    return results, all(result == "credential valid" for _, result in results)
+
+
+def _is_maintained(entry, now):
+    until = entry.get("maintenance_until")
+    return until is not None and now < until
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default=os.environ.get("K3DM_HEARTBEAT_CONFIG", str(DEFAULT_CONFIG)))
+    parser.add_argument("--check", choices=sorted(IDENTITIES))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--validate-credentials", action="store_true",
+                        help="validate local credential sources without probing or pinging")
+    args = parser.parse_args()
+    try:
+        if args.dry_run and args.validate_credentials:
+            raise ValueError("dry-run and credential validation are separate operations")
+        outcomes, success = (validate_credentials(args.config, args.check) if args.validate_credentials
+                             else run(args.config, args.check, args.dry_run))
+        for name, result in outcomes:
+            print(f"{name}: {result}")
+        return 0 if success else 1
+    except ValueError as error:
+        print(f"heartbeat: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

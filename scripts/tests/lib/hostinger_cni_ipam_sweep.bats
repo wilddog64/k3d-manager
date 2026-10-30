@@ -67,6 +67,23 @@ make_reservation() {
   grep -q '^young=1$' "${state_file}"
 }
 
+@test "sweep: records the count and oldest age of SKIP reservations" {
+  make_reservation 10.42.0.11 live-sandbox
+  make_reservation 10.42.0.2 reported-id "$(date -v-2H +%Y%m%d%H%M 2>/dev/null || date -d '2 hours ago' +%Y%m%d%H%M)"
+  make_reservation 10.42.0.12 young-id "$(date +%Y%m%d%H%M)"
+  make_reservation 10.42.0.10 stale-id
+  run "${SWEEP}" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped=1 skipped_oldest_age_s="* ]]
+  grep -q '^kept=2$' "${state_file}"
+  grep -q '^skipped=1$' "${state_file}"
+  grep -q '^young=1$' "${state_file}"
+  grep -q '^stale=1$' "${state_file}"
+  age="$(sed -n 's/^skipped_oldest_age_s=//p' "${state_file}")"
+  [ "${age}" -ge 7140 ]
+  [ "${age}" -le 7260 ]
+}
+
 @test "sweep: empty sandbox list refuses to remove" {
   : > "${BATS_TEST_TMPDIR}/live"
   make_reservation 10.42.0.10 stale-id

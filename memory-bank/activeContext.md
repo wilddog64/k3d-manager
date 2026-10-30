@@ -21,6 +21,20 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Latest live investigations and records
 
+- **2026-10-29 — PR #152 open (v1.43.9).** Copilot's one finding fixed (2adab150) and resolved; CodeQL #35 dismissed as an intentional TLS probe. Next: CI green → enforce_admins DELETE → operator merges → /post-merge.
+
+- **2026-10-29 — v1.43.9 release prep done.** Grafana guide split (34fd8f9b): agent-run-log/cost/activity pages, Release plans and forecast to k3dm-bugs.md, Host Disk and CVE triage to their pages; test_dashboard_queries now reads k3dm-bugs.md. CHANGELOG promoted to `[1.43.9] - 2026-10-29` with the missing CNI IPAM and VectorDB drift entries; README (top 3) and docs/releases.md rows; README links webhook-doctor, orbstack-upgrade and independent-heartbeats how-tos (bb601a38). Scope check: every code file named by a branch spec. PR next.
+
+- **2026-10-29 — v1.43.12 M5 hub special release opened** (out of order, operator choice). Plans: `v1.43.12-one-command-machine-setup.md` (moved from v1.43.11; now covers M4 workstation parity: the curated brew list, the agent config repos, the same `~/src` layout of 50 checkouts, the `~/.zsh` → zshdotfiles links, and the smartcd/direnv → `sync-*` agent-state backup chain) and `v1.43.12-m5-new-hub-one-command.md` (`make hub-new` / `hub-cutover`). Promotion phases 2–3 moved to v1.43.13. Open before implementation: tracked home for the untracked `.envrc` files, smartcd `bash_enter` scripts and the personal `CLAUDE.md`/`AGENTS.md`/`GEMINI.md`; sync scripts need `pull --rebase` before two machines run them. Commits 21c84360, 2eed97db, 2dfbc318, 105e3b90. PR #62 main build passed, including build-push.
+
+- 2026-10-29: operator approved two items. (1) product-catalog PR #65 opened (`fix/cve-manual-rebuild`, Copilot requested), awaiting CI and an operator merge, then a live manual dispatch. (2) ask-docs Phase 0 landed by Claude as `9fbc6051`: webhook template `ProcessType Interactive`, BATS red-before, N3 guard mutation-caught. The operator must add the key to the installed plist and run `make restart-webhook`; then E3 needs 20 live counts.
+
+- 2026-10-29 (Claude): ask-docs timeout root cause measured. Tally 1.8 s normal vs 13.0 / 58.6 s under `taskpolicy -b`. The webhook plist has no `ProcessType`, so launchd throttles it. Added Phase 0 (`ProcessType Interactive`, webhook only) and an Acceptance block to `v1.43.11-ask-docs-count-performance.md`. Noted in the P2 bug.
+- 2026-10-29 operator decision: the Kine P2 is recovered by building the new hub on the M5 (fresh datastore); the M4 is repurposed after cutover. Recorded in the Kine bug; acceptance is measured on the M5.
+- 2026-10-29: product-catalog CI fix `85945891` is on `fix/cve-manual-rebuild` in shopping-cart-product-catalog with NO PR. app-cve-scan next run 01:00 PDT 10-30 (job history is cleaned up after each run).
+
+- 2026-10-29 (Claude): filed P2 `docs/bugs/2026-10-29-non-claude-coordinator-work-unattributed.md` (`ad5cba50`, v1.43.10, approval pending). 31/32 dispatch starts since 10-26 record an unreported coordinator. No Sol/Terra commit carries a trailer. Fix: `K3DM_COORDINATOR` fallback, AGENTS.md rule, `Coordinator:` trailer, an unreported-share stat.
+
 - 2026-10-23 (cloud session): Added bridge action `diagnose-pods-all` (`provider` only → webhook `get-pods-all`) to `scripts/lib/webhook/cloud_actions.py`, so a cloud session can read every namespace's pods; howto table and CHANGELOG updated. `test_cloud_bridge.py` + `test_diagnostics_all_pods.py`: 99 passed. Fast-forwarded onto `k3d-manager-v1.43.5` (`b5ba7da8..fc2f335d`, no merge commit). Takes effect when the operator restarts the bridge on the release branch; not live-verified. Rechecked the other two 2026-09-29 follow-ups: the dashboard/alert-routing bug docs were filed 2026-09-29/30 and are FIXED, and the e2e payment auth decision (option b, Keycloak token) was made 2026-10-02; that bug waits only on a live Tier 1 rerun.
 
 - 2026-10-22 spec/bug review: two P3 bugs made dispatch-ready (bugs-table column filter; diagnostics job ID). Thread-routing half of the cloud-request bug belongs to v1.44.0 routing plan. v1.43.7 plan numbering fixed (landing-latency = 3 of 5). Open review notes not yet acted on: v1.43.7 N3 needs a concrete worker-vs-operator mechanism; v1.51.0 Falco host audit should be a go/no-go gate; v1.51.0 has no roadmap milestone heading. Awaiting go: Luna dispatch of the two P3 bugs + panel-13 PromQL fix.
@@ -415,3 +429,1225 @@ Claude spends its weekly quota on design and specs, dispatching to Luna, and wor
 - 2026-10-25: PR #151 opened (v1.43.8 release), Copilot requested; CI pending.
 - 2026-10-25: queued for k3d-manager-v1.43.9 (first change after #151 merges, Claude, docs-only, outside cap): split remaining sections of docs/guides/grafana-dashboards.md into per-dashboard pages (new agent-run-log/agent-cost/agent-activity pages; move Release plans/forecast to k3dm-bugs.md; Host Disk to its page); update test_dashboard_queries.py:229 + test_cni_ipam_dashboard.py:78,109 paths; check anchors in 122 linking files.
 - 2026-10-25: PR #151 CI lint failed (ruff F841 unused info in bin/k3dm-vectordb-metrics, from ea9638cc); fixed 5497ba01. Copilot: no open issues. Local ruff was missing — scratchpad venv used.
+- 2026-10-25: PR #151 CI green (run 40258117732), Copilot no issues, 0 unresolved threads; enforce_admins disabled for merge — re-enable in /post-merge.
+- 2026-10-25: v1.43.8 MERGED — PR #151 squash 6974f426 (19:28 PDT). enforce_admins restored. Tag v1.43.8 + GitHub release published. codex-release-merged recorded. Branch k3d-manager-v1.43.9 cut from 6974f426. Retro docs/retro/2026-10-25-v1.43.8-retrospective.md. Operator to run from release branch in tmux: make appsets-reapply, then make platform-ops (confirm exporter rollout). Next: grafana-dashboards guide split (docs-only) on v1.43.9.
+- 2026-10-25: operator ran appsets-reapply (hub 5/5 + app-cluster 8/8, all Applications on k3d-manager-v1.43.9 = merge 6974f426 + retro) and platform-ops; exporter rolled out. Run was via ! in Claude's session: Keychain webhook-token read failed, sync skipped, cicd/k3dm-webhook-token Secret still present (harmless). platform-ops-notifications has no slack-incoming-webhook-url key — pre-existing (P2 bug OPEN, restore before 10-29 drill); Slack plan E3 still blocked on it.
+- 2026-10-25: spec docs/plans/v1.43.11-one-command-machine-setup.md written (PROPOSED, approval pending) — make machine-setup/machine-check ROLE=hub|worker|console, per-role lists, presence-only secrets; opened patch v1.43.11 (plan 1/5) in roadmap + release-milestones.json because v1.43.9/v1.43.10 are full. Dispatch to Luna on operator's go; live E4 on M5 by operator.
+- 2026-10-25: spec docs/plans/v1.43.11-two-machine-work-distribution.md (PROPOSED, plan 2/5, after machine-setup): git work-queue branch (no LAN/VPN dependency), needs+weight per job, leases/heartbeats, land+acg lock refs, ledger host/seq store-and-forward, resource-aware claiming (battery, reserve_gb, M2 opt-in light only). D1 transport decision pending operator (recommended git; Tailscale alternative).
+- 2026-10-25: operator decided D1 for two-machine-work-distribution: git queue; Tailscale only a possible backup (pricing to verify). Spec updated; dispatch still needs go.
+- 2026-10-25: spec docs/plans/v1.43.11-web-console-ssh-behind-cloudflare-access.md (PROPOSED, plan 3/5, critical) — browser SSH via per-machine cloudflared + Cloudflare Access (operator GitHub identity only; 2FA = authenticator app or GitHub Mobile, SMS recovery only), sshd loopback + Access short-lived certs only, check + revoke. Operator runs live steps.
+- 2026-10-25: web-console spec revised per operator port question: macOS Remote Login (launchd *:22, ignores ListenAddress) stays OFF; dedicated LaunchDaemon sshd on 127.0.0.1:2222 with own config; check fails if Remote Login on.
+- 2026-10-25: web-console port per operator: configurable WEB_CONSOLE_SSH_PORT (hosts.conf), default 42722; setup refuses 22, common alternates (2222/2200-2299/2022/8022/10222/22222/32222), ephemeral 49152-65535 and busy ports (new N7).
+- 2026-10-25: web-console bind rule per operator: 127.0.0.1 and/or ::1 only, never 0.0.0.0/::/*; explicit ListenAddress, no bare Port, cloudflared ingress targets 127.0.0.1 literally; check via lsof; new N8 with red tests.
+- 2026-10-25: spec docs/plans/v1.43.11-dev-staging-prod-promotion-path.md (PROPOSED, plan 4/5, P1, phase 1 only; phases 2-3 -> v1.43.12). Decisions pending: D1 staging location (rec. OrbStack k3s VM on M5), D2 deploy/staging+deploy/prod refs supersede release-branch appsets tracking, D3 operator-only make promote.
+- 2026-10-25: promotion-path decisions: D1 staging = OrbStack k3s VM on M5 hub; D2 per-env branches deploy/staging + deploy/prod (pointers moved only by make promote, not git flow; prod FF-only along main; staging may soak release tip pre-merge; prod gate = tree equality with what staging ran). D3 pending. Dashboard-guide split: operator may give to Codex or Claude later.
+- 2026-10-25: promotion-path D3 decided: both — operator make promote, or Slack Approve via make promote --request (reuses v1.33.0 slack-relay approval: allowlist, /hermes-auth 24h, PULL; approval bound to plan hash, single-use, 30 min, gates re-run). All decisions done; dispatch go pending.
+- 2026-10-25: promotion-path D3 addendum: single promotion request, first decision wins via atomic lock ref refs/k3dm/locks/promote-prod; other path auto-voided (Slack message edited, terminal reports); deny voids both; new request voids older; phase-2 race tests required.
+- 2026-10-25: review note applied: all locks/pointers via CAS (push --force-with-lease=<ref>:<expected>, empty = must not exist; --atomic for lock+deploy/prod); claim = fencing token; Slack/KV records intent only, git is sole arbiter; no age-based lock expiry; write-ahead journal + make promote-reconcile ENV=prod classifies actual prod state (finished/never-started/in-progress/partial/drift) before any new op. Same CAS fix in work-distribution D4.
+- 2026-10-25: review note applied to promotion path: D1a staging hard cap (Lima fixed-size VM default; OrbStack machine shares hub VM, cgroup cap only if proven), budget from 7d measured hub peak, PriorityClass + staging-pause on pressure; make env-parity with declared-divergence list; arm64 (M5) vs amd64 (Hostinger, to verify) gap -> amd64 digest gates + ACG x86 smoke; staging own creds/paths/tunnel/data. Acceptance M6 M7 N5 E4 E5.
+- 2026-10-25: vector store in distributed setup (operator: sounds good): plan 2 D7 — hub sole indexer, M4/M2 search a pushed embedding-cache copy locally (as-of + lexical for newer docs, always exit 0), no vectors in git; M10 N7 E6. Plan 1: worker secrets gain gemini-cli-api-key, embed-cache-restore before first index on new hub. Promotion plan N6: vectordb never on staging/prod.
+- 2026-10-26: v1.43.9 execution started (operator: "execute v1.43.9"). Waves: 1a vectordb-drift-kinds-and-age + cni-ipam-reclaim-visibility (dispatched to Luna); 1b dispatch-spec-and-change-complexity + orbstack-upgrade-coordinated (code only; operator runs the upgrade); 2 vectordb-retrieval-quality-probe (after drift lands). Note: codex-dispatch BRANCH= needs REPO=; k3d-manager derives the branch from the spec.
+- 2026-10-26: v1.43.9 vectordb-drift-kinds-and-age LANDED `dd53c17c` (pushed). Review: added `drift` to sensor key-set test (spec Files updated `349eab30`), pre-fix red 6/6, N1/N2/N3 mutation red, ruff clean, validate-manifests 85/85. Live E2 pending hub sync.
+- 2026-10-26: v1.43.9 cni-ipam-reclaim-visibility LANDED `c292d69d` (pushed). Claude review fixes: guide text moved from index to `grafana-dashboards/k3dm-host-cni-ipam.md` + alerting triage row (M5 was unmet); "unchanged" tests compared to `git show HEAD:` (fails once committed) → pinned sha256 baselines; added M5 guide test. N1/N2/N3 mutation red; pre-fix 7 py + 1 bats red. Live E4 pending operator `make refresh CLUSTER_PROVIDER=k3s-hostinger` + `make platform-ops`. Wave 1a done; dispatching wave 1b.
+- 2026-10-26: v1.43.9 wave 1b DISPATCHED to Luna: dispatch-spec-and-change-complexity, orbstack-upgrade-coordinated (code only; operator runs the upgrade).
+- 2026-10-26: v1.43.9 dispatch-spec-and-change-complexity LANDED `8d7e00cd` (pushed). Claude review fixes: new stat panels re-id 20–23→89–92 (collided with agent-cost ids), Per spec description restored + size note, explicit stat colours, agent_dispatch_dashboard.bats pins updated (spec Files `0419355a`), null spec_stats no longer counted as measured (+N1 test, mutation red). Red on pre-change: py 4 failed, bats tests 1/3/4. Live E3 pending (next real land + screenshot).
+- 2026-10-26: v1.43.9 orbstack-upgrade-coordinated REVIEW FAILED → resumed Luna (resume 1). Findings: F1 export freshness reads nonexistent snapshots/ dir in dashed format (real record is ~/.k3dm/hub-data/last-success, compact stamp) → always refuses live; F2 hardcoded localhost:19094 Pushgateway (tests unisolated); F3 empty regressions → [""]; F4 no test reaches upgrade/recovery/verify (M3–M6, N2, N4 unproven); F5 `! grep` no-op; F6 Hermes N1 test.
+- 2026-10-26: v1.43.9 wave 2 DISPATCHED to Luna: vectordb-retrieval-quality-probe (drift dependency landed dd53c17c). Running alongside orbstack resume 1.
+
+- 2026-10-26: vectordb-retrieval-quality-probe LANDED/offline VERIFIED `b133f53e61d0b64aa55bb805bb369f91f2babffe` through dispatcher. C1–C7, daily attempt throttle, currentness filtering, four dashboard rows, three alerts; unused-import/BATS negation fixes and success/noop failure-isolation checks. Pytest 125 passed/1 opt-in live skipped, VectorDB BATS 17/17 (with negation guard 18/18), Ruff clean, manifests 85/85, audit passed. Broad runs partial: 6 then 4 failures (negation, Python 3.15 legacy loader, unpushed HEAD); all affected focused rechecks green. Shared branch synchronized by merge (no history rewrite). Evidence: docs/issues/2026-10-26-v1439-retrieval-landing-verification.md. Live E2 pending operator screenshot + Claude live pytest. PR URL: none.
+
+- 2026-10-26: Live diagnosis of v1.43.9 Retrieval quality dashboard no-data screenshot: Hermes `retrieval_probe_last_attempt` remains null, last index success at 15:58 PDT, repeated LaunchAgent GitHub SSH fetch failures; after manual fetch succeeded, the Hermes process still ran and repeatedly spawned `security find-generic-password -s gemini-cli-api-key -w` while evaluating 53 queries. Retrieval obtains the key through `api_key()` for each search; metrics publish only after the full probe. No process restart/kill or live pytest was run. Filed P2 follow-up docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md; recommended reuse one in-memory credential per probe and verify noninteractive Hermes access.
+
+- 2026-10-26: operator explicitly dispatched fix for docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md via k3dm-codex-dispatch; bounded credential reuse to one in-memory lookup per evaluation, offline-only tests, no live pytest/restart/deploy. Task slug vectordb-retrieval-key-cache; awaiting worker.
+
+- 2026-10-26: v1.43.9 credential-reuse fix dispatch running as `vectordb-retrieval-key-cache-retry2` from the approved P2 issue. Worker status: running, scope in-scope. Initial start failures (missing codex/node PATH) and the Files-heading parser correction recorded in the issue doc.
+
+- 2026-10-26: credential-reuse fix LANDED `8237c54d` via `k3dm-codex-dispatch` (issue/task `vectordb-retrieval-key-cache-retry2`). Reuses one in-memory API key per probe/live evaluation; standalone search retains prior lookup. Gates: prior_art/retrieval pytest 105 passed, 1 live skipped; VectorDB+negation BATS 18/18; Ruff clean; manifests 85/85; audit and diff checks passed. Live verification pending deploy + Hermes restart (explicitly excluded from dispatched task).
+- 2026-10-26: Deep dive confirmed Hermes LaunchAgent has no `SSH_AUTH_SOCK` while interactive M4 shell has an agent; manual `git ls-remote` succeeds and the same read with agent removed fails `Permission denied (publickey)`. `_refresh_index` suppresses retrieval probe after fetch failure. Filed OPEN P2 `docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md`; do not pin the ephemeral socket in plist. Issue commit 49b73ced pushed to origin/k3d-manager-v1.43.9; PR URL: none.
+- 2026-10-26: Retrieval screenshot follow-up: panel 23 has unit seconds but no thresholds; Grafana default turns red above 80, while probe cadence is daily and stale alert is 48h. Filed separate P3 `docs/bugs/2026-10-26-vectordb-probe-age-panel-default-red.md`. SSH auth bug narrowed: `UseKeychain=yes` succeeds with `SSH_AUTH_SOCK` unset; dispatch spec added to P2 bug under explicit operator go. Both doc changes pending commit; screenshot panel fix not dispatched.
+- 2026-10-26: Dispatched `docs/bugs/2026-10-26-hermes-launchagent-github-fetch-misses-ssh-agent.md` as task `hermes-launchagent-keychain-ssh`; dispatcher state `running`, scope `in-scope`. Bounded fix uses macOS Keychain-backed `/usr/bin/ssh -o UseKeychain=yes`, preserves caller override, offline test + guide update; no live deploy/restart. Scope/spec commit `37eb2821` pushed. Screenshot false-red is separately filed P3 and not dispatched. PR URL: none.
+- 2026-10-26: `hermes-launchagent-keychain-ssh` worker exited successfully, scope in-scope; patch touches only the three approved files. Offline probe suite reported 11 passed; Ruff unavailable on M4; review/landing pending and no live restart/fetch was run. Retrieval-usage research: current `find-similar-docs.py` emits no event IDs and Codex dispatch records task lifecycle only; cannot prove “Used” from current telemetry. v1.43.9 plans are 5/5, so no new usage-attribution plan doc was written; awaiting next-milestone direction.
+
+- 2026-10-26: Wrote `docs/plans/v1.44.3-dispatch-prior-art-usage.md` and placed it in roadmap Plan 3 of 5. Scope defines lookup ledger events, agent-reported reads, validated `Prior-art:` land trailers, bounded release dashboard metrics, missing-data handling, and no session-file parsing. v1.44.3 is now at its five-plan cap. Approved to write/place; dispatch not separately approved.
+
+- 2026-10-26: Restored a distinct Live verified indicator to the Release Plans table. The plan metric's `verification` label is now projected into separate Verified and Live verified display fields; live verification is also shown as verified. Widths total 1,320 px within the 1,350 px laptop budget. Focused Grafana dashboard suite passed 38/38. Fix commit `7ec87a73`; rollout/live verification pending. PR URL: none.
+- 2026-10-27: Filed P3 `docs/bugs/2026-10-26-plans-table-live-verification-column.md` for the restored Plans status indicator. Hub ArgoCD hard refresh reconciled `1e44141e` as Synced/Healthy; live Bug Tracking ConfigMap and Grafana sidecar/provisioner confirm separate Verified/Live verified fields and 1,320/1,350 px configured width. This is backend provisioning evidence, not a browser screenshot. The bug/guide record was pushed as `35959fa0`; PR URL: none.
+- 2026-10-27: Investigated why three landed v1.43.9 plans still show proposed. Ledger has start+land for drift (`dd53c17c`), CNI IPAM (`c292d69d`), dispatch complexity (`8d7e00cd`); code land commits omitted their plan docs. The exporter derives execution only from plan `Status:` and does not reconcile ledger land events. Retrieval-quality is the sole plan with a post-land status doc commit (`f5c1a745`). Added evidence to existing P3 issue; left all three Status headers unchanged pending operator/Claude decision.
+- 2026-10-27: P3 `plans-dispatch-status-reconcile` landed as `78ffa7d5` on `origin/k3d-manager-v1.43.9`. Plan panel separates Dispatch approval from Dispatch task, maps missing approval to `not recorded`, and labels landed plans with stale execution as `landed; documentation stale`. Focused pytest 108 passed; Grafana dashboard BATS 38/38; py_compile, diff check, `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` passed. E3 live sync/screenshot remains pending. Initial start/land workflow refusals and recovery are documented in `docs/issues/2026-10-27-dispatch-from-release-branch.md` and `docs/issues/2026-10-27-dispatch-land-refused-dirty-worker.md`.
+- 2026-10-28: At operator request, commit `915c55f4` restored panel 107 to its pre-`7ec87a73` state: one Verification column, original Dispatch label/mapping, and original Blocked by query. Closeout `8f4cea4b` records the reversion; both commits pushed. Reopened the two related P3 dashboard records pending Claude's design decision. Focused pytest 108 passed and dashboard BATS 38/38. M4 hard-refreshed `hub-grafana-dashboards`, which is Synced/Healthy at revision `8f4cea4b`; live ConfigMap confirms restored query/columns. Browser screenshot not captured; see `docs/issues/2026-10-28-plans-dashboard-revert-live-sync.md`.
+- 2026-10-28: Follow-up screenshot still showed the Live verified bug as Fixed. Read-only Prometheus query, including the dashboard's Auto/current-release join, returns status `open`, `fixed_in=-`, `fix_sha=-`, `verified=-`, `live_verified=-`; Pushgateway `k3dm-bug-open` publication is current. Likely the browser showed an older panel result; exact output recorded in `docs/issues/2026-10-28-plans-dashboard-revert-live-sync.md`. Need operator browser refresh; if still Fixed, inspect its variable values/query.
+
+- 2026-10-26: Rechecked operator Plans screenshot against current exporter/plan headers and M4 dispatch ledger: drift/CNI/complexity remain proposed, OrbStack ready, retrieval implemented; all five ledger tasks are landed with passed landing tests. Dispatch is structured plan-header approval (all five headers missing), while Dispatch task is ledger state. Status metadata was not reconciled after four landings; retrieval alone got f5c1a745. No plan/dashboard/code changes or live rollout; preserve the prior table reversion. Evidence commit `48db4ad7`, full 38/38 BATS output and ancillary Zsh glob recovery in `docs/issues/2026-10-26-plans-execution-versus-dispatch-task.md`; audit/lint/diff gates passed. PR URL: none.
+
+- 2026-10-26: Updated the existing OPEN/P3 bug `docs/bugs/2026-10-26-release-plans-dispatch-approval-unknown-despite-landed.md` in `ced8f0a0` at operator request. Current evidence is five landed tasks, four stale Status headers (now explicitly including OrbStack), and five missing structured Dispatch headers. Added the five-row comparison, Spec approval/Dispatch/Dispatch task source distinction, retrieval's leading-keyword verification caveat, and link to full diagnostic/BATS evidence. Prior presentation fix remains reverted; no plan/runtime/code changes. Doc links, audit/lint and staged diff checks passed; prior unchanged dashboard BATS evidence is 38/38, not rerun for this Markdown-only update. PR URL: none.
+
+- 2026-10-26: Operator explicitly requested GPT-6-Luna dispatch of the existing Plans execution/dispatch P3. Pushed authorization/scope `a1ba5bf1`, then started fresh task `plans-dispatch-status-reconcile-luna` with `--agent codex --model gpt-6-luna`. Status running/in-scope; runtime model gpt-6-luna, session `01a17b2f-6931-7a01-9672-72f648ece226`; ledger model_source explicit. Six-file offline scope only, no plan headers/ledger/runtime changes or separate Live verified column; worker must leave changes uncommitted. No landing/deployment attempted. Startup evidence and ancillary source-search glob recovery: `docs/issues/2026-10-26-plans-p3-luna-dispatch.md`. Implementation tests/review pending. PR URL: none.
+
+- 2026-10-26: Reviewed completed dispatches. Hermes Keychain SSH fix independently passed 369 Python tests, Ruff, 17/17 VectorDB/negation BATS, and 3 pre-fix red regressions; dispatcher rebased/landed it as `3aae7adc`, pushed to release. Bug is VERIFIED offline; no live fetch/restart/deploy performed. P3 worker exit 0 concealed explicitly reported partial work (36/38 BATS, missing blocker reconciliation/lifecycle coverage), so resumed rather than landed. Resume 2 unexpectedly used gpt-6.1-sol; stopped only that worker and resumed the same session with a temporary explicit-model wrapper. Resume 3 runtime confirms gpt-6-luna; task still in-scope/running. Dispatcher model-preservation bug is out of scope and needs follow-up. Evidence/tool recovery: `docs/issues/2026-10-26-dispatch-closeout-review.md`. PR URL: none.
+
+- 2026-10-26: Completed review/landing of both pending dispatches. Hermes fix `3aae7adc` remains VERIFIED offline (369 Python, Ruff, 17 BATS, 3 original-code red checks). GPT-6-Luna P3 replacement independently reviewed and dispatcher-landed as `608b90a1`: 111 Python including actual Prometheus Auto/Manual lifecycle evaluations, Ruff, 38 BATS, both original-query engine checks red; staged audit/lint/diff/doc links passed. Preserves raw exporter contract and plan statuses; maps approval unknown in UI, flags landed documentation lag, keeps one Verified column and 1,312 px widths. No live fetch/restart/dashboard sync/deployment performed. Both canonical bugs and evidence updated in `docs/issues/2026-10-26-dispatch-closeout-review.md`. Resume's default-model drift remains an out-of-scope follow-up. PR URL: none.
+
+- 2026-10-27 UTC: Both fixes now LIVE-VERIFIED from operator evidence plus read-only runtime checks. Hermes `3aae7adc`: LaunchAgent PID77982 started 03:06:35Z, fixed source clean, launchd/plist SSH_AUTH_SOCK and GIT_SSH_COMMAND unset; published success/run timestamp 03:07:05.180833Z, success=1/failed=0. Operator JSON/screenshot show VectorDB healthy, 2304 rows/corpus. Plans `608b90a1`: Argo Synced/Healthy/Succeeded at ef57b255; ConfigMap/file/API agree, Grafana k3dm-bugs v60. Operator page refresh then screenshot confirms Dispatch approval not recorded, all 5 tasks landed, four stale-document blockers, retrieval dash, original execution/one Verified column. Initial table screenshot was an old browser view. Saved screenshots and full operator output in `docs/issues/2026-10-27-live-verification-hermes-and-plans.md`. Commands were from iTerm, not default tmux; grep alias to rg caused -E error, corrected with /usr/bin/grep. Probe-age red at 3.25h remains separate OPEN P3. No assistant sync/restart/deployment/credential change. PR URL: none.
+
+- 2026-10-27: Operator selected six screenshot bugs for GPT-6-Luna, independent verification and live checks strictly one at a time. Approved compatible GHCR transport/image change to meet N1. Scopes pushed 0510c5d3/5dae466f. Probe thresholds independently landed 74d2d4e2 (18 BATS + ShellCheck, old-panel red); Live verified column landed 9893651f (111 Python incl real PromQL, Ruff, 38 BATS, old-query red), both offline VERIFIED. GHCR, heartbeat and primary-coordinator workers running on confirmed gpt-6-luna; webhook doctor scope committed but queued to keep active workers bounded. Temporary /private/tmp/k3dm-luna-batch-wrapper forces Luna on resume and adds Homebrew PATH. First live question pending: probe-age under24h green after normal sync/refresh; do not force probe. Hold all subsequent live checks. Full scopes, old exit127 recovery (retry2 landed8237c54d), audit assertion replacement and test output: docs/issues/2026-10-27-six-bug-luna-batch.md. User's product-catalog critical alert maps to existing GHCR P2; no duplicate/new causal claim. No live worker mutations. PR URL:none.
+
+## 2026-10-27 — Dashboard live checks and ask-docs count investigation
+
+- Operator live checks 1/2 passed: probe age 11.6h green (`74d2d4e2`); Plans Manual v1.43.8 has two positive Verified/Live verified rows and matching summary, while v1.43.9 unknown/n/a rows remain dashes (`9893651f`). Canonical bugs LIVE-VERIFIED; screenshots and evidence appended to docs/issues/2026-10-27-six-bug-luna-batch.md.
+- Exact ask-docs question `how many P1 open for v1.43.5` reproduces matcher None; adding bugs yields CountQuery(v1.43.5,P1,open). Filed OPEN P2 docs/bugs/2026-10-27-ask-docs-priority-count-requires-bugs-word.md and verbatim issue evidence. Existing v1.45.1 translation gate also requires bugs; no code fix/dispatch/live change yet.
+- GHCR and heartbeat resumed for review corrections; doctor completed awaiting review; remaining batch work is pending. Next live check waits for accepted implementation. PR URL: none. Evidence-record commit SHA is in git history for this entry.
+
+## 2026-10-27 — Three remaining Luna deliverables landed
+
+- GHCR `0cd39eb8680e3eab0fb70e42ff6f58f7e8b4b3ca`: independent36 BATS, ShellCheck, real curl fixture, non-root network-disabled cached image compatibility, staged gates and dispatcher post-rebase gate pass. VERIFIED offline; operator live credential/remediation evidence pending.
+- Heartbeat `79bd9eb50614ae6acf37cc868a1111bbcf8cc722` plus CLI executable correction `233a4b1117645b1ea8506fb183fcd963756cd926`:136 Python,3 BATS, Ruff/audit/lint pass; optional disabled by default. VERIFIED offline; enrollment/alert live checks pending. CHANGELOG-only isolated rebase conflict resolved retaining both entries; retested.
+- Doctor `e4f6823ed52e8c070ccf516cb000af5fc2f5a6e9`:21 Python,5 BATS, Ruff/audit/lint, no-I/O direct dry-run pass. Incident stays OPEN pending live evidence; no restart performed. Reviewed/fixed Keychain dict-contract crash and missing-ok schema.
+- All three pushed and dispatcher verify pass recorded. Coordinator resumed for hidden data columns, normalized duplicate identity series, pre-side-effect actor validation, and missing fixtures; not accepted yet. Curated test all running. Full actual outputs/findings in docs/issues/2026-10-27-six-bug-luna-batch.md. PR URL:none.
+
+- 2026-10-27 startup-log follow-up: actual codex.log files contain missing codex/node errors. Metrics expose a codex.log path but Loki only ships landing-test logs by design; failed starts never produced those. Filed P3 docs/bugs/2026-10-27-dispatch-startup-failure-log-link-empty.md and exact evidence issue; no transcript shipping or ledger rewrite. Curated batch gate found two new test-style violations (bare negation heartbeat BATS and grep-q pipeline CVE BATS); fixed assertions/consumer behavior and focused guard retest running.
+
+- Curated batch run also exposed existing ESO test failure: SourceFileLoader.load_module missing in current Python; focused rerun 5pass/1fail, exact output docs/issues/2026-10-27-existing-eso-test-python-loader-failure.md. Unchanged by batch; no production ESO fault inferred and no out-of-scope fix.
+
+- Curated batch also found unchanged hub_data recovery tests failing to cp -R the pre-existing Unix socket ./-e (mtime Oct26 15:19). Did not delete operator socket or alter out-of-scope recovery tests. Exact output/follow-up docs/issues/2026-10-27-existing-hub-recovery-test-copy-socket-failure.md.
+
+- Broad curated regression completed before final coordinator landing:1895 total,1869 passed,19 skipped,7 failed; full output docs/assets/2026-10-27-six-bug-curated-tests.txt. Batch negation failure fixed/29 affected tests pass; six remaining failures out-of-scope (OrbStack1,Python3.15 ESO1,socket-copy4). Overall suite NOT green. Existing BW02 captured. Final coordinator landing full124 BATS +136Python still running; next live question queued only doctor --check, no restart.
+
+## 2026-10-27 — Six Luna implementation deliverables accepted
+
+- Final coordinator implementation `9424c32a9f0032797c7c803a9a7fc3d1d1651ab5` landed via dispatcher. Independent136 pytest and focused CLI/dashboard checks pass; post-rebase136 pytest +124BATS, Ruff, ShellCheck, staged audit/lint and normal hooks pass. CHANGELOG-only conflict resolved on isolated branch. Sole scope exception dashboard BATS documented before land. Verify pass recorded; push follows closeout.
+- All6 deliverables now independently accepted/landed. Probe-age74d2d4e2 and Live-column9893651f LIVE-VERIFIED. GHCR0cd39eb8, heartbeat79bd9eb5/233a4b11 and coordinator9424c32a VERIFIED offline. Doctor e4f6823e verified deliverable; original webhook incident stays OPEN pending live diagnosis/recovery evidence. Assertion correction78073617 landed/pushed.
+- Broad curated run1895:1869 pass,19skip,7fail at its starting revision. Introduced negation assertion issue fixed/29 affected BATS pass; six remaining out-of-scope failures recorded in individual issue docs. Do not claim whole-repository green. Full output docs/assets/2026-10-27-six-bug-curated-tests.txt and batch issue.
+- Next live check3 only: operator runs bin/k3dm-webhook-doctor --check and supplies JSON; no restart yet. Operator said sure, but no JSON/result received, so no new live verification claimed. GHCR/heartbeat/coordinator live checks wait behind this one. No assistant deployments or provider calls. PR URL:none.
+
+## 2026-10-27 — Live check3 caught diagnostic port defect
+
+- User supplied operator JSON12:17:20Z auth_unavailable/no recovery. iTerm2 tool blocks native access; user corrected tmux, five-pane search found no doctor command, then supplied JSON. No UI workaround. Coordinator's transparent fresh read-only check at12:19Z incorrectly called9000 unresponsive. Independent lsof confirmed PID4295 on127.0.0.1:7443; production defaults7443.
+- Fixed doctor +heartbeat defaults/example and loaded LaunchAgent port override validation in `2b93434e893ff0417946c550deecbecb1443021d`.6 pre-fix failures; final161 Python +8 BATS, Ruff, ShellCheck, staged audit/lint pass; legitimate old-port assertion replacements documented, no bypass. New P2 diagnostic-port bug VERIFIED.
+- Corrected direct read-only live result12:24:33Z: PID4295 loaded/listening7443, HTTP healthy/all_ok=true, recovery_recommended=false. NO restart. Operator credential-context reason remains unknown; original incident OPEN (historical cause/external delivery unverified). Full outputs docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.
+- Next single operator step: Slack /k3dm fix-list, confirm completed reply (not just queue acknowledgment). Other batch live checks stay queued; no heartbeat enrollment or credential changes. PR URL:none.
+
+## 2026-10-27 — Operator Slack live check3 passed
+
+- Screenshot job a13d5831: /k3dm fix-list queued, started by operator, succeeded with actual fix-list output, all in same Slack thread. Archived docs/assets/2026-10-27-webhook-fix-list-live.png. Full evidence docs/issues/2026-10-27-webhook-doctor-live-port-mismatch.md.
+- Current local7443 authenticated health +Slack result delivery confirmed. No restart warranted or performed. Historical offsite cause and operator reader-credential context remain unknown; original incident stays OPEN, and cloud-bridge path not separately tested. Diagnostic deliverable/current functionality live-confirmed. Implementation2b93434e; evidence1148a5c8 plus this record.
+- Next live item4 GHCR: first read-only inspect deployed scanner image; wait for result before choosing rollout or credential steps. No blind rotation, no scan triggered. Heartbeats/coordinator live checks queued. PR URL:none.
+
+## 2026-10-27 — GHCR live check4 waits for deployment
+
+- Operator CronJob main-container read exit0: aquasec/trivy:0.63.0. Expected accepted main image docker.io/alpine/k8s:1.31.4 with Trivy init. New fix is not deployed; live auth behavior untested, canonical bug remains VERIFIED offline.
+- Recorded PARTIAL prerequisite in docs/issues/2026-10-27-ghcr-live-check-old-scanner-image.md and canonical/batch docs. Reviewed make platform-ops target: applies CronJob and script ConfigMap from checkout through deploy_argocd_platform_ops --confirm. Next operator action only make platform-ops, then inspect result before advancing. No assistant mutation, blind PAT rotation or scan triggered. PR URL:none.
+
+- 2026-10-27 GHCR rollout: operator make platform-ops excerpt reached platform-ops deployed; annotation warnings patched automatically. Local Keychain webhook/rebuild/git-writer items unavailable; existing app-rebuild Secret retained, actual auth untested. Full supplied excerpt recorded in docs/issues/2026-10-27-ghcr-live-check-old-scanner-image.md (no exit code supplied). Next single check main+init CronJob images expected alpine/k8s:1.31.4 +trivy:0.63.0. No blind rotation, scan trigger or unrelated optional setup. GHCR live still pending; PR URL:none.
+
+## 2026-10-27 — Doctor lookup correction and GHCR deployment prerequisites
+
+- Operator doctor12:42:06Z:7443 listening, auth_unavailable, no recovery. Offline reproduction found _run terminates a child that closes both output streams before successful exit (-15 despite time remaining). Fixed b591a13c803b44377fcea91207ea68142a9fdf5c;2 red regressions,26 Python+5 BATS, Ruff, audit/lint pass. Cause of operator Keychain context still unproven; no credentials/services changed. Evidence docs/issues/2026-10-27-webhook-doctor-command-exit-race.md.
+- GHCR deployment now read-only confirmed main alpine/k8s:1.31.4, init trivy:0.63.0, UID/fsGroup65534, deployed/local scanner SHA256 c6762a033e4b6ad66a0d448debc47f4e26cde14a750fff1a0cd7825e850ea258 match. Full evidence appended to GHCR prerequisite issue. Registry auth/runtime scan not exercised.
+- Remote17 concurrent doc commits merged without rewriting history (21e235d1), gates pass. Next user step only rerun doctor in same shell after push; hold manual make app-cve-scan (may promote clean images), heartbeat enrollment and coordinator E3. Historical incident remains OPEN; prior local/Slack healthy evidence preserved. PR URL:none.
+
+## 2026-10-27 — Operator reader lookup still unavailable
+
+- Operator22:30:13Z doctor repeat after b591a13c still auth_unavailable;7443 listening, no exceptions in recent categories, recovery=false. EOF race is independently fixed but NOT established as this credential symptom's cause.
+- Read-only coordinator lookup metadata only: /usr/bin/security, reader env absent, complete/exit0, nonempty reader returned. No token printed/copied/rotated. Source doctor/server service/account/env match. Operator context's access is not proven; don't guess missing item or rotate credentials.
+- Exact JSON+metadata appended docs/issues/2026-10-27-webhook-doctor-command-exit-race.md and canonical incident. Next single operator check: bounded absolute security lookup printing only exit code/presence/elapsed, no value or stderr. GHCR runtime and remaining live checks queued. Code tests unchanged26Python/5BATS; evidence-only gates apply. PR URL:none.
+
+- 2026-10-27 operator metadata lookup: /usr/bin/security exit36, credential_present=false,0.03s. Not a timeout; success-gated false does not prove missing item. Local security error -25308 says User interaction is not allowed, SDK confirms enum, modulo256=36; primary Apple docs consulted. Session/access restriction is an inference, not confirmed locked keychain/tmux cause (native stderr not yet observed). Next user check fresh local GUI tab outside tmux, absolute lookup stdout>/dev/null then print exit; no token/ACL/unlock/restart changes. Exact evidence appended doctor-command-exit-race issue. GHCR runtime still queued. PR URL:none.
+
+## 2026-10-27 — Operator reader lookup resolved by Keychain unlock
+
+- Operator confirmed login.keychain-db locked, ran security unlock-keychain interactively, then exact reader lookup stdout>/dev/null returned lookup_exit=0 (previous36). Locked Keychain now confirmed cause of operator auth_unavailable lookup symptom; no token disclosure/rotation, ACL modification or webhook restart. Not proof of tmux cause or historical offsite incident cause.
+- Exact supplied terminal output appended docs/issues/2026-10-27-webhook-doctor-command-exit-race.md; canonical incident/howto updated. Independent EOF race fix remains valid but was not the actual locked-Keychain cause.
+- Next single operator check final doctor --check with Keychain unlocked; authenticated HTTP result still pending from operator. GHCR images/init/securityContext/script hash passed; runtime scan/auth, heartbeat enrollment and coordinator E3 stay queued. Evidence-only gates; code tests unchanged26Python/5BATS. PR URL:none.
+
+## 2026-10-27 — Recurring Keychain lock is now explicit doctor state
+
+- Operator requested doctor account for frequent locks. Implemented1ff3b09b2bda92fc20125253f5c7b365db320e46: keychain_interaction_required for blocked native access, sanitized credential/status/action; missing reader distinct; timeout/outputlimit/empty/failure statuses; env bypass and next-run unlock observation. HTTP unprobed without credential, no credential-only restart action. No auto-unlock, caching, lock-policy/ACL/credential/service changes.
+-4 regressions red on prior implementation; final31Python +5BATS, Ruff, direct no-I/O dry-run, diff check, staged audit/lint and normal hooks pass. Full exact output docs/issues/2026-10-27-webhook-doctor-keychain-aware-auth.md; new P2 bug VERIFIED offline. Did not relock real Keychain. Whole-suite known unrelated failures remain separate/not rerun.
+- Next single live check doctor --check in unlocked operator session; current auth result not yet supplied. GHCR deployment prerequisites passed, runtime auth/scan still pending; heartbeat enrollment and coordinator E3 queued. Original historical incident stays OPEN. PR URL:none.
+
+## 2026-10-27 — Health timeout is inconclusive with a listener
+
+- Operator22:43:40Z credential available after unlock but four-second health request timed out, PID4295/listener7443 present, olddoctor recommended restart. Held recovery. Quick health still runs parallel8-second dependency HTTP probes; four-second aggregate budget/inference was invalid. Independent current4010.146s and authenticated healthy3.438s without restart; no exact cause/duration of prior request claimed.
+- Fixed eafe42da71f6243f9613dc85f53f92f9e7ae0182: health15s separate from commands4s; body uses remaining budget; health_timeout_seconds output. Present/unknown listener+timeout =>health_check_timeout with no restart, all_okunknown; missingjob/listener remains independent recovery evidence.4 regressions red;35Python+5BATS, Ruff, audit/lint/hooks passed. No service/credential/lock-policy changes.
+- Corrected direct check22:49:14Z healthy/all_oktrue, reader available, no recovery. Full operator and current JSON, measurements and gates docs/issues/2026-10-27-webhook-doctor-health-timeout-restart-inference.md; new P2 VERIFIED. Historical cause still unknown, prior Slack a13d5831 evidence retained.
+- Resume queued GHCR runtime: prerequisites images/init/UID/fsGroup/hash passed. Check no active scanner before requesting operator make app-cve-scan (real scan may promote clean images); coordinator has not triggered it. Heartbeats/coordinator E3 stay queued. PR URL:none.
+
+- GHCR runtime readiness after doctor correction: read-only hub Jobs query active_app_cve_scan_jobs=[]; images/init/securityContext/script hash already confirmed. Next operator command make app-cve-scan (real scan may promote clean candidates); no assistant Job creation/credential rotation/promotion. Await result, then inspect reason/metrics. Doctor fix eafe42da and full evidence0215b1bb pushed, current direct authenticated health good with no recovery.
+
+## 2026-10-27 — Make doctor wrapper and live GHCR credential rejection
+
+- Added user-requested make webhook-doctor(default --check), DRY_RUN=1(--dry-run), PHONY/help/howto/testguide in47b4d740. Actual Make expansions, no-I/O plan, help presence and5 restart BATS pass; staged lint/audit/hooks pass. No new runtime dependency/restart/scan linkage.
+- Operator scan app-cve-scan-manual-1793141593 completed but newlog product-catalog reason=auth/promotion skipped; published per-service auth metric1. Listed promotion events old. Notifications email/PagerDuty skipped for missing config; <none> report tags not independently interpreted. No second scan started.
+- Dedicated Keychain platform-ops-app-rebuild lookup0/present; in-memory TLS-only intended-recipient checks returned GHCRtoken403(no pulltoken) and GitHub/user401. Credential rejected, expiry/revocation/other cause not distinguished. No token/Authorization argv/output, profile/scope dump or cluster Secret read/decode.
+- Next single operator task replace/regenerate dedicated GitHub PAT and update existing Keychain item/account k3dm via own credential UI. GHCR needsclassicPAT read:packages/package access per officialdocs; preserve required existing dedicated rebuild permissions, never broadgh-token substitution. No assistant credential writes. Recheck auth after storage before sync/rescan. GHCR live partial, overall canonical VERIFIED; heartbeat/coordinator live queued. Full output docs/issues/2026-10-27-webhook-doctor-make-target-and-ghcr-live-auth.md. PR URL:none.
+
+- 2026-10-27 credential selection: user asked about k3dm-dependabot-merger. Existing2026-10-17 dependabot-automerge doc identifies it as GitHub App installed on5 shopping-cart repos, not the scanner PAT target. No App keys/client credentials changed. Screenshot archiving was rejected by automatic approval review (credential-page artifact export not authorized/verified); omitted artifact, recorded only existing-repo-supported identity. Next operator action correct classicPAT page/dedicated scanner token, then Keychain platform-ops-app-rebuild/k3dm. No token in chat. GHCR authentication pending replacement. PR URL:none.
+
+- 2026-10-27 user clarified scanner PAT entry name platform-ops-app-rebuild and requested Keychain command. Verified local security help plus Apple source: add-generic-password -U -s platform-ops-app-rebuild -a k3dm -w with -w LAST prompts hidden PAT+confirmation; no token in argv/history. Added howto/guidance evidence. No screenshot/expiry/scope artifact archived, respecting prior rejection. Operator must execute/store value; coordinator did not write credentials/ACLs/Secrets or rescan. Authentication still pending new stored value; PR URL:none.
+
+## 2026-10-27 — Renewed scanner PAT accepted;90-day rotation record
+
+- Operator stored replacement platform-ops-app-rebuild/k3dm PAT and explicitly requested recording90-day expiry for rotation. Local in-memory read-only verification now GitHub200(owner matches),GHCRtoken200/pulltokenpresent,latestmanifest200/digestpresent. Literal read_packages_scope=false is not effective denial (write packages includes download); actual package requests succeed. No token value/profile/scope list disclosed.
+- Exact GitHub expiration header2027-01-26 01:55:50UTC =2027-01-25 17:55:50PST America/Los_Angeles. Rotate by2027-01-18, one week early. Durable table in docs/howto/app-cve-scan-auth.md; full actual metadata in make-target-and-ghcr-live-auth issue. User authorized textual expiry note; no screenshot export or scheduled notification created.
+- Next single operator action hub-context ./scripts/k3d-manager argocd_sync_app_rebuild_secret platform-ops, then inspect output before one rescan. Coordinator has not synced Secret or launched a second Job; successful local PAT does not prove cluster replacement/promotion. GHCR live still pending sync+scan; other live items queued. Evidence-only gates; PR URL:none.
+
+- Operator replacement Secret sync completed: argocd_sync_app_rebuild_secret platform-ops logged Keychain source and secret/platform-ops-app-rebuild configured. Exact output appended make-target-and-ghcr-live-auth issue/canonical bug. Local auth previously200; cluster runtime auth-to-ok/promotion still pending. Next single user command make app-cve-scan once, then inspect new Job log/metrics. No coordinator Secret decode or Job creation. Rotation expiry2027-01-26 01:55:50UTC (Jan25PST), rotate-byJan18 retained; PR URL:none.
+
+## 2026-10-27 — GHCR auth fix LIVE-VERIFIED; separate fail-open gate found
+
+- Operator post-sync scan app-cve-scan-manual-1793149530 completed; resolves sha-cf926352…@sha256:3e77ceae…, metric reasonauth replaced byok1, persists Git e35525bc and clears live override. ArgoSynced/Healthy/Succeeded, Deployment generation80 observed80 and1/1 ready, podproduct-catalog-7b4f748f6-lm4ft running targetdigest. Local clean checkout ff-only to scanner's already-pushed e35525bc. Auth bug0cd39eb8 LIVE-VERIFIED/E3 for auth/immutable promotion only.
+- Fresh report01:09:12Z same digest0CRITICAL/4HIGH with fixes: msgpack1.1.2->1.2.1, setuptools70.3.0->78.1.1, urllib3 2.7.0->2.8.0(twoCVEs). NOT clean. No end-to-end email/PD verified (channels skipped).
+- Offline disposable cached Trivy0.63 container --network none/no creds/current helper: scan_count=0, trivy_failure_present=true. Helper unchanged from pre-batch5dae466f. Proves existing fail-open path; does NOT prove exact live scan-error cause (suppressed output unavailable). New P2 docs/bugs/2026-10-27-app-cve-scan-failed-trivy-treated-as-clean.md bounded Files/acceptance ready, no code/dispatch/live suspension/app dependency changes. AGENTS Rule7 scope choice needed before new work.
+- Full actual user job,logs,metrics,rollout/report and offline proof docs/issues/2026-10-27-app-cve-scan-auth-recovery-and-gate-followup.md. Original six other live items remain pending; no extra production scan bycoordinator, no secret values read/decoded. ExpiryrotationJan18/Jan25PST retained. PR URL:none.
+
+- Operator approved separate scanner fail-open P2 dispatch to GPT-6-Luna ("go ahead"). Four-file scope and offline-only worker instructions finalized; coordinator review/gates/landing follow before operator live check. Prior evidence/spec commit e7287a13 is pushed; PR URL:none.
+
+## 2026-10-27 — Luna scanner fail-closed follow-up landed
+
+- User approved separateP2; GPT-6-Luna task app-cve-scan-fail-closed implemented four-file scope, review follow-up corrected test assertions/fixtures. Real implementation commit c3703fed3c4764a392e68c60be04db60c31d17f3. Unknown scan cannot promote/rebuild; batch nonzero with bounded reason. Temporary GHCR Docker config0700/0600 removed, no credentials in argv/notices.
+- Independent45BATS passed0skips plus same45 landing checks, ShellCheck/sh-n/diff and actual staged lint/audit/hooks passed. Old-code4 regressions fail as expected; cached nonroot network-disabled Trivy0.63 template/helper returned0/2. Fixture noexec/dedup/stale Docker bytes and initial test failures explicitly documented in docs/issues/2026-10-27-app-cve-scan-fail-closed-verification.md. Prior unrelated curated failures unchanged; not rerun.
+- Live pending; no coordinator deployment/job/credential mutation. Next single operator make platform-ops, inspect output before requesting scan. Current application4HIGH dependency remediation and exact prior live scan cause remain separate. Original remaining live items queued. PR URL:none.
+
+- Operator make platform-ops completed; all3 Keychain-backed Secrets unchanged. Independent read-only ConfigMap comparison exactly matches c3703fed scanner SHA2567d7d3649637c19b8fc708affa99e9365ec0fb8aa55840fa38cf903431d18ffc3; images alpine/k8s1.31.4 + initTrivy0.63 unchanged, active scan Jobs[]. Full pasted output/comparison appended fail-closed verification issue. No Secret reads or coordinator mutations. Runtime live pending; next single operator make app-cve-scan (may promote/rebuild on valid scan). Manual-secret reminder is generic, not evidence of missing resources. Implementation/evidence c3703fed/f525281a pushed; PR URL:none.
+
+- Operator live Job app-cve-scan-manual-1793151640 completed1; exact logs in fail-closed verification issue: candidate5 HIGH/CRITICAL, no promotion, rebuild dispatch FAILED. Live vulnerable-candidate gate passed; scan-error paths not forced live (offline45tests). Whole-Job success for per-service dispatch failure is intentional2026-08-01 decision. Read-only GitHub confirms product-catalog activeci.yml has push/pull_request only, no workflow_dispatch. NewP2 docs/bugs/2026-10-27-product-catalog-ci-missing-workflow-dispatch.md; POSTstatus suppressed, no claim no other auth/transport issue. Application-repo scope not authorized, no worker or extra live scan/POST/credential access. Current4HIGH remediation remains separate. PR URL:none; scanner fix c3703fed, deployment evidence8bb0b76e pushed.
+
+- User approved Luna application-workflow follow-up. Product-catalog instructions read; current checkout fix/automerge-app-token left untouched. Separate /private/tmp/k3dm-product-catalog-rebuild checkout + remote fix/cve-manual-rebuild created from origin/main ae982f0. Scope onlyci.yml: add workflow_dispatch and main-only push/manual publish condition; preserve reusableSHA/signing/permissions/checks. Baseline actionlint exit0. No graph tools available (discovery[]), direct review fallback. App activeContext gated on CI success; manager records pending work. No PR/merge or live dispatch; user no-PR rule retained. PR URL:none.
+
+## 2026-10-27 — Product-catalog Luna manual rebuild workflow pushed
+
+- User-approved Luna task product-catalog-manual-rebuild implemented onlyci.yml, add workflow_dispatch + main-only push/manual publication. Independent actionlint/exact-two-edit parent comparison/6-event truth matrix and landing validation passed. Actual parent reusableSHA c7ff88… preserved; coordinator initial olderSHA98b10f spec corrected, no app pin changed. Remote fix/cve-manual-rebuild commit 85945891b6234e5efcbd06b767baea4c84592816, GitHub API verified. Original fix/automerge-app-token checkout untouched.
+- No CI yet (branch runs[]; main-only push/no PR), no app activeContext update under CI-success restriction. No PR/merge/live dispatch/extra scan/credentials/app dependency changes. Claude/owner PR+CI+merge needed before one operator live scanner retry. Full outputs and limitations docs/issues/2026-10-27-product-catalog-manual-rebuild-workflow-verification.md. Manager bug IMPLEMENTED, not closed/liveverified. PR URL:none.
+
+- Screenshot3-open-bug record review: P3 startup Loglink and P2 ask-docs priority question are filed/reproduced, not dispatched/implemented. Webhook incident OPEN for historical offsite cause + unexercised cloud-bridge route; doctor fixes/current local+Slack verified, later locked Keychain symptom resolved independently, no historical causal claim. Canonical status lines pasted batch issue. Read-only source review, no new live test/code/status changes, existing tests not rerun. PR URL:none.
+
+- User authorized investigation/dispatch of3 open screenshot bugs. Confirmed two existing unimplemented causes; bounded Luna specs finalized: startup local-only log links (metrics/dashboard/tests), omitted-noun priority count (matcher/tests). Separate files, offline workers only. Webhook current/historical investigation stays coordinator-owned first; do not dispatch speculative repair or repeat completed doctor deliverable. Graphtools unavailable[], direct source fallback. No new plan or live mutation. PR URL:none.
+
+## 2026-10-27 — Three-open-bug investigation and first two Luna fixes
+
+- ask-docs fix b6704d68 pushed: exact omittedbugs P1/open/release question deterministic, bounded grammar after review rejected unrelated plans/tickets/alerts. Independent81pytest/Ruff + landing pass. Startup log fix61e1d994 + fixture7451280f pushed: unsupportedcodexexit row local-only/no Loki target; supportedlandinglogs link preserved, no transcript shipping/history changes.138pytest/28BATS/Ruff + final landing pass. Initial assertion audit refusal resolved with justified replacement marker; landing TMPDIR/home fixture failure fixed without weakening asserts, all actual outputs issue.
+- Webhook doctor01:59:44Z healthyall_oktrue no recovery. Bridge runningPID4315; incidentwindow13:50–14:50Z60SSH github.com:22 Undefinederror0 errors, webhook14INFO; retained Oct27 bridgeHTTP200/202 responses (historical, not new probe). Controlled no-agent gitread exits128/publickey; AppleUseKeychainyes exits0. Exact historicerror not reproduced. NewP2 bridge fallback scoped for Luna, same established Hermespolicy, overrides/platform preserved, no creds/plist/live operations. Original incident OPEN. Full evidence docs/issues/2026-10-27-three-open-bugs-investigation-and-luna.md; user authorized3-bug investigation/dispatch. PR URL:none.
+
+- Third Luna task cloud-bridge-keychain-git-auth landed f046763ff2a45e8fe56b938a8f828658d0b05ebe: small macOS Keychain-backed Git default, inherited/caller custom+empty overrides and callerenv preserved, Linux unaffected. Twofallbackreds on oldcode; final independent107pytest/Ruff, staged lint/audit/hooks and repeated landing gates pass. Strengthened no-direct-SSH guard instead of weakening it; full outputs/initial failures in three-open-bugs issue. All3 focused totals326Python+28BATS pass, fullcurated not rerun/pre-existing failures unchanged.
+- No live reload/deployment/remote request/credential mutation. First single operator step make platform-ops to deploy Agent Dispatch dashboard, inspect then screenshot; later reload/query/bridge checks one at a time. Bridge-auth bug VERIFIEDoffline; historical webhook incident OPEN (exact historical SSHcause not established). Countfixb6704d68, logfix61e1d994+fixture7451280f, thirdf046763ff2a45e8fe56b938a8f828658d0b05ebe; PR URL:none.
+
+- Operator platform-ops deployment completed;3KeychainSecrets unchanged. Independent Agent Dispatch ConfigMap JSON matches currentfix SHA256cf105d791db5954f33bfc06560fb8ee84e2c8cdbd3edecc3ae5aab3521d83b94, panel47 per-rowloki_url link. Published7d rows stillold exit127 summary and startup taskunknown, so metric refresh needed before UI verification. Schedulerlock/pending markers present, PIDnotpartofcontract, lagcause notestablished; no deletion/restart/metricwrite. Full actual output appended three-open-bugs issue. Next single operator make dispatch-metrics then inspectoutput/rows. Livepending; no new code/tests rerun. Implementations b6704d68/61e1d994+7451280f/f046763f and evidencecda9bdbc pushed; PR URL:none.
+
+- Operator make dispatch-metrics silent; independent read-only published7d rows now updated. Both historical exit127 rows show exit127;localonly(notshipped), no loki_url; acceptedrun2 rows show81passed/107passed/28of28ok+138passed and correct per-row Loki targets. Full actual selectedrowoutput appended three-open-bugs issue. Silence matched normal success convention but success grounded in metricread. Historicalrun1unknown retained, not newfailure. Next single UIcheck refresh Agent Dispatch Per run evidence, screenshot two failed startup rows; actualrendering/clicks pending. No coordinator writes/restart/UI, no code/tests rerun. PR URL:none.
+
+- Operator Per run evidence screenshot archived docs/assets/2026-10-27-startup-log-local-only-render.png: both historical exit127 rows failed and Result local-only text visible; retry2accepted unchanged. Failed Log cells still blue; target/action unknown from screenshot. Next single UI check click failed key-cache Log and report result. Do not mark P3liveverified yet; supported link check follows separately. Full observation in three-open-bugs issue. No code/runtime mutation/tests rerun; PR URL:none.
+
+- Live failed-startup Log click opens Grafana Page not found; P3 reopened. Missing loki_url did not disable field-level links in Grafana11.4, and organize removes referenced field. Corrective same-scope Luna spec now requires structural no-link/support separation + transform-aware tests; no Grafanaupgrade/exportplugins/transcripts. Full-browser screenshot not archived due unrelated personal/credential-page tab titles. Source citations + observations in three-open-bugs issue.
+- User asked unknownidentities/blanktokens: ledger confirms omitted optional coordinator/landing metadata (recentworkerLuna known, coordinatorunreported); do not guess/backfill. Exit127starts have no codex_usage (missingcodex/node beforeworker); blanktokens unknown/unmeasured, retry2separate. Correction will declare known openai/unknown coordinator and actorcodex. Existing bugs beyond P3 unchanged; PR URL:none.
+
+- Corrective Luna task startup-log-noninteractive-cells landed 0d1807715691c0b21c344de7d0af724ff05c5e20, superseding prior P3patch after operator404livefailure. Plain all-run Logpaths no datalink; Supported landing logs panel93 restricts exactsupportedtypes and static visibleversion/slug/run URL. RemovedunusedURLcolumn, retainedpathinspection;29otherpanelsunchanged. Independent138pytest/28BATS/Ruff/2PromQL/staged gates and repeatedlanding pass, no code/runtime upgrades/schema/shipper/history changes. UI pendingredeploy; no coordinatorlive mutations. Full outputs + workerreviewcorrections + branchlookup cleanup race in three-open-bugs issue.
+- Metadata questions answered fromledger: old coordinator/landing optionalfields omitted; no inference fromworkeridentity. Blankexit127tokens=no codex_usage beforemissingcodex/node; retry2separate. New task coordinator/primaryopenai/unknown and landingactorcodex recorded; exactmodel/costnotfabricated, oldrowsunchanged. Next single operator make platform-ops; verify unsupportedplain then supportedlink separately. PR URL:none.
+
+- Operator reran suggested platform-ops; read-only CM stillold30panels/no93/oldLogaction. First probeStopIteration because assumednewpanel; robustfollowup/source confirm deploy_argocd_platform_ops onlyinstalls5otherdashboards, NOTAgentDispatch. Coordinator gavewrongdeploymenttarget; do not repeat. This supersedes earlierguidance: next single user kubectl --context k3d-k3d-cluster -n monitoring apply -f scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml. OnlyreviewedCM, thencompareJSONbeforeUI. Full actualoutput/failure/correction three-open-bugs issue. Newcode0d180771 notactuallydeployed yet; no new livecodefailure or coordinator mutation. PR URL:none.
+
+- Operator explicitAgentDispatchCMapply configured, missinglast-appliedannotationautomaticallypatched. Independentread-onlyJSONexactmatchtrue,31panels, Per run evidence Logactions[], Supported landing logs presentwithfixedversion/slug/runURL. Corrective0d180771 nowactuallydeployed; sidecar/browserclicks stillpending. Next singleoperator refreshPerRunEvidence, confirm failedkey-cacheLogplain/non-navigating; supportedclickafterseparately. Fullactualoutput/comparison three-open-bugsissue. No coordinatorclusterwrite/creds/restart/code/testsrerun; PR URL:none.
+
+- User wants primary Per run evidence hyperlinks preserved. Coordinator correction 19a56939e3c65f93d3ef293697ae76c63aacdaad: originalpanel47shippedlogslinked; Local-only run evidence93onlyunshipped/absent/legacy viaexactnegativefilter, tokenjoinsconsistent, mainmerge/layoutretained,29othersunchanged.138Python/28BATS/4PromQL/stagedgates passed; initial missingmerge/importfixture failures corrected/fulloutputissue. No newLunatask/liveapply/schema/shipper/history changes. Next explicitAgentDispatchCMapply then mainacceptedLogclick.
+- Automatic approval review rejected copying screenshot into repo/upstream (artifactexport notauthorized/priorrejectionmustnotretry); combinedcommanddidnotexecute. Optionalimageomitted, no bypass/indirectexport; textualfindings+tests suffice for codefix, no artifactpermission needed. PR URL:none.
+
+- Explicit user preference: communicate proposed user-visible changes/scope BEFORE editing; do not introduce extra tables/components as incidental bug fixes or treat coordinator-authored spec expansion as operator design approval. User rejects duplicate Supported landing logs table idea; original requirement is working hyperlinks in existing evidence interface. Coordinator acknowledged overreach; NO further UI/code/deployment changes this turn. This is communication-first, not a new blanket approval ritual. Single-table correction needs clear proposed behavior before work.
+- Latest read-only deployedCM matches19a56939 primarylinks+Local-onlysecondary, while screenshotstillpriorlayout; served/browser refresh causeunestablished. No browser providers inCUAinventory, no UI actions/bypass. No screenshotexports. Rootincident/otherlivechecks remain pending; PR URL:none.
+
+- User explicitly requested removeextra table/fix Per run evidence Log. Communicatedbeforeediting: singleall-runtable withfixedlinks toexistinglogview, Result inexistingheading viahiddenvariable (no newpanels/visiblecontrols). Implemented 0fc9d3ef34698e067d4045e287753bedc74e9cd8: panel93removed, primary47allkinds/tokenquery restored; visibleversion/slug/run/Result URL; unshippedstartupavailabilityexplicit, codex.logstayslocal, unchangedLokiquery/options/layout.29otherpanelsunchanged. No newLunatask/schema/shipping/history/identity/deployment changes.
+- Independent138Python/28BATS/Ruff/2PromQL/stagedgates/hooks pass; newcontractreds +obsoleteURLassertfixturecorrection +fulloutputs documented three-open-bugs issue. No fullcuratedrerun (priorfailuresunchanged). Grafana11.4 display-name lookup supportsResult; escaping tests cover&/#. Next singleoperator explicitkubectlapply BOTH AgentDispatch and AgentRunLogCMs, comparethenfullbrowserreload/oneclickcheck. Otherlivechecksunchanged; PR URL:none.
+
+- Operator applied BOTHdashboardCMs configured (last-appliedannotationwarningauto-patched). Independentread-onlyexactmatchestrue: Dispatch30panels/no93/primaryLoglinkvisibleversion-slug-run-Result; RunLog1existingpanelheadingResult/hiddenvariable. Single-table0fc9d3ef nowdeployed. UI/sidecarreload/clicknotproven. Next singleoperator fullbrowserCmdShiftR then acceptedapp-cve-scan-fail-closedLogclick; verifyexistingview/output beforestartupcheck. Fullactualoutput/JSON three-open-bugsissue; no coordinatorwrites/restarts/exports/code/testsrerun. PR URL:none.
+
+- User reports blankLog/allunknown. Read-only7d/v1439 shows19accepted withpaths,14earlierunknown/noevidence,2failed. Selected tasks earlierattempts differfromacceptedlaterland; directLoki acceptedapp-cve-scan-fail-closed/run2 returns1stream/1line(limit1), soactual logexists. Published19workersLuna known, coordinator/landing fieldsoriginallyunrecorded; newCodexactorledgerknownbutnotinpublishedselection. Renderer partialvendorcollapse reproduced.
+- Communicated existing-field changes BEFOREedit; implemented 0077b7b8f6cbc13b76a07c63bbd1b9286afa36f4: empty/nullLog→clickableOpen run evidence, rawunknownattempt→displayunverified, none→No landing-test evidence recorded, identityunknown→notrecorded, knownvendor/modelmissing preserved. No newpanels/layout,30remain; no ledger/backfill/cost/modelguesses.139pytest/30BATS/Ruff/stagedgates pass; newreds/fulloutputs docs/issues/2026-10-27-run-evidence-empty-link-and-attribution-findings.md. No livewrites/exports. Nextoperator make dispatch-metrics then applyonlyAgentDispatchCM/UIcheckseparately. PR URL:none.
+
+- Operator screenshot + “fixed now”: single Per run evidence shows acceptedpathlinks, unverifiedearlierruns/No landing-test evidence/Open run evidence links, and historicalfailed127local-onlypathlinks. Rendering0077b7b8 passed. No imageexport. Next singleuser click acceptedwebhook-incident-doctor-luna/run3Log toconfirmexistingRunLogpage+testoutput; destinationnotshownyet. Fulltextverification in empty-link/attribution findingsissue. No code/runtimewrites/testsrerun;139Python/30BATS retained, otherlivechecksunchanged; PR URL:none.
+
+- Operator destination screenshot verifiesdoctorrun2(unverified), not3: validAgentRunLogpage/versionv1439/slug/run2, headingNo landing-test evidence recorded, no404. Unverifiednavigation+availabilityPASS; acceptedtestoutputstillpending. Nextsingle returnviaAgentDispatchbutton and accepteddoctorrun3Log(5of5ok;21passed) soRun+Resultcontexttravelstogether, notmanualRun-onlyedit. No screenshotexport/code/runtime/testchange; prior139Python/30BATS. Fulltextfindingsissue, PR URL:none.
+
+- Operator accepteddoctorrun3Log destinationPASS: correctv1439/slug/run3, heading5of5ok;21passed and actualLoki21pytest+TAP1..5allok output. Historicshippedmarker2026-10-27T12:07:42Z; oldTCP9000dryruntextishistoricalartifact, notfreshdoctorstate/fixreversal. No screenshotexport. Supported+unverifiednavigationPASS; finalP3startup key-cachefailedrun1local-onlyheadingroutechecknextsingleoperatorstep. Doesnotverifywebhookservice/bridgehealth; otherliveitemsseparate. No code/runtime/tests rerun, prior139Python/30BATS; PR URL:none.
+
+## 2026-10-28 per-run task-name GitHub404 correction
+
+Operator screenshot showed the slug link guessing docs/plans/v1.43.9-vectordb-retrieval-key-cache.md.
+Recorded spec is docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md (remote API verified).
+Communicated scope first; use recorded start spec for all runs/resumes, release-branch fallback
+for absent/unsafe metadata, no extra panels or Log/layout changes. New per-run spec_url label
+retained with custom.hidden. Offline: 151 pytest, 30 BATS, Ruff, two PromQL rules pass.
+Evidence: docs/issues/2026-10-28-dispatch-run-spec-link-verification.md.
+Publication/click pending; first operator step make dispatch-metrics, then apply only Agent
+Dispatch dashboard and reload. Accepted doctor run3 Log is live verified; failed-startup Log
+availability remains pending, separate from this GitHub404. Commit SHA recorded after commit;
+no PR (repository policy).
+
+Correction commit: `fbb52f67` on `origin/k3d-manager-v1.43.9`; no PR created. Required staged `_agent_lint` and `_agent_audit` exited 0; checkpoint hooks passed (check-doc-links: 4 file(s) OK).
+
+## 2026-10-28 failed-startup Log live verification — PASS
+
+Operator screenshot: Version v1.43.9; Slug vectordb-retrieval-key-cache;
+Run 1; heading `Run log — exit 127; local only (not shipped)`.
+Original startup Log bug now LIVE-VERIFIED, with accepted doctor run3 output
+and unverified run2 availability already passed. No screenshot export, runtime
+mutation or test rerun (documentation only). Separate task-name GitHub404 fix
+fbb52f67 remains offline verified, publication/click pending; next single step
+still operator make dispatch-metrics unless already completed. No PR.
+
+## 2026-10-28 recorded-spec task-name link live verification — PASS
+
+Operator confirmed metrics publication complete, supplied successful Agent Dispatch
+ConfigMap apply (missing last-applied annotation automatically patched), and GitHub
+screenshot of expected docs/issues/2026-10-26-v1439-retrieval-dashboard-no-data.md
+with rendered title. GitHub404 link bug fbb52f67 now LIVE-VERIFIED. Original startup
+Log bug already LIVE-VERIFIED separately; underlying retrieval issue status unchanged.
+Evidence docs/issues/2026-10-28-dispatch-run-spec-link-verification.md. No screenshot
+export/runtime mutation/test rerun; docs-only, existing 151 pytest/30 BATS retained.
+No PR created (repository policy). Other unrelated live items remain pending.
+
+## 2026-10-28 Plans Title column provenance — PASS
+
+Operator asked whether recent coordinator work invented the Plans Title column.
+Read-only git history confirms original spec commit a4e5d422 already required
+`title` → Title in the Plans organize transform (then line 191; current spec line195).
+Spec docs/plans/v1.43.5-release-plan-tracking.md lines6-8 records operator approval
+2026-10-17; current lines195-199 explicitly enumerate the Title column.
+Dashboard line2000 blame attributes title→Title to release squash401e4eca
+(v1.43.5 PR148, 2026-10-24), preceding current hyperlink fixes. No UI/source changes.
+Original spec approval is recorded evidence, not a newly inferred approval.
+Documentation-only provenance check; no BATS/ShellCheck rerun applicable, no PR.
+
+## 2026-10-28 Plans table redundant Plan column P3
+
+Explicit operator amendment: keep Title, link to plan, remove visible Plan.
+Filed docs/bugs/2026-10-28-plans-table-redundant-plan-column.md; implemented
+panel107 field overrides only, retained hidden plan stem and branch for links.
+No queries/sort/layout/other panels changed. 38 dashboard BATS pass; regression
+against old dashboard fails as expected. Initial width fixture corrected for
+custom.hidden; full outputs docs/issues/2026-10-28-plans-title-link-verification.md.
+YAML/JSON and diff checks pass; no shell implementation (ShellCheck N/A).
+Operator deployment/reload/Title click pending, not LIVE-VERIFIED. No screenshot
+export, live writes, new plan doc or PR. Required commit SHA follows landing.
+
+Plans Title cleanup fix commit: `b543cb91`; staged `_agent_lint` and `_agent_audit` exited 0, checkpoint hooks passed. PR URL: none (repository policy). Operator live acceptance pending.
+
+## 2026-10-28 Plans Title deployment mismatch — PARTIAL
+
+Operator apply configured but screenshot still old. Read-only liveCM RV1738551
+has Plan width110/link, no hiddenPlan/Titlelink, no last-applied annotation;
+tracking owner hub-grafana-dashboards in cicd (not argocd). Owner correctv1439
+branch but Synced to10c45a52, beforefixb543cb91; selfHeal enabled. Consistent
+with reconciliation of stale desired revision, exactwrite uncaptured. Next
+singleoperator hard refresh owner via cicd annotation, then coordinator rechecks
+revision/CM before UI. No coordinator live writes or screenshot export/test rerun.
+Full actual read findings docs/issues/2026-10-28-plans-title-link-verification.md.
+Bug remains VERIFIED offline, livepending; no codechange/newplan/PR.
+
+## 2026-10-28 Plans Title rendering PASS; destination pending
+
+Operator screenshot shows hidden Plan and blue Title. Read-only CM exactly matches
+source; owner hub-grafana-dashboards now Synced to1fc7680e, stale revision cleared.
+Second screenshot is previous docs/issues retrieval-no-data destination, not a plan;
+click provenance unknown, so neither count as Title navigation pass nor assert bug.
+Next singleoperator click first Title (VectorDB drift) expecting
+ docs/plans/v1.43.9-vectordb-drift-kinds-and-age.md. Bug remains VERIFIED, livepartial.
+Evidence docs/issues/2026-10-28-plans-title-link-verification.md. No code/runtime
+changes, screenshot export or test rerun; no PR.
+
+## 2026-10-28 three screenshot bugs — Luna dispatch authorized
+
+Operator selects webhook incident, PR duration history semantics and Target state
+reason readability. Existing bug docs amended with explicit current authorization
+and bounded worker rules (no live writes/credentials/PRs). Incident is offline
+review of existing landed doctor/bridge work and remaining evidence, not presumed
+new fix/rootcause. PR follow-up preserves history/current queries and clarifies
+labels; blocker uses existing panel31 supported text controls, no extra panel.
+Worker isolated native gpt-6-luna tasks planned; coordinator independently tests,
+reviews/lands/pushes, then operator live checks one at a time. Prior Plans Title
+rendering passed; its exact plan click remains a separate pending acceptance.
+
+## 2026-10-28 Luna batch independent review progress
+
+Three native gpt-6-luna tasks dispatched360bf344. Target-state-readable-reason-luna
+landed2f551fc7 after independent38BATS/structural/stagedgates and landing rerun;
+only existingpanel31 title16/value40, no extraUI/query/status/layout change.
+webhook-incident-evidence-review-luna landed223bb879, independently142Python+5BATS;
+no new codebug proven, incident OPEN, bridge live path/historicalcause unconfirmed.
+Coordinator corrects original staleport9000→7443 docs, no live/credential/restart.
+PR history task rework2 replacing toyfixtures with realproducer/PromQL checks.
+Sandboxfalse terminated state resolved via permitted processview; no workerfailure.
+Full actualoutputs docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+Operator live checks after final offline review, one at a time; no PR.
+
+## 2026-10-28 selected Luna batch — offline work complete
+
+Target-state-readable-reason-luna fix2f551fc7 VERIFIED38BATS; PR-history task
+rework2 fix2b21e8af VERIFIED4pytest+6BATS/promtool(zero skips),Ruff/structural/
+stagedgates/post-rebase tests. PRproductionquery/collector unchanged, historykept.
+Olddashboard rejectsnewpresentationcontracts. Incident evidence review223bb879
+complete142pytest+5BATS; no newcodebug proven, originalP2incident remainsOPEN.
+Exact historiccause and currentbridge liveevidence stillmissing; do not claimall3
+closed. Rootcorrectedstale9000doc to7443 and added scopedTargetstatechangelog.
+Full actualoutputs/failures docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+No live deployment/restart/credentials/cloudrequests/screenshotexport; no PR.
+First operatorlive step make webhook-doctor, inspectredactedJSON, thenoneatatime.
+Prior PlansTitle renderingPASS but exactplanTitleclick stillpending separately.
+
+## 2026-10-28 renewed webhook live step1 — PASS
+
+Operator doctor11:44:33.867109Z loadedPID4295/port7443, credentiallookup0,
+healthy_http/all_oktrue, freshlog/noerrors, no recoveryaction/recommendation.
+LocalhealthPASS; externaldeliveryunverified, originalincidentOPEN/historiccauseunknown.
+FullactualJSON docs/issues/2026-10-28-three-bug-luna-batch-verification.md.
+No webhookrestart. Nextsingleoperator make restart-cloud-bridge to activate
+previouslypendingf046763f, inspectresultthenbenigncloudhealth separately.
+Docs-only,no code/test rerun or coordinatorruntime/credential/externalwrites; no PR.
+
+## 2026-10-28 bridge reload process verification
+
+Operator make restart-cloud-bridge silent (expected targetbehavior). Filtered
+read-only launchctl exit0/state running/PID65583/runs89; psage31s. No command
+exit supplied, no fake exit0 inference; currentprocessPASS, externaldeliverypending.
+Nextsingleoperator bin/k3dm-cloud-request --wait health; inspectdeliveredresponse.
+No coordinatorrestart/cloudrequest/credential/rawlogaccess; incidentOPEN.
+Fullactualoutput batchverificationissue; docs-only/no testsrerun/no PR.
+
+## 2026-10-28 bridge delivery live PASS
+
+Operator health request20261028T114826Z-health completed11:49:51.677857Z HTTP200/
+statusok/all_oktrue/all21checksok afterbridge reload. Localdoctor alreadyPASS.
+Currentexternaldelivery verified, bridgeauthbug f046763f LIVE-VERIFIED to bounded
+reload/health acceptance (no-agent not forcedlive); historicalincidentOPEN/cause
+unconfirmed, no webhookrestart. FullactualJSON in batchverificationissue.
+Read-only TargetstateCM nowtitle16/value40/querypreserved, ownerSynced2cbc24d0.
+Cleanrelease fast-forwarded concurrent unrelated2cbc24d0plan doc withoutedits.
+Nextsingleoperator reloadBugTracking normalzoom Targetstate screenshot, thennarrow
+check. No newruntime/coordinatorcloudrequest/screenshotexport/testrerun; no PR.
+
+## 2026-10-28 Target state normal-width visual PASS
+
+Operator screenshot complete reasonwraps3readablelines (blockedatv1.49.0,
+TwinkleAIappM1neardone/apprepo), prominentorangestatus/nooverlapclipping.
+NormalwidthPASS; narrowwidthE2stillpending, bugVERIFIED notLIVE-VERIFIED.
+Nextsingleoperator narrowbrowser atsamezoom andshowTargetstate. Fulltextual
+record batchverificationissue; no screenshotexport/runtimewrite/testrerun/PR.
+
+## 2026-10-28 Target state live acceptance complete
+
+Operator supplied croppedpanel in response to narrow-window check: fullreason
+wraps3lines/prominentorangestatus/nooverlapclipping. Acceptsuppliedview, viewport
+notmeasured. Prior normalwidthpassed; P3fix2f551fc7 nowLIVE-VERIFIED withE2line.
+No screenshotexport/testrerun/runtimewrite. Read-only PRChecksCM nowcorrect
+Historical sampled check durations (may include closed PRs), queryunchanged.
+Nextsingleoperator reloadPRChecks/paymentrepo/Last7days screenshot currenttables,
+readhealth+history; timestampcrosscheck/nohistoryrepo later. Fulltextualbatchissue;
+originalhistoricwebhookcause remainsOPEN, currentbridge livepassed; no PR.
+
+## 2026-10-28 PR Checks All/24h presentation partial PASS
+
+Operator screenshotAll/24h(notpayment/7d): newhistorytitle/current5rows/readok/
+lastscrape7.25min, retainedpayment93/94history. Read-onlyGitHubAPI PRsmergedOct27,
+BuildandTest92s/97s timestamps. Fulloutputs docs/issues/2026-10-28-pr-checks-github-timestamp-comparison.md.
+Nextsingleoperator paymentonlysame24h; exacttooltip/nohistoryrepo stillpending.
+UnexpectedGitHub94skippedcheck completed1secbeforestarted; outofscopefuturecollector
+followup, notfixed/usedcomparison. No screenshotexport/CIrun/livewrite/testrerun.
+PRbugVERIFIED notLIVE; normalAllviewPASSonly. No PRcreated.
+
+## 2026-10-28 webhook Open-row closeout review authorized
+
+Operator again asks review/dispatch screenshotP2incident. OPEN currently tracks
+unknownhistoriccause despite local+externalhealthy/reload+completedhealthproof.
+Communicated bounded Luna closeout/evidenceaudit, no duplicatecode/liveactions.
+Latest canonicalbug taskinstructions only docs/issues/2026-10-28-webhook-incident-closeout-review.md;
+mapacceptance/retrospectivelimits, recommend operationalclosure vsconcretegap,
+retainrootcauseunconfirmed separately, typedinvestigationmetadata/nofakeFixSHA.
+Coordinator independentlyreviews/appliestruthfulstatus. PRChecks payment-only
+liveview remains pending separately, not replaced by this investigation.
+
+## 2026-10-28 webhook incident operational closeout accepted
+
+Luna webhook-incident-closeout-luna auditcompleted, independentlyreviewed actual
+localhealthy11:44anddeliveredHTTP200/all21health11:49proof. No webhookrepair
+indicated, no newcodebugproven. ParentCLOSED—operationallyrecovered, notcausalfix.
+UnknownOct26cause split docs/issues/2026-10-28-webhook-offsite-historical-cause-followup.md.
+Existingheartbeatfollowuplink preserved; historicalE1unavailableexplicit.
+Sourceconsumerprobe: typedinvestigationLIVE statuswouldpublishlive_evidence=missing;
+useCLOSED(nofakeFixcommit/codeverificationflags), retainactualoperationalproof.
+Report docs/issues/2026-10-28-webhook-incident-closeout-review.md includesfullprobe.
+Review-onlyreportadoptedbycoordinator, notduplicateimplementationland: nativeguard
+onlysinglepriorspecslug but2alreadylanded; no guard/ledger/markers altered. Future
+review-only/multisupersedingtracking andtypedproofpublisher gap recordedoutofscope.
+No live/provider/restart/credential/screenshotexport/testrerun/PR. PRCheckspayment
+liveviewstillpending separately. Nextpublishbugmetrics thencheckOpenrowclears.
+
+Operational closeout commit: `7ea1032f`; independent consumer assertion, three-file links/whitespace and staged lint/audit passed; checkpoint hooks check-doc-links5filesOK. Docs-only, no PR URL (policy). Dashboard publication remains pending.
+
+## 2026-10-28 webhook closeout metrics publication PASS
+
+Operator publishercompleted. Read-onlyPushgateway exactparentrow nowstatusfixed/
+fixed_inv1.43.9/fix_sha7ea1032f(docstatustransition), notOpen. Codefix/liveflagsfalse
+bydesign; runtimecurrenthealthproofseparate, historicalcauseunconfirmed. Fullactual
+metric closeoutreviewissue. No newruntimewrite/testrerun. NextoperatorBugTracking
+refresh toconfirmFixed/removalifOpenfilter; PRCheckspaymentviewpendingseparately.
+No PRcreated.
+
+## 2026-10-28 investigation verification metrics fix authorized
+
+Operator asks dispatch fix for recovered incident's misleading notyet cells.
+New P3 docs/bugs/2026-10-28-bug-tracking-ignores-investigation-verification.md:
+share existing typed investigation contract hook/publisher, recognize valid
+closed recovery proof, suppress causalFixSHA, ground dates/verificationrecord,
+failclosedinvalid/open/mixed, preserve normalcodefix/ancestry/legacy and UI.
+Native gpt-6-luna isolated implementation planned, independent review/gates/
+landing/push then operator publisher/rowcheck. No new table, causeclaim, parent
+status rewrite or live actions; codefix scope now explicitly authorized.
+
+## 2026-10-28 investigation metrics Luna review/rework
+
+Task investigation-verification-metrics-luna run1exited; rootrejectedinvaliddate
+stilltrueflags andmalformedexplicitFixheaderaccepted (actualprobes recorded).
+Also restore unrelatedassertions, testrealGitdates/ref/record andlegacy/unassigned.
+ResumedLunarun2; firstdraftnotaccepted/landed. Baseline232Python+2promtoolskips,
+38BATS; finalPROMTOOLsetwillrunskips. Fullactualoutputs
+ docs/issues/2026-10-28-investigation-verification-metrics-review.md.
+No live writes/credentials/screenshotexports; parentCLOSEDunchanged, no PR.
+
+## 2026-10-28 investigation verification mapping fix VERIFIED
+
+Luna rework2 investigation-verification-metrics-luna landedc96d0d13. Independent
+269Python(zero skips/PROMTOOL3.2.1),38BATS,Ruff/syntax/stagedgates/hooks andlanding
+rerunpass. Nativeindependentverify recordedpass. ActualunchangedincidentCLOSED
+nowofflinerendersverifiedtrue/livetrue/evidenceok/date2026-10-28/record7ea1032f/
+causalFixSHA'-', stopsOpenforcount. Normalcodefixancestry/legacy/open caseskept;
+invalidtypedproof/headerconflictsfailclosed. No newlayout/query/panel/parentstatus.
+Coordinatorguideclarification neededexact-sentenceassertupdate andsupported
+reasonedallowmarker (semanticcodefixassertretained+investigationexceptionadded),
+auditpasswithoutbypass. Actualfulloutputs docs/issues/2026-10-28-investigation-verification-metrics-review.md.
+Operatorpublisher/rowcheckpending, notLIVE-VERIFIEDyet. Historicalcauseremains
+unknownfollowup; no livewrites/credentials/screenshotexports/PR. Firstsingle
+operator bin/k3dm-vectordb-metrics thenpublishedmetric/UIcheck.
+
+## 2026-10-28 investigation metrics published-data PASS
+
+Operator publisherdone; independent exactPushgatewayincidentrow: statusfixed,
+verifiedtrue/livetrue/evidenceok/date2026-10-28/record7ea1032f/fix_sha'-'/value-2.
+Onecurrentrow, allassertionspass. OriginalincidentCLOSED unchanged, historical
+causeunconfirmed; recoveryproofrecognized. Fullactualrow in investigationmetrics
+reviewissue. Nextsingleoperator refreshBugTracking andshowfilteredincidentrow;
+P3codefixremainsVERIFIED untilvisualacceptance. No runtimewrite/testrerun/image
+export/PR. NativeLunafixc96d0d13 alreadypushed with269Python/38BATS gates.
+
+## 2026-10-28 two new P2s authorized for Luna
+
+User selectsCloudflareHTTPS/TLS andofflinetestall fourfailures. CurrentrootHEAD
+concurrentd7b74077/docsfilingspreserved. Scopeamendedexplicitofflineimplementation:
+CFread-onlypreflight/posturehelper+rollbackguide, livezonewritesstillseparateF0/
+operatorgo; no applymode/credentialscheduler/newUI. Offlinefixgrep-q OrbStack
+producerhazard andE2Esafefixturepreconditions, preserveallguards, fakeSSH/scp/
+credentialboundarybeforerepro, no fullpublishedrerun byworker.
+Read-onlyPromsourcecase4=1194PRdurationlegend, currentfocused6pass butrecorded
+run12:41:14Zfailed; no causalguess/midrunstateinference. complete0,laststeptest.
+GuardexactscanOrbStackline168rc0, guard1fail/1pass. RawlognotfoundknownTMPDIR;
+optionaluserpathquestionpendingwithoutblockingwork. Fullsource/baselines in
+ docs/issues/2026-10-28-two-new-p2-luna-batch.md.
+PriorinvestigationfixPrometheusdatasourcealsoPASS(true/true/ok/date/dashFixSHA),
+finalincidentrowUIstillpending; PRCheckspaymentviewpending. No livewrite/restart/
+credentialaccess/screenshotexport/newplan/PR. Independentreviewthenoneatatime
+operatorvalidation continuesafterLunaworkers.
+
+## 2026-10-28 new P2 workers rework2 in progress
+
+Nativegpt-6-luna offline-test-all-regressions-luna run2: initialprodgrepfix/SSH
+fixtures reviewed; require realguardsharedscanner/negativefixtures andactual
+largepayloadOrbStackforecastregression plusrawShellCheck(no blanketSC2034skip).
+cloudflare-https-tls-preflight-luna run2: initialreadonlyhelper rejectedunknown
+settingecho/localVERSION_TOO_LOW falselyedge_rejected/uncaughtSSLconfigValueError;
+requeststrictenums/redactedLocations/definitivealerts/fakeAPI/TLSnegativecoverage.
+Fullactualinitialfindingsbatchissue. Bothprivateworktreesuncommitted, no landing/
+no liveinfrastructure/account/credential/metricschanges. Optionaluserrawlogpath
+pending; all4failednames/stage0/source12:41:14ZalreadyknownfromPrometheus.
+OriginalinvestigationmetricsfixPrometheusPASS, finalGUIrowstillpending; preserve
+PRCheckspaymentviewpending. No newplan/PR, liveCFwriteapprovalstillseparate.
+
+## 2026-10-28 Cloudflare helper landed; offline broad gate running
+
+Luna cloudflare-https-tls-preflight-luna rework2 independently verified and
+landed/pushed 2e0be3f6; native verification pass. Actual169pytest/Ruff/direct
+help+dryrun/lint/audit/hooks pass. Security bug remains OPEN: no actual zone
+read/write, F0 compatibility review/F1 separate go/F2 live acceptance yet.
+No PR (Claude owns creation). Review fulloutput two-new-P2 batch issue.
+Offline Luna rework2 independent116BATS/37Python/rawShellCheck/syntax/diff pass;
+curated1913-case BATS stage running under tripwire, no metrics publication.
+Not yet landed/complete; original4th case1194 historicalcause still unknown,
+current PRChecks isolated6pass. Optional original rawlogpath still pending.
+Prior incident UI screenshot and PRChecks payment-only acceptance remain pending.
+
+## 2026-10-28 broad offline P2 verification PARTIAL
+
+Curated stage under tripwire complete:1892passed/20skipped/1failed (1913total),
+exit1; all4originalcasespass. SolefailESOload_module existingPython3.15P3;
+samecasepassesexisting3.13.6. No quietout-of-scopefix. Fullactualoutput and
+skip/tripwire545blockedcalls in docs/issues/2026-10-28-offline-p2-curated-verification.md.
+PRChecks actual6BATS withavailablepromtool rerunPASS/no skips. FinalE2Ecommand
+order assertions added;116focusedrerun inprogressbeforecommit/landing.
+Operator screenshot confirms all4names/assertions; originalrawlog stillabsent.
+Fullpublishedmake test-all/operatoracceptance pending, no alertclosure claim.
+Cloudflaretooling2e0be3f6 alreadypushed/offlineverified169pytest; securitybugOPEN.
+No PR (Claude), no runtimewrites/accountchanges/credentials/livepublication.
+
+## 2026-10-28 offline landing rework: fixture checkout dependency
+
+First nativeoffline landing refusedtests36/48 (notmerged): isolated taskHEAD
+notpushed triggeredrealguard in2olderfixtures usingrealGit. Captured2red with
+K3DM_REPO_ROOT=$PWD, reusedLuna'ssafehelperinpreflight-refusal/SSHexit7 tests,
+2green sameenv; rawShellCheck/diffpass. No productionguardrelaxed. Scopeonly
+E2EBATS+testguide. Newcheckpoint/native116BATS+37Pythonretry pending. Exact
+red/green andfailededitpermission retry recordedtwo-new-P2batchissue.
+No closure/liveclaims; broadknownESO3.15P3 and20skipsremainrecorded.
+
+## 2026-10-28 both new P2 Luna tasks landed; operator acceptance pending
+
+Offline native task finalnormalretryPASS:116BATS/37Python/rawShellCheck/Bash
+production-syntax/lint/audit/hooks. Pushed5a2a958f +0514e9d9, nativeverifiedpass.
+Includes coordinatorcommand-orderassertionsand2fixtureisolationrepairs. Full
+actualoutput two-new-P2batchissue. Broad1913stage:1892pass/20skip/knownESO3.15
+1fail; all4originalcasespass. ESOexisting3.13.6focusedpass; PR6withpromtoolpass.
+Offlinebug remainsOPENpending freshoperator3-stage make test-all/usual3.13shell,
+failed0/complete1/freshmetrics/alertreview; no historicalcauseinvented.
+Cloudflare nativehelper2e0be3f6 pushed/offline169pytest/Ruffverified; securitybug
+OPENpendingactualF0review/F1separatego/F2liveacceptance; no accountaccess/write.
+NoPRcreated/URLnone(ClaudeownsPRs), no screenshotexports/livepublication/restarts.
+PreviousoriginalincidentGUIrow andPRCheckspaymentview acceptance stillpending.
+Nextsingleoperatorstep freshmake test-all, noArgoCDrefreshneededforthesefixes.
+
+## 2026-10-28 operator test-all follow-up fixed; CF preflight partial
+
+Operator /tmp/k3dm-test-all-1793208248.log:1913cases,1889passed/4failed/20skipped.
+Original4casefixespass; new4HubrecoveryMakefixtures copiedPWD inclpreexisting
+Unixsocket ./-e. FixedtestonlyhelpercopiesactualMakefile+emptystubdirs; all
+assertions/countspreserved, socket/production/Makefileuntouchedbyrecoveryfix.
+Pushedrealcommitcfb60be0; focused4red/4green, full116hub_data BATS/no skipsPASS
+usingexistingPython3.13.6/tripwire; rawShellCheckclean after4legacywarningfixes,
+lint/audit/checkpointhookspass. Fullactualoperator+testoutput:
+docs/issues/2026-10-28-offline-rerun-hub-fixture-socket.md. Fresh3-stageoperator
+make test-all/publication stillpending; no alertresolutionclaimed. PRURLnone
+(ClaudeownsPRs).
+
+Operator CFpreflight timestamp2026-10-28T17:36:46.131214Z:all7TLS1.2/1.3certvalid;
+TLS1.0/1.1client_unsupported, HTTPnoHTTPSupgrades (200/401/302same-scheme),
+allAPIsettingsnull/noAPIcredential. ValidzoneIDsupplied, APIreadnotperformed.
+Fullreportedoutput+warnings in newCloudflareoperatorreportissue. F0partial,
+nozonewritesapproved; rules/SSO/Slack/configreadsremaining. UserexplicitMake
+shortcutrequestimplementedcloudflare-preflight ZONE_ID=<zone>, DRY_RUN=1;
+make-n/dryrunPASS, no coordinatorliveprobes/credentials. Makecommitpending
+requiredgates/push. PriorCFhelper2e0be3f6verified169tests unchanged/norerun.
+IncidentGUI/payment-onlyPRChecks pending; no screenshotexport/newplan/PR.
+
+## 2026-10-28 Make preflight shortcut pushed / HTTP probes retained
+
+Make+howtoimplementation7ce79b70pushed, stagedlint/audit/checkpointhooks/docs
+pass; make-ncheck andrealDRY_RUN=1planpass(no accesses). No newmirroringtests,
+helperlogicunchanged. Currentoperatorpreflightpartial (APIcredentialabsent,
+legacyTLSclientunsupported), F0manualrules/SSO/Slackreviewstillpending, no live
+writego. AnsweredHTTPprobequestion: retainHTTPtoverifyredirectandHTTPSfor
+securebaseline; intendedremediationCFAlwaysUseHTTPSafterpreflight, notprobe
+replacement. Fulloperatorreport+remoteproof Cloudflareoperatorreportissue.
+Recoveryfixturecfb60be0alreadyremotepushed:116BATS/no skips, cleanrawShellCheck/
+audit/hooks. Nextoperatorfulltest-allfresh3stages/publicationstillpending.
+NoPR/URLnone(ClaudeownsPRs), nozonewrite/credentialaccess/metricspublication/
+restart/screenshotexport/newplan. PriorGUIincident/paymentPRchecksremainpending.
+
+## 2026-10-28 operator prefers tmux report reads; locator PARTIAL
+
+User explicitly asksreadpreviousCFpreflightfromtmux, avoidlargeJSONcopy.
+Read-onlytmuxinventory/captureauthorized; firstsandboxsocketdenied, permitted
+escalationreadsuccess. Localdefaultserveronlyworksession(attached0), panes
+work1.0%2/1.1%3/2.0%0/3.0%4/4.0%7. Scanned1000then6000lines, remaining%2
+fullhistory9241logicallines: nohelpercommand/reportmarkers/JSON. No unrelated
+contentsprinted, no keystrokes/probes/credentialreads/restarts/zonewrites.
+Optionalclarificationtoolaskswhichsession/window/pane/host/customserver;
+locationrequiredtocontinue, noJSONpasteorrerequestedrun. Previousoperator
+17:36:46Zreportalreadyrecorded; no newtmuxreportobtained. Exactoutputs in
+docs/issues/2026-10-28-preflight-tmux-report-location.md. Docs-onlyrecord,
+no BATS/ShellCheck rerun; gatesbeforecommit. NoPR(Claudeowns)/noactualfixclaim.
+Otherpendingfulltest-allfreshpublication/CFmanualreview/GUIacceptancespreserved.
+
+## 2026-10-28 exact tmux address read: report still absent
+
+Operator supplied/private/tmp/tmux-501/default work:4.0. Exactcapturecomplete
+history98logicallines,0preflightcommands/0reports. Redactedtailendsold05:42:31
+dispatchstatus, sessionattached0; no newpreflight obtained/keys/probes/writes.
+Explainedearlierdisplay-message locatorcanpickdefaultpaneoutsideactualtmux;
+askoperator one-line printf pane=%s withTMUX_PANE fallbacknot-in-tmux. NoJSON
+copy/newrunrequested. Previousfull17:36:46Zreportalreadyknown, no newsettings
+verification. Existingtmuxlocationissueupdated(actualcountoutput); docs-only
+no BATS/ShellCheck rerun, gatesbeforecommit, noPR/implementationcompleteclaim.
+Alltest-all/CFmanualreview/GUIacceptancespending preserved.
+
+## 2026-10-28 tmux mismatch explained: actual terminal outside tmux
+
+Operator reran/checkagain; exactwork4.0still98lines/0report/old05:42dispatch.
+ThenoperatorprintfTMUX_PANE actual pane=not-in-tmux. Causeidentified: previous
+display-message pickedunrelatedolddefaultpane; acknowledgedlocatorerror.
+Stoprepeatedtmuxreads. Latestreportstillpending; offerone-time actualterminal
+Makecheckredirectto/tmp/k3dm-cloudflare-preflight.json, thenreadfiledirectly,
+noJSONpaste. Do notassumefileexists/newcheckpassed. Previous17:36:46report
+alreadyknownpartial; no zonewrites/credentials/probesbycoordinator.
+Existinglocationissue recordsactualcounts+useroutput; docs-onlynotestsrerun.
+NoPR/implementationcompleteclaim; fulltest-allandCFmanualacceptancepending.
+
+## 2026-10-28 saved Cloudflare report read PASS; F0 remains PARTIAL
+
+Operator done; actual/tmp/k3dm-cloudflare-preflight.json exists7279bytes, valid
+JSON timestamp2026-10-28T18:16:57.631803Z. InlineobservationalassertsPASS:7hosts,
+allTLS1.2/1.3certvalidnegotiated,0HTTPHTTPSupgrades,1.0/1.1clientunsupported,
+APIallnull/sourceerrorcredentialunavailable/f0false. Fullactualstdout+operator
+stderr warnings in existingCFoperatorreportissue. Explainedlegacydeprecation
+warnings intentionalprobe/localunsupported, notedge-rejection orAPIcause;
+nohelperchanges/suppressions/newprobesbycoordinator. Filehandoffworks, tmux
+locatorresolvedactualterminaloutside; preferfileoutputoverbigJSONcopy.
+No identicalrerunneeded. NextCloudflareAI/dashboardreadonly currentsettings/
+rules/hostnameexceptions, thenremainingF0compatreviewbeforeF1separatego.
+SecuritybugOPEN, noAPIcredentialsretrieved/zonewrites/restarts/newplan/PR.
+NoBATS/ShellCheck rerun(docs/live-reportreadonly); docgatesbeforecommit.
+Freshfulltest-allpublication/incidentGUI/paymentPRchecksremainpending.
+
+## 2026-10-28 test-all status check: fix pushed, old failed run still published
+
+Userasksstatus. Actualrootclean; latest/tmp/k3dm-test-all-*.log remains
+1793208248 (mtime17:34:54Z),1913cases/4hubfixturecopyfails. Read-onlyPrometheus
+source queryPASS:cases_failed4,run_complete0,laststep=test,lasttimestamp
+1793208894=17:34:54Z. No newer fullrun orpostfixfailure established.
+cfb60be0pushedfix, prior116BATS/rawShellCheck/audit/hookspass. No testrepeat/
+metricspublication/runtimechange; fullresponse existinghub-fixtureissue.
+BugOPENuntiloperatorfreshmake test-all/usual3.13shell andall3stages+failed0/
+complete1 accepted. No PR(Claudeowns), no newcodeverificationclaimed.
+CFsavedreportalreadyreadpartial/APIcredentialunavailable, manualreviewpending.
+
+## 2026-10-28 tmux host mapping resolved; M2 old-branch run failed
+
+Usernewtmuxscreenshottitlem2-air.local; coordinatorlocalm4-air.local. SSH
+m2jump(existingaliasdirectm2-air.local) readonlyBatchMode/StrictHostKeyChecking
+works. RemotePATHlacktmux firstexit127; absolute/opt/homebrew/bin/tmuxworks.
+M2attachedsession20261012051512 window1/%10make, window2/%0SSH; workaliases
+samepanes. ActiveM2checkout cleanbranchk3d-manager-v1.43.1 HEAD71ef4dea
+Oct11; notcurrentv1.43.9fixcheckout. Watchedfinish1583cases/23fails, teststage
+exit1; missingyamlamongerrors, metrics3attemptsconnectionrefused/skipped.
+FullactualM2log1793212745retrievedandrecordednewM2watchissue; no mutations.
+Window2/%0SSHlatestprompthostm4-airconfirmed. No morelocatorquestionsneeded.
+Nextoperatorrunmake test-all inM4SSHpane(currentfixcfb60be0/usual3.13shell);
+oldM2resultnotcurrentfixvalidation. NoM2branchswitch/depsinstall/stop/restart/
+metricspush/credentialretrieval. Docs-onlywatch,no extraBATS/ShellCheckrerun,
+gatesbeforecommit. P2OPEN/currentfullrunpending, CFmanualreviewpending. NoPR.
+
+## 2026-10-28 Python correction: active M2 is3.11.6
+
+Usercorrected3.13assumption. ReadactiveM2%10labelsPython3.11.6/python-3.11;
+existingpersonal/.direnv/python-3.11/bin/python3--version=3.11.6. Installed
+Homebrewdefault3.15.1/opt311binary3.11.18 differ; SSHnonlogin/usr/bin/python3
+3.9.6 notoperatorinteractiveenv. Optionalpythonabsentexit127diagnosticrecorded.
+Acknowledgedcorrection; no versionupgrade/depsinstall/checkoutchange.
+OldM2branchv1.43.1 HEAD71ef4dea andmissingyaml remainactualtestfindings.
+Don't require3.13merelyfrompriorrecommendation; currentv1.43.9checkoutand
+itsactualtestdependenciesneedverificationonchosenhost. ExistingM4 3.13test
+proofremainsvalidhistoricalcoordinatortest, notclaimofuserM2environment.
+M2watchissueupdatedactualoutputs; docs-onlynoBATS/ShellCheckrerun/hooksapply.
+Currentfulltest-all/CFmanualacceptancepending. NoPR/remotechanges.
+
+## 2026-10-28 Kine recurrence confirmed and proper P2 filing
+
+Operatoralert investigatedreadonlyM4: lastsuccessfulCOMPACTdeleted17:45:03Z,
+nextstart17:50:03/error17:50:14Z failedtorecordcompactrevision/transaction
+committedorrolledback; no latersuccessbounded120h/tail120klogs. Metricmatches
+lastsuccess, alertfiring, pushage627s/tick490s, APIready/all4nodesReady.
+DB583081984B(556MiB), WAL78090512B(74MiB). ContainerstartedOct25, image
+rancher/k3s:v1.32.0-k3s1/restartcount0. Underlyingtriggerunknown; nooutage or
+DBintegrityclaim. Userexplicitproperbugfilingapproved: newP2
+docs/bugs/2026-10-28-hub-kine-compaction-recurred-after-transaction-rollback.md,
+parentlinked; fullactualoutputsnewinvestigationissue. Filingonly/noimpltask/
+newplan/PR/restart/rebuild/SQLwrite/credentials. October29slotonlypriorrecord,
+needsreconfirm; controlledrecoverypreflight+explicitgo, no naivek3srestart.
+
+M4operatorrun1793213637finished:main1913/no fails(1893pass20skip), bin622/two
+fails:413cleanupstat-cDarwin,567OrbStacknonTTYmessageassert. Pythonnotrun.
+UserupdatedP2commit46a02628 preserved; nowreview/fixfakefixture isolation
+andboundednonTTY/PTY withproductiontypedyesguardkept. Kinedocscommitafter
+runfinished; test-allP2remainsOPEN/fresh3stagepending.
+
+## 2026-10-28 OrbStack automation follow-up reviewed/fixed offline
+
+UserupdatedP2commit46a02628preserved. M4fullruns1793213637and1793216188
+record2535cases/2fails:main1913green(1893pass20skip), bin622fails413cleanup
+GNUstat-cDarwin and567nonTTYmessage; Pythonskippedaftertest-bin. Latest
+metricsfailed2/complete0,laststepbin. Fullverbatimtextlogassets+actualterminal/
+Promstatus in docs/issues/2026-10-28-orbstack-noninteractive-test-fixture.md.
+ControlledfakePTYbaseline567 status2, confirmationnotyes, upgrade_spy=false;
+BATSruninheritedTTY. Test-onlyrunner nowDEVNULLstdin/newsession/30stimeout
+withownedPGkill+boundedcleanup; fakeTTYyes/no bounded, +1stalledfake regression
+exit124. SamePTYgreenexpectednonTTYrefusal/no humanprompt/no upgrade.
+CleanupinodeobservationusesportablePythonos.stat, identityassertionkept.
+Final30BATS/no skips +rawShellCheckclean +diffcheck; productionupgradeand
+cleanupunchanged. Linuxscript-e semanticsreadutil-linuxmanual, noLinuxexec
+claimed. Requiredgates/commit/pushpending; no fullpublishedrerun bycoordinator,
+P2OPENuntilfresh3stagesandfailed0/complete1.
+KineproperrecurrenceP2alreadyfiled/pushed4611543d withliveproof, no recovery
+approval/action. CFoperatorAIsettingsreportreviewed; pendingrecordofreported
+Full/HTTPSoff/min1.0/TLS1.3on+rewriteson andcaveats(noanalyticsnotproof, tunnel
+notredirect/clientcompatguarantee). NoCFwritego. No newplans/PR/CIreruns.
+
+## 2026-10-28 OrbStack fixture repair pushed; CF AI report reviewed
+
+Realtest-onlyfix a7b5e5dfpushed:30focusedBATS/no skips, rawShellCheckclean,
+stagedlint/audit/checkpointhooksPASS. OwnedPGtimeouts+explicitnonTTYprevent
+humanprompts; controlledPTYred/greenno upgrade spy. Productionunchanged;
+cleanupDarwininodeassertfixedportably. Fullproofissue/assets; freshoperator
+3-stagemake test-all remainsneeded; P2OPEN/latestoldfailed2complete0.
+KineproperP2filing4611543dpushed(no restart/rebuild authorized/performed).
+
+CloudflareAIscreenshotsreportFull,HTTPSOff,minTLS1.0,TLS1.3On,rewritesOn,
+7proxiedTunnelCNAMEs. Operator-source(notindependentAPIread), noHSTSvalue/
+actualruleinventoryshown. OfficialCFdocschecked: origin/edgeredirectrules
+needreview; Tunnelnotvisitorcompatibility/loopguarantee; missingTLSanalytics
+unknownnotzerolegacytraffic. ExistingCFoperatorissue/bugupdated, F0partial/
+noF1go. Recommendationafterrules/compatbaseline: HTTPSonlyfirst, validate
+7hosts+SSO/Slack, then separatelyTLS1.2; nootherzonechanges. NoCloudflare
+write/credentialread/probe/codechange. No newplan/PR/CIrerun.
+
+## 2026-10-28 Kine Luna dispatch authorized / new M4 full run active
+
+Userrunningnewtest-all andexplicitlyasksKineP2toLuna. Scopeamendedinexisting
+recurrencebug fornativegpt-6-luna taskkine-recurrence-readiness-luna: offline
+recorded-evidence/recovery-readiness audit, oneoutputreviewissue, no runtime
+commands/credentials/livepreflight/restart/rebuild/codeorupstreamguessing.
+Coordinatorwillindependentlyreviewreport andconcretechecklist; livego separate.
+Docs-onlyscope/memorycommitneededfordispatch, runtimecodeunchangeda7b5e5df.
+NewM4operatorlog/tmp/k3dm-test-all-1793222885.log active(first448cases0fails
+attaskstart), priorfull2535casesfailed2beforefix. Followall3stages/publication;
+no newpublisherbycoordinator. CFsettingsAIreportknown/F0rulesreviewpending.
+No newplan/PR/CIrerun orKineremediationauthorized.
+
+## 2026-10-28 Luna Kine report accepted/pushed, incident stillOPEN
+
+Nativegpt-6-luna kine-recurrence-readiness-luna rework2 done/in-scopeonefile.
+Independentreviewcaughtstalerunbook, missingcommandeffects/dryrun/volume
+proof limits. Correctedreport d4481849 normalcheckpoint/land/reportlinks/
+whitespace/lint/auditPASS, pushed/nativeverifiedpass. Fullworkerreport and
+coordinatorreviewissue documentactualoutputs, no BATS/ShellCheckrerun(report
+only). Local nonsecret exportmarker10:33:40Z/39602sageprelimonly, no remote
+integrity/decryptability/restoreproof. Rulesrequireconcretereadiness+operator
+go; no recoveryperformed/authorized. Proposedrunbookpatchseparatescope.
+MakegenericKEEP_LOCALcommentdoesnotoverrideproviderk3dexplicitdeletioninbin;
+DRY_RUNhub-recover-allnot safeendtoendpreview. No naiveK3srestart.
+CurrentM4fullrun1793222885 continues0fails sofar(mainstagegreen, bin~220);
+docs-onlyspec/reportcommits movedHEAD, runtimecodea7b5e5dfunchanged. Follow
+all3stages/freshpublicationbeforetestP2closure. NoPR/newplan/CIrerun, CFmanual
+review/authorizationstillpending.
+
+## 2026-10-28 HTTPS first change / Python follow-up
+
+Operator CF AI reports HTTPS On at22:00:41Z, minimumTLS1.0 unchanged. Public
+root probes22:02:51Z independently7/7HTTP301same-hostHTTPS; directHTTPSbaseline
+200/302/401 unchanged. FullactualJSON inexistingoperatorissue; no redirects
+followed/authflows/Slack tested, no credentials/settingswrite. CFbugOPEN;
+operator login/Slack acceptance before separateTLS1.2 approval.
+
+Fulloperatorrun1793222885: main1913(20skip) andbin623 green, Python4fail from
+Dockerpromtoolfallback; tripwirealso4OrbStackupdatechecks blocked. Fixture-only
+Hermespoll mocks optionalOrbStackhooks+closedpublisherURL, sentinelred/green.
+ExistingnativepromtoolPATH makes fullmake test-python1661pass2skip, only8blocked
+read-onlycalls, noDocker/OrbStackattempt. TwoE2EsemanticBATS pass/no skip.
+Initialwrongpython-mpytest(no module) recorded transparently. Evidenceissue
+2026-10-28-offline-python-promtool-and-orbstack-hooks.md +fullassets. RuffPASS;
+requiredgates/commitpending. Freshfullpublished3-stageoperatorrun stillneeded;
+P2OPEN. No productionchange/PR/newplan/recovery.
+
+Verification follow-up commit: 6578fb95. Required staged `_agent_lint`,
+`_agent_audit`, checkpoint hooks and doc-links passed (7 files OK). Actual
+Python/BATS transcripts in linked issue/assets; ShellCheck N/A Python-only.
+No PR created (repository rule); PR URL N/A. Pushing this commit and evidence
+record to origin/k3d-manager-v1.43.9; fresh full operator run remains pending.
+
+## 2026-10-28 Full test-all passed and telemetry accepted
+
+OperatorM4run1793225872 completed3stages, duration1450s, publisher4312cases
+0failed/exit0. Main1913BATS17skip; bin623BATS0skip; pytest1661pass2skip plus
+unittest. Fullverbatimasset andliveverificationissue recorded. No unsafe
+Docker/OrbStackattempt;8read-onlytripwireblocks retained. Fresh1793227322
+samplebothPrometheus backends failed0/total4312/complete1; ACGPushgateway
+exit0/classpassed/freshsuccess. BothOfflineSuiteFailing/RunIncomplete absent.
+Initialstale4fail andwrongACGservicenameNotFound documented/correctedwithout
+mutations. HubPushgatewaylocalmatchinggroupabsent, hubscrapedmetricpass; no
+inventedlocalgroup. P2nowVERIFIED/M5E3accepted. Fix6578fb95 andpriorcommits;
+verificationcheckout418ea8aa. Docs-onlygates/checkpoint/pushpending; PRN/A.
+CFrealSSO/Slack+separateTLS1.2 andKinereadiness/recovery remainopen; nolive
+changeauthorizedbytestpass.
+
+Full-suite verification evidence and VERIFIED bug status committed and pushed:
+24aa3ff7. Staged `_agent_lint` and `_agent_audit` exited0; checkpoint hooks
+passed, check-doc-links4filesOK. FullactualBATS/Python transcript is preserved
+in docs/assets/2026-10-28-test-all-1793225872.txt. Main17skips (not previous
+run20); bin0skip; pytest2skip. Documentation-only, ShellCheckN/A. NoPR per
+repositoryrule; PRURLN/A. No coordinator metrics publication or live mutation.
+
+## 2026-10-28 Cloudflare browser smoke evidence
+
+Operator reports frontendSSOlogin success; screenshotDeveloper/Logout. Grafana
+Tests andArgoCDApplications accessible inexistingauthenticatedsessions; user
+notesneitherloggedout. Thisprovescontinuedaccess, notfreshlogin/sessionexpiry;
+no sessionbug inferred. Fulltext evidence/limits inexistingCFoperatorissue,
+no screenshotexport. Slackcommandresponse stillpending, then separateTLS1.2
+change/verification. LatestminTLS1.0/securitybugOPEN. Docs-only; no credentials,
+logout/settingswrite/probes/runtimechange. BATS/ShellCheckN/A. Required
+lint/audit/checkpoint/push pending; noPR perrepositoryrule (URLN/A).
+
+Browser smoke evidence pushed: 01831bd2. Staged lint/audit and checkpoint
+hooks passed; check-doc-links4filesOK. Documentation-only; BATS/ShellCheck
+not applicable. PRURLN/A per repository rule. Slack/TLS acceptance pending.
+
+## 2026-10-28 HTTPS application checks accepted
+
+Operator freshGrafanalogout/loginpass (mechanismnotclaimedSSO), plus fresh
+Slackmakefix-listjob02be2e0bqueued/started/succeeded/reply. FrontendSSOpass,
+ArgoCDexistingaccesspass; no needforceArgoCDlogoutforagreedaccesscheck.
+FullSlacktranscription/limits inexistingCFoperatorissue, noscreenshotexport.
+FirstHTTPSchangesmokepass; recommendoperatorCF_AI minimumTLS1.0to1.2only,
+TLS1.3On/allotherskept; awaitoperatorchangeconfirmation+postverification.
+LatestminTLS1.0/securitybugOPEN; no coordinatorcredentials/writes/commands.
+Docs-onlyBATS/ShellCheckN/A; lint/audit/hooksrequired, noPR(URLN/A).
+
+HTTPS application acceptance evidence pushed62232504. Stagedlint/audit
+exited0, checkpoint/doclinks4filesOK. Docs-onlyBATS/ShellCheckN/A; noPR
+(URLN/A). MinimumTLSchange andpostverificationstillpending.
+
+## 2026-10-28 Minimum TLS1.2 confirmed / enforcement verified
+
+OperatorAI table1.0to1.2only; TLS1.3On/HTTPSOn/Full unchanged. Reported
+22:00:41Zduplicateseartimestamp, retainedasreportednotindependentlyconfirmed.
+Independent00:05:40ZOct29/17:05PDTOct28all7HTTP301samehostHTTPS, HTTPSbaseline
+unchanged, exactTLS1.2/1.3validcert/negotiate, TLS1.0/1.1explicitstructured
+protocolversionedgealerts. DiagnostictransientlegacySSLContextSECLEVEL0only
+allowedclienthandshake; certverifykept, no system/helper/appconfigurationchange.
+Unlikepriorclient_unsupportedthisprovesedgelegacyrejection. FullactualJSON+
+expecteddeprecationwarnings/method/AI526correctioninexistingoperatorissue.
+M2/M6PASS; firstchangeSSO/Grafana/Slackpassknown, finalpostTLSfrontendSSO+
+freshSlackstillpendingM3/E2, bugOPEN. Nocredentials/settingswrite/screenshot
+export. Liveverificationdocs-onlyBATS/ShellCheckN/A; lint/audit/hooksbefore
+commit, noPR(URLN/A).
+
+TLSsetting+sevenhostenforcement evidence pushed8297d54e; stagedlint/audit
+exit0, checkpoint/doclinks4filesOK. No codechange/BATS/ShellCheckN/A.
+NoPR(URLN/A). FinalpostTLSfrontendSSO+Slacksmokepending, securitybugOPEN.
+
+## 2026-10-28 Cloudflare security bug LIVE-VERIFIED
+
+FinaloperatorpostTLSfrontendlogout/loginpass; authenticatedDeveloper shown.
+FreshSlackmakefix-listjobe3c25194queued/started/succeeded/reply, distinctfrom
+preTLS02be2e0b. Combinedwith8297d54e all7HTTP301samehostHTTPS, validexact
+TLS1.2/1.3, explicitTLS1.0/1.1edgealerts +operatorCFminimum1.2/HTTPSOn/TLS1.3On
+confirmsagreedM3/E2smoke. BugnowLIVE-VERIFIED. Fulltext/coverage/timecaveatsin
+existingCFoperatorissue; no screenshotexport, coordinatorcredentials/writes/
+Slacksend/runtimemutation. Grafanaloginfirstchange, ArgoCDexistingaccess;
+freshArgoCDSSO/allcallbacksubtypesnotclaimed. F0historicalinventoryproof
+limitsremainexplicit; no scheduleddrift/auto-repairadded. Docs-onlyBATS/
+ShellCheckN/A; stagedlint/audit/checkpointhooksbeforecommit. NoPR(URLN/A).
+
+ClosurehookinitiallyrefusedregularLiveevidencewithoutcodefixSHA; actualfixis
+externalCFsettings. Correctedtoexistingtypedoperational/investigationevidence
+withissue-ref/noFixcommit, no fabricatedSHA/bypass/parserchange. Actualhook
+output inexistingoperatorissue. Normalcheckpointretryrequired.
+
+CloudflareLIVE-VERIFIEDclosure committedandpushede717ffab. Existingtyped
+operationalproofacceptedbynormalhooks; stagedlint/auditexit0, doclinks4filesOK.
+No runtimecodechange/BATS/ShellCheckN/A; noPR(URLN/A). AllagreedCloudflare
+checkscomplete; KineincidentremainsseparateOPEN/operatorrecoverypending.
+
+## 2026-10-28 product-catalog rebuild workflow offline re-verified
+
+Userflaggeddashboardnotyetverified/live. Recheck85945891actionlintclean,
+exacttwoeditparentcomparison+6eventmatrixPASS; bugnowVERIFIEDofflineonly.
+FreshGitHubmainae982f0stillmissingworkflow_dispatch; fixbranch1ahead0behind,
+PRsearchnone, exactbranch/SHAall-eventruns0 (CLIusedbecauseconnectorPRonly).
+Existingissuehasactualoutputs+handoffcomparelink. Noapplicationcode/memory
+change/PR/merge/trigger/scan/imagepush/rollout/credentials. Claude/ownerPR+
+requiredCI+mergebeforeoneoperatorscannerretry; livepending, noCIpassclaimed.
+BATS/ShellCheckN/AYAML-onlyreview; managerstagedlint/audit/hooksbeforecommit,
+PRURLnone perusernoPRrule. CloudflarealreadyLIVE-VERIFIED; Kinestillseparate.
+
+Product-catalogofflineverification+unmergedlivegaterecordpusheddca4f988.
+Stagedlint/auditexit0, checkpoint/doclinks4filesOK. Actionlintclean+6cases
+PASS/fullactualoutputinexistingissue. Docs-onlyBATS/ShellCheckN/A; PRnone
+perrepositoryrule. RequiredCI/merge/operatorlivedispatchremainpending.
+
+## 2026-10-28 P2 sequential live-verification readiness review
+
+UserasksremainingP2liveoneatatime. Queueissue2026-10-28-p2-live-verification-
+readiness.md records9rows/evidence/limits. Firstitemtest-allalreadyE3passed;
+correctVERIFIEDtoLIVE-VERIFIEDusingtested418ea8aa/finalfix6578fb95/actual
+run1793225872 andexistingfullmetricsissue; no rerun/publish. Nextsingleoperator
+Slacktestask-docshowmanyP1openforv1.43.5 (omitbugs). LocalmatchCountQuery
+v1.43.5/P1/open; tally0open/6closed/6total atd4193471. LiveSlackreplypending,
+comparecorpus/refifdifferent. Doctorhappy-pathproofknown11:44:33Z; faultpaths
+remainoffline, heartbeatproviderenrollmentpending, no forcedprodtimeout/
+Keychainlock/restart/scan/accounts/secrets. ProductcatalogholdforClaude.
+Docs-onlyBATS/ShellCheckN/A; stagedlint/audit/hooksbeforecommit, noPR(URLN/A).
+
+P2queue/test-alllive-statuscorrectionpushed58368823; stagedlint/auditexit0,
+checkpoint/doclinks4filesOK. ExistingliveE3acceptedbynormalfix/evidencehook.
+No newruntimecode/BATS/ShellCheckN/A; PRURLN/A. Nextsingleoperatorask-docs
+Slackquestionpending; no otherlivecheckstarted or automatedmutation.
+
+## 2026-10-28 ask-docs live FAIL / stale runtime strongly suspected
+
+Operatorexactmissingnounquestionsemanticfallback/no thread; job58e47ff3
+00:26:05ZOct29statussuccessbutwronganswer, responseurlpresent(valueunread),
+thread/channelcontextabsent. ReadonlyPID4295startOct25 predatesb6704d68fix
+Oct27; startupimportsask_docs/bug_count so staleloadedcode stronglysuspected,
+notinprocesscodeinspection/newregressionproof. Freshimportreturns0P1open
+v1.43.5atsource322b4634withoutretrieval/model;87focusedpytestPASS/tripwire
+only2blockedcredentialreads/nonereachedbinary. Threadrouteentry/channelasked
+asyncpending; currentheaderthreadonlydefaultmatchingchannel+botconfig, header
+failureandoutsidechannelcanfallback. No blanketthreadpatch/guardweakening.
+ExistingcountbugreopenedOPENforfailedliveacceptance, offlinefixretained.
+Queuepausedatthisitem; nextsingleoperatorM4make restart-webhook(also bridge),
+thenexactquestioninSamechannel andnewPIDcheck. No coordinatorrestart/
+credentials/Slacksend.0persistedrunning/29historicalqueued(latestOct7)notlive
+workerproof; untouched. Fullactualoutput/limitsissue2026-10-28-ask-docs-live-
+count-and-thread-failure.md. Docs-onlyShellCheckN/A; stagedlint/audit/hooks
+beforecommit, noPR/newplan. ProductcatalogstillholdforClaude.
+
+Failedliveask-docsdiagnosis/reopenedP2pushed58cd7581.87focusedtestsPASS;
+stagedlint/auditexit0, checkpoint/doclinks5filesOK. No runtimeedit/
+ShellCheckN/A; noPR(URLN/A). Operatorreload/retestandchannelcontextpending,
+no nextP2advanced or livepassclaimed.
+
+## 2026-10-28 user-agent reload succeeded / no-root hint fix / tally timeout
+
+OperatorrestartprintedbootstrapI/O5+genericrootadvice thenreloaded. Actual
+readonlyPIDs43179webhook/43185bridge start19:22:14/running. Rootnotneeded;
+userexplicitlyrequiresnorootadvice. SmallMakefilteronlyexactgenericline,
+errors/retries5/guiuser/bridgeorderingpreserved. NewBATSredonold; final6BATS
+PASS/rawShellCheckclean/diffclean, fakesonly/noservicerestart. P3bug+issue
+2026-10-28-restart-webhook-user-domain-diagnostics.md actualoutputrecorded.
+No secondrestartneededforMake-onlyoutputchange.
+
+Afterreloadoperatorask-docs nowdeterministictallytimeout—notsemanticfallback.
+Job6f069edf02:24:14ZOct29; no thread/channelpersisted. CountP2stillOPEN.
+Localactualtally5.137s(136tagcalls), samelauncherthread3.632s/rc0/json258198B,
+so live30snotreproduced/rootcauseunknown. No timeoutincrease/cache/refactor
+orfalsepass; collectboundednonsecretchildtraceononeoperatorrepeatnext.
+Detailedfulloutputinexistingask-docsfailedliveissue. No credentialread/
+servicewrite/Slacksend. Stagedlint/audit/hooksbeforecommit, noPR/newplan.
+
+No-rootdiagnosticfixpushedevidencebabdfe72.6BATSgreen/redproof/rawShellCheck
+clean; stagedlint/auditexit0/checkpoint/doclinks6filesOK. Actualtallytimeout
+stillOPEN, noperformancefixclaimed. Bounded300sread-onlychildtracearmedfor
+PID43179 insession43637/log/private/tmp/k3dm-ask-docs-service-child-trace.txt;
+onlyPID/state/exebasename,noargv/env/secrets. AwaitonesameoperatorSlack
+retry/context, noanotherrestart. PRURLN/A.
+
+## 2026-10-28 ask-docs repeated timeout trace
+
+Repeat failed. Nonsecret process trace showed Git child running >=22s inside
+30s request; exact argv unknown. Disposable background profile reproduced
+38.562s tally, initial history log28.523s. Root-only pathspec candidate initial
+18.228s but full run exceeded60s; not accepted. Taskpolicy wrong path and
+sandbox setpriority denial recorded in existing issue, escalation only changed
+disposable child. User tally screenshot six open total vs local zero open P1.
+No production code change or timeout increase; P2 OPEN, performance fix and
+thread route remain pending. Documentation-only; no BATS/ShellCheck rerun.
+
+## 2026-10-28 ask-docs investigation only
+
+Operator says threadsonlyacg-automation and providedpost screenshot: job
+2a85e015 at02:36:43Z createdthreadbutcounttimeout. Currentcodeexplicitly
+requiresincomingchannel==SLACK_CHANNEL_ID to createbotthread; otherchannels
+use response_url or fallback. Fullactualfinding in existingask-docsissue.
+30s tallytimeout; backgroundprofile38.562s, tracedGit>=22s, exactliveGitargv/
+schedulingunknown; rootonlycandidateexceeded60s. Userrequestsno codechanges;
+none made. No service/credential/Slackmessage mutation; bugOPEN. Docs-only
+BATS/ShellCheckN/A, no PR.
+
+## 2026-10-28 ask-docs historical change investigation
+
+Read-only Gitdiff/blame: b6704d68 changed omitted-bug-noun question from
+semanticfallback to deterministic tally; timeout30s and added-doc history
+dateedfc9a5c Oct11; 881bb921 Oct16 added fixed-history scan for allJSON counts.
+Backgroundprofile38.562s/addedhistory28.523/fixedhistory5.904, livetrace
+Git>=22s noargv. Plausiblecontributors, no proofwhich change/workloadcaused
+regression or historical successfulanswer semantics. Userrequiresinvestigation
+only; no code/runtime changes. BugOPEN. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 requested known-good rollback: target unresolved
+
+Operatorrequestsrevert and originalbugreview. Beforeb6704d68 exactmissingnoun
+questionmatchNone→semanticfallback (originalbug); explicitbugsquerymatchesboth
+old/currentandusesexisting30stally. Oct22liveee456c83workedforgenericbugtally;
+bothOct11addedhistoryandOct16fixedhistoryareancestors. Doesnotprovewhichlater
+changeorcurrentworkloadcausedtimeout. Wholeoldfilewoulddiscardunrelated
+intentionalchanges/tests. Askeduserwhichworkingrevision/example orpre-b670
+behavior; no codechange/revert/runtimeaction untiltargetclear. OriginalP2OPEN.
+Recommendaftertargetclarified preserveaccuratecounts, profileboundedhistory
+andtestequivalence; threadroutingseparate. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 operator-requested ask-docs-only rollback
+
+Userclarifiedask-docsonly; restoredask_docs.py/bug_count.py byte-exact
+ee456c83Oct22 generic-bugtallylivegood. Sharedwebhookandbug-tallyscript
+unchanged; no Gitreset/rebase. Four ask-docs source/testfiles only plus
+trackingdocs/memory. OriginalmissingnounbugOPEN (returnssearchfallback);
+30stallytimeoutpotentialremains. Oldreplylosesdenominator/commit/source
+link; all87focusedcasesretained, historicalexpectationschangedunderexplicit
+rollback, tripwire2blockedcredentialreads, norealbinary. RuffPASS, cmpPASS,
+diffcheckclean; fullactualoutputinask-docsfailedliveissue. No service
+restart; operator-controlledreload/liveverificationpending. Recommend
+profileandboundedcount-onlysemantics/equivalence thenrestoreintent separately
+afterdiscussion. Stagedlint/audit/hooksrequired; noPR.
+
+Ask-docs-onlyOctober22source restorationpushed2d88c7be. Finalfocused87passed,
+Ruffclean, audit/checkpointhookpass (explicit operator-authorized expectation
+changes noted), doclinks4filesOK; ShellCheckN/A. NoPR; no runtimerestart.
+Operatornoted yesterday: actualrecordedliveee456c83 Oct22 is sixdays before
+Oct28; Oct27 pre-b670 version containslaterformatting/source improvements.
+Exact Oct27 live-good commit not independently established. OriginalbugOPEN,
+current timeout potential remains.
+
+## 2026-10-28 operator post-rollback ask-docs test
+
+OperatortriggeredSlack; readonlyjob87aacff5 completed, bot_threaddelivered
+true. Outputsemanticfallback saysdocscontainnoP1countforv1.43.5, no count;
+fullactualoutputinexistingask-docsissue. Exactinputnotread/inferred. PID30397
+webhookand30403bridge start19:52:41PDT afterrollbackcommit19:49:42. Original
+missingnounbugconsistentwithobservedfallback, remainsOPEN. Explicitbugtally
+timeoutnotretested/provenfixed. No credential/responseURLread, Slacksend,
+coordinatorrestart orruntimecodechange. Docs-only; noBATS/ShellCheck/PR.
+
+## 2026-10-28 ask-docs post-rollback response time
+
+Operator asksresponse time forjob87aacff5. Readonlyfiletimestamps: status
+creation02:53:12.497454Z, output02:54:33.820867Z, deliverylog
+02:54:34.105340Z => about81.6s jobcreationtodeliveryrecord. Approximate,
+notfullSlackend-to-end/exactAPI timing. Slowinteractiveanswer andnoP1count;
+doesnotprove deterministic30stallytimeoutfixed. Actualtimestampoutput in
+existingask-docsissue; nocode/services/credentials/Slackmessage change.
+Docs-onlyBATS/ShellCheckN/A, noPR.
+
+## 2026-10-28 ask-docs latency options review
+
+Sourceinspection: restoredmissingnounquestionusesretrieval/excerpts/model;
+job81.6shasnostagetimings so bottleneckunknown. --sources bypassesmodel but
+returnslinksnotcount, retrievalstillruns; noguaranteedlatency. Explicitbugs
+countusesdeterministictallybut30slivefailed, so no claimitworks. Recommend
+stage timingswithoutprompt/secrets, profile representativecount workload,
+then bounded accuratecount-onlypath/equivalence/failclosed tests before
+restoringomittednounrouting. No code/config/livechange; docs-only, noPR.
+
+## 2026-10-28 model summarization latency evidence
+
+Operatorasksmodelfaster. Existingjob87aacff5 metadata status success,
+elapsed_s45.568 candidateagy; `_call_gemini` measuresfullcandidate/CLI loop,
+notpureserverinference. Priorjobcreation-to-delivery~81.6s leaves~36s outside
+loopincludingretrieval/otheroverhead, stagesnotisolated. Single sample.
+Potentialbenchmarksamequestions/excerpts/candidates, startup/retrieval/model
+timing and answerquality; shorterprompts/reasoning onlyifsupported. Google
+Gemini API docs say lower thinking may reduce latency; agyCLI support unproven.
+No model/credentials/livecodechange/benchmark. OriginalcountbugOPEN;
+deterministic count needsfullcorrectevidence. Docs-only, noPR.
+
+## 2026-10-28 existing ask-docs P2 updated for count timeout
+
+OperatorasksupdateexistingP2 andwhethercountbugnew. Existing
+2026-10-27-ask-docs-priority-count-requires-bugs-word.md alreadytracks
+missingnouncount; updatedsameOPENP2toincludeobserveddeterministictallytimeout
+andboundedaccuratecount/equivalence/liveacceptance. No duplicate/newplan.
+Correctedstaleheader(previousfixb670rolledback2d88) andunverifiedworkaround
+claim; livecurrentsemanticfallback, explicitbugsworkaroundnotproven.
+Generalmodelsummarylatencyseparateenhancementunlessagreedtargetviolated.
+Userrequestedcommunicationbeforechange: docs-onlyscopeproposal, no new
+implementation/dispatch/credential/service/Slackaction authorized or performed.
+Evidence/live traces in existingissue. Docs-onlyBATS/ShellCheckN/A; noPR.
+
+## 2026-10-28 Luna dispatch authorized for ask-docs count P2
+
+User explicitlyrequestsLuna for existingupdatedP2; boundedtask
+ask-docs-count-tally-luna, gpt-6-luna. Scopeexisting matcher/count tests plus
+scripts/bug-tally.py and test_bug_tally.py to addressactualtally work while
+preserving existingCLI/fixed_in/release/status/countsemantics. No generic
+modelsummaryfeature/dashboard/newplan, externalruntime/secrets/Slack/restart
+orworkerGitmutations. Workerfocusedofflineequivalence/failure/work-reduction
+tests; coordinatorindependentreview/normalgates/landthenoperatorlive.
+OriginalcountbugOPEN; realtimeoutcause partiallyobserved, notclaimedknown.
+Needcommit/pushscopebefore native dispatch.
+
+## 2026-10-28 Luna ask-docs count follow-up landed
+
+NativeGPT-6-Lunatask ask-docs-count-tally-luna reworkedafterindependentreview
+andlanded67c26bdf, explicitnative superseding ask-docs-priority-count-intent;
+pushed/nativeverifyofflinepass. DefaultfullCLI/fixed_in retained; count-only
+skipsfixedhistory andunneededexplicitbranch ancestry, preservesfallback;
+boundedomittednounmatcher/unrelatednouns. Independent227pytestPASS/noskips
+usingexistingpromtool/tripwire; Ruffclean/audit/hooks/landingtestsPASS.
+Warmbackgroundcount3.093s; Luna11.765–26.048s variable, noliveguarantee.
+InitialLunaruffmissing/2skips, initialaudit assertionreplacement andland
+prior-taskguard resolvedthroughnormaldocumentedmechanisms/no bypass; actual
+output in issue2026-10-28-ask-docs-count-tally-luna-verification.md.
+P2OPEN untiloperatorrestart-webhook(alsobridge)+exactSlackcount/threadtest;
+no coordinatorliveaction/credentials. Python-onlyShellCheckN/A, noPR.
+
+## 2026-10-28 ask-docs P2 live failure after Luna follow-up
+
+Operatorreloaded PID35701/bridge35707 20:25:11PDT after67c26bdf20:21:20.
+Jobcc203d78 03:26:27ZOct29 bot_threaddeliveredtrue but outputtallytimeout/
+Sourcesnone. LiveFAIL, P2OPEN; workerjobstatussuccessisnotcountsuccess.
+Separatewarmbackgroundcount13.486s variable/notliveproof. Existingverification
+issue records actualoutput and boundednewtask Files/scope. User LunaP2dispatch
+continuesas ask-docs-count-timeout-followup-luna, spec existingissue to avoid
+prior-landed-taskguard; no newplan/bug. No prodretry/restart/credential/Slack
+send bycoordinator. PreserveCLI/attribution/failure semantics and realistic
+coldwork reduction, independentreviewbeforeoperatorlive. Docs-onlyBATS/
+ShellCheckN/A; lint/audit/hooksbeforecommit; noPR.
+
+## 2026-10-29 ask-docs timeout follow-up unresolved
+
+Operatorrequestedcontinueafterinterruption. NativeLuna task
+ask-docs-count-timeout-followup-luna resumedafterusagelimit; candidate
+batchedtagancestry118focusedtests/RuffPASS butindependentbackground37.997s
+vsbaseline43.471s, equalbuckets; tagretargetrace, so rejected. Two-phase
+normal-renameverification matching64buckets but52.506/58.596s vsbaseline
+30.632s, rejected. No-renames31.235→18.179s current1124maps equal but fixture
+shows pathrestrictionchangesrenameattribution/visiblecount; not safe.
+Narrowed176relevantfallback paths Gitlog25–27s beforeotherwork. Packedclone
+comparisoninconclusive. Finalworkerinvestigation116tests/RuffPASS, no source
+changes/worktreeclean, no newfixlanded. Existingask-docsP2OPEN/live timeout.
+Fullactualoutputs/race/limitations inexistingverificationissue. Nextdesign
+directionvalidatedimmutable snapshot/index, first-miss/lifecycle/ref/tag races
+need concrete plan and discussion before implementation. No cache/scheduler/
+service/credentials/Slack action or newplan/PR. Docs-onlyShellCheckN/A.
+
+## 2026-10-29 ask-docs count performance proposal
+
+Operator requested a plan for later evaluation. Filed v1.43.11 plan 5 of 5: validated tally snapshot/index or another safe design, with freshness, cold-start, correctness and live performance criteria. No implementation or dispatch approved. Existing P2 remains open after live timeout; model-summary latency is separate. Plan and roadmap documentation only; no production action.
+Plan checkpoint: 7f0fdca3. PR: none (not requested). Documentation-only; BATS and ShellCheck not applicable.
+
+## 2026-10-29 Kine recurrence follow-up
+
+Operator requested review and possible Luna dispatch. Luna performed offline root-cause review: transaction trigger remains unknown, no safe fix or K3s upgrade scoped; matching Kine source/version and incident-window evidence needed. Read-only M4 checks: API ready, container has not restarted, no matching compaction events in bounded recent logs. Sandbox log access failed; approved retry worked. Full outputs and limits in docs/issues/2026-10-29-kine-recurrence-follow-up-review.md. P2 remains open; no recovery or restart performed. PR: none.
+Review checkpoint: 6e281548. Documentation-only: BATS and ShellCheck not applicable; doc links and agent audit passed.
+
+## 2026-10-29 live verification queue review
+
+Reviewed eight screenshot rows. First selected operator check: webhook doctor in unlocked GUI session. Coordinator sandbox check returned auth_unavailable/lookup_exit 44 and process command_error; does not prove missing credential in operator context and did not run authenticated HTTP. Actual output and remaining prerequisites in docs/issues/2026-10-29-live-verification-queue-review.md. No status marked live verified, service restart or credential change. PR: none.
+Review checkpoint: 9a3561ff. Documentation-only: BATS and ShellCheck not applicable; doc links and agent audit passed.
+
+## 2026-10-29 operator doctor tmux lookup
+
+Operator ran doctor in tmux; approved read-only search of five default-socket panes found no matching command or diagnostic in 3000 scrollback lines. Initial sandbox socket access denied. Requested pane identifier or JSON; result remains pending, no live verification claimed. See docs/issues/2026-10-29-live-verification-queue-review.md. PR: none.
+
+## 2026-10-29 operator webhook doctor result
+
+Operator supplied /tmp/webhook-doctor.json on M4: lookup exit 0, available reader, authenticated healthy HTTP, port 7443 listening, no recovery recommended. Actual JSON in docs/issues/2026-10-29-live-verification-queue-review.md. Healthy-path evidence does not reproduce EOF race, locked Keychain or timeout; heartbeat remains unenrolled. No live-verified flag changed or restart performed. PR: none.
+
+## 2026-10-29 doctor command-exit live verification
+
+Operator requested controlled timing test. Current M4 helper waited for successful closed-stream child (exit 0, 0.156s) and timed out/terminated over-deadline child (0.204s); fix b591a13c present. Operator real doctor lookup and authenticated health passed. Bug marked live-verified with controlled-race limitation; original locked-Keychain symptom was separate. Full command/output in docs/issues/2026-10-29-live-verification-queue-review.md. No restart or Keychain lock. PR: none.
+
+## 2026-10-29 PR Checks chart live verification
+
+Operator screenshots show zero open/no history for k3d-manager and zero open/retained history for payment, GitHub read ok. PR93 Build and Test tooltip 1.53m matches recorded GitHub 92s rounded. Hub dashboard app Healthy/Synced at 858d6612 containing fix 2b21e8af. Bug marked LIVE-VERIFIED; failed-read case offline only. Full evidence/screenshots and read-only access issues in docs/issues/2026-10-28-pr-checks-github-timestamp-comparison.md. No live mutation. PR: none.

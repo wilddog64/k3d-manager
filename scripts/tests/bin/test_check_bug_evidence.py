@@ -1,6 +1,7 @@
 """Tests for the LIVE-VERIFIED evidence lint."""
 
 import subprocess
+import pytest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -117,3 +118,26 @@ def test_non_bug_path_passes(tmp_path):
     path.parent.mkdir()
     path.write_text("**Status:** LIVE-VERIFIED\n", encoding="utf-8")
     assert _run(path, tmp_path).returncode == 0
+
+
+@pytest.mark.parametrize("header", ["**Fix commit:** not-a-sha", "**Fix commit:**", "**FIX COMMIT:** broken", "**Fix commit:** abcdef1234567"])
+def test_investigation_hook_rejects_explicit_fix_headers(tmp_path, header):
+    path = _repo(tmp_path, "LIVE-VERIFIED", (
+        "**verification type:** INVESTIGATION\n"
+        "**live investigation evidence:** 2026-10-28 · source operator · "
+        "reference opaque-proof · env local · scenario health · proves m1\n" + header + "\n"))
+    result = _run(path, tmp_path)
+    assert result.returncode == 1
+    assert "only for bugs without a **Fix commit:**" in result.stderr
+
+
+def test_investigation_hook_case_insensitive_type_and_line(tmp_path):
+    path = _repo(tmp_path, "LIVE-VERIFIED", (
+        "**verification type:** INVESTIGATION\n"
+        "**live investigation evidence:** 2026-10-28 · source operator · "
+        "reference opaque-proof · env local · scenario health · proves m1\n"))
+    assert _run(path, tmp_path).returncode == 0
+    path.write_text(path.read_text().replace("2026-10-28", "2026-02-30"))
+    result = _run(path, tmp_path)
+    assert result.returncode == 1
+    assert "typed **Live investigation evidence:** line" in result.stderr

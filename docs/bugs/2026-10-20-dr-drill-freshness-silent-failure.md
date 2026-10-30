@@ -1,7 +1,7 @@
 # Bug: DR drill freshness workflow fails silently when last successful result is stale
 
 **Filed:** 2026-10-20 (operator GitHub failure notification; investigated with GitHub Actions logs and results branch)
-**Status:** VERIFIED — offline fix landed as `c20d90cd` on 2026-10-21; live data-repo workflow verification pending
+**Status:** VERIFIED — offline fix `c20d90cd`; installed in data repo `1a7b21ed` 2026-10-29; live check = next scheduled run (2026-10-30 09:17 UTC)
 **Priority:** P2 — repeated scheduled freshness failures lack actionable diagnostics and the DR evidence is past its eight-day assurance window
 **Severity:** moderate — DR readiness evidence is stale and the automated workflow cannot distinguish its failure mode; no evidence that an actual recovery drill failed
 **Approval:** operator requested review and dispatch on 2026-10-21; live DR operations, data-repo deployment, and synthetic result publication remain unauthorized
@@ -94,3 +94,13 @@ interface:
 - `scripts/etc/dr/drill-freshness.sh`
 - `scripts/tests/plugins/dr_drill_freshness.bats`
 - `docs/howto/hub-dr-drill.md`
+
+## Live status — 2026-10-29 (Claude, read-only)
+
+- The workflow has failed every night from 10-24 through 10-29 (latest run 40849406726). Each time `drill-freshness.sh results` exits 1 with no diagnostic.
+- `wilddog64/k3dm-hub-data:main/drill-freshness.sh` is blob `72f1880e`; the fixed `scripts/etc/dr/drill-freshness.sh` is `dcf320de`. The fix was never installed in the data repo, so the live workflow still runs the pre-fix script.
+- Live verification needs two things: (1) operator-approved install of the fixed script into the data repo, after which the next run must name its failure class; (2) a fresh successful drill result, which clears the underlying staleness (last result 2026-10-10).
+
+### Fix installed — 2026-10-29
+
+The operator installed the fixed script into the data repo (`k3dm-hub-data` commit `1a7b21ed`). The installed blob is `dcf320de`, identical to `scripts/etc/dr/drill-freshness.sh`. The workflow is schedule-only (`17 9 * * *` UTC). The next run (2026-10-30 09:17 UTC) is expected to fail with the titled error `DR drill freshness: successful result is stale`, naming the 2026-10-10 result. That message is the live proof of the fix. The staleness itself clears only with a fresh drill (`make dr-drill`, then `make dr-drill-publish`).

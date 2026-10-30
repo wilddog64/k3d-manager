@@ -31,20 +31,35 @@ _lp_mark_status() {
 }
 
 _lp_usage() {
-  echo "usage: bin/k3dm-codex-land-pending --slug SLUG --test CMD" >&2
+  echo "usage: bin/k3dm-codex-land-pending --slug SLUG --test CMD [--landing-actor ACTOR] [--landing-model VENDOR/MODEL]" >&2
   exit 2
 }
 
+_lp_validate_landing_metadata() {
+  local actor="$1" model="$2"
+  case "$actor" in ""|human|claude|codex|other_agent|unknown) ;; *) _lp_die "invalid landing actor: $actor" ;; esac
+  case "$model" in
+    "") ;;
+    *)
+      [[ "$model" =~ ^[A-Za-z0-9._:-]{1,64}/[A-Za-z0-9._:-]{1,64}$ ]] || _lp_die "invalid landing model"
+      case "$actor" in claude|codex|other_agent) ;; *) _lp_die "landing model requires an identified agent actor" ;; esac
+      ;;
+  esac
+}
+
 _lp_main() {
-  local slug="" test_cmd="" rel version task run spec msg sha when task_status
+  local slug="" test_cmd="" landing_actor="" landing_model="" rel version task run spec msg sha when task_status
   while (($#)); do
     case "$1" in
       --slug) slug="${2:-}"; shift 2 ;;
       --test) test_cmd="${2:-}"; shift 2 ;;
+      --landing-actor) landing_actor="${2:-}"; [[ -n "$landing_actor" ]] || _lp_usage; shift 2 ;;
+      --landing-model) landing_model="${2:-}"; [[ -n "$landing_model" ]] || _lp_usage; shift 2 ;;
       *) _lp_usage ;;
     esac
   done
   [[ -n "$slug" && -n "$test_cmd" ]] || _lp_usage
+  _lp_validate_landing_metadata "$landing_actor" "$landing_model"
 
   rel="$(git -C "$_lp_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   [[ "$rel" =~ ^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _lp_die "checkout is on '${rel:-detached}', not a release branch"
@@ -74,7 +89,10 @@ _lp_main() {
     git -C "$task" commit -q -m "$msg"
   fi
 
-  "$_lp_dispatch" land --slug "$slug" --test "$test_cmd"
+  local -a land_args=(land --slug "$slug" --test "$test_cmd" --review-pending)
+  [[ -z "$landing_actor" ]] || land_args+=(--landing-actor "$landing_actor")
+  [[ -z "$landing_model" ]] || land_args+=(--landing-model "$landing_model")
+  "$_lp_dispatch" "${land_args[@]}"
   git -C "$_lp_root" push -q origin "$rel"
   sha="$(git -C "$_lp_root" rev-parse --short HEAD)"
   when="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"

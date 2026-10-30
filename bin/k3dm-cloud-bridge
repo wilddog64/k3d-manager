@@ -254,7 +254,12 @@ def _recover_orphaned_claims(repo, ref, processed, claims):
 
 
 def _git(repo, args, env=None, timeout=30):
-    rc, output, timed_out = _spawn_capture_text(["git", *args], cwd=repo, env=env, timeout=timeout)
+    git_env = os.environ.copy() if env is None else dict(env)
+    if sys.platform == "darwin" and "GIT_SSH_COMMAND" not in git_env:
+        git_env["GIT_SSH_COMMAND"] = (
+            "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
+    rc, output, timed_out = _spawn_capture_text(
+        ["git", *args], cwd=repo, env=git_env, timeout=timeout)
     if timed_out or rc != 0:
         raise RuntimeError(output.strip() or "git command failed")
     return output
@@ -672,6 +677,19 @@ def _next_sleep(now, last_activity):
     return IDLE_POLL_SECONDS
 
 
+def _write_heartbeat_marker(now=None):
+    """Advisory timestamp for a successfully completed bridge poll."""
+    marker = STATE_DIR / "heartbeat.timestamp"
+    temporary = STATE_DIR / f".heartbeat.{os.getpid()}.tmp"
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary.write_text(f"{time.time() if now is None else now:.3f}\n", encoding="ascii")
+        temporary.chmod(0o600)
+        os.replace(temporary, marker)
+    except OSError as error:
+        _LOG.warning("completion marker skipped (%s)", type(error).__name__)
+
+
 def main():
     root = Path(os.environ.get("K3DM_REPO_ROOT", ROOT))
     repo = Path(os.environ.get("K3DM_CLOUD_BRIDGE_REPO",
@@ -682,6 +700,7 @@ def main():
     while True:
         try:
             last_tip, processed_count = process_tick(repo, root, last_tip=last_tip)
+            _write_heartbeat_marker()
             if processed_count:
                 last_activity = time.monotonic()
         except (RuntimeError, OSError, ValueError) as error:

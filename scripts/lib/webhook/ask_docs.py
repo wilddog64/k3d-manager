@@ -247,7 +247,7 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("Question rejected — too long or contains disallowed patterns.", [])
     query = bug_count.match(question)
     if query is not None:
-        return _reply(bug_count.reply(query), ["scripts/bug-tally.py"], scrub_prose=False)
+        return _reply(bug_count.reply(query), [], scrub_prose=False)
     recent = _wants_recent(question)
     try:
         results = _recent_docs(question, k) if recent else []

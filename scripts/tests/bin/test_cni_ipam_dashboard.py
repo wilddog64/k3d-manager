@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -41,6 +42,11 @@ def test_dashboard_has_required_panels_with_unique_ids():
         "Stale reservations removed per sweep",
         "Since last sweep",
         "Last push age",
+        "In use",
+        "Starting (grace period)",
+        "Held without a sandbox",
+        "Oldest held without a sandbox",
+        "Reservations by outcome",
     ]
     assert len({panel["id"] for panel in panels}) == len(panels)
 
@@ -54,6 +60,10 @@ def test_dashboard_queries_only_emitted_series():
         "k3dm_cni_ipam_probe_success",
         "k3dm_cni_ipam_stale_last_run",
         "k3dm_cni_ipam_sweep_last_run_timestamp_seconds",
+        "k3dm_cni_ipam_kept",
+        "k3dm_cni_ipam_young",
+        "k3dm_cni_ipam_skipped",
+        "k3dm_cni_ipam_skipped_oldest_age_seconds",
         "push_time_seconds",
     }
     for panel in dashboard_json["panels"]:
@@ -120,3 +130,21 @@ def test_every_stat_panel_sets_its_own_thresholds_or_mappings():
             continue
         defaults = panel["fieldConfig"]["defaults"]
         assert "thresholds" in defaults or "mappings" in defaults, panel["title"]
+
+
+ORIGINAL_PANELS_SHA256 = "0362cb7bb68e18c468968dc5692101620ca7bf4078fca6cb52d1bff38a6ba0e9"
+
+
+def test_original_panels_are_unchanged():
+    _, current = dashboard()
+    digest = hashlib.sha256(json.dumps(current["panels"][:8], sort_keys=True).encode()).hexdigest()
+    assert digest == ORIGINAL_PANELS_SHA256  # agent-audit: allow assert-removed git HEAD baseline broke once committed; pinned digest of the pre-change panels
+
+
+def test_guide_documents_outcome_row_and_alert():
+    subdoc = (GUIDE_PATH.parent / "grafana-dashboards" / "k3dm-host-cni-ipam.md").read_text()
+    for token in ("k3dm_cni_ipam_skipped", "k3dm_cni_ipam_skipped_oldest_age_seconds",
+                  "k3dm_cni_ipam_young", "needs host refresh", "HostCniIpamOrphanNotReclaimed"):
+        assert token in subdoc, token
+    alerting = (ROOT / "docs/guides/alerting.md").read_text()
+    assert "| `HostCniIpamOrphanNotReclaimed` fires |" in alerting

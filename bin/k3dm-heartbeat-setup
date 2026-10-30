@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Render disabled-by-default heartbeat config and scheduler candidates."""
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+import plistlib
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+_HEARTBEAT_PATH = ROOT / "bin" / "k3dm-heartbeat"
+_SPEC = importlib.util.spec_from_loader(
+    "heartbeat_setup_validation", importlib.machinery.SourceFileLoader(
+        "heartbeat_setup_validation", str(_HEARTBEAT_PATH)))
+_HEARTBEAT = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(_HEARTBEAT)
+
+
+def _python_interpreter(python_path=None):
+    candidate = str(python_path or sys.executable)
+    path = Path(candidate)
+    if not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK):
+        raise ValueError("Python interpreter must be an absolute executable path")
+    result = subprocess.run([candidate, "--version"], capture_output=True, text=True,
+                            timeout=5, check=False)
+    version = (result.stdout + result.stderr).strip()
+    try:
+        major, minor = (int(part) for part in version.split()[1].split(".")[:2])
+    except (IndexError, ValueError):
+        raise ValueError("Python interpreter version could not be validated") from None
+    if result.returncode or (major, minor) < (3, 9):
+        raise ValueError("Python 3.9 or newer is required")
+    return candidate
+
+
+def _systemd_arg(value):
+    if "\n" in value or "\r" in value:
+        raise ValueError("systemd argument contains a newline")
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def render(config_path, output_dir, platform, python_path=None):
+    config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    expected_role = "m4" if platform == "launchd" else "hostinger" if platform == "systemd" else None
+    if expected_role is None:
+        raise ValueError("unsupported scheduler platform")
+    _HEARTBEAT._validate_config(config, expected_role=expected_role)
+    interpreter = _python_interpreter(python_path)
+    output = Path(output_dir).expanduser().absolute()
+    output.mkdir(parents=True, exist_ok=True)
+    config_target = output / "heartbeat.json"
+    binary = ROOT / "bin" / "k3dm-heartbeat"
+    if platform == "launchd":
+        targets = [config_target, output / "com.k3d-manager.heartbeat.plist"]
+        plist = {"Label": "com.k3d-manager.heartbeat", "ProgramArguments": [
+            interpreter, str(binary), "--config", str(config_target)],
+            "StartInterval": 60, "RunAtLoad": True,
+            "StandardOutPath": str(output / "heartbeat.log"),
+            "StandardErrorPath": str(output / "heartbeat.log")}
+        contents = {targets[0]: json.dumps(config, indent=2) + "\n",
+                    targets[1]: plistlib.dumps(plist)}
+    else:
+        targets = [config_target, output / "k3dm-heartbeat.service",
+                   output / "k3dm-heartbeat.timer"]
+        command = " ".join(_systemd_arg(item) for item in
+                           (interpreter, str(binary), "--config", str(config_target)))
+        service = ("[Unit]\nDescription=k3d-manager independent heartbeat probes\n\n"
+                   "[Service]\nType=oneshot\nExecStart=" + command + "\n")
+        timer = ("[Unit]\nDescription=Schedule independent heartbeat probes\n\n"
+                 "[Timer]\nOnBootSec=30s\nOnUnitActiveSec=60s\nAccuracySec=5s\n"
+                 "Persistent=true\nUnit=k3dm-heartbeat.service\n\n[Install]\nWantedBy=timers.target\n")
+        contents = {targets[0]: json.dumps(config, indent=2) + "\n",
+                    targets[1]: service, targets[2]: timer}
+    existing = [str(path) for path in targets if path.exists()]
+    if existing:
+        raise FileExistsError("render targets already exist: " + ", ".join(existing))
+    created = []
+    try:
+        for path, data in contents.items():
+            with path.open("xb") as handle:
+                handle.write(data if isinstance(data, bytes) else data.encode("utf-8"))
+            path.chmod(0o600 if path == config_target else 0o644)
+            created.append(path)
+    except OSError:
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
+    return [str(path) for path in targets]
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--platform", choices=("launchd", "systemd"), required=True)
+    parser.add_argument("--python", help="absolute supported Python 3.9+ interpreter path")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    try:
+        if args.dry_run:
+            print(f"Would render disabled-by-default {args.platform} candidates under {args.output_dir}")
+        else:
+            for path in render(args.config, args.output_dir, args.platform, args.python):
+                print(path)
+        return 0
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

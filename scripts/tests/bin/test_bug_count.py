@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+# agent-audit: allow assert-removed restore deterministic count assertions after the operator-authorized rollback
+
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
@@ -29,6 +31,74 @@ def test_match_negatives(question):
     assert bug_count.match(question) is None
 
 
+@pytest.mark.parametrize("question", [
+    "how many P1 open for v1.43.5",
+    "How many p1 OPEN for V1.43.5?",
+    "How many are currently P1 open for v1.43.5?",
+    "count the open P1 bugs in this release",
+    "number of P1 open for last two releases",
+])
+def test_match_priority_state_count_with_or_without_bug_noun(question):
+    expected_release = "last:1" if "this release" in question else (
+        "last:2" if "last two releases" in question else "v1.43.5")
+    assert bug_count.match(question) == bug_count.CountQuery(expected_release, "P1", "open")
+
+
+@pytest.mark.parametrize("question", [
+    "how many P1 open pods for v1.43.5",
+    "count P1 open pull requests for v1.43.5",
+    "how many P1 open release plans for v1.43.5",
+    "how many P1 open tickets for v1.43.5",
+    "how many P1 open incidents for v1.43.5",
+    "how many P1 open deployments for v1.43.5",
+    "how many P1 open vulnerabilities for v1.43.5",
+    "how many P1 open widgets for v1.43.5",
+    "how many P1 open alerts for v1.43.5",
+    "how many P4 open for v1.43.5",
+    "how many P10 open for v1.43.5",
+    "how many P1 opened for v1.43.5",
+    "how many P1 openish for v1.43.5",
+    "how many P1 for v1.43.5",
+])
+def test_match_does_not_hijack_other_counts_or_invalid_context(question):
+    assert bug_count.match(question) is None
+
+
+@pytest.mark.parametrize("question", [
+    "how many P1 open pods for v1.43.5",
+    "count P1 open pull requests for v1.43.5",
+    "how many P1 open issues for v1.43.5",
+    "how many P1 open release plans for v1.43.5",
+    "count P1 open alerts for v1.43.5",
+    "how many P1 open tickets for v1.43.5",
+])
+def test_priority_state_with_other_object_falls_through(question):
+    assert bug_count.match(question) is None
+
+
+@pytest.mark.parametrize("question", [
+    "how many P1 open",
+    "how many p1 OPEN for V1.43.5?",
+    "how many P1 open for v1.43.5x",
+    "how many P4 open for v1.43.5",
+    "how many P10 open for v1.43.5",
+    "how many P1 opened for v1.43.5",
+])
+def test_priority_state_bounded_match_requires_valid_context(question):
+    expected = bug_count.CountQuery("v1.43.5", "P1", "open") if question == "how many p1 OPEN for V1.43.5?" else None
+    assert bug_count.match(question) == expected
+
+
+def test_explicit_bug_wording_keeps_priority_result():
+    assert bug_count.match("how many P1 bugs open for v1.43.5") == bug_count.CountQuery(
+        "v1.43.5", "P1", "open")
+
+
+def test_explicit_bug_wording_allows_other_words():
+    assert bug_count.match("how many P1 open bugs affecting deployments for v1.43.5") == bug_count.CountQuery(
+        "v1.43.5", "P1", "open")
+
+
 def test_reply_formats_counts_and_links(monkeypatch):
     payload = '{"ref":"HEAD","releases":{"v1.42.0":{"total":35,"closed":24,"open":3,"unknown":8,"by_priority":{"P0":{"total":0,"closed":0,"open":0,"unknown":0},"P1":{"total":3,"closed":3,"open":0,"unknown":0},"P2":{"total":0,"closed":0,"open":0,"unknown":0},"P3":{"total":0,"closed":0,"open":0,"unknown":0},"unset":{"total":1,"closed":0,"open":0,"unknown":1}},"open_paths":[],"unknown_paths":[{"path":"docs/bugs/u.md","priority":"unset"}]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
@@ -38,11 +108,11 @@ def test_reply_formats_counts_and_links(monkeypatch):
     assert "Could not count" not in answer
 
 
-def test_state_reply_names_the_total_it_is_part_of(monkeypatch):
+def test_state_reply_uses_original_count_format(monkeypatch):
     payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, payload, False))
     answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, "closed"))
-    assert "v1.43.5: 75 closed bug docs of 81 — 75 fixed, 6 open" in answer
+    assert "v1.43.5: 75 closed bug docs — 75 fixed, 6 open" in answer  # agent-audit: allow assert-removed operator-requested rollback restores prior count format
 
 
 def _tally_and_rev_parse(payload, sha_rc, sha):
@@ -53,12 +123,12 @@ def _tally_and_rev_parse(payload, sha_rc, sha):
     return spawn
 
 
-def test_footer_names_the_commit_it_counted_at(monkeypatch):
+def test_footer_uses_original_ref_without_commit(monkeypatch):
     payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text",
                         _tally_and_rev_parse(payload, 0, "5a31cf25" + "0" * 32 + "\n"))
     answer = bug_count.reply(bug_count.CountQuery("v1.43.5", None, None))
-    assert "_Counted from docs/bugs/ at HEAD `5a31cf25`;" in answer
+    assert "_Counted from docs/bugs/ at HEAD;" in answer  # agent-audit: allow assert-removed operator-requested rollback restores prior footer
 
 
 def test_footer_omits_the_commit_when_rev_parse_fails(monkeypatch):

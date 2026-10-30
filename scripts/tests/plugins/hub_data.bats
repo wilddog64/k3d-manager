@@ -323,7 +323,7 @@ freeze_clock() {
   make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z DR_TEST_LARGE=1
   _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
   run hub_data_export; [ "$status" -eq 0 ]; [ "$(grep -R -c 'state.db\|kind: Secret' "$TEST_ROOT/last-snapshots" | awk -F: '{s += $NF} END {print s+0}')" -eq 0 ]
-  while read -r sum file; do [[ "$file" == *.age || "$file" == *.age.part-* || "$file" == pv-pvc.yaml || "$file" == inventory.json ]]; done < "$TEST_ROOT/last-snapshots/20261009T120000Z/SHA256SUMS"
+  while read -r _sum file; do [[ "$file" == *.age || "$file" == *.age.part-* || "$file" == pv-pvc.yaml || "$file" == inventory.json ]]; done < "$TEST_ROOT/last-snapshots/20261009T120000Z/SHA256SUMS"
   [ "$(find "$TEST_ROOT/last-snapshots" -type f -size +95M -print | wc -l)" -eq 0 ]
 }
 
@@ -617,7 +617,7 @@ _fake_vault_tree() {
 
 @test "17 setup self-test passes and revokes its single token" {
   source_plugin; _vault_login() { :; }; _vault_exec() { :; }; _hub_data_vault_revoke() { printf 'token revoke -self\n' >> "$VLOG"; }; run hub_data_export_setup; [ "$status" -eq 0 ]; grep -q 'token revoke -self' "$VLOG"; [ "$(grep -c 'auth/kubernetes/login' "$VLOG")" -eq 1 ]
-  declare -gA _VAULT_SESSION_TOKENS=(); _vault_login() { _VAULT_SESSION_TOKENS[secrets/vault]=admin; }
+  declare -gA _VAULT_SESSION_TOKENS=(); _vault_login() { _VAULT_SESSION_TOKENS[secrets/vault]='admin'; }
   _hub_data_vault_kv_list() { [[ -z "${_VAULT_SESSION_TOKENS[secrets/vault]:-}" ]] || { printf 'admin session still set\n' >&2; return 1; }; [[ "$4" == secret/ ]] && printf '["app/"]' || printf '["leaf"]'; }
   run hub_data_export_setup; [ "$status" -eq 0 ]
 }
@@ -914,6 +914,13 @@ STUB
   run _hub_data_repoint_vault ctx; [ "$status" -eq 0 ]; mapfile -t order < "$CALL_LOG"; [ "${order[*]}" = 'config shards vault-root root' ]
 }
 
+make_recovery_recipe_fixture() {
+  local destination="$1" repo_root
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  mkdir -p "$destination/scripts" "$destination/bin"
+  cp "$repo_root/Makefile" "$destination/Makefile"
+}
+
 @test "recover B4-20: refused preflight prevents hub-recover" {
   local fakebin="$TEST_ROOT/fakebin" script="$TEST_ROOT/fake-k3d-manager" copy="$TEST_ROOT/repo"
   mkdir -p "$fakebin"
@@ -926,7 +933,7 @@ fi
 printf '%s\n' "$1" >> "$CALL_LOG"
 STUB
   chmod +x "$script"
-  cp -R "$PWD" "$copy"
+  make_recovery_recipe_fixture "$copy"
   cp "$script" "$copy/scripts/k3d-manager"
   cat > "$copy/bin/hub-restore" <<'STUB'
 #!/usr/bin/env bash
@@ -1067,7 +1074,7 @@ STUB
 #!/usr/bin/env bash
 printf 'make %s\n' "$*" >> "$CALL_LOG"
 STUB
-  chmod +x "$script" "$fake_make"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  chmod +x "$script" "$fake_make"; make_recovery_recipe_fixture "$copy"; cp "$script" "$copy/scripts/k3d-manager"
   cat > "$copy/bin/hub-restore" <<'STUB'
 #!/usr/bin/env bash
 printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
@@ -1092,7 +1099,7 @@ if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; 
 printf '%s\n' "$1" >> "$CALL_LOG"
 [[ "$1" == hub_data_recover_teardown ]] && exit 2
 STUB
-  chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  chmod +x "$script"; make_recovery_recipe_fixture "$copy"; cp "$script" "$copy/scripts/k3d-manager"
   cat > "$copy/bin/hub-restore" <<'STUB'
 #!/usr/bin/env bash
 printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
@@ -1110,7 +1117,7 @@ STUB
 if [[ "$1" == hub_data_recover_preflight ]]; then printf 'RUN_ID=t1\n'; exit 0; fi
 printf '%s\n' "$1" >> "$CALL_LOG"
 STUB
-  chmod +x "$script"; cp -R "$PWD" "$copy"; cp "$script" "$copy/scripts/k3d-manager"
+  chmod +x "$script"; make_recovery_recipe_fixture "$copy"; cp "$script" "$copy/scripts/k3d-manager"
   cat > "$copy/bin/hub-restore" <<'STUB'
 #!/usr/bin/env bash
 printf 'hub-restore %s\n' "$*" >> "$CALL_LOG"
@@ -1302,7 +1309,8 @@ STUB
 @test "dr credential shim: argv -w is skipped and never written under the run directory" {
   local run_dir="$TEST_ROOT/credential-argv"
   mkdir -p "$run_dir"
-  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL="$(command -v true)"
+  DR_SECURITY_REAL="$(command -v true)"
+  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_SCOPES="restore restore-hub" DR_SECURITY_CONTEXT=k3d-k3d-cluster DR_SECURITY_REAL
   "$PWD/scripts/etc/dr/security-shim" add-generic-password -s k3dm-vault-root-token -a k3d-k3d-cluster -w SENTINEL
   grep -qx $'add\tk3dm-vault-root-token\tk3d-k3d-cluster' "$run_dir/credentials.tsv"
   run grep -R -q SENTINEL "$run_dir"
@@ -1325,7 +1333,8 @@ STUB
 
 _shim_env() {
   local run_dir="$TEST_ROOT/shim-$1"; mkdir -p "$run_dir"
-  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL="$(command -v true)"
+  DR_SECURITY_REAL="$(command -v true)"
+  export DR_SECURITY_CREDENTIALS_FILE="$run_dir/credentials.tsv" DR_SECURITY_UNEXPECTED_FILE="$run_dir/unexpected.tsv" DR_SECURITY_ALLOWLIST="$PWD/scripts/etc/dr/credential-allowlist.tsv" DR_SECURITY_REAL
   export DR_SECURITY_SCOPES="$2" DR_SECURITY_CONTEXT="$3"
 }
 

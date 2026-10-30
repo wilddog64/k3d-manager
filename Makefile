@@ -6,6 +6,8 @@
 .PHONY: lint-python
 .PHONY: image-pin-drift
 .PHONY: check-bug-evidence
+.PHONY: webhook-doctor
+.PHONY: cloudflare-preflight
 
 # Recipes below use `set -euo pipefail`, which is a bashism. make defaults to
 # /bin/sh — dash on Debian/Ubuntu — where `-o pipefail` is an illegal option, so
@@ -32,7 +34,7 @@ RELAY_DIR        ?= workers/slack-relay
 K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
-.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule
+.PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -404,7 +406,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',)
 
 ## Show Codex worktree task status
 codex-status:
@@ -412,15 +414,19 @@ codex-status:
 
 ## Land a verified Codex task (SLUG=slug)
 codex-land:
-	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,)
+	@bin/k3dm-codex-dispatch land --slug '$(SLUG)' $(if $(TEST),--test '$(TEST)',) $(if $(NO_TEST),--no-test,) $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',) $(if $(REVIEW_PENDING),--review-pending,)
 
 ## Land a finished Codex task while Claude is away; marks it review pending (SLUG=slug, TEST=cmd)
 codex-land-pending:
-	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)'
+	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)' $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',)
 
 ## Resume a Codex task (SLUG=slug, PROMPT=path)
 codex-resume:
 	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+
+## Record an explicit coordinator handoff (SLUG=slug, ACTING_COORDINATOR=vendor/model)
+codex-handoff:
+	@bin/k3dm-codex-dispatch handoff --slug '$(SLUG)' --acting-coordinator '$(ACTING_COORDINATOR)' $(if $(HANDOFF_REASON),--reason '$(HANDOFF_REASON)',) $(if $(HANDOFF_PROVENANCE),--provenance '$(HANDOFF_PROVENANCE)',)
 
 ## Abandon a Codex task (SLUG=slug, YES=1 to remove)
 codex-abandon:
@@ -436,6 +442,10 @@ codex-release-merged:
 ## Export Codex dispatch metrics (DRY_RUN=1 prints without pushing)
 dispatch-metrics:
 	@bin/k3dm-dispatch-metrics $(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+## Run an operator-approved OrbStack upgrade and coordinated hub recovery
+orbstack-upgrade:
+	@DRY_RUN='$(if $(DRY_RUN),$(DRY_RUN),0)' FORCE='$(if $(FORCE),$(FORCE),0)' bin/k3dm-orbstack-upgrade
 
 dispatch-logs:
 	@bin/k3dm-dispatch-logs $(if $(filter 1,$(DRY_RUN)),--dry-run,)
@@ -477,14 +487,26 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
+webhook-doctor:
+	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
+
+## Check Cloudflare posture read-only (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)
+cloudflare-preflight:
+	@bin/k3dm-cloudflare-posture $(if $(filter 1,$(DRY_RUN)),--dry-run,--check) --zone-id '$(ZONE_ID)'
+
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
 	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
-		if launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"; then \
+		if _bootstrap_output=$$(launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>&1); then \
+			[ -z "$${_bootstrap_output}" ] || printf '%s\n' "$${_bootstrap_output}"; \
 			echo "[restart-webhook] reloaded LaunchAgent definition"; \
 			exit 0; \
 		fi; \
+		while IFS= read -r _bootstrap_line; do \
+			[ "$${_bootstrap_line}" = 'Try re-running the command as root for richer errors.' ] || printf '%s\n' "$${_bootstrap_line}" >&2; \
+		done <<< "$${_bootstrap_output}"; \
 		if [ "$$_attempt" -lt 5 ]; then sleep 1; fi; \
 		_attempt=$$((_attempt + 1)); \
 	done; \
@@ -1557,6 +1579,7 @@ help:
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
+	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
 	@echo "    make restart-cloud-bridge  Restart cloud bridge alone"
 	@echo "    make webhook-log-level LEVEL=debug  Set webhook/cloud-bridge log verbosity and restart"
@@ -1628,6 +1651,7 @@ help:
 	@echo "    make validate-manifests         Validate manifests and CRDs with kubeconform (installs it if missing)"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo "    make cloudflared-config         Check or install the repo-managed Cloudflare tunnel config"
+	@echo "    make cloudflare-preflight       Read-only HTTPS/TLS preflight (ZONE_ID=<zone>; DRY_RUN=1 prints the plan)"
 	@echo "    make argocd-hermes-token        Re-mint the Hermes ArgoCD token into Keychain (needs a TTY; required after an ArgoCD rebuild)"
 	@echo ""
 	@echo "  Examples:"

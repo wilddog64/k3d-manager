@@ -286,8 +286,9 @@ IDs, so an unchanged corpus performs no embedding work. Changed documents are in
 The automatic path is advisory: a failed credential, store or fetch is logged and the monitoring poll
 continues. A daily embeddings quota response pauses until the next 00:00 UTC rather than retrying.
 The `k3dm-vectordb-index` Pushgateway job publishes the last result, backlog, duration, embedded and
-pruned counts, and quota pause time. `VectorDBIndexDrift` fires after two hours of backlog drift and
-`VectorDBIndexFailing` after thirty minutes of failed runs.
+pruned counts, and quota pause time. `VectorDBIndexDrift` fires when any missing, stale-hash or
+deleted document has remained drifted for over two hours; `VectorDBIndexFailing` fires after thirty
+minutes of failed runs.
 
 The VectorDB dashboard's **Last run result** `failed` means the index run itself failed; a metrics
 publish failure is logged as `metrics publish skipped` and does not count.
@@ -299,7 +300,8 @@ bin/k3dm-vectordb-status --json
 
 `k3dm-vectordb-status` is the read-only source of truth for Hermes and the Pushgateway publisher.
 It reports the store reachability and row count, the `vectordb-postgres` ExternalSecret condition,
-the `vectordb-0` Ready condition, the tracked corpus size and the newest `indexed_at` timestamp.
+the `vectordb-0` Ready condition, the tracked corpus size, the newest `indexed_at` timestamp, and
+when reachable, paths classified as missing, stale-hash or deleted.
 The `--offline` mode skips every cluster and database call and is safe for a local contract check.
 
 Hermes samples the same facts on every tick. The `vectordb` sensor checks the ExternalSecret first,
@@ -321,10 +323,18 @@ app-cluster jobs.
 |---|---|
 | `k3dm_vectordb_rows` | `rows` — indexed chunks in the store |
 | `k3dm_vectordb_corpus_docs` | `corpus_docs` — documents the tracked corpus contains |
-| `k3dm_vectordb_drift_docs` | `corpus_docs - rows`, emitted only when both are present |
+| `k3dm_vectordb_drift_docs` | `corpus_docs - rows`, emitted only when both are present; this net count can be 0 while documents are wrong because missing and deleted documents cancel, and stale hashes do not change row count |
+| `k3dm_vectordb_drift_docs_by_kind{kind=...}` | Counts of missing, stale-hash and deleted documents; all three kinds are published, including zeroes |
+| `k3dm_vectordb_oldest_drift_age_seconds{kind=...}` | Age of the oldest currently drifted document in each kind, from its first observed exporter run; zero when empty |
 | `k3dm_vectordb_last_index_timestamp_seconds` | `last_indexed_epoch` — what the staleness alert reads |
 | `k3dm_vectordb_reachable` | `available`, as 0/1 |
 | `k3dm_vectordb_external_secret_synced` | `external_secret_synced`, as 0/1 |
+
+First-seen epochs are kept in `K3DM_VECTORDB_DRIFT_STATE`, defaulting to
+`~/.local/share/k3d-manager/state/vectordb-drift-first-seen.json`. The state stores only document
+paths and epochs. Age begins at the first exporter run that sees drift, so its precision is limited
+to the exporter interval. Losing the state file restarts existing ages from zero. An unreachable
+store leaves the state file unchanged and omits the drift-kind metrics for that publish.
 
 **A metric whose field is absent is omitted, not zeroed** — so a panel reading "No data" means the
 status probe could not determine that fact, which is different from a fact it determined to be zero.
@@ -386,6 +396,26 @@ correctly. A bug filed as `eso-403-vault-path` does not match an existing
 already happened in this repo. Similarity search catches the near-miss the glob cannot.
 
 ## Measuring retrieval quality
+
+Hermes runs the same labelled evaluation used by the optional live pytest after a successful or
+no-op index refresh, at most once per 24 hours. The probe uses about 52 query embeddings per run.
+It checks each returned row against the indexed ref's corpus hashes, counts stale and deleted
+results, and excludes both from recall. The embedding credential stays in Hermes' indexing
+process; the metrics LaunchAgent does not run the probe.
+
+The VectorDB dashboard is organised around three questions. **Infrastructure health** shows
+reachability, index age, and corpus size. **Data consistency** shows missing, stale, and deleted
+documents, drift age, and backlog. **Retrieval quality** shows recall@5 and hard-negative
+intrusion@5 by directory, outdated returned rows, and time since the last probe. The existing
+**Ingestion** row shows indexing results and work per run.
+
+The `k3dm-vectordb-retrieval` Pushgateway job publishes `k3dm_vectordb_retrieval_recall_at5` and
+`k3dm_vectordb_retrieval_intrusion_at5` by directory, the corresponding
+`k3dm_vectordb_retrieval_recall_floor`, stale and deleted hit counts, total returned results, and
+the last successful probe timestamp. Labels contain only the directory on the three per-directory
+metrics. Prometheus warns when recall stays below its floor for an hour, outdated results persist
+for an hour, or the probe has not succeeded for 48 hours. Each alert directs operators to run the
+live evaluation; the outdated-documents alert also recommends `make index-docs DRY_RUN=1`.
 
 `scripts/tests/bin/test_find_similar_docs.py` scores hand-labelled pairs from the real corpus
 (`scripts/tests/fixtures/doc-dedup/pairs.jsonl`): 27 **positives** (the same defect filed twice,

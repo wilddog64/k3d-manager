@@ -1,0 +1,19 @@
+{
+  "role": "m4",
+  "enabled": false,
+  "state_dir": "~/.local/share/k3d-manager/heartbeat/state",
+  "timeout_seconds": 5,
+  "provider_timeout_seconds": 5,
+  "webhook_url": "http://127.0.0.1:7443/api/v1/health?quick=1",
+  "webhook_reader_token_service": "k3dm-webhook-token-reader",
+  "hermes_marker": "~/.k3dm/hermes/heartbeat.timestamp",
+  "hermes_freshness_seconds": 1200,
+  "bridge_marker": "~/.k3d-manager/cloud-bridge/heartbeat.timestamp",
+  "bridge_freshness_seconds": 180,
+  "checks": [
+    {"id": "m4-host", "disabled": true, "period_seconds": 60, "grace_seconds": 180, "secret_source": {"type": "keychain", "service": "k3dm-heartbeat-m4-host"}},
+    {"id": "m4-hermes", "disabled": true, "period_seconds": 60, "grace_seconds": 1800, "secret_source": {"type": "keychain", "service": "k3dm-heartbeat-m4-hermes"}},
+    {"id": "m4-webhook", "disabled": true, "period_seconds": 60, "grace_seconds": 180, "secret_source": {"type": "keychain", "service": "k3dm-heartbeat-m4-webhook"}},
+    {"id": "m4-cloud-bridge", "disabled": true, "period_seconds": 120, "grace_seconds": 360, "secret_source": {"type": "keychain", "service": "k3dm-heartbeat-m4-cloud-bridge"}}
+  ]
+}

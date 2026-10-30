@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from collections import defaultdict
@@ -15,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
-from hermes.prior_art import (doc_fix_commit, doc_live_evidence, _status_value, doc_meta,
+from hermes.prior_art import (doc_fix_commit, doc_live_evidence, doc_investigation_evidence, doc_is_investigation, doc_has_fix_commit, _status_value, doc_meta,
                               doc_status, doc_verification)  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
@@ -49,7 +50,44 @@ def _status():
         return {}
 
 
-def _metrics(payload):
+DRIFT_KINDS = ("missing", "stale", "deleted")
+
+
+def _drift_state_path():
+    configured = os.environ.get("K3DM_VECTORDB_DRIFT_STATE")
+    return Path(configured).expanduser() if configured else Path(
+        "~/.local/share/k3d-manager/state/vectordb-drift-first-seen.json").expanduser()
+
+
+def _update_drift_state(drift, now=None, state_path=None):
+    path = Path(state_path) if state_path is not None else _drift_state_path()
+    now = time.time() if now is None else float(now)
+    drifted = {item for kind in DRIFT_KINDS for item in drift.get(kind, [])}
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(previous, dict):
+            previous = {}
+    except (OSError, ValueError, TypeError):
+        previous = {}
+    state = {item: float(previous[item]) for item in drifted
+             if item in previous and isinstance(previous[item], (int, float))}
+    for item in drifted:
+        state.setdefault(item, now)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, sort_keys=True)
+            handle.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return state
+
+
+def _metrics(payload, now=None, state_path=None):
     lines = []
     values = {
         "k3dm_vectordb_rows": payload.get("rows"),
@@ -67,6 +105,15 @@ def _metrics(payload):
     for name, value in values.items():
         if value is not None:
             lines.append(f"{name} {value}")
+    drift = payload.get("drift")
+    if drift is not None:
+        state = _update_drift_state(drift, now=now, state_path=state_path)
+        now = time.time() if now is None else float(now)
+        for kind in DRIFT_KINDS:
+            paths = drift.get(kind, [])
+            lines.append(f'k3dm_vectordb_drift_docs_by_kind{{kind="{kind}"}} {len(paths)}')
+            age = max((now - state[path] for path in paths), default=0)
+            lines.append(f'k3dm_vectordb_oldest_drift_age_seconds{{kind="{kind}"}} {max(0, age)}')
     return "\n".join(lines) + "\n"
 
 
@@ -453,10 +500,26 @@ def _evidence_contains_fix(root, fix_commit, evidence_commit):
     return None
 
 
+def _bug_verification(text):
+    """Fail closed only for typed investigations lacking their required proof."""
+    ordinary_proof = doc_fix_commit(text) and doc_live_evidence(text)
+    if not doc_is_investigation(text) or ordinary_proof:
+        return doc_verification(text)
+    if doc_status(text)[1] == "fixed" and doc_investigation_evidence(text):
+        return "live"
+    return ""
+
+
 def _verification_times(root, ref, texts):
     times = {}
     for path, text in texts.items():
-        verification = doc_verification(text)
+        verification = _bug_verification(text)
+        investigation = doc_investigation_evidence(text)
+        if investigation and doc_meta(text)[1] == "closed":
+            recorded = _verification_commit(
+                root, ref, path, "^" + re.escape(investigation["line"]) + "$")
+            times[path] = (investigation["date"], investigation["date"], recorded[0] if recorded else None)
+            continue
         if verification not in ("verified", "live"):
             continue
         live_commit = None
@@ -497,7 +560,8 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
     verification_times = verification_times or {}
     for path, text in texts.items():
         priority, status, _live_verified = doc_status(text)
-        verification = doc_verification(text)
+        verification = _bug_verification(text)
+        investigation = doc_investigation_evidence(text)
         stem = Path(path).name.removesuffix(".md")
         if not _BUG_STEM_RE.fullmatch(stem):
             skipped += 1
@@ -526,9 +590,11 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         evidence = doc_live_evidence(text)
         fixed_item = (fixed_in or {}).get(path) or {}
         fix_commit = doc_fix_commit(text) or fixed_item.get("commit")
-        if status == "fixed" and verification == "live":
+        if status == "fixed" and (verification == "live" or doc_is_investigation(text)):
             if not _release_at_least(release, (1, 43, 4)):
                 live_evidence = "n/a"
+            elif investigation:
+                live_evidence = "ok"
             elif not evidence:
                 live_evidence = "missing"
             elif not isinstance(fix_commit, str) or not re.fullmatch(r"[0-9a-f]{7,40}", fix_commit):
@@ -605,8 +671,9 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         labels += f',verified_at="{timestamp_labels[0]}"'
         labels += f',live_verified_at="{timestamp_labels[1]}"'
         fixed_item = (fixed_in or {}).get(path) or {}
-        fix_commit = doc_fix_commit(texts.get(path, "")) if status == "fixed" else None
-        if not fix_commit and status == "fixed":
+        investigation_only = doc_is_investigation(texts.get(path, "")) and not doc_has_fix_commit(texts.get(path, ""))
+        fix_commit = doc_fix_commit(texts.get(path, "")) if status == "fixed" and not investigation_only else None
+        if not fix_commit and status == "fixed" and not doc_is_investigation(texts.get(path, "")):
             fix_commit = fixed_item.get("commit", "")
         fix_sha = fix_commit[:8] if isinstance(fix_commit, str) else "-"
         verified_sha = values[2][:8] if verified == "true" and isinstance(values[2], str) else "-"

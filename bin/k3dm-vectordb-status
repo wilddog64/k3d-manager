@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
 from hermes.prior_art import (  # noqa: E402
-    KUBE_CONTEXT, NAMESPACE, TABLE, RetrievalUnavailable, iter_corpus, run_sql,
+    KUBE_CONTEXT, NAMESPACE, TABLE, RetrievalUnavailable, fetch_hashes, iter_corpus, run_sql,
 )
 
 EXTERNAL_BINDING = "vectordb-postgres"
@@ -70,14 +70,31 @@ def _corpus_docs():
         return 0
 
 
+def _drift():
+    """Classify corpus paths against indexed content hashes."""
+    corpus = {row[0]: row[3] for row in iter_corpus(ROOT, os.environ.get("K3DM_INDEX_REF") or None)}
+    indexed = fetch_hashes()
+    return {
+        "missing": sorted(corpus.keys() - indexed.keys()),
+        "stale": sorted(path for path in corpus.keys() & indexed.keys()
+                        if corpus[path] != indexed[path]),
+        "deleted": sorted(indexed.keys() - corpus.keys()),
+    }
+
+
 def status(offline=False):
     corpus_docs = _corpus_docs()
     if offline:
         binding_synced, pod_ready = None, None
         available, rows, last_indexed_epoch = False, None, None
+        drift = None
     else:
         binding_synced, pod_ready = _cluster_facts()
         available, rows, last_indexed_epoch = _store_facts()
+        try:
+            drift = _drift() if available else None
+        except (RetrievalUnavailable, OSError, subprocess.SubprocessError, TypeError, ValueError):
+            drift = None
     return {
         "available": available,
         "external_secret_synced": binding_synced,
@@ -85,6 +102,7 @@ def status(offline=False):
         "rows": rows,
         "corpus_docs": corpus_docs,
         "last_indexed_epoch": last_indexed_epoch,
+        "drift": drift,
     }
 
 
@@ -98,7 +116,7 @@ def main(argv=None):
     except Exception:
         print(json.dumps({"available": False, "external_secret_synced": None,
                           "pod_ready": None, "rows": None, "corpus_docs": 0,
-                          "last_indexed_epoch": None}, sort_keys=True))
+                          "last_indexed_epoch": None, "drift": None}, sort_keys=True))
     return 0
 
 

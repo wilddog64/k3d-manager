@@ -7,7 +7,7 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `k3dm-bug-releases` is the same count per release, from `scripts/bug-tally.py` (the doc's
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
-Open for counts from filed until the bug is LIVE-VERIFIED.
+Open for counts from filed until the bug is LIVE-VERIFIED, or a closed investigation has valid typed recovery proof.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
@@ -46,15 +46,15 @@ Fixed documents also have a Verified and Live-verified label:
 
 | Verified | When |
 |---|---|
-| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED` |
-| `false` | fixed, release v1.43.2 or later, any other fixed status |
+| `true` | fixed, release v1.43.2 or later, status begins `VERIFIED` or `LIVE-VERIFIED`, or a closed investigation has valid typed proof |
+| `false` | fixed, release v1.43.2 or later, any other fixed status without valid typed investigation proof |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
 | Live-verified | When |
 |---|---|
-| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED` |
-| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` |
+| `true` | fixed, release v1.43.2 or later, status begins `LIVE-VERIFIED`, or a closed investigation has valid typed proof |
+| `false` | fixed, release v1.43.2 or later, status is not `LIVE-VERIFIED` and has no valid typed investigation proof |
 | `n/a` | fixed, release before v1.43.2 or unassigned |
 | `-` | not fixed (table series only; shown as —) |
 
@@ -76,6 +76,25 @@ The table also shows `fix_sha` and `verified_sha` as **Fix commit** and **Verifi
 contain the first eight characters of the commit that marked the doc fixed (the commit used for
 **Fixed in**) and the earliest commit that marked it `VERIFIED` or `LIVE-VERIFIED`, respectively;
 otherwise they are `-` and render as `—`.
+
+An investigation can verify recovery without identifying a causal code fix. Such a bug doc uses
+`**Verification type:** investigation` and a typed line, for example:
+`**Live investigation evidence:** 2026-10-28 · source operator · reference docs/issues/recovery-check.md · env m4-webhook · scenario health-check · proves m1,m3`.
+The parser checks the metadata shape and calendar date; it does not fetch the reference or claim
+that the cited evidence is true. The operator remains responsible for reviewing that evidence.
+When this proof is attached to a closed bug, the row reports Verified and Live-verified with
+`live_evidence="ok"`; `verified_sha` identifies the commit recording the proof, while `fix_sha`
+stays `-` because an operational recovery record is not a causal code fix. Both date labels use
+the typed proof date; the recording SHA is found in the history of the scanned Git ref, even
+when a later working tree contains different evidence. Legacy and unassigned releases retain
+their established `n/a` labels. Open investigations
+remain open and unverified. Do not add a Fix commit to an investigation-only proof; ordinary code
+fix evidence continues to require its Fix commit and ancestry check. Any explicit Fix commit
+header conflicts with investigation-only proof, including an empty or malformed value. Typed
+investigations with missing or invalid proof stay unverified even when their Status says
+LIVE-VERIFIED. Their inferred status-change commit is never displayed as a causal fix; a genuine
+explicit code-fix SHA remains visible, and ordinary live code-fix evidence retains its ancestry
+validation.
 
 It also shows **Live evidence**, which checks the proof commit recorded in the bug doc against the
 fix commit:
@@ -135,3 +154,41 @@ its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
 `~/src/gitrepo/personal/lib-foundation`), and its release labels are its own tags such as
 `v0.5.3`. The "Fixed this release" and "Open in later releases" tiles remain k3d-manager-only
 because lib-foundation has no release branch.
+
+## Filters, release mode and the Bugs table
+
+In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
+
+Bug Tracking defaults to **Auto (current)**: the **Release** row (Release, Bugs filed, Bugs open and Bugs fixed) and Bugs table follow `k3dm_bug_current_release_info` for the selected repository. Choose **Manual** to use **Manual releases (ignored in Auto)**, which retains historical multi-select and **All**; the Release tile shows the picked releases as that box names them, or All. **Open, scheduled later** and **Open, untriaged** are repository-wide counts in both modes. “Filed in” follows the shared attribution rule: the bug doc's **Branch:** line, otherwise the first tag containing the commit that added it, otherwise the current release branch. If the selected repository has no current-release metric, use Manual; Auto has no release to match. In Manual, panels filter with `release=~"$release"`; the `release_order` label only sorts release choices and tables (it holds an ordering prefix and the release value), so never filter on it.
+
+In the Bugs table, **Fix commit** comes from the bug doc's **Fix commit:** header when present, otherwise from the commit that marked the bug fixed. **Fixed in** continues to show the release where its status changed.
+
+## Release plans
+
+The **Release plans** row inventories every top-level `docs/plans/v<X.Y.Z>-<slug>.md` file for k3d-manager. Hermes reads each plan's H1, `**Status:**`, `**Approval:**`, `**Dispatch:**`, `**Release:**`, `**Depends on:**`, `**Wave:**`, and `**Component:**` lines; the filename determines its release. Each plan name in the **Plans** table links to that file on the branch Hermes scanned (a plan for a later release still lives on the current release branch). Execution and verification are independent labels derived from the leading Status words:
+
+The **Order** column comes from the plan number on each document's `**Release:**` line. **Depends on** lists the referenced plans and links to the first dependency's spec on the scanned branch. A plan whose dependency has not been implemented is not ready to dispatch. **Wave** is calculated from same-release dependencies: independent plans start at 1, and each dependent plan follows the highest dependency wave. A cycle displays `cycle`. A declared `**Wave:** <n> — <reason>` can postpone a plan; it cannot make it earlier. **Wave note** shows the sanitized reason (up to 80 characters), or reports when the declared number is earlier than required.
+
+**Overlaps** flags same-release plans that share a path listed on their `**Component:**` lines and have no direct or transitive dependency. Directory paths ending in `/` cover paths below them. To clear an overlap, add the real prerequisite to `**Depends on:**`; if the shared work is intentionally independent, record the accepted overlap in the plan body. The table continues to flag accepted overlaps by design. Keep `**Component:**` complete: detection reads only that header, not paths mentioned elsewhere in the document. The Undeclared plan overlaps stat counts conflicting pairs for the selected releases.
+
+**Spec approval** reports `approved`, `pending`, `none`, or `n/a` from the plan `**Approval:**` header. **Dispatch approval** reports the plan `**Dispatch:**` header (`go`, `needed`, `not required`, or `unknown`); the table displays `unknown` as `not recorded`. It is independent of spec approval, and neither approval prose nor ledger events fill in a missing header. **Dispatch task** comes from the dispatch ledger and shows lifecycle (`landed`, `awaiting land`, `refused`, `Codex failed`, `running`, or `no record`). `awaiting land` means the worker exited successfully and the task still awaits integration; it does not mean landed or verified. **Execution**, **Verified**, and **Live verified** come from the plan `**Status:**` header, never from the land event. The verification columns are status indicators only; they do not identify a verifier, timestamp, commit, or evidence record. **Verified** is marked for `verified` and `live_verified`; **Live verified** is marked only for `live_verified`; other states show `-`. The raw source verification label remains unchanged in query metadata. **Status lags dispatch** counts ledger-landed tasks whose document still says proposed, ready, or in progress. In the v1.43.9 screenshot, all five ledger tasks were landed while four plan Status headers remained PROPOSED/READY. After reviewing the landed change and its evidence, reconcile the plan document itself; the dashboard preserves its current Status and verification until then. For a landed task with stale Status, **Blocked by** displays `landed; documentation stale`; tasks that have not landed retain their branch, dependency, approval, and wave blockers.
+
+When filing a plan, keep `**Component:**` complete with every touched file or directory in backticks. The overlap scanner intentionally uses this line alone.
+
+| Status starts with | Execution | Verification |
+|---|---|---|
+| LIVE-VERIFIED | implemented | live_verified |
+| VERIFIED | implemented | verified |
+| IMPLEMENTED, DONE, LANDED, MERGED, SHIPPED | implemented | unknown |
+| IN PROGRESS, IN-PROGRESS, DISPATCHED, PENDING CODEX | in_progress | n/a |
+| READY, APPROVED | ready | n/a |
+| PROPOSED, SPEC, DRAFT, PLAN, PLANNED, SCOPED, QUEUED | proposed | n/a |
+| DEFERRED, MOVED, SPLIT | deferred | n/a |
+| SUPERSEDED, CANCELLED, CANCELED, DROPPED, WITHDRAWN | cancelled | n/a |
+| anything else or no Status | unknown | unknown |
+
+Approval is `explicit` unless the line is absent (`none`) or begins with `pending`; plans before v1.43.2 use `n/a`. Dispatch is joined by the plan filename stem from the Codex dispatch ledger. Its state comes from the task's dispatch events only (start, resume, worker exit, land, land refused, abandon); bookkeeping recorded afterwards, such as interventions, usage or verification, does not change it. Only a start event that records a `docs/plans/` spec can appear; `landed` describes integration and does not change verification. Missing dispatch telemetry displays **no record**. The dashboard deliberately does not infer **not started** from missing information or **done** from implementation. As the operator requirements say: “Include every planned specification”; “Keep execution state separate from verification state”; “Don't infer completion from missing information.” Each **Dispatch** cell links to that release in Agent dispatch, and the Agent dispatch dashboard has a top-level **Bug Tracking** link back. The Agent dispatch **Window** selector lists the time windows and ledger releases from v1.43.0 onward; v1.43.0 is the coverage floor because earlier releases predate the ledger. Its **Release** cells link back to Bug Tracking. A release before v1.43.0 has no dispatch scope, so its row link opens an empty dispatch view.
+
+## Release forecast
+
+The **Release forecast** row reads the ordered inventory in `docs/release-milestones.json`, maintained alongside the roadmap. The summary tiles always describe the whole path to the target; the **Remaining releases** table follows **Release mode**: in Auto it shows the current release; switch to Manual and pick **All** in **Manual releases** to see every remaining release. Update the JSON in the same commit as any roadmap split. The scanner derives cadence from the last 12 date-ordered gaps between annotated k3d-manager release tags and uses nearest-rank 25th, 50th, and 75th percentiles to make earliest, expected, and latest estimates for each remaining milestone. **Median gap (days)** is the median gap between release tags: a cadence measure, not the effort a release takes. A milestone blocked by outside work and every later milestone have no dates; **Target state** names the blocking milestone and its `blocked_by` reason. The panel keeps the state prominent and renders the supporting reason as a 16 px wrapping title. Set optional `not_before: YYYY-MM-DD` when a plan's live evidence must wait for a scheduled window; forecasts for that milestone and later releases will not be earlier than midnight Pacific time on that date (`K3DM_FORECAST_TZ` overrides the zone), so the dashboard never shows the day before. Shipped milestones ignore the floor.

@@ -76,6 +76,11 @@ assert "label_join" in blocked and '"version", "blocked_by"' in blocked
 assert 'and on(repo) k3dm_release_milestone_info{repo="$repo",target="true",state=~"blocked|after_blocked"})' in blocked.split(" or (2 *")[0], blocked
 assert p[31]["fieldConfig"]["defaults"]["displayName"] == "${__field.labels.blocker}"
 assert p[31]["options"]["textMode"] == "value_and_name"
+assert p[31]["options"]["text"] == {"titleSize": 16, "valueSize": 40}
+assert p[31]["fieldConfig"]["defaults"]["noValue"] == "-"
+assert 'label_join(k3dm_release_milestone_info{repo="$repo",state="blocked"}' in blocked
+assert 'state=~"blocked|after_blocked"' in blocked
+assert 'k3dm_release_milestone_info{repo="$repo",target="true",state="forecast"}' in blocked
 PY
   [ "${status}" -eq 0 ]
 }
@@ -359,23 +364,25 @@ PY
   [ "${status}" -eq 0 ]
 }
 
-@test "plan names link to the plan doc on the scanned branch, and bug tiles say bugs" {
+@test "plan titles link to the plan doc with redundant Plan hidden, and bug tiles say bugs" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
 from pathlib import Path
 d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels={p["id"]: p for p in d["panels"]}
 overrides={o["matcher"]["options"]: o["properties"] for o in panels[107]["fieldConfig"]["overrides"]}
-links=next(p["value"] for p in overrides["Plan"] if p["id"]=="links")
+links=next(p["value"] for p in overrides["Title"] if p["id"]=="links")
 assert links[0]["url"]=="https://github.com/wilddog64/k3d-manager/blob/${__data.fields.branch}/docs/plans/${__data.fields.plan}.md"
 assert links[0]["targetBlank"] is True
 assert next(p["value"] for p in overrides["branch"] if p["id"]=="custom.hidden") is True
 bug_overrides={o["matcher"]["options"]: o["properties"] for o in panels[23]["fieldConfig"]["overrides"]}
 assert next(p["value"] for p in bug_overrides["branch"] if p["id"]=="custom.hidden") is True
 width=lambda n: [p["value"] for o in panels[107]["fieldConfig"]["overrides"] if o["matcher"]["options"]==n for p in o["properties"] if p["id"]=="custom.width"]
-assert width("Plan") and width("Title")
+assert not width("Plan") and width("Title")
+assert next(p["value"] for p in overrides["Plan"] if p["id"]=="custom.hidden") is True
 organize=next(t for t in panels[107]["transformations"] if t["id"]=="organize")
 assert "branch" not in organize["options"]["excludeByName"]
+assert not organize["options"]["excludeByName"].get("plan"), "Title URL needs retained plan stem"
 assert [panels[i]["title"] for i in (2,3,4)]==["Bugs filed","Bugs open","Bugs fixed"]
 PY
   [ "${status}" -eq 0 ]
@@ -430,7 +437,7 @@ assert options['renameByName']['wave_note']=='Wave note'
 assert options['renameByName']['overlaps']=='Overlaps'
 assert options['renameByName']['blocked_by']=='Blocked by'
 assert options['renameByName']['approval']=='Spec approval'
-assert options['renameByName']['dispatch_approval']=='Dispatch'
+assert options['renameByName']['dispatch_approval']=='Dispatch approval'
 assert any(p['id']=='links' and '${__data.fields.depends_on_path}' in p['value'][0]['url']
            for o in table['fieldConfig']['overrides'] if o['matcher'].get('options')=='Depends on'
            for p in o['properties'])
@@ -440,8 +447,8 @@ assert overlap['title']=='Undeclared plan overlaps'
 assert 'k3dm_plan_undeclared_overlaps' in overlap['targets'][0]['expr']
 overrides={o['matcher'].get('options'):o['properties'] for o in table['fieldConfig']['overrides']}
 order_props={p['id']:p['value'] for p in overrides['Order']}
-assert order_props['custom.width']==62 and order_props['noValue']=='-'
-assert any(p['id']=='custom.width' and p['value']==100 for p in overrides['Depends on'])
+assert order_props['custom.width']==55 and order_props['noValue']=='-'
+assert any(p['id']=='custom.width' and p['value']==90 for p in overrides['Depends on'])
 PY
   [ "${status}" -eq 0 ]
 }
@@ -753,7 +760,9 @@ table = {p["id"]: p for p in data["panels"]}[107]
 assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 org = next(t for t in table["transformations"] if t["id"] == "organize")["options"]
-visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k)]
+hidden = {o["matcher"].get("options") for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.hidden" and p["value"] is True}
+visible = [k for k in org["indexByName"] if not org["excludeByName"].get(k) and org["renameByName"].get(k, k) not in hidden]
+assert "plan" not in visible and "title" in visible
 assert org["excludeByName"].get("slug") is True and "slug" not in visible
 assert widths["Title"] >= 150 and widths["Dispatch task"] >= 150, widths
 assert not [k for k in visible if org["renameByName"].get(k, k) not in widths], "every visible column needs a fixed width so headers are not cut to 45px"
@@ -778,6 +787,34 @@ org = next(t for t in table["transformations"] if t["id"] == "organize")["option
 assert "not_before_reason" not in org["renameByName"] or "Not before reason" not in widths
 assert [org["renameByName"][k] for k in ("Value #B", "Value #C", "Value #D")] == ["Earliest", "Expected", "Latest"]
 assert sum(widths.values()) + 2 * table["fieldConfig"]["defaults"]["custom"]["minWidth"] <= 1100, widths
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "Plans table separates verified and live-verified status indicators" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panel=next(p for p in data["panels"] if p["id"]==107)
+org=next(t for t in panel["transformations"] if t["id"]=="organize")["options"]
+assert org["renameByName"]["verified"] == "Verified"
+assert org["renameByName"]["live_verified"] == "Live verified"
+assert org["excludeByName"]["verification"] is True
+assert '"verified", "$1", "verification", "(verified|live_verified)"' in panel["targets"][0]["expr"]
+assert '"live_verified", "$1", "verification", "(live_verified)"' in panel["targets"][0]["expr"]
+assert '"verified", "-", "", ""' in panel["targets"][0]["expr"]
+assert '"live_verified", "-", "", ""' in panel["targets"][0]["expr"]
+assert org["renameByName"]["dispatch_approval"] == "Dispatch approval"
+assert org["renameByName"]["dispatch_state"] == "Dispatch task"
+assert '"blocked_by", "landed; documentation stale"' in panel["targets"][0]["expr"]
+assert 'dispatch_state="landed"' in panel["targets"][0]["expr"]
+assert 'execution=~"proposed|ready|in_progress"' in panel["targets"][0]["expr"]
+assert ' unless on(plan) ' in panel["targets"][0]["expr"]
+for label in ("Verified", "Live verified"):
+    props=next(o["properties"] for o in panel["fieldConfig"]["overrides"] if o["matcher"].get("options")==label)
+    assert any(p["id"]=="custom.width" for p in props)
+    assert any(p["id"]=="noValue" and p["value"]=="-" for p in props)
 PY
   [ "${status}" -eq 0 ]
 }

@@ -37,3 +37,12 @@ spec:
           annotations:
             summary: "CNI IP reservation sweep has not reported"
             description: "The sweep state for {{ $labels.host }} is missing or older than 1h; check the k3dm-cni-ipam-sweep timer on the node, Hermes and the hub Pushgateway port-forward."
+        - alert: HostCniIpamOrphanNotReclaimed
+          expr: k3dm_cni_ipam_skipped > 0 and k3dm_cni_ipam_skipped_oldest_age_seconds > 3600
+          for: 30m
+          labels:
+            severity: warning
+            cluster: hub
+          annotations:
+            summary: "A pod IP on {{ $labels.host }} has had no sandbox for over an hour"
+            description: "{{ $value }} reservation(s) on {{ $labels.host }} have no pod sandbox but a pod still reports the IP, so the sweep will not reclaim them. ssh in; sudo /usr/local/sbin/k3dm-cni-ipam-sweep --dry-run lists them as SKIP lines; find the pod with kubectl get pods -A -o wide."

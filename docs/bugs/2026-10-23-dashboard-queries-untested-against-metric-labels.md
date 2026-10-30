@@ -1,7 +1,7 @@
 # Bug: Bug Tracking dashboard tests check panel structure, never whether a query matches the metrics
 
 **Filed:** 2026-10-23 (Claude, found during live E3 of `release-plan-tracking`)
-**Status:** FIXED offline — `baa2d055` (Luna, two rework fixes by Claude); E1, E3 and the E2 local skip verified 2026-10-24; E2's "not skipped in CI" check waits for the v1.43.5 PR run
+**Status:** VERIFIED — `baa2d055`; E1, E3 and E2 complete (CI run 40124898903 on PR #148 ran the promtool test unskipped and passed)
 **Priority:** P2 — a wrong query ships green and shows "No data" or duplicate rows; the only check is a person looking at the live dashboard
 **Severity:** medium
 **Approval:** approved to file — operator, 2026-10-23: "file a bug (maybe P2) for what you discovered"

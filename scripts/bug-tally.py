@@ -26,14 +26,17 @@ def _git(*args):
                           check=True).stdout
 
 
-def _added_releases(ref, branch):
+def _added_releases(ref, branch, required_paths=None):
+    if required_paths is not None and not required_paths:
+        return {}
     output = _git("log", "--diff-filter=A", "--format=%H", "--name-only", ref, "--", "docs/bugs/")
     current = None
     paths = {}
     for line in output.splitlines():
         if re.fullmatch(r"[0-9a-f]{40}", line):
             current = line
-        elif current and line.startswith("docs/bugs/") and "/" not in line[len("docs/bugs/"):]:
+        elif (current and line.startswith("docs/bugs/") and "/" not in line[len("docs/bugs/"):]
+              and (required_paths is None or line in required_paths)):
             paths[line] = current
     by_commit = {}
     for path, commit in paths.items():
@@ -129,13 +132,16 @@ def _read_blobs(ref, paths):
     return texts
 
 
-def _scan(ref):
+def _scan(ref, include_fixed=True):
     listing = _git("ls-tree", "-r", "--name-only", ref, "docs/bugs")
     paths = [path for path in listing.splitlines()
              if path.startswith("docs/bugs/") and "/" not in path[len("docs/bugs/"):]]
     branch = ref.removeprefix("origin/") if ref != "HEAD" else _git("branch", "--show-current").strip()
-    added_releases = _added_releases(ref, branch)
     texts = _read_blobs(ref, paths)
+    required_paths = None
+    if not include_fixed and REPO_NAME == "k3d-manager":
+        required_paths = {path for path in paths if doc_release(texts[path])[1] != "branch_line"}
+    added_releases = _added_releases(ref, branch, required_paths)
     result = {}
     for path in paths:
         raw = texts[path]
@@ -162,6 +168,8 @@ def _scan(ref):
         elif state == "closed":
             item = {"path": path, "priority": priority}
             bucket["closed_paths"].append(item)
+    if not include_fixed:
+        return result, None
     fixed_commits = _fixed_commits(ref)
     fixed_releases = _fixed_releases(ref, branch, fixed_commits)
     fixed_in = {}
@@ -192,17 +200,24 @@ def main(argv=None):
     parser.add_argument("--release")
     parser.add_argument("--priority", choices=("P0", "P1", "P2", "P3"))
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--counts-only", action="store_true",
+                        help="omit fixed_in history for count-only consumers")
     args = parser.parse_args(argv)
+    if args.counts_only and not args.json:
+        parser.error("--counts-only requires --json")
     REPO_DIR = args.repo_dir
     REPO_NAME = args.repo_name
     try:
-        releases, fixed = _scan(args.ref)
+        releases, fixed = _scan(args.ref, include_fixed=not args.counts_only)
     except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
         return 2
     if args.json:
-        print(json.dumps({"ref": args.ref, "generated_at": datetime.now(timezone.utc).isoformat(),
-                          "releases": releases, "fixed_in": fixed, "repo": args.repo_name},
-                         separators=(",", ":")))
+        payload = {"ref": args.ref, "generated_at": datetime.now(timezone.utc).isoformat(),
+                   "releases": releases}
+        if not args.counts_only:
+            payload["fixed_in"] = fixed
+        payload["repo"] = args.repo_name
+        print(json.dumps(payload, separators=(",", ":")))
         return 0
     selected = {args.release: releases.get(args.release)} if args.release else releases
     for release in sorted((name for name, value in selected.items() if value), reverse=True):
