@@ -103,6 +103,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 ## Recent completed work
 
 - **2026-10-30 — M5 hub-new run 2: hub-up step 5 failed `repo argo not found`** — deploy_argocd never added its helm repo; fixed (repo add --force-update) + 3 argocd.bats tests. Cluster, Vault, ESO, OpenLDAP up on the M5; rerun resumes at hub-up (skips create).
+- **2026-10-30 — M5 hub-new run 4: hub-up step 5 died silently after the webhook-token sync** — ArgoCD installed fine (7 pods Running). Cause: no `platform-ops-app-rebuild` Keychain item on the M5, so `argocd_sync_app_rebuild_secret` probed the cluster with plain `_kubectl get` (exits on NotFound, output to /dev/null). Fixed `655cf003` (`--no-exit` on both probes) + 2 argocd.bats tests (red pre-fix + mutant; argocd 45/45; shellcheck clean). git-writer/slack syncs return 0 before probing. Next: operator pulls + reruns `make hub-new HUB_OLD_HOST=m4-air.local`.
 
 - **2026-10-30 — M5 hub-new run 1: hub-up failed** — k3d installer (sudo, M5 password) put k3d in `~/.local/bin` (root-owned) then failed `k3d not found ... on your $PATH?`; every rerun reinstalled. Fixed in `_provider_k3d_install` (PATH prepend, USE_SUDO=false when writable, host-naming SUDO_PROMPT) + `scripts/tests/lib/k3d_install.bats`. State on M5: preflight + machine-setup pass; tunnel files copied. (secrets-present=pass was there; my redaction grep hid it.)
 
