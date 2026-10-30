@@ -602,3 +602,41 @@ STUB
   [ "$(grep -c 'delete secret cluster-ubuntu-k3s' "${calls}")" -eq 2 ]
   [ "$(grep -c 'delete applicationset ' "${calls}")" -eq 0 ]
 }
+
+_app_rebuild_real_kubectl() {
+  fakebin="${BATS_TEST_TMPDIR}/fakebin"
+  mkdir -p "$fakebin"
+  # A missing object: "kubectl get secret|cronjob" exits 1 with NotFound on stderr.
+  cat > "${fakebin}/kubectl" <<'SH'
+#!/usr/bin/env bash
+echo "kubectl $*" >> "${KUBECTL_CALLS}"
+echo "Error from server (NotFound): not found" >&2
+exit 1
+SH
+  chmod +x "${fakebin}/kubectl"
+  export KUBECTL_CALLS="${BATS_TEST_TMPDIR}/kubectl.calls"
+  export PATH="${fakebin}:${PATH}"
+  unset -f _kubectl _run_command kubectl
+  [ "$(command -v kubectl)" = "${fakebin}/kubectl" ]
+  source "${BATS_TEST_DIRNAME}/../../lib/foundation/scripts/lib/system.sh"
+  _argocd_keychain_value() { :; }
+}
+
+@test "app-rebuild sync with no Keychain item and no Secret returns 0 instead of exiting" {
+  _app_rebuild_real_kubectl
+  run argocd_sync_app_rebuild_secret platform-ops
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"optional app-rebuild gh-token; skipping"* ]]
+  grep -q 'get secret platform-ops-app-rebuild' "$KUBECTL_CALLS"
+  grep -q 'get cronjob app-cve-scan' "$KUBECTL_CALLS"
+}
+
+@test "app-rebuild sync with no Keychain item leaves an existing Secret as-is" {
+  _app_rebuild_real_kubectl
+  printf '#!/usr/bin/env bash\necho "kubectl $*" >> "${KUBECTL_CALLS}"\n' > "${fakebin}/kubectl"
+  run argocd_sync_app_rebuild_secret platform-ops
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Secret already present in platform-ops; leaving as-is"* ]]
+  run grep -c 'get cronjob' "$KUBECTL_CALLS"
+  [ "$output" = 0 ]
+}

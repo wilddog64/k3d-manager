@@ -12,6 +12,8 @@
 - Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
 
 ### Fixed
+
+- **`deploy_argocd` no longer dies silently on a hub with no app-rebuild PAT in the Keychain.** When `platform-ops-app-rebuild` is absent, `argocd_sync_app_rebuild_secret` asks the cluster whether the Secret or the `app-cve-scan` CronJob already exists. Both checks were plain `_kubectl get`, which exits the whole run on a non-zero result, and their output went to `/dev/null` — so on a fresh hub (the M5) `hub-up` step 5 failed right after the webhook-token sync with no error printed. The M4 always had the Keychain item and never reached the checks. Both now use `_kubectl --no-exit`, and the optional-PAT path returns 0 as designed. Tests run the real `_kubectl`/`_run_command` against a fake `kubectl` that returns NotFound; the missing-Secret test is red on the pre-fix code and on a mutant missing either `--no-exit`.
 - `deploy_argocd` now adds its chart repo (`argo`, `ARGOCD_HELM_REPO_URL`) with `helm repo add --force-update` before installing. It never added it, so `make hub-up` on a new Mac failed at step 5 with `Error: repo argo not found`; older Macs only worked because the repo had been added by hand.
 - k3d install on a Mac (`~/.local/bin`) no longer fails with `k3d not found. Is ~/.local/bin on your $PATH?` when that directory is not on the caller's PATH, which made every `make hub-new` rerun reinstall k3d and ask for sudo again. The install directory is put on PATH, the upstream installer runs without sudo when the directory is writable, and any remaining sudo prompt names the host.
 
