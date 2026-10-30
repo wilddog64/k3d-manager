@@ -1,6 +1,6 @@
 # Bug: PR Checks "Checks per PR" ignores its sort order, so rows from different PRs interleave
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `pr-checks-sort`
+**Status:** FIXED — `111f9e73` (Luna, amended by Claude); live check E2 pending `make platform-ops`
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead to file a P3 bug")
 **Filed:** 2026-10-30
