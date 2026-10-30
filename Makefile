@@ -1673,7 +1673,7 @@ help:
 .PHONY: machine-setup machine-check machine-secrets-export machine-secrets-import
 machine-setup:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
-	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)")
+	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
 
 ## Read-only workstation inventory; exits nonzero when any item is missing; see docs/howto/machine-setup.md
 machine-check:

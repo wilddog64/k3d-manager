@@ -147,6 +147,48 @@ run_machine() {
   run env HOME="$FIXHOME" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
 }
 
+@test "N1: agents option rejects unsupported values" {
+  setup_machine_fixture
+  run_machine --role console --agents never
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'Invalid --agents value: never'* ]]
+}
+
+@test "N2: agents install remains the default" {
+  setup_machine_fixture
+  printf '%s\n' fake-target > "$FIXROOT/scripts/etc/machine/agents.console.list"
+  run_machine --role console
+  grep -q '^make -C .* fake-target$' "$CALL_LOG"
+}
+
+@test "M1/N3: agents skip avoids new installs but preserves installed agents and smartcd" {
+  setup_machine_fixture
+  printf '%s\n' install-cleanup install-node-health-watch bin/k3dm-webhook-setup smartcd-install > "$FIXROOT/scripts/etc/machine/agents.hub.list"
+  mkdir -p "$FIXHOME/Library/LaunchAgents"
+  : > "$FIXHOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+  mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
+  touch "$CALL_LOG.installsmartcd"
+  REMOTE_FIXTURE='https://github.com/cxreg/smartcd.git' run_machine --role hub --agents skip
+  printf '%s\n' "$output" | grep -Eq '^agent:install-cleanup +ok$'
+  [[ "$output" == *'agent:install-node-health-watch'*'skipped (AGENTS=skip)'* ]]
+  [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'skipped (AGENTS=skip)'* ]]
+  grep -q '^make -C .* install$' "$CALL_LOG"
+  ! grep -q 'install-node-health-watch' "$CALL_LOG" || false
+  ! grep -q '^bin/k3dm-' "$CALL_LOG" || false
+}
+
+@test "M2: machine-setup forwards AGENTS to the setup command" {
+  output="$(make -n machine-setup ROLE=console AGENTS=skip)"
+  [[ "$output" == *'--agents "skip"'* ]]
+}
+
+@test "M3/M4: hub secrets include Hermes credentials and rotator is excluded" {
+  grep -Fqx 'k3dm-hermes-gh-token|k3dm|Hermes R4 CI re-run PAT|operator: see docs/guides/hermes.md' "$MACHINE_DIR/secrets.hub.list"
+  grep -Fqx 'k3dm-slack-webhook|k3dm|Hermes Slack summary relay|operator: see docs/guides/hermes.md' "$MACHINE_DIR/secrets.hub.list"
+  ! grep -Fqx install-token-rotator "$MACHINE_DIR"/agents.*.list || false
+  grep -Fq 'install-token-rotator|not installed by setup:' "$MACHINE_DIR/not-installed.list"
+}
+
 @test "machine setup: repository manifest paths are unique" {
   duplicates="$(awk -F'|' '!/^#/ && NF > 1 { print $1 }' "$MACHINE_DIR/repos.list" | sort | uniq -d)"
   [ -z "$duplicates" ]

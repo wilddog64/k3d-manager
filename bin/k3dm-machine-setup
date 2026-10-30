@@ -7,13 +7,14 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/core.sh"
 
-usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--check|--dry-run]\n'; }
-role='' from_host='' secrets_mode=ask mode=setup failed=0 brew_available=0
+usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--agents install|skip] [--check|--dry-run]\n'; }
+role='' from_host='' secrets_mode=ask agents_mode=install mode=setup failed=0 brew_available=0
 while (($#)); do
   case "$1" in
     --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
     --from) (($# >= 2)) || { usage >&2; exit 2; }; from_host="$2"; shift 2 ;;
     --secrets) (($# >= 2)) || { usage >&2; exit 2; }; secrets_mode="$2"; shift 2 ;;
+    --agents) (($# >= 2)) || { usage >&2; exit 2; }; agents_mode="$2"; shift 2 ;;
     --check) mode=check; shift ;;
     --dry-run) mode=dry-run; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -22,6 +23,7 @@ while (($#)); do
 done
 case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
 case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
+case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
 
@@ -349,6 +351,7 @@ run_one_agent() {
   if [[ "$target" == install-sudoers && -f /etc/sudoers.d/k3d-manager ]]; then report "agent:${target}" ok; return; fi
   if [[ -n "$label" && -f "$HOME/Library/LaunchAgents/com.k3d-manager.${label}.plist" ]]; then report "agent:${target}" ok; return; fi
   if [[ "$mode" != setup ]]; then record_failure "agent:${target}" missing; return; fi
+  if [[ "$agents_mode" == skip ]]; then record_failure "agent:${target}" 'skipped (AGENTS=skip)'; return; fi
   perform_agent_install "$target"
 }
 

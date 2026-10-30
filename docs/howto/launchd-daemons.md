@@ -11,7 +11,7 @@ Install via `make <target>` or via the plugin function noted below.
 | Label | Port / Action | KeepAlive | Install Method | Log |
 |-------|--------------|-----------|----------------|-----|
 | `com.k3d-manager.webhook` | HTTP server :9000 | ✅ | `make install-webhook` | `~/Library/Logs/k3dm-webhook.log` |
-| `com.k3d-manager.webhook-token-rotate` | Rotates Slack webhook token | ❌ (timer: 6h) | `make install-token-rotator` | `~/Library/Logs/k3dm-webhook-token-rotate.log` |
+| `com.k3d-manager.webhook-token-rotate` | Updates Cloudflare relay and Keychain token | ❌ (timer: 6h) | Not installed by machine setup | `~/Library/Logs/k3dm-webhook-token-rotate.log` |
 | `com.k3d-manager.ssh-tunnel` | Hostinger SSH forward → `:6443` | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel.out`, `.err` |
 | `com.k3d-manager.ssh-tunnel-vault` | Hostinger Vault reverse tunnel | ✅ | `tunnel_start` | `/tmp/k3d-manager-tunnel-vault.out`, `.err` |
 | `com.k3d-manager.sandbox.ssh-tunnel` | Sandbox SSH forward → `:16443` | ✅ | `TUNNEL_SCOPE=sandbox tunnel_start` | `/tmp/k3d-manager-sandbox-tunnel.out`, `.err` |
@@ -155,9 +155,9 @@ Restart the tunnel separately if needed using the launchd hint printed by the ta
 
 ### `com.k3d-manager.webhook-token-rotate`
 - **Trigger:** `StartInterval=21600` (every 6 hours)
-- **Action:** Rotates the Slack webhook HMAC token in Vault and reloads the webhook process
+- **Action:** Pushes a new token to the Cloudflare Worker and local Keychain, then restarts the webhook. It does not update the `cicd/k3dm-webhook-token` Secret, the `K3DM_WEBHOOK_TOKEN` GitHub secret, or the relay copy re-uploaded by `deploy-worker.yml`; those consumers would retain the old token. Machine setup therefore does not install this agent.
 - **Template:** `scripts/etc/launchd/com.k3d-manager.webhook-token-rotate.plist.tmpl`
-- **Install:** `make install-token-rotator`
+- **Install:** `make install-token-rotator` (manual only; do not enable while the hub token consumers remain unsynchronized)
 
 ### `com.k3d-manager.cleanup`
 - **Trigger:** `StartCalendarInterval` (daily at 03:00)

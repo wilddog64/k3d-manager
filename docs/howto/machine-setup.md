@@ -16,9 +16,9 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 ## M5 hub cut-over
 
-1. Read and run the bootstrap. Enable **Remote Login** in Sharing settings on the M4, then run `make machine-setup ROLE=hub FROM=m4-air.local` on the M5 in a local terminal. It prompts for this Mac's login Keychain password if that Keychain is locked (common in SSH sessions), then for the M4 login password and old Mac Keychain unlock password (normally the same password). On a new Mac, use `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip` to copy existing items without offering commands that create or rotate credentials. Items requiring GUI approval are reported by name; run the file-based export below in a GUI terminal on the M4 for those items.
+1. Read and run the bootstrap. Enable **Remote Login** in Sharing settings on the M4, then run `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` on the M5 in a local terminal before cut-over. This copies existing items without offering commands that create or rotate credentials and leaves hub LaunchAgents off the new Mac. It prompts for this Mac's login Keychain password if that Keychain is locked (common in SSH sessions), then for the M4 login password and old Mac Keychain unlock password (normally the same password). Items requiring GUI approval are reported by name; run the file-based export below in a GUI terminal on the M4 for those items.
 2. Open OrbStack once (`open -a OrbStack`), accept its first-run screens and approve its helper with your admin password; setup installs the cask but cannot do this step, and `machine-check` does not test it. Wait for `orbctl status` to print `Running`.
-3. Re-enter secrets at the TTY when prompted. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
+3. At cut-over, stop the old Mac's agents first, then rerun `make machine-setup ROLE=hub FROM=m4-air.local` without `AGENTS=skip` to install the hub agents on the new Mac. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
 4. Restore the hub by following [Hub snapshots](hub-snapshots.md). This tool does not move cluster data.
 5. Verify the restored hub services and operator access before moving responsibility from the M4. Only then explicitly retire the former hub services.
 

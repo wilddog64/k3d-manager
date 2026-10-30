@@ -1,6 +1,5 @@
 # Ordered actions; make target or setup command, one per line.
 smartcd-install
-install-token-rotator
 install-cleanup
 install-node-health-watch
 install-sandbox-reaper
