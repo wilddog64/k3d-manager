@@ -1,6 +1,6 @@
 # Bug: machine setup installs live-hub agents on a new Mac before cut-over, and misses two Hermes credentials
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `setup-agents-skip`
+**Status:** FIXED — `30d1aab6` (Luna, amended by Claude); live check E2 pending on the M5
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("go ahead to file a bug and dispatch to Luna")
 **Filed:** 2026-10-30
@@ -57,6 +57,15 @@ On the M5, which is not the hub yet, setup's agent stage installed every hub Lau
   (it pushes a new token to the Cloudflare Worker and the Keychain and restarts the webhook; it does not
   use Vault), and say machine setup does not install it and why (the three consumers above). Change its
   table row on line 14 to match.
+
+**As landed (Claude's review, 2026-10-30).** Luna had moved the `skipped (hub only)` check below the
+installed-plist check and duplicated it into check mode; Claude restored the original order, so worker
+and console output is unchanged. Test amendments: the M1/N3 test now lists `bin/k3dm-webhook-setup` and
+asserts it reports `skipped (AGENTS=skip)` (the skip runs before the TTY gate); its three mid-test
+`! grep` lines end with `|| false`; the installed-agent assertion is a whole-line match
+(`^agent:install-cleanup +ok$`), because the old glob matched any later `ok`. 52/52 pass; shellcheck
+clean. Mutations red on temp copies: no skip branch, skip before the installed check, default `skip`,
+no value check.
 
 ## Files
 
