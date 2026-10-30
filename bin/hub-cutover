@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+SINGLETONS="$REPO_ROOT/scripts/etc/machine/hub-singletons.list"
+OLD_HOST="${HUB_OLD_HOST:-m4-air.local}"
+STATE_DIR="${HUB_CUTOVER_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-cutover}"
+NEW_STATE_DIR="${HUB_NEW_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-new}"
+REPORT="$NEW_STATE_DIR/hub-new-report.json"
+TTY="${HUB_CUTOVER_TTY:-/dev/tty}"
+VERIFY_TRIES="${HUB_CUTOVER_VERIFY_TRIES:-18}"
+VERIFY_WAIT="${HUB_CUTOVER_VERIFY_WAIT:-10}"
+
+labels=()
+while IFS='|' read -r label _installer _note; do
+  [[ -n "$label" && "$label" != \#* ]] || continue
+  labels+=("com.k3d-manager.$label")
+done < "$SINGLETONS"
+
+read_report() {
+  python3 - "$REPORT" <<'PY'
+import datetime, json, sys
+try:
+    report = json.load(open(sys.argv[1]))
+    stamp = datetime.datetime.fromisoformat(report["timestamp"].replace("Z", "+00:00"))
+    age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds()
+    if report.get("status") != "pass" or age < 0 or age >= 86400:
+        raise ValueError("report is not a passing report less than 24 hours old")
+except Exception as exc:
+    print(f"hub-cutover: refusing: {exc}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+confirm() {
+  local expected="$1" answer
+  printf 'Type %s to continue: ' "$expected"
+  IFS= read -r answer < "$TTY" || answer=""
+  [[ "$answer" == "$expected" ]] || { echo "hub-cutover: confirmation did not match; nothing changed" >&2; return 1; }
+}
+
+local_loaded() {
+  local label rc
+  if launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1; then return 0; else rc=$?; fi
+  [[ $rc -eq 113 ]] && return 1
+  echo "hub-cutover: launchctl print failed for $1 (exit $rc)" >&2
+  return 2
+}
+
+old_loaded() {
+  local label="$1" rc
+  # shellcheck disable=SC2029
+  if ssh "$OLD_HOST" "launchctl print \"gui/\$(id -u)/$label\"" >/dev/null 2>&1; then return 0; else rc=$?; fi
+  [[ $rc -eq 113 ]] && return 1
+  echo "hub-cutover: could not inspect $label on $OLD_HOST (ssh/launchctl exit $rc)" >&2
+  return 2
+}
+
+print_plan() {
+  local label
+  echo "Cutover plan: stop loaded agents on $OLD_HOST in reverse order, then load on $(hostname -s) in this order:"
+  for label in "${labels[@]}"; do echo "  $label"; done
+}
+
+append_report() {
+  local result="$1" labels_json
+  labels_json="$(python3 - "$STATE_DIR/stopped-on-old" <<'PY'
+import json, sys
+try: print(json.dumps([x.strip() for x in open(sys.argv[1]) if x.strip()]))
+except FileNotFoundError: print("[]")
+PY
+)"
+  python3 - "$STATE_DIR/hub-cutover-report.json" "$OLD_HOST" "$(hostname -s)" "$result" "$labels_json" <<'PY'
+import datetime, json, os, sys
+path, old, new, result, moved = sys.argv[1:]
+try:
+    rows = json.load(open(path))
+except (FileNotFoundError, json.JSONDecodeError): rows = []
+rows.append({"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+             "old_host": old, "new_host": new, "labels_moved": json.loads(moved), "verify": result})
+with open(path, "w") as out: json.dump(rows, out, indent=2); out.write("\n")
+PY
+}
+
+verify_cutover() {
+  local label output count frontend_code webhook_code
+  make webhook-doctor || return 1
+  frontend_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://frontend.3ai-talk.org/)" || return 1
+  [[ "$frontend_code" == 200 ]] || { echo "hub-cutover: frontend returned $frontend_code" >&2; return 1; }
+  webhook_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://webhook.3ai-talk.org/)" || return 1
+  [[ "$webhook_code" == 401 ]] || { echo "hub-cutover: webhook returned $webhook_code" >&2; return 1; }
+  output="$(cloudflared tunnel info k3d-manager)" || return 1
+  count="$(printf '%s\n' "$output" | awk '$1 ~ /^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$/ { n++ } END { print n+0 }')"
+  [[ "$count" -eq 1 ]] || { echo "hub-cutover: expected one cloudflared connector, found $count; run make hub-cutover-rollback" >&2; return 1; }
+  for label in com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault; do
+    output="$(launchctl print "gui/$(id -u)/$label")" || return 1
+    [[ "$output" == *'state = running'* ]] || { echo "hub-cutover: $label is not running; run make hub-cutover-rollback" >&2; return 1; }
+  done
+  bin/k3dm-hermes status || return 1
+  echo 'Operator check: confirm a Hermes message arrives in Slack.'
+}
+
+verify_with_retries() {
+  local attempt
+  for ((attempt=1; attempt<=VERIFY_TRIES; attempt++)); do
+    verify_cutover && return 0
+    (( attempt < VERIFY_TRIES )) || break
+    echo "hub-cutover: verify attempt ${attempt}/${VERIFY_TRIES} failed; retrying in ${VERIFY_WAIT}s" >&2
+    sleep "$VERIFY_WAIT"
+  done
+  return 1
+}
+
+rollback() {
+  local label rc
+  local stopped="$STATE_DIR/stopped-on-old"
+  [[ -f "$stopped" ]] || { echo "hub-cutover: no stopped-on-old record; refusing rollback" >&2; return 1; }
+  print_plan
+  confirm rollback || return 1
+  for ((i=${#labels[@]}-1; i>=0; i--)); do
+    label="${labels[i]}"
+    if local_loaded "$label"; then launchctl bootout "gui/$(id -u)/$label"; else rc=$?; [[ $rc -eq 1 ]] || return "$rc"; fi
+  done
+  while IFS= read -r label; do
+    [[ -n "$label" ]] || continue
+    [[ " ${labels[*]} " == *" $label "* ]] || { echo "hub-cutover: invalid recorded label $label" >&2; return 1; }
+  done < "$stopped"
+  for label in "${labels[@]}"; do
+    grep -Fxq "$label" "$stopped" || continue
+    # shellcheck disable=SC2029
+    ssh "$OLD_HOST" "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\""
+  done
+  append_report rollback-pass
+}
+
+if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
+read_report || exit 1
+print_plan
+if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
+confirm cutover || exit 1
+mkdir -p "$STATE_DIR"
+: > "$STATE_DIR/stopped-on-old"
+for ((i=${#labels[@]}-1; i>=0; i--)); do
+  label="${labels[i]}"
+  if old_loaded "$label"; then
+    # shellcheck disable=SC2029
+    ssh "$OLD_HOST" "launchctl bootout \"gui/\$(id -u)/$label\""
+    printf '%s\n' "$label" >> "$STATE_DIR/stopped-on-old"
+  else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
+done
+for label in "${labels[@]}"; do
+  if old_loaded "$label"; then
+    echo "hub-cutover: $label remains loaded on $OLD_HOST; M5 agents were not loaded. Run make hub-cutover-rollback" >&2
+    append_report old-host-not-quiet
+    exit 1
+  else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
+done
+for label in "${labels[@]}"; do
+  [[ -f "$HOME/Library/LaunchAgents/$label.plist" ]] || { echo "hub-cutover: missing plist $label" >&2; append_report load-failed; exit 1; }
+  launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" || { echo "hub-cutover: could not load $label; run make hub-cutover-rollback" >&2; append_report load-failed; exit 1; }
+done
+if verify_with_retries; then append_report pass; else append_report verify-failed; echo 'hub-cutover: verification failed; run make hub-cutover-rollback' >&2; exit 1; fi

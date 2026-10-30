@@ -16,6 +16,8 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 ## M5 hub cut-over
 
+For the staged one-command build and safe agent cut-over, follow the [M5 hub migration guide](m5-hub-migration.md).
+
 1. Read and run the bootstrap. Enable **Remote Login** in Sharing settings on the M4, then run `make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip` on the M5 in a local terminal before cut-over. This copies existing items without offering commands that create or rotate credentials and leaves hub LaunchAgents off the new Mac. It prompts for this Mac's login Keychain password if that Keychain is locked (common in SSH sessions), then for the M4 login password and old Mac Keychain unlock password (normally the same password). Items requiring GUI approval are reported by name; run the file-based export below in a GUI terminal on the M4 for those items.
 2. Open OrbStack once (`open -a OrbStack`), accept its first-run screens and approve its helper with your admin password; setup installs the cask but cannot do this step, and `machine-check` does not test it. Wait for `orbctl status` to print `Running`.
 3. At cut-over, stop the old Mac's agents first, then rerun `make machine-setup ROLE=hub FROM=m4-air.local` without `AGENTS=skip` to install the hub agents on the new Mac. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.

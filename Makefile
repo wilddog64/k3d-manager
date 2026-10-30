@@ -46,6 +46,13 @@ argocd-upgrade:
 hub-new:
 	@bin/hub-new
 
+.PHONY: hub-cutover hub-cutover-rollback
+hub-cutover:
+	@bin/hub-cutover
+
+hub-cutover-rollback:
+	@bin/hub-cutover --rollback
+
 .PHONY: install-prometheus-credential-rotator
 install-prometheus-credential-rotator:
 	@./scripts/k3d-manager observability_install_prometheus_rotator
@@ -1595,6 +1602,8 @@ help:
 	@echo "    make up            Provision full stack"
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
 	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
+	@echo "    make hub-cutover  Move single-instance agents from the old hub to the new hub"
+	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
