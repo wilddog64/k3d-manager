@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [1.43.9] - 2026-10-29
+
 ### Added
 
 - Add `make webhook-doctor` for read-only diagnostics and `DRY_RUN=1` for its probe plan.
@@ -19,8 +21,12 @@
 - Agent Dispatch records explicit primary coordinator assignments, append-only coordinator handoffs, and landing actors independently from implementation workers. The Per spec table shows Primary coordinator, Acting coordinator, Landed by, handoff count, and whether primary cost is measured; legacy identities stay unknown when absent.
 - Agent Dispatch records spec size at dispatch and changed files and lines at land, with per-spec columns and release totals.
 - Add an operator-approved OrbStack upgrade command with hub preflight, Vault and host-network recovery, health verification, JSON reporting, and Hermes notices.
+- The Host Pod IP Pool dashboard splits kept reservations into in use, starting (grace period) and held without a sandbox, with the age of the oldest held reservation. The Hostinger sweep writes the skipped counts, and `HostCniIpamOrphanNotReclaimed` fires when a reservation stays held without a sandbox for over an hour. Before this, the dashboard showed how full the pool was but not whether the sweep was keeping up.
+- VectorDB drift is published by kind (missing, stale hash, deleted) with the age of the oldest drifted document in each kind, kept in a first-seen state file. The net `drift_docs` count could read 0 while documents were wrong, because missing and deleted documents cancel and stale hashes do not change the row count. `VectorDBIndexDrift` now fires when any kind stays drifted for over two hours.
 
 ### Changed
+
+- The Grafana dashboards guide is now an index with one page per dashboard: Agent Run Log, Agent Cost and Agent Activity have their own pages, and the Release plans, Release forecast, Host Disk and CVE triage notes moved to the pages of the dashboards they describe.
 
 - The webhook LaunchAgent now runs as `ProcessType Interactive`. With the key unset, launchd applies its default CPU and I/O throttle, and the ask-docs bug tally's Git children inherit it. The same tally took 0.85 s at normal priority, 13–59 s at background priority and 130 s I/O-throttled, so Slack count questions hit the 30 s deadline. Only the webhook changes; every other k3dm LaunchAgent keeps the default throttle, and a BATS guard enforces both.
 
