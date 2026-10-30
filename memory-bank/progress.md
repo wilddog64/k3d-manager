@@ -2013,3 +2013,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] 2026-10-29: one-command-machine-setup dispatched to Luna (gpt-6-luna), worktree v1.43.12/one-command-machine-setup. Hold operator make commands until it lands.
 - [x] 2026-10-29: D1a (operator): one workspace CLAUDE.md in zshdotfiles, AGENTS.md/GEMINI.md link to it; repo-specific rules stay per repo; content never in k3d-manager (public, branch-switching).
 - 2026-10-29: D1a preamble (instruction precedence + layer-1 security) drafted, recorded in spec; awaits operator approval, operator commits to zshdotfiles. Luna machine-setup review round 1 sent (F1-F8: not-installed contradiction, missing webhook/hermes/heartbeat, set -e aborts, D1a+smartcd links, secrets lists, pkg signer, shellcheck, gh hosts.yml).
+- 2026-10-29: preamble approved; zshdotfiles docs/workspace-claude-md 4800546 adds workspace/CLAUDE.md, awaiting operator merge.
