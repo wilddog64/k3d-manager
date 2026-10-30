@@ -1,6 +1,6 @@
 # Bug: secrets pull fails on a locked local keychain, and setup has no way to skip secret prompts
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `secrets-local-unlock`
+**Status:** FIXED — `67391f97` (Luna, amended by Claude); live check E3 pending on the M5
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead", after the M5 pull run)
 **Filed:** 2026-10-30
@@ -54,6 +54,15 @@ An unlocked local keychain gets no prompt.
 
 `docs/howto/machine-setup.md`: say that the pull unlocks this Mac's keychain when it is locked (ssh
 sessions), name `SECRETS=skip`, and recommend `SECRETS=skip` with `FROM=` on a new Mac.
+
+**As landed (Claude's review, 2026-10-30).** Three amendments: the local password prompt goes to
+`/dev/tty` like the remote one (Luna's went to stderr); the M1 test's fixture was `svc`/`acct`, which
+export filters out because it is not in the hub manifest, so the test never passed outside the Codex
+sandbox, where it skipped. It now uses a listed record. Its mid-test `! grep` for the password was a
+no-op in bats and now ends with `|| false`. Outside the sandbox: 72 ok, 0 skipped; shellcheck clean.
+Mutation checks on temp copies turned a test red for each guard: no local unlock, always prompt,
+unlock failure ignored, password passed with `-p`, no skip branch, no value check, no Make forward,
+and default `skip`.
 
 ## Files
 
