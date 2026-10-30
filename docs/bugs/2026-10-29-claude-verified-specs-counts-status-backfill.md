@@ -1,6 +1,6 @@
 # Bug: `k3dm_claude_verified_specs` counts a status backfill and closed-to-closed edits as verified specs
 
-**Status:** OPEN
+**Status:** LANDED — 2026-10-29: fix `79b525a8` (Luna, gpt-6-luna). Claude independent Acceptance tests 5/5 pass on the fix; N1 and N2 shown red on the pre-fix counter. Luna suites 162 pytest + 30/30 dashboard BATS green. Out-of-scope edits reviewed and allowed: `scripts/tests/bin/test_dispatch_logs.py` (mock follows new return shape), `scripts/tests/plugins/agent_dispatch_dashboard.bats` (new panel 93 and row layout). Dry-run on the fix: 30d 450 (130 live / 251 verified / 69 unverified), was 858. E4 (live panel read after the next push) pending.
 **Priority:** P2
 **Approval:** explicit 2026-10-29 "go with your suggestion" (operator): fix the count and add a `level` label (live / verified / unverified) in one change
 **Filed:** 2026-10-29
