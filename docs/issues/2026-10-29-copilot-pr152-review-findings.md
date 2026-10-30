@@ -21,3 +21,20 @@
 ## Finding 2 — CodeQL `py/insecure-protocol`: TLS 1.0/1.1 allowed in `bin/k3dm-cloudflare-posture:249`
 
 **Not changed; intentional.** `probe_tls` pins one TLS version per handshake (minimum = maximum) to prove the Cloudflare edge rejects TLS 1.0 and 1.1. It reads only the negotiated version and sends no data. Code-scanning alert #35 was dismissed as won't-fix with this reason.
+
+## Finding 3 — CI: eight `orbstack_upgrade.bats` TTY tests time out on Linux
+
+**Flagged:** CI run 40978560786, `lint` job. Tests 571–579 in `scripts/tests/bin/orbstack_upgrade.bats` each failed after exactly 30 s. These are the tests that drive the real confirmation prompt through `_run_tty`.
+
+**Root cause:** on Linux, `_run_tty` puts the child command's single quotes inside a double-quoted `script -c` string, so the outer shell expands `$0`, `$1` and `$rc` too early.
+- The child ran `_` (command not found) instead of the upgrade script.
+- It wrote the done marker to a file named `no` (`Read-only file system`).
+- The answer feeder then waited for a marker that never appeared, until the bounded runner killed it.
+
+macOS takes the BSD `script` branch, so the plan's offline verification (macOS only) never ran the Linux path.
+
+**Fix:** the Linux branch passes the child command and its two paths through environment variables (`ORB_TTY_CHILD`, `ORB_TTY_SCRIPT`, `ORB_TTY_DONE`), so no nested quoting is needed.
+- Reproduced red and then green in `ubuntu:24.04` with util-linux `script` 2.39.3: all 18 tests pass.
+- The macOS run is unchanged: 18 tests pass.
+
+**Process note:** a BATS suite with an `uname -s` branch must be run on Linux before landing, either in the `ubuntu:24.04` container or on CI. A green macOS run does not exercise the other branch.

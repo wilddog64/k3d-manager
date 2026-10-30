@@ -205,7 +205,9 @@ _run_tty() {
   if [[ "$(uname -s)" == Darwin ]]; then
     _run_bounded bash -c "$feed"' | script -q /dev/null bash -c '"'$child'"' "$2" "$3"' _ "$answer" "$SCRIPT" "$done_file"
   else
-    _run_bounded bash -c "$feed"' | script -q -e -c "bash -c '"'$child'"' \"$2\" \"$3\"" /dev/null' _ "$answer" "$SCRIPT" "$done_file"
+    export ORB_TTY_CHILD='"$ORB_TTY_SCRIPT"; rc=$?; : > "$ORB_TTY_DONE"; exit "$rc"'
+    export ORB_TTY_SCRIPT="$SCRIPT" ORB_TTY_DONE="$done_file"
+    _run_bounded bash -c "$feed"' | script -q -e -c "bash -c \"\$ORB_TTY_CHILD\"" /dev/null' _ "$answer" "$SCRIPT" "$done_file"
   fi
 }
 
