@@ -118,6 +118,26 @@ check, no `secret` check, no verdict check, no `<|` escape. **Known limit (accep
 regex also matches prose, so a line that only mentions `make`, `git` or `rm` is withheld. This loses some
 advice but never lets a command through; tighten it only if Slack replies show it in practice.
 
+## Limits and scope of this fix (operator review, 2026-10-30)
+
+1. **`filter_suggestion` is a pattern filter, not a safety check.** A regex and an allow-list can
+   withhold legitimate explanatory text (the known limit above), and they cannot catch a dangerous
+   recommendation written in plain language, for example "delete the vault namespace and redeploy". The
+   control that holds is that no code path executes or acts on a model reply: the reply is advice to a
+   human in Slack. The filter only reduces how easily such advice can be copied and pasted.
+2. **The fix covers the five webhook diagnostic paths listed under Affected, and nothing else.** It
+   does not show that other model paths are protected:
+   - **`/ask-docs`** (`scripts/lib/webhook/ask_docs.py` `answer`): retrieved excerpts go into the
+     prompt unfenced, and the reply is posted without `filter_suggestion` (credential/IP scrubbing
+     only). The model has no tools, but `docs/bugs/` and `docs/issues/` quote raw log output, so log
+     text can reach this prompt through a doc. Not covered; candidate follow-up.
+   - **`/ask`** (`scripts/lib/webhook/agent.py`): runs `claude -p` with `--allowedTools Bash` (plus
+     `Write` when filing) over cluster output. This is the path where an injection could lead to an
+     action. Its controls are the `.ask-sandbox` PATH shim and the system-prompt rules, not this fix. It
+     has not been reviewed against log-borne injection. Candidate follow-up, higher priority than
+     `/ask-docs`.
+   - Other RAG retrieval paths and autonomous agents (Codex dispatch, Hermes) are out of scope here.
+
 ## Files
 
 - `scripts/lib/webhook/untrusted.py` (new)
