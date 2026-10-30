@@ -1,6 +1,6 @@
 # Bug: CI `stage2` on the M2 ignores the e2e runner lock, so it can run alongside a remote e2e
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `ci-runner-lock`
+**Status:** FIXED — `d478ed59` (Luna); live check E3 pending a `ci:cluster-tests` PR
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("we just want to ensure … only one can be executed"; "go ahead")
 **Filed:** 2026-10-30
@@ -68,6 +68,11 @@ to `another run (E2E or CI) holds the runner lock`. Nothing else in this file ch
 
 `docs/howto/cloud-session-requests.md`, section **Remote-runner contention**: one short paragraph saying the CI `stage2` job takes the same
 lock, waits up to 30 minutes for it, and that remote e2e never waits.
+
+**As landed (Claude's review, 2026-10-30).** Landed as Luna wrote it. 7/7 tests pass; shellcheck and
+actionlint clean. Mutations red on temp copies: claiming with `mkdir -p`, blind release, a timeout that
+removes the lock, no wait, usage exit 1; and on `ci.yml`: no `always()`, the token interpolated into the
+script, no `timeout-minutes`, and the pre-fix workflow.
 
 ## Files
 
