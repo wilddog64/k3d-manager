@@ -713,3 +713,82 @@ SH
   run_machine --role console --check
   [ ! -e "$FIXHOME/.local/state/k3d-manager/machine-setup.log" ]
 }
+
+files_fixture() {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR"/* && "$FIXHOME" != "$HOME" ]]
+  printf '%s\n' '# fixture' '.cloudflared/tunnel.json' '.cloudflared/cert.pem' > "$FIXROOT/scripts/etc/machine/files.hub.list"
+  cat > "$STUBS/scp" <<'SH'
+#!/bin/sh
+printf 'scp %s\n' "$*" >> "$CALL_LOG"
+[ -z "$SCP_FAIL" ] || { : > "$(eval echo \${$#})"; exit 1; }
+for last; do :; done
+printf 'copied-fixture\n' > "$last"
+SH
+  chmod +x "$STUBS/scp"
+}
+
+@test "files: FROM copies each missing hub file from the old Mac with private modes" {
+  files_fixture
+  run_machine --role hub --from old-mac.local
+  [ "$(grep -c '^scp ' "$CALL_LOG")" -eq 2 ]
+  grep -q '^scp -q -o ConnectTimeout=10 -- old-mac.local:.cloudflared/tunnel.json ' "$CALL_LOG"
+  grep -q '^scp -q -o ConnectTimeout=10 -- old-mac.local:.cloudflared/cert.pem ' "$CALL_LOG"
+  [ "$(cat "$FIXHOME/.cloudflared/tunnel.json")" = copied-fixture ]
+  [ "$(ls -l "$FIXHOME/.cloudflared/tunnel.json" | cut -c1-10)" = '-rw-------' ]
+  [ "$(ls -ld "$FIXHOME/.cloudflared" | cut -c1-10)" = 'drwx------' ]
+  [[ "$output" == *'file:~/.cloudflared/cert.pem'*'copied from old-mac.local'* ]]
+  run ls "$FIXHOME/.cloudflared"
+  [[ "$output" != *k3dm-partial* ]]
+}
+
+@test "files: a file already present is kept and never copied over" {
+  files_fixture
+  mkdir -p "$FIXHOME/.cloudflared"
+  printf 'existing\n' > "$FIXHOME/.cloudflared/tunnel.json"
+  run_machine --role hub --from old-mac.local
+  [ "$(cat "$FIXHOME/.cloudflared/tunnel.json")" = existing ]
+  run grep -c '^scp .*tunnel.json' "$CALL_LOG"
+  [ "$output" = 0 ]
+  grep -q '^scp .*cert.pem' "$CALL_LOG"
+}
+
+@test "files: a failed copy leaves no file or partial and fails the run" {
+  files_fixture
+  SCP_FAIL=1 run_machine --role hub --from old-mac.local
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'file:~/.cloudflared/tunnel.json'*'copy from old-mac.local failed'* ]]
+  [ ! -e "$FIXHOME/.cloudflared/tunnel.json" ]
+  [ ! -e "$FIXHOME/.cloudflared/tunnel.json.k3dm-partial" ]
+}
+
+@test "files: no copy without FROM, in check mode, or in dry-run" {
+  files_fixture
+  run_machine --role hub
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'file:~/.cloudflared/tunnel.json'*'rerun with FROM='* ]]
+  run_machine --role hub --check --from old-mac.local
+  [ "$status" -ne 0 ]
+  run_machine --role hub --dry-run --from old-mac.local
+  [[ "$output" == *'would copy from old-mac.local'* ]]
+  run grep -c '^scp ' "$CALL_LOG"
+  [ "$output" = 0 ]
+  [ ! -e "$FIXHOME/.cloudflared" ]
+}
+
+@test "files: a path that leaves HOME is rejected without copying" {
+  files_fixture
+  printf '%s\n' '../outside.json' '/etc/hosts' > "$FIXROOT/scripts/etc/machine/files.hub.list"
+  run_machine --role hub --from old-mac.local
+  [ "$status" -ne 0 ]
+  [ "$(grep -c 'rejected (bad path)' <<< "$output")" -eq 2 ]
+  run grep -c '^scp ' "$CALL_LOG"
+  [ "$output" = 0 ]
+}
+
+@test "files: the hub manifest names the tunnel credentials cloudflared is configured to read" {
+  creds="$(awk '$1 == "credentials-file:" {print $2}' "$REPO_ROOT/scripts/etc/cloudflared/config.yml")"
+  [ -n "$creds" ]
+  grep -Fqx ".cloudflared/${creds##*/}" "$MACHINE_DIR/files.hub.list"
+  grep -Fqx '.cloudflared/cert.pem' "$MACHINE_DIR/files.hub.list"
+}

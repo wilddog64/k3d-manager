@@ -12,6 +12,7 @@ setup() {
   ln -s "$REPO/scripts/lib/provider.sh" "$ROOT/scripts/lib/provider.sh"
   ln -s "${AGENT_CLASSIFICATION_DIR:-$REPO/scripts/etc/machine}" "$ROOT/scripts/etc/machine"
   ln -s "$REPO/scripts/etc/cloudflared" "$ROOT/scripts/etc/cloudflared"
+  ln -s "$REPO/scripts/etc/hostinger" "$ROOT/scripts/etc/hostinger"
   TUNNEL_CREDS="$(awk '$1 == "credentials-file:" {print $2}' "$REPO/scripts/etc/cloudflared/config.yml")"
   TUNNEL_CREDS="${TUNNEL_CREDS##*/}"
   mkdir -p "$WORK/home/.cloudflared"
@@ -160,14 +161,14 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   grep -q '^k3d-manager tunnel_start .*TUNNEL_SSH_HOST=ubuntu@vps.example.test' "$CALLS"
 }
 
-@test "prepare-singletons fails clearly without HOSTINGER_HOST and loads nothing" {
-  unset HOSTINGER_HOST
+@test "without HOSTINGER_HOST the tunnel installer uses the tracked Hostinger default" {
+  unset HOSTINGER_HOST HOSTINGER_SSH_USER
+  expected="$(source "$REPO/scripts/etc/hostinger/vars.sh"; printf '%s@%s' "$HOSTINGER_SSH_USER" "$HOSTINGER_HOST")"
+  [[ "$expected" == ?*@?* && "$expected" != *vps.example.test* ]]
   run "$HUB_NEW_BIN"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *'HOSTINGER_HOST is not set'* ]]
-  grep -q '^prepare-singletons=fail ' "$HUB_NEW_STATE_DIR/state"
-  run grep -q '^k3d-manager tunnel_start' "$CALLS"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^k3d-manager tunnel_start ' "$CALLS")" -eq 1 ]
+  grep -qF "TUNNEL_SSH_HOST=${expected} " "$CALLS"
 }
 
 @test "N2: preflight refuses to run on the old hub host before any mutating stage" {
@@ -198,22 +199,25 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ "$status" -eq 1 ]
 }
 
-@test "preflight refuses without the Cloudflare tunnel credentials before any mutating stage" {
+@test "secrets-present refuses without the Cloudflare tunnel credentials after machine-setup and before hub-up" {
   [[ "$HOME" == "$WORK/home" ]]
   rm "$HOME/.cloudflared/$TUNNEL_CREDS"
   run "$HUB_NEW_BIN"
   [ "$status" -ne 0 ]
   [[ "$output" == *"Cloudflare tunnel file missing: ~/.cloudflared/$TUNNEL_CREDS"* ]]
   [[ "$output" == *"scp m4-air.local:.cloudflared/$TUNNEL_CREDS"* ]]
-  run grep -q '^make ' "$CALLS"
+  grep -q '^secrets-present=fail ' "$HUB_NEW_STATE_DIR/state"
+  grep -q '^make machine-setup ROLE=hub FROM=m4-air.local' "$CALLS"
+  run grep -q '^make hub-up' "$CALLS"
   [ "$status" -eq 1 ]
 }
 
-@test "preflight refuses without the Cloudflare origin cert" {
+@test "secrets-present refuses without the Cloudflare origin cert" {
   rm "$HOME/.cloudflared/cert.pem"
   run "$HUB_NEW_BIN"
   [ "$status" -ne 0 ]
   [[ "$output" == *'Cloudflare tunnel file missing: ~/.cloudflared/cert.pem'* ]]
+  grep -q '^secrets-present=fail ' "$HUB_NEW_STATE_DIR/state"
 }
 
 @test "preflight passes without k3d installed so hub-up can install it" {

@@ -5,6 +5,7 @@
 ### Added
 
 - Add `make hub-new` to rebuild the M5 as a fresh hub, verify its recovery and platform state, and prepare single-instance agent plists without loading them.
+- `make machine-setup FROM=<host>` now also copies the files a role lists in `scripts/etc/machine/files.<role>.list` when they are missing (mode 600, never overwriting). For a hub these are the Cloudflare tunnel credentials and origin cert, so `make hub-new` no longer needs a manual copy first. It also takes the Hostinger tunnel target from `scripts/etc/hostinger/vars.sh` when `HOSTINGER_HOST` is not exported.
 - Add `make hub-cutover` and `make hub-cutover-rollback` to move the classified single-instance agents between hubs with a recorded rollback path.
 - Add Keychain secret migration for Mac setup: encrypted file export/import fallback and optional `FROM=<host>` streaming over SSH, with safe prompts and setup integration.
 - Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.

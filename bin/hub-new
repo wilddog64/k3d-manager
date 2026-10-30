@@ -59,10 +59,6 @@ preflight() {
     clusters="$(k3d cluster list -o name 2>/dev/null)" || fail 'cannot query local k3d clusters' 'start OrbStack and verify k3d is installed'
     if printf '%s\n' "$clusters" | grep -Fx "$CLUSTER" >/dev/null && ! stage_passed hub-up; then fail "cluster ${CLUSTER} exists but hub-new has no hub-up pass" 'inspect the cluster; do not delete it automatically'; fi
   fi
-  creds="$(awk '$1 == "credentials-file:" {print $2}' "${REPO_ROOT}/scripts/etc/cloudflared/config.yml")"
-  for f in "${creds##*/}" cert.pem; do
-    [[ -s "$HOME/.cloudflared/$f" ]] || fail "Cloudflare tunnel file missing: ~/.cloudflared/$f" "copy it from the old hub: scp ${OLD_HOST}:.cloudflared/$f ~/.cloudflared/"
-  done
   while IFS='|' read -r label _installer _note; do
     [[ -n "$label" && "$label" != \#* ]] || continue
     if label_loaded "$label"; then fail "singleton ${label} is already loaded on this Mac" "run: launchctl bootout gui/$(id -u)/com.k3d-manager.${label}"; fi
@@ -70,7 +66,7 @@ preflight() {
 }
 machine_setup() { make machine-setup "ROLE=hub" "FROM=$OLD_HOST" SECRETS=skip AGENTS=skip; }
 secrets_present() {
-  local service account _description _command lookup_account
+  local service account _description _command lookup_account creds f
   while IFS='|' read -r service account _description _command; do
     [[ -n "$service" && "$service" != \#* ]] || continue
     lookup_account="$account"
@@ -81,6 +77,10 @@ secrets_present() {
       security find-generic-password -s "$service" -a "$lookup_account" >/dev/null 2>&1 || fail "Keychain item missing: ${service} (${lookup_account})" "run make machine-setup ROLE=hub FROM=$OLD_HOST SECRETS=skip AGENTS=skip"
     fi
   done < "${REPO_ROOT}/scripts/etc/machine/secrets.hub.list"
+  creds="$(awk '$1 == "credentials-file:" {print $2}' "${REPO_ROOT}/scripts/etc/cloudflared/config.yml")"
+  for f in "${creds##*/}" cert.pem; do
+    [[ -s "$HOME/.cloudflared/$f" ]] || fail "Cloudflare tunnel file missing: ~/.cloudflared/$f" "machine-setup copies it from $OLD_HOST; check its output, or run: scp ${OLD_HOST}:.cloudflared/$f ~/.cloudflared/"
+  done
 }
 hub_up() { make hub-up; }
 hub_restore() { HUB_RESTORE_TUNNEL=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
@@ -93,8 +93,9 @@ prepare_singletons() {
       bin/k3dm-webhook-setup|bin/k3dm-hermes-setup) K3DM_AGENT_LOAD=0 "${REPO_ROOT}/${installer}" || return 1 ;;
       tunnel_start)
         if (( ! tunnel_done )); then
-          [[ -n "${HOSTINGER_HOST:-}" ]] || fail "HOSTINGER_HOST is not set; ${label} needs the Hostinger SSH target" 'export HOSTINGER_HOST as on the old hub, then rerun make hub-new'
-          TUNNEL_SCOPE="" TUNNEL_FORCE_HOST=1 TUNNEL_SSH_HOST="${HOSTINGER_SSH_USER:-ubuntu}@${HOSTINGER_HOST}" K3DM_AGENT_LOAD=0 scripts/k3d-manager tunnel_start || return 1
+          # shellcheck source=scripts/etc/hostinger/vars.sh
+          source "${REPO_ROOT}/scripts/etc/hostinger/vars.sh"
+          TUNNEL_SCOPE="" TUNNEL_FORCE_HOST=1 TUNNEL_SSH_HOST="${HOSTINGER_SSH_USER}@${HOSTINGER_HOST}" K3DM_AGENT_LOAD=0 scripts/k3d-manager tunnel_start || return 1
           tunnel_done=1
         fi ;;
       scripts/k3d-manager\ vault_install_failover_watchdog) K3DM_AGENT_LOAD=0 scripts/k3d-manager vault_install_failover_watchdog || return 1 ;;

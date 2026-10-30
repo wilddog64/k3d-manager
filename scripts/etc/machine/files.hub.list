@@ -1,0 +1,5 @@
+# Files copied from the old Mac by machine-setup FROM=<host> when missing here; never overwritten.
+# Paths are relative to HOME on both Macs. Saved with mode 600 in a mode-700 directory.
+# The tunnel credentials name must match credentials-file in scripts/etc/cloudflared/config.yml.
+.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json
+.cloudflared/cert.pem

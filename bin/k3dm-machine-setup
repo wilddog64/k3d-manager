@@ -309,6 +309,28 @@ check_secrets() {
   done 3< "${manifest_dir}/secrets.${role}.list"
 }
 
+copy_files() {
+  local list="${manifest_dir}/files.${role}.list" path target partial
+  [[ -r "$list" ]] || return 0
+  while IFS= read -r path <&3 || [[ -n "$path" ]]; do
+    path="${path%%#*}"; path="${path//[$'\t\r ']/}"
+    [[ -n "$path" ]] || continue
+    if [[ ! "$path" =~ ^[A-Za-z0-9._/-]+$ || "$path" == /* || "$path" == *..* || "$path" != */* ]]; then record_failure "file:${path}" 'rejected (bad path)'; continue; fi
+    target="$HOME/$path"
+    if [[ -s "$target" ]]; then report "file:~/${path}" ok; continue; fi
+    if [[ -z "$from_host" || "$mode" == check ]]; then record_failure "file:~/${path}" 'missing (rerun with FROM=<old Mac hostname> to copy it)'; continue; fi
+    if [[ ! "$from_host" =~ ^[A-Za-z0-9.-]+$ ]]; then record_failure "file:~/${path}" 'missing (invalid FROM host)'; continue; fi
+    if [[ "$mode" == dry-run ]]; then report "file:~/${path}" "would copy from $from_host"; continue; fi
+    mkdir -p "${target%/*}"; chmod 700 "${target%/*}"
+    partial="${target}.k3dm-partial"
+    if scp -q -o ConnectTimeout=10 -- "${from_host}:${path}" "$partial" && [[ -s "$partial" ]]; then
+      chmod 600 "$partial"; mv "$partial" "$target"; report "file:~/${path}" "copied from $from_host"
+    else
+      rm -f "$partial"; record_failure "file:~/${path}" "missing (copy from $from_host failed)"
+    fi
+  done 3< "$list"
+}
+
 is_hub_agent() {
   case "$1" in install-token-rotator|install-cleanup|install-node-health-watch|install-sandbox-reaper|install-vault-port-forward|install-prometheus-port-forward|install-hub-pushgateway-port-forward|install-hub-loki-port-forward|install-alertmanager-port-forward|install-alertmanager-auth-proxy|install-cloud-bridge|bin/k3dm-webhook-setup|bin/k3dm-hermes-setup|bin/k3dm-heartbeat-setup) return 0 ;; *) return 1 ;; esac
 }
@@ -370,5 +392,6 @@ ensure_python_tools
 install_repos
 install_state_chain
 check_secrets
+copy_files
 run_agents
 exit "$failed"
