@@ -470,6 +470,10 @@ as a LaunchAgent with a model memory cap. Size it only after the M5 has run as t
 measured. First uses: local embeddings for ask-docs and `find-similar-docs`, and Hermes digest summaries. Gets a spec when
 scheduled.
 
+**v1.43.13 also carries** [`control-node-role`](plans/v1.43.13-control-node-role.md) (operator, 2026-10-30): a `control`
+machine role for a Mac that develops k3d-manager and runs hub work over ssh, with no OrbStack or hub agents. The M2 moves
+to it so the operator can travel with it. Open decisions D1 (reaching the hub away from home) and D2 (the M2 e2e runner while away).
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
