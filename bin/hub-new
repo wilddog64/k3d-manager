@@ -21,7 +21,7 @@ NEW_HOST="${HUB_NEW_HOST:-m5-air}"
 CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 SINGLETONS="${REPO_ROOT}/scripts/etc/machine/hub-singletons.list"
 export K3DM_AGENT_LOAD=0
-STAGES=(preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify)
+STAGES=(preflight machine-setup secrets-present hub-up hub-restore data reconcile prepare-singletons platform verify)
 say() { printf '[hub-new] %s\n' "$*"; }
 fail() {
   say "FAIL: $1" >&2

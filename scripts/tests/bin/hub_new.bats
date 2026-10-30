@@ -126,7 +126,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   run "$HUB_NEW_BIN"
   [ "$status" -eq 0 ]
   [ "$(grep -oE '^\[hub-new\] [a-z-]+: PASS' <<<"$output" | awk '{print $2}' | tr -d : | paste -sd' ' -)" = \
-    'preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify' ]
+    'preflight machine-setup secrets-present hub-up hub-restore data reconcile prepare-singletons platform verify' ]
   jq -e '.status == "pass" and ([.stages[].stage] | length) == 10 and .checks.kine_compaction_cycles == 6 and .checks.kine_datastore_bytes == "4096"' \
     "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
   grep -q '^make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip ' "$CALLS"
@@ -162,6 +162,17 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ -n "$data_line" ] && [ -n "$reapply_line" ]
   [ "$rec_line" -gt "$data_line" ]
   [ "$rec_line" -lt "$reapply_line" ]
+}
+
+@test "singleton plists are prepared after the reconcile writes the Cloudflare config" {
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  rec_line="$(grep -n '^k3d-manager hub_recovery_reconcile --confirm ' "$CALLS" | head -1 | cut -d: -f1)"
+  tunnel_line="$(grep -n '^_ensure_cloudflare_tunnel_agent ' "$CALLS" | head -1 | cut -d: -f1)"
+  cleanup_line="$(grep -n '^make install-cleanup' "$CALLS" | head -1 | cut -d: -f1)"
+  [ -n "$rec_line" ] && [ -n "$tunnel_line" ] && [ -n "$cleanup_line" ]
+  [ "$tunnel_line" -gt "$rec_line" ]
+  [ "$cleanup_line" -gt "$rec_line" ]
 }
 
 @test "M1/N1: every child runs with K3DM_AGENT_LOAD=0 and every singleton plist is written" {
@@ -295,7 +306,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
 
 @test "M2: HUB_NEW_FROM restarts at that stage and reruns the stages after it" {
   mkdir -p "$HUB_NEW_STATE_DIR"
-  printf '%s=pass 1\n' preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify > "$HUB_NEW_STATE_DIR/state"
+  printf '%s=pass 1\n' preflight machine-setup secrets-present hub-up hub-restore data reconcile prepare-singletons platform verify > "$HUB_NEW_STATE_DIR/state"
   export HUB_NEW_FROM=platform
   run "$HUB_NEW_BIN"
   [ "$status" -eq 0 ]

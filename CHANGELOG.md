@@ -24,6 +24,10 @@
   at its own ArgoCD (`http://localhost:8080`); before cutover the public `*.3ai-talk.org` names still
   reach the old hub. `HUB_NEW_KEYCLOAK_URL` and `HUB_NEW_ARGOCD_URL` override them. A standalone
   `bin/hub-restore` still runs the reconcile.
+  The `prepare-singletons` stage now runs after `reconcile`, because the reconcile writes
+  `~/.cloudflared/config.yml` and the Cloudflare tunnel installer skips (writing no plist) without it.
+  Stage order: `preflight machine-setup secrets-present hub-up hub-restore data reconcile
+  prepare-singletons platform verify`.
 - **The hub reconcile skips the Hostinger CVE reader seed when the app context is missing, instead of
   exiting.** `_hub_recovery_seed_app_cluster_reader` guarded the seed with `if ! _kubectl -- --context
   ubuntu-hostinger get namespace platform`, but `_kubectl` exits the process on a failed call unless it
