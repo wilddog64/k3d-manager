@@ -45,6 +45,7 @@ because it carried the same ignored `sortBy` and N1 covers every `organize` tran
 columns read Check, PR, Repo. `indexByName` was keyed by the display names (`Repo`, `PR`), and
 Grafana keys it by the original field names (`repo`, `pr`, `Value #B`), as every other dashboard here
 does. No key matched, so the columns stayed in label order. The test asserted the same wrong keys.
+The operator then asked for Repo, PR, Check, **Duration**, **State** (2026-10-30), which supersedes M2's order.
 Fixed: keys are now field names, and the test requires every `indexByName` key to be a
 `renameByName` source field. It fails against the display-name version.
 
