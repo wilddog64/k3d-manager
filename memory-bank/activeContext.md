@@ -102,6 +102,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Recent completed work
 
+- **2026-10-30 — hub-new needs no manual steps (`edcfbddf`, operator "go ahead")** — machine-setup `FROM=` copies `scripts/etc/machine/files.hub.list` (tunnel `<id>.json` + `cert.pem`) over scp; hub-new checks them in secrets-present; prepare-singletons defaults HOSTINGER_HOST from `scripts/etc/hostinger/vars.sh`. M5 run = `git pull` + `make hub-new HUB_OLD_HOST=m4-air.local`; then hub-cutover DRY_RUN=1 / hub-cutover; M4 `k3d cluster stop k3d-cluster`. Suites: hub_new 25, machine_setup 58, agent_classification 3, hub_cutover 12, hub_restore 18, all green.
+
 - `dc906243`: documented the clipped PR Checks legend, cross-linked it to the populated-table bug, and pushed the update.
 - `e3a6d040`: added the canonical dashboard bug record for the e2e frontend upstream race.
 - `a43f0b58`: merged the two remote branch commits without rebasing or force-pushing.
