@@ -13,6 +13,15 @@
 
 ### Fixed
 
+- **`hub-restore` writes the ArgoCD and Keycloak port-forward wrappers when they are missing.** The
+  wrappers were only ever written by the ACG `bin/cluster-up` path, so on a hub built with k3d alone
+  (the M5) Step 8 failed with `wrapper ... missing; run make up once to generate it`, and `make up` on a
+  k3d hub never generates them. Step 8 now renders them for the hub context with the same arguments
+  `bin/cluster-up` uses (`cicd`/`svc/argocd-server` 8080:80, `identity`/`svc/keycloak` 8880:http). To
+  make that possible without loading the whole ArgoCD plugin (which pulls in `vault.sh` and needs bash 4),
+  `_argocd_write_port_forward_wrapper` moved unchanged to `scripts/lib/port_forward_wrapper.sh`, which
+  `argocd.sh` now sources.
+
 - **`hub-new` no longer runs observability and platform-ops before the hub has its data.** On a new
   machine Vault starts empty and is only filled by the `data` stage (`make hub-data-recover`), but the
   `hub-up` stage ran `make hub-up` (which also runs `make observability`, `make platform-ops` and the

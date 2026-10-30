@@ -171,13 +171,26 @@ teardown() { rm -rf "${WORK}"; }
   [ "${output}" -eq 0 ]
 }
 
-@test "hub-restore Step 8 fails without a port-forward wrapper and writes no plist" {
-  rm -f "${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+@test "hub-restore Step 8 writes missing ArgoCD and Keycloak wrappers for the hub context (k3d-only hub)" {
+  [[ "${HOME}" == "${FAKE_HOME}" && "${STATE_BASE}" == "${WORK}"/* ]]
+  rm -f "${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh" "${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+  envsubst_bin="$(PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin command -v envsubst)"
+  [ -n "${envsubst_bin}" ]
+  ln -s "${envsubst_bin}" "${STUB}/envsubst"
   export LOADED_PF=none
   _run_noninteractive_restore
-  [ "${status}" -eq 1 ]
-  run test -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist"
-  [ "${status}" -ne 0 ]
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'8/9 Local agents             PASS'* ]]
+  argocd_wrapper="${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh"
+  keycloak_wrapper="${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+  grep -q 'k3d-k3d-cluster' "${argocd_wrapper}"
+  grep -q 'svc/argocd-server' "${argocd_wrapper}"
+  grep -q 'cicd' "${argocd_wrapper}"
+  grep -q 'svc/keycloak' "${keycloak_wrapper}"
+  grep -q 'identity' "${keycloak_wrapper}"
+  grep -q '8880' "${keycloak_wrapper}"
+  [ -f "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist" ]
+  grep -q "${keycloak_wrapper}" "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist"
 }
 
 @test "hub-restore rejects a non-TTY before any make step" {

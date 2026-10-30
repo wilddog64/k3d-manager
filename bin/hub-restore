@@ -158,6 +158,15 @@ if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
   _step_result SKIP
 elif "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
 
+_hub_restore_write_pf_wrapper() {
+  (
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    # shellcheck source=scripts/lib/port_forward_wrapper.sh
+    source "${SCRIPT_DIR}/lib/port_forward_wrapper.sh"
+    _argocd_write_port_forward_wrapper "$@"
+  )
+}
+
 _hub_restore_ensure_pf_agent() {
   local name="$1" label="com.k3d-manager.$1-port-forward" state_dir wrapper plist log
   state_dir="$(_acg_provider_state_dir k3s-aws)"
@@ -165,8 +174,14 @@ _hub_restore_ensure_pf_agent() {
   plist="${HOME}/Library/LaunchAgents/${label}.plist"
   log="${state_dir}/logs/${name}-pf.log"
   if [[ ! -f "${wrapper}" ]]; then
-    _info "[hub-restore] ${label}: wrapper ${wrapper} missing; run make up once to generate it"
-    return 1
+    _info "[hub-restore] ${label}: writing missing wrapper ${wrapper}"
+    mkdir -p "$(dirname "${wrapper}")" "$(dirname "${log}")"
+    case "${name}" in
+      argocd) _hub_restore_write_pf_wrapper "${wrapper}" "${log}" "$(command -v kubectl)" "$(command -v curl)" "cicd" "${_hub_context}" "svc/argocd-server" "8080" "80" ;;
+      keycloak) _hub_restore_write_pf_wrapper "${wrapper}" "${log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "${_hub_context}" "svc/keycloak" "8880" "http" "http://localhost:8880/realms/master" "" "127.0.0.1" "keycloak-pf" ;;
+      *) _info "[hub-restore] ${label}: wrapper ${wrapper} missing"; return 1 ;;
+    esac
+    [[ -s "${wrapper}" ]] || { _info "[hub-restore] ${label}: could not write wrapper ${wrapper}"; return 1; }
   fi
   if [[ ! -f "${plist}" ]]; then
     mkdir -p "$(dirname "${log}")" "$(dirname "${plist}")"

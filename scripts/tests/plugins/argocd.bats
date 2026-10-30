@@ -205,7 +205,7 @@ setup() {
 @test "_argocd_write_port_forward_wrapper includes a self-healing loop" {
   run declare -F _argocd_write_port_forward_wrapper
   [ "$status" -eq 0 ]
-  run grep -Eq 'template_path=.*port-forward-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run grep -Eq 'template_path=.*port-forward-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../lib/port_forward_wrapper.sh"
   [ "$status" -eq 0 ]
   run grep -F 'healthz did not become reachable — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
@@ -266,15 +266,15 @@ setup() {
   [ "$call_line" -gt "$loop_line" ]
   run grep -F 'using current-context' "$template"
   [ "$status" -eq 0 ]
-  run grep -Eq 'local address=.*127\.0\.0\.1|local address=' scripts/plugins/argocd.sh
+  run grep -Eq 'local address=.*127\.0\.0\.1|local address=' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'q_address' scripts/plugins/argocd.sh
+  run grep -F 'q_address' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'q_log_tag' scripts/plugins/argocd.sh
+  run grep -F 'q_log_tag' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'ADDRESS="$q_address"' scripts/plugins/argocd.sh
+  run grep -F 'ADDRESS="$q_address"' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'LOG_TAG="$q_log_tag"' scripts/plugins/argocd.sh
+  run grep -F 'LOG_TAG="$q_log_tag"' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
 }
 
