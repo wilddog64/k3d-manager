@@ -1,9 +1,10 @@
-# Active context — k3d-manager-v1.43.5
+# Active context — k3d-manager-v1.43.10
 
 This file was compressed on 2026-10-19 because the active memory-bank exceeded 700 KB and was approaching the repository's 200K-token context-compaction boundary. Older detail is summarized in `memory-bank/archive/2026-10-07-to-2026-10-16-compressed.md`; the pre-compression files remain recoverable from git history.
 
 ## Current branch and operating rules
 
+- 2026-10-29: **v1.43.9 merged** (PR #152, `32393e17`), tagged and released (`v1.43.9`), enforce_admins restored, `archive/k3d-manager-v1.43.9` pushed. Current branch `k3d-manager-v1.43.10`, cut from the merge. The verified-specs bug (P2, approved) was carried over; it goes to Luna after the operator's release steps (appsets-reapply/check, platform-ops, Hostinger refresh) finish.
 - Branch: `k3d-manager-v1.43.5`, tracking `origin/k3d-manager-v1.43.5`.
 - 2026-10-24 `69dc063b`: Bug Tracking showed LANDED bugs as Open (parser lacked LANDED); fixed. usage-backfill P1 now LIVE-VERIFIED with evidence lines. Operator chose to wait for the v1.43.8 branch before dispatching.
 - Latest relevant release commits: `63d604dd` (dispatch missing-telemetry exporter), `611bc1f8` (Slack smoke target selector), and `4a8aeaae` (dispatch telemetry LIVE-VERIFIED evidence). Both dispatch bugs are LIVE-VERIFIED from operator screenshots/jobs on 2026-10-20; Slack selector job `c4a9465f` passed 2/2 with `ARGOCD_APP_PREFIX=ubuntu-hostinger-`. Replay fix live-verified from job `3198fa72`.
