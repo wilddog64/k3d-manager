@@ -2035,3 +2035,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [x] 2026-10-30: v1.43.12 plan 4 Part 1 landed 2029f93c (review: verify=fail, Claude fixes). Part 2 FROM= pending dispatch.
 - [x] 2026-10-30: aerospace cask from nikitabobko/tap be02d2de (setup suites 85/85 in a clean worktree).
 - [ ] 2026-10-30: v1.43.12 plan 4 Part 2 (FROM= pull) dispatched to Luna, slug machine-secrets-pull — review pending.
+- 2026-10-30: Filed P3 docs/bugs/2026-10-30-agent-cost-tokens-and-cost-by-kind-read-as-one-panel.md (operator go): merge Agent Cost panels 86 (tokens by kind) and 88 (cost by kind) into one table with a $ per million tokens column; dashboard-only, land after machine-secrets Part 2. Also checked: by-model vs by-kind daily totals match exactly in one push (diff 0 every day), so the Oct 29 81.0M/84.2M gap is not a producer bug.
