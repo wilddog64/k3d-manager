@@ -1,6 +1,6 @@
 # Bug: the hub's system-notice Slack URL is lost on every rebuild, so notices stop silently
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `slack-url-durable`
+**Status:** FIXED — `a4c90598` (Luna, amended by Claude); live check E2 pending: the operator seeds the Keychain record, then `make platform-ops`
 **Priority:** P2
 **Severity:** medium — ACG expiry warnings and every rotation notice have not been sent since 2026-10-16; the operator can restore the URL by hand
 **Release:** bug (does not count toward the five-plan cap). Restore before the 2026-10-29 hub rebuild drill, and add it to that drill's checklist.
@@ -103,6 +103,15 @@ interface:
   - make platform-ops (deploy_argocd_platform_ops)
   - kubectl -n platform-ops describe secret platform-ops-notifications
 ```
+
+**As landed (Claude's review, 2026-10-30).** `argocd_sync_notifications_slack_secret` writes a
+`--type=merge` patch of the one key from a `mktemp` file (base64, never argv) under `_no_trace`; the
+missing-key warning reads `get secret -o json | jq -e` with all output discarded. Claude restored an
+unrelated reworded log line, and strengthened the tests: the patch is `--type=merge` and carries only
+`slack-incoming-webhook-url` decoding to the Keychain value; a deploy with the record present runs the
+patch. 6/6 pass; the platform-ops bootstrap, rotator and `argocd.bats` suites still pass; shellcheck
+clean. Red on the pre-fix `argocd.sh`: tests 1, 2, 4, 5. Mutations, all red: `--type=json`, no base64,
+no empty-value check, deploy without the sync call.
 
 ## Workaround
 
