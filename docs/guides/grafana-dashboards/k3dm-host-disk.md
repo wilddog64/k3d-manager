@@ -16,3 +16,7 @@ or the Pushgateway port-forward is down.
 The dashboard syncs from git through the `grafana-dashboards-hub` ApplicationSet. The alert rules
 do not: apply them with `make prometheus-rules`, which applies only
 `scripts/etc/prometheus/rules/*.yaml` to the hub, without the full `make observability` redeploy.
+
+## OrbStack
+
+The **OrbStack** stat shows the installed version and whether an update is available. The **OrbStack upgraded** annotation marks when a new version first appears, over the restart interval.
