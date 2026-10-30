@@ -112,6 +112,9 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
+- 2026-10-30: Hostinger upgraded to 4 CPU / 16 GB (operator; Claude confirmed read-only: 43% CPU / 32% mem requested, 47% mem in use). Roadmap revised: TwinkleAI runs beside shopping-cart on Hostinger for v1.49.0 -> v1.50.0; shopping-cart leaves Hostinger at the end of v1.50.0 (was: first, in v1.49.0). Follow-up to check: the Hostinger maxSurge=0 stopgap may be revertible.
+- 2026-10-30: machine-secrets Part 1 landed 2029f93c (Claude fixed: dump parser never emitted, zero-record runs accepted, fake-green real-keychain test). Part 2 (FROM= pull inside machine-setup) spec written, uncommitted until machine_setup_acceptance rerun explains 18 failures seen after the aerospace cask fix.
+
 - 2026-10-30: v1.43.12 plan 4 `docs/plans/v1.43.12-machine-secrets-copy.md` (operator go): encrypted export/import of Keychain items M4 -> M5; dispatched to Luna. M5 setup run interrupted by operator (Ctrl-C) at bin/k3dm-worker-setup prompt (nothing written; that script redeploys the live relay — manifest fixed in plan 4). Brew nearly done (aerospace cask name wrong: nikitabobko/tap/aerospace). ask-docs free-form priority wording deferred to v1.45.1 (operator).
 
 - 2026-10-30: ask-docs bug count now links fixed docs (P3, Claude fix, offline green). Operator: `make restart-webhook`, then rerun `/ask-docs how many P1 bugs in v1.43.5` in #acg-automation (E2).

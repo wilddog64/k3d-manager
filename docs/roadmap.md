@@ -889,6 +889,31 @@ leaves Hostinger first, which frees the room the new app needs there (about 900m
 requests on a 2-CPU node). It stays on the hub and ACG only as the e2e target until the new app
 takes over.
 
+**Revised 2026-10-30 (operator; Hostinger upgraded).** The operator upgraded the Hostinger node
+from 2 CPU to **4 CPU and 16 GB**. That removes the capacity reason for removing shopping-cart first.
+Claude read the node read-only that day, with shopping-cart and the full platform stack running:
+
+| | Capacity | Requested by pods | In use |
+|---|---|---|---|
+| CPU | 4 cores | 1735m (43%) | 437m (10%) |
+| Memory | 16 GB | 5200 Mi (32%) | 7543 Mi (47%) |
+| Disk | ~193 GB | 54 Gi of PVCs | no disk pressure |
+
+The app's estimate is about 900m CPU and 3 GiB of requests in the 10-10 note, with Next.js and
+Postgres only; the LLM and MCP are external APIs. That would take the node to about 66% CPU and 51%
+memory requested. Even if every pod hit its memory limit at once, the total would be about 13.6 GB
+of 16 GB.
+
+So the app now runs **beside** shopping-cart on Hostinger for the v1.49.0 → v1.50.0 window. The
+platform proofs move to the app while the old target still runs, so there is never a gap with
+nothing proven. Shopping-cart leaves Hostinger at the end of v1.50.0, once those proofs are green
+against the app. The 10-10 rule still holds: no long side-by-side period.
+
+To watch while both run:
+- Monitoring is the largest consumer, at about 1.5 GB in use; its retention grows first.
+- CPU limits are already 203% of the cores, so loadtest runs against either app are scheduled, not
+  continuous.
+
 **Timing, revised 2026-10-10 (operator).** The two tracks are independent until they meet at
 v1.49.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
 may start any time, in the gaps while agents work k3d-manager batches. M2 and later are not run in
@@ -900,8 +925,8 @@ by editing lists, not code.
 | Step | Where | Scope |
 |---|---|---|
 | App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
-| v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
-| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
+| v1.49.0 | k3d-manager | Starts when app M1 is near done. Onboard the app on Hostinger beside shopping-cart (revised 2026-10-30: the 4 CPU / 16 GB node fits both). Before onboarding, re-read node requests read-only and confirm about 0.9 CPU / 3 GiB of headroom. Onboard: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
+| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards); the operator removes shopping-cart from Hostinger (moved here from v1.49.0, 2026-10-30). |
 | v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 
