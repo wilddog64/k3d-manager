@@ -12,6 +12,7 @@
 - Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
 
 ### Fixed
+- k3d install on a Mac (`~/.local/bin`) no longer fails with `k3d not found. Is ~/.local/bin on your $PATH?` when that directory is not on the caller's PATH, which made every `make hub-new` rerun reinstall k3d and ask for sudo again. The install directory is put on PATH, the upstream installer runs without sudo when the directory is writable, and any remaining sudo prompt names the host.
 
 - Restore the platform-ops system-notice Slack URL from the hub login Keychain during deployment and warn when it is missing. (`docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md`)
 - Add `AGENTS=skip` for pre-cut-over machine setup, copy the Hermes GitHub and Slack credentials, and keep the webhook token rotator out of machine setup until its consumers can be updated together. (`docs/bugs/2026-10-30-machine-setup-installs-hub-agents-before-cutover.md`)
