@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Restore the platform-ops system-notice Slack URL from the hub login Keychain during deployment and warn when it is missing. (`docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md`)
 - Add `AGENTS=skip` for pre-cut-over machine setup, copy the Hermes GitHub and Slack credentials, and keep the webhook token rotator out of machine setup until its consumers can be updated together. (`docs/bugs/2026-10-30-machine-setup-installs-hub-agents-before-cutover.md`)
 - Serialize the self-hosted CI `stage2` job with remote e2e by sharing the M2 runner lock; CI waits up to 30 minutes and remote e2e keeps failing fast. (`docs/bugs/2026-10-30-ci-stage2-ignores-m2-e2e-runner-lock.md`)
 - Sort the PR Checks tables so each pull request's rows stay together: the sort was a `sortBy` key inside `organize`, which Grafana ignores, so rows came out grouped by check. Both tables now sort on the hidden `repo:pr:check` join key before `organize`, and Checks per PR orders its columns Repo, PR, Check, Duration, State. (`docs/bugs/2026-10-30-pr-checks-checks-per-pr-sort-ignored.md`)

@@ -66,6 +66,7 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 - [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
 - [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)
+- [Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)
 
 ## Usage
 

@@ -1906,6 +1906,37 @@ function argocd_sync_git_writer_secret() {
    _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" git-token
 }
 
+function _argocd_sync_notifications_slack_secret_untraced() {
+   local _ns="${1:-platform-ops}"
+   local _service="k3dm-platform-ops-slack-url"
+   local _account="k3dm"
+   local _value=""
+   local _payload_file=""
+
+   _value=$(_argocd_keychain_value "${_service}" "${_account}")
+   if [[ -z "${_value}" ]]; then
+      _info "[argocd] ${_service} not in Keychain"
+      return 0
+   fi
+
+   _payload_file="$(mktemp "${TMPDIR:-/tmp}/k3dm-platform-ops-slack.XXXXXX")" || return 1
+   {
+      printf '{"data":{"slack-incoming-webhook-url":"'
+      printf '%s' "${_value}" | base64 | tr -d '\n'
+      printf '"}}'
+   } >"${_payload_file}"
+   _value=""
+   local _rc=0
+   _kubectl -n "${_ns}" patch secret platform-ops-notifications \
+      --type=merge --patch-file="${_payload_file}" >/dev/null || _rc=$?
+   rm -f -- "${_payload_file}"
+   return "${_rc}"
+}
+
+function argocd_sync_notifications_slack_secret() {
+   _no_trace _argocd_sync_notifications_slack_secret_untraced "${1:-platform-ops}"
+}
+
 function _argocd_apply_credential_rotator() {
    local _manifest="${ARGOCD_CONFIG_DIR}/platform-ops/argocd-credential-rotator.yaml"
    [[ -f "${_manifest}" ]] || return 0
@@ -2032,13 +2063,16 @@ EOF
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
    argocd_sync_git_writer_secret platform-ops
+   argocd_sync_notifications_slack_secret platform-ops
+   if ! _kubectl -n platform-ops get secret platform-ops-notifications -o json 2>/dev/null \
+      | jq -e '.data["slack-incoming-webhook-url"] | type == "string" and length > 0' >/dev/null 2>&1; then
+      _warn "[argocd] platform-ops-notifications has no slack-incoming-webhook-url — system notices will not be sent"
+   fi
    _argocd_apply_credential_rotator
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets still to create manually (no durable local source):"
    _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
-   _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
-   _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
 }
 
 function argocd_check_values_branch() {
