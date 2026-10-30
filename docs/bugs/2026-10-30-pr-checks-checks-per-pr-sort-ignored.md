@@ -32,6 +32,15 @@ In panel 6:
    keep the join's Check order.
 4. Keep `noValue`, mappings, units and the empty-state text unchanged.
 
+**As landed (Claude's review amendment, 2026-10-30).** Luna placed a `sortBy` transformation after
+`organize` on the PR column (panel 6) and on Repo then PR (panel 5). Claude changed both panels to
+sort on the hidden `__join` key (`repo:pr:check`, or `repo:pr` on panel 5), ascending, placed
+**before** `organize`, since `organize` hides that column. One key keeps each repo's PRs, and each
+PR's checks, together. A PR-only sort mixes PRs that share a number across repos, and sorting on the
+renamed columns depends on more than one key being honoured. PRs within a repo sort as strings
+(ascending), not as numbers descending. Panel 5 also changed, despite "no other panel" below,
+because it carried the same ignored `sortBy` and N1 covers every `organize` transformation.
+
 Update `scripts/tests/plugins/grafana_dashboard_pr_checks.bats` (the panel 6 test) and, if it names
 the column order, `docs/guides/grafana-dashboards/k3dm-pr-checks.md`. Takes effect after
 `make platform-ops`.
