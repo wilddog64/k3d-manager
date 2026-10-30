@@ -16,7 +16,7 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 ## M5 hub cut-over
 
-1. Read and run the bootstrap. Before setup, copy Keychain secrets from the M4 as described below, then run `make machine-setup ROLE=hub` on the M5.
+1. Read and run the bootstrap. Enable **Remote Login** in Sharing settings on the M4, then run `make machine-setup ROLE=hub FROM=m4-air.local` on the M5 in a local terminal. It prompts for the M4 login password and then the old Mac Keychain unlock password (normally the same password). Items requiring GUI approval are reported by name; run the file-based export below in a GUI terminal on the M4 for those items.
 2. Open OrbStack once (`open -a OrbStack`), accept its first-run screens and approve its helper with your admin password; setup installs the cask but cannot do this step, and `machine-check` does not test it. Wait for `orbctl status` to print `Running`.
 3. Re-enter secrets at the TTY when prompted. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
 4. Restore the hub by following [Hub snapshots](hub-snapshots.md). This tool does not move cluster data.
@@ -26,7 +26,9 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 
 ### Copy secrets from the old machine
 
-On the old Mac, run `make machine-secrets-export ROLE=hub` in a local terminal with the login Keychain unlocked. Enter and confirm a strong passphrase. Transfer the encrypted `.enc` file to the new Mac with AirDrop or `scp`, then run `make machine-secrets-import FILE=<path>` there and enter the passphrase. A successful import deletes the encrypted transfer file; if an item fails, the file is kept for another attempt. Add `FORCE=1` only when intentionally replacing an existing item.
+The preferred M5 workflow is `make machine-setup ROLE=hub FROM=m4-air.local`. It streams missing Keychain items through SSH without creating a transfer file. Enable **Remote Login** in Sharing settings on the M4. The M5 prompts first for the M4 SSH login password, then for the M4 Keychain unlock password; these are normally the same.
+
+If SSH is unavailable, an item needs GUI approval, or you prefer a file, run `make machine-secrets-export ROLE=hub` on the old Mac in a local terminal with the login Keychain unlocked. Enter and confirm a strong passphrase. Transfer the encrypted `.enc` file to the new Mac with AirDrop or `scp`, then run `make machine-secrets-import FILE=<path>` there and enter the passphrase. A successful import deletes the encrypted transfer file; if an item fails, the file is kept for another attempt. Add `FORCE=1` only when intentionally replacing an existing item.
 
 iCloud does not sync these credentials: `security add-generic-password` writes to each Mac's local file-based login Keychain. When setup later prompts to create missing secrets, answer **N** for secrets being copied; the transfer command copies existing values without rotating tokens or changing their live consumers.
 

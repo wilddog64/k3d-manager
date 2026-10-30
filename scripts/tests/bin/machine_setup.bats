@@ -63,6 +63,12 @@ setup_machine_fixture() {
   mkdir -p "$FIXROOT/bin" "$FIXROOT/scripts/lib" "$FIXROOT/scripts/etc/machine" "$FIXHOME" "$STUBS"
   cp "$SCRIPT_SOURCE" "$FIXROOT/bin/k3dm-machine-setup"
   chmod +x "$FIXROOT/bin/k3dm-machine-setup"
+  cat > "$FIXROOT/bin/k3dm-machine-secrets" <<'SH'
+#!/bin/sh
+printf 'secrets %s\n' "$*" >> "$CALL_LOG"
+exit "${SECRETS_STUB_RC:-0}"
+SH
+  chmod +x "$FIXROOT/bin/k3dm-machine-secrets"
   printf '%s\n' '_run_command() { return 1; }' > "$FIXROOT/scripts/lib/system.sh"
   : > "$FIXROOT/scripts/lib/core.sh"
   for role in hub worker console; do
@@ -293,6 +299,60 @@ run_machine() {
     if grep -Eq '^(git clone|brew install|security add|make |launchctl |gh auth setup-git)' "$CALL_LOG"; then cat "$CALL_LOG"; return 1; fi
     if [ -e "$FIXHOME/src/gitrepo/example" ]; then return 1; fi
   done
+}
+
+@test "machine setup: FROM dry-run describes the pull without invoking it" {
+  setup_machine_fixture
+  printf 'fixture|acct|fixture secret|operator: see docs/howto/machine-setup.md\n' > "$FIXROOT/scripts/etc/machine/secrets.hub.list"
+  run_machine --role hub --dry-run --from old-mac.local
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'would pull secrets from old-mac.local'* ]]
+  ! grep -q '^secrets pull ' "$CALL_LOG" || false
+}
+
+tty_machine() {
+  command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
+  local wrapper="$BATS_TEST_TMPDIR/tty-machine"
+  printf '#!/usr/bin/env bash\nexec' > "$wrapper"
+  printf ' %q' env HOME="$FIXHOME" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" SECRETS_STUB_RC="${SECRETS_STUB_RC:-0}" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://example.test/existing.git "$FIXROOT/bin/k3dm-machine-setup" "$@" >> "$wrapper"
+  printf '\n' >> "$wrapper"
+  chmod +x "$wrapper"
+  if [[ "$(uname -s)" == Darwin ]]; then
+    run bash -c "/bin/sleep 3 | script -q /dev/null '$wrapper'"
+  else
+    run bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
+  fi
+}
+
+@test "M7: setup with FROM on a terminal pulls once before the per-item checks" {
+  setup_machine_fixture
+  printf '%s\n' 'fixture|k3dm|purpose|make secret-setup' > "$FIXROOT/scripts/etc/machine/secrets.console.list"
+  tty_machine --role console --from old-mac.local
+  [ "$(grep -c '^secrets pull --from old-mac.local --role console$' "$CALL_LOG")" -eq 1 ]
+  pull_line="$(grep -n '^secrets pull ' "$CALL_LOG" | cut -d: -f1)"
+  last_check="$(grep -n '^security find-generic-password -s fixture' "$CALL_LOG" | tail -1 | cut -d: -f1)"
+  [ "$pull_line" -lt "$last_check" ]
+  [[ "$output" != *'Rerun with FROM='* ]]
+}
+
+@test "M9: a failed pull is reported and setup still checks every item" {
+  setup_machine_fixture
+  printf '%s\n' 'fixture|k3dm|purpose|make secret-setup' > "$FIXROOT/scripts/etc/machine/secrets.console.list"
+  SECRETS_STUB_RC=1 tty_machine --role console --from old-mac.local
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'secret-pull'*'missing'* ]]
+  [[ "$output" == *'secret:fixture'* ]]
+}
+
+@test "N9: no pull without FROM, without a terminal, or in check mode" {
+  setup_machine_fixture
+  printf '%s\n' 'fixture|k3dm|purpose|make secret-setup' > "$FIXROOT/scripts/etc/machine/secrets.console.list"
+  tty_machine --role console
+  [[ "$output" == *'Rerun with FROM=<old Mac hostname>'* ]]
+  run_machine --role console --from old-mac.local
+  run_machine --role console --check --from old-mac.local
+  ! grep -q '^secrets pull' "$CALL_LOG" || false
+  ! grep -q '^ssh ' "$CALL_LOG" || false
 }
 
 @test "machine setup: safety N3 worker rejects hub installers" {

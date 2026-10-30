@@ -7,11 +7,12 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/core.sh"
 
-usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--check|--dry-run]\n'; }
-role='' mode=setup failed=0 brew_available=0
+usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--check|--dry-run]\n'; }
+role='' from_host='' mode=setup failed=0 brew_available=0
 while (($#)); do
   case "$1" in
     --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
+    --from) (($# >= 2)) || { usage >&2; exit 2; }; from_host="$2"; shift 2 ;;
     --check) mode=check; shift ;;
     --dry-run) mode=dry-run; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -267,7 +268,20 @@ secret_present() {
 }
 
 check_secrets() {
-  local service account purpose command missing_hint=0
+  local service account purpose command missing_hint=0 has_missing=0
+  if [[ "$mode" == dry-run && -n "$from_host" ]]; then report secrets "would pull secrets from $from_host"; fi
+  if [[ "$mode" == setup && -n "$from_host" && -t 0 ]]; then
+    while IFS='|' read -r service account purpose command <&3; do
+      [[ -n "$service" && "$service" != \#* ]] || continue
+      local probe_account="$account"
+      [[ "$probe_account" != USER ]] || probe_account="$(id -un)"
+      if ! secret_present "$service" "$probe_account"; then has_missing=1; break; fi
+    done 3< "${manifest_dir}/secrets.${role}.list"
+    if (( has_missing )); then
+      if "${REPO_ROOT}/bin/k3dm-machine-secrets" pull --from "$from_host" --role "$role"; then :
+      else record_failure secret-pull 'missing (see output above)'; fi
+    fi
+  fi
   while IFS='|' read -r service account purpose command <&3; do
     [[ -n "$service" && "$service" != \#* ]] || continue
     local lookup_account="$account"
@@ -275,12 +289,12 @@ check_secrets() {
     if secret_present "$service" "$lookup_account"; then report "secret:${service}:${account}" ok
     elif [[ "$command" == operator:* ]]; then record_failure "secret:${service}" "missing ($command)"
     elif [[ "$mode" == setup && -t 0 ]]; then
-      if (( ! missing_hint )); then
-        printf '%s\n' 'Moving from another Mac? Copy the Keychain items with make machine-secrets-export/import first (docs/howto/machine-setup.md).' >/dev/tty
+      if (( ! missing_hint )) && [[ -z "$from_host" ]]; then
+        printf 'Moving from another Mac? Rerun with FROM=<old Mac hostname> to copy these items (docs/howto/machine-setup.md).\n' >/dev/tty
         missing_hint=1
       fi
       printf 'Missing Keychain item %s (%s). Run setup command now? [y/N] ' "$service" "$purpose" >/dev/tty
-      local answer; read -r answer </dev/tty
+      local answer; read -r answer </dev/tty || answer=''
       if [[ "$answer" == y || "$answer" == Y ]]; then
         if [[ "$command" == bin/* ]]; then command="${REPO_ROOT}/$command"; fi
         if bash -c "$command" </dev/tty; then report "secret:${service}" installed

@@ -6,7 +6,7 @@ setup() {
   mkdir -p "$TMP/bin" "$TMP/home"
   export PATH="$TMP/bin:$PATH" HOME="$TMP/home" K3DM_SECRETS_PASSPHRASE_FILE="$TMP/pass"
   printf 'test passphrase\n' > "$K3DM_SECRETS_PASSPHRASE_FILE"
-  export SECURITY_LOG="$TMP/security.log" FIXTURE="$TMP/items"
+  export SECURITY_LOG="$TMP/security.log" FIXTURE="$TMP/items" UNLOCK_FAIL_FILE="$TMP/unlock-fail"
   export OPENSSL_LOG="$TMP/openssl.log" REAL_OPENSSL="$(command -v openssl)"
   : > "$SECURITY_LOG"
   : > "$FIXTURE"
@@ -16,6 +16,12 @@ printf 'argv:' >> "$SECURITY_LOG"
 printf ' <%s>' "$@" >> "$SECURITY_LOG"
 printf '\n' >> "$SECURITY_LOG"
 case "$1" in
+  unlock-keychain)
+    IFS= read -r unlock_value
+    printf 'unlock-keychain <%s>\n' "$*" >> "$SECURITY_LOG"
+    [ ! -e "$UNLOCK_FAIL_FILE" ] || exit 1
+    [[ "$unlock_value" == fixture-password ]]
+    ;;
   dump-keychain)
     while IFS=$'\t' read -r svc acct value; do
       printf 'keychain: "/fixture.keychain-db"\nversion: 256\nclass: "genp"\nattributes:\n    0x00000007 <blob>="%s"\n    "acct"<blob>="%s"\n    "svce"<blob>="%s"\n' "$svc" "$acct" "$svc"
@@ -52,6 +58,101 @@ SH
   SCRIPT="$ROOT/bin/k3dm-machine-secrets"
 }
 
+tty_run() {
+  command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
+  local input="$1"; shift
+  local wrapper="$TMP/tty-wrapper"
+  printf '#!/usr/bin/env bash\nexec' > "$wrapper"
+  printf ' %q' "$@" >> "$wrapper"
+  printf '\n' >> "$wrapper"
+  chmod +x "$wrapper"
+  printf '%s\n' "$input" > "$TMP/tty-input"
+  if [[ "$(uname -s)" == Darwin ]]; then
+    run bash -c "{ /bin/sleep 1; cat '$TMP/tty-input'; /bin/sleep 2; } | script -q /dev/null '$wrapper'"
+  else
+    run bash -c "{ /bin/sleep 1; cat '$TMP/tty-input'; /bin/sleep 2; } | script -qec '$wrapper' /dev/null"
+  fi
+}
+
+make_fake_ssh() {
+  export SSH_LOG="$TMP/ssh.log" SSH_FAIL_FILE="$TMP/ssh-fail" K3DM_SECRETS_REMOTE_BASH="$(command -v bash)"
+  : > "$SSH_LOG"
+  mkdir -p "$HOME/src/gitrepo/personal"
+  ln -s "$ROOT" "$HOME/src/gitrepo/personal/k3d-manager"
+  cat > "$TMP/bin/ssh" <<'SH'
+#!/usr/bin/env bash
+printf 'argv:' >> "$SSH_LOG"
+printf ' <%s>' "$@" >> "$SSH_LOG"
+printf '\n' >> "$SSH_LOG"
+[ ! -e "$SSH_FAIL_FILE" ] || { printf 'ssh: connect to host refused\n' >&2; exit 255; }
+cd "$HOME" && exec bash -c "${!#}"
+SH
+  chmod +x "$TMP/bin/ssh"
+}
+
+@test "M6/N6: pull streams records through ssh into the import with no secret in any argv" {
+  make_fake_ssh
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role hub --force
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
+  grep -Fq 'add-generic-password -U -s k3dm-cloudflare-api-token -a k3dm -X 746f6b656e' "$SECURITY_LOG.stdin"
+  grep -Fq '<old-mac.local>' "$SSH_LOG"
+  grep -Fq 'export --role hub --stream --unlock' "$SSH_LOG"
+  grep -q '^unlock-keychain .*login.keychain-db' "$SECURITY_LOG"
+  ! grep -Fq 'fixture-password' "$SSH_LOG" "$SECURITY_LOG" || false
+  ! grep -Fq '746f6b656e' "$SSH_LOG" "$SECURITY_LOG" || false
+  [[ "$output" != *'fixture-password'* ]]
+  [[ "$output" != *'746f6b656e'* ]]
+}
+
+@test "M9: a failed ssh connection exits non-zero and prints the file fallback" {
+  make_fake_ssh
+  : > "$SSH_FAIL_FILE"
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role hub
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Fallback: run make machine-secrets-export ROLE=hub on old-mac.local'* ]]
+  ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null || false
+}
+
+@test "M9: a wrong old-Mac password exits non-zero and imports nothing" {
+  make_fake_ssh
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  tty_run wrong-password "$SCRIPT" pull --from old-mac.local --role hub --force
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'could not unlock the keychain'* ]]
+  [[ "$output" == *'Fallback:'* ]]
+  ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null || false
+}
+
+@test "N7: stream export refuses to write records to a terminal" {
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  tty_run '' "$SCRIPT" export --role hub --stream
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'refusing to write secret records to a terminal'* ]]
+  [[ "$output" != *'746f6b656e'* ]]
+}
+
+@test "M8: an item that needs GUI approval is named and the rest still stream" {
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\nk3dm-webhook-token\tk3dm\t6869\n' > "$FIXTURE"
+  cat > "$TMP/bin/security-wrap" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == find-generic-password && " $* " == *' k3dm-webhook-token '* ]]; then
+  printf 'security: SecKeychainSearchCopyNext: User interaction is not allowed.\n' >&2; exit 36
+fi
+exec "$(dirname "$0")/security-real" "$@"
+SH
+  mv "$TMP/bin/security" "$TMP/bin/security-real"
+  mv "$TMP/bin/security-wrap" "$TMP/bin/security"
+  chmod +x "$TMP/bin/security"
+  grep -q '^k3dm-webhook-token|' "$ROOT/scripts/etc/machine/secrets.hub.list" || skip 'k3dm-webhook-token is not in the hub manifest'
+  run bash -c "printf 'fixture-password\\n' | '$SCRIPT' export --role hub --stream --unlock"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'skipped (needs approval on the old Mac) k3dm-webhook-token'* ]]
+  [[ "$output" == *$'k3dm-cloudflare-api-token\tk3dm\t746f6b656e'* ]]
+}
+
 @test "machine secrets: make targets name the transfer script" {
   run make -n -C "$ROOT" machine-secrets-export ROLE=hub
   [ "$status" -eq 0 ]
@@ -59,6 +160,42 @@ SH
   run make -n -C "$ROOT" machine-secrets-import FILE=/tmp/example.enc FORCE=1
   [ "$status" -eq 0 ]
   [[ "$output" == *'bin/k3dm-machine-secrets import --in "/tmp/example.enc" --force'* ]]
+}
+
+@test "M8: stream export unlocks from stdin and emits records only on stdout" {
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  run bash -c "printf 'fixture-password\\n' | '$SCRIPT' export --role hub --stream --unlock"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'k3dm-cloudflare-api-token\tk3dm\t746f6b656e'* ]]
+  [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
+  ! grep -F 'fixture-password' "$SECURITY_LOG" || false
+}
+
+@test "N8: failed stream unlock emits no records" {
+  printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
+  : > "$UNLOCK_FAIL_FILE"
+  run bash -c "printf 'fixture-password\\n' | '$SCRIPT' export --role hub --stream --unlock"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'could not unlock the keychain'* ]]
+  [[ "$output" != *$'k3dm-cloudflare-api-token\tk3dm\t746f6b656e'* ]]
+}
+
+@test "N10: pull rejects invalid host or repo before ssh or terminal access" {
+  run "$SCRIPT" pull --from 'bad;host' --role hub
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'invalid host or repository'* ]]
+  run "$SCRIPT" pull --from old-mac --role hub --repo 'bad;path'
+  [ "$status" -eq 2 ]
+  [[ "$output" == *'invalid host or repository'* ]]
+}
+
+@test "M4: setup Make target forwards FROM and check ignores it" {
+  run make -n -C "$ROOT" machine-setup ROLE=hub FROM=m4-air.local
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'bin/k3dm-machine-setup --role "hub" --from "m4-air.local"'* ]]
+  run make -n -C "$ROOT" machine-check ROLE=hub FROM=m4-air.local
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'--from'* ]]
 }
 
 @test "machine secrets: export encrypts every matching account without plaintext output" {
@@ -162,7 +299,7 @@ SH
 @test "machine secrets: manifest, setup hint and migration guide cover the workflow" {
   grep -Fqx 'k3dm-cloudflare-api-token|k3dm|Cloudflare Worker API token|operator: see docs/howto/machine-setup.md' "$ROOT/scripts/etc/machine/secrets.hub.list"
   ! grep -Fq 'k3dm-cloudflare-api-token|k3dm|Cloudflare Worker API token|bin/k3dm-worker-setup' "$ROOT/scripts/etc/machine/secrets.hub.list" || false
-  grep -Fq 'Moving from another Mac? Copy the Keychain items' "$ROOT/bin/k3dm-machine-setup"
+  grep -Fq 'Moving from another Mac? Rerun with FROM=<old Mac hostname>' "$ROOT/bin/k3dm-machine-setup"
   grep -Fq 'Copy secrets from the old machine' "$ROOT/docs/howto/machine-setup.md"
   grep -Fq 'iCloud does not sync' "$ROOT/docs/howto/machine-setup.md"
 }
@@ -177,10 +314,10 @@ SH
   printf 'svc-roundtrip|*|fixture|operator: fixture\n' > "$project/scripts/etc/machine/secrets.hub.list"
   source_keychain="$TMP/source.keychain-db"
   target_keychain="$TMP/target.keychain-db"
-  security create-keychain -p fixture "$source_keychain"
-  security create-keychain -p fixture "$target_keychain"
-  security unlock-keychain -p fixture "$source_keychain"
-  security unlock-keychain -p fixture "$target_keychain"
+  if ! security create-keychain -p fixture-pass "$source_keychain"; then skip 'throwaway Keychain creation unavailable in this environment'; fi
+  if ! security create-keychain -p fixture-pass "$target_keychain"; then security delete-keychain "$source_keychain" >/dev/null 2>&1 || true; skip 'throwaway Keychain creation unavailable in this environment'; fi
+  security unlock-keychain -p fixture-pass "$source_keychain"
+  security unlock-keychain -p fixture-pass "$target_keychain"
   security add-generic-password -s svc-roundtrip -a account-one -X 7370616365202271756f746564220a6e65776c696e65 "$source_keychain"
   security add-generic-password -s svc-roundtrip -a account-two -X 73617920226869220a "$source_keychain"
   security add-generic-password -s svc-roundtrip -a account-three -X 7361792022686922 "$source_keychain"
@@ -202,6 +339,27 @@ SH
   [ "$source_three" = "$target_three" ]
   run security find-generic-password -s svc-other -a account-four "$target_keychain"
   [ "$status" -ne 0 ]
+  security delete-keychain "$source_keychain"
+  security delete-keychain "$target_keychain"
+}
+
+@test "M6: stream unlock round trip uses throwaway keychains on macOS" {
+  if [[ "$(uname -s)" != Darwin ]]; then skip 'macOS Keychain required'; fi
+  rm -f "$TMP/bin/security"
+  source_keychain="$TMP/stream-source.keychain-db"
+  target_keychain="$TMP/stream-target.keychain-db"
+  if ! security create-keychain -p fixture-pass "$source_keychain"; then skip 'throwaway Keychain creation unavailable in this environment'; fi
+  if ! security create-keychain -p fixture-pass "$target_keychain"; then security delete-keychain "$source_keychain" >/dev/null 2>&1 || true; skip 'throwaway Keychain creation unavailable in this environment'; fi
+  security unlock-keychain -p fixture-pass "$source_keychain"
+  security unlock-keychain -p fixture-pass "$target_keychain"
+  security add-generic-password -s k3dm-cloudflare-api-token -a k3dm -X 746f6b656e "$source_keychain"
+  security lock-keychain "$source_keychain"
+  run bash -c "printf 'fixture-pass\\n' | '$SCRIPT' export --role hub --stream --unlock --keychain '$source_keychain' | '$SCRIPT' import --in - --keychain '$target_keychain'"
+  [ "$status" -eq 0 ]
+  source_value="$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -g "$source_keychain" 2>&1 | sed -n 's/.*password: //p')"
+  target_value="$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -g "$target_keychain" 2>&1 | sed -n 's/.*password: //p')"
+  [ -n "$source_value" ]
+  [ "$source_value" = "$target_value" ]
   security delete-keychain "$source_keychain"
   security delete-keychain "$target_keychain"
 }
