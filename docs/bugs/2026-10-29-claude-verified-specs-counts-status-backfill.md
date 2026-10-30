@@ -73,6 +73,14 @@ On 2026-10-29 history this gives 30d: 120 live, 265 verified, 68 unverified (453
 - describe the new panel;
 - name the squash-merge limitation.
 
+## Files
+
+- `bin/k3dm-dispatch-metrics`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml`
+- `docs/guides/grafana-dashboards/k3dm-agent-cost.md`
+- `docs/guides/grafana-dashboards/k3dm-agent-activity.md`
+
 ## Acceptance
 
 ```yaml
