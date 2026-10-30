@@ -55,8 +55,14 @@ preflight() {
   pmset -g | grep -Eq '(SleepDisabled|disablesleep)[[:space:]]+1' || fail 'sleep is not disabled' 'run: sudo pmset -a disablesleep 1, then rerun'
   docker info >/dev/null 2>&1 || fail 'OrbStack is not running' 'start OrbStack and rerun'
   gh auth status >/dev/null 2>&1 || fail 'GitHub CLI is not authenticated' 'run gh auth login and rerun'
-  clusters="$(k3d cluster list -o name 2>/dev/null)" || fail 'cannot query local k3d clusters' 'start OrbStack and verify k3d is installed'
-  if printf '%s\n' "$clusters" | grep -Fx "$CLUSTER" >/dev/null && ! stage_passed hub-up; then fail "cluster ${CLUSTER} exists but hub-new has no hub-up pass" 'inspect the cluster; do not delete it automatically'; fi
+  if command -v k3d >/dev/null 2>&1; then
+    clusters="$(k3d cluster list -o name 2>/dev/null)" || fail 'cannot query local k3d clusters' 'start OrbStack and verify k3d is installed'
+    if printf '%s\n' "$clusters" | grep -Fx "$CLUSTER" >/dev/null && ! stage_passed hub-up; then fail "cluster ${CLUSTER} exists but hub-new has no hub-up pass" 'inspect the cluster; do not delete it automatically'; fi
+  fi
+  creds="$(awk '$1 == "credentials-file:" {print $2}' "${REPO_ROOT}/scripts/etc/cloudflared/config.yml")"
+  for f in "${creds##*/}" cert.pem; do
+    [[ -s "$HOME/.cloudflared/$f" ]] || fail "Cloudflare tunnel file missing: ~/.cloudflared/$f" "copy it from the old hub: scp ${OLD_HOST}:.cloudflared/$f ~/.cloudflared/"
+  done
   while IFS='|' read -r label _installer _note; do
     [[ -n "$label" && "$label" != \#* ]] || continue
     if label_loaded "$label"; then fail "singleton ${label} is already loaded on this Mac" "run: launchctl bootout gui/$(id -u)/com.k3d-manager.${label}"; fi

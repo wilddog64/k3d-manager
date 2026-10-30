@@ -4,7 +4,7 @@ This guide moves the single-instance services from the M4 hub to a freshly built
 
 ## Build and prepare the M5
 
-1. Complete [one-command machine setup](machine-setup.md), enable Remote Login on the M4, and confirm the M5 has its copied Keychain records and authenticated GitHub CLI.
+1. Complete [one-command machine setup](machine-setup.md), enable Remote Login on the M4, and confirm the M5 has its copied Keychain records and authenticated GitHub CLI. Copy the Cloudflare tunnel credentials (`~/.cloudflared/<tunnel-id>.json`, where the id is the `tunnel:` value in `scripts/etc/cloudflared/config.yml`) and the origin cert (`~/.cloudflared/cert.pem`) from the M4; `hub-new` stops at preflight without them. You do not need to install `k3d` first; the `hub-up` stage installs it.
 2. Open OrbStack on the M5 and wait until it is running. Confirm sleep prevention is enabled: `pmset -g` must show a `SleepDisabled 1` line (set it with `sudo pmset -a disablesleep 1`).
 3. Export `HOSTINGER_HOST` (and `HOSTINGER_SSH_USER` if it is not `ubuntu`) with the same values the M4 uses; `hub-new` writes the Hostinger SSH tunnel plists from them and stops if `HOSTINGER_HOST` is unset. Then run `make hub-new HUB_OLD_HOST=m4-air.local`. It builds the fresh local cluster, restores credentials without starting the Cloudflare tunnel, prepares the single-instance plists without loading them, recovers the newest export (type the approval at its prompt), applies platform state, and waits for the read-only verification checks. Review `~/.local/share/k3d-manager/hub-new/hub-new-report.json`; it must report `status: pass` and be less than 24 hours old before cut-over.
 

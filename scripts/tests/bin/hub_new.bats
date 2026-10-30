@@ -11,6 +11,12 @@ setup() {
   ln -s "$REPO/scripts/lib/system.sh" "$ROOT/scripts/lib/system.sh"
   ln -s "$REPO/scripts/lib/provider.sh" "$ROOT/scripts/lib/provider.sh"
   ln -s "${AGENT_CLASSIFICATION_DIR:-$REPO/scripts/etc/machine}" "$ROOT/scripts/etc/machine"
+  ln -s "$REPO/scripts/etc/cloudflared" "$ROOT/scripts/etc/cloudflared"
+  TUNNEL_CREDS="$(awk '$1 == "credentials-file:" {print $2}' "$REPO/scripts/etc/cloudflared/config.yml")"
+  TUNNEL_CREDS="${TUNNEL_CREDS##*/}"
+  mkdir -p "$WORK/home/.cloudflared"
+  echo fixture > "$WORK/home/.cloudflared/$TUNNEL_CREDS"
+  echo fixture > "$WORK/home/.cloudflared/cert.pem"
   export HOME="$WORK/home" HUB_NEW_STATE_DIR="$WORK/state" CALLS="$WORK/calls" AGENTS_DIR="$WORK/home/Library/LaunchAgents"
   export PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin"
   export HUB_NEW_HOST=m5-air HUB_OLD_HOST=m4-air.local HOSTINGER_HOST=vps.example.test
@@ -190,6 +196,34 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [[ "$output" == *'singleton webhook is already loaded'* ]]
   run grep -q '^make ' "$CALLS"
   [ "$status" -eq 1 ]
+}
+
+@test "preflight refuses without the Cloudflare tunnel credentials before any mutating stage" {
+  [[ "$HOME" == "$WORK/home" ]]
+  rm "$HOME/.cloudflared/$TUNNEL_CREDS"
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Cloudflare tunnel file missing: ~/.cloudflared/$TUNNEL_CREDS"* ]]
+  [[ "$output" == *"scp m4-air.local:.cloudflared/$TUNNEL_CREDS"* ]]
+  run grep -q '^make ' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "preflight refuses without the Cloudflare origin cert" {
+  rm "$HOME/.cloudflared/cert.pem"
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Cloudflare tunnel file missing: ~/.cloudflared/cert.pem'* ]]
+}
+
+@test "preflight passes without k3d installed so hub-up can install it" {
+  rm "$WORK/stub/k3d"
+  run command -v k3d
+  [ "$status" -ne 0 ]
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'cannot query local k3d clusters'* ]]
+  grep -q '^make ' "$CALLS"
 }
 
 @test "preflight reads macOS pmset output: SleepDisabled 1 passes, 0 fails" {
