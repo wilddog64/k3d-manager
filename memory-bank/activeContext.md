@@ -112,6 +112,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
+- 2026-10-30: v1.43.12 plan 4 `docs/plans/v1.43.12-machine-secrets-copy.md` (operator go): encrypted export/import of Keychain items M4 -> M5; dispatched to Luna. M5 setup run interrupted by operator (Ctrl-C) at bin/k3dm-worker-setup prompt (nothing written; that script redeploys the live relay — manifest fixed in plan 4). Brew nearly done (aerospace cask name wrong: nikitabobko/tap/aerospace). ask-docs free-form priority wording deferred to v1.45.1 (operator).
+
 - 2026-10-30: ask-docs bug count now links fixed docs (P3, Claude fix, offline green). Operator: `make restart-webhook`, then rerun `/ask-docs how many P1 bugs in v1.43.5` in #acg-automation (E2).
 - 2026-10-24: snapshot-list P2 landed a602bfee (Luna, reviewed; 39/39 + red on pre-fix) and LIVE-VERIFIED via make snapshot-list (3 snapshots). Next: land dashboard-queries P2.
 - 2026-10-24: placed the two coordinator caveats as v1.44.2 plans 3–4 (roadmap only; specs unwritten). Analysis spec after Claude's coordinator week; Codex-coordinator spec before Codex's week.
