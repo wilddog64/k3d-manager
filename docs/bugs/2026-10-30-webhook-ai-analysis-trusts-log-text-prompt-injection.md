@@ -1,6 +1,6 @@
 # Bug: webhook AI analysis pastes raw log and cluster text into the prompt and posts the reply unchecked (prompt injection)
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `ai-prompt-injection`
+**Status:** FIXED — `e9cb9129` (Luna, amended by Claude); live check E2 pending a webhook restart
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead to file a P3 bug and dispatch to Luna")
 **Filed:** 2026-10-30
@@ -106,6 +106,17 @@ All three keep an `AIResult`'s `metadata`: when the input has a `metadata` attri
 `docs/architecture/webhook-server.md`: one short section "Untrusted input": log and cluster text is
 fenced as data, the reply is format-checked, and links and commands outside the read-only allow-list
 are withheld; the reply is advice and nothing acts on it.
+
+**As landed (Claude's review, 2026-10-30).** Claude reworded the Degraded-app prompt so the instruction
+sentence stays whole around the fence. Tests Claude added: `_analyze_stall` fences its lines and filters
+its reply; every `_call_gemini(` line in `bin/k3dm-webhook` and `status.py` is wrapped in
+`filter_suggestion` or `validate_failure_reply`; `_analyze_failure` never posts the canary or `make
+down`; the fence nonce is random per call; a 4-line reply with a wrong verdict is rejected. 21/21 pass
+(252 webhook tests pass). Red on the pre-fix `bin/k3dm-webhook`: the fence, the stall, the fence-close
+and both call-site tests. Mutations of `untrusted.py`, all red: no `| ` prefix, fixed nonce, no link
+check, no `secret` check, no verdict check, no `<|` escape. **Known limit (accepted):** the command
+regex also matches prose, so a line that only mentions `make`, `git` or `rm` is withheld. This loses some
+advice but never lets a command through; tighten it only if Slack replies show it in practice.
 
 ## Files
 
