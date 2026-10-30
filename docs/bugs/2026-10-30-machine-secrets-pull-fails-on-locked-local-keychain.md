@@ -1,6 +1,6 @@
 # Bug: secrets pull fails on a locked local keychain, and setup has no way to skip secret prompts
 
-**Status:** OPEN
+**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-10-30, slug `secrets-local-unlock`
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead", after the M5 pull run)
 **Filed:** 2026-10-30
