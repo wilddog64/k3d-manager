@@ -62,6 +62,11 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 ---
 
+## How-To guides
+
+- [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
+- [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)
+
 ## Usage
 
 ```bash
@@ -261,6 +266,9 @@ docs/
 - **[Vector Store](docs/architecture/vector-store.md)** — pgvector prior-art index: components, index-run sequence, credential resolution, failure modes
 
 ### How-To
+
+**Workstations**
+- **[One-command machine setup](docs/howto/machine-setup.md)** — bootstrap and check hub, worker and console Macs.
 
 **Secrets & Identity**
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth

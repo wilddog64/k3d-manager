@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.
+
 ## [1.43.9] - 2026-10-29
 
 ### Added

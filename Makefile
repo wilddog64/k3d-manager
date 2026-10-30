@@ -1578,6 +1578,8 @@ help:
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
+	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
+	@echo "    make machine-check ROLE=hub|worker|console  Read-only workstation inventory (docs/howto/machine-setup.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
@@ -1666,3 +1668,14 @@ help:
 	@echo ""
 	@echo "  Default URL: $(URL)"
 	@echo ""
+
+## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
+.PHONY: machine-setup machine-check
+machine-setup:
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@bin/k3dm-machine-setup --role "$(ROLE)"
+
+## Read-only workstation inventory; exits nonzero when any item is missing; see docs/howto/machine-setup.md
+machine-check:
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@bin/k3dm-machine-setup --role "$(ROLE)" --check

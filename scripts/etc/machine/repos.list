@@ -1,0 +1,46 @@
+# path relative to ~/src|remote|branch|roles; sanitized inventory from M4 checkout metadata
+gitrepo/code-review-graph|https://github.com/tirth8205/code-review-graph.git|main|hub,worker
+gitrepo/personal/ansible/linux-base|https://github.com/wilddog64/linux-base.git|docs/add-clinerules-memory-bank|worker
+gitrepo/personal/ansible/provision-base-image|SKIP: requires Bitbucket SSH key|-|worker
+gitrepo/personal/ansible/provision-java|https://github.com/wilddog64/provision-java.git|dev|worker
+gitrepo/personal/ansible/provision-jenkins|https://github.com/wilddog64/provision-jenkins.git|main|worker
+gitrepo/personal/ansible/provision-jenkins-ci|SKIP: requires Bitbucket SSH key|-|worker
+gitrepo/personal/ansible/provision-redhat-aap|https://github.com/wilddog64/provision-redhat-aap.git|main|worker
+gitrepo/personal/ansible/provision-tomcat|https://github.com/wilddog64/provision-tomcat.git|aws-dev|worker
+gitrepo/personal/ansible/provision-tomcat-bitbucket|SKIP: requires Bitbucket SSH key|-|worker
+gitrepo/personal/ansible/provision-windows-security|https://github.com/wilddog64/provision-windows-security.git|main|worker
+gitrepo/personal/ansible/windows-base|https://github.com/wilddog64/windows-base.git|github-workflow|worker
+gitrepo/personal/articles/tech|https://github.com/wilddog64/tech-articles.git|main|hub,worker
+gitrepo/personal/bde|SKIP: requires Bitbucket SSH key|-|hub,worker
+gitrepo/personal/codex-skill|https://github.com/wilddog64/codex-skill.git|main|hub,worker
+gitrepo/personal/gemini-skills|https://github.com/wilddog64/gemini-skills.git|main|hub,worker
+gitrepo/personal/jenkins-service|https://github.com/wilddog64/jenkins-service.git|dev|hub,worker
+gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console
+gitrepo/personal/k3d-manager-console|https://github.com/wilddog64/k3d-manager-console.git|main|hub,worker
+gitrepo/personal/k3dm-mcp|https://github.com/wilddog64/k3dm-mcp.git|main|hub,worker
+gitrepo/personal/lib-acg|https://github.com/wilddog64/lib-acg.git|fix/acg-session-profile-selector|hub,worker
+gitrepo/personal/lib-foundation|https://github.com/wilddog64/lib-foundation.git|main|hub,worker,console
+gitrepo/personal/pygit|SKIP: requires Bitbucket SSH key|-|hub,worker
+gitrepo/personal/python/dreambox-pythonlib|SKIP: requires Bitbucket SSH key|-|worker
+gitrepo/personal/python/pyjenkinsapi|https://github.com/wilddog64/pyjenkinsapi.git|docs/next-improvements|worker
+gitrepo/personal/resume|https://github.com/wilddog64/resume.git|main|hub,worker
+gitrepo/personal/rigor-cli|https://github.com/wilddog64/rigor-cli.git|rigor-cli-v0.1.7|hub,worker
+gitrepo/personal/shopping-carts/observability-stack|https://github.com/wilddog64/observability-stack.git|main|worker
+gitrepo/personal/shopping-carts/rabbitmq-client-dotnet|https://github.com/wilddog64/rabbitmq-client-dotnet.git|chore/add-pre-push-hook|worker
+gitrepo/personal/shopping-carts/rabbitmq-client-go|https://github.com/wilddog64/rabbitmq-client-go.git|main|worker
+gitrepo/personal/shopping-carts/rabbitmq-client-java|https://github.com/wilddog64/rabbitmq-client-java.git|main|worker
+gitrepo/personal/shopping-carts/rabbitmq-client-library|https://github.com/wilddog64/rabbitmq-client-library.git|chore/add-pre-push-hook|worker
+gitrepo/personal/shopping-carts/rabbitmq-client-python|https://github.com/wilddog64/rabbitmq-client-python.git|rabbitmq-client-python|worker
+gitrepo/personal/shopping-carts/shopping-cart-basket|https://github.com/wilddog64/shopping-cart-basket.git|fix/automerge-app-token|worker
+gitrepo/personal/shopping-carts/shopping-cart-e2e-tests|https://github.com/wilddog64/shopping-cart-e2e-tests.git|main|worker
+gitrepo/personal/shopping-carts/shopping-cart-frontend|https://github.com/wilddog64/shopping-cart-frontend.git|main|worker
+gitrepo/personal/shopping-carts/shopping-cart-frontend-tw4|https://github.com/wilddog64/shopping-cart-frontend.git|chore/tailwind-v4-migration|worker
+gitrepo/personal/shopping-carts/shopping-cart-infra|https://github.com/wilddog64/shopping-cart-infra.git|main|worker
+gitrepo/personal/shopping-carts/shopping-cart-infra-ldap|https://github.com/wilddog64/shopping-cart-infra.git|fix/remove-orphan-osixia-ldap|worker
+gitrepo/personal/shopping-carts/shopping-cart-order|https://github.com/wilddog64/shopping-cart-order.git|fix/automerge-app-token|worker
+gitrepo/personal/shopping-carts/shopping-cart-payment|https://github.com/wilddog64/shopping-cart-payment.git|fix/spring-boot-tools-jarmode|worker
+gitrepo/personal/shopping-carts/shopping-cart-product-catalog|https://github.com/wilddog64/shopping-cart-product-catalog.git|fix/automerge-app-token|worker
+gitrepo/personal/smartcd|https://github.com/cxreg/smartcd.git|master|hub,worker
+gitrepo/personal/tax-returns|https://github.com/wilddog64/tax-returns.git|main|hub,worker
+gitrepo/personal/twinkleai-real-estate-lab|https://github.com/wilddog64/twinkleai-real-estate-lab.git|main|hub,worker
+gitrepo/personal/zshdotfiles|https://github.com/wilddog64/zshdotfiles.git|main|hub,worker,console

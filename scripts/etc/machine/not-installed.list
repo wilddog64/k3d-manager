@@ -1,0 +1,6 @@
+# LaunchAgents installed during the hub build rather than machine setup.
+install-hub-snapshot|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-hub-data-export|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-vault-failover|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-prometheus-auth-proxy|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-prometheus-credential-rotator|installed by the cluster deploy (hub build, v1.43.12 plan 2)

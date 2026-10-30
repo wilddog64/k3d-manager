@@ -1,0 +1,3 @@
+# Ordered actions; make target or setup command, one per line.
+smartcd-install
+install-sudoers
