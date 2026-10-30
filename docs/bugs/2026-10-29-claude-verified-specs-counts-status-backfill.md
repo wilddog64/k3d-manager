@@ -2,10 +2,10 @@
 
 **Status:** OPEN
 **Priority:** P2
-**Approval:** pending
+**Approval:** explicit 2026-10-29 "go with your suggestion" (operator): fix the count and add a `level` label (live / verified / unverified) in one change
 **Filed:** 2026-10-29
 **Detected by:** human (an assistant reading the Claude cost panel flagged that $1.00 per spec implied about 851 specs)
-**Affected:** `bin/k3dm-dispatch-metrics` `_verified_specs`; the Agent Cost panel **Claude cost per verified spec** and the Agent Activity panel **Compactions per verified spec**
+**Affected:** `bin/k3dm-dispatch-metrics` `_verified_specs` and the line that renders `k3dm_claude_verified_specs`; the Agent Cost panel **Claude cost per verified spec** and the Agent Activity panel **Compactions per verified spec**
 **Caused by:** `61256041` (v1.43.6, introduced the counter) together with the v1.42.0 status backfill `cc88386c`
 **Severity:** a per-spec cost KPI reads about half its true value for 30 days, and the compaction trial in `CLAUDE.md` (`autoCompactWindow` 400K) is measured against this denominator.
 
@@ -42,13 +42,36 @@ The cost is correct. The spec count is not.
 
 ## Fix
 
-In `_verified_specs`, track the `-**Status:**` line removed in the same file diff, and the `--- ` side of the header:
+**Part 1: count only real closes.** In `_verified_specs`, track the `-**Status:**` line removed in the same file diff, and the `--- ` side of the header:
 - count a file when its `--- ` side is `/dev/null` (a new file) and the added status is closed;
 - count it when the removed status line exists and does **not** match `_CLOSED_RE`, and the added one does;
 - do not count it when no `-**Status:**` line was removed from an existing file (a backfill);
 - do not count it when the removed status line also matches `_CLOSED_RE` (closed to closed).
 
-Update `docs/guides/grafana-dashboards/k3dm-agent-cost.md` and `k3dm-agent-activity.md` to say what counts as a verified spec, and to name the squash-merge limitation.
+**Part 2: split the count by level (operator, 2026-10-29).** A single total hides how much of the work was proven live. Each counted doc gets a `level`, taken from the first word of the added status line:
+
+| `level` | Status word |
+|---|---|
+| `live` | `LIVE-VERIFIED` |
+| `verified` | `VERIFIED`, `FIXED`, `Fixed on/in` |
+| `unverified` | every other `_CLOSED_RE` match (`LANDED`, `IMPLEMENTED`, `DONE`, `CLOSED`, `RESOLVED`, `WONTFIX`, `SUPERSEDED`, `DUPLICATE` …) |
+
+- `_verified_specs` returns counts per window and per level.
+- Render `k3dm_claude_verified_specs{window="<w>",level="<l>"}` for every window and all three levels. Emit 0 for empty ones, so a level never disappears from the series.
+- A doc counted more than once in a window keeps the level of its latest counted commit in that window.
+
+On 2026-10-29 history this gives 30d: 120 live, 265 verified, 68 unverified (453 total); 7d: 83 / 56 / 16 (155).
+
+**Dashboards.** Once the metric carries `level`, the existing Agent Cost expression no longer matches one-to-one, because the cost series has no `level` label.
+- `grafana-dashboard-agent-cost.yaml`, **Claude cost per verified spec**: `k3dm_dispatch_claude_api_cost_usd{window="$window"} / (sum by (window) (k3dm_claude_verified_specs{window="$window"}) > 0)`.
+- Add a stat **Claude cost per live-verified resolution** next to it: the same expression with `level="live"` inside the sum. Fit it into the existing row, with no overlapping panels.
+- `grafana-dashboard-agent-activity.yaml` **Compactions per verified spec** already uses `sum(...)`. Leave it as is.
+
+**Docs.** In `docs/guides/grafana-dashboards/k3dm-agent-cost.md` and `k3dm-agent-activity.md`:
+- say what counts as a verified spec;
+- list the three levels;
+- describe the new panel;
+- name the squash-merge limitation.
 
 ## Acceptance
 
@@ -59,7 +82,15 @@ must:
   - id: M2
     text: A commit that creates a doc whose status line is already closed counts it once.
   - id: M3
-    text: Each window reports the number of distinct docs that meet M1 or M2 inside that window.
+    text: For each window, the counts across all levels add up to the number of distinct docs that meet M1 or M2 inside that window.
+  - id: M4
+    text: A doc closed as LIVE-VERIFIED counts under level="live"; VERIFIED, FIXED or "Fixed on/in" counts under level="verified"; any other closed status counts under level="unverified".
+  - id: M5
+    text: --dry-run prints k3dm_claude_verified_specs{window,level} for every window and all three levels, including zero values.
+  - id: M6
+    text: The Agent Cost dashboard shows Claude cost per verified spec (all levels) and Claude cost per live-verified resolution. Both expressions return a value when the matching count is above zero, and the panels do not overlap.
+  - id: M7
+    text: The agent-cost and agent-activity guides define a verified spec, list the three levels and name the squash-merge limitation.
 must_not:
   - id: N1
     text: A commit that adds a closed status line to an existing doc that had no status line must not count that doc.
@@ -67,24 +98,33 @@ must_not:
     text: A commit that changes a closed status line to another closed status line must not count that doc.
   - id: N3
     text: The counter must not push, write the Pushgateway or read Keychain values when run with --dry-run.
+  - id: N4
+    text: k3dm_claude_verified_specs must not be emitted without a level label.
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1, N2]
+    proves: [M1, M2, M3, M4, N1, N2]
     kind: offline
-    text: A pytest builds a throwaway git repo with one commit for each kind (transition, new closed file, backfill, closed-to-closed) and asserts the per-window counts. N1 and N2 are shown red against the pre-fix _verified_specs.
+    text: A pytest builds a throwaway git repo with one commit for each kind (transition, new closed file, backfill, closed-to-closed) and one doc per level, then asserts the per-window, per-level counts. N1 and N2 are shown red against the pre-fix _verified_specs.
   - id: E2
-    proves: [N3]
+    proves: [M5, N3, N4]
     kind: offline
-    text: The existing hermetic guard passes with K3DM_DISPATCH_PUSHGATEWAY_URL=http://127.0.0.1:9.
+    text: A --dry-run test with K3DM_DISPATCH_PUSHGATEWAY_URL=http://127.0.0.1:9 asserts all window x level lines and that no unlabelled verified_specs line exists.
   - id: E3
-    proves: [M3]
+    proves: [M6]
+    kind: offline
+    text: The existing dashboard tests (every queried metric exported, no overlapping panels) pass with the new panel, and a test asserts both cost expressions use sum by (window).
+  - id: E4
+    proves: [M3, M6]
     kind: live
-    text: After the next metrics push, Claude reads the panel. The 30-day verified-specs count is far below the 2026-10-29 value of 858 (453 on that day's history), and Claude cost per verified spec rises accordingly.
+    text: After the next metrics push, Claude reads both panels. The 30-day total is near 453, not 858, and the live-verified cost is above the all-levels cost.
 interface:
-  - bin/k3dm-dispatch-metrics --dry-run (prints k3dm_claude_verified_specs{window=...})
+  - bin/k3dm-dispatch-metrics --dry-run (prints k3dm_claude_verified_specs{window=...,level=...})
   - _verified_specs(repo_root, now) in bin/k3dm-dispatch-metrics
+  - scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml
 ```
 
-## Open question for the operator
+## Decision (operator, 2026-10-29)
 
-`_CLOSED_RE` also matches `LANDED`, `IMPLEMENTED`, `DONE` and `CLOSED`. So a plan that has landed but has not been verified counts as a "verified spec", and so does a bug closed without verification. Should the denominator be limited to `VERIFIED` / `LIVE-VERIFIED` / `FIXED`? This fix leaves the set unchanged until you decide.
+Keep every `_CLOSED_RE` status in the total, and split it by `level` instead of dropping statuses. Restricting the set alone would have shrunk the 30-day count from 453 to 385 and still shown one number; the split shows how much of it was proven live.
+
+**Considered and not chosen:** basing `live` on a `**Live evidence:**` line instead of the status word. It is stricter, but the line is often added in a later commit than the close.
