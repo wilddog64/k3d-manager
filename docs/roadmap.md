@@ -457,12 +457,13 @@ Proposed for later review, not dispatched; the existing P2 remains open.
 ### Candidate milestone — v1.43.12 (special release: M5 hub)
 
 **M5 Air becomes the hub** (operator, 2026-10-29). Branch `k3d-manager-v1.43.12`, cut from `main` after v1.43.9
-merges. It ships **before** v1.43.10 and v1.43.11, so its tag lands out of numeric order. The operator chose that over
-renumbering. Plan 1 of 2 is [`one-command-machine-setup`](plans/v1.43.12-one-command-machine-setup.md) (moved from
-v1.43.11). Plan 2 of 2 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
+merges. It ships **before** v1.43.11, so its tag lands out of numeric order. The operator chose that over
+renumbering. On 2026-10-29 the operator moved v1.43.10 ahead of it: v1.43.10 merges first, and v1.43.12 carries a merge of
+the v1.43.10 branch (`2ceb59f2`). Plan 1 of 3 is [`one-command-machine-setup`](plans/v1.43.12-one-command-machine-setup.md) (moved from
+v1.43.11). Plan 2 of 3 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
 verifies a fresh hub on the M5 while the M4 keeps serving, and `make hub-cutover` moves the agents and the tunnels in one
 gated step, with rollback. Its live run is the recovery for the Kine compaction bug and the proof for the three
-2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending.
+2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending. Plan 3 of 3 is [`whole-system-api-cost-panels`](plans/v1.43.12-whole-system-api-cost-panels.md): Claude + Codex cost at API prices per live-verified spec, and the API run rate against the plans it would replace (operator, 2026-10-29).
 
 **Follow-on, not scheduled: a local LLM (Ollama) on the M5.** It runs on the macOS host (Metal; containers have no GPU),
 as a LaunchAgent with a model memory cap. Size it only after the M5 has run as the hub for a week and its free memory is
