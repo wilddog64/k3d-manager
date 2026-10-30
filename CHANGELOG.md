@@ -13,6 +13,14 @@
 
 ### Fixed
 
+- **The hub reconcile skips the Hostinger CVE reader seed when the app context is missing, instead of
+  exiting.** `_hub_recovery_seed_app_cluster_reader` guarded the seed with `if ! _kubectl -- --context
+  ubuntu-hostinger get namespace platform`, but `_kubectl` exits the process on a failed call unless it
+  is given `--no-exit`, even as an `if` condition. A hub without that context (the M5 before cutover)
+  lost the rest of the reconcile silently. The guard and the two frontend probes in
+  `_hub_recovery_frontend_origin_provider` (which left the Cloudflare origin provider empty instead of
+  falling through to the hub check) now pass `--no-exit`.
+
 - **The hub reconcile no longer dies when there is no cosign key to restore.** `_hub_recovery_restore_signing`
   was meant to warn and continue when `signing_restore` fails, but `signing_restore` reports "no Vault key
   and no Keychain backup" through `_err`, which exits the process. On a new hub (the M5: empty Vault until

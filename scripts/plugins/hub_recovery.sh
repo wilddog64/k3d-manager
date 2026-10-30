@@ -37,9 +37,9 @@ function _hub_recovery_frontend_origin_provider() {
   local hub_context="$1" app_context="$2"
   if [[ -n "${HUB_RECOVERY_FRONTEND_PROVIDER:-}" ]]; then
     printf '%s\n' "$HUB_RECOVERY_FRONTEND_PROVIDER"
-  elif _kubectl -- --context "$app_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+  elif _kubectl --no-exit -- --context "$app_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
     printf '%s\n' k3s-hostinger
-  elif _kubectl -- --context "$hub_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
+  elif _kubectl --no-exit -- --context "$hub_context" -n shopping-cart-apps get deployment frontend >/dev/null 2>&1; then
     printf '%s\n' k3d
   else
     printf '%s\n' k3s-hostinger
@@ -106,7 +106,7 @@ function _hub_recovery_restore_signing() {
 
 function _hub_recovery_seed_app_cluster_reader() {
   local hub_context="$1" app_context="$2" server ca_data bearer_token root_token payload
-  if ! _kubectl -- --context "$app_context" get namespace platform >/dev/null 2>&1; then
+  if ! _kubectl --no-exit -- --context "$app_context" get namespace platform >/dev/null 2>&1; then
     _warn "[hub-recovery] app context '${app_context}' unavailable; skipping CVE reader seed"
     return 0
   fi

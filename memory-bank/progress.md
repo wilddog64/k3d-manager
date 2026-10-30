@@ -2065,3 +2065,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-30: M5 hub-new live-run fixes: k3d install off-PATH/sudo `59a088cf`, argo helm repo `7401fe79`, app-rebuild probe exiting `655cf003`, monitoring namespace race `a207bf59`. M4 alertmanager-basic-auth.env clobbered by a test draft — restore with `make observability` on the M4. hub-up is the stage being retried.
 - 2026-10-30: M5 hub-new stage order — observability/platform-ops deferred past `data` (`e7e4f84b`); awaiting rerun.
 - 2026-10-30: M5 hub-restore Step 8 writes missing argocd/keycloak PF wrappers (`5a96fc40`); Step 5 reconcile failure pending operator output.
+- 2026-10-30: M5 Step 5 reconcile: signing `_err` exit contained (`42a4418d`); missing-app-context `_kubectl` probes get `--no-exit`.
