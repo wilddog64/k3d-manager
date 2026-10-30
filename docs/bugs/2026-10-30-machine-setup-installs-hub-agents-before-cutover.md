@@ -1,6 +1,6 @@
 # Bug: machine setup installs live-hub agents on a new Mac before cut-over, and misses two Hermes credentials
 
-**Status:** FIXED — `30d1aab6` (Luna, amended by Claude); live check E2 pending on the M5
+**Status:** FIXED — `30d1aab6` (Luna, amended by Claude); E2 passed live on the M5 2026-10-30
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("go ahead to file a bug and dispatch to Luna")
 **Filed:** 2026-10-30
@@ -66,6 +66,15 @@ asserts it reports `skipped (AGENTS=skip)` (the skip runs before the TTY gate); 
 (`^agent:install-cleanup +ok$`), because the old glob matched any later `ok`. 52/52 pass; shellcheck
 clean. Mutations red on temp copies: no skip branch, skip before the installed check, default `skip`,
 no value check.
+
+**Live check E2 (2026-10-30, 09:3x PDT).** The operator ran `make machine-setup ROLE=hub
+FROM=m4-air.local SECRETS=skip AGENTS=skip` on the M5 at `9e59379c`. `k3dm-hermes-gh-token` and
+`k3dm-slack-webhook` were exported and `copied`; every `secret:` line read `ok`. No agent was installed:
+the agents installed by the earlier pre-fix run reported `ok` (plist present, N3), and
+`bin/k3dm-hermes-setup` and `bin/k3dm-heartbeat-setup` reported `skipped (AGENTS=skip)`. Make still exits
+1, because an `AGENTS=skip` skip goes through `record_failure`, as the spec asked. The pre-fix run's 12
+LaunchAgents (installed 08:54) are still loaded on the M5, including `webhook`, `cloud-bridge` and
+`webhook-token-rotate` (6 h interval, not yet run); the operator is booting them out.
 
 ## Files
 
