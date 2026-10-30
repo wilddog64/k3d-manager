@@ -2006,3 +2006,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [x] v1.43.9 release prep: guide split 34fd8f9b, CHANGELOG/README/releases bb601a38. PR pending.
 - [x] PR #152 (v1.43.9) review: Copilot duplicate `## Unreleased` heading fixed in 2adab150 (thread resolved); CodeQL alert #35 (TLS probe) dismissed won't-fix. Findings in docs/issues/2026-10-29-copilot-pr152-review-findings.md.
 - [x] PR #152 CI red (8 orbstack_upgrade TTY tests timed out on Linux): Linux `_run_tty` quoting fixed in 481ce13d; 18/18 green in ubuntu:24.04 and on macOS.
+- [x] PR #152 CI red #2: release-milestones.json missing v1.43.12 and v1.45.4 (drift test) — fixed f41068ab. Same commit: v1.43.12 machine-setup plan absorbs the manual M5 prep (CLT via softwareupdate label, Homebrew latest/download pkg + team 927JGANW46 check, gh login + setup-git, dot-folder config clones, git-less bootstrap).
+- [x] M5 manual prep 2026-10-29: CLT 26.6, Homebrew 7.0.11 (signed+notarized), gh 2.103.3 + tmux 3.8, gh logged in (hosts.yml, not Keychain), repos cloned.
