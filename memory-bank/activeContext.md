@@ -102,6 +102,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Recent completed work
 
+- **2026-10-30 — M5 hub-new run 2: hub-up step 5 failed `repo argo not found`** — deploy_argocd never added its helm repo; fixed (repo add --force-update) + 3 argocd.bats tests. Cluster, Vault, ESO, OpenLDAP up on the M5; rerun resumes at hub-up (skips create).
+
 - **2026-10-30 — M5 hub-new run 1: hub-up failed** — k3d installer (sudo, M5 password) put k3d in `~/.local/bin` (root-owned) then failed `k3d not found ... on your $PATH?`; every rerun reinstalled. Fixed in `_provider_k3d_install` (PATH prepend, USE_SUDO=false when writable, host-naming SUDO_PROMPT) + `scripts/tests/lib/k3d_install.bats`. State on M5: preflight + machine-setup pass; tunnel files copied. (secrets-present=pass was there; my redaction grep hid it.)
 
 - **2026-10-30 — hub-new needs no manual steps (`edcfbddf`, operator "go ahead")** — machine-setup `FROM=` copies `scripts/etc/machine/files.hub.list` (tunnel `<id>.json` + `cert.pem`) over scp; hub-new checks them in secrets-present; prepare-singletons defaults HOSTINGER_HOST from `scripts/etc/hostinger/vars.sh`. M5 run = `git pull` + `make hub-new HUB_OLD_HOST=m4-air.local`; then hub-cutover DRY_RUN=1 / hub-cutover; M4 `k3d cluster stop k3d-cluster`. Suites: hub_new 25, machine_setup 58, agent_classification 3, hub_cutover 12, hub_restore 18, all green.
