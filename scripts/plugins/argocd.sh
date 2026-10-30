@@ -561,6 +561,13 @@ function _argocd_helm_deploy_release() {
       )
    fi
 
+   if [[ "$ARGOCD_HELM_CHART_REF" == "${ARGOCD_HELM_REPO_NAME}/"* ]]; then
+      _helm repo add --force-update "$ARGOCD_HELM_REPO_NAME" "$ARGOCD_HELM_REPO_URL" >/dev/null || {
+         _err "[argocd] helm repo add ${ARGOCD_HELM_REPO_NAME} ${ARGOCD_HELM_REPO_URL} failed"
+         return 1
+      }
+   fi
+
    if (( release_exists )); then
       _info "[argocd] Upgrading existing release with new configuration"
       _helm upgrade --install --reset-values \

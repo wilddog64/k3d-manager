@@ -468,6 +468,40 @@ JSON
   [[ "$output" != *"configs.cm.url=https://argo.internal.invalid"* ]]
 }
 
+@test "deploy release adds the argo chart repo before installing on a Mac that never added it" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_REPO_URL=https://argoproj.github.io/argo-helm ARGOCD_HELM_CHART_REF=argo/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 1p "$HELM_LOG")" = "repo add --force-update argo https://argoproj.github.io/argo-helm" ]
+  [[ "$(sed -n 2p "$HELM_LOG")" == "upgrade --install "*" argo/argo-cd "* ]]
+}
+
+@test "deploy release does not add a repo for a chart ref outside it" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_CHART_REF=oci://registry.example.invalid/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -eq 0 ]
+  run grep -c '^repo add' "$HELM_LOG"
+  [ "$output" = 0 ]
+  grep -q '^upgrade --install .*oci://registry.example.invalid/argo-cd' "$HELM_LOG"
+}
+
+@test "deploy release stops when the repo cannot be added" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_REPO_URL=https://argoproj.github.io/argo-helm ARGOCD_HELM_CHART_REF=argo/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; [[ "$1" != repo ]]; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -ne 0 ]
+  run grep -c '^upgrade' "$HELM_LOG"
+  [ "$output" = 0 ]
+}
+
 @test "register_app_cluster: shopping-cart label defaults to false" {
   RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-default.yaml"
   _kubectl() {
