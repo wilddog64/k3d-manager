@@ -36,6 +36,20 @@ Update `scripts/tests/plugins/grafana_dashboard_pr_checks.bats` (the panel 6 tes
 the column order, `docs/guides/grafana-dashboards/k3dm-pr-checks.md`. Takes effect after
 `make platform-ops`.
 
+## Files
+
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-pr-checks.yaml`
+- `scripts/tests/plugins/grafana_dashboard_pr_checks.bats`
+- `docs/guides/grafana-dashboards/k3dm-pr-checks.md` (only if it names the column order)
+- `CHANGELOG.md` (one `### Fixed` line under `[Unreleased]`)
+
+## What NOT to do
+
+- Do not change any other panel, query, mapping, unit or empty-state text.
+- Do not run `make platform-ops`, `kubectl` or anything against a cluster; the live check (E2) is the operator's or Claude's.
+- Do not create a PR, commit to `main`, or skip hooks with `--no-verify`.
+- Write the M1 and N1 tests first and show them red against the pre-fix dashboard on a temp copy.
+
 ## Acceptance
 
 ```yaml
