@@ -210,3 +210,37 @@ def test_all_releases_with_priority_skips_releases_without_a_match(monkeypatch):
     answer = _reply_with(monkeypatch, releases, bug_count.CountQuery("*", "P1", None))
     assert "v1.41.0:" not in answer
     assert "4 docs in these releases have no Priority line" in answer
+
+
+def _closed_payload(count, priority="P1"):
+    closed = ",".join(f'{{"path":"docs/bugs/f{i}.md","priority":"{priority}"}}' for i in range(count))
+    other = '{"path":"docs/bugs/other.md","priority":"P2"}'
+    return ('{"ref":"HEAD","releases":{"v1.43.5":{"total":%d,"closed":%d,"open":0,"unknown":0,'
+            '"by_priority":{"P1":{"total":%d,"closed":%d,"open":0,"unknown":0}},'
+            '"open_paths":[],"unknown_paths":[],"closed_paths":[%s,%s]}}}'
+            % (count + 1, count + 1, count, count, closed, other))
+
+
+def test_reply_links_fixed_docs_for_a_release(monkeypatch):
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(2), False))
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.5", "P1", None))
+    assert "Fixed: <https://github.com/" in answer
+    assert "|docs/bugs/f0.md>" in answer
+    assert "|docs/bugs/f1.md>" in answer
+    assert "other.md" not in answer
+
+
+def test_reply_caps_fixed_links_at_ten(monkeypatch):
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(13), False))
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.5", "P1", None))
+    assert answer.count("Fixed: ") == 10
+    assert "and 3 more fixed" in answer
+
+
+@pytest.mark.parametrize("query", [
+    bug_count.CountQuery("v1.43.5", "P1", "open"),
+    bug_count.CountQuery("*", "P1", None),
+])
+def test_reply_omits_fixed_links_for_open_or_all_release_questions(monkeypatch, query):
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(2), False))
+    assert "Fixed: " not in bug_count.reply(query)

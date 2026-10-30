@@ -111,6 +111,8 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 - e2e sandbox settle-wait fix is LIVE-VERIFIED by run `1792355973-27075`; the later `8417cf04` failure is a distinct startup-order race.
 
 ## Open / pending
+
+- 2026-10-30: ask-docs bug count now links fixed docs (P3, Claude fix, offline green). Operator: `make restart-webhook`, then rerun `/ask-docs how many P1 bugs in v1.43.5` in #acg-automation (E2).
 - 2026-10-24: snapshot-list P2 landed a602bfee (Luna, reviewed; 39/39 + red on pre-fix) and LIVE-VERIFIED via make snapshot-list (3 snapshots). Next: land dashboard-queries P2.
 - 2026-10-24: placed the two coordinator caveats as v1.44.2 plans 3–4 (roadmap only; specs unwritten). Analysis spec after Claude's coordinator week; Codex-coordinator spec before Codex's week.
 - 2026-10-24: operator: plan the two coordinator-trial caveats (measuring the bug-sweep quota impression; Codex-as-coordinator interactive-session rules) in a later proper release; v1.44.1 plans stand as written.
