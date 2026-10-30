@@ -69,8 +69,8 @@ panels = {panel["id"]: panel for panel in data["panels"]}
 def organize(panel_id):
     return next(item for item in panels[panel_id]["transformations"] if item["id"] == "organize")["options"]
 
-assert [item["id"] for item in panels[5]["transformations"]] == ["joinByField", "organize"]
-assert [item["id"] for item in panels[6]["transformations"]] == ["joinByField", "organize"]
+assert [item["id"] for item in panels[5]["transformations"]] == ["joinByField", "sortBy", "organize"]
+assert [item["id"] for item in panels[6]["transformations"]] == ["joinByField", "sortBy", "organize"]
 for panel_id in (5, 6):
     join = panels[panel_id]["transformations"][0]
     assert join["options"] == {"byField": "__join", "mode": "outer"}
@@ -98,6 +98,37 @@ duration_override = next(
     if override["matcher"] == {"id": "byName", "options": "Duration"}
 )
 assert {prop["id"]: prop["value"] for prop in duration_override["properties"]}["unit"] == "s"
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "PR checks per PR sorts on the repo:pr:check join key before organize and keeps the intended columns" {
+  run python3 - "${PR_CHECKS_DASHBOARD:-${dashboard}}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+panel = next(panel for panel in data["panels"] if panel["id"] == 6)
+transformations = panel["transformations"]
+assert [item["id"] for item in transformations] == ["joinByField", "sortBy", "organize"]
+sort = transformations[1]
+assert sort["options"]["sort"] == [{"field": "__join", "desc": False}]
+organize = transformations[2]["options"]
+assert organize["indexByName"] == {"Repo": 0, "PR": 1, "Check": 2, "State": 3, "Duration": 4}
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "PR checks dashboard does not put sorting inside organize options" {
+  run python3 - "${PR_CHECKS_DASHBOARD:-${dashboard}}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  pr-checks.json: |\n", 1)[1])
+for panel in data["panels"]:
+    for transformation in panel.get("transformations", []):
+        if transformation["id"] == "organize":
+            assert "sortBy" not in transformation["options"], panel["id"]
 PY
   [ "${status}" -eq 0 ]
 }
