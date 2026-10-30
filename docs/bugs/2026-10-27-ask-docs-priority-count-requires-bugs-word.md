@@ -4,6 +4,7 @@
 **Fix commit:** 67c26bdf0f8aa7c6340a422891a0247f3145abb8
 **Previous fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2 (rolled back by 2d88c7be)
 **Priority:** P2
+**Deferred:** 2026-10-30, operator: no more matcher vocabulary. Wording gaps ("how many P1 open", "what are / list open P2 bugs") wait for `docs/plans/v1.45.1-bug-count-query-translation.md`, where the model writes the query and the tally counts. Workaround: start with "how many … bugs".
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
 **Related:** `docs/plans/v1.45.1-bug-count-query-translation.md`; `docs/bugs/2026-10-10-ask-docs-bug-count-ignores-release-range.md`
