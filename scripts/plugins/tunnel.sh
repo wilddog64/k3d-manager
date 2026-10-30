@@ -229,7 +229,7 @@ EOF
   _tunnel_write_plist
   _tunnel_write_vault_agent
   _tunnel_rotate_logs
-  if [[ "$(uname)" == "Darwin" ]]; then
+  if [[ "$(uname)" == "Darwin" && "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
     launchctl unload -w "${_TUNNEL_PLIST_PATH}" 2>/dev/null || true
     launchctl load -w "${_TUNNEL_PLIST_PATH}"
     launchctl unload -w "${_TUNNEL_VAULT_PLIST_PATH}" 2>/dev/null || true

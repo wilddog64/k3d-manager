@@ -513,8 +513,10 @@ function hub_data_export_schedule() { (
   _is_mac || return 0; command -v launchctl >/dev/null 2>&1 || { _warn "[hub-data] launchctl not available"; return 0; }
   mkdir -p "$(dirname "$plist")"
   sed -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" -e "s|{{HOME}}|${HOME}|g" "$template" > "$plist"
-  launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-data-export" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "$plist"
+  if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
+    launchctl bootout "gui/$(id -u)/com.k3d-manager.hub-data-export" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+  fi
 ) }
 
 function hub_data_export_unschedule() { (

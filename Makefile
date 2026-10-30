@@ -42,6 +42,24 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 argocd-upgrade:
 	@args=(); [ -z "$(TO)" ] || args+=(--to '$(TO)'); [ "$(DRY_RUN)" != 1 ] || args+=(--dry-run); ./scripts/k3d-manager argocd_upgrade "$${args[@]}"
 
+.PHONY: hub-new
+hub-new:
+	@bin/hub-new
+
+.PHONY: install-prometheus-credential-rotator
+install-prometheus-credential-rotator:
+	@./scripts/k3d-manager observability_install_prometheus_rotator
+
+.PHONY: install-test-metrics
+install-test-metrics:
+	sed \
+	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
+
 .PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
@@ -576,8 +594,8 @@ install-cleanup:
 	  scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; fi
 	@echo "Cleanup agent installed — fires daily at 03:00"
 
 ## Install the bounded k3d agent health/recovery watchdog (restarts after 3 failures)
@@ -586,7 +604,7 @@ install-node-health-watch:
 	  scripts/etc/launchd/com.k3d-manager.node-health-watch.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; fi
 	@echo "Node health watchdog installed — recovery is bounded to agent-0 with a 5-minute cooldown"
 
 uninstall-node-health-watch:
@@ -600,7 +618,7 @@ install-sandbox-reaper:
 	  scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; fi
 	@echo "Expired-sandbox reaper installed — fires every 10 minutes"
 
 uninstall-sandbox-reaper:
@@ -742,8 +760,8 @@ install-cloud-bridge:
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; fi
 	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
 
 ## Revoke cloud-session access — stop and remove the bridge LaunchAgent
@@ -1576,6 +1594,7 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3d|k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
+	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"

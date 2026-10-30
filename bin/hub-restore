@@ -202,7 +202,11 @@ done
 if launchctl list 2>/dev/null | grep 'com.k3d-manager.grafana-port-forward' >/dev/null; then
   launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.grafana-port-forward" || _local_agents_ok=0
 fi
-_ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
+if [[ "${HUB_RESTORE_TUNNEL:-}" == skip ]]; then
+  _info "[hub-restore] Cloudflare tunnel: SKIP (deferred until hub cutover)"
+else
+  _ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
+fi
 if (( _local_agents_ok )); then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 9
@@ -229,7 +233,9 @@ if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smt
 else
   _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
 fi
-if launchctl list 2>/dev/null | awk '$3 == "com.k3d-manager.cloudflare-tunnel" && $1 ~ /^[0-9]+$/ { found=1 } END { exit !found }'; then
+if [[ "${HUB_RESTORE_TUNNEL:-}" == skip ]]; then
+  _info "[hub-restore] Cloudflare tunnel check: SKIP"
+elif launchctl list 2>/dev/null | awk '$3 == "com.k3d-manager.cloudflare-tunnel" && $1 ~ /^[0-9]+$/ { found=1 } END { exit !found }'; then
   _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: PASS"
 else
   _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: FAIL"; _verify_ok=0

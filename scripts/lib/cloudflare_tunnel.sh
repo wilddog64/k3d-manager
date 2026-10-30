@@ -57,10 +57,12 @@ PLIST
     _info "${_prefix} Cloudflare named tunnel LaunchAgent unchanged — skipping reinstall"
   else
     : > "${_tunnel_launchctl_log}"
-    launchctl bootout "gui/$(id -u)" "${_named_tunnel_plist}" \
-      >"${_tunnel_launchctl_log}" 2>&1 || true
+    if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
+      launchctl bootout "gui/$(id -u)" "${_named_tunnel_plist}" \
+        >"${_tunnel_launchctl_log}" 2>&1 || true
+    fi
     local _named_tunnel_plist_legacy="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
-    if [[ -f "${_named_tunnel_plist_legacy}" ]]; then
+    if [[ "${K3DM_AGENT_LOAD:-1}" != 0 && -f "${_named_tunnel_plist_legacy}" ]]; then
       _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
         >/dev/null 2>&1 || true
       _run_command --prefer-sudo --quiet --soft -- rm -f "${_named_tunnel_plist_legacy}" \
@@ -73,10 +75,12 @@ PLIST
       _warn "${_prefix} failed to install tunnel plist — skipping"
     else
       rm -f "${_named_tunnel_plist_tmp}"
-      : > "${_tunnel_launchctl_log}"
-      if ! launchctl bootstrap "gui/$(id -u)" "${_named_tunnel_plist}" \
-          >"${_tunnel_launchctl_log}" 2>&1; then
-        _warn "${_prefix} failed to bootstrap cloudflare tunnel"
+      if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
+        : > "${_tunnel_launchctl_log}"
+        if ! launchctl bootstrap "gui/$(id -u)" "${_named_tunnel_plist}" \
+            >"${_tunnel_launchctl_log}" 2>&1; then
+          _warn "${_prefix} failed to bootstrap cloudflare tunnel"
+        fi
       fi
     fi
   fi

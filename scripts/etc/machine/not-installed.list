@@ -4,4 +4,23 @@ install-hub-snapshot|installed by the cluster deploy (hub build, v1.43.12 plan 2
 install-hub-data-export|installed by the cluster deploy (hub build, v1.43.12 plan 2)
 install-vault-failover|installed by the cluster deploy (hub build, v1.43.12 plan 2)
 install-prometheus-auth-proxy|installed by the cluster deploy (hub build, v1.43.12 plan 2)
-install-prometheus-credential-rotator|installed by the cluster deploy (hub build, v1.43.12 plan 2)
+install-prometheus-credential-rotator|available to hub-new; not installed by generic machine setup because it is a singleton
+webhook-token-rotate|installed only after cutover; rotates shared Cloudflare and GitHub secrets
+sandbox.argocd-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.frontend-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.grafana-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.keycloak-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.vault-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.hub-pushgateway-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.hub-loki-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.alertmanager-port-forward|managed by the ACG sandbox lifecycle (make up)
+argocd-browser-https|system LaunchDaemon managed by cluster-up
+frontend-browser-http|system LaunchDaemon managed by cluster-up
+keycloak-browser-http|system LaunchDaemon managed by cluster-up
+chrome-cdp|ACG browser lifecycle, not a hub service
+sandbox.loopback-alias|system LaunchDaemon managed by cluster-up
+sandbox.ssh-tunnel|ACG sandbox lifecycle, managed by make up
+sandbox.frontend-browser-http|system LaunchDaemon managed by cluster-up
+sandbox.prometheus-port-forward|managed by the ACG sandbox lifecycle (make up)
+sandbox.pushgateway-port-forward|managed by the ACG sandbox lifecycle (make up)
+heartbeat|not loaded by hub-new or cutover: bin/k3dm-heartbeat-setup renders a review candidate only

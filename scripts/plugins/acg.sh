@@ -73,7 +73,7 @@ with plist_path.open('wb') as handle:
     plistlib.dump(data, handle, sort_keys=False)
 PY
 
-  if command -v launchctl >/dev/null 2>&1 && launchctl list "${label}" >/dev/null 2>&1; then
+  if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]] && command -v launchctl >/dev/null 2>&1 && launchctl list "${label}" >/dev/null 2>&1; then
     launchctl unload "${plist_path}" 2>/dev/null || true
     launchctl load "${plist_path}" 2>/dev/null || true
   fi
@@ -89,6 +89,15 @@ function _acg_extend_playwright()   { __acg_stub__acg_extend_playwright "$@"; }
 function acg_extend()               { __acg_stub_acg_extend "$@"; }
 function acg_watch()                { __acg_stub_acg_watch "$@"; }
 function acg_watch_start()          {
+  if [[ "${K3DM_AGENT_LOAD:-1}" == 0 ]]; then
+    local _sandbox_url="${1:-${_ACG_SANDBOX_LIST_URL}}"
+    [[ "$(uname)" == Darwin ]] || return 0
+    _acg_watch_write_wrapper "$_sandbox_url" || return 1
+    _acg_watch_write_plist
+    _acg_watch_retarget_logs
+    _info "[acg] Sandbox watcher plist written; loading deferred"
+    return 0
+  fi
   local _rc=0
   __acg_stub_acg_watch_start "$@" || _rc=$?
   if [[ "${_rc}" -ne 0 ]]; then

@@ -7,6 +7,7 @@ setup() {
   export STATE_BASE="${WORK}/state"
   export CALL_LOG="${WORK}/calls.log"
   mkdir -p "${STUB}" "${FAKE_HOME}/.cloudflared" "${STATE_BASE}/k3s-aws/bin"
+  export RESTORE_BIN="${HUB_RESTORE_SOURCE:-${BATS_TEST_DIRNAME}/../../../bin/hub-restore}"
   printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh"
   printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
   : > "${CALL_LOG}"
@@ -109,7 +110,7 @@ _run_with_tty() {
 }
 
 _run_noninteractive_restore() {
-  run bash -c "bin/hub-restore </dev/null"
+  run bash -c "\"${RESTORE_BIN}\" </dev/null"
 }
 
 teardown() { rm -rf "${WORK}"; }
@@ -132,6 +133,16 @@ teardown() { rm -rf "${WORK}"; }
   run grep -Ec 'launchctl bootstrap .*com\.k3d-manager\.(argocd|keycloak)-port-forward' "${CALL_LOG}"
   [ "${status}" -eq 0 ]
   [ "${output}" -eq 2 ]
+}
+
+@test "hub-restore defers the Cloudflare tunnel when HUB_RESTORE_TUNNEL=skip" {
+  export HUB_RESTORE_TUNNEL=skip
+  export LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  ! grep -q 'cloudflare-tunnel' "$CALL_LOG"
+  [ ! -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" ]
+  [[ "$output" == *'Cloudflare tunnel check: SKIP'* ]]
 }
 
 @test "hub-restore Step 8 does not bootstrap already-loaded port-forward agents" {

@@ -1404,9 +1404,11 @@ function vault_install_failover_watchdog() {
     -e "s|{{HUB_VAULT_FAILOVER_APP_CONTEXT}}|${_app_ctx}|g" \
     "${_tmpl}" > "${_dst}" \
     || { _err "[vault] failed to render ${_dst}"; return 1; }
-  launchctl bootout "gui/$(id -u)/${_label}" >/dev/null 2>&1 || true
-  launchctl bootstrap "gui/$(id -u)" "${_dst}" \
-    || { _err "[vault] failed to bootstrap ${_label}"; return 1; }
+  if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
+    launchctl bootout "gui/$(id -u)/${_label}" >/dev/null 2>&1 || true
+    launchctl bootstrap "gui/$(id -u)" "${_dst}" \
+      || { _err "[vault] failed to bootstrap ${_label}"; return 1; }
+  fi
   _info "[vault] failover watchdog installed (${_label}); probes ${_app_ctx} every 300s"
 }
 

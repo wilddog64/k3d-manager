@@ -110,7 +110,15 @@ SH
 #!/bin/sh
 printf 'git %s\n' "$*" >> "$CALL_LOG"
 case "$1" in
-  -C) printf '%s\n' "${REMOTE_FIXTURE:-https://example.test/existing.git}"; exit 0 ;;
+  -C)
+    case "$2" in
+      "$HOME/.claude") printf '%s\n' https://github.com/wilddog64/claude-settings.git ;;
+      "$HOME/.codex") printf '%s\n' https://github.com/wilddog64/codex-settings.git ;;
+      "$HOME/.gemini") printf '%s\n' https://github.com/wilddog64/gemini-config.git ;;
+      "$HOME/.copilot") printf '%s\n' https://github.com/wilddog64/copilot-config.git ;;
+      *) printf '%s\n' "${REMOTE_FIXTURE:-https://example.test/existing.git}" ;;
+    esac
+    exit 0 ;;
   ls-remote) exit 0 ;;
   clone) exit 1 ;;
 esac
@@ -164,11 +172,21 @@ run_machine() {
 @test "M1/N3: agents skip avoids new installs but preserves installed agents and smartcd" {
   setup_machine_fixture
   printf '%s\n' install-cleanup install-node-health-watch bin/k3dm-webhook-setup smartcd-install > "$FIXROOT/scripts/etc/machine/agents.hub.list"
+  for config in claude-settings codex-settings gemini-config copilot-config; do
+    case "$config" in
+      claude-settings) dir=.claude ;;
+      codex-settings) dir=.codex ;;
+      gemini-config) dir=.gemini ;;
+      copilot-config) dir=.copilot ;;
+    esac
+    mkdir -p "$FIXHOME/$dir/.git"
+  done
   mkdir -p "$FIXHOME/Library/LaunchAgents"
   : > "$FIXHOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
   mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
   touch "$CALL_LOG.installsmartcd"
   REMOTE_FIXTURE='https://github.com/cxreg/smartcd.git' run_machine --role hub --agents skip
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
   printf '%s\n' "$output" | grep -Eq '^agent:install-cleanup +ok$'
   [[ "$output" == *'agent:install-node-health-watch'*'skipped (AGENTS=skip)'* ]]
   [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'skipped (AGENTS=skip)'* ]]

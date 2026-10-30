@@ -25,6 +25,31 @@ if ! declare -F _install_hermes_agent >/dev/null; then
   exit 1
 fi
 
+if [[ "${K3DM_AGENT_LOAD:-1}" == 0 && "${1:-}" != "--uninstall" ]]; then
+  _tmpl="${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.hermes.plist.tmpl"
+  _dst="${HOME}/Library/LaunchAgents/com.k3d-manager.hermes.plist"
+  for _svc in k3dm-webhook-token k3dm-hermes-argocd-token k3dm-hermes-gh-token k3dm-slack-webhook; do
+    security find-generic-password -a k3dm -s "${_svc}" >/dev/null 2>&1 || {
+      echo "[k3dm-hermes-setup] missing read-only Keychain credential: ${_svc}" >&2
+      exit 1
+    }
+  done
+  _rendered="$(<"${_tmpl}")"
+  _patsub_was_set=0
+  if shopt -q patsub_replacement 2>/dev/null; then
+    _patsub_was_set=1
+    shopt -u patsub_replacement
+  fi
+  _rendered="${_rendered//\{\{HERMES_BIN\}\}/${REPO_ROOT}/bin/k3dm-hermes}"
+  _rendered="${_rendered//\{\{K3DM_REPO_ROOT\}\}/${REPO_ROOT}}"
+  _rendered="${_rendered//\{\{HERMES_LOG\}\}/${HOME}/Library/Logs/k3dm-hermes.log}"
+  (( _patsub_was_set )) && shopt -s patsub_replacement
+  mkdir -p "${HOME}/Library/LaunchAgents" "${HOME}/Library/Logs"
+  printf '%s\n' "${_rendered}" > "${_dst}"
+  echo "[k3dm-hermes-setup] LaunchAgent plist written; loading deferred"
+  exit 0
+fi
+
 if [[ "${1:-}" == "--uninstall" ]]; then
   _uninstall_hermes_agent
   exit 0

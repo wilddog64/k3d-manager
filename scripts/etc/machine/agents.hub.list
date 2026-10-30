@@ -3,6 +3,7 @@ smartcd-install
 install-cleanup
 install-node-health-watch
 install-sandbox-reaper
+install-test-metrics
 install-vault-port-forward
 install-prometheus-port-forward
 install-hub-pushgateway-port-forward
