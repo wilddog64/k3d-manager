@@ -98,7 +98,7 @@ function _hub_recovery_restore_signing() {
     _warn "[hub-recovery] could not pin kubeconfig for cosign signing restore; continuing"
     return 0
   fi
-  if ! KUBECONFIG="$kubeconfig" signing_restore; then
+  if ! ( KUBECONFIG="$kubeconfig" signing_restore ); then
     _warn "[hub-recovery] cosign signing restore failed; continuing recovery"
   fi
   rm -f "$kubeconfig"

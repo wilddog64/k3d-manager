@@ -13,6 +13,14 @@
 
 ### Fixed
 
+- **The hub reconcile no longer dies when there is no cosign key to restore.** `_hub_recovery_restore_signing`
+  was meant to warn and continue when `signing_restore` fails, but `signing_restore` reports "no Vault key
+  and no Keychain backup" through `_err`, which exits the process. On a new hub (the M5: empty Vault until
+  the `data` stage, no `k3d-manager-signing` Keychain item) the whole `hub_recovery_reconcile` ended right
+  after the Vault root-token sync, before the hub's ArgoCD registration, and hub-restore Step 5 failed
+  with no reconcile error of its own. `signing_restore` now runs in a subshell, so its exit is caught and
+  the existing "continuing recovery" warning applies.
+
 - **`hub-restore` writes the ArgoCD and Keycloak port-forward wrappers when they are missing.** The
   wrappers were only ever written by the ACG `bin/cluster-up` path, so on a hub built with k3d alone
   (the M5) Step 8 failed with `wrapper ... missing; run make up once to generate it`, and `make up` on a

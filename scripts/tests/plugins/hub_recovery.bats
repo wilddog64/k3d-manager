@@ -532,6 +532,21 @@ STUB
   [ -z "$(ls -A "$tmp")" ]
 }
 
+@test "_hub_recovery_restore_signing: a signing_restore that exits (via _err) warns and continues" {
+  local tmp="${BATS_TEST_TMPDIR}/t" after="${BATS_TEST_TMPDIR}/after"
+  mkdir -p "$tmp"
+  [[ "$tmp" == "${BATS_TEST_TMPDIR}"/* ]]
+  _kubectl() { printf 'apiVersion: v1\ncurrent-context: %s\n' "$3"; }
+  signing_restore() { echo "ERROR: [signing] no Vault key and no Keychain backup" >&2; exit 1; }
+  _warn() { echo "WARN $*"; }
+  run bash -c 'source /dev/stdin <<<"$1"; TMPDIR="$2" _hub_recovery_restore_signing k3d-k3d-cluster; echo continued >"$3"' _ \
+    "$(declare -f _kubectl signing_restore _warn _hub_recovery_restore_signing)" "$tmp" "$after"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$after")" = continued ]
+  [[ "$output" == *"cosign signing restore failed; continuing recovery"* ]]
+  [ -z "$(ls -A "$tmp")" ]
+}
+
 @test "_hub_recovery_restore_signing: a pin failure warns, skips the restore and leaves no temp file" {
   local tmp="${BATS_TEST_TMPDIR}/t" called="${BATS_TEST_TMPDIR}/called"
   mkdir -p "$tmp"
