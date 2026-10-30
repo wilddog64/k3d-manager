@@ -156,7 +156,10 @@ def test_metrics_calls_shipper_only_after_successful_non_dry_push(monkeypatch, t
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
     monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(tmp_path / "agents"))
     monkeypatch.setattr(metrics.urllib.request, "urlopen", lambda *_a, **_k: type("Response", (), {"__enter__": lambda s: s, "__exit__": lambda *_: None})())
-    monkeypatch.setattr(metrics, "_verified_specs", lambda *_a: {"1d": 0, "7d": 0, "30d": 0})
+    monkeypatch.setattr(metrics, "_verified_specs", lambda *_a: {
+        window: {level: 0 for level in ("live", "verified", "unverified")}
+        for window in ("1d", "7d", "30d")
+    })
     calls = []
     monkeypatch.setattr(metrics.subprocess, "run", lambda *a, **_k: calls.append(a) or type("Result", (), {"returncode": 0, "stdout": ""})())
     assert metrics.main(["--prices", str(tmp_path / "missing")]) == 0
