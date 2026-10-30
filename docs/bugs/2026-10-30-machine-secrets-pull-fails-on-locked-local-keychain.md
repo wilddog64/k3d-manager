@@ -1,6 +1,6 @@
 # Bug: secrets pull fails on a locked local keychain, and setup has no way to skip secret prompts
 
-**Status:** FIXED — `67391f97` (Luna, amended by Claude); live check E3 pending on the M5
+**Status:** FIXED — `67391f97` (Luna, amended by Claude); E3 passed live on the M5 2026-10-30
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead", after the M5 pull run)
 **Filed:** 2026-10-30
@@ -63,6 +63,11 @@ no-op in bats and now ends with `|| false`. Outside the sandbox: 72 ok, 0 skippe
 Mutation checks on temp copies turned a test red for each guard: no local unlock, always prompt,
 unlock failure ignored, password passed with `-p`, no skip branch, no value check, no Make forward,
 and default `skip`.
+
+**Live check E3 (2026-10-30).** The operator ran `make machine-setup ROLE=hub FROM=m4-air.local
+SECRETS=skip` on the M5 at `deef0217`. All 15 records were exported and copied, every `secret:` line
+read `ok`, and no `[y/N]` prompt appeared. The local keychain was already unlocked, so no local prompt
+(M2). Setup then failed later in the agent stage (Hermes credentials missing), which is outside this bug.
 
 ## Files
 
