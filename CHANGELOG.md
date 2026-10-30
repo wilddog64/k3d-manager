@@ -7,6 +7,10 @@
 - Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.
 - Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
 
+### Fixed
+
+- Fix machine setup on a real terminal: the manifest loops read their lists on fd 3 so secret prompts, setup scripts, `brew install` and `sudo` see the terminal; install output goes to `~/.local/state/k3d-manager/machine-setup.log` instead of `/dev/null`. The setup guide adds OrbStack's first launch.
+
 ## [1.43.9] - 2026-10-29
 
 ### Added

@@ -1,6 +1,6 @@
 # Machine setup
 
-`make machine-setup ROLE=hub|worker|console` installs the tools and repositories in the matching `scripts/etc/machine/` manifests. `make machine-check ROLE=...` prints a redacted inventory and exits nonzero when an item is missing. `--check` and `--dry-run` are read-only.
+`make machine-setup ROLE=hub|worker|console` installs the tools and repositories in the matching `scripts/etc/machine/` manifests. `make machine-check ROLE=...` prints a redacted inventory and exits nonzero when an item is missing. `--check` and `--dry-run` are read-only. Install output (Homebrew, git clone, `make install-*`) goes to `~/.local/state/k3d-manager/machine-setup.log` (mode 600); a failed install reports `missing (see machine-setup.log)`. Run setup from a terminal: secret prompts and the hub setup scripts need it.
 
 Ruff and pytest come from `PATH` or from the setup-managed `${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv/bin`; add that directory to `PATH` when using the managed venv.
 
@@ -17,9 +17,10 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 ## M5 hub cut-over
 
 1. Read and run the bootstrap, then `make machine-setup ROLE=hub` on the M5.
-2. Re-enter secrets at the TTY when prompted. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
-3. Restore the hub by following [Hub snapshots](hub-snapshots.md). This tool does not move cluster data.
-4. Verify the restored hub services and operator access before moving responsibility from the M4. Only then explicitly retire the former hub services.
+2. Open OrbStack once (`open -a OrbStack`), accept its first-run screens and approve its helper with your admin password; setup installs the cask but cannot do this step, and `machine-check` does not test it. Wait for `orbctl status` to print `Running`.
+3. Re-enter secrets at the TTY when prompted. Run `make machine-check ROLE=hub` twice and confirm the second report is all `ok`.
+4. Restore the hub by following [Hub snapshots](hub-snapshots.md). This tool does not move cluster data.
+5. Verify the restored hub services and operator access before moving responsibility from the M4. Only then explicitly retire the former hub services.
 
 ## Secrets and machine-only keys
 

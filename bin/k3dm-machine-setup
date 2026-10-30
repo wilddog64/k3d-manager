@@ -22,7 +22,13 @@ case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
 
+setup_log="${XDG_STATE_HOME:-$HOME/.local/state}/k3d-manager/machine-setup.log"
 report() { printf '%-32s %s\n' "$1" "$2"; }
+log_install() {
+  if [[ ! -e "$setup_log" ]]; then mkdir -p "$(dirname "$setup_log")" && (umask 077 && : > "$setup_log"); fi
+  printf '== %s\n' "$*" >> "$setup_log"
+  "$@" >> "$setup_log" 2>&1
+}
 record_failure() { failed=1; report "$1" "$2"; }
 verify_homebrew_package() {
   local signature
@@ -121,18 +127,18 @@ install_smartcd() {
 
 install_tools() {
   local raw kind name
-  while IFS= read -r raw || [[ -n "$raw" ]]; do
+  while IFS= read -r raw <&3 || [[ -n "$raw" ]]; do
     raw="${raw%%#*}"; raw="${raw//[$'\t\r']/}"
     [[ -n "${raw// /}" ]] || continue
     kind=formula; name="$raw"
     case "$raw" in cask:*) kind=cask; name="${raw#cask:}" ;; formula:*) name="${raw#formula:}" ;; esac
     if brew list "--${kind}" "$name" >/dev/null 2>&1; then report "brew:${name}" ok
     elif [[ "$mode" == setup ]]; then
-      if if [[ "$kind" == cask ]]; then brew install --cask "$name"; else brew install "$name"; fi >/dev/null 2>&1; then report "brew:${name}" installed
-      else record_failure "brew:${name}" missing; fi
+      if if [[ "$kind" == cask ]]; then log_install brew install --cask "$name"; else log_install brew install "$name"; fi; then report "brew:${name}" installed
+      else record_failure "brew:${name}" 'missing (see machine-setup.log)'; fi
     else record_failure "brew:${name}" missing
     fi
-  done < "${manifest_dir}/brew.${role}.list"
+  done 3< "${manifest_dir}/brew.${role}.list"
 }
 
 ensure_python_tools() {
@@ -163,20 +169,20 @@ clone_if_absent() {
   if ! mkdir -p "$(dirname "$target")"; then record_failure "repo:${path}" missing; return; fi
   if [[ "$branch" != - ]] && ! git ls-remote --exit-code --heads "$remote" "$branch" >/dev/null 2>&1; then record_failure "repo:${path}" 'skipped (branch unavailable upstream)'; return; fi
   if [[ "$branch" == - ]]; then
-    if git clone "$remote" "$target" >/dev/null 2>&1; then report "repo:${path}" installed
-    else record_failure "repo:${path}" missing; fi
-  elif git clone --branch "$branch" --single-branch "$remote" "$target" >/dev/null 2>&1; then report "repo:${path}" installed
-  else record_failure "repo:${path}" missing; fi
+    if log_install git clone "$remote" "$target"; then report "repo:${path}" installed
+    else record_failure "repo:${path}" 'missing (see machine-setup.log)'; fi
+  elif log_install git clone --branch "$branch" --single-branch "$remote" "$target"; then report "repo:${path}" installed
+  else record_failure "repo:${path}" 'missing (see machine-setup.log)'; fi
 }
 
 install_repos() {
   local path remote branch roles
-  while IFS='|' read -r path remote branch roles; do
+  while IFS='|' read -r path remote branch roles <&3; do
     [[ -n "$path" && "$path" != \#* ]] || continue
     case ",$roles," in *",$role,"*) ;; *) continue ;; esac
     case "$remote" in SKIP:*) report "repo:${path}" "skipped (${remote#SKIP: })"; continue ;; esac
     clone_if_absent "$path" "$remote" "$branch"
-  done < "${manifest_dir}/repos.list"
+  done 3< "${manifest_dir}/repos.list"
   clone_configs
   setup_shell_links
 }
@@ -262,7 +268,7 @@ secret_present() {
 
 check_secrets() {
   local service account purpose command
-  while IFS='|' read -r service account purpose command; do
+  while IFS='|' read -r service account purpose command <&3; do
     [[ -n "$service" && "$service" != \#* ]] || continue
     local lookup_account="$account"
     if [[ "$account" == USER ]]; then lookup_account="$(id -un)"; fi
@@ -277,7 +283,7 @@ check_secrets() {
         else record_failure "secret:${service}" missing; fi
       else record_failure "secret:${service}" missing; fi
     else record_failure "secret:${service}" missing; fi
-  done < "${manifest_dir}/secrets.${role}.list"
+  done 3< "${manifest_dir}/secrets.${role}.list"
 }
 
 is_hub_agent() {
@@ -310,8 +316,8 @@ perform_agent_install() {
   if [[ "$target" == bin/k3dm-heartbeat-setup ]]; then render_heartbeat "$target"; return; fi
   if [[ "$target" == bin/* ]]; then
     if "$REPO_ROOT/$target" </dev/tty; then report "agent:${target}" installed; else record_failure "agent:${target}" missing; fi
-  elif make -C "$REPO_ROOT" "$target" >/dev/null 2>&1; then report "agent:${target}" installed
-  else record_failure "agent:${target}" missing; fi
+  elif log_install make -C "$REPO_ROOT" "$target"; then report "agent:${target}" installed
+  else record_failure "agent:${target}" 'missing (see machine-setup.log)'; fi
 }
 
 run_one_agent() {
@@ -327,11 +333,11 @@ run_one_agent() {
 
 run_agents() {
   local target
-  while IFS= read -r target || [[ -n "$target" ]]; do
+  while IFS= read -r target <&3 || [[ -n "$target" ]]; do
     target="${target%%#*}"; target="${target//[$'\t\r ']/}"
     [[ -n "$target" ]] || continue
     run_one_agent "$target"
-  done < "${manifest_dir}/agents.${role}.list"
+  done 3< "${manifest_dir}/agents.${role}.list"
 }
 
 preflight

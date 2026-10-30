@@ -511,3 +511,61 @@ Notarization: trusted by the Apple notary service'; do
     done
   done
 }
+
+@test "machine setup: manifest loops keep stdin for children that read it" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = list ] && exit 1
+cat >/dev/null
+exit 0
+SH
+  cat > "$STUBS/make" <<'SH'
+#!/bin/sh
+printf 'make %s\n' "$*" >> "$CALL_LOG"
+cat >/dev/null
+exit 0
+SH
+  chmod +x "$STUBS/brew" "$STUBS/make"
+  printf '%s\n' one two cask:three > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  printf '%s\n' target-a target-b target-c > "$FIXROOT/scripts/etc/machine/agents.console.list"
+  run_machine --role console </dev/null
+  [[ "$output" == *'brew:one'*'installed'* ]] || { printf '%s\n' "$output"; return 1; }
+  [[ "$output" == *'brew:two'*'installed'* ]] || { printf '%s\n' "$output"; return 1; }
+  [[ "$output" == *'brew:three'*'installed'* ]] || { printf '%s\n' "$output"; return 1; }
+  [[ "$output" == *'agent:target-c'*'installed'* ]] || { printf '%s\n' "$output"; return 1; }
+  [ "$(grep -c '^brew install' "$CALL_LOG")" -eq 3 ]
+}
+
+@test "machine setup: no manifest loop reads its list on stdin" {
+  run grep -nE 'done < "\$\{manifest_dir\}' "$SCRIPT_SOURCE"
+  [ "$status" -eq 1 ]
+}
+
+@test "machine setup: failed install output goes to the setup log, not the report" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = list ] && exit 1
+echo "Error: fixture install failure for $2"
+exit 1
+SH
+  chmod +x "$STUBS/brew"
+  printf '%s\n' broken > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  run_machine --role console
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'brew:broken'*'missing (see machine-setup.log)'* ]] || { printf '%s\n' "$output"; return 1; }
+  [[ "$output" != *'fixture install failure'* ]]
+  [[ "$output" != *"$FIXHOME"* ]]
+  grep -q 'fixture install failure for broken' "$FIXHOME/.local/state/k3d-manager/machine-setup.log"
+  [ -n "$(find "$FIXHOME/.local/state/k3d-manager/machine-setup.log" -perm 600)" ]
+}
+
+@test "machine setup: check mode writes no setup log" {
+  setup_machine_fixture
+  printf '%s\n' absent > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  run_machine --role console --check
+  [ ! -e "$FIXHOME/.local/state/k3d-manager/machine-setup.log" ]
+}
