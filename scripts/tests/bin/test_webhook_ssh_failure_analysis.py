@@ -18,7 +18,8 @@ spec.loader.exec_module(webhook)
 def test_ssh_timeout_analysis_requires_evidence_and_safe_stack_inspection(monkeypatch):
     prompts = []
     monkeypatch.setattr(webhook, "_collect_cluster_state", lambda: "")
-    monkeypatch.setattr(webhook, "_call_gemini", lambda prompt: prompts.append(prompt) or "analysis")
+    reply = "APP_FAILURE\nTRANSIENT\nObserved SSH readiness timeout.\nRetry by sending /cluster-resume in Slack"
+    monkeypatch.setattr(webhook, "_call_gemini", lambda prompt: prompts.append(prompt) or reply)
 
     result = webhook._analyze_failure(
         [
@@ -26,7 +27,7 @@ def test_ssh_timeout_analysis_requires_evidence_and_safe_stack_inspection(monkey
         ]
     )
 
-    assert result == "analysis"
+    assert result == reply  # agent-audit: allow assert-removed a free-text stub reply now fails the format check; the stub is a well-formed reply
     assert len(prompts) == 1
     prompt = prompts[0]
     assert "using only observed evidence" in prompt

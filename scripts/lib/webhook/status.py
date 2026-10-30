@@ -7,6 +7,7 @@ from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
 from webhook.render import _slack_post, _post_slack_bot, _start_bot_thread
 from webhook.agent import _call_gemini
+from webhook.untrusted import fence, filter_suggestion
 from webhook.redact import mask_env_values, scrub_credentials
 
 __all__ = [
@@ -317,8 +318,8 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, cha
                     diag_parts.append(f"Pod state ({ns}):\n{pod_state_out.strip()[:800]}")
             prompt = (
                 _ARCH_CONTEXT + "\n"
-                f"Service `{svc_name}` failed an HTTP smoke test. Error: {err_detail}\n\n"
-                "Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
+                f"Service `{svc_name}` failed an HTTP smoke test.\n\n"
+                "Diagnostics:\n" + fence("cluster diagnostics", "\n\n".join(diag_parts) + "\nError: " + err_detail) + "\n\n"
                 "Is this a TRANSIENT issue (pod still starting, port-forward not ready, "
                 "ESO secret not yet synced — will resolve in a few minutes) or a REAL FAILURE "
                 "(crash loop, missing secret, misconfiguration — needs human action)?\n"
@@ -326,7 +327,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, cha
                 "Reply with TRANSIENT or REAL FAILURE, then one sentence with the most likely "
                 "cause. Be brief."
             )
-            analysis = _call_gemini(prompt)
+            analysis = filter_suggestion(_call_gemini(prompt))
             _write_log(f"\n🔍 *{svc_name}:* {analysis}")
 
         _finish("success")

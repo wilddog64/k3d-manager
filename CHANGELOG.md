@@ -17,6 +17,10 @@
 - Link the fixed docs in an `/ask-docs` bug count: a named-release or last-N count now lists each fixed doc of the asked priority as a Slack link (capped at ten, with an "and N more" line), so a release where every bug is fixed no longer answers with a bare number and `Sources: none`. Open-only and all-releases counts stay short. (`docs/bugs/2026-10-30-ask-docs-bug-count-does-not-link-fixed-docs.md`)
 - Fix machine setup on a real terminal: the manifest loops read their lists on fd 3 so secret prompts, setup scripts, `brew install` and `sudo` see the terminal; install output goes to `~/.local/state/k3d-manager/machine-setup.log` instead of `/dev/null`. The setup guide adds OrbStack's first launch.
 
+### Security
+
+- Fence untrusted webhook logs and cluster diagnostics before AI analysis, validate failure-analysis reply format, and withhold links and commands outside the read-only allow-list.
+
 ## [1.43.9] - 2026-10-29
 
 ### Added
