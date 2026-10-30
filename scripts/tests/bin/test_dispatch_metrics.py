@@ -1088,10 +1088,14 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
     assert properties["decimals"] == 2
     verified = by_title["Claude cost per verified spec"]["targets"][0]["expr"]
     live = by_title["Claude cost per live-verified resolution"]["targets"][0]["expr"]
-    assert verified == ('k3dm_dispatch_claude_api_cost_usd{window="$window"} / '
+    assert verified == ('sum by (window) (k3dm_dispatch_claude_api_cost_usd{window="$window"}) / '
                         '(sum by (window) (k3dm_claude_verified_specs{window="$window"}) > 0)')
-    assert live == ('k3dm_dispatch_claude_api_cost_usd{window="$window"} / '
+    assert live == ('sum by (window) (k3dm_dispatch_claude_api_cost_usd{window="$window"}) / '
                     '(sum by (window) (k3dm_claude_verified_specs{window="$window",level="live"}) > 0)')
+    # agent-audit: allow assert-removed both cost exprs now aggregate the numerator by window; asserts updated, not dropped
+    for expr in (verified, live):
+        numerator, denominator = expr.split(" / ", 1)
+        assert numerator.startswith("sum by (window) (") and denominator.startswith("(sum by (window) (")
     boxes = []
     for panel in dashboard["panels"]:
         pos = panel.get("gridPos")

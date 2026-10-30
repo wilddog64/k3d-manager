@@ -634,7 +634,7 @@ data:
           },
           "targets": [
             {
-              "expr": "k3dm_dispatch_claude_api_cost_usd{window=\"$window\"} / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\"}) > 0)",
+              "expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\"}) > 0)",
               "instant": true
             }
           ],
@@ -845,7 +845,7 @@ data:
           },
           "targets": [
             {
-              "expr": "k3dm_dispatch_claude_api_cost_usd{window=\"$window\"} / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)",
+              "expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)",
               "instant": true
             }
           ],
