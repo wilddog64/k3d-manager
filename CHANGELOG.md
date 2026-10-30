@@ -13,6 +13,17 @@
 
 ### Fixed
 
+- **`make hub-new` runs the hub reconcile after the data restore, not before it.** The reconcile ran
+  inside `hub-restore`, two stages before `data` restores the Vault PVC from the old hub. On the M5
+  Vault was still empty, so `keycloak/admin` and `keycloak/clients` did not exist, the
+  `keycloak-secrets` ExternalSecret never synced, `postgres-keycloak` sat in
+  `CreateContainerConfigError`, and the identity hook replay failed after its 300-second wait.
+  `hub-new` now passes `HUB_RESTORE_RECONCILE=skip` to `hub-restore` (Step 5 reports SKIP) and runs
+  the reconcile as its own `reconcile` stage between `data` and `platform`. That stage points the
+  smoke-user seed at the new hub's own Keycloak (`http://localhost:8880`) and the ArgoCD admin check
+  at its own ArgoCD (`http://localhost:8080`); before cutover the public `*.3ai-talk.org` names still
+  reach the old hub. `HUB_NEW_KEYCLOAK_URL` and `HUB_NEW_ARGOCD_URL` override them. A standalone
+  `bin/hub-restore` still runs the reconcile.
 - **The hub reconcile skips the Hostinger CVE reader seed when the app context is missing, instead of
   exiting.** `_hub_recovery_seed_app_cluster_reader` guarded the seed with `if ! _kubectl -- --context
   ubuntu-hostinger get namespace platform`, but `_kubectl` exits the process on a failed call unless it

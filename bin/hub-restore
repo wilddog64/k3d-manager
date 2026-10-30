@@ -106,7 +106,10 @@ else
 fi
 
 _step_start 5
-if "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_RECONCILE:-}" == skip ]]; then
+  _info "[hub-restore] Hub reconcile: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 6
 _embeddings_key_length() {

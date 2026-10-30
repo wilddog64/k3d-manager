@@ -155,6 +155,21 @@ teardown() { rm -rf "${WORK}"; }
   [ "$status" -eq 1 ]
 }
 
+@test "HUB_RESTORE_RECONCILE=skip defers the hub reconcile on a hub whose Vault data is not restored yet" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip HUB_RESTORE_RECONCILE=skip LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Hub reconcile: SKIP'* ]]
+  run grep -q 'hub_recovery_reconcile' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "without HUB_RESTORE_RECONCILE, the hub reconcile runs" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip LOADED_PF=both
+  _run_noninteractive_restore
+  grep -q 'hub_recovery_reconcile --confirm' "$CALL_LOG"
+}
+
 @test "without HUB_RESTORE_PLATFORM, observability and platform-ops run and a down Grafana fails the restore" {
   export HUB_RESTORE_TUNNEL=skip GRAFANA_MODE=always-fail LOADED_PF=both
   _run_noninteractive_restore

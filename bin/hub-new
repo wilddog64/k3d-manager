@@ -21,7 +21,7 @@ NEW_HOST="${HUB_NEW_HOST:-m5-air}"
 CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 SINGLETONS="${REPO_ROOT}/scripts/etc/machine/hub-singletons.list"
 export K3DM_AGENT_LOAD=0
-STAGES=(preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data platform verify)
+STAGES=(preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify)
 say() { printf '[hub-new] %s\n' "$*"; }
 fail() {
   say "FAIL: $1" >&2
@@ -83,7 +83,7 @@ secrets_present() {
   done
 }
 hub_up() { bin/hub-up; }
-hub_restore() { HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
+hub_restore() { HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip HUB_RESTORE_RECONCILE=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
 prepare_singletons() {
   local label installer _note plist missing="" tunnel_done=0
   while IFS='|' read -r label installer _note; do
@@ -116,6 +116,7 @@ prepare_singletons() {
   done < "$SINGLETONS"
 }
 data_recover() { make hub-data-recover; }
+reconcile() { KEYCLOAK_BASE_URL="${HUB_NEW_KEYCLOAK_URL:-http://localhost:8880}" HUB_RECOVERY_ARGOCD_URL="${HUB_NEW_ARGOCD_URL:-http://localhost:8080}" K3DM_AGENT_LOAD=0 scripts/k3d-manager hub_recovery_reconcile --confirm; }
 platform() { make appsets-reapply && make appsets-check && make platform-ops && make observability; }
 verify_hub() {
   local context="k3d-${CLUSTER}" server="k3d-${CLUSTER}-server-0" apps externals kine count elapsed retry_at checks label kine_bytes wal_bytes
@@ -163,6 +164,7 @@ for _stage in "${STAGES[@]}"; do
     hub-restore) run_stage "$_stage" hub_restore ;;
     prepare-singletons) run_stage "$_stage" prepare_singletons ;;
     data) run_stage "$_stage" data_recover ;;
+    reconcile) run_stage "$_stage" reconcile ;;
     platform) run_stage "$_stage" platform ;;
     verify) run_stage "$_stage" verify_hub ;;
   esac

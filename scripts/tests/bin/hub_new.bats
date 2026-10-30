@@ -98,7 +98,7 @@ STUB
 source "$WORK/record"
 STUB
     cat >> "$ROOT/$script" <<'STUB'
-record "$(basename "$0")" "$* HUB_RESTORE_TUNNEL=${HUB_RESTORE_TUNNEL:-unset} HUB_RESTORE_PLATFORM=${HUB_RESTORE_PLATFORM:-unset} TUNNEL_SSH_HOST=${TUNNEL_SSH_HOST:-unset}"
+record "$(basename "$0")" "$* HUB_RESTORE_TUNNEL=${HUB_RESTORE_TUNNEL:-unset} HUB_RESTORE_PLATFORM=${HUB_RESTORE_PLATFORM:-unset} HUB_RESTORE_RECONCILE=${HUB_RESTORE_RECONCILE:-unset} KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-unset} HUB_RECOVERY_ARGOCD_URL=${HUB_RECOVERY_ARGOCD_URL:-unset} TUNNEL_SSH_HOST=${TUNNEL_SSH_HOST:-unset}"
 case "$(basename "$0") ${1:-}" in
   'k3dm-webhook-setup '*) plist webhook ;;
   'k3dm-hermes-setup '*) plist hermes ;;
@@ -126,8 +126,8 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   run "$HUB_NEW_BIN"
   [ "$status" -eq 0 ]
   [ "$(grep -oE '^\[hub-new\] [a-z-]+: PASS' <<<"$output" | awk '{print $2}' | tr -d : | paste -sd' ' -)" = \
-    'preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data platform verify' ]
-  jq -e '.status == "pass" and ([.stages[].stage] | length) == 9 and .checks.kine_compaction_cycles == 6 and .checks.kine_datastore_bytes == "4096"' \
+    'preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify' ]
+  jq -e '.status == "pass" and ([.stages[].stage] | length) == 10 and .checks.kine_compaction_cycles == 6 and .checks.kine_datastore_bytes == "4096"' \
     "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
   grep -q '^make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip ' "$CALLS"
   grep -q '^hub-up ' "$CALLS"
@@ -146,6 +146,22 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ -n "$data_line" ] && [ -n "$obs_line" ] && [ -n "$ops_line" ]
   [ "$obs_line" -gt "$data_line" ]
   [ "$ops_line" -gt "$data_line" ]
+}
+
+@test "the hub reconcile waits for the data restore and uses the new hub's own Keycloak and ArgoCD" {
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  grep -q '^hub-restore .*HUB_RESTORE_RECONCILE=skip' "$CALLS"
+  rec="$(grep -n '^k3d-manager hub_recovery_reconcile --confirm ' "$CALLS")"
+  [ "$(grep -c '^k3d-manager hub_recovery_reconcile' "$CALLS")" -eq 1 ]
+  [[ "$rec" == *'KEYCLOAK_BASE_URL=http://localhost:8880 '* ]]
+  [[ "$rec" == *'HUB_RECOVERY_ARGOCD_URL=http://localhost:8080 '* ]]
+  rec_line="${rec%%:*}"
+  data_line="$(grep -n '^make hub-data-recover' "$CALLS" | head -1 | cut -d: -f1)"
+  reapply_line="$(grep -n '^make appsets-reapply' "$CALLS" | head -1 | cut -d: -f1)"
+  [ -n "$data_line" ] && [ -n "$reapply_line" ]
+  [ "$rec_line" -gt "$data_line" ]
+  [ "$rec_line" -lt "$reapply_line" ]
 }
 
 @test "M1/N1: every child runs with K3DM_AGENT_LOAD=0 and every singleton plist is written" {
@@ -279,7 +295,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
 
 @test "M2: HUB_NEW_FROM restarts at that stage and reruns the stages after it" {
   mkdir -p "$HUB_NEW_STATE_DIR"
-  printf '%s=pass 1\n' preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data platform verify > "$HUB_NEW_STATE_DIR/state"
+  printf '%s=pass 1\n' preflight machine-setup secrets-present hub-up hub-restore prepare-singletons data reconcile platform verify > "$HUB_NEW_STATE_DIR/state"
   export HUB_NEW_FROM=platform
   run "$HUB_NEW_BIN"
   [ "$status" -eq 0 ]
