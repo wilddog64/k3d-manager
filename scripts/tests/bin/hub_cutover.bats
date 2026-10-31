@@ -413,7 +413,7 @@ for label, port in (("hub-pushgateway-port-forward", "19094"), ("hub-loki-port-f
     with open(path, 'rb') as f: current = plistlib.load(f)
     with open(path + '.pre-cutover', 'rb') as f: original = plistlib.load(f)
     assert original['ProgramArguments'] == ['kubectl']
-    assert current['ProgramArguments'] == ['/usr/bin/ssh', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    assert current['ProgramArguments'] == ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
     assert current['KeepAlive'] and current['StandardOutPath'] == '/tmp/forward.log'
 PYCODE
   grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"

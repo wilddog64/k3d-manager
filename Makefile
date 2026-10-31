@@ -50,7 +50,7 @@ hub-new:
 hub-cutover:
 	@bin/hub-cutover
 
-hub-cutover-forwards:
+hub-cutover-forwards: hub-cutover-verify
 	@bin/hub-cutover --forwards
 
 hub-cutover-verify:
@@ -1610,7 +1610,7 @@ help:
 	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
 	@echo "    make hub-cutover  Move single-instance agents from the old hub to the new hub"
 	@echo "    make hub-cutover-verify    Re-run cutover verification and record the result"
-	@echo "    make hub-cutover-forwards  Re-point old-hub push forwards to the new hub"
+	@echo "    make hub-cutover-forwards  Re-verify, then re-point old-hub push forwards to the new hub"
 	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"

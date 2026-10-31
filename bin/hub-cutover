@@ -233,7 +233,7 @@ else:
     if not os.path.exists(backup):
         with open(path, 'rb') as source, open(backup, 'xb') as target:
             shutil.copyfileobj(source, target)
-    original['ProgramArguments'] = ['/usr/bin/ssh', '-N', '-o', 'BatchMode=yes', '-o',
+    original['ProgramArguments'] = ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o',
         'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o',
         'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, host]
     original.pop('Program', None)
