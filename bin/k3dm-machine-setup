@@ -309,6 +309,20 @@ check_secrets() {
   done 3< "${manifest_dir}/secrets.${role}.list"
 }
 
+ensure_operator_include() {
+  local config="$HOME/.ssh/config" backup="$HOME/.ssh/config.pre-machine-setup" temp
+  [[ "$mode" == setup ]] || return 0
+  if [[ -f "$config" ]] && grep -Fxq 'Include ~/.ssh/config.d/operator' "$config"; then
+    chmod 600 "$config"
+    return 0
+  fi
+  if [[ -e "$config" && ! -e "$backup" ]]; then cp -p "$config" "$backup"; fi
+  temp="$(mktemp "$HOME/.ssh/config.XXXXXX")"
+  { printf '%s\n' 'Include ~/.ssh/config.d/operator'; if [[ -f "$config" ]]; then cat "$config"; fi; } > "$temp"
+  chmod 600 "$temp"
+  mv "$temp" "$config"
+}
+
 copy_files() {
   local list="${manifest_dir}/files.${role}.list" path target partial
   [[ -r "$list" ]] || return 0
@@ -317,14 +331,19 @@ copy_files() {
     [[ -n "$path" ]] || continue
     if [[ ! "$path" =~ ^[A-Za-z0-9._/-]+$ || "$path" == /* || "$path" == *..* || "$path" != */* ]]; then record_failure "file:${path}" 'rejected (bad path)'; continue; fi
     target="$HOME/$path"
-    if [[ -s "$target" ]]; then report "file:~/${path}" ok; continue; fi
+    if [[ -s "$target" ]]; then
+      [[ "$path" != .ssh/config.d/operator ]] || ensure_operator_include
+      report "file:~/${path}" ok; continue
+    fi
     if [[ -z "$from_host" || "$mode" == check ]]; then record_failure "file:~/${path}" 'missing (rerun with FROM=<old Mac hostname> to copy it)'; continue; fi
     if [[ ! "$from_host" =~ ^[A-Za-z0-9.-]+$ ]]; then record_failure "file:~/${path}" 'missing (invalid FROM host)'; continue; fi
     if [[ "$mode" == dry-run ]]; then report "file:~/${path}" "would copy from $from_host"; continue; fi
     mkdir -p "${target%/*}"; chmod 700 "${target%/*}"
     partial="${target}.k3dm-partial"
     if scp -q -o ConnectTimeout=10 -- "${from_host}:${path}" "$partial" && [[ -s "$partial" ]]; then
-      chmod 600 "$partial"; mv "$partial" "$target"; report "file:~/${path}" "copied from $from_host"
+      chmod 600 "$partial"; mv "$partial" "$target"
+      [[ "$path" != .ssh/config.d/operator ]] || ensure_operator_include
+      report "file:~/${path}" "copied from $from_host"
     else
       rm -f "$partial"; record_failure "file:~/${path}" "missing (copy from $from_host failed)"
     fi

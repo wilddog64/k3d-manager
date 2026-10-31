@@ -66,11 +66,13 @@ def test_push_failure_is_non_fatal(monkeypatch, capsys):
 
 
 def test_default_m2_target_is_the_snapshot_dir(monkeypatch):
+    monkeypatch.setattr(disk.subprocess, "run", lambda *_args, **_kwargs: _run("m5-air\n"))
     monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
     assert ("m2", "m2jump", "k3dm-snapshots") in disk._targets()
 
 
 def test_default_targets_include_hostinger_root(monkeypatch):
+    monkeypatch.setattr(disk.subprocess, "run", lambda *_args, **_kwargs: _run("m5-air\n"))
     monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
     assert ("hostinger", "hostinger", "/") in disk._targets()
 
@@ -93,3 +95,29 @@ def test_hostinger_probe_uses_key_user_and_host(monkeypatch, capsys):
     assert command[command.index("--") + 1] == "u@h.example"
     assert command[-3:] == ["df", "-Pk", "/"]
     assert 'k3dm_disk_probe_success{host="hostinger",path="/"} 1' in output
+
+
+def test_fleet_defaults_and_override(monkeypatch):
+    calls = []
+    def scutil(command, **kwargs):
+        calls.append(command)
+        return _run("m5-air\n")
+    monkeypatch.setattr(disk.subprocess, "run", scutil)
+    monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
+    assert disk._targets() == [("m5", "local", "/System/Volumes/Data"),
+                               ("m2", "m2jump", "k3dm-snapshots"),
+                               ("m4", "m4-air.local", "/System/Volumes/Data"),
+                               ("hostinger", "hostinger", "/")]
+    assert calls == [["scutil", "--get", "LocalHostName"]]
+    monkeypatch.setenv("K3DM_DISK_TARGETS", "custom=local:/custom")
+    assert disk._targets() == [("custom", "local", "/custom")]
+    assert len(calls) == 1
+
+
+def test_m4_defaults_exclude_self(monkeypatch):
+    monkeypatch.delenv("K3DM_DISK_TARGETS", raising=False)
+    monkeypatch.setattr(disk.subprocess, "run", lambda *_args, **_kwargs: _run("m4-air\n"))
+    targets = disk._targets()
+    assert ("m4", "local", "/System/Volumes/Data") in targets
+    assert ("m5", "m5-air.local", "/System/Volumes/Data") in targets
+    assert not any(host == "m4-air.local" for _, host, _ in targets)

@@ -800,3 +800,35 @@ SH
   grep -q '^platform-ops-app-rebuild|k3dm|' "$MACHINE_DIR/secrets.hub.list"
   grep -q '^platform-ops-git-writer|k3dm|' "$MACHINE_DIR/secrets.hub.list"
 }
+
+@test "files: operator fragment installs Include once and preserves backup" {
+  files_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR"/* && "$FIXHOME" != "$HOME" ]]
+  printf '%s\n' '.ssh/config.d/operator' > "$FIXROOT/scripts/etc/machine/files.hub.list"
+  mkdir -p "$FIXHOME/.ssh"
+  printf 'Host example\n  User example\n' > "$FIXHOME/.ssh/config"
+  run_machine --role hub --from old-mac.local
+  [[ "$output" == *"file:~/.ssh/config.d/operator"* ]]
+  [ "$(head -1 "$FIXHOME/.ssh/config")" = 'Include ~/.ssh/config.d/operator' ]
+  [ "$(ls -l "$FIXHOME/.ssh/config" | cut -c1-10)" = '-rw-------' ]
+  printf 'Host example\n  User example\n' > "$BATS_TEST_TMPDIR/expected-backup"
+  cmp "$BATS_TEST_TMPDIR/expected-backup" "$FIXHOME/.ssh/config.pre-machine-setup"
+  cp "$FIXHOME/.ssh/config" "$BATS_TEST_TMPDIR/expected-config"
+  run_machine --role hub --from old-mac.local
+  [[ "$output" == *"file:~/.ssh/config.d/operator"* ]]
+  cmp "$BATS_TEST_TMPDIR/expected-config" "$FIXHOME/.ssh/config"
+  cmp "$BATS_TEST_TMPDIR/expected-backup" "$FIXHOME/.ssh/config.pre-machine-setup"
+  [ "$(grep -Fxc 'Include ~/.ssh/config.d/operator' "$FIXHOME/.ssh/config")" -eq 1 ]
+}
+
+@test "files: existing operator fragment creates missing ssh config" {
+  files_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR"/* && "$FIXHOME" != "$HOME" ]]
+  printf '%s\n' '.ssh/config.d/operator' > "$FIXROOT/scripts/etc/machine/files.hub.list"
+  mkdir -p "$FIXHOME/.ssh/config.d"
+  printf 'fixture\n' > "$FIXHOME/.ssh/config.d/operator"
+  run_machine --role hub --from old-mac.local
+  [[ "$output" == *"file:~/.ssh/config.d/operator"* ]]
+  [ "$(cat "$FIXHOME/.ssh/config")" = 'Include ~/.ssh/config.d/operator' ]
+  [ ! -e "$FIXHOME/.ssh/config.pre-machine-setup" ]
+}

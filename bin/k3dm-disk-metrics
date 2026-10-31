@@ -10,7 +10,10 @@ from pathlib import Path
 
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
-DEFAULT_TARGETS = "m4=local:/System/Volumes/Data m2=m2jump:k3dm-snapshots hostinger=hostinger:/"
+FLEET = (("m2", "m2jump", "k3dm-snapshots"),
+         ("m4", "m4-air.local", "/System/Volumes/Data"),
+         ("m5", "m5-air.local", "/System/Volumes/Data"))
+LOCAL_PATH = "/System/Volumes/Data"
 
 
 def _ssh_destination(host):
@@ -23,8 +26,14 @@ def _ssh_destination(host):
 
 
 def _targets():
+    if "K3DM_DISK_TARGETS" not in os.environ:
+        name = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True,
+                              text=True, check=True).stdout.strip().removesuffix("-air")
+        return ([(name, "local", LOCAL_PATH)] +
+                [(label, host, path) for label, host, path in FLEET if label != name] +
+                [("hostinger", "hostinger", "/")])
     targets = []
-    for item in os.environ.get("K3DM_DISK_TARGETS", DEFAULT_TARGETS).split():
+    for item in os.environ["K3DM_DISK_TARGETS"].split():
         label, separator, target = item.partition("=")
         host, separator, path = target.partition(":")
         if label and separator and host and path:

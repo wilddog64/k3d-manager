@@ -2,8 +2,8 @@
 
 [← Grafana dashboards index](../grafana-dashboards.md)
 
-Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the M4 locally,
-the M2 over the existing SSH alias, and the Hostinger node (`/`) over SSH with the
+Hermes ticks every five minutes and runs `bin/k3dm-disk-metrics`, which probes the current Mac locally, the other fleet Macs over SSH (including the M2 alias),
+and the Hostinger node (`/`) over SSH with the
 `HOSTINGER_*` settings before pushing gauges to the hub Pushgateway. The
 dashboard shows used percentage, free GiB, probe status, and Pushgateway age for each host.
 

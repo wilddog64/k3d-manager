@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Label the local Host Disk target from the Mac hostname, probe the other fleet Macs, and load the copied operator SSH configuration during machine setup.
+
 - Re-point old-hub Pushgateway and Loki forwards during cutover, with standalone retry and rollback restoration; correct the platform-ops schedule message.
 
 ### Added
