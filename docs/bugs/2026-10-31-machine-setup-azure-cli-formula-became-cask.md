@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Approval:** pending (filed by Claude 2026-10-31; operator to approve)
+**Approval:** operator, 2026-10-31 ("go ahead")
 **Filed:** 2026-10-31
 **Detected by:** the operator's `make machine-setup ROLE=hub` on the M5 (exit 1); diagnosed by Claude
 **Affected:** `bin/k3dm-machine-setup` (brew package loop, line ~178); `scripts/etc/machine/brew.hub.list`, `brew.worker.list`
