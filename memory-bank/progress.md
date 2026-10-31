@@ -2083,3 +2083,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-31: AGENTS.md + GEMINI.md: newest Handoff section is the resume point after /clear; its Next list is Claude's queue, not a work order. Claude memory feedback_resume_from_handoff_after_clear.
 - 2026-10-31: host-disk P2 DISPATCHED to Luna (task/v1.43.12/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2, coordinator anthropic/claude-opus-5-5). Hold operator make commands until verified.
 - 2026-10-31: hub-cutover old-hub-producers P2 flipped to FIXED (8765c128 + 2d68e533; E4 live 2026-10-31).
+- 2026-10-31: m5-hub-migration how-to step 2: key-based SSH M5→old hub (authorized_keys + known_hosts; ssh -o BatchMode=yes check), matching hub-cutover's BatchMode refusal.
