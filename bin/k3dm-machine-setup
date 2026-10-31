@@ -37,7 +37,7 @@ try:
 except subprocess.TimeoutExpired as exc:
     output = (exc.stdout or b"").decode(errors="replace") + "\nlogin shell timed out\n"
     status = 1
-pattern = re.compile(r"Username for|Password for|command not found|insecure directories|compinit|_lastcomp|Permission denied|timed out", re.I)
+pattern = re.compile(r"Username for|Password for|command not found|insecure directories|_lastcomp|Permission denied|timed out", re.I)
 lines = [line for line in output.splitlines() if pattern.search(line)]
 for line in lines:
     home = os.path.expanduser("~")

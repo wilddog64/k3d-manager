@@ -928,6 +928,9 @@ SH
   [[ "$output" == *'~/secret'* && "$output" != *"$FIXHOME"* && "$output" != *'ghp_abc'* ]]
   run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
   [ "$status" -eq 0 ]
+  # zplug banner on a clean login, captured on m5-air.local and m2-air.local, 2026-10-31.
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 0 ]
   run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
   [ "$status" -eq 42 ]
 }

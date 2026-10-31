@@ -74,7 +74,10 @@ tracked copy drifts. The M2's config has no Include, so its next setup run would
    shell. Checked on the M5: `ssh m5-air.local 'echo $-'` has no `i`; `'$SHELL -lic ...'` has `i` and `l`
    and defines `compdef`.) It fails if:
    - the run times out (a prompt is waiting);
-   - the output matches `Username for|Password for|command not found|insecure directories|compinit|_lastcomp|Permission denied`;
+   - the output matches `Username for|Password for|command not found|insecure directories|_lastcomp|Permission denied`;
+     (Correction, Claude 2026-10-31, from E5: the first draft also matched bare `compinit`, which hits zplug's
+     normal `[zplug] Run compinit` banner on every clean login, so both the M5 and the M2 failed. The real
+     failure, `zsh compinit: insecure directories`, is still caught by `insecure directories`.)
    - the exit code is not 0.
 
    It prints the matched lines, with home paths and anything token-shaped redacted. It changes nothing on
