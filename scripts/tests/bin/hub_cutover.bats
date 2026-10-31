@@ -32,6 +32,10 @@ exit 0
 STUB
   cat > "$WORK/stub/ssh" <<'STUB'
 #!/usr/bin/env bash
+opts=""
+while [[ "$1" == -o ]]; do opts+="$2 "; shift 2; done
+[[ "$opts" == *BatchMode=yes* && "$opts" == *ClearAllForwardings=yes* ]] || { echo "ssh without BatchMode/ClearAllForwardings" >&2; exit 97; }
+[[ "${STUB_SSH_DENIED:-0}" == 0 ]] || exit 255
 printf 'ssh host=%s command=%s\n' "$1" "$2" >> "$CALLS"
 if [[ "$2" == *'get statefulset'* ]]; then
   if [[ "$2" == *readyReplicas* ]]; then echo "${STUB_OLD_READY:-0}"; else cat "$WORK_OLD_REPLICAS"; fi
@@ -316,4 +320,22 @@ STUB
   export STUB_NO_REGISTRATION=0 STUB_BAD_ESO=1
   run "$ROOT/bin/hub-cutover"
   [ "$status" -ne 0 ]
+}
+
+@test "an old host that needs a password stops cutover and rollback before any change" {
+  export STUB_SSH_DENIED=1
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'cannot ssh to m4-air.local without a password'* ]]
+  run grep -Eq 'scale statefulset|^scp |^refresh_registration |launchctl (bootstrap|bootout)' "$CALLS"
+  [ "$status" -eq 1 ]
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'cannot ssh to m4-air.local without a password'* ]]
+  run grep -q 'scale statefulset' "$CALLS"
+  [ "$status" -eq 1 ]
 }

@@ -53,10 +53,22 @@ local_loaded() {
   return 2
 }
 
+SSH_OPTS=(-o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=10)
+
+old_ssh() {
+  ssh "${SSH_OPTS[@]}" "$OLD_HOST" "$@"
+}
+
+require_old_ssh() {
+  old_ssh true >/dev/null 2>&1 && return 0
+  echo "hub-cutover: cannot ssh to $OLD_HOST without a password; set up key login from this Mac (ssh-copy-id $OLD_HOST) and rerun" >&2
+  return 1
+}
+
 old_loaded() {
   local label="$1" rc
   # shellcheck disable=SC2029
-  if ssh "$OLD_HOST" "launchctl print \"gui/\$(id -u)/$label\"" >/dev/null 2>&1; then return 0; else rc=$?; fi
+  if old_ssh "launchctl print \"gui/\$(id -u)/$label\"" >/dev/null 2>&1; then return 0; else rc=$?; fi
   [[ $rc -eq 113 ]] && return 1
   echo "hub-cutover: could not inspect $label on $OLD_HOST (ssh/launchctl exit $rc)" >&2
   return 2
@@ -90,7 +102,7 @@ PY
 
 remote_kubectl() {
   # shellcheck disable=SC2029
-  ssh "$OLD_HOST" "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context '$CONTEXT' -n '$ARGOCD_NS' $*"
+  old_ssh "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context '$CONTEXT' -n '$ARGOCD_NS' $*"
 }
 
 controller_stopped() {
@@ -119,7 +131,7 @@ read_handoff() {
   [[ "$OLD_REPLICAS" =~ ^[0-9]+$ ]] || { echo 'hub-cutover: invalid old controller replicas' >&2; return 1; }
   CONFIG_SOURCE=local
   if ! kubectl config get-contexts ubuntu-hostinger >/dev/null 2>&1 && [[ ! -f "$HOME/.kube/hostinger.config" ]]; then
-    ssh "$OLD_HOST" 'test -f "$HOME/.kube/hostinger.config"' || { echo 'hub-cutover: Hostinger kubeconfig missing on old host' >&2; return 1; }
+    old_ssh 'test -f "$HOME/.kube/hostinger.config"' || { echo 'hub-cutover: Hostinger kubeconfig missing on old host' >&2; return 1; }
     CONFIG_SOURCE="$OLD_HOST:~/.kube/hostinger.config"
   fi
   echo "Old controller replicas: $OLD_REPLICAS"
@@ -136,7 +148,7 @@ handoff() {
   fi
   if [[ "$CONFIG_SOURCE" != local ]]; then
     mkdir -p "$HOME/.kube"
-    scp "$OLD_HOST:.kube/hostinger.config" "$HOME/.kube/hostinger.config" || return 1
+    scp -o BatchMode=yes -o ConnectTimeout=10 "$OLD_HOST:.kube/hostinger.config" "$HOME/.kube/hostinger.config" || return 1
     chmod 600 "$HOME/.kube/hostinger.config" || return 1
   fi
   if ! CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_registration; then
@@ -185,6 +197,7 @@ rollback() {
   local label rc
   local stopped="$STATE_DIR/stopped-on-old"
   [[ -f "$stopped" ]] || { echo "hub-cutover: no stopped-on-old record; refusing rollback" >&2; return 1; }
+  require_old_ssh || return 1
   print_plan
   confirm rollback || return 1
   if [[ -f "$STATE_DIR/old-argocd-controller-replicas" ]]; then
@@ -208,13 +221,14 @@ rollback() {
   for label in "${labels[@]}"; do
     grep -Fxq "$label" "$stopped" || continue
     # shellcheck disable=SC2029
-    ssh "$OLD_HOST" "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\""
+    old_ssh "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\""
   done
   append_report rollback-pass
 }
 
 if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
 read_report || exit 1
+require_old_ssh || exit 1
 print_plan
 read_handoff || exit 1
 if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
@@ -226,7 +240,7 @@ for ((i=${#labels[@]}-1; i>=0; i--)); do
   label="${labels[i]}"
   if old_loaded "$label"; then
     # shellcheck disable=SC2029
-    ssh "$OLD_HOST" "launchctl bootout \"gui/\$(id -u)/$label\""
+    old_ssh "launchctl bootout \"gui/\$(id -u)/$label\""
     printf '%s\n' "$label" >> "$STATE_DIR/stopped-on-old"
   else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
 done

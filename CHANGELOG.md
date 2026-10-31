@@ -26,7 +26,10 @@
   prune the generated Applications, the hub's ESO among them. hub-new also clones `shopping-cart-infra`
   on hubs, fails preflight without its `argocd-secret.yaml`, and fails verify without
   `cicd/argocd-oidc-secret`. On the M5 that ExternalSecret had been skipped with only a warning, which
-  would have broken ArgoCD's Keycloak login after cutover.
+  would have broken ArgoCD's Keycloak login after cutover. Every SSH call to the old hub now runs with
+  `BatchMode=yes` and `ClearAllForwardings=yes`, and the cutover and rollback refuse up front when
+  key login fails: the first M5 dry run prompted for the M4 password on each call and inherited a
+  global `RemoteForward` that failed on every connection.
 
 - **`make hub-new` runs the hub reconcile after the data restore, not before it.** The reconcile ran
   inside `hub-restore`, two stages before `data` restores the Vault PVC from the old hub. On the M5
