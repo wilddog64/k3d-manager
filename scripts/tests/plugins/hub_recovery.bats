@@ -532,6 +532,21 @@ STUB
   [ -z "$(ls -A "$tmp")" ]
 }
 
+@test "_hub_recovery_restore_signing: a signing_restore that exits (via _err) warns and continues" {
+  local tmp="${BATS_TEST_TMPDIR}/t" after="${BATS_TEST_TMPDIR}/after"
+  mkdir -p "$tmp"
+  [[ "$tmp" == "${BATS_TEST_TMPDIR}"/* ]]
+  _kubectl() { printf 'apiVersion: v1\ncurrent-context: %s\n' "$3"; }
+  signing_restore() { echo "ERROR: [signing] no Vault key and no Keychain backup" >&2; exit 1; }
+  _warn() { echo "WARN $*"; }
+  run bash -c 'source /dev/stdin <<<"$1"; TMPDIR="$2" _hub_recovery_restore_signing k3d-k3d-cluster; echo continued >"$3"' _ \
+    "$(declare -f _kubectl signing_restore _warn _hub_recovery_restore_signing)" "$tmp" "$after"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$after")" = continued ]
+  [[ "$output" == *"cosign signing restore failed; continuing recovery"* ]]
+  [ -z "$(ls -A "$tmp")" ]
+}
+
 @test "_hub_recovery_restore_signing: a pin failure warns, skips the restore and leaves no temp file" {
   local tmp="${BATS_TEST_TMPDIR}/t" called="${BATS_TEST_TMPDIR}/called"
   mkdir -p "$tmp"
@@ -544,6 +559,50 @@ STUB
   [[ "$output" != *"unexpected EOF"* ]]
   [ ! -e "$called" ]
   [ -z "$(ls -A "$tmp")" ]
+}
+
+# _kubectl contract (scripts/lib/foundation/scripts/lib/system.sh _kubectl -> _run_command): a failing
+# kubectl exits the process unless --no-exit is passed, even when the call is an if condition.
+_missing_app_context_kubectl() {
+  _kubectl() {
+    local no_exit=0 a
+    for a in "$@"; do [[ "$a" == --no-exit ]] && no_exit=1; done
+    if [[ " $* " == *" --context ubuntu-hostinger "* ]]; then
+      (( no_exit )) && return 1
+      exit 1
+    fi
+    [[ " $* " == *" get deployment frontend "* ]] && return 0
+    return 1
+  }
+}
+
+@test "_hub_recovery_seed_app_cluster_reader: a missing app context skips the seed instead of exiting" {
+  _missing_app_context_kubectl
+  _warn() { echo "WARN $*"; }
+  run bash -c 'source /dev/stdin <<<"$1"; _hub_recovery_seed_app_cluster_reader k3d-k3d-cluster ubuntu-hostinger; echo "rc=$?"' _ \
+    "$(declare -f _kubectl _warn _hub_recovery_seed_app_cluster_reader)"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"app context 'ubuntu-hostinger' unavailable; skipping CVE reader seed"* ]]
+  [[ "$output" == *"rc=0"* ]]
+}
+
+@test "_hub_recovery_seed_app_cluster_reader: a reachable app context goes on to read the reader Secret" {
+  local calls="${BATS_TEST_TMPDIR}/calls"
+  _kubectl() { printf '%s\n' "$*" >>"$calls"; return 0; }
+  _warn() { echo "WARN $*"; }
+  run _hub_recovery_seed_app_cluster_reader k3d-k3d-cluster ubuntu-hostinger
+  grep -q 'get secret hub-cve-inventory-reader-token' "$calls"
+  [[ "$output" != *"unavailable; skipping CVE reader seed"* ]]
+}
+
+@test "_hub_recovery_frontend_origin_provider: a missing app context falls through to the hub frontend" {
+  _missing_app_context_kubectl
+  _warn() { echo "WARN $*"; }
+  unset HUB_RECOVERY_FRONTEND_PROVIDER
+  run bash -c 'source /dev/stdin <<<"$1"; _hub_recovery_frontend_origin_provider k3d-k3d-cluster ubuntu-hostinger' _ \
+    "$(declare -f _kubectl _warn _hub_recovery_frontend_origin_provider)"
+  [ "$status" -eq 0 ]
+  [ "$output" = k3d ]
 }
 
 @test "hub_recovery_reconcile: the dry list names the cosign step" {

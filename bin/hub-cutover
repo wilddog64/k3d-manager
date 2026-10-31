@@ -1,0 +1,386 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+SINGLETONS="$REPO_ROOT/scripts/etc/machine/hub-singletons.list"
+FORWARDS="$REPO_ROOT/scripts/etc/machine/hub-push-forwards.list"
+NEW_HOST="${HUB_NEW_HOST:-$(scutil --get LocalHostName).local}"
+OLD_HOST="${HUB_OLD_HOST:-}"
+STATE_DIR="${HUB_CUTOVER_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-cutover}"
+NEW_STATE_DIR="${HUB_NEW_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-new}"
+REPORT="$NEW_STATE_DIR/hub-new-report.json"
+TTY="${HUB_CUTOVER_TTY:-/dev/tty}"
+VERIFY_TRIES="${HUB_CUTOVER_VERIFY_TRIES:-18}"
+CONTEXT="${HUB_CUTOVER_CONTEXT:-k3d-k3d-cluster}"
+ARGOCD_NS="${HUB_CUTOVER_ARGOCD_NS:-cicd}"
+CONTROLLER_WAIT="${HUB_CUTOVER_CONTROLLER_WAIT_S:-180}"
+CONTROLLER=statefulset/argocd-application-controller
+SELECTOR=app.kubernetes.io/name=argocd-application-controller
+VERIFY_WAIT="${HUB_CUTOVER_VERIFY_WAIT:-10}"
+FORWARD_TRIES="${HUB_CUTOVER_FORWARD_TRIES:-15}"
+FORWARD_WAIT="${HUB_CUTOVER_FORWARD_WAIT:-1}"
+
+labels=()
+while IFS='|' read -r label _installer _note; do
+  [[ -n "$label" && "$label" != \#* ]] || continue
+  labels+=("com.k3d-manager.$label")
+done < "$SINGLETONS"
+
+read_report() {
+  python3 - "$REPORT" <<'PY'
+import datetime, json, sys
+try:
+    report = json.load(open(sys.argv[1]))
+    stamp = datetime.datetime.fromisoformat(report["timestamp"].replace("Z", "+00:00"))
+    age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds()
+    if report.get("status") != "pass" or age < 0 or age >= 86400:
+        raise ValueError("report is not a passing report less than 24 hours old")
+    print(report.get("old_host") or "")
+except Exception as exc:
+    print(f"hub-cutover: refusing: {exc}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
+confirm() {
+  local expected="$1" answer
+  printf 'Type %s to continue: ' "$expected"
+  IFS= read -r answer < "$TTY" || answer=""
+  [[ "$answer" == "$expected" ]] || { echo "hub-cutover: confirmation did not match; nothing changed" >&2; return 1; }
+}
+
+local_loaded() {
+  local label rc
+  if launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1; then return 0; else rc=$?; fi
+  [[ $rc -eq 113 ]] && return 1
+  echo "hub-cutover: launchctl print failed for $1 (exit $rc)" >&2
+  return 2
+}
+
+SSH_OPTS=(-o BatchMode=yes -o ClearAllForwardings=yes -o ConnectTimeout=10)
+
+old_ssh() {
+  # Arguments are intentionally passed to the remote shell.
+  # shellcheck disable=SC2029
+  ssh "${SSH_OPTS[@]}" "$OLD_HOST" "$@"
+}
+
+require_old_ssh() {
+  old_ssh true >/dev/null 2>&1 && return 0
+  echo "hub-cutover: cannot ssh to $OLD_HOST without a password; set up key login from this Mac (ssh-copy-id $OLD_HOST) and rerun" >&2
+  return 1
+}
+
+old_loaded() {
+  local label="$1" rc
+  # shellcheck disable=SC2029
+  if old_ssh "launchctl print \"gui/\$(id -u)/$label\"" >/dev/null 2>&1; then return 0; else rc=$?; fi
+  [[ $rc -eq 113 ]] && return 1
+  echo "hub-cutover: could not inspect $label on $OLD_HOST (ssh/launchctl exit $rc)" >&2
+  return 2
+}
+
+print_plan() {
+  local label
+  echo "Cutover plan: stop loaded agents on $OLD_HOST in reverse order, then load on $(hostname -s) in this order:"
+  for label in "${labels[@]}"; do echo "  $label"; done
+}
+
+append_report() {
+  local result="$1" labels_json
+  labels_json="$(python3 - "$STATE_DIR/stopped-on-old" <<'PY'
+import json, sys
+try: print(json.dumps([x.strip() for x in open(sys.argv[1]) if x.strip()]))
+except FileNotFoundError: print("[]")
+PY
+)"
+  python3 - "$STATE_DIR/hub-cutover-report.json" "$OLD_HOST" "$(hostname -s)" "$result" "$labels_json" <<'PY'
+import datetime, json, os, sys
+path, old, new, result, moved = sys.argv[1:]
+try:
+    rows = json.load(open(path))
+except (FileNotFoundError, json.JSONDecodeError): rows = []
+rows.append({"timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+             "old_host": old, "new_host": new, "labels_moved": json.loads(moved), "verify": result})
+with open(path, "w") as out: json.dump(rows, out, indent=2); out.write("\n")
+PY
+}
+
+remote_kubectl() {
+  # shellcheck disable=SC2029
+  old_ssh "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context '$CONTEXT' -n '$ARGOCD_NS' $*"
+}
+
+controller_stopped() {
+  local side="$1" ready pods
+  if [[ "$side" == old ]]; then
+    ready="$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.status.readyReplicas}')" || return 1
+    pods="$(remote_kubectl get pods -l "$SELECTOR" -o name)" || return 1
+  else
+    ready="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get "$CONTROLLER" -o 'jsonpath={.status.readyReplicas}')" || return 1
+    pods="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get pods -l "$SELECTOR" -o name)" || return 1
+  fi
+  [[ ( -z "$ready" || "$ready" == 0 ) && -z "$pods" ]]
+}
+
+wait_controller_stopped() {
+  local side="$1" elapsed=0
+  while ! controller_stopped "$side"; do
+    (( elapsed < CONTROLLER_WAIT )) || return 1
+    sleep 1
+    ((elapsed+=1))
+  done
+}
+
+read_handoff() {
+  OLD_REPLICAS="$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" || { echo 'hub-cutover: cannot read old controller replicas' >&2; return 1; }
+  [[ "$OLD_REPLICAS" =~ ^[0-9]+$ ]] || { echo 'hub-cutover: invalid old controller replicas' >&2; return 1; }
+  CONFIG_SOURCE=local
+  if ! kubectl config get-contexts ubuntu-hostinger >/dev/null 2>&1 && [[ ! -f "$HOME/.kube/hostinger.config" ]]; then
+    # shellcheck disable=SC2016
+    old_ssh 'test -f "$HOME/.kube/hostinger.config"' || { echo 'hub-cutover: Hostinger kubeconfig missing on old host' >&2; return 1; }
+    CONFIG_SOURCE="$OLD_HOST:~/.kube/hostinger.config"
+  fi
+  echo "Old controller replicas: $OLD_REPLICAS"
+  echo "Hostinger kubeconfig source: $CONFIG_SOURCE"
+  echo 'Handoff plan: stop old controller, register Hostinger, start new controller, then load singletons'
+}
+
+handoff() {
+  printf '%s\n' "$OLD_REPLICAS" > "$STATE_DIR/old-argocd-controller-replicas"
+  remote_kubectl scale "$CONTROLLER" --replicas=0 || return 1
+  if ! wait_controller_stopped old; then
+    echo 'hub-cutover: old controller did not stop; run make hub-cutover-rollback' >&2
+    append_report old-controller-not-stopped; return 1
+  fi
+  if [[ "$CONFIG_SOURCE" != local ]]; then
+    mkdir -p "$HOME/.kube"
+    scp -o BatchMode=yes -o ConnectTimeout=10 "$OLD_HOST:.kube/hostinger.config" "$HOME/.kube/hostinger.config" || return 1
+    chmod 600 "$HOME/.kube/hostinger.config" || return 1
+  fi
+  if ! CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_registration; then
+    echo 'hub-cutover: registration failed; run make hub-cutover-rollback' >&2
+    append_report registration-failed; return 1
+  fi
+  local replicas
+  replicas="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" || return 1
+  [[ "$replicas" =~ ^[0-9]+$ ]] || return 1
+  if [[ "$replicas" == 0 ]]; then kubectl --context "$CONTEXT" -n "$ARGOCD_NS" scale "$CONTROLLER" --replicas=1 || return 1; fi
+}
+
+verify_cutover() {
+  local label output count frontend_code webhook_code
+  output="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret -l k3d-manager/role=app-cluster -o name)" || return 1
+  grep -Fxq secret/cluster-ubuntu-hostinger <<<"$output" || return 1
+  kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
+  [[ "$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" == 0 ]] || return 1
+  make webhook-doctor || return 1
+  frontend_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://frontend.3ai-talk.org/)" || return 1
+  [[ "$frontend_code" == 200 ]] || { echo "hub-cutover: frontend returned $frontend_code" >&2; return 1; }
+  webhook_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://webhook.3ai-talk.org/)" || return 1
+  [[ "$webhook_code" == 401 ]] || { echo "hub-cutover: webhook returned $webhook_code" >&2; return 1; }
+  output="$(cloudflared tunnel info k3d-manager)" || return 1
+  count="$(printf '%s\n' "$output" | awk '$1 ~ /^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$/ { n++ } END { print n+0 }')"
+  [[ "$count" -eq 1 ]] || { echo "hub-cutover: expected one cloudflared connector, found $count; run make hub-cutover-rollback" >&2; return 1; }
+  for label in com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault; do
+    output="$(launchctl print "gui/$(id -u)/$label")" || return 1
+    [[ "$output" == *'state = running'* ]] || { echo "hub-cutover: $label is not running; run make hub-cutover-rollback" >&2; return 1; }
+  done
+  bin/k3dm-hermes status || return 1
+  echo 'Operator check: confirm a Hermes message arrives in Slack.'
+}
+
+verify_with_retries() {
+  local attempt
+  for ((attempt=1; attempt<=VERIFY_TRIES; attempt++)); do
+    verify_cutover && return 0
+    (( attempt < VERIFY_TRIES )) || break
+    echo "hub-cutover: verify attempt ${attempt}/${VERIFY_TRIES} failed; retrying in ${VERIFY_WAIT}s" >&2
+    sleep "$VERIFY_WAIT"
+  done
+  return 1
+}
+
+forward_report_allowed() {
+  python3 - "$STATE_DIR/hub-cutover-report.json" <<'PYCODE'
+import json, sys
+try:
+    rows = json.load(open(sys.argv[1]))
+    assert rows[-1]["verify"] in ("pass", "forwards-failed", "forwards-skipped")
+except (OSError, ValueError, KeyError, IndexError, TypeError, AssertionError):
+    print("hub-cutover: no eligible passing cutover report; refusing forwards", file=sys.stderr)
+    sys.exit(1)
+PYCODE
+}
+
+change_forward() {
+  local label="$1" port="$2" action="$3"
+  # Labels, ports and host are validated before interpolation into the remote command.
+  old_ssh "python3 - '$action' '$label' '$port' '$NEW_HOST'" <<'PYCODE'
+import os, plistlib, shutil, subprocess, sys, time
+mode, label, port, host = sys.argv[1:]
+path = os.path.expanduser('~/Library/LaunchAgents/' + label + '.plist')
+backup = path + '.pre-cutover'
+domain = 'gui/' + str(os.getuid())
+
+def reload():
+    target = domain + '/' + label
+    subprocess.run(['launchctl', 'bootout', target])
+    for _ in range(30):
+        if subprocess.run(['launchctl', 'print', target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+            break
+        time.sleep(0.5)
+    else:
+        sys.exit(label + ' is still loaded 15s after bootout')
+    subprocess.run(['launchctl', 'bootstrap', domain, path], check=True)
+
+if mode == 'restore':
+    if os.path.exists(backup):
+        os.replace(backup, path)
+        reload()
+else:
+    with open(path, 'rb') as source:
+        original = plistlib.load(source)
+    if not os.path.exists(backup):
+        with open(path, 'rb') as source, open(backup, 'xb') as target:
+            shutil.copyfileobj(source, target)
+    original['ProgramArguments'] = ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o',
+        'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o',
+        'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, host]
+    original.pop('Program', None)
+    original['KeepAlive'] = True
+    with open(path, 'wb') as target:
+        plistlib.dump(original, target)
+    reload()
+PYCODE
+}
+
+for_each_forward() {
+  local action="$1" label port _note
+  [[ "$NEW_HOST" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo 'hub-cutover: invalid new host' >&2; return 1; }
+  while IFS='|' read -r label port _note; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    [[ "$label" =~ ^[a-zA-Z0-9._-]+$ && "$port" =~ ^[0-9]+$ ]] || return 1
+    change_forward "com.k3d-manager.$label" "$port" "$action" || return 1
+  done < "$FORWARDS"
+}
+
+forwards_ready() {
+  local attempt
+  for ((attempt=1; attempt<=FORWARD_TRIES; attempt++)); do
+    [[ "$(old_ssh 'curl -s -m 10 http://127.0.0.1:19094/-/ready')" == OK ]] &&
+      [[ "$(old_ssh 'curl -s -m 10 http://127.0.0.1:19100/')" == OK ]] && return 0
+    (( attempt < FORWARD_TRIES )) || break
+    sleep "$FORWARD_WAIT"
+  done
+  return 1
+}
+
+repoint_forwards() {
+  [[ "$NEW_HOST" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo 'hub-cutover: invalid new host' >&2; return 1; }
+  if ! old_ssh "ssh -o BatchMode=yes -o ConnectTimeout=10 '$NEW_HOST' true"; then
+    echo "hub-cutover: cutover passed, but old host cannot ssh to $NEW_HOST; set up key login on $OLD_HOST (ssh-copy-id $NEW_HOST) and rerun make hub-cutover-forwards" >&2
+    append_report forwards-skipped; return 1
+  fi
+  if for_each_forward install && forwards_ready; then
+    append_report forwards-pass; return 0
+  fi
+  append_report forwards-failed
+  echo 'hub-cutover: cutover itself passed, but forwarding failed; rerun make hub-cutover-forwards' >&2
+  return 1
+}
+
+rollback() {
+  local label rc
+  local stopped="$STATE_DIR/stopped-on-old"
+  [[ -f "$stopped" ]] || { echo "hub-cutover: no stopped-on-old record; refusing rollback" >&2; return 1; }
+  require_old_ssh || return 1
+  print_plan
+  confirm rollback || return 1
+  if [[ -f "$STATE_DIR/old-argocd-controller-replicas" ]]; then
+    local replicas
+    read -r replicas < "$STATE_DIR/old-argocd-controller-replicas"
+    [[ "$replicas" =~ ^[0-9]+$ ]] || { echo 'hub-cutover: invalid saved replica count' >&2; return 1; }
+    kubectl --context "$CONTEXT" -n "$ARGOCD_NS" scale "$CONTROLLER" --replicas=0 || return 1
+    wait_controller_stopped new || { echo 'hub-cutover: new controller did not stop; old controller not restored' >&2; return 1; }
+    remote_kubectl scale "$CONTROLLER" "--replicas=$replicas" || return 1
+  else
+    echo "hub-cutover: no recorded controller handoff; ArgoCD controllers left as they are. If the old controller is at 0, run: ssh $OLD_HOST 'PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context $CONTEXT -n $ARGOCD_NS scale $CONTROLLER --replicas=1'" >&2
+  fi
+  for ((i=${#labels[@]}-1; i>=0; i--)); do
+    label="${labels[i]}"
+    if local_loaded "$label"; then launchctl bootout "gui/$(id -u)/$label"; else rc=$?; [[ $rc -eq 1 ]] || return "$rc"; fi
+  done
+  while IFS= read -r label; do
+    [[ -n "$label" ]] || continue
+    [[ " ${labels[*]} " == *" $label "* ]] || { echo "hub-cutover: invalid recorded label $label" >&2; return 1; }
+  done < "$stopped"
+  for_each_forward restore || return 1
+  for label in "${labels[@]}"; do
+    grep -Fxq "$label" "$stopped" || continue
+    # shellcheck disable=SC2029
+    old_ssh "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\""
+  done
+  append_report rollback-pass
+}
+
+if [[ "${1:-}" == --rollback || "${1:-}" == --verify || "${1:-}" == --forwards ]]; then
+  if [[ -z "$OLD_HOST" && -f "$STATE_DIR/old-host" ]]; then OLD_HOST="$(cat "$STATE_DIR/old-host")"; fi
+else
+  if [[ -z "$OLD_HOST" && ! -f "$REPORT" ]]; then
+    echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2; exit 2
+  fi
+  report_host="$(read_report)" || exit 1
+  if [[ -n "$OLD_HOST" && -n "$report_host" && "$OLD_HOST" != "$report_host" ]]; then
+    echo 'hub-cutover: HUB_OLD_HOST differs from hub-new report' >&2; exit 2
+  fi
+  OLD_HOST="${OLD_HOST:-$report_host}"
+fi
+[[ -n "$OLD_HOST" ]] || { echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2; exit 2; }
+if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
+if [[ "${1:-}" == --verify ]]; then
+  [[ -f "$STATE_DIR/stopped-on-old" ]] || { echo 'hub-cutover: no recorded cutover; refusing verify' >&2; exit 1; }
+  require_old_ssh || exit 1
+  if verify_with_retries; then append_report pass; echo 'hub-cutover: verification passed; run make hub-cutover-forwards'; exit 0; fi
+  append_report verify-failed; echo 'hub-cutover: verification failed; run make hub-cutover-rollback' >&2; exit 1
+fi
+if [[ "${1:-}" == --forwards ]]; then
+  forward_report_allowed || exit 1
+  require_old_ssh || exit 1
+  confirm forwards || exit 1
+  repoint_forwards
+  exit $?
+fi
+require_old_ssh || exit 1
+print_plan
+read_handoff || exit 1
+if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
+confirm cutover || exit 1
+mkdir -p "$STATE_DIR"
+printf '%s\n' "$OLD_HOST" > "$STATE_DIR/old-host"
+: > "$STATE_DIR/stopped-on-old"
+rm -f "$STATE_DIR/old-argocd-controller-replicas"
+for ((i=${#labels[@]}-1; i>=0; i--)); do
+  label="${labels[i]}"
+  if old_loaded "$label"; then
+    # shellcheck disable=SC2029
+    old_ssh "launchctl bootout \"gui/\$(id -u)/$label\""
+    printf '%s\n' "$label" >> "$STATE_DIR/stopped-on-old"
+  else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
+done
+for label in "${labels[@]}"; do
+  if old_loaded "$label"; then
+    echo "hub-cutover: $label remains loaded on $OLD_HOST; M5 agents were not loaded. Run make hub-cutover-rollback" >&2
+    append_report old-host-not-quiet
+    exit 1
+  else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
+done
+handoff || exit 1
+for label in "${labels[@]}"; do
+  [[ -f "$HOME/Library/LaunchAgents/$label.plist" ]] || { echo "hub-cutover: missing plist $label" >&2; append_report load-failed; exit 1; }
+  launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" || { echo "hub-cutover: could not load $label; run make hub-cutover-rollback" >&2; append_report load-failed; exit 1; }
+done
+if verify_with_retries; then append_report pass; else append_report verify-failed; echo 'hub-cutover: verification failed; run make hub-cutover-rollback' >&2; exit 1; fi
+
+repoint_forwards

@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
   export WORK="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-restore.XXXXXX")"
@@ -7,6 +8,7 @@ setup() {
   export STATE_BASE="${WORK}/state"
   export CALL_LOG="${WORK}/calls.log"
   mkdir -p "${STUB}" "${FAKE_HOME}/.cloudflared" "${STATE_BASE}/k3s-aws/bin"
+  export RESTORE_BIN="${HUB_RESTORE_SOURCE:-${BATS_TEST_DIRNAME}/../../../bin/hub-restore}"
   printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh"
   printf '#!/usr/bin/env bash\n' >"${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
   : > "${CALL_LOG}"
@@ -109,7 +111,7 @@ _run_with_tty() {
 }
 
 _run_noninteractive_restore() {
-  run bash -c "bin/hub-restore </dev/null"
+  run bash -c "\"${RESTORE_BIN}\" </dev/null"
 }
 
 teardown() { rm -rf "${WORK}"; }
@@ -134,6 +136,50 @@ teardown() { rm -rf "${WORK}"; }
   [ "${output}" -eq 2 ]
 }
 
+@test "hub-restore defers the Cloudflare tunnel when HUB_RESTORE_TUNNEL=skip" {
+  export HUB_RESTORE_TUNNEL=skip
+  export LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  [ ! -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" ]
+  [[ "$output" == *'Cloudflare tunnel check: SKIP'* ]]
+  run ! grep -q 'cloudflare-tunnel' "$CALL_LOG"
+}
+
+@test "HUB_RESTORE_PLATFORM=skip defers observability, platform-ops and their checks on a hub with no data yet" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip GRAFANA_MODE=always-fail LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Grafana health: SKIP'* ]]
+  [[ "$output" == *'Alertmanager SMTP Secret exists: SKIP'* ]]
+  run grep -Eq '^make (observability|platform-ops)( |$)' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "HUB_RESTORE_RECONCILE=skip defers the hub reconcile on a hub whose Vault data is not restored yet" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip HUB_RESTORE_RECONCILE=skip LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Hub reconcile: SKIP'* ]]
+  run grep -q 'hub_recovery_reconcile' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "without HUB_RESTORE_RECONCILE, the hub reconcile runs" {
+  export HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip LOADED_PF=both
+  _run_noninteractive_restore
+  grep -q 'hub_recovery_reconcile --confirm' "$CALL_LOG"
+}
+
+@test "without HUB_RESTORE_PLATFORM, observability and platform-ops run and a down Grafana fails the restore" {
+  export HUB_RESTORE_TUNNEL=skip GRAFANA_MODE=always-fail LOADED_PF=both
+  _run_noninteractive_restore
+  [ "$status" -eq 1 ]
+  grep -q '^make observability' "$CALL_LOG"
+  grep -q '^make platform-ops' "$CALL_LOG"
+  [[ "$output" == *'Grafana health: FAIL'* ]]
+}
+
 @test "hub-restore Step 8 does not bootstrap already-loaded port-forward agents" {
   _run_noninteractive_restore
   [ "${status}" -eq 0 ]
@@ -141,13 +187,26 @@ teardown() { rm -rf "${WORK}"; }
   [ "${output}" -eq 0 ]
 }
 
-@test "hub-restore Step 8 fails without a port-forward wrapper and writes no plist" {
-  rm -f "${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+@test "hub-restore Step 8 writes missing ArgoCD and Keycloak wrappers for the hub context (k3d-only hub)" {
+  [[ "${HOME}" == "${FAKE_HOME}" && "${STATE_BASE}" == "${WORK}"/* ]]
+  rm -f "${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh" "${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+  envsubst_bin="$(PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin command -v envsubst)"
+  [ -n "${envsubst_bin}" ]
+  ln -s "${envsubst_bin}" "${STUB}/envsubst"
   export LOADED_PF=none
   _run_noninteractive_restore
-  [ "${status}" -eq 1 ]
-  run test -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist"
-  [ "${status}" -ne 0 ]
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *'8/9 Local agents             PASS'* ]]
+  argocd_wrapper="${STATE_BASE}/k3s-aws/bin/argocd-port-forward.sh"
+  keycloak_wrapper="${STATE_BASE}/k3s-aws/bin/keycloak-port-forward.sh"
+  grep -q 'k3d-k3d-cluster' "${argocd_wrapper}"
+  grep -q 'svc/argocd-server' "${argocd_wrapper}"
+  grep -q 'cicd' "${argocd_wrapper}"
+  grep -q 'svc/keycloak' "${keycloak_wrapper}"
+  grep -q 'identity' "${keycloak_wrapper}"
+  grep -q '8880' "${keycloak_wrapper}"
+  [ -f "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist" ]
+  grep -q "${keycloak_wrapper}" "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist"
 }
 
 @test "hub-restore rejects a non-TTY before any make step" {

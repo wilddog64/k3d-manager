@@ -25,6 +25,25 @@ bounded reason label and contain no task identifiers.
 
 Claude usage in **Cost (API-equivalent)** comes from Claude Code assistant transcript records under `~/.claude/projects`, including subagent transcripts. The exporter stores only message IDs, model, timestamp, speed and usage numbers in `~/.local/share/k3d-manager/claude-usage/rollup.json`, reading appended bytes incrementally so coverage survives transcript deletion. Transcripts older than Claude Code's retention period are gone unless the exporter saw them first. Time-window Claude totals count each retained message exactly once; the **Claude ≈** Per spec column attributes usage between each task's dispatch and land, splitting messages evenly across overlapping tasks. It is approximate because it misses spec writing and post-land verification and can include unrelated work during the task interval. Claude API-equivalent rates remain unpriced until confirmed.
 
+**Claude cost per verified spec** divides Claude API-equivalent cost by distinct documents in
+`docs/bugs` or `docs/plans` that were newly created with a closed status or transitioned from an
+open status to a closed status in the selected window. A status backfill on an existing document
+and edits from one closed status to another do not count. The `level` label splits those
+resolutions into `live` (`LIVE-VERIFIED`), `verified` (`VERIFIED`, `FIXED`, or `Fixed on/in`), and
+`unverified` (other closed statuses such as `LANDED` or `CLOSED`). **Claude cost per
+live-verified resolution** uses only the `live` count. Release branches are squash-merged, so
+documents closed during a release branch are dated to the squash-merge commit; this can bunch
+resolutions into a single window.
+
+The **Whole system at API prices** row shows four combined views. **Claude + Codex at API prices**
+sums Claude, ledgered Codex and unledgered Codex costs for the selected window; a missing
+unledgered series contributes zero. **Claude + Codex per live-verified spec** divides that sum by
+the live-verified count in the window and shows No data when there are none. **API run rate /
+month** divides each 7d cost by its observed days and scales the result to 30 days; unledgered
+Codex uses the ledgered Codex observed-days metric. These totals use list API prices and include
+failed dispatches, rework and review. **API vs replaced plans** divides the monthly API run rate by
+the Claude and ChatGPT subscription plans only; Gemini, GitHub and Hostinger plans remain.
+
 ## Agent dispatch cost details
 
 Agent Dispatch measures two kinds of size separately. **Spec files** and **Acceptance items** are

@@ -4,6 +4,7 @@
 **Fix commit:** 67c26bdf0f8aa7c6340a422891a0247f3145abb8
 **Previous fix commit:** b6704d68e04da578bc060cda96e19fe0ae94e5f2 (rolled back by 2d88c7be)
 **Priority:** P2
+**Deferred:** 2026-10-30, operator: no more matcher vocabulary. Wording gaps ("how many P1 open", "what are / list open P2 bugs") wait for `docs/plans/v1.45.1-bug-count-query-translation.md`, where the model writes the query and the tally counts. Workaround: start with "how many … bugs".
 **Filed:** 2026-10-27
 **Branch:** `k3d-manager-v1.43.9`
 **Related:** `docs/plans/v1.45.1-bug-count-query-translation.md`; `docs/bugs/2026-10-10-ask-docs-bug-count-ignores-release-range.md`
@@ -205,3 +206,17 @@ The same `bug-tally.py --json --counts-only --ref HEAD` takes 1.8 s at normal pr
 ### Phase 0 deployed — 2026-10-29 16:0x PDT
 
 The operator added `ProcessType Interactive` to the installed plist and ran `make restart-webhook` from the M4 tmux pane. Claude confirmed with read-only `launchctl print`: `spawn type = interactive (4)` (was `daemon (3)`), on new pid 87282. Remaining for closure: at least 20 live Slack count questions over a day of ordinary load, with timings and an answer comparison (plan E3). Status stays OPEN.
+
+### E3 samples (Claude, read from job directories)
+
+Response time = job directory created → `output` written (excludes the Slack post). The webhook log's
+`duration_ms` is only the 202 accept, so it is not used. Count-route samples so far:
+
+| When (PDT) | Job | Route | Time | Note |
+|---|---|---|---|---|
+| 2026-10-30 04:45 | `1c3b1e84` | count | 3 s | v1.43.5 P1 |
+| 2026-10-30 11:01 | `a2edbce3` | count | 5 s | current release P2; first after the 10:57 restart |
+
+2 of 20. Both under the 30 s deadline; the 5 s sample is over the 3 s p95 target, so keep collecting
+before deciding. Search-route answers (typos, "list", "what are") took 39–48 s; that is the model, not
+the tally, and does not count toward E3.

@@ -1,0 +1,13 @@
+# Agents connected only to this Mac's Hub cluster.
+argocd-port-forward|hub-restore|Local cluster forward
+frontend-port-forward|make up|Local cluster forward
+grafana-port-forward|make hub-restore|Local cluster forward
+keycloak-port-forward|hub-restore|Local cluster forward
+vault-port-forward|install-vault-port-forward|Local cluster forward
+prometheus-port-forward|install-prometheus-port-forward|Local cluster forward
+pushgateway-port-forward|make up|Local cluster forward
+hub-pushgateway-port-forward|install-hub-pushgateway-port-forward|Local cluster forward
+hub-loki-port-forward|install-hub-loki-port-forward|Local cluster forward
+alertmanager-port-forward|install-alertmanager-port-forward|Local cluster forward
+alertmanager-auth-proxy|install-alertmanager-auth-proxy|Local cluster auth proxy
+prometheus-auth-proxy|install-prometheus-auth-proxy|Local cluster auth proxy

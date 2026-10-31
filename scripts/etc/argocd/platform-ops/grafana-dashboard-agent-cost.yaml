@@ -621,7 +621,7 @@ data:
             }
           },
           "title": "Claude cost per verified spec",
-          "description": "Claude API-equivalent cost in the selected time window divided by specs and bug docs whose Status moved to a closed state in the window. Shows No data when the count is 0.",
+          "description": "Claude API-equivalent cost in the selected time window divided by distinct docs newly closed or transitioned from open to closed in the window, across all verification levels. Shows No data when the count is 0.",
           "gridPos": {
             "h": 8,
             "w": 6,
@@ -634,7 +634,7 @@ data:
           },
           "targets": [
             {
-              "expr": "k3dm_dispatch_claude_api_cost_usd{window=\"$window\"} / (k3dm_claude_verified_specs{window=\"$window\"} > 0)",
+              "expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\"}) > 0)",
               "instant": true
             }
           ],
@@ -666,8 +666,8 @@ data:
           "description": "All Claude tokens in the selected window or release, split by kind across every model. cache_read is a prompt-cache hit, billed at a small fraction of the input rate; cache_write is a cache fill (5m and 1h combined), billed above the input rate; input is uncached input. Token volume is therefore not proportional to cost.",
           "gridPos": {
             "h": 8,
-            "w": 10,
-            "x": 6,
+            "w": 6,
+            "x": 12,
             "y": 27
           },
           "datasource": {
@@ -777,8 +777,8 @@ data:
           "description": "Claude API-equivalent cost in the selected window or release, split into input, cache_write, cache_read and output. Cache reads are billed at a fraction of the input rate.",
           "gridPos": {
             "h": 8,
-            "w": 8,
-            "x": 16,
+            "w": 6,
+            "x": 18,
             "y": 27
           },
           "datasource": {
@@ -822,6 +822,105 @@ data:
               "values": false
             }
           }
+        },
+        {
+          "id": 93,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claude cost per live-verified resolution",
+          "description": "Claude API-equivalent cost in the selected time window divided by distinct docs newly marked LIVE-VERIFIED in the window. Shows No data when the count is 0.",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 27
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "decimals": 2,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 94,
+          "type": "row",
+          "title": "Whole system at API prices",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43},
+          "panels": []
+        },
+        {
+          "id": 95,
+          "type": "stat",
+          "title": "Claude + Codex at API prices",
+          "description": "Sum of Claude, ledgered Codex and unledgered Codex usage in the selected window, with no denominator. Uses list API prices; includes failed dispatches, rework and review.",
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 44},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 96,
+          "type": "stat",
+          "title": "Claude + Codex per live-verified spec",
+          "description": "Claude, ledgered Codex and unledgered Codex costs at list API prices in the selected window divided by the live-verified count for that window. Shows No data when the count is 0. Includes failed dispatches, rework and review.",
+          "gridPos": {"h": 8, "w": 6, "x": 6, "y": 44},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "(sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) + sum by (window) (k3dm_dispatch_api_cost_usd{window=\"$window\"}) + (sum by (window) (k3dm_dispatch_unledgered_api_cost_usd{window=\"$window\"}) or sum by (window) (k3dm_dispatch_claude_api_cost_usd{window=\"$window\"}) * 0)) / (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=\"live\"}) > 0)", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 97,
+          "type": "stat",
+          "title": "API run rate / month",
+          "description": "Each Claude and Codex cost at list API prices from the 7d window is divided by its observed days and scaled to 30 days; unledgered Codex uses the Codex observed-days series. Includes failed dispatches, rework and review.",
+          "gridPos": {"h": 8, "w": 6, "x": 12, "y": 44},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 98,
+          "type": "stat",
+          "title": "API vs replaced plans",
+          "description": "The 7d API run rate at list API prices per month divided by the combined Claude + ChatGPT monthly subscription plans only. Gemini, GitHub and Hostinger plans remain. Includes failed dispatches, rework and review.",
+          "gridPos": {"h": 8, "w": 6, "x": 18, "y": 44},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "(sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30) / (sum(k3dm_dispatch_subscription_usd_per_month{plan=\"claude\"}) + sum(k3dm_dispatch_subscription_usd_per_month{plan=\"chatgpt\"}))", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "x", "decimals": 1, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
         }
       ]
     }

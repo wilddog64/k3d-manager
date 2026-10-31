@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -f "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/system.sh"
+else
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/scripts/lib/system.sh"
+fi
+# shellcheck source=scripts/lib/provider.sh
+source "${REPO_ROOT}/scripts/lib/provider.sh"
+# shellcheck source=scripts/lib/cloudflare_tunnel.sh
+source "${REPO_ROOT}/scripts/lib/cloudflare_tunnel.sh"
+cd "$REPO_ROOT"
+STATE_DIR="${HUB_NEW_STATE_DIR:-${HOME}/.local/share/k3d-manager/hub-new}"
+STATE_FILE="${STATE_DIR}/state"
+REPORT_FILE="${STATE_DIR}/hub-new-report.json"
+OLD_HOST="${HUB_OLD_HOST:-}"
+[[ -n "$OLD_HOST" ]] || { echo "hub-new: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)" >&2; exit 2; }
+NEW_HOST="${HUB_NEW_HOST:-m5-air}"
+CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
+SINGLETONS="${REPO_ROOT}/scripts/etc/machine/hub-singletons.list"
+export K3DM_AGENT_LOAD=0
+STAGES=(preflight machine-setup secrets-present hub-up hub-restore data reconcile prepare-singletons platform verify)
+say() { printf '[hub-new] %s\n' "$*"; }
+fail() {
+  say "FAIL: $1" >&2
+  say "Next safe step: $2" >&2
+  [[ -z "${_active_stage:-}" ]] || stage_record "$_active_stage" fail
+  exit 1
+}
+stage_passed() { awk -F'[ =]' -v s="$1" '$1 == s && $2 == "pass" { ok=1 } END { exit !ok }' "$STATE_FILE" 2>/dev/null; }
+stage_record() { local s="$1" result="$2" epoch; epoch="$(date +%s)"; awk -v s="$s" '$1 != s' "$STATE_FILE" >"${STATE_FILE}.tmp"; printf '%s=%s %s\n' "$s" "$result" "$epoch" >>"${STATE_FILE}.tmp"; mv "${STATE_FILE}.tmp" "$STATE_FILE"; }
+label_loaded() { launchctl list 2>/dev/null | awk -v label="com.k3d-manager.$1" '$NF == label { found=1 } END { exit !found }'; }
+run_stage() {
+  local s="$1"; shift
+  if [[ -n "${HUB_NEW_FROM:-}" ]]; then
+    if [[ "$s" != "$HUB_NEW_FROM" && "${_force_from:-0}" == 0 ]]; then return 0; fi
+    _force_from=1
+  elif stage_passed "$s"; then say "$s: already passed; skipping"; return 0; fi
+  _active_stage="$s"
+  say "$s: running"
+  if "$@"; then stage_record "$s" pass; _active_stage=""; say "$s: PASS"; else stage_record "$s" fail; _active_stage=""; fail "$s failed" 'resolve the reported cause, then rerun make hub-new'; fi
+}
+preflight() {
+  local arch mem free host old_short clusters label
+  arch="$(uname -m)"; [[ "$arch" == arm64 ]] || fail "requires arm64 (found $arch)" 'run hub-new on the M5 Air'
+  mem="$(sysctl -n hw.memsize)"
+  if [[ ! "$mem" =~ ^[0-9]+$ ]] || (( mem < 34359738368 )); then fail 'requires at least 32 GiB RAM' 'run hub-new on a 32 GiB M5 Air'; fi
+  free="$(df -Pk "$HOME" | awk 'NR==2 {print $4}')"
+  if [[ ! "$free" =~ ^[0-9]+$ ]] || (( free < 104857600 )); then fail 'requires at least 100 GB free on HOME volume' 'free space on the M5, then rerun'; fi
+  host="$(hostname -s)"; old_short="${OLD_HOST%%.*}"
+  [[ "$host" == "$NEW_HOST" ]] || fail "hostname is $host, expected $NEW_HOST" "set the M5 hostname to $NEW_HOST"
+  [[ "$host" != "$old_short" ]] || fail 'refusing to build on the old hub host' "run this command on $NEW_HOST"
+  pmset -g | grep -E '(SleepDisabled|disablesleep)[[:space:]]+1' >/dev/null || fail 'sleep is not disabled' 'run: sudo pmset -a disablesleep 1, then rerun'
+  [[ -f "${HUB_RECOVERY_INFRA_ROOT:-$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra}/argocd/config/argocd-secret.yaml" ]] || fail 'shopping-cart-infra ArgoCD secret manifest is missing' 'run make machine-setup ROLE=hub, or clone shopping-cart-infra beside k3d-manager'
+  docker info >/dev/null 2>&1 || fail 'OrbStack is not running' 'start OrbStack and rerun'
+  gh auth status >/dev/null 2>&1 || fail 'GitHub CLI is not authenticated' 'run gh auth login and rerun'
+  if command -v k3d >/dev/null 2>&1; then
+    clusters="$(k3d cluster list -o name 2>/dev/null)" || fail 'cannot query local k3d clusters' 'start OrbStack and verify k3d is installed'
+    if printf '%s\n' "$clusters" | grep -Fx "$CLUSTER" >/dev/null && ! stage_passed hub-up; then fail "cluster ${CLUSTER} exists but hub-new has no hub-up pass" 'inspect the cluster; do not delete it automatically'; fi
+  fi
+  while IFS='|' read -r label _installer _note; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    if label_loaded "$label"; then fail "singleton ${label} is already loaded on this Mac" "run: launchctl bootout gui/$(id -u)/com.k3d-manager.${label}"; fi
+  done < "$SINGLETONS"
+}
+machine_setup() { make machine-setup "ROLE=hub" "FROM=$OLD_HOST" SECRETS=skip AGENTS=skip; }
+secrets_present() {
+  local service account _description _command lookup_account creds f
+  while IFS='|' read -r service account _description _command; do
+    [[ -n "$service" && "$service" != \#* ]] || continue
+    lookup_account="$account"
+    [[ "$lookup_account" != USER ]] || lookup_account="$(id -un)"
+    if [[ "$lookup_account" == '*' ]]; then
+      security find-generic-password -s "$service" >/dev/null 2>&1 || fail "Keychain item missing: ${service}" "run make machine-setup ROLE=hub FROM=$OLD_HOST SECRETS=skip AGENTS=skip"
+    else
+      security find-generic-password -s "$service" -a "$lookup_account" >/dev/null 2>&1 || fail "Keychain item missing: ${service} (${lookup_account})" "run make machine-setup ROLE=hub FROM=$OLD_HOST SECRETS=skip AGENTS=skip"
+    fi
+  done < "${REPO_ROOT}/scripts/etc/machine/secrets.hub.list"
+  creds="$(awk '$1 == "credentials-file:" {print $2}' "${REPO_ROOT}/scripts/etc/cloudflared/config.yml")"
+  for f in "${creds##*/}" cert.pem; do
+    [[ -s "$HOME/.cloudflared/$f" ]] || fail "Cloudflare tunnel file missing: ~/.cloudflared/$f" "machine-setup copies it from $OLD_HOST; check its output, or run: scp ${OLD_HOST}:.cloudflared/$f ~/.cloudflared/"
+  done
+}
+hub_up() { bin/hub-up; }
+hub_restore() { HUB_RESTORE_TUNNEL=skip HUB_RESTORE_PLATFORM=skip HUB_RESTORE_RECONCILE=skip K3DM_AGENT_LOAD=0 bin/hub-restore; }
+prepare_singletons() {
+  local label installer _note plist missing="" tunnel_done=0
+  while IFS='|' read -r label installer _note; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    case "$installer" in
+      install-cleanup|install-node-health-watch|install-sandbox-reaper|install-cloud-bridge|install-prometheus-credential-rotator|install-test-metrics) K3DM_AGENT_LOAD=0 make "$installer" || return 1 ;;
+      bin/k3dm-webhook-setup|bin/k3dm-hermes-setup) K3DM_AGENT_LOAD=0 "${REPO_ROOT}/${installer}" || return 1 ;;
+      tunnel_start)
+        if (( ! tunnel_done )); then
+          # shellcheck source=scripts/etc/hostinger/vars.sh
+          source "${REPO_ROOT}/scripts/etc/hostinger/vars.sh"
+          TUNNEL_SCOPE="" TUNNEL_FORCE_HOST=1 TUNNEL_SSH_HOST="${HOSTINGER_SSH_USER}@${HOSTINGER_HOST}" K3DM_AGENT_LOAD=0 scripts/k3d-manager tunnel_start || return 1
+          tunnel_done=1
+        fi ;;
+      scripts/k3d-manager\ vault_install_failover_watchdog) K3DM_AGENT_LOAD=0 scripts/k3d-manager vault_install_failover_watchdog || return 1 ;;
+      scripts/k3d-manager\ acg_watch_start) K3DM_AGENT_LOAD=0 scripts/k3d-manager acg_watch_start || return 1 ;;
+      make\ snapshot-schedule) K3DM_AGENT_LOAD=0 make snapshot-schedule || return 1 ;;
+      make\ hub-data-export-schedule) K3DM_AGENT_LOAD=0 make hub-data-export-schedule || return 1 ;;
+      _ensure_cloudflare_tunnel_agent) K3DM_AGENT_LOAD=0 _ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" '[hub-new]' || return 1 ;;
+      unavailable) say "MISSING INSTALLER: ${label} (${_note})"; missing+=" ${label}"; continue ;;
+      *) fail "installer not implemented for singleton ${label}: ${installer}" 'add the installer before running hub-new' ;;
+    esac
+    plist="${HOME}/Library/LaunchAgents/com.k3d-manager.${label}.plist"
+    [[ -f "$plist" ]] || fail "installer did not write ${plist}" "inspect ${installer} and rerun"
+  done < "$SINGLETONS"
+  [[ -z "$missing" ]] || fail "no supported non-loading installer for:${missing}" 'add safe installers for the reported labels, then rerun hub-new'
+  while IFS='|' read -r label _installer _note; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    ! label_loaded "$label" || fail "singleton ${label} loaded during preparation" 'unload it and inspect its installer'
+  done < "$SINGLETONS"
+}
+data_recover() { make hub-data-recover; }
+reconcile() { KEYCLOAK_BASE_URL="${HUB_NEW_KEYCLOAK_URL:-http://localhost:8880}" HUB_RECOVERY_ARGOCD_URL="${HUB_NEW_ARGOCD_URL:-http://localhost:8080}" K3DM_AGENT_LOAD=0 scripts/k3d-manager hub_recovery_reconcile --confirm; }
+platform() { make appsets-reapply && make appsets-check && make platform-ops && make observability; }
+verify_hub() {
+  local context="k3d-${CLUSTER}" server="k3d-${CLUSTER}-server-0" apps externals kine count elapsed retry_at checks label kine_bytes wal_bytes
+  checks="${STATE_DIR}/verify.json"
+  apps="$(kubectl --context "$context" -n cicd get applications -o json 2>/dev/null)" || fail 'cannot read ArgoCD Applications' 'repair ArgoCD access and rerun'
+  printf '%s' "$apps" | jq -e '(.items | length) > 0 and all(.items[]; .status.sync.status == "Synced" and .status.health.status == "Healthy")' >/dev/null || fail 'one or more cicd Applications are not Synced and Healthy, or none exist' 'repair Applications and rerun'
+  kubectl --context "$context" -n cicd get externalsecret argocd-oidc-secret >/dev/null 2>&1 || fail 'ArgoCD OIDC ExternalSecret cicd/argocd-oidc-secret is missing' 'clone shopping-cart-infra, then HUB_NEW_FROM=reconcile make hub-new'
+  externals="$(kubectl --context "$context" get externalsecrets -A -o json 2>/dev/null)" || fail 'cannot read ExternalSecrets' 'repair ESO access and rerun'
+  printf '%s' "$externals" | jq -e '(.items | length) > 0 and all(.items[]; .status.conditions | any(.type == "Ready" and .status == "True" and .reason == "SecretSynced"))' >/dev/null || fail 'one or more ExternalSecrets are not SecretSynced, or none exist' 'repair ESO and rerun'
+  kubectl --context "$context" -n secrets exec vault-0 -- vault status 2>/dev/null | grep -E '^Sealed[[:space:]]+false' >/dev/null || fail 'Vault is sealed or unavailable' 'unseal Vault, then rerun'
+  kubectl --context "$context" get clustersecretstore vault-backend -o json 2>/dev/null | jq -e '.status.conditions | any(.type == "Ready" and .status == "True")' >/dev/null || fail 'ESO ClusterSecretStore is not Ready' 'repair the store and rerun'
+  kubectl --context "$context" -n cicd get application shopping-cart-identity -o json 2>/dev/null | jq -e '.status.health.status == "Healthy"' >/dev/null || fail 'shopping-cart-identity Application is missing or unhealthy' 'repair shopping-cart-identity and rerun'
+  kubectl --context "$context" -n platform-ops describe secret platform-ops-notifications 2>/dev/null | grep -F 'slack-incoming-webhook-url' >/dev/null || fail 'platform-ops-notifications Slack URL key is absent' 'restore its key through the approved secret workflow'
+  kine="$(docker logs --since 2h "${server}" 2>&1)" || fail "cannot read Kine logs from ${server}" 'inspect the k3d server container and rerun'
+  ! printf '%s\n' "$kine" | grep -E 'Compact failed|transaction has already been' >/dev/null || fail 'Kine compaction error found' 'resolve the datastore error and rerun'
+  read -r count elapsed < <(printf '%s\n' "$kine" | python3 -c 'import datetime,re,sys; events=[]; pat=re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)");
+for line in sys.stdin:
+ if "COMPACT deleted" in line:
+  m=pat.search(line)
+  if m:
+   try: events.append(datetime.datetime.fromisoformat(m.group(1).replace("Z","+00:00")))
+   except ValueError: pass
+print(len(events), int((events[-1]-events[0]).total_seconds()) if len(events)>=6 else 0)')
+  if (( count < 6 || elapsed < 1800 )); then
+    retry_at="$(python3 -c 'import datetime,sys; print((datetime.datetime.now()+datetime.timedelta(seconds=max(0,1800-int(sys.argv[1])))).strftime("%H:%M"))' "$elapsed")"
+    fail "Kine: ${count} of 6 compaction cycles over 30 minutes; rerun make hub-new after ${retry_at}" 'wait for six compaction cycles spanning 30 minutes, then rerun make hub-new'
+  fi
+  while IFS='|' read -r label _installer _note; do [[ -z "$label" || "$label" == \#* ]] || ! label_loaded "$label" || fail "singleton ${label} is loaded" 'unload it before cutover'; done < "$SINGLETONS"
+  kine_bytes="$(docker exec "${server}" stat -c %s /var/lib/rancher/k3s/server/db/state.db 2>/dev/null || printf unknown)"
+  wal_bytes="$(docker exec "${server}" stat -c %s /var/lib/rancher/k3s/server/db/state.db-wal 2>/dev/null || printf unknown)"
+  printf '{"apps":"pass","externalsecrets":"pass","vault":"pass","clustersecretstore":"pass","shopping_cart_identity":"pass","system_notice_slack_key":"pass","kine_compaction_cycles":%s,"singletons_loaded":"none","kine_datastore_bytes":"%s","kine_wal_bytes":"%s"}\n' "$count" "$kine_bytes" "$wal_bytes" > "$checks"
+  printf '\n%-32s %s\n' 'Check' 'Result'
+  printf '%-32s %s\n' '-----' '------'
+  while IFS=$'\t' read -r _check _result; do printf '%-32s %s\n' "$_check" "$_result"; done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' "$checks")
+}
+mkdir -p "$STATE_DIR"; touch "$STATE_FILE"; _force_from=0; _active_stage=""
+if [[ -n "${HUB_NEW_FROM:-}" ]]; then
+  case " ${STAGES[*]} " in *" ${HUB_NEW_FROM} "*) ;; *) fail "unknown stage ${HUB_NEW_FROM}" 'use a stage name listed by bin/hub-new' ;; esac
+fi
+for _stage in "${STAGES[@]}"; do
+  case "$_stage" in
+    preflight) run_stage "$_stage" preflight ;;
+    machine-setup) run_stage "$_stage" machine_setup ;;
+    secrets-present) run_stage "$_stage" secrets_present ;;
+    hub-up) run_stage "$_stage" hub_up ;;
+    hub-restore) run_stage "$_stage" hub_restore ;;
+    prepare-singletons) run_stage "$_stage" prepare_singletons ;;
+    data) run_stage "$_stage" data_recover ;;
+    reconcile) run_stage "$_stage" reconcile ;;
+    platform) run_stage "$_stage" platform ;;
+    verify) run_stage "$_stage" verify_hub ;;
+  esac
+done
+if stage_passed verify; then
+  jq -Rn '[inputs | capture("(?<stage>[^=]+)=(?<result>pass|fail) (?<epoch>[0-9]+)") | {stage:.stage,result:.result,epoch:(.epoch|tonumber)}]' "$STATE_FILE" > "${STATE_DIR}/stages.json"
+  jq -n --arg old_host "$OLD_HOST" --arg timestamp "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --slurpfile stages "${STATE_DIR}/stages.json" --slurpfile checks "${STATE_DIR}/verify.json" '{status:"pass",timestamp:$timestamp,old_host:$old_host,stages:$stages[0],checks:$checks[0]}' > "${REPORT_FILE}.tmp"
+  mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+  say "Verify report: $REPORT_FILE"
+fi
+say 'All stages passed.'

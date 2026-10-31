@@ -457,17 +457,39 @@ Proposed for later review, not dispatched; the existing P2 remains open.
 ### Candidate milestone — v1.43.12 (special release: M5 hub)
 
 **M5 Air becomes the hub** (operator, 2026-10-29). Branch `k3d-manager-v1.43.12`, cut from `main` after v1.43.9
-merges. It ships **before** v1.43.10 and v1.43.11, so its tag lands out of numeric order. The operator chose that over
-renumbering. Plan 1 of 2 is [`one-command-machine-setup`](plans/v1.43.12-one-command-machine-setup.md) (moved from
-v1.43.11). Plan 2 of 2 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
+merges. It ships **before** v1.43.11, so its tag lands out of numeric order. The operator chose that over
+renumbering. On 2026-10-29 the operator moved v1.43.10 ahead of it: v1.43.10 merges first, and v1.43.12 carries a merge of
+the v1.43.10 branch (`2ceb59f2`). Plan 1 of 3 is [`one-command-machine-setup`](plans/v1.43.12-one-command-machine-setup.md) (moved from
+v1.43.11). Plan 2 of 3 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
 verifies a fresh hub on the M5 while the M4 keeps serving, and `make hub-cutover` moves the agents and the tunnels in one
 gated step, with rollback. Its live run is the recovery for the Kine compaction bug and the proof for the three
-2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending.
+2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending. Plan 3 of 3 is [`whole-system-api-cost-panels`](plans/v1.43.12-whole-system-api-cost-panels.md): Claude + Codex cost at API prices per live-verified spec, and the API run rate against the plans it would replace (operator, 2026-10-29). Plan 5 of 5 is [`hub-cutover-hostinger-handoff`](plans/v1.43.12-hub-cutover-hostinger-handoff.md) (2026-10-31, operator approved): the cutover hands the Hostinger app cluster to the M5's ArgoCD (old controller to 0 first, rollback by scaling, never by deleting a registration), and hub-new catches the missing `argocd-oidc-secret`. The release is now at its 5-plan cap; further work goes to v1.43.13.
 
 **Follow-on, not scheduled: a local LLM (Ollama) on the M5.** It runs on the macOS host (Metal; containers have no GPU),
 as a LaunchAgent with a model memory cap. Size it only after the M5 has run as the hub for a week and its free memory is
 measured. First uses: local embeddings for ask-docs and `find-similar-docs`, and Hermes digest summaries. Gets a spec when
 scheduled.
+
+**v1.43.13 also carries** [`control-node-role`](plans/v1.43.13-control-node-role.md) (operator, 2026-10-30): a `control`
+machine role for a Mac that develops k3d-manager and runs hub work over ssh, with no OrbStack or hub agents. The M2 moves
+to it so the operator can travel with it. Open decisions D1 (reaching the hub away from home) and D2 (the M2 e2e runner while away).
+
+**v1.43.13 plan 2:** [`claude-context-cost-per-turn`](plans/v1.43.13-claude-context-cost-per-turn.md) (operator, 2026-10-30).
+It adds per-turn context size, the post-compaction floor, the observed ceiling, and cache rebuilds by cause to the
+Agent Cost dashboard. Its findings: the 400K auto-compact trial was inert (the observed ceiling was 168K both before and after),
+and the roughly 95–100K floor is the main cost lever.
+
+**v1.43.13 plan 3:** [`bug-open-history-from-git`](plans/v1.43.13-bug-open-history-from-git.md) (operator, 2026-10-30): a 30-day open-bugs-by-priority trend computed from git (last commit of each UTC day), published as one Pushgateway group so Prometheus's 3-day retention no longer limits it. The transition ledger stays deferred. 
+
+**v1.43.13 plan 4:** [`fleet-host-cpu-memory-alerts`](plans/v1.43.13-fleet-host-cpu-memory-alerts.md) (operator, 2026-10-31): CPU and memory for the M2, M4 and M5 on a Host Resources dashboard. The alerts trigger on the swap-in rate and on CPU idle or load (never on "memory used"), and route to `k3dm-analyze`, which posts a top-process diagnosis to Slack. v1.43.13 is at 4 of 5 plans.
+
+**v1.43.13 plan 5:** [`agent-instruction-files-refresh`](plans/v1.43.13-agent-instruction-files-refresh.md) (operator, 2026-10-31; dispatch go given, first after the branch is cut): rewrite `AGENTS.md` and `GEMINI.md` to match the dispatch prompt (no git writes, no memory-bank), drop the stale M2/ubuntu-k3s cluster facts and the SDET persona, carry the Acceptance and test-control rules, and guard a shared rules block with `make check-agent-docs`. v1.43.13 is now at its 5-plan cap; the rest of the operator-adopted sequence (2026-10-31) follows in a later release, in order: blind calibration on 3–4 PRs with instructions unchanged, unspoken-rule mining kept only where calibration showed a miss, a thinking-budget benchmark on the calibration set, and extra adversarial reviewers only where measured.
+
+### Patch release — v1.43.14
+
+Split from v1.43.13 on 2026-10-31 by Claude (v1.43.13 is at its 5-plan cap). Branch `k3d-manager-v1.43.14`, cut from `main` after v1.43.13 merges.
+
+**v1.43.14 plan 1:** [`intent-verification`](plans/v1.43.14-intent-verification.md) (operator, 2026-10-31, after blind calibration 1): every Acceptance evidence item gets a plain-language intent ("you will see… / it failed if…"), the operator approves the intents before dispatch (`**Intent approved:**`), `bin/k3dm-codex-dispatch` refuses newer specs without them, and every verification report answers the intent first, then gives proof and an "Errors seen" list. Answers calibration findings O2 and O4 (`docs/calibration/v1.43.12.md`).
 
 ### Candidate milestone — v1.44.0
 
@@ -888,6 +910,31 @@ leaves Hostinger first, which frees the room the new app needs there (about 900m
 requests on a 2-CPU node). It stays on the hub and ACG only as the e2e target until the new app
 takes over.
 
+**Revised 2026-10-30 (operator; Hostinger upgraded).** The operator upgraded the Hostinger node
+from 2 CPU to **4 CPU and 16 GB**. That removes the capacity reason for removing shopping-cart first.
+Claude read the node read-only that day, with shopping-cart and the full platform stack running:
+
+| | Capacity | Requested by pods | In use |
+|---|---|---|---|
+| CPU | 4 cores | 1735m (43%) | 437m (10%) |
+| Memory | 16 GB | 5200 Mi (32%) | 7543 Mi (47%) |
+| Disk | ~193 GB | 54 Gi of PVCs | no disk pressure |
+
+The app's estimate is about 900m CPU and 3 GiB of requests in the 10-10 note, with Next.js and
+Postgres only; the LLM and MCP are external APIs. That would take the node to about 66% CPU and 51%
+memory requested. Even if every pod hit its memory limit at once, the total would be about 13.6 GB
+of 16 GB.
+
+So the app now runs **beside** shopping-cart on Hostinger for the v1.49.0 → v1.50.0 window. The
+platform proofs move to the app while the old target still runs, so there is never a gap with
+nothing proven. Shopping-cart leaves Hostinger at the end of v1.50.0, once those proofs are green
+against the app. The 10-10 rule still holds: no long side-by-side period.
+
+To watch while both run:
+- Monitoring is the largest consumer, at about 1.5 GB in use; its retention grows first.
+- CPU limits are already 203% of the cores, so loadtest runs against either app are scheduled, not
+  continuous.
+
 **Timing, revised 2026-10-10 (operator).** The two tracks are independent until they meet at
 v1.49.0. App specs and the M1 `tools/list` spike live in the app repo and touch no cluster, so they
 may start any time, in the gaps while agents work k3d-manager batches. M2 and later are not run in
@@ -899,8 +946,8 @@ by editing lists, not code.
 | Step | Where | Scope |
 |---|---|---|
 | App M1–M4 | app repo, its own versions; may start any time | 20 plan tasks in 4 milestones of at most 5 specs. Start with a live `tools/list` spike that records TwinkleAI's real tool schema as a fixture. Bilingual from M1: `next-intl`, zh-TW default, a message-file parity test, and a `locale` field on QueryLog. Postgres, not SQLite, so it fits the hub's DR export. |
-| v1.49.0 | k3d-manager | Starts when app M1 is near done. Confirm, read-only, that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards). The operator removes shopping-cart from Hostinger. Onboard the app there: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
-| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. |
+| v1.49.0 | k3d-manager | Starts when app M1 is near done. Onboard the app on Hostinger beside shopping-cart (revised 2026-10-30: the 4 CPU / 16 GB node fits both). Before onboarding, re-read node requests read-only and confirm about 0.9 CPU / 3 GiB of headroom. Onboard: ApplicationSet, own namespace, Keycloak client, Vault/ESO secrets (the TwinkleAI and LLM keys), signed image under Kyverno, Grafana research dashboard, small requests with memory limits. |
+| v1.50.0 | k3d-manager | Re-point the platform proofs from shopping-cart to the app: e2e Tier 1/2, the promotion gate, loadtest, hub-data DR inventory, Hermes e2e triage. Then, once they are green against the app, confirm read-only that nothing on Hostinger still depends on shopping-cart (loadtest targets, alert rules, dashboards); the operator removes shopping-cart from Hostinger (moved here from v1.49.0, 2026-10-30). |
 | v1.50.1 | k3d-manager | Bug-fix-only patch (operator, 2026-10-12): bug-doc status cleanup. Also the docs/issues vs docs/bugs taxonomy research ([`2026-10-13`](bugs/2026-10-13-docs-issues-versus-bugs-taxonomy-research.md), triage 2026-10-15). Walk every open `docs/bugs/` doc and set a status the Bug Tracking dashboard can read — close what shipped and was proven, mark what was withdrawn, keep real open work open. Done when the dashboard's open counts match the real backlog. |
 | v2.0.0 | k3d-manager | Retire shopping-cart from the hub and ACG, with no soak period. Remove the AppSets, Keycloak realm, Vault paths, `shopping_cart.sh`, tests and alerts; archive the nine `shopping-cart-*` repos. |
 

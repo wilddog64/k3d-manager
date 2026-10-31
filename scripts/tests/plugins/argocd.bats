@@ -205,7 +205,7 @@ setup() {
 @test "_argocd_write_port_forward_wrapper includes a self-healing loop" {
   run declare -F _argocd_write_port_forward_wrapper
   [ "$status" -eq 0 ]
-  run grep -Eq 'template_path=.*port-forward-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  run grep -Eq 'template_path=.*port-forward-wrapper\.sh\.tmpl' "$BATS_TEST_DIRNAME/../../lib/port_forward_wrapper.sh"
   [ "$status" -eq 0 ]
   run grep -F 'healthz did not become reachable — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
@@ -266,15 +266,15 @@ setup() {
   [ "$call_line" -gt "$loop_line" ]
   run grep -F 'using current-context' "$template"
   [ "$status" -eq 0 ]
-  run grep -Eq 'local address=.*127\.0\.0\.1|local address=' scripts/plugins/argocd.sh
+  run grep -Eq 'local address=.*127\.0\.0\.1|local address=' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'q_address' scripts/plugins/argocd.sh
+  run grep -F 'q_address' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'q_log_tag' scripts/plugins/argocd.sh
+  run grep -F 'q_log_tag' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'ADDRESS="$q_address"' scripts/plugins/argocd.sh
+  run grep -F 'ADDRESS="$q_address"' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
-  run grep -F 'LOG_TAG="$q_log_tag"' scripts/plugins/argocd.sh
+  run grep -F 'LOG_TAG="$q_log_tag"' scripts/lib/port_forward_wrapper.sh
   [ "$status" -eq 0 ]
 }
 
@@ -468,6 +468,40 @@ JSON
   [[ "$output" != *"configs.cm.url=https://argo.internal.invalid"* ]]
 }
 
+@test "deploy release adds the argo chart repo before installing on a Mac that never added it" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_REPO_URL=https://argoproj.github.io/argo-helm ARGOCD_HELM_CHART_REF=argo/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -eq 0 ]
+  [ "$(sed -n 1p "$HELM_LOG")" = "repo add --force-update argo https://argoproj.github.io/argo-helm" ]
+  [[ "$(sed -n 2p "$HELM_LOG")" == "upgrade --install "*" argo/argo-cd "* ]]
+}
+
+@test "deploy release does not add a repo for a chart ref outside it" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_CHART_REF=oci://registry.example.invalid/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -eq 0 ]
+  run grep -c '^repo add' "$HELM_LOG"
+  [ "$output" = 0 ]
+  grep -q '^upgrade --install .*oci://registry.example.invalid/argo-cd' "$HELM_LOG"
+}
+
+@test "deploy release stops when the repo cannot be added" {
+  export ARGOCD_HELM_REPO_NAME=argo ARGOCD_HELM_REPO_URL=https://argoproj.github.io/argo-helm ARGOCD_HELM_CHART_REF=argo/argo-cd
+  HELM_LOG="${BATS_TEST_TMPDIR}/helm.log"
+  _helm() { printf '%s\n' "$*" >> "$HELM_LOG"; [[ "$1" != repo ]]; }
+  _argocd_ensure_servicemonitors() { :; }
+  run _argocd_helm_deploy_release 0 0
+  [ "$status" -ne 0 ]
+  run grep -c '^upgrade' "$HELM_LOG"
+  [ "$output" = 0 ]
+}
+
 @test "register_app_cluster: shopping-cart label defaults to false" {
   RENDERED_FILE="${BATS_TEST_TMPDIR}/shopping-cart-default.yaml"
   _kubectl() {
@@ -567,4 +601,42 @@ STUB
 
   [ "$(grep -c 'delete secret cluster-ubuntu-k3s' "${calls}")" -eq 2 ]
   [ "$(grep -c 'delete applicationset ' "${calls}")" -eq 0 ]
+}
+
+_app_rebuild_real_kubectl() {
+  fakebin="${BATS_TEST_TMPDIR}/fakebin"
+  mkdir -p "$fakebin"
+  # A missing object: "kubectl get secret|cronjob" exits 1 with NotFound on stderr.
+  cat > "${fakebin}/kubectl" <<'SH'
+#!/usr/bin/env bash
+echo "kubectl $*" >> "${KUBECTL_CALLS}"
+echo "Error from server (NotFound): not found" >&2
+exit 1
+SH
+  chmod +x "${fakebin}/kubectl"
+  export KUBECTL_CALLS="${BATS_TEST_TMPDIR}/kubectl.calls"
+  export PATH="${fakebin}:${PATH}"
+  unset -f _kubectl _run_command kubectl
+  [ "$(command -v kubectl)" = "${fakebin}/kubectl" ]
+  source "${BATS_TEST_DIRNAME}/../../lib/foundation/scripts/lib/system.sh"
+  _argocd_keychain_value() { :; }
+}
+
+@test "app-rebuild sync with no Keychain item and no Secret returns 0 instead of exiting" {
+  _app_rebuild_real_kubectl
+  run argocd_sync_app_rebuild_secret platform-ops
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"optional app-rebuild gh-token; skipping"* ]]
+  grep -q 'get secret platform-ops-app-rebuild' "$KUBECTL_CALLS"
+  grep -q 'get cronjob app-cve-scan' "$KUBECTL_CALLS"
+}
+
+@test "app-rebuild sync with no Keychain item leaves an existing Secret as-is" {
+  _app_rebuild_real_kubectl
+  printf '#!/usr/bin/env bash\necho "kubectl $*" >> "${KUBECTL_CALLS}"\n' > "${fakebin}/kubectl"
+  run argocd_sync_app_rebuild_secret platform-ops
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Secret already present in platform-ops; leaving as-is"* ]]
+  run grep -c 'get cronjob' "$KUBECTL_CALLS"
+  [ "$output" = 0 ]
 }

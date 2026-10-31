@@ -1,0 +1,3 @@
+# label|port|note
+hub-pushgateway-port-forward|19094|Pushgateway
+hub-loki-port-forward|19100|Loki

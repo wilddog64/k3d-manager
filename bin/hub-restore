@@ -85,7 +85,10 @@ _step_start 2
 if "${_make}" restore-google-app-password; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 3
-if "${_make}" observability; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Observability: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_make}" observability; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 4
 _signing_output=""
@@ -103,7 +106,10 @@ else
 fi
 
 _step_start 5
-if "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_RECONCILE:-}" == skip ]]; then
+  _info "[hub-restore] Hub reconcile: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_dispatcher}" hub_recovery_reconcile --confirm; then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 6
 _embeddings_key_length() {
@@ -150,7 +156,19 @@ else
 fi
 
 _step_start 7
-if "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Platform ops: SKIP (deferred until after the data restore)"
+  _step_result SKIP
+elif "${_make}" platform-ops; then _step_result PASS; else _step_result FAIL; fi
+
+_hub_restore_write_pf_wrapper() {
+  (
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    # shellcheck source=scripts/lib/port_forward_wrapper.sh
+    source "${SCRIPT_DIR}/lib/port_forward_wrapper.sh"
+    _argocd_write_port_forward_wrapper "$@"
+  )
+}
 
 _hub_restore_ensure_pf_agent() {
   local name="$1" label="com.k3d-manager.$1-port-forward" state_dir wrapper plist log
@@ -159,8 +177,14 @@ _hub_restore_ensure_pf_agent() {
   plist="${HOME}/Library/LaunchAgents/${label}.plist"
   log="${state_dir}/logs/${name}-pf.log"
   if [[ ! -f "${wrapper}" ]]; then
-    _info "[hub-restore] ${label}: wrapper ${wrapper} missing; run make up once to generate it"
-    return 1
+    _info "[hub-restore] ${label}: writing missing wrapper ${wrapper}"
+    mkdir -p "$(dirname "${wrapper}")" "$(dirname "${log}")"
+    case "${name}" in
+      argocd) _hub_restore_write_pf_wrapper "${wrapper}" "${log}" "$(command -v kubectl)" "$(command -v curl)" "cicd" "${_hub_context}" "svc/argocd-server" "8080" "80" ;;
+      keycloak) _hub_restore_write_pf_wrapper "${wrapper}" "${log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "${_hub_context}" "svc/keycloak" "8880" "http" "http://localhost:8880/realms/master" "" "127.0.0.1" "keycloak-pf" ;;
+      *) _info "[hub-restore] ${label}: wrapper ${wrapper} missing"; return 1 ;;
+    esac
+    [[ -s "${wrapper}" ]] || { _info "[hub-restore] ${label}: could not write wrapper ${wrapper}"; return 1; }
   fi
   if [[ ! -f "${plist}" ]]; then
     mkdir -p "$(dirname "${log}")" "$(dirname "${plist}")"
@@ -202,7 +226,11 @@ done
 if launchctl list 2>/dev/null | grep 'com.k3d-manager.grafana-port-forward' >/dev/null; then
   launchctl kickstart -k "gui/$(id -u)/com.k3d-manager.grafana-port-forward" || _local_agents_ok=0
 fi
-_ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
+if [[ "${HUB_RESTORE_TUNNEL:-}" == skip ]]; then
+  _info "[hub-restore] Cloudflare tunnel: SKIP (deferred until hub cutover)"
+else
+  _ensure_cloudflare_tunnel_agent "$(_acg_provider_state_dir k3s-aws)" "[hub-restore]" || _local_agents_ok=0
+fi
 if (( _local_agents_ok )); then _step_result PASS; else _step_result FAIL; fi
 
 _step_start 9
@@ -212,24 +240,31 @@ if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18
 else
   _info "[hub-restore] Vault :18200 health: FAIL"; _verify_ok=0
 fi
-_grafana_ok=0
-for _grafana_try in $(seq 1 15); do
-  if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
-    _grafana_ok=1; break
+if [[ "${HUB_RESTORE_PLATFORM:-}" == skip ]]; then
+  _info "[hub-restore] Grafana health: SKIP"
+  _info "[hub-restore] Alertmanager SMTP Secret exists: SKIP"
+else
+  _grafana_ok=0
+  for _grafana_try in $(seq 1 15); do
+    if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:3001/api/health 2>/dev/null || true)" == "200" ]]; then
+      _grafana_ok=1; break
+    fi
+    sleep 1
+  done
+  if (( _grafana_ok )); then
+    _info "[hub-restore] Grafana health: PASS"
+  else
+    _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
   fi
-  sleep 1
-done
-if (( _grafana_ok )); then
-  _info "[hub-restore] Grafana health: PASS"
-else
-  _info "[hub-restore] Grafana health: FAIL"; _verify_ok=0
+  if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smtp-secret >/dev/null 2>&1; then
+    _info "[hub-restore] Alertmanager SMTP Secret exists: PASS"
+  else
+    _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
+  fi
 fi
-if kubectl --context "${_hub_context}" -n monitoring get secret alertmanager-smtp-secret >/dev/null 2>&1; then
-  _info "[hub-restore] Alertmanager SMTP Secret exists: PASS"
-else
-  _info "[hub-restore] Alertmanager SMTP Secret exists: FAIL"; _verify_ok=0
-fi
-if launchctl list 2>/dev/null | awk '$3 == "com.k3d-manager.cloudflare-tunnel" && $1 ~ /^[0-9]+$/ { found=1 } END { exit !found }'; then
+if [[ "${HUB_RESTORE_TUNNEL:-}" == skip ]]; then
+  _info "[hub-restore] Cloudflare tunnel check: SKIP"
+elif launchctl list 2>/dev/null | awk '$3 == "com.k3d-manager.cloudflare-tunnel" && $1 ~ /^[0-9]+$/ { found=1 } END { exit !found }'; then
   _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: PASS"
 else
   _info "[hub-restore] Cloudflare tunnel LaunchAgent has a PID: FAIL"; _verify_ok=0

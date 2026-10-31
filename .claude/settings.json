@@ -5,5 +5,18 @@
       "Bash(bin/k3dm-cloud-request:*)"
     ]
   },
-  "autoCompactWindow": 400000
+  "autoCompactWindow": 400000,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-clear-after-land.sh"
+          }
+        ]
+      }
+    ]
+  }
 }

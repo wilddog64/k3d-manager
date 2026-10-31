@@ -2,7 +2,7 @@
 # Format: <path>:<function>
 # See docs/issues entries for each item.
 scripts/plugins/keycloak.sh:deploy_keycloak
-scripts/plugins/argocd.sh:_argocd_write_port_forward_wrapper
+scripts/lib/port_forward_wrapper.sh:_argocd_write_port_forward_wrapper
 scripts/lib/test.sh:test_jenkins
 scripts/lib/test.sh:test_cert_rotation
 scripts/plugins/shopping_cart.sh:shopping_cart_seed_sandbox_vault_kv

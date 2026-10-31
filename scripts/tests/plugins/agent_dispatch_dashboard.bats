@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-BASE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops"
+BASE="${BASE:-${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops}"
 FIXTURE="${BATS_TEST_DIRNAME}/../fixtures/agent-dispatch-dashboard-pre-split.yaml"
 EXPORTER="${BATS_TEST_DIRNAME}/../../../bin/k3dm-dispatch-metrics"
 
@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92}|set(range(42,49))
-assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88}
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98}
 assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 76 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 82 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,47,83,84,85,86,87,88,89,90,91,92):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -531,7 +531,7 @@ assert gauge["title"]=="Claude cost by kind" and gauge["type"]=="bargauge"
 assert gauge["targets"][0]["expr"]=='k3dm_dispatch_claude_api_cost_by_kind_usd{window="$window"}'
 assert gauge["targets"][0]["instant"] and gauge["targets"][0]["legendFormat"]=="{{kind}}"
 assert gauge["fieldConfig"]["defaults"]["unit"]=="currencyUSD" and gauge["fieldConfig"]["defaults"]["decimals"]==2
-assert gauge["gridPos"]=={"h":8,"w":8,"x":16,"y":27}
+assert gauge["gridPos"]=={"h":8,"w":6,"x":18,"y":27}
 assert gauge["options"]["orientation"]=="horizontal" and gauge["options"]["namePlacement"]=="left"
 assert gauge["options"]["text"]=={"titleSize":14,"valueSize":20}
 assert "cache_read" in gauge["description"] and "fraction" in gauge["description"]
@@ -550,9 +550,9 @@ def load(name,key):
   return json.loads("\n".join(x[4:] for x in (base/name).read_text().split(f"  {key}: |\n",1)[1].splitlines()))
 cost={p["id"]:p for p in load("grafana-dashboard-agent-cost.yaml","agent-cost.json")["panels"]}
 dispatch={p["id"]:p for p in load("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json")["panels"]}
-assert cost[34]["gridPos"]["w"]>=6 and cost[86]["gridPos"]["x"]==cost[34]["gridPos"]["w"]
-assert cost[34]["gridPos"]["h"]==cost[86]["gridPos"]["h"]==cost[88]["gridPos"]["h"]
-assert sum(cost[i]["gridPos"]["w"] for i in (34,86,88))==24
+assert cost[34]["gridPos"]["w"]>=6 and cost[93]["gridPos"]["x"]==cost[34]["gridPos"]["w"]
+assert cost[34]["gridPos"]["h"]==cost[93]["gridPos"]["h"]==cost[86]["gridPos"]["h"]==cost[88]["gridPos"]["h"]
+assert sum(cost[i]["gridPos"]["w"] for i in (34,93,86,88))==24
 for i in (29,31):
   assert cost[i]["fieldConfig"]["defaults"]["noValue"]=="Release window only",i
 for i in (32,87):
@@ -664,4 +664,85 @@ print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: whole-system API panels meet the cost and denominator contract" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
+by_title={p["title"]:p for p in d["panels"]}
+titles=["Claude + Codex at API prices","Claude + Codex per live-verified spec","API run rate / month","API vs replaced plans"]
+row=next(p for p in d["panels"] if p["title"]=="Whole system at API prices")
+assert row["type"]=="row" and row["gridPos"]["y"]>=max(p["gridPos"]["y"]+p["gridPos"]["h"] for p in d["panels"] if p["id"] not in range(94,99))
+for title in titles:
+    p=by_title[title]
+    assert p["type"]=="stat" and p["gridPos"]["y"]>row["gridPos"]["y"]
+    assert p["targets"][0]["instant"]
+    assert "API price" in p["description"]
+assert [by_title[t]["id"] for t in titles]==[95,96,97,98]
+assert [by_title[t]["fieldConfig"]["defaults"]["unit"] for t in titles]==["currencyUSD","currencyUSD","currencyUSD","x"]
+expr0=by_title[titles[0]]["targets"][0]["expr"]
+expr1=by_title[titles[1]]["targets"][0]["expr"]
+expr2=by_title[titles[2]]["targets"][0]["expr"]
+expr3=by_title[titles[3]]["targets"][0]["expr"]
+for metric in ("k3dm_dispatch_claude_api_cost_usd","k3dm_dispatch_api_cost_usd","k3dm_dispatch_unledgered_api_cost_usd"):
+    assert metric in expr0 and metric in expr1
+assert 'window="$window"' in expr0 and 'window="$window"' in expr1
+assert " or " in expr0 and " or " in expr1
+assert 'level="live"' in expr1 and "> 0" in expr1
+assert "k3dm_claude_verified_specs{window=\"$window\"}" not in expr1
+assert 'window="7d"' in expr2 and 'window="7d"' in expr3
+for metric in ("k3dm_dispatch_claude_api_cost_observed_days","k3dm_dispatch_api_cost_observed_days"):
+    assert metric in expr2 and metric in expr3
+assert "k3dm_dispatch_unledgered_api_cost_usd" in expr2 and "k3dm_dispatch_unledgered_api_cost_usd" in expr3
+assert '{plan="claude"}' in expr3 and '{plan="chatgpt"}' in expr3
+assert all(f'plan="{plan}"' not in expr3 for plan in ("gemini","github","hostinger"))
+assert all("failed dispatches" in by_title[t]["description"] and "rework" in by_title[t]["description"] for t in titles)
+assert "Claude + ChatGPT" in by_title[titles[3]]["description"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: existing panels are unchanged and new API panels do not overlap" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,subprocess,sys
+from pathlib import Path
+path=Path(sys.argv[1]); text=path.read_text()
+def load(raw): return json.loads("\n".join(x[4:] for x in raw.split("  agent-cost.json: |\n",1)[1].splitlines()))
+current=load(text)
+base=load(subprocess.check_output(["git","show","HEAD:scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml"],text=True))
+old={p["id"]:p for p in base["panels"]}
+now={p["id"]:p for p in current["panels"]}
+assert set(old).issubset(now)
+for panel_id,panel in old.items():
+    assert now[panel_id]==panel,(panel_id,"existing panel changed")
+for i,a_panel in enumerate(current["panels"]):
+    a=a_panel["gridPos"]
+    for b_panel in current["panels"][i+1:]:
+        b=b_panel["gridPos"]
+        assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(a_panel["id"],b_panel["id"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent cost: API cost expression stub matches the 7d baseline and missing release term" {
+  run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read(); d=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
+p={x["title"]:x for x in d["panels"]}
+expr=p["Claude + Codex per live-verified spec"]["targets"][0]["expr"]
+assert all(term in expr for term in ("sum by (window) (k3dm_dispatch_claude_api_cost_usd", "sum by (window) (k3dm_dispatch_api_cost_usd", "sum by (window) (k3dm_dispatch_unledgered_api_cost_usd", "sum by (window) (k3dm_claude_verified_specs"))
+claude,ledgered,unledgered,live=292.58,5.41,0.10,93
+assert abs((claude+ledgered+unledgered)/live-3.21)<=0.01
+# Release windows omit unledgered data; the PromQL `or ... * 0` fallback contributes zero.
+assert abs((292.58+5.41+0)/93-3.21)<=0.01
+assert " or " in expr and "* 0" in expr
+print("ok: 7d = $3.21/live-verified; missing unledgered release term = zero")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"7d ="* && "$output" == *"missing unledgered release term = zero"* ]]
 }

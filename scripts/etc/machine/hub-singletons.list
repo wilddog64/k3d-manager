@@ -1,0 +1,16 @@
+# Loaded only during cutover, in this order. cloudflare-tunnel must stay last.
+vault-failover|scripts/k3d-manager vault_install_failover_watchdog|Hub Vault failover watcher
+ssh-tunnel-vault|tunnel_start|Hostinger reverse Vault tunnel; needs HOSTINGER_HOST
+ssh-tunnel|tunnel_start|Hostinger k3s API tunnel; needs HOSTINGER_HOST
+cleanup|install-cleanup|Shared state cleanup
+node-health-watch|install-node-health-watch|Node health reporting
+sandbox-reaper|install-sandbox-reaper|Shared sandbox cleanup
+acg-watch|scripts/k3d-manager acg_watch_start|ACG sandbox watcher
+prometheus-credential-rotator|install-prometheus-credential-rotator|Prometheus credential rotation
+hub-snapshot|make snapshot-schedule|Hub data snapshot
+hub-data-export|make hub-data-export-schedule|Hub data export
+test-metrics|install-test-metrics|Nightly test metrics
+cloud-bridge|install-cloud-bridge|External cloud request bridge
+webhook|bin/k3dm-webhook-setup|External webhook
+hermes|bin/k3dm-hermes-setup|External notifications and automation
+cloudflare-tunnel|_ensure_cloudflare_tunnel_agent|Public ingress; install last

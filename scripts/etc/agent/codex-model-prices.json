@@ -1,11 +1,13 @@
 {
   "currency": "USD",
   "unit": "per_million_tokens",
-  "checked": "2026-10-23",
-  "source": "OpenAI API standard short-context rates, via third-party price trackers (gpt-5.6-luna after the 2026-07-30 cut; gpt-6-luna per pricepertoken.com, morphllm.com, venturebeat.com on 2026-10-23); not yet confirmed on openai.com/api/pricing. Subscriptions per the operator 2026-10-23; hostinger is $250 per 2 years.",
+  "checked": "2026-10-29",
+  "source": "OpenAI API standard short-context rates, via third-party price trackers (gpt-5.6-luna after the 2026-07-30 cut; gpt-6-luna per pricepertoken.com, morphllm.com, venturebeat.com on 2026-10-23); not yet confirmed on openai.com/api/pricing. gpt-6.1-terra and gpt-6.1-sol standard rates per the operator 2026-10-29, from the published OpenAI standard-mode table (Luna rates in that table match this file). Subscriptions per the operator 2026-10-23; hostinger is $250 per 2 years.",
   "models": {
     "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
-    "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "output": 0.50}
+    "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "output": 0.50},
+    "gpt-6.1-terra": {"input": 1.00, "cached_input": 0.05, "output": 5.00},
+    "gpt-6.1-sol": {"input": 2.00, "cached_input": 0.10, "output": 10.00}
   },
   "subscriptions_usd_per_month": {"chatgpt": 20, "claude": 20, "gemini": 20, "github": 4, "hostinger": 10.42},
   "claude_models": {

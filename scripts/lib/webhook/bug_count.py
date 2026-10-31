@@ -182,6 +182,17 @@ def reply(query):
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
             lines.append(f"Unknown: {_doc_link(path)}")
+        if query.release != "*" and query.state != "open":
+            closed_items = data.get("closed_paths", [])
+            if query.priority:
+                closed_items = [item for item in closed_items
+                                if isinstance(item, dict) and item.get("priority") == query.priority]
+            for item in closed_items[:10]:
+                from webhook.ask_docs import _doc_link
+                path = item["path"] if isinstance(item, dict) else item
+                lines.append(f"Fixed: {_doc_link(path)}")
+            if len(closed_items) > 10:
+                lines.append(f"…and {len(closed_items) - 10} more fixed.")
     if unset_total:
         lines.append(f"{unset_total} docs in these releases have no Priority line, so they are not counted here.")
     lines.append(f"_Counted from docs/bugs/ at {ref}; release = Branch: line, else the release the doc was added in._")

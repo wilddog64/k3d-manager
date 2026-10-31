@@ -61,9 +61,19 @@ function _provider_k3d_install() {
       _install_istioctl
    fi
 
+   case ":${PATH}:" in
+      *":${K3D_INSTALL_DIR}:"*) ;;
+      *) export PATH="${K3D_INSTALL_DIR}:${PATH}" ;;
+   esac
+
    if ! _command_exist k3d ; then
       echo k3d does not exist, install it
-      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | INSTALL_DIR="$K3D_INSTALL_DIR" bash
+      local use_sudo=true
+      if [[ -d "$K3D_INSTALL_DIR" && -w "$K3D_INSTALL_DIR" ]]; then
+         use_sudo=false
+      fi
+      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | \
+         USE_SUDO="$use_sudo" SUDO_PROMPT="[sudo] password for %u on %H (installing k3d): " INSTALL_DIR="$K3D_INSTALL_DIR" bash
    else
       echo k3d installed already
    fi

@@ -10,6 +10,13 @@ failure notes, and cloud-session action definitions.
 **Related specs:** [`docs/plans/v1.13.0-webhook-modularization.md`](../plans/v1.13.0-webhook-modularization.md),
 [`docs/plans/v1.34.0-slack-k3dm-make-command.md`](../plans/v1.34.0-slack-k3dm-make-command.md)
 
+## Untrusted input
+
+Log, pod, alert, and cluster text sent to AI analysis is fenced as untrusted data so its
+contents are treated as evidence rather than instructions. Failure-analysis replies must
+match the expected format; links and commands outside the read-only allow-list are withheld.
+The reply is advice only, and nothing acts on the model's verdict.
+
 This document describes the webhook server as it exists in the tree measured on 2026-10-09:
 what has been extracted into the package, what still lives in the monolith, and the seams the
 remaining phases may cut along. Function names are used for the monolith inventory so that

@@ -62,6 +62,13 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 ---
 
+## How-To guides
+
+- [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
+- [M5 hub migration](docs/howto/m5-hub-migration.md) — build, cut over and roll back the single-instance hub agents.
+- [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)
+- [Platform-ops system-notice Slack webhook](docs/howto/platform-ops-notifications.md)
+
 ## Usage
 
 ```bash
@@ -262,6 +269,9 @@ docs/
 
 ### How-To
 
+**Workstations**
+- **[One-command machine setup](docs/howto/machine-setup.md)** — bootstrap and check hub, worker and console Macs.
+
 **Secrets & Identity**
 - **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
 - **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
@@ -348,6 +358,7 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.43.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.12) | 2026-10-31 | M5 hub release. **Hub:** `make hub-new` builds a fresh hub from the old one's data, and `make hub-cutover` moves the single-instance agents, the forwards and the Hostinger ArgoCD registration to it, with a verify and a rollback; the M5 became the hub on 2026-10-31. **Machines:** `make machine-setup`/`machine-check ROLE=hub|worker|console` set up a Mac from role lists, copying Keychain secrets and listed files from another Mac over SSH. **Cost:** Agent Cost shows whole-system Claude and Codex API cost, unit cost and monthly run rate. **Security:** webhook AI analysis fences untrusted log text and withholds commands outside a read-only allow-list. v1.43.10's plans stay queued. |
 | [v1.43.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.9) | 2026-10-29 | Diagnostics and visibility release. **Webhook:** `make webhook-doctor` diagnoses the webhook read-only and tells a locked Keychain apart from missing credentials; the webhook runs at interactive priority, so ask-docs bug counts finish in under a second instead of timing out. **Hub:** an operator-approved OrbStack upgrade command with Vault and network recovery, and optional outbound heartbeat probes. **CVE:** app CVE scans fail closed on Trivy or registry errors and report GHCR authentication failures separately. **Dispatch:** primary and acting coordinators, landing actors, spec size and change size are recorded per spec. **Dashboards:** the Host Pod IP Pool shows reservations held without a sandbox and alerts after an hour; VectorDB drift is shown by kind and age; Release Plans shows Verified and Live verified separately; the Grafana guide has one page per dashboard. |
 | [v1.43.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.8) | 2026-10-25 | Release-tracking and ops-routing release. **Dispatch:** Agent Dispatch shows each release's span from first dispatch to merge and its active time, with overlapping specs counted once. **Plans:** the Plans table shows dependency waves, timing notes, undeclared file overlaps between plans, separate spec and dispatch approval, and what blocks a dispatch. **Bugs:** the Release row follows Auto or Manual release selection. **Snapshots:** the hub snapshot runs every Sunday at 02:30 and keeps verified snapshots for 30 days, never fewer than three. **Slack:** alert analyses post to the status channel. The Hostinger public-path plan moved to v1.43.10. |
 | [v1.43.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.43.7) | 2026-10-25 | Dispatch identity and dashboard-fit release. **Dispatch:** specs can target another repository's branch, worker and coordinator models are recorded per run, and total dispatch-to-land time is split from the final exit-to-land gap with operator prompts counted. **Hub:** the Argo CD chart is pinned at 10.10.5 with a guarded in-place upgrade command, a rejected Vault unseal cache can no longer trigger a destructive reinit, and Hermes reports OrbStack version and pending updates. **Dashboards:** Bug Tracking and Agent Dispatch tables fit a laptop-width panel without horizontal scrolling, forecasts show dates only, and a landed plan no longer reads `awaiting land`. |

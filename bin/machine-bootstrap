@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Read this file before running it on a fresh Mac. Never pipe it into a shell.
+set -euo pipefail
+_run_command() {
+  local need_sudo=0
+  if [[ "$1" == --require-sudo ]]; then need_sudo=1; shift; fi
+  [[ "$1" == -- ]] && shift
+  if (( need_sudo )); then command sudo "$@"; else command "$@"; fi
+}
+verify_homebrew_package() {
+  local signature
+  signature="$(pkgutil --check-signature "$1" 2>&1)" || return 1
+  if ! printf '%s\n' "$signature" | grep -E 'Developer ID Installer:.*\(927JGANW46\)' >/dev/null; then return 1; fi
+  printf '%s\n' "$signature" | grep -E '^[[:space:]]*Notarization: trusted by the Apple notary service[[:space:]]*$' >/dev/null
+}
+
+if [[ "$(uname -s)" != Darwin || "$(uname -m)" != arm64 ]]; then echo 'Requires macOS arm64' >&2; exit 1; fi
+if ! xcode-select -p >/dev/null 2>&1; then
+  _label="$(softwareupdate --list 2>/dev/null | sed -n 's/^[[:space:]]*\* Label: \(Command Line Tools for Xcode[^[:cntrl:]]*\)$/\1/p' | head -1)"
+  [[ -n "$_label" ]] || { echo 'Could not find current Command Line Tools label' >&2; exit 1; }
+  _run_command --require-sudo -- softwareupdate --install "$_label"
+fi
+if [[ ! -x /opt/homebrew/bin/brew ]]; then
+  _pkg="$(mktemp "${TMPDIR:-/tmp}/Homebrew.XXXXXX.pkg")"
+  trap 'rm -f "$_pkg"' EXIT
+  curl -fL 'https://github.com/Homebrew/brew/releases/latest/download/Homebrew.pkg' -o "$_pkg"
+  verify_homebrew_package "$_pkg" || { echo 'Homebrew package signer was not verified' >&2; exit 1; }
+  _run_command --require-sudo -- installer -pkg "$_pkg" -target /
+fi
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+brew install gh tmux
+if ! gh auth status >/dev/null 2>&1; then gh auth login; fi
+gh auth setup-git
+_repo="${HOME}/src/gitrepo/personal/k3d-manager"
+if [[ ! -d "$_repo/.git" ]]; then
+  mkdir -p "$(dirname "$_repo")"
+  gh repo clone wilddog64/k3d-manager "$_repo"
+fi
+cd "$_repo"
+make machine-setup "ROLE=${ROLE:-hub}"

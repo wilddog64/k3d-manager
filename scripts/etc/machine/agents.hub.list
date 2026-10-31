@@ -1,0 +1,16 @@
+# Ordered actions; make target or setup command, one per line.
+smartcd-install
+install-cleanup
+install-node-health-watch
+install-sandbox-reaper
+install-test-metrics
+install-vault-port-forward
+install-prometheus-port-forward
+install-hub-pushgateway-port-forward
+install-hub-loki-port-forward
+install-alertmanager-port-forward
+install-alertmanager-auth-proxy
+install-cloud-bridge
+bin/k3dm-webhook-setup
+bin/k3dm-hermes-setup
+bin/k3dm-heartbeat-setup

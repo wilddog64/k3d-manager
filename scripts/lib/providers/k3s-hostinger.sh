@@ -1133,6 +1133,13 @@ function _provider_k3s_hostinger_refresh_registration() {
     printf 'ERROR: %s\n' "[k3s-hostinger] refresh_registration is additive-only; K3DM_EXCLUSIVE_APP_CLUSTER=true would strip the app-cluster role from the hub registration" >&2
     return 1
   fi
+  if ! kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
+    if [[ ! -f "${_HOSTINGER_KUBECONFIG}" ]]; then
+      printf 'ERROR: %s\n' "[k3s-hostinger] no ${_HOSTINGER_KUBE_CONTEXT} context and ${_HOSTINGER_KUBECONFIG} missing — copy it from the old hub first" >&2
+      return 1
+    fi
+    _hostinger_merge_kubeconfig || return 1
+  fi
   _info "[k3s-hostinger] Refreshing ArgoCD registration only (additive) — no GitOps reapply, no edge changes"
   K3DM_EXCLUSIVE_APP_CLUSTER=false _hostinger_register_cluster || return 1
   _info "[k3s-hostinger] Registration refresh complete"

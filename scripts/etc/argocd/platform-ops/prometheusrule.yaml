@@ -70,6 +70,18 @@ spec:
           annotations:
             summary: "Trivy report missing for {{ $labels.image_repository }} in {{ $labels.exported_namespace }}"
             description: "Running image {{ $labels.image_repository }} in namespace {{ $labels.exported_namespace }} (workload {{ $labels.workload }}) has no VulnerabilityReport; the critical-CVE table cannot vouch for it."
+        - alert: CriticalCVEFixAvailableNotRemediated
+          expr: |
+            max by (image_repository, vulnerability_id) (
+              trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*", patch_status="available"}
+            ) > 0
+          for: 2d
+          labels:
+            group: trivy-operator
+            severity: warning
+          annotations:
+            summary: "Fixable critical CVE remains open"
+            description: "{{ $labels.vulnerability_id }} in {{ $labels.image_repository }} remains open for two days; see docs/guides/grafana-dashboards/cve-autopatch.md."
         - alert: TrivyOperatorScanJobFailures
           expr: |
             sum(increase(kube_job_status_failed{namespace="trivy-system",job_name=~"scan-.*"}[10m])) > 0

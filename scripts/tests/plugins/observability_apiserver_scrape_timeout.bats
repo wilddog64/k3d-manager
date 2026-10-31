@@ -94,3 +94,62 @@ setup() {
   [ "${status}" -eq 0 ]
   [ "${output}" = "argocd apiserver" ]
 }
+
+_fresh_hub_deploy_observability() {
+  export HOME="${BATS_TEST_TMPDIR}/home"
+  export SCRIPT_DIR="${REPO_ROOT}/scripts"
+  mkdir -p "${HOME}"
+  [[ "${HOME}" == "${BATS_TEST_TMPDIR}"/* ]]
+  NS_MARKER="${BATS_TEST_TMPDIR}/monitoring-ns.created"
+  curl() { return 1; }
+  _vault_login() { :; }
+  _observability_ensure_alertmanager_login() { :; }
+  _observability_install_alertmanager_port_forward() { :; }
+  _observability_install_alertmanager_auth_proxy() { :; }
+  _observability_refresh_prometheus_auth_proxy() { :; }
+  _observability_ensure_prometheus_login() { :; }
+  _observability_apply_grafana_rotator() { :; }
+  _observability_install_prometheus_rotator() { :; }
+  _observability_apply_argocd_dashboard() { :; }
+  _deploy_promtail_acg() { :; }
+  _observability_ensure_argocd_servicemonitors() { :; }
+  _observability_ensure_apiserver_scrape_timeout() { :; }
+  _observability_apply_alertmanager_config() { :; }
+  envsubst() { cat; }
+  export K3D_MANAGER_BRANCH=test-branch
+  # A fresh hub: the monitoring namespace does not exist until something creates it,
+  # and a namespaced apply into it fails NotFound (M5, 2026-10-30).
+  _kubectl() {
+    printf '%s\n' "$*" >> "${KUBECTL_LOG}"
+    case "$*" in
+      "create namespace monitoring --dry-run=client -o yaml")
+        printf 'apiVersion: v1\nkind: Namespace\nmetadata:\n  name: monitoring\n'
+        ;;
+      "apply -f -")
+        if grep -q '^kind: Namespace' && [[ ! -e "${NS_MARKER}" ]]; then : > "${NS_MARKER}"; fi
+        ;;
+      "apply -f "*grafana-admin-externalsecret.yaml)
+        [[ -e "${NS_MARKER}" ]] || { echo 'namespaces "monitoring" not found' >&2; return 1; }
+        ;;
+    esac
+  }
+}
+
+@test "deploy_observability: creates the monitoring namespace before the Grafana ExternalSecret on a fresh hub" {
+  _fresh_hub_deploy_observability
+  [ ! -e "${NS_MARKER}" ]
+  run deploy_observability
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Grafana admin credential ExternalSecret applied"* ]]
+  ns_line="$(grep -n '^create namespace monitoring' "${KUBECTL_LOG}" | head -1 | cut -d: -f1)"
+  es_line="$(grep -n 'grafana-admin-externalsecret.yaml' "${KUBECTL_LOG}" | head -1 | cut -d: -f1)"
+  [ -n "${ns_line}" ] && [ -n "${es_line}" ]
+  [ "${ns_line}" -lt "${es_line}" ]
+}
+
+@test "deploy_observability: Grafana ExternalSecret stub rejects an apply with no monitoring namespace" {
+  _fresh_hub_deploy_observability
+  run _kubectl apply -f "${REPO_ROOT}/scripts/etc/argocd/platform-ops/grafana-admin-externalsecret.yaml"
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *'namespaces "monitoring" not found'* ]]
+}

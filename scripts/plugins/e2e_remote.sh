@@ -213,7 +213,7 @@ function _e2e_remote_eval_gates() {
     return 1
   fi
   if [[ "$lock" == "1" ]]; then
-    printf 'reason=%s\nstatus=busy\n' "an E2E run already holds the runner lock"
+    printf 'reason=%s\nstatus=busy\n' "another run (E2E or CI) holds the runner lock"
     return 1
   fi
   if _e2e_num_lt "$cpu_mean" "$E2E_M2_MIN_CPU_IDLE"; then

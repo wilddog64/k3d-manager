@@ -2,6 +2,146 @@
 
 ## [Unreleased]
 
+## [1.43.12] - 2026-10-31
+
+M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1.43.10 plans themselves are not implemented and stay queued.
+
+- Label the local Host Disk target from the Mac hostname, probe the other fleet Macs, and load the copied operator SSH configuration during machine setup.
+
+- Re-point old-hub Pushgateway and Loki forwards during cutover, with standalone retry and rollback restoration; correct the platform-ops schedule message.
+
+### Removed
+
+- Retire the CI `stage2` and `detect` jobs, the `ci:cluster-tests` label and `scripts/ci/runner_lock.sh`. `stage2` ran against a long-lived cluster on the M2 that nothing else used or checked; it had drifted (no Vault, OrbStack stopped) and had not passed in weeks. The remote e2e on the M2 builds its own cluster per run and stays the live test path. A workflow test keeps self-hosted jobs out of `ci.yml`.
+
+### Added
+
+- Add `make hub-new` to rebuild the M5 as a fresh hub, verify its recovery and platform state, and prepare single-instance agent plists without loading them.
+- `make machine-setup FROM=<host>` now also copies the files a role lists in `scripts/etc/machine/files.<role>.list` when they are missing (mode 600, never overwriting). For a hub these are the Cloudflare tunnel credentials and origin cert, so `make hub-new` no longer needs a manual copy first. It also takes the Hostinger tunnel target from `scripts/etc/hostinger/vars.sh` when `HOSTINGER_HOST` is not exported.
+- Add `make hub-cutover` and `make hub-cutover-rollback` to move the classified single-instance agents between hubs with a recorded rollback path.
+- Add `make hub-cutover-verify`, which re-runs the cutover verification without changing anything and records `pass` or `verify-failed`. A cutover whose verification failed on a transient check could not otherwise reach a passing report, so `make hub-cutover-forwards` refused it forever.
+- **The old-hub push tunnels ignore `~/.ssh/config`.** The M4 config adds two `RemoteForward` relays for the M5. The Pushgateway tunnel took them first, and under `ExitOnForwardFailure=yes` the Loki tunnel exited 255 on every start, so `make hub-cutover-forwards` recorded `forwards-failed`. The tunnel now runs `ssh -F /dev/null` (`ClearAllForwardings` would also drop its own `-L`), and `make hub-cutover-forwards` depends on `make hub-cutover-verify`.
+- **Re-pointing a forward waits for launchd to drop the old job.** `launchctl bootout` returns before a running job is gone, so the immediate `bootstrap` failed with `5: Input/output error` and left the Pushgateway forward unloaded. The installer now polls `launchctl print` for up to 15s before bootstrapping, and a forward that was not loaded (bootout rc 3) is installed instead of stopping the run. The same applies on rollback.
+- Add Keychain secret migration for Mac setup: encrypted file export/import fallback and optional `FROM=<host>` streaming over SSH, with safe prompts and setup integration.
+- Add role-based Mac setup and read-only checks, with role manifests, a reviewed-file bootstrap, and an operator cut-over guide.
+- Add whole-system Claude and Codex API cost, live-verified unit cost, monthly run rate and replaced-plan comparison panels to Agent Cost.
+
+### Fixed
+
+- The nightly CVE rebuild could not pick up fixed packages: every app build uses the GitHub Actions buildkit cache, so a dispatched rebuild with unchanged sources replayed the old `pip install`, `apt-get upgrade` and base layers and produced an image as vulnerable as the last one. `app-cve-scan` now deletes the service repo's `buildkit-blob-*` and `index-buildkit-*` cache entries before it dispatches a rebuild, keeping trivy and other caches; a failed delete only warns. A new alert, `CriticalCVEFixAvailableNotRemediated`, fires when a fixable CRITICAL CVE on a `wilddog64/` image stays open for two days, across digest changes, so a stuck rebuild loop is no longer visible only as an empty dashboard panel.
+
+- **Agent Cost: Claude cost per verified spec counts only real closes.** The verified-specs counter no longer counts a status backfill on an existing doc or a closed-to-closed status edit. Each counted doc carries a level label (live, verified, unverified), a cost-per-live-verified panel was added, and the per-spec panels aggregate Claude cost by window so they agree. (`docs/bugs/2026-10-29-claude-verified-specs-counts-status-backfill.md`)
+- Port-forward installs wait for launchd to unload and protect cutover tunnels; `make hub-migrate HUB_OLD_HOST=<old>` combines the migration stages and records the old hub.
+
+- **Bugs dashboard: "Open by priority over time" no longer looks like lost data.** Hub Prometheus keeps
+  3 days (`retention: 3d`), so a 30-day range showed an empty chart with a spike at the right edge, which read
+  as data lost in the M4 → M5 cutover. Nothing was lost: no hub ever held more than 3 days. The panel is now
+  pinned to the last 3 days (`timeFrom: 3d`) and its description names the retention. A 30-day trend needs
+  history derived from git, not a longer range.
+
+- **`make hub-cutover` hands the Hostinger app cluster to the new hub's ArgoCD.** The cutover moved only
+  the launchd singletons. The M5 ArgoCD had no `cluster-ubuntu-hostinger` registration, so it ran 13
+  Applications to the M4's 33, and once the M4 cluster stopped nothing would have managed the shop. The
+  cutover now scales the old hub's `argocd-application-controller` to 0 and waits for its pod to go,
+  copies `~/.kube/hostinger.config` when the M5 lacks it, registers Hostinger with
+  `refresh_registration` (which now merges a saved kubeconfig when the context is missing), and starts
+  the M5 controller. Only one controller is active at a time while both hubs register Hostinger, so the
+  two never sync the same Applications. Verify now also requires the labelled registration, a Synced
+  and Healthy `ubuntu-hostinger-eso`, and the old controller still at 0. Rollback moves the controller
+  back by scaling and never deletes a registration, because deleting one makes the ApplicationSets
+  prune the generated Applications, the hub's ESO among them. hub-new also clones `shopping-cart-infra`
+  on hubs, fails preflight without its `argocd-secret.yaml`, and fails verify without
+  `cicd/argocd-oidc-secret`. On the M5 that ExternalSecret had been skipped with only a warning, which
+  would have broken ArgoCD's Keycloak login after cutover. Every SSH call to the old hub now runs with
+  `BatchMode=yes` and `ClearAllForwardings=yes`, and the cutover and rollback refuse up front when
+  key login fails: the first M5 dry run prompted for the M4 password on each call and inherited a
+  global `RemoteForward` that failed on every connection.
+- **`hub-cutover` verify no longer asks kubectl for a Secret by name and label at once.** kubectl refuses
+  that (`name cannot be provided when a selector is specified`), so on the first real cutover every
+  verify attempt failed and the run told the operator to roll back a handoff that had worked. It now
+  lists the `app-cluster` registrations and looks for `cluster-ubuntu-hostinger` among them. The test
+  stub now refuses the same combination, with the real error, so the suite goes red on the old call.
+- **The hub copy lists now carry the hub-data export key and the platform-ops PATs.** `files.hub.list`
+  adds `~/.ssh/k3dm-hub-data-write` (and `.pub`) and the `~/.ssh/config.d/operator` fragment that defines
+  the `github-k3dm-hub-data` alias; `secrets.hub.list` adds `platform-ops-app-rebuild` and
+  `platform-ops-git-writer`. The M5 had none of them, so after cutover the `hub-data-export` agent could
+  not push and `make platform-ops` could not create the two `platform-ops` Secrets the M4 runs with.
+
+- **`make hub-new` runs the hub reconcile after the data restore, not before it.** The reconcile ran
+  inside `hub-restore`, two stages before `data` restores the Vault PVC from the old hub. On the M5
+  Vault was still empty, so `keycloak/admin` and `keycloak/clients` did not exist, the
+  `keycloak-secrets` ExternalSecret never synced, `postgres-keycloak` sat in
+  `CreateContainerConfigError`, and the identity hook replay failed after its 300-second wait.
+  `hub-new` now passes `HUB_RESTORE_RECONCILE=skip` to `hub-restore` (Step 5 reports SKIP) and runs
+  the reconcile as its own `reconcile` stage between `data` and `platform`. That stage points the
+  smoke-user seed at the new hub's own Keycloak (`http://localhost:8880`) and the ArgoCD admin check
+  at its own ArgoCD (`http://localhost:8080`); before cutover the public `*.3ai-talk.org` names still
+  reach the old hub. `HUB_NEW_KEYCLOAK_URL` and `HUB_NEW_ARGOCD_URL` override them. A standalone
+  `bin/hub-restore` still runs the reconcile.
+  The `prepare-singletons` stage now runs after `reconcile`, because the reconcile writes
+  `~/.cloudflared/config.yml` and the Cloudflare tunnel installer skips (writing no plist) without it.
+  Stage order: `preflight machine-setup secrets-present hub-up hub-restore data reconcile
+  prepare-singletons platform verify`.
+- **hub-new's verify stage measures the Kine compaction window from the first logged cycle.** It
+  required the last six `COMPACT deleted` lines to span 30 minutes, but Kine compacts every five
+  minutes, so six cycles span 25 minutes and the gate could never pass (the M5 failed it with 24
+  cycles logged). It now needs at least six cycles and 30 minutes from the first to the last. The
+  test fixture's invented ten-minute gaps were replaced by lines captured from the M5's server.
+- **The hub reconcile skips the Hostinger CVE reader seed when the app context is missing, instead of
+  exiting.** `_hub_recovery_seed_app_cluster_reader` guarded the seed with `if ! _kubectl -- --context
+  ubuntu-hostinger get namespace platform`, but `_kubectl` exits the process on a failed call unless it
+  is given `--no-exit`, even as an `if` condition. A hub without that context (the M5 before cutover)
+  lost the rest of the reconcile silently. The guard and the two frontend probes in
+  `_hub_recovery_frontend_origin_provider` (which left the Cloudflare origin provider empty instead of
+  falling through to the hub check) now pass `--no-exit`.
+
+- **The hub reconcile no longer dies when there is no cosign key to restore.** `_hub_recovery_restore_signing`
+  was meant to warn and continue when `signing_restore` fails, but `signing_restore` reports "no Vault key
+  and no Keychain backup" through `_err`, which exits the process. On a new hub (the M5: empty Vault until
+  the `data` stage, no `k3d-manager-signing` Keychain item) the whole `hub_recovery_reconcile` ended right
+  after the Vault root-token sync, before the hub's ArgoCD registration, and hub-restore Step 5 failed
+  with no reconcile error of its own. `signing_restore` now runs in a subshell, so its exit is caught and
+  the existing "continuing recovery" warning applies.
+
+- **`hub-restore` writes the ArgoCD and Keycloak port-forward wrappers when they are missing.** The
+  wrappers were only ever written by the ACG `bin/cluster-up` path, so on a hub built with k3d alone
+  (the M5) Step 8 failed with `wrapper ... missing; run make up once to generate it`, and `make up` on a
+  k3d hub never generates them. Step 8 now renders them for the hub context with the same arguments
+  `bin/cluster-up` uses (`cicd`/`svc/argocd-server` 8080:80, `identity`/`svc/keycloak` 8880:http). To
+  make that possible without loading the whole ArgoCD plugin (which pulls in `vault.sh` and needs bash 4),
+  `_argocd_write_port_forward_wrapper` moved unchanged to `scripts/lib/port_forward_wrapper.sh`, which
+  `argocd.sh` now sources.
+
+- **`hub-new` no longer runs observability and platform-ops before the hub has its data.** On a new
+  machine Vault starts empty and is only filled by the `data` stage (`make hub-data-recover`), but the
+  `hub-up` stage ran `make hub-up` (which also runs `make observability`, `make platform-ops` and the
+  Pushgateway port-forward) and `hub-restore` ran both again and then checked Grafana and
+  `alertmanager-smtp-secret`. On the M5 that failed with `configSecret alertmanager-smtp-secret, which
+  does not exist`, because the Secret is rendered from Vault `secret/k3d-manager/alertmanager`. The
+  `hub-up` stage now runs `bin/hub-up` only. `hub-restore` takes `HUB_RESTORE_PLATFORM=skip`, which
+  reports its Observability and Platform ops steps and the Grafana and SMTP checks as `SKIP`; hub-new
+  sets it. The `platform` stage, after `data`, already runs `make platform-ops` and `make observability`,
+  and `hub-restore` Step 8 still installs the Pushgateway and Loki port-forwards. `make hub-up` and plain
+  `hub-restore` are unchanged.
+
+- **`deploy_observability` creates the `monitoring` namespace before applying the Grafana admin ExternalSecret.** On a fresh hub the namespace only appears once ArgoCD syncs `kube-prometheus-stack`, which races the observability step: the M5 `hub-new` run failed `namespaces "monitoring" not found` about 90 seconds before ArgoCD created it. The M4 hub always had the namespace. The later ServiceMonitor and scrape-timeout steps already wait for their CRDs. The new test fails on the pre-fix code and on a mutant that creates the namespace after the apply; it runs with a scratch `HOME` and a stubbed `curl`.
+
+- **`deploy_argocd` no longer dies silently on a hub with no app-rebuild PAT in the Keychain.** When `platform-ops-app-rebuild` is absent, `argocd_sync_app_rebuild_secret` asks the cluster whether the Secret or the `app-cve-scan` CronJob already exists. Both checks were plain `_kubectl get`, which exits the whole run on a non-zero result, and their output went to `/dev/null` — so on a fresh hub (the M5) `hub-up` step 5 failed right after the webhook-token sync with no error printed. The M4 always had the Keychain item and never reached the checks. Both now use `_kubectl --no-exit`, and the optional-PAT path returns 0 as designed. Tests run the real `_kubectl`/`_run_command` against a fake `kubectl` that returns NotFound; the missing-Secret test is red on the pre-fix code and on a mutant missing either `--no-exit`.
+- `deploy_argocd` now adds its chart repo (`argo`, `ARGOCD_HELM_REPO_URL`) with `helm repo add --force-update` before installing. It never added it, so `make hub-up` on a new Mac failed at step 5 with `Error: repo argo not found`; older Macs only worked because the repo had been added by hand.
+- k3d install on a Mac (`~/.local/bin`) no longer fails with `k3d not found. Is ~/.local/bin on your $PATH?` when that directory is not on the caller's PATH, which made every `make hub-new` rerun reinstall k3d and ask for sudo again. The install directory is put on PATH, the upstream installer runs without sudo when the directory is writable, and any remaining sudo prompt names the host.
+
+- Restore the platform-ops system-notice Slack URL from the hub login Keychain during deployment and warn when it is missing. (`docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md`)
+- Add `AGENTS=skip` for pre-cut-over machine setup, copy the Hermes GitHub and Slack credentials, and keep the webhook token rotator out of machine setup until its consumers can be updated together. (`docs/bugs/2026-10-30-machine-setup-installs-hub-agents-before-cutover.md`)
+- Serialize the self-hosted CI `stage2` job with remote e2e by sharing the M2 runner lock; CI waits up to 30 minutes and remote e2e keeps failing fast. (`docs/bugs/2026-10-30-ci-stage2-ignores-m2-e2e-runner-lock.md`)
+- Sort the PR Checks tables so each pull request's rows stay together: the sort was a `sortBy` key inside `organize`, which Grafana ignores, so rows came out grouped by check. Both tables now sort on the hidden `repo:pr:check` join key before `organize`, and Checks per PR orders its columns Repo, PR, Check, Duration, State. (`docs/bugs/2026-10-30-pr-checks-checks-per-pr-sort-ignored.md`)
+- Unlock this Mac's login Keychain before a secrets pull when it is locked, and add `SECRETS=skip` to machine setup so new Macs can copy existing credentials without running missing-secret setup commands. (`docs/bugs/2026-10-30-machine-secrets-pull-fails-on-locked-local-keychain.md`)
+- Link the fixed docs in an `/ask-docs` bug count: a named-release or last-N count now lists each fixed doc of the asked priority as a Slack link (capped at ten, with an "and N more" line), so a release where every bug is fixed no longer answers with a bare number and `Sources: none`. Open-only and all-releases counts stay short. (`docs/bugs/2026-10-30-ask-docs-bug-count-does-not-link-fixed-docs.md`)
+- Fix machine setup on a real terminal: the manifest loops read their lists on fd 3 so secret prompts, setup scripts, `brew install` and `sudo` see the terminal; install output goes to `~/.local/state/k3d-manager/machine-setup.log` instead of `/dev/null`. The setup guide adds OrbStack's first launch.
+
+### Security
+
+- Fence untrusted webhook logs and cluster diagnostics before AI analysis, validate failure-analysis reply format, and withhold links and commands outside the read-only allow-list.
+
 ## [1.43.9] - 2026-10-29
 
 ### Added

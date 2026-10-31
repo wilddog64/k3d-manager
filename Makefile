@@ -42,6 +42,40 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 argocd-upgrade:
 	@args=(); [ -z "$(TO)" ] || args+=(--to '$(TO)'); [ "$(DRY_RUN)" != 1 ] || args+=(--dry-run); ./scripts/k3d-manager argocd_upgrade "$${args[@]}"
 
+.PHONY: hub-new hub-migrate
+hub-migrate:
+	@HUB_OLD_HOST="$(HUB_OLD_HOST)" bin/hub-new && HUB_OLD_HOST="$(HUB_OLD_HOST)" bin/hub-cutover
+
+hub-new:
+	@bin/hub-new
+
+.PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
+hub-cutover:
+	@bin/hub-cutover
+
+hub-cutover-forwards: hub-cutover-verify
+	@bin/hub-cutover --forwards
+
+hub-cutover-verify:
+	@bin/hub-cutover --verify
+
+hub-cutover-rollback:
+	@bin/hub-cutover --rollback
+
+.PHONY: install-prometheus-credential-rotator
+install-prometheus-credential-rotator:
+	@./scripts/k3d-manager observability_install_prometheus_rotator
+
+.PHONY: install-test-metrics
+install-test-metrics:
+	sed \
+	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
+
 .PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
@@ -576,8 +610,8 @@ install-cleanup:
 	  scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"; fi
 	@echo "Cleanup agent installed — fires daily at 03:00"
 
 ## Install the bounded k3d agent health/recovery watchdog (restarts after 3 failures)
@@ -586,7 +620,7 @@ install-node-health-watch:
 	  scripts/etc/launchd/com.k3d-manager.node-health-watch.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.node-health-watch" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.node-health-watch.plist"; fi
 	@echo "Node health watchdog installed — recovery is bounded to agent-0 with a 5-minute cooldown"
 
 uninstall-node-health-watch:
@@ -600,7 +634,7 @@ install-sandbox-reaper:
 	  scripts/etc/launchd/com.k3d-manager.sandbox-reaper.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.sandbox-reaper" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.sandbox-reaper.plist"; fi
 	@echo "Expired-sandbox reaper installed — fires every 10 minutes"
 
 uninstall-sandbox-reaper:
@@ -615,9 +649,7 @@ install-vault-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.vault-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.vault-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
 	@echo "Vault port-forward agent installed — port 18200 will stay open while k3d-cluster is running"
 
 ## Stop and remove the Vault port-forward LaunchAgent
@@ -632,9 +664,7 @@ install-prometheus-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.prometheus-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
 	@echo "Prometheus port-forward agent installed — raw backend port 19091 will stay open while the hub cluster is reachable"
 	@echo "Run: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.prometheus-auth-proxy\" to bind the authenticated port 19090"
 
@@ -644,13 +674,14 @@ uninstall-prometheus-port-forward:
 	@echo "Prometheus port-forward agent removed"
 
 install-hub-pushgateway-port-forward:
+	@if [ -e "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist.pre-cutover" ] && [ "$(HUB_FORWARD_OVERWRITE)" != 1 ]; then \
+	  echo "refusing: $(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist is a hub-cutover tunnel to the new hub; run make hub-cutover-rollback to restore it, or set HUB_FORWARD_OVERWRITE=1" >&2; exit 1; fi
 	sed \
 	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.hub-pushgateway-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.hub-pushgateway-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
 	@echo "Hub Pushgateway port-forward agent installed — port 19094 will stay open while the hub is reachable"
 
 uninstall-hub-pushgateway-port-forward:
@@ -659,13 +690,14 @@ uninstall-hub-pushgateway-port-forward:
 	@echo "Hub Pushgateway port-forward agent removed"
 
 install-hub-loki-port-forward:
+	@if [ -e "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ] && [ "$(HUB_FORWARD_OVERWRITE)" != 1 ]; then \
+	  echo "refusing: $(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist is a hub-cutover tunnel to the new hub; run make hub-cutover-rollback to restore it, or set HUB_FORWARD_OVERWRITE=1" >&2; exit 1; fi
 	sed \
 	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.hub-loki-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-loki-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.hub-loki-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
 	@echo "Hub Loki port-forward agent installed — port 19100 will stay open while the hub is reachable"
 
 uninstall-hub-loki-port-forward:
@@ -679,9 +711,7 @@ install-alertmanager-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.alertmanager-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
 	@echo "Alertmanager port-forward agent installed — raw backend now stays open on port 19093"
 
 uninstall-alertmanager-port-forward:
@@ -742,8 +772,8 @@ install-cloud-bridge:
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	plutil -lint "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cloud-bridge" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"
+	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cloud-bridge.plist"; fi
 	@echo "Cloud bridge installed — polling origin/cloud-requests every 60s; log: $(HOME)/Library/Logs/k3dm-cloud-bridge.log"
 
 ## Revoke cloud-session access — stop and remove the bridge LaunchAgent
@@ -1454,7 +1484,7 @@ test-pytest:
 	 scripts/tests/tripwire.sh "$$@" scripts/tests/hermes scripts/tests/bin/test_*.py
 
 test-alertmanager-behaviour:
-	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py -v
+	python3 -m pytest scripts/tests/observability/test_alertmanager_notify_behaviour.py scripts/tests/observability/test_kine_compaction_stalled.py scripts/tests/observability/test_cve_fix_available_alert.py -v
 
 ## Run every Python suite (unittest + pytest)
 test-python: test-python-unit test-pytest
@@ -1576,8 +1606,16 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3d|k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
+	@echo "    make hub-migrate HUB_OLD_HOST=<old>  Build and cut over a new hub"
+	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
+	@echo "    make hub-cutover  Move single-instance agents from the old hub to the new hub"
+	@echo "    make hub-cutover-verify    Re-run cutover verification and record the result"
+	@echo "    make hub-cutover-forwards  Re-verify, then re-point old-hub push forwards to the new hub"
+	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
+	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
+	@echo "    make machine-check ROLE=hub|worker|console  Read-only workstation inventory (docs/howto/machine-setup.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
@@ -1666,3 +1704,22 @@ help:
 	@echo ""
 	@echo "  Default URL: $(URL)"
 	@echo ""
+
+## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
+.PHONY: machine-setup machine-check machine-secrets-export machine-secrets-import
+machine-setup:
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
+
+## Read-only workstation inventory; exits nonzero when any item is missing; see docs/howto/machine-setup.md
+machine-check:
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@bin/k3dm-machine-setup --role "$(ROLE)" --check
+
+machine-secrets-export:
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@bin/k3dm-machine-secrets export --role "$(ROLE)"
+
+machine-secrets-import:
+	@test -n "$(FILE)" || { echo 'Usage: make machine-secrets-import FILE=<file> [FORCE=1]' >&2; exit 2; }
+	@if [ "$(FORCE)" = 1 ]; then bin/k3dm-machine-secrets import --in "$(FILE)" --force; else bin/k3dm-machine-secrets import --in "$(FILE)"; fi

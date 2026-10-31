@@ -23,6 +23,7 @@ function deploy_observability() {
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   local _grafana_secret_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-admin-externalsecret.yaml"
+  _kubectl create namespace monitoring --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
   if [[ -f "${_grafana_secret_manifest}" ]]; then
     _kubectl apply -f "${_grafana_secret_manifest}" >/dev/null \
       && _info "[observability] Grafana admin credential ExternalSecret applied"
@@ -202,6 +203,10 @@ function _observability_apply_grafana_rotator() {
   fi
 }
 
+function observability_install_prometheus_rotator() {
+  _observability_install_prometheus_rotator "$@"
+}
+
 function _observability_install_prometheus_rotator() {
   if ! _is_mac; then
     return 0
@@ -218,8 +223,10 @@ function _observability_install_prometheus_rotator() {
     -e "s|{{K3D_MANAGER_PATH}}|${SCRIPT_DIR}/k3d-manager|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
-  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
+    launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  fi
   _info "[observability] Prometheus credential rotator installed"
 }
 

@@ -950,7 +950,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 78  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats
+    assert sum("$window" in expr for expr in expressions) == 81  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1086,6 +1086,16 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
     properties = {prop["id"]: prop["value"] for prop in outside_override["properties"]}
     assert properties["unit"] == "currencyUSD"
     assert properties["decimals"] == 2
+    verified = by_title["Claude cost per verified spec"]["targets"][0]["expr"]
+    live = by_title["Claude cost per live-verified resolution"]["targets"][0]["expr"]
+    assert verified == ('sum by (window) (k3dm_dispatch_claude_api_cost_usd{window="$window"}) / '
+                        '(sum by (window) (k3dm_claude_verified_specs{window="$window"}) > 0)')
+    assert live == ('sum by (window) (k3dm_dispatch_claude_api_cost_usd{window="$window"}) / '
+                    '(sum by (window) (k3dm_claude_verified_specs{window="$window",level="live"}) > 0)')
+    # agent-audit: allow assert-removed both cost exprs now aggregate the numerator by window; asserts updated, not dropped
+    for expr in (verified, live):
+        numerator, denominator = expr.split(" / ", 1)
+        assert numerator.startswith("sum by (window) (") and denominator.startswith("(sum by (window) (")
     boxes = []
     for panel in dashboard["panels"]:
         pos = panel.get("gridPos")
@@ -1095,6 +1105,22 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
         for prior in boxes:
             assert rect[2] <= prior[0] or prior[2] <= rect[0] or rect[3] <= prior[1] or prior[3] <= rect[1]
         boxes.append(rect)
+
+
+def test_dry_run_exports_verified_spec_counts_for_each_window_and_level():
+    env = os.environ.copy()
+    env["K3DM_DISPATCH_PUSHGATEWAY_URL"] = "http://127.0.0.1:9"
+    proc = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                          env=env, check=True, timeout=60)
+    lines = [line for line in proc.stdout.splitlines()
+             if line.startswith("k3dm_claude_verified_specs")]
+    assert len(lines) == len(dispatch_metrics.WINDOWS) * 3
+    assert all('level=' in line for line in lines)
+    assert all(any(f'window="{window}",level="{level}"' in line for line in lines)
+               for window in dispatch_metrics.WINDOWS
+               for level in ("live", "verified", "unverified"))
+    assert not any(line.startswith('k3dm_claude_verified_specs{window=') and 'level=' not in line
+                   for line in proc.stdout.splitlines())
 
 
 def test_by_model_target_is_instant_and_uses_model_legend():
@@ -1671,12 +1697,31 @@ def test_claude_verified_specs_counts_closed_status_transitions_in_window(tmp_pa
     commit_doc("docs/bugs/in-window.md", "OPEN", now - 5 * 86400)
     commit_doc("docs/bugs/in-window.md", "LIVE-VERIFIED — proven", now - 2 * 86400)
     commit_doc("docs/bugs/in-window.md", "VERIFIED — updated note", now - 3600)
+    commit_doc("docs/bugs/new-verified.md", "Fixed on v1.43.10", now - 3 * 86400)
+    commit_doc("docs/bugs/new-unverified.md", "LANDED", now - 3 * 86400)
+    backfill = repo / "docs/bugs/backfill.md"
+    backfill.write_text("# Doc\n\nNo status recorded yet.\n")
+    subprocess.run(["git", "-C", str(repo), "add", "docs/bugs/backfill.md"], check=True)
+    env = os.environ.copy()
+    env["GIT_AUTHOR_DATE"] = f"{now - 3 * 86400} +0000"
+    env["GIT_COMMITTER_DATE"] = env["GIT_AUTHOR_DATE"]
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "backfill precursor"], check=True, env=env)
+    backfill.write_text("# Doc\n\n**Status:** CLOSED — backfilled\n")
+    subprocess.run(["git", "-C", str(repo), "add", "docs/bugs/backfill.md"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "backfill status"], check=True, env=env)
     commit_doc("docs/plans/v1.43.6-open.md", "IN PROGRESS", now - 3600)
 
     output = dispatch_metrics.render([], 0, now, repo_root=repo)
-    assert 'k3dm_claude_verified_specs{window="1d"} 1' in output
-    assert 'k3dm_claude_verified_specs{window="7d"} 1' in output
-    assert 'k3dm_claude_verified_specs{window="30d"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="1d",level="live"} 0' in output
+    assert 'k3dm_claude_verified_specs{window="1d",level="verified"} 0' in output
+    assert 'k3dm_claude_verified_specs{window="1d",level="unverified"} 0' in output
+    assert 'k3dm_claude_verified_specs{window="7d",level="live"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="7d",level="verified"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="7d",level="unverified"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="30d",level="live"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="30d",level="verified"} 1' in output
+    assert 'k3dm_claude_verified_specs{window="30d",level="unverified"} 1' in output
+    assert all('level=' in line for line in output.splitlines() if line.startswith("k3dm_claude_verified_specs"))
 
 
 def test_codex_activity_exports_sessions_tokens_quota_and_untracked(tmp_path):

@@ -29,6 +29,7 @@ You are **not** the orchestrator. Planning and PR management go to Claude.
 1. `hostname && uname -n` — verify you are on the correct machine before anything else
 2. Read `memory-bank/activeContext.md` — current branch, active task, cluster state
 3. Read `memory-bank/progress.md` — what is done, what is pending
+   The newest `## Handoff — <date> <objective>` section in `memory-bank/activeContext.md` is the resume point after a context reset (`/clear`): its objective, evidence, decisions and verification status are settled. Its `Next, in order` list is Claude's planning queue, not a work order; act only on the task you were dispatched or assigned.
 4. Read the full task spec inline — do not start from your own interpretation
 
 ---

@@ -104,6 +104,21 @@ its own tests from the Acceptance section only, never the fix spec or the diff, 
 must pass; live evidence is run by the operator or Claude, never Gemini. Example:
 `docs/bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md`.
 
+**Test controls (operator, 2026-10-30; from "Four ways a test can lie").** Three more rules for
+dispatched tests:
+- **Paired positive control.** A test that asserts "X has no effect" (nothing loaded, nothing
+  written, no call made) is paired with a test showing the effect does happen when X is enabled.
+  Without the pair, a stub that never makes the call passes the negative test vacuously.
+- **Stubs are captured, not imagined.** A stub that imitates an external tool's output (`pmset`,
+  `docker`, `kubectl`, `launchctl`, `security`) takes that output from a real read-only capture,
+  with the host and date in a comment beside it. Mutation tests cannot catch a wrong contract,
+  because the code and the test share it: v1.43.12 `hub-new` passed every test against a
+  `disablesleep` pmset line, a `kine` pod and an `identity` app that the real hub does not have.
+- **Verify the target before the result.** A fixture first asserts what it is pointed at: a fake
+  repo root rather than the real tree, a stub endpoint rather than the live hub, a scratch HOME
+  rather than `~/Library/LaunchAgents`. Code under test resolves paths from its own root, never
+  from the caller's current directory.
+
 - **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
 - **`docs/issues/`** — Copilot PR findings and post-incident notes.
 - **Dedup before filing — two passes.** The exact-slug glob only matches a slug someone already

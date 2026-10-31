@@ -52,6 +52,7 @@ from webhook.agent import (  # noqa: E402
     _run_cluster_ask,
     _sanitize_question,
 )
+from webhook.untrusted import fence, filter_suggestion, validate_failure_reply  # noqa: E402
 from webhook import ask_docs  # noqa: E402
 from webhook.lifecycle import (  # noqa: E402
     _run_make_target, _run_upgrade, _run_cluster,
@@ -1380,13 +1381,13 @@ def _analyze_stall(lines):
     last_output = "\n".join(last_20)
     prompt = (
         "cluster-up has been running and produced no new output for several minutes. "
-        f"Last 20 lines of output:\n\n{last_output}\n\n"
+        f"Last 20 lines of output:\n\n{fence('cluster-up job output', last_output)}\n\n"
         "Is this process genuinely stalled (no progress, waiting on something that "
         "will not resolve), or is it still doing legitimate work (e.g. waiting for a "
         "pod to become Ready)? "
         "Reply with exactly: STALLED or PROGRESSING, then one sentence why. Be brief."
     )
-    return _call_gemini(prompt)
+    return filter_suggestion(_call_gemini(prompt))
 
 
 def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
@@ -1539,7 +1540,7 @@ def _analyze_failure(lines):
     last_output = "\n".join(last_50)
     cluster_state = _collect_cluster_state()
     cluster_section = (
-        f"Live cluster state at time of failure:\n\n{cluster_state}\n\n"
+        f"Live cluster state at time of failure:\n\n{fence('live cluster state', cluster_state)}\n\n"
         if cluster_state else ""
     )
     prompt = (
@@ -1548,7 +1549,7 @@ def _analyze_failure(lines):
         "the remote k3s cluster with ArgoCD, then deploys a shopping-cart application "
         "stack (PostgreSQL StatefulSets, Redis, RabbitMQ, Keycloak, Vault, ESO) via "
         "ArgoCD GitOps sync. It failed — make up exited non-zero.\n\n"
-        f"Last 50 lines of output:\n\n{last_output}\n\n"
+        f"Last 50 lines of output:\n\n{fence('cluster-up job output', last_output)}\n\n"
         f"{cluster_section}"
         "Diagnose the failure using only observed evidence. Treat absent state as unknown;\n"
         "do not infer that an EC2 instance finished booting, that sshd is running, or that\n"
@@ -1591,7 +1592,7 @@ def _analyze_failure(lines):
                     " was likely showing and how it relates to the failure."
                 )
             break
-    return _call_gemini(prompt)
+    return validate_failure_reply(_call_gemini(prompt))
 
 
 def _init_k8s_ctx():
@@ -1905,16 +1906,17 @@ def _run_post_provision_check(job_id, provider):
                 continue
 
             prompt = (
-                f"A Kubernetes ArgoCD application named '{app_name}' is Degraded "
-                f"90 seconds after a fresh cluster provision.\n\n"
-                f"Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
+                "A Kubernetes ArgoCD application is Degraded 90 seconds after a fresh "
+                "cluster provision. Application name:\n"
+                f"{fence('cluster diagnostics', app_name)}\n\n"
+                f"Diagnostics:\n" + fence("cluster diagnostics", "\n\n".join(diag_parts)) + "\n\n"
                 "Is this a TRANSIENT issue (ESO not synced yet, pod still starting — "
                 "will resolve in a few minutes) or a REAL FAILURE (misconfiguration, "
                 "missing secret, crash loop — needs human action)?\n"
                 "Reply with TRANSIENT or REAL FAILURE, then one sentence with the "
                 "most likely cause and fix. Be brief."
             )
-            analysis = _call_gemini(prompt)
+            analysis = filter_suggestion(_call_gemini(prompt))
             _notify_job(job_id, f"🔍 *{app_name}* — {analysis}")
 
     # Gemini triage for failed smoke checks
@@ -1957,8 +1959,8 @@ def _run_post_provision_check(job_id, provider):
         prompt = (
             _ARCH_CONTEXT + "\n"
             f"Service `{svc_name}` failed an HTTP smoke test 90 seconds after a fresh "
-            f"Kubernetes cluster provision. Error: {err_detail}\n\n"
-            "Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
+            "Kubernetes cluster provision.\n\n"
+            "Diagnostics:\n" + fence("cluster diagnostics", "\n\n".join(diag_parts) + "\nError: " + err_detail) + "\n\n"
             "Is this a TRANSIENT issue (pod still starting, port-forward not ready, "
             "ESO secret not yet synced — will resolve in a few minutes) or a REAL FAILURE "
             "(crash loop, missing secret, misconfiguration — needs human action)?\n"
@@ -1966,7 +1968,7 @@ def _run_post_provision_check(job_id, provider):
             "Reply with TRANSIENT or REAL FAILURE, then one sentence with the most likely "
             "cause and what to check or fix. Be brief."
         )
-        analysis = _call_gemini(prompt)
+        analysis = filter_suggestion(_call_gemini(prompt))
         _notify_job(job_id, f"🔍 *{svc_name} smoke failure* — {analysis}")
 
 
@@ -2068,10 +2070,10 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             prompt = (
                 f"You are a Kubernetes operations expert. Analyze this alert and give a "
                 f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
-                f"Alert: {alert_name} on app '{display_name}'\n\n"
-                f"Diagnostics:\n{diagnostics}"
+                f"Alert: {fence('alert diagnostics', alert_name + ' on app ' + display_name)}\n\n"
+                f"Diagnostics:\n{fence('alert diagnostics', diagnostics)}"
             )
-            analysis = _call_gemini(prompt)
+            analysis = filter_suggestion(_call_gemini(prompt))
             _log(analysis + "\n")
 
             message = f"🔍 *{alert_name}* — `{display_name}`\n{analysis}"

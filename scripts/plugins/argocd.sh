@@ -15,6 +15,9 @@ fi
 # shellcheck disable=SC1090
 source "$PROVIDER_LIB"
 
+# shellcheck source=scripts/lib/port_forward_wrapper.sh
+source "$SCRIPT_DIR/lib/port_forward_wrapper.sh"
+
 # Source Vault plugin for PKI and secret management
 VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
 if [[ -r "$VAULT_PLUGIN" ]]; then
@@ -233,88 +236,6 @@ function _argocd_issue_browser_tls_material() {
          _warn "[argocd] failed to revoke previous browser TLS certificate serial $existing_serial"
       fi
    fi
-}
-
-function _argocd_write_port_forward_wrapper() {
-   local wrapper_path="$1"
-   local log_file="$2"
-   local kubectl_bin="${3:-}"
-   local curl_bin="${4:-}"
-   local namespace="${5:-$ARGOCD_NAMESPACE}"
-   local context="${6:-k3d-k3d-cluster}"
-   local service="${7:-svc/argocd-server}"
-   local local_port="${8:-8080}"
-   local remote_port="${9:-80}"
-   local healthz_url="${10:-}"
-   local kubeconfig_file="${11:-}"
-   local address="${12:-127.0.0.1}"
-   local log_tag="${13:-argocd-pf}"
-
-   case "$kubectl_bin" in
-      "") kubectl_bin="$(command -v kubectl 2>/dev/null || true)" ;;
-   esac
-   case "$curl_bin" in
-      "") curl_bin="$(command -v curl 2>/dev/null || true)" ;;
-   esac
-   case "$healthz_url" in
-      "") healthz_url="http://localhost:${local_port}/healthz" ;;
-   esac
-
-   case "$kubectl_bin" in
-      "")
-         _err "[argocd] kubectl not found while writing port-forward wrapper"
-         return 1
-         ;;
-   esac
-   case "$curl_bin" in
-      "")
-         _err "[argocd] curl not found while writing port-forward wrapper"
-         return 1
-         ;;
-   esac
-
-   local template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
-   if [[ ! -r "$template_path" ]]; then
-      _err "[argocd] Port-forward wrapper template not found: $template_path"
-      return 1
-   fi
-
-   local q_kubectl_bin q_curl_bin q_log_file q_kubeconfig_file q_namespace q_context q_service q_local_port q_remote_port q_healthz_url q_startup_timeout q_address q_log_tag
-   printf -v q_kubectl_bin '%q' "$kubectl_bin"
-   printf -v q_curl_bin '%q' "$curl_bin"
-   printf -v q_log_file '%q' "$log_file"
-   if [[ -n "$kubeconfig_file" ]]; then
-      printf -v q_kubeconfig_file '%q' "$kubeconfig_file"
-   else
-      q_kubeconfig_file=""
-   fi
-   printf -v q_namespace '%q' "$namespace"
-   printf -v q_context '%q' "$context"
-   printf -v q_service '%q' "$service"
-   printf -v q_local_port '%q' "$local_port"
-   printf -v q_remote_port '%q' "$remote_port"
-   printf -v q_healthz_url '%q' "$healthz_url"
-   printf -v q_startup_timeout '%q' "${ARGOCD_PORT_FORWARD_STARTUP_TIMEOUT:-30}"
-   printf -v q_address '%q' "$address"
-   printf -v q_log_tag '%q' "$log_tag"
-
-   mkdir -p "$(dirname "$wrapper_path")"
-   KUBECTL_BIN="$q_kubectl_bin" \
-   CURL_BIN="$q_curl_bin" \
-   LOG_FILE="$q_log_file" \
-   KUBECONFIG_FILE="$q_kubeconfig_file" \
-   NAMESPACE="$q_namespace" \
-   CONTEXT="$q_context" \
-   SERVICE="$q_service" \
-   LOCAL_PORT="$q_local_port" \
-   REMOTE_PORT="$q_remote_port" \
-   HEALTHZ_URL="$q_healthz_url" \
-   STARTUP_TIMEOUT="$q_startup_timeout" \
-   ADDRESS="$q_address" \
-   LOG_TAG="$q_log_tag" \
-      envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT $ADDRESS $LOG_TAG' \
-         < "$template_path" > "$wrapper_path"
-   chmod 700 "$wrapper_path"
 }
 
 function _argocd_write_browser_https_wrapper() {
@@ -559,6 +480,13 @@ function _argocd_helm_deploy_release() {
          --set "server.insecure=true"
          --set "server.service.type=ClusterIP"
       )
+   fi
+
+   if [[ "$ARGOCD_HELM_CHART_REF" == "${ARGOCD_HELM_REPO_NAME}/"* ]]; then
+      _helm repo add --force-update "$ARGOCD_HELM_REPO_NAME" "$ARGOCD_HELM_REPO_URL" >/dev/null || {
+         _err "[argocd] helm repo add ${ARGOCD_HELM_REPO_NAME} ${ARGOCD_HELM_REPO_URL} failed"
+         return 1
+      }
    fi
 
    if (( release_exists )); then
@@ -1874,9 +1802,9 @@ function argocd_sync_app_rebuild_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
-      if _kubectl get secret "${_name}" -n "${_ns}" >/dev/null 2>&1; then
+      if _kubectl --no-exit get secret "${_name}" -n "${_ns}" >/dev/null 2>&1; then
          _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — Secret already present in ${_ns}; leaving as-is"
-      elif _kubectl get cronjob app-cve-scan -n "${_ns}" >/dev/null 2>&1; then
+      elif _kubectl --no-exit get cronjob app-cve-scan -n "${_ns}" >/dev/null 2>&1; then
          _warn "[argocd] ${_service} MISSING from Keychain (${_service}/${_account}) AND no ${_name} Secret in ${_ns}: the app-cve-scan CronJob will wedge on CreateContainerConfigError until a dedicated PAT is stored. Store a dedicated PAT (do NOT reuse a broad gh CLI token), then re-run argocd_sync_app_rebuild_secret ${_ns}."
       else
          _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional app-rebuild gh-token; skipping (store a dedicated PAT there to enable auto-sync — do NOT reuse a broad gh CLI token)"
@@ -1904,6 +1832,37 @@ function argocd_sync_git_writer_secret() {
 
    _info "[argocd] Syncing ${_name} Secret (git-token) into namespace ${_ns} from Keychain..."
    _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" git-token
+}
+
+function _argocd_sync_notifications_slack_secret_untraced() {
+   local _ns="${1:-platform-ops}"
+   local _service="k3dm-platform-ops-slack-url"
+   local _account="k3dm"
+   local _value=""
+   local _payload_file=""
+
+   _value=$(_argocd_keychain_value "${_service}" "${_account}")
+   if [[ -z "${_value}" ]]; then
+      _info "[argocd] ${_service} not in Keychain"
+      return 0
+   fi
+
+   _payload_file="$(mktemp "${TMPDIR:-/tmp}/k3dm-platform-ops-slack.XXXXXX")" || return 1
+   {
+      printf '{"data":{"slack-incoming-webhook-url":"'
+      printf '%s' "${_value}" | base64 | tr -d '\n'
+      printf '"}}'
+   } >"${_payload_file}"
+   _value=""
+   local _rc=0
+   _kubectl -n "${_ns}" patch secret platform-ops-notifications \
+      --type=merge --patch-file="${_payload_file}" >/dev/null || _rc=$?
+   rm -f -- "${_payload_file}"
+   return "${_rc}"
+}
+
+function argocd_sync_notifications_slack_secret() {
+   _no_trace _argocd_sync_notifications_slack_secret_untraced "${1:-platform-ops}"
 }
 
 function _argocd_apply_credential_rotator() {
@@ -2032,13 +1991,14 @@ EOF
    argocd_sync_webhook_token_secret cicd
    argocd_sync_app_rebuild_secret platform-ops
    argocd_sync_git_writer_secret platform-ops
+   argocd_sync_notifications_slack_secret platform-ops
+   if ! _kubectl -n platform-ops get secret platform-ops-notifications -o json 2>/dev/null \
+      | jq -e '.data["slack-incoming-webhook-url"] | type == "string" and length > 0' >/dev/null 2>&1; then
+      _warn "[argocd] platform-ops-notifications has no slack-incoming-webhook-url — system notices will not be sent"
+   fi
    _argocd_apply_credential_rotator
 
-   _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
-   _info "[argocd] Secrets still to create manually (no durable local source):"
-   _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
-   _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
-   _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
+   _info "[argocd] platform-ops deployed — app CVE scan daily 01:00, ArgoCD CVE scan daily 01:30 (America/Los_Angeles), expiry check every 30m, remediation verify every 15m"
 }
 
 function argocd_check_values_branch() {

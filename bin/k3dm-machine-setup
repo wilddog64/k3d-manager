@@ -1,0 +1,417 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/lib/core.sh"
+
+usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--agents install|skip] [--check|--dry-run]\n'; }
+role='' from_host='' secrets_mode=ask agents_mode=install mode=setup failed=0 brew_available=0
+while (($#)); do
+  case "$1" in
+    --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
+    --from) (($# >= 2)) || { usage >&2; exit 2; }; from_host="$2"; shift 2 ;;
+    --secrets) (($# >= 2)) || { usage >&2; exit 2; }; secrets_mode="$2"; shift 2 ;;
+    --agents) (($# >= 2)) || { usage >&2; exit 2; }; agents_mode="$2"; shift 2 ;;
+    --check) mode=check; shift ;;
+    --dry-run) mode=dry-run; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
+case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
+case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
+manifest_dir="${REPO_ROOT}/scripts/etc/machine"
+sudoers_file="${K3DM_SUDOERS_FILE:-/etc/sudoers.d/k3d-manager}"
+[[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
+
+setup_log="${XDG_STATE_HOME:-$HOME/.local/state}/k3d-manager/machine-setup.log"
+report() { printf '%-32s %s\n' "$1" "$2"; }
+log_install() {
+  if [[ ! -e "$setup_log" ]]; then mkdir -p "$(dirname "$setup_log")" && (umask 077 && : > "$setup_log"); fi
+  printf '== %s\n' "$*" >> "$setup_log"
+  "$@" >> "$setup_log" 2>&1
+}
+record_failure() { failed=1; report "$1" "$2"; }
+verify_homebrew_package() {
+  local signature
+  signature="$(pkgutil --check-signature "$1" 2>&1)" || return 1
+  if ! printf '%s\n' "$signature" | grep -E 'Developer ID Installer:.*\(927JGANW46\)' >/dev/null; then return 1; fi
+  printf '%s\n' "$signature" | grep -E '^[[:space:]]*Notarization: trusted by the Apple notary service[[:space:]]*$' >/dev/null
+}
+
+ensure_homebrew() {
+  if command -v brew >/dev/null 2>&1; then report homebrew ok; return 0; fi
+  if [[ "$mode" != setup ]]; then record_failure homebrew missing; return 1; fi
+  local package
+  package="$(mktemp "${TMPDIR:-/tmp}/Homebrew.XXXXXX.pkg")"
+  if ! curl -fL 'https://github.com/Homebrew/brew/releases/latest/download/Homebrew.pkg' -o "$package" >/dev/null 2>&1; then
+    rm -f "$package"; record_failure homebrew missing; return 1
+  fi
+  if ! verify_homebrew_package "$package"; then
+    rm -f "$package"; record_failure homebrew 'skipped (package signer not verified)'; return 1
+  fi
+  if ! _run_command --interactive-sudo --require-sudo -- installer -pkg "$package" -target /; then
+    rm -f "$package"; record_failure homebrew missing; return 1
+  fi
+  rm -f "$package"
+  PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"; export PATH
+  command -v brew >/dev/null 2>&1 || { record_failure homebrew missing; return 1; }
+  report homebrew installed
+}
+
+check_clt() {
+  local label
+  if xcode-select -p >/dev/null 2>&1; then report command-line-tools ok; return; fi
+  if [[ "$mode" != setup ]]; then record_failure command-line-tools missing; return; fi
+  label="$(softwareupdate --list 2>/dev/null | sed -n 's/^[[:space:]]*\* Label: \(Command Line Tools for Xcode[^[:cntrl:]]*\)$/\1/p' | head -1)"
+  if [[ -z "$label" ]]; then record_failure command-line-tools 'missing (no current label)'; return; fi
+  if _run_command --interactive-sudo --require-sudo -- softwareupdate --install "$label"; then report command-line-tools installed
+  else record_failure command-line-tools missing; fi
+}
+
+check_github_auth() {
+  local auth_status
+  if ! auth_status="$(gh auth status 2>&1)"; then
+    if [[ "$mode" != setup || ! -t 0 ]]; then record_failure github-auth missing; return; fi
+    if ! gh auth login; then record_failure github-auth missing; return; fi
+    if ! auth_status="$(gh auth status 2>&1)"; then record_failure github-auth missing; return; fi
+  fi
+  if [[ "$auth_status" == *hosts.yml* ]]; then
+    report github-auth-storage 'skipped (hosts.yml storage; run gh auth logout then gh auth login to use Keychain)'
+  fi
+  if [[ "$mode" == setup ]] && ! gh auth setup-git >/dev/null 2>&1; then record_failure github-setup-git missing; fi
+  report github-auth ok
+}
+
+preflight() {
+  if [[ "$(uname -s)" == Darwin ]]; then report preflight-macos ok; else record_failure preflight-macos missing; fi
+  if [[ "$(uname -m)" == arm64 ]]; then report preflight-arm64 ok; else record_failure preflight-arm64 missing; fi
+  check_clt
+  if ensure_homebrew; then brew_available=1; fi
+  check_github_auth
+}
+
+normalize_github_remote() {
+  local remote
+  remote="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$remote" in
+    https://github.com/*) remote="${remote#https://github.com/}" ;;
+    git@github.com:*) remote="${remote#git@github.com:}" ;;
+    ssh://git@github.com/*) remote="${remote#ssh://git@github.com/}" ;;
+    *) return 1 ;;
+  esac
+  while [[ "$remote" == */ ]]; do remote="${remote%/}"; done
+  remote="${remote%.git}"
+  case "$remote" in */*) ;; *) return 1 ;; esac
+  [[ -n "${remote%%/*}" && -n "${remote#*/}" && "${remote#*/}" != */* ]] || return 1
+  printf '%s\n' "$remote"
+}
+
+same_remote() {
+  local actual="$1" expected="$2" actual_normalized expected_normalized
+  [[ -n "$actual" && "$actual" == "$expected" ]] && return 0
+  actual_normalized="$(normalize_github_remote "$actual")" || return 1
+  expected_normalized="$(normalize_github_remote "$expected")" || return 1
+  [[ "$actual_normalized" == "$expected_normalized" ]]
+}
+
+install_smartcd() {
+  [[ "$role" == hub || "$role" == worker ]] || return 0
+  local clone="$HOME/src/gitrepo/personal/smartcd" actual
+  if [[ -r "$HOME/.smartcd/lib/core/smartcd" ]]; then report smartcd ok; return; fi
+  if [[ "$mode" != setup ]]; then record_failure smartcd missing; return; fi
+  if [[ ! -e "$clone/.git" ]]; then record_failure smartcd 'missing (source clone unavailable)'; return; fi
+  actual="$(git -C "$clone" remote get-url origin 2>/dev/null || true)"
+  if ! same_remote "$actual" 'https://github.com/cxreg/smartcd.git'; then record_failure smartcd 'skipped (source clone has another remote)'; return; fi
+  if make -C "$clone" install >/dev/null 2>&1 && [[ -r "$HOME/.smartcd/lib/core/smartcd" ]]; then report smartcd installed
+  else record_failure smartcd missing; fi
+}
+
+install_tools() {
+  local raw kind name
+  while IFS= read -r raw <&3 || [[ -n "$raw" ]]; do
+    raw="${raw%%#*}"; raw="${raw//[$'\t\r']/}"
+    [[ -n "${raw// /}" ]] || continue
+    kind=formula; name="$raw"
+    case "$raw" in cask:*) kind=cask; name="${raw#cask:}" ;; formula:*) name="${raw#formula:}" ;; esac
+    if brew list "--${kind}" "$name" >/dev/null 2>&1; then report "brew:${name}" ok
+    elif [[ "$mode" == setup ]]; then
+      if if [[ "$kind" == cask ]]; then log_install brew install --cask "$name"; else log_install brew install "$name"; fi; then report "brew:${name}" installed
+      else record_failure "brew:${name}" 'missing (see machine-setup.log)'; fi
+    else record_failure "brew:${name}" missing
+    fi
+  done 3< "${manifest_dir}/brew.${role}.list"
+}
+
+ensure_python_tools() {
+  local venv_dir="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv" python_bin
+  if command -v ruff >/dev/null 2>&1 && command -v pytest >/dev/null 2>&1; then report python-tools ok; return; fi
+  if [[ -x "$venv_dir/bin/ruff" && -x "$venv_dir/bin/pytest" ]]; then report python-tools ok; return; fi
+  if [[ "$mode" != setup ]]; then record_failure python-tools missing; return; fi
+  python_bin="$(command -v python3 || true)"
+  if [[ -z "$python_bin" ]]; then record_failure python-tools missing; return; fi
+  if ! "$python_bin" -m venv "$venv_dir" || ! "$venv_dir/bin/python" -m pip install 'pytest==9.1.1' 'ruff==0.15.8' >/dev/null; then
+    record_failure python-tools missing; return
+  fi
+  if [[ ! -x "$venv_dir/bin/ruff" || ! -x "$venv_dir/bin/pytest" ]]; then record_failure python-tools missing; return; fi
+  report python-tools 'installed (add ~/.local/share/k3d-manager/venv/bin to PATH)'
+
+}
+
+clone_if_absent() {
+  local path="$1" remote="$2" branch="$3" target="$HOME/src/$1"
+  if [[ -e "$target/.git" ]]; then
+    local actual
+    actual="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
+    if same_remote "$actual" "$remote"; then report "repo:${path}" ok; else record_failure "repo:${path}" 'skipped (existing clone has another remote)'; fi
+    return
+  fi
+  if [[ ! -e "$target/.git" && -e "$target" && -n "$(ls -A "$target" 2>/dev/null || true)" ]]; then record_failure "repo:${path}" 'skipped (target is not empty)'; return; fi
+  if [[ "$mode" != setup ]]; then record_failure "repo:${path}" missing; return; fi
+  if ! mkdir -p "$(dirname "$target")"; then record_failure "repo:${path}" missing; return; fi
+  if [[ "$branch" != - ]] && ! git ls-remote --exit-code --heads "$remote" "$branch" >/dev/null 2>&1; then record_failure "repo:${path}" 'skipped (branch unavailable upstream)'; return; fi
+  if [[ "$branch" == - ]]; then
+    if log_install git clone "$remote" "$target"; then report "repo:${path}" installed
+    else record_failure "repo:${path}" 'missing (see machine-setup.log)'; fi
+  elif log_install git clone --branch "$branch" --single-branch "$remote" "$target"; then report "repo:${path}" installed
+  else record_failure "repo:${path}" 'missing (see machine-setup.log)'; fi
+}
+
+install_repos() {
+  local path remote branch roles
+  while IFS='|' read -r path remote branch roles <&3; do
+    [[ -n "$path" && "$path" != \#* ]] || continue
+    case ",$roles," in *",$role,"*) ;; *) continue ;; esac
+    case "$remote" in SKIP:*) report "repo:${path}" "skipped (${remote#SKIP: })"; continue ;; esac
+    clone_if_absent "$path" "$remote" "$branch"
+  done 3< "${manifest_dir}/repos.list"
+  clone_configs
+  setup_shell_links
+}
+
+clone_config() {
+  local repo="$1" target="$2" remote="https://github.com/wilddog64/${1}.git"
+  if [[ -e "$target/.git" ]]; then
+    if same_remote "$(git -C "$target" remote get-url origin 2>/dev/null || true)" "$remote"; then report "config:${repo}" ok
+    else record_failure "config:${repo}" 'skipped (unexpected existing directory)'; fi
+    return
+  fi
+  if [[ -e "$target" && -n "$(ls -A "$target" 2>/dev/null || true)" ]]; then record_failure "config:${repo}" 'skipped (target is not empty)'; return; fi
+  if [[ "$mode" != setup ]]; then record_failure "config:${repo}" missing; return; fi
+  if git clone "$remote" "$target" >/dev/null 2>&1; then report "config:${repo}" installed
+  else record_failure "config:${repo}" missing; fi
+}
+clone_configs() {
+  [[ "$role" == hub || "$role" == worker ]] || return 0
+  clone_config claude-settings "$HOME/.claude"
+  clone_config codex-settings "$HOME/.codex"
+  clone_config gemini-config "$HOME/.gemini"
+  clone_config copilot-config "$HOME/.copilot"
+}
+
+setup_shell_links() {
+  [[ "$role" == hub || "$role" == worker ]] || return 0
+  local src="$HOME/src/gitrepo/personal/zshdotfiles" name dest backup
+  [[ -d "$src" ]] || return 0
+  for name in .zsh .zshrc .zshenv; do
+    case "$name" in .zsh) dest="$src" ;; .zshrc) dest="$HOME/.zsh/zshrc" ;; .zshenv) dest="$HOME/.zsh/zshenv" ;; esac
+    if [[ -L "$HOME/$name" && "$HOME/$name" -ef "$dest" ]]; then report "shell:${name}" ok; continue; fi
+    if [[ "$mode" != setup ]]; then record_failure "shell:${name}" missing; continue; fi
+    if [[ -e "$HOME/$name" && ! -L "$HOME/$name" ]]; then
+      backup="$HOME/${name}.pre-machine-setup"
+      if [[ -e "$backup" ]]; then record_failure "shell:${name}" 'skipped (backup already exists)'; continue; fi
+      if ! mv "$HOME/$name" "$backup" 2>/dev/null; then record_failure "shell:${name}" missing; continue; fi
+    fi
+    if ln -sfn "$dest" "$HOME/$name" 2>/dev/null; then report "shell:${name}" installed
+    else record_failure "shell:${name}" missing; fi
+  done
+}
+
+link_optional() {
+  local source="$1" target="$2" label="$3" allow_dir="${4:-}"
+  if [[ ! -e "$source" ]]; then report "$label" 'skipped (tracked source not present yet)'; return 0; fi
+  if [[ -L "$target" && "$target" -ef "$source" ]]; then report "$label" ok; return 0; fi
+  if [[ -e "$target" || -L "$target" ]]; then record_failure "$label" 'skipped (target already exists)'; return 0; fi
+  if [[ "$mode" != setup ]]; then record_failure "$label" missing; return 0; fi
+  if ! mkdir -p "$(dirname "$target")" 2>/dev/null || ! ln -s "$source" "$target" 2>/dev/null; then record_failure "$label" missing; return 0; fi
+  if [[ -n "$allow_dir" ]] && ! direnv allow "$allow_dir" >/dev/null 2>&1; then record_failure "$label" 'missing (direnv allow failed)'; return 0; fi
+  report "$label" installed
+}
+
+install_state_chain() {
+  [[ "$role" == hub || "$role" == worker ]] || return 0
+  local base="$HOME/src/gitrepo/personal/zshdotfiles" name source
+  link_optional "$base/smartcd_config" "$HOME/.smartcd_config" state-smartcd-config
+  link_optional "$base/direnvrc" "$HOME/.config/direnv/direnvrc" state-direnvrc
+  for name in sync-claude sync-gemini sync-codex sync-copilot; do
+    case "$name" in
+      sync-claude|sync-gemini) source="$base/scripts/$name" ;;
+      *) source="$base/scripts/sync-agent-state.sh" ;;
+    esac
+    link_optional "$source" "$HOME/.local/bin/$name" "state:$name"
+  done
+  link_optional "$base/envrc/personal.envrc" "$HOME/src/gitrepo/personal/.envrc" state-personal-envrc "$HOME/src/gitrepo/personal"
+  link_optional "$base/envrc/k3d-manager.envrc" "$HOME/src/gitrepo/personal/k3d-manager/.envrc" state-k3d-manager-envrc "$HOME/src/gitrepo/personal/k3d-manager"
+  link_optional "$base/envrc/ansible.envrc" "$HOME/src/gitrepo/personal/ansible/.envrc" state-ansible-envrc "$HOME/src/gitrepo/personal/ansible"
+  link_optional "$base/smartcd/src/bash_enter" "$HOME/.smartcd/scripts$HOME/src/bash_enter" state-smartcd-src
+  link_optional "$base/smartcd/personal/bash_enter" "$HOME/.smartcd/scripts$HOME/src/gitrepo/personal/bash_enter" state-smartcd-personal
+  link_optional "$base/smartcd/k3d-manager/bash_enter" "$HOME/.smartcd/scripts$HOME/src/gitrepo/personal/k3d-manager/bash_enter" state-smartcd-k3d-manager
+  link_optional "$base/smartcd/provision-win-tomcat/bash_enter" "$HOME/.smartcd/scripts$HOME/src/gitrepo/personal/ansible/provision-win-tomcat/bash_enter" state-smartcd-provision-win-tomcat
+  for name in CLAUDE.md AGENTS.md GEMINI.md; do
+    link_optional "$base/workspace/CLAUDE.md" "$HOME/src/gitrepo/personal/$name" "workspace:$name"
+  done
+}
+
+secret_present() {
+  local service="$1" account="$2"
+  if [[ "$account" == '*' ]]; then security find-generic-password -s "$service" >/dev/null 2>&1
+  else security find-generic-password -s "$service" -a "$account" >/dev/null 2>&1; fi
+}
+
+check_secrets() {
+  local service account purpose command missing_hint=0 has_missing=0
+  if [[ "$mode" == dry-run && -n "$from_host" ]]; then report secrets "would pull secrets from $from_host"; fi
+  if [[ "$mode" == setup && -n "$from_host" && -t 0 ]]; then
+    while IFS='|' read -r service account purpose command <&3; do
+      [[ -n "$service" && "$service" != \#* ]] || continue
+      local probe_account="$account"
+      [[ "$probe_account" != USER ]] || probe_account="$(id -un)"
+      if ! secret_present "$service" "$probe_account"; then has_missing=1; break; fi
+    done 3< "${manifest_dir}/secrets.${role}.list"
+    if (( has_missing )); then
+      if "${REPO_ROOT}/bin/k3dm-machine-secrets" pull --from "$from_host" --role "$role"; then :
+      else record_failure secret-pull 'missing (see output above)'; fi
+    fi
+  fi
+  while IFS='|' read -r service account purpose command <&3; do
+    [[ -n "$service" && "$service" != \#* ]] || continue
+    local lookup_account="$account"
+    if [[ "$account" == USER ]]; then lookup_account="$(id -un)"; fi
+    if secret_present "$service" "$lookup_account"; then report "secret:${service}:${account}" ok
+    elif [[ "$secrets_mode" == skip ]]; then record_failure "secret:${service}" 'missing (skipped: SECRETS=skip)'
+    elif [[ "$command" == operator:* ]]; then record_failure "secret:${service}" "missing ($command)"
+    elif [[ "$mode" == setup && -t 0 ]]; then
+      if (( ! missing_hint )) && [[ -z "$from_host" ]]; then
+        printf 'Moving from another Mac? Rerun with FROM=<old Mac hostname> to copy these items (docs/howto/machine-setup.md).\n' >/dev/tty
+        missing_hint=1
+      fi
+      printf 'Missing Keychain item %s (%s). Run setup command now? [y/N] ' "$service" "$purpose" >/dev/tty
+      local answer; read -r answer </dev/tty || answer=''
+      if [[ "$answer" == y || "$answer" == Y ]]; then
+        if [[ "$command" == bin/* ]]; then command="${REPO_ROOT}/$command"; fi
+        if bash -c "$command" </dev/tty; then report "secret:${service}" installed
+        else record_failure "secret:${service}" missing; fi
+      else record_failure "secret:${service}" missing; fi
+    else record_failure "secret:${service}" missing; fi
+  done 3< "${manifest_dir}/secrets.${role}.list"
+}
+
+ensure_operator_include() {
+  local config="$HOME/.ssh/config" backup="$HOME/.ssh/config.pre-machine-setup" temp
+  [[ "$mode" == setup ]] || return 0
+  if [[ -f "$config" ]] && grep -Fxq 'Include ~/.ssh/config.d/operator' "$config"; then
+    chmod 600 "$config"
+    return 0
+  fi
+  if [[ -e "$config" && ! -e "$backup" ]]; then cp -p "$config" "$backup"; fi
+  temp="$(mktemp "$HOME/.ssh/config.XXXXXX")"
+  { printf '%s\n' 'Include ~/.ssh/config.d/operator'; if [[ -f "$config" ]]; then cat "$config"; fi; } > "$temp"
+  chmod 600 "$temp"
+  mv "$temp" "$config"
+}
+
+copy_files() {
+  local list="${manifest_dir}/files.${role}.list" path target partial
+  [[ -r "$list" ]] || return 0
+  while IFS= read -r path <&3 || [[ -n "$path" ]]; do
+    path="${path%%#*}"; path="${path//[$'\t\r ']/}"
+    [[ -n "$path" ]] || continue
+    if [[ ! "$path" =~ ^[A-Za-z0-9._/-]+$ || "$path" == /* || "$path" == *..* || "$path" != */* ]]; then record_failure "file:${path}" 'rejected (bad path)'; continue; fi
+    target="$HOME/$path"
+    if [[ -s "$target" ]]; then
+      [[ "$path" != .ssh/config.d/operator ]] || ensure_operator_include
+      report "file:~/${path}" ok; continue
+    fi
+    if [[ -z "$from_host" || "$mode" == check ]]; then record_failure "file:~/${path}" 'missing (rerun with FROM=<old Mac hostname> to copy it)'; continue; fi
+    if [[ ! "$from_host" =~ ^[A-Za-z0-9.-]+$ ]]; then record_failure "file:~/${path}" 'missing (invalid FROM host)'; continue; fi
+    if [[ "$mode" == dry-run ]]; then report "file:~/${path}" "would copy from $from_host"; continue; fi
+    mkdir -p "${target%/*}"; chmod 700 "${target%/*}"
+    partial="${target}.k3dm-partial"
+    if scp -q -o ConnectTimeout=10 -- "${from_host}:${path}" "$partial" && [[ -s "$partial" ]]; then
+      chmod 600 "$partial"; mv "$partial" "$target"
+      [[ "$path" != .ssh/config.d/operator ]] || ensure_operator_include
+      report "file:~/${path}" "copied from $from_host"
+    else
+      rm -f "$partial"; record_failure "file:~/${path}" "missing (copy from $from_host failed)"
+    fi
+  done 3< "$list"
+}
+
+is_hub_agent() {
+  case "$1" in install-token-rotator|install-cleanup|install-node-health-watch|install-sandbox-reaper|install-vault-port-forward|install-prometheus-port-forward|install-hub-pushgateway-port-forward|install-hub-loki-port-forward|install-alertmanager-port-forward|install-alertmanager-auth-proxy|install-cloud-bridge|bin/k3dm-webhook-setup|bin/k3dm-hermes-setup|bin/k3dm-heartbeat-setup) return 0 ;; *) return 1 ;; esac
+}
+
+agent_label() {
+  case "$1" in
+    install-token-rotator) printf '%s' webhook-token-rotate ;;
+    bin/k3dm-*-setup) local name="${1#bin/k3dm-}"; printf '%s' "${name%-setup}" ;;
+    install-*) printf '%s' "${1#install-}" ;;
+  esac
+}
+
+render_heartbeat() {
+  local target="$1" candidate_dir="$HOME/.local/share/k3d-manager/heartbeat-candidates"
+  if [[ ! -e "$candidate_dir/com.k3d-manager.heartbeat.plist" ]]; then
+    if ! "$REPO_ROOT/$target" --config "$REPO_ROOT/scripts/etc/heartbeat/checks.example.json" --output-dir "$candidate_dir" --platform launchd </dev/tty >/dev/null; then
+      record_failure "agent:${target}" 'missing (candidate render failed)'; return
+    fi
+  fi
+  record_failure "agent:${target}" 'missing (review candidates: docs/howto/independent-heartbeats.md)'
+}
+
+perform_agent_install() {
+  local target="$1"
+  if [[ "$target" == bin/* || "$target" == install-sudoers ]]; then
+    if [[ ! -t 0 ]]; then record_failure "agent:${target}" 'missing (TTY required)'; return; fi
+  fi
+  if [[ "$target" == bin/k3dm-heartbeat-setup ]]; then render_heartbeat "$target"; return; fi
+  if [[ "$target" == bin/* ]]; then
+    if "$REPO_ROOT/$target" </dev/tty; then report "agent:${target}" installed; else record_failure "agent:${target}" missing; fi
+  elif log_install make -C "$REPO_ROOT" "$target"; then report "agent:${target}" installed
+  else record_failure "agent:${target}" 'missing (see machine-setup.log)'; fi
+}
+
+run_one_agent() {
+  local target="$1" label
+  if [[ "$target" == smartcd-install ]]; then install_smartcd; return; fi
+  if [[ "$role" != hub ]] && is_hub_agent "$target"; then record_failure "agent:${target}" 'skipped (hub only)'; return; fi
+  label="$(agent_label "$target")"
+  if [[ "$target" == install-sudoers && -f "$sudoers_file" ]]; then report "agent:${target}" ok; return; fi
+  if [[ -n "$label" && -f "$HOME/Library/LaunchAgents/com.k3d-manager.${label}.plist" ]]; then report "agent:${target}" ok; return; fi
+  if [[ "$mode" != setup ]]; then record_failure "agent:${target}" missing; return; fi
+  if [[ "$agents_mode" == skip ]]; then report "agent:${target}" 'skipped (AGENTS=skip)'; return; fi
+  perform_agent_install "$target"
+}
+
+run_agents() {
+  local target
+  while IFS= read -r target <&3 || [[ -n "$target" ]]; do
+    target="${target%%#*}"; target="${target//[$'\t\r ']/}"
+    [[ -n "$target" ]] || continue
+    run_one_agent "$target"
+  done 3< "${manifest_dir}/agents.${role}.list"
+}
+
+preflight
+if (( brew_available )); then install_tools; else report brew-phase 'skipped (Homebrew unavailable)'; fi
+ensure_python_tools
+install_repos
+install_state_chain
+check_secrets
+copy_files
+run_agents
+exit "$failed"
