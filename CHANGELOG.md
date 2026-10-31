@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Re-point old-hub Pushgateway and Loki forwards during cutover, with standalone retry and rollback restoration; correct the platform-ops schedule message.
+
 ### Added
 
 - Add `make hub-new` to rebuild the M5 as a fresh hub, verify its recovery and platform state, and prepare single-instance agent plists without loading them.

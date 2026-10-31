@@ -46,9 +46,12 @@ argocd-upgrade:
 hub-new:
 	@bin/hub-new
 
-.PHONY: hub-cutover hub-cutover-rollback
+.PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards
 hub-cutover:
 	@bin/hub-cutover
+
+hub-cutover-forwards:
+	@bin/hub-cutover --forwards
 
 hub-cutover-rollback:
 	@bin/hub-cutover --rollback
@@ -1603,6 +1606,7 @@ help:
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
 	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
 	@echo "    make hub-cutover  Move single-instance agents from the old hub to the new hub"
+	@echo "    make hub-cutover-forwards  Re-point old-hub push forwards to the new hub"
 	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"

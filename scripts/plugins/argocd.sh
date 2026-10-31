@@ -1998,9 +1998,7 @@ EOF
    fi
    _argocd_apply_credential_rotator
 
-   _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
-   _info "[argocd] Secrets still to create manually (no durable local source):"
-   _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
+   _info "[argocd] platform-ops deployed — app CVE scan daily 01:00, ArgoCD CVE scan daily 01:30 (America/Los_Angeles), expiry check every 30m, remediation verify every 15m"
 }
 
 function argocd_check_values_branch() {

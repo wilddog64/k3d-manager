@@ -6,17 +6,27 @@ setup() {
   ROOT="$WORK/repo"
   mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$ROOT/bin" "$ROOT/scripts/etc/machine"
   cp "${HUB_CUTOVER_SOURCE:-$REPO/bin/hub-cutover}" "$ROOT/bin/hub-cutover"
+  cp "$REPO/scripts/etc/machine/hub-push-forwards.list" "$ROOT/scripts/etc/machine/"
   cp "$REPO/scripts/etc/machine/hub-singletons.list" "$ROOT/scripts/etc/machine/"
   export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
-  export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local
-  [[ "$HOME" == "$WORK/home" ]]
+  export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local HUB_NEW_HOST=m5-air.local
+  [[ "$HOME" == "$WORK/home" && "$HUB_CUTOVER_STATE_DIR" == "$WORK/state" ]]
+  export OLD_HOME="$WORK/old-home"
+  mkdir -p "$OLD_HOME/Library/LaunchAgents"
+  python3 - "$OLD_HOME" <<'PYCODE'
+import os, plistlib, sys
+for label in ("hub-pushgateway-port-forward", "hub-loki-port-forward"):
+    with open(os.path.join(sys.argv[1], "Library/LaunchAgents/com.k3d-manager." + label + ".plist"), "wb") as f:
+        plistlib.dump({"Label": "com.k3d-manager." + label, "ProgramArguments": ["kubectl"], "StandardOutPath": "/tmp/forward.log"}, f)
+PYCODE
   export HUB_CUTOVER_CONTROLLER_WAIT_S=0
-  export HUB_CUTOVER_TTY="$WORK/tty" HUB_CUTOVER_VERIFY_WAIT=0 HUB_CUTOVER_VERIFY_TRIES=3
+  export HUB_CUTOVER_TTY="$WORK/tty" HUB_CUTOVER_VERIFY_WAIT=0 HUB_CUTOVER_VERIFY_TRIES=3 HUB_CUTOVER_FORWARD_WAIT=0
   printf 'cutover\n' > "$HUB_CUTOVER_TTY"
   mkdir -p "$HUB_NEW_STATE_DIR"
   printf '{"status":"pass","timestamp":"%s","stages":[],"checks":{}}\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$HUB_NEW_STATE_DIR/hub-new-report.json"
   cat > "$WORK/stub/launchctl" <<'STUB'
 #!/usr/bin/env bash
+if [[ "$HOME" == "$OLD_HOME" ]]; then printf 'remote-launchctl %s\n' "$*" >> "$CALLS"; exit 0; fi
 printf 'launchctl %s\n' "$*" >> "$CALLS"
 label="${*: -1}"
 label="${label##*/}"
@@ -37,6 +47,15 @@ while [[ "$1" == -o ]]; do opts+="$2 "; shift 2; done
 [[ "$opts" == *BatchMode=yes* && "$opts" == *ClearAllForwardings=yes* ]] || { echo "ssh without BatchMode/ClearAllForwardings" >&2; exit 97; }
 [[ "${STUB_SSH_DENIED:-0}" == 0 ]] || exit 255
 printf 'ssh host=%s command=%s\n' "$1" "$2" >> "$CALLS"
+if [[ "$2" == ssh\ -o* ]]; then exit "${STUB_FORWARD_SSH_DENIED:-0}"; fi
+if [[ "$2" == python3\ -* ]]; then HOME="$OLD_HOME" bash -c "$2"; exit $?; fi
+if [[ "$2" == curl\ -* ]]; then
+  if [[ -n "${STUB_FORWARD_FAIL_FIRST:-}" ]]; then
+    n=$(( $(cat "$CALLS.forward-probes" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$CALLS.forward-probes"
+    (( n > STUB_FORWARD_FAIL_FIRST )) && echo OK || echo bad; exit 0
+  fi
+  echo "${STUB_FORWARD_BODY:-OK}"; exit 0
+fi
 if [[ "$2" == *'get statefulset'* ]]; then
   if [[ "$2" == *readyReplicas* ]]; then echo "${STUB_OLD_READY:-0}"; else cat "$WORK_OLD_REPLICAS"; fi
   exit 0
@@ -133,7 +152,8 @@ teardown() { rm -rf "$WORK"; }
   run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
   [ "$status" -eq 0 ]
   [[ "$output" == *cloudflare-tunnel* ]]
-  ! grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
+  run grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
+  [ "$status" -eq 1 ]
   [ ! -e "$HUB_CUTOVER_STATE_DIR" ]
 }
 
@@ -141,7 +161,8 @@ teardown() { rm -rf "$WORK"; }
   printf 'nope\n' > "$HUB_CUTOVER_TTY"
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
-  ! grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
+  run grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
+  [ "$status" -eq 1 ]
   [ ! -e "$HUB_CUTOVER_STATE_DIR" ]
 }
 
@@ -340,4 +361,95 @@ STUB
   [[ "$output" == *'cannot ssh to m4-air.local without a password'* ]]
   run grep -q 'scale statefulset' "$CALLS"
   [ "$status" -eq 1 ]
+}
+
+@test "forwards: passing cutover installs both tunnels and preserves original backups" {
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  python3 - "$OLD_HOME" <<'PYCODE'
+import os, plistlib, sys
+for label, port in (("hub-pushgateway-port-forward", "19094"), ("hub-loki-port-forward", "19100")):
+    path = os.path.join(sys.argv[1], "Library/LaunchAgents/com.k3d-manager." + label + ".plist")
+    with open(path, 'rb') as f: current = plistlib.load(f)
+    with open(path + '.pre-cutover', 'rb') as f: original = plistlib.load(f)
+    assert original['ProgramArguments'] == ['kubectl']
+    assert current['ProgramArguments'] == ['/usr/bin/ssh', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    assert current['KeepAlive'] and current['StandardOutPath'] == '/tmp/forward.log'
+PYCODE
+  grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+}
+
+@test "forwards: failed batch login skips changes after a passing cutover" {
+  export STUB_FORWARD_SSH_DENIED=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 1 ]
+  grep -q '"verify": "forwards-skipped"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ ! -e "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ]
+  run grep -q 'command=python3 -' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "forwards: failed readiness reports failure without rollback" {
+  export STUB_FORWARD_BODY=bad
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'cutover itself passed'* ]]
+  grep -q '"verify": "forwards-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  run grep -q '"verify": "rollback-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$status" -eq 1 ]
+}
+
+@test "forwards: a tunnel that needs a moment to connect passes after retrying" {
+  export STUB_FORWARD_FAIL_FIRST=3
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$(cat "$CALLS.forward-probes")" -gt 3 ]
+}
+
+@test "forwards: standalone gate, confirmation, retry and backup preservation" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+  [ ! -s "$CALLS" ]
+  printf '[{"verify":"verify-failed"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+  [ ! -s "$CALLS" ]
+  printf '[{"verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  printf 'wrong\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+  run grep -q 'command=python3 -' "$CALLS"
+  [ "$status" -eq 1 ]
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  export STUB_FORWARD_BODY=bad
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+  export STUB_FORWARD_BODY=OK
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  run grep -Eq 'scale statefulset|^launchctl bootout|^refresh_registration' "$CALLS"
+  [ "$status" -eq 1 ]
+  python3 - "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" <<'PYCODE'
+import plistlib, sys
+with open(sys.argv[1], 'rb') as f: assert plistlib.load(f)['ProgramArguments'] == ['kubectl']
+PYCODE
+}
+
+@test "forwards: rollback restores backups before singleton reload" {
+  printf 'webhook\n' > "$OLD_LOADED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  [ ! -e "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ]
+  python3 - "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist" <<'PYCODE'
+import plistlib, sys
+with open(sys.argv[1], 'rb') as f: assert plistlib.load(f)['ProgramArguments'] == ['kubectl']
+PYCODE
+  [ "$(grep -n 'command=python3 -.*restore' "$CALLS" | tail -1 | cut -d: -f1)" -lt "$(grep -n '^ssh .*command=launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" ]
 }

@@ -51,3 +51,7 @@ After reviewing each file for secrets, the operator places the workstation files
 Missing source files are reported as skipped. Existing destination files are left for operator review. The worker role includes `install-sudoers` for the scoped host, launchd, CA, and local cluster operations used by ACG. `make setup-worker` configures and deploys the Cloudflare Slack Worker; it is not a workstation worker setup step.
 
 Heartbeat setup renders disabled candidates for review; it does not install a scheduler job. Follow [Independent Heartbeats](independent-heartbeats.md) to enroll checks, review the candidate, and install it separately.
+
+## After the cutover: old-hub forwards
+
+A successful cutover re-points the old hub’s Pushgateway and Loki loopback forwards over SSH to the new hub. Set `HUB_NEW_HOST` if the new hub’s local hostname is not reachable from the old hub; key-based SSH login from old to new is required. For an already completed cutover, run `make hub-cutover-forwards` on the new hub and type `forwards` when prompted. The command checks both endpoints and records the result. `make hub-cutover-rollback` restores the saved original forward plists before reloading the old hub’s singletons.
