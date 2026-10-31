@@ -1,6 +1,6 @@
 # Bug: machine setup leaves HTTPS remotes and a world-writable ~/.zplug, and its check never opens a shell
 
-**Status:** OPEN
+**Status:** FIXED — `8210a0eb`, `087b87fc`, `61dc0c04` (Codex; Claude review, independent verifier 20/20; E5 live on M4/M5)
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("yes, file a v1.43.13 bug")
 **Filed:** 2026-10-31

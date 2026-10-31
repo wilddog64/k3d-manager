@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Approval:** pending (filed by Claude 2026-10-31; operator to approve)
+**Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31
 **Detected by:** Claude, on the first push through the v1.43.13 fast-gate pre-push hook (`18d7d95d`)
 **Affected:** `scripts/tests/bin/machine_setup_acceptance.bats` (`ensure_copy`)

@@ -1833,3 +1833,9 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - **New, not yet filed:** `machine_setup.bats` test 32 (N9, `tty_machine` under `script`) hung 43 min in the 18c48507 push gate (setup waiting under the pty, stdin /dev/null); killing it let the test PASS and the push go through — tty tests need a timeout, and the gate cannot see a hang. Prior pushes/land passed, so intermittent.
 - **Notes (no bug):** `ssh -tt m5-air.local '$SHELL -lic ...'` has no /opt/homebrew/bin on PATH (operator's local M5 terminal does); remote checks need `eval "$(/opt/homebrew/bin/brew shellenv)"`. `check-shell` does not match `parse error`/`unmatched` (my_func.zsh:25 on both Macs).
 - **Still open:** acceptance-copy bug (P3, push ~7 min) — consider P2; land-test-log bug intent approval; v1.43.14 control-node plan waits for the v1.43.13 PR; scratch worktrees `e4`, `pre` to remove.
+
+## 2026-10-31 — v1.43.13 bug batch dispatched
+
+- Approved + dispatched to Codex: pre-push-gate P1, acceptance-copies, land-test-log, ask-docs-bug-count-truncation, ai-analysis-filter. Shared files: CHANGELOG.md (all), fast_gate.sh only in P1. Land one at a time, rebase the rest.
+- None of the 5 v1.43.13 plans executed yet; agent-instruction-files-refresh is first in line.
+- Unfiled: machine_setup.bats test 32 tty hang (43 min in push gate).

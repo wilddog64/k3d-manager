@@ -1,6 +1,6 @@
 # Bug: CI reds that a few seconds of local checks would catch reach the PR
 
-**Status:** OPEN
+**Status:** FIXED — `18d7d95d` (Codex; Claude review, independent verifier 13/13, 11 red on pre-fix)
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("1 and 2 seems to be a good suggestion. probably can give them a shot")
 **Filed:** 2026-10-31

@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P3
-**Approval:** operator, 2026-10-31 ("go ahead to file two gaps as a separate small bug for v1.43.13")
+**Approval:** operator, 2026-10-31 ("go ahead to file two gaps as a separate small bug for v1.43.13"); dispatch go: operator, 2026-10-31 ("go ahead to dispatch all approved P3 bugs")
 **Filed:** 2026-10-31
 **Detected by:** Claude, answering the operator's question whether a failed case among a land's 101
 tests reaches the Agent Dispatch "Per run evidence" Log link

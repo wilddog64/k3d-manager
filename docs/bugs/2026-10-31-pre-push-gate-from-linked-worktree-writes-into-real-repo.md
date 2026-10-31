@@ -2,7 +2,7 @@
 
 **Status:** OPEN
 **Priority:** P1
-**Approval:** pending
+**Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31
 **Detected by:** Claude, pushing `k3d-manager-v1.43.13` from a scratch worktree to work around the push drop in
 `docs/bugs/2026-10-31-machine-setup-acceptance-copies-whole-working-tree.md`

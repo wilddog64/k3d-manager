@@ -7,7 +7,7 @@
 **Filed:** 2026-10-31
 **Detected by:** Claude, reading the live E2 reply for `docs/bugs/2026-10-30-ask-docs-bug-count-does-not-link-fixed-docs.md`
 **Affected:** `scripts/lib/webhook/ask_docs.py` (`MAX_REPLY_CHARS`, `TRUNCATION_MARKER`), `scripts/lib/webhook/bug_count.py` `reply()`
-**Branch:** `k3d-manager-v1.43.12`
+**Branch:** `k3d-manager-v1.43.13`
 **Related:** `docs/bugs/2026-10-30-ask-docs-bug-count-does-not-link-fixed-docs.md` (added the `Fixed:` lines and the cap of 10); `docs/bugs/2026-10-22-ask-docs-reply-truncated-mid-slack-link.md` (added the line-boundary cut and the marker)
 
 ## Observed failure
@@ -26,6 +26,14 @@ The output was 2868 bytes. The question already named a release, so the hint is 
 
 1. `bug_count.reply()` sizes its own list: it keeps whole `Open:`/`Fixed:` lines while they fit the reply budget, and always ends with an exact `…and N more fixed.` (and `…and N more open.` when open lines are dropped). The ask-docs truncation never fires for a bug-count reply.
 2. The truncation marker is chosen by the caller. A named-release reply that still has to be cut says `…(truncated; add a priority, e.g. "P2 bugs in v1.43.5", to narrow it)`. The existing marker stays for the all-releases tally.
+
+## Files
+
+- `scripts/lib/webhook/bug_count.py`
+- `scripts/lib/webhook/ask_docs.py`
+- `scripts/tests/bin/test_bug_count.py`
+- `scripts/tests/bin/test_ask_docs.py`
+- `CHANGELOG.md`
 
 ## Acceptance
 
