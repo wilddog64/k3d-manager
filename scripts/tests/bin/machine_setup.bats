@@ -305,6 +305,49 @@ run_machine() {
   grep -Eq '^secret:fixture[[:space:]]+missing' <<< "$output"
 }
 
+@test "machine setup: unprefixed brew packages accept either installation type" {
+  setup_machine_fixture
+  # Exit codes captured 2026-10-31: m5-air.local `brew list --formula azure-cli` 1, `--cask` 0; m4-air `--formula` 0, `--cask` 1.
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+case "$*" in
+  'list --cask azure-cli') echo 'azure-cli 2.91.0'; exit 0 ;;
+  'list --formula formula-package') echo 'formula-package 2.90.0'; exit 0 ;;
+  list*) exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  printf '%s\n' azure-cli formula-package > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  for mode in --check ''; do
+    run_machine --role console $mode
+    [ "$status" -eq 0 ]
+    grep -Eq '^brew:azure-cli[[:space:]]+ok$' <<< "$output"
+    grep -Eq '^brew:formula-package[[:space:]]+ok$' <<< "$output"
+  done
+  run ! grep -q '^brew install' "$CALL_LOG"
+}
+
+@test "machine setup: absent and explicitly typed brew packages remain strict" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+case "$*" in
+  'list --cask azure-cli'|'list --formula formula-package') exit 0 ;;
+  list*) exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  printf '%s\n' absent formula:azure-cli cask:formula-package > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  for name in absent azure-cli formula-package; do
+    grep -Eq "^brew:${name}[[:space:]]+missing$" <<< "$output"
+  done
+}
+
 @test "machine setup: missing Homebrew skips brew and continues reporting" {
   setup_machine_fixture
   rm "$STUBS/brew"

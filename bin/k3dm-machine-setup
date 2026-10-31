@@ -175,7 +175,7 @@ install_tools() {
     [[ -n "${raw// /}" ]] || continue
     kind=formula; name="$raw"
     case "$raw" in cask:*) kind=cask; name="${raw#cask:}" ;; formula:*) name="${raw#formula:}" ;; esac
-    if brew list "--${kind}" "$name" >/dev/null 2>&1; then report "brew:${name}" ok
+    if brew list "--${kind}" "$name" >/dev/null 2>&1 || { [[ "$raw" != *:* ]] && brew list --cask "$name" >/dev/null 2>&1; }; then report "brew:${name}" ok
     elif [[ "$mode" == setup ]]; then
       if if [[ "$kind" == cask ]]; then log_install brew install --cask "$name"; else log_install brew install "$name"; fi; then report "brew:${name}" installed
       else record_failure "brew:${name}" 'missing (see machine-setup.log)'; fi
