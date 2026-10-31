@@ -106,6 +106,8 @@ def test_host_disk_dashboard_keeps_its_panels_and_adds_only_orbstack():
     # agent-audit: allow assert-removed byte pin replaced by panel-level equality so the OrbStack panel can be added
     before, after = dashboard(expected), dashboard(path.read_bytes())
     added_panels = after["panels"][len(before["panels"]):]
+    host_tiles = [panel for panel in after["panels"] if panel["title"] in ("Used %", "Free", "Probe status")]
+    assert [panel.pop("options") for panel in host_tiles] == [{"orientation": "vertical"}] * 3
     assert after["panels"][:len(before["panels"])] == before["panels"]
     assert [panel["title"] for panel in added_panels] == ["OrbStack"]
     assert [item["name"] for item in after["annotations"]["list"]] == ["OrbStack upgraded"]
