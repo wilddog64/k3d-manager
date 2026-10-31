@@ -335,6 +335,46 @@ STUB
   [ "$(stat -f %Lp "$HOME/.kube/hostinger.config")" = 600 ]
 }
 
+@test "verify mode: re-verifies a recorded cutover and unblocks forwards" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'no recorded cutover'* ]]
+  [ ! -s "$CALLS" ]
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  printf '[{"verify":"verify-failed"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  grep -q '"verify": "pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  run grep -q 'launchctl bootout\|launchctl bootstrap\|command=python3 -' "$CALLS"
+  [ "$status" -eq 1 ]
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+}
+
+@test "verify mode: a failing check records verify-failed and keeps forwards blocked" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_NO_REGISTRATION=1
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'verify attempt 1/3 failed'* ]]
+  [[ "$output" == *'hub-cutover-rollback'* ]]
+  grep -q '"verify": "verify-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  run grep -q 'bootout\|bootstrap\|scale statefulset' "$CALLS"
+  [ "$status" -eq 1 ]
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+}
+
 @test "verify requires the labeled registration and healthy ESO application" {
   export STUB_NO_REGISTRATION=1
   run "$ROOT/bin/hub-cutover"

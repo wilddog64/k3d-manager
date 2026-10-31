@@ -315,6 +315,12 @@ rollback() {
 }
 
 if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
+if [[ "${1:-}" == --verify ]]; then
+  [[ -f "$STATE_DIR/stopped-on-old" ]] || { echo 'hub-cutover: no recorded cutover; refusing verify' >&2; exit 1; }
+  require_old_ssh || exit 1
+  if verify_with_retries; then append_report pass; echo 'hub-cutover: verification passed; run make hub-cutover-forwards'; exit 0; fi
+  append_report verify-failed; echo 'hub-cutover: verification failed; run make hub-cutover-rollback' >&2; exit 1
+fi
 if [[ "${1:-}" == --forwards ]]; then
   forward_report_allowed || exit 1
   require_old_ssh || exit 1
