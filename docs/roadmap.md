@@ -491,6 +491,8 @@ Split from v1.43.13 on 2026-10-31 by Claude (v1.43.13 is at its 5-plan cap). Bra
 
 **v1.43.14 plan 1:** [`intent-verification`](plans/v1.43.14-intent-verification.md) (operator, 2026-10-31, after blind calibration 1): every Acceptance evidence item gets a plain-language intent ("you will see… / it failed if…"), the operator approves the intents before dispatch (`**Intent approved:**`), `bin/k3dm-codex-dispatch` refuses newer specs without them, and every verification report answers the intent first, then gives proof and an "Errors seen" list. Answers calibration findings O2 and O4 (`docs/calibration/v1.43.12.md`).
 
+**v1.43.14 plan 2:** [`control-node-linux`](plans/v1.43.14-control-node-linux.md) (operator, 2026-10-31): the `control` role from v1.43.13 runs on Linux, to test the one-command setup on another OS. It needs no secrets, never runs sudo and refuses root. It installs tools with Homebrew on Linux, for the same versions as the Macs. It is proven first in a Vagrant (VirtualBox) Ubuntu 24.04 VM on the M4, then on Hostinger as a dedicated non-sudo user, with k3s left untouched. Starts after v1.43.13's `control` role lands.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
