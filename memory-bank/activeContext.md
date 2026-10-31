@@ -1724,3 +1724,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-30: wrote `docs/plans/v1.43.13-claude-context-cost-per-turn.md` (operator "go ahead"). Findings: the 400K auto-compact setting was inert (main-session ceiling 168K in both the 200K and 400K periods; hub average 168K before compacting), the post-compaction floor is about 95–100K, and 126 cache rebuilds over 50K. Claude-owned follow-ups D1–D3: close the trial, trim MEMORY.md under its load limit, session habits. Dispatch waits for the v1.43.13 branch.
 
 - 2026-10-30: added `.claude/hooks/remind-clear-after-land.sh` (PostToolUse Bash) — after `make codex-land`, prompts a 6-field handoff + `/clear` once the objective is live-verified. D3 in the v1.43.13 plan reworded to one session per objective.
+- 2026-10-30: v1.43.13 plan gained turns lever — `k3dm_claude_turns_per_active_day` + C2 panel 5 (turns/active day, turns per verified spec); M6, N6 added.
