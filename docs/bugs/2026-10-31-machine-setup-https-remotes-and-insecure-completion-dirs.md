@@ -68,8 +68,11 @@ tracked copy drifts. The M2's config has no Include, so its next setup run would
    Make the same change anywhere else in the script that `mv`s over a file under `~/.ssh` or a
    shell-link target.
 4. **A login-shell check.** Add `--check-shell HOST` (and `make machine-check-shell HOST=`). It runs
-   `ssh -tt -o BatchMode=yes HOST 'exit'` under a 60-second timeout, keeping stdout and stderr. It fails
-   if:
+   `ssh -tt -o BatchMode=yes HOST '$SHELL -lic exit'` under a 60-second timeout, keeping stdout and stderr.
+   (Correction, Claude 2026-10-31: the first draft said `HOST 'exit'`. That runs a non-interactive shell,
+   which never reads `.zshrc`, so `compinit` and `compdef` never load and the check passes on a broken
+   shell. Checked on the M5: `ssh m5-air.local 'echo $-'` has no `i`; `'$SHELL -lic ...'` has `i` and `l`
+   and defines `compdef`.) It fails if:
    - the run times out (a prompt is waiting);
    - the output matches `Username for|Password for|command not found|insecure directories|compinit|_lastcomp|Permission denied`;
    - the exit code is not 0.
