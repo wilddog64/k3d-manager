@@ -55,6 +55,16 @@ Vault again would only reset the clock. The remote e2e on the M2 (`make e2e-remo
    retired (docs/bugs/2026-10-31-ci-stage2-m2-cluster-has-no-vault.md)`.
 8. `CHANGELOG.md`: add a `### Removed` entry under the v1.43.12 section.
 
+## Files
+
+- `.github/workflows/ci.yml`
+- `scripts/ci/runner_lock.sh` (delete)
+- `scripts/tests/lib/runner_lock.bats` (delete)
+- `scripts/tests/lib/ci_workflow_no_stage2.bats` (new)
+- `docs/howto/cloud-session-requests.md`
+- `docs/bugs/2026-10-30-ci-stage2-ignores-m2-e2e-runner-lock.md`
+- `CHANGELOG.md`
+
 ## What NOT to do
 
 - Do not provision Vault on the M2, and do not unregister the M2 Actions runner (operator, later).
