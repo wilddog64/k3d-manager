@@ -474,6 +474,11 @@ scheduled.
 machine role for a Mac that develops k3d-manager and runs hub work over ssh, with no OrbStack or hub agents. The M2 moves
 to it so the operator can travel with it. Open decisions D1 (reaching the hub away from home) and D2 (the M2 e2e runner while away).
 
+**v1.43.13 plan 2:** [`claude-context-cost-per-turn`](plans/v1.43.13-claude-context-cost-per-turn.md) (operator, 2026-10-30).
+It adds per-turn context size, the post-compaction floor, the observed ceiling, and cache rebuilds by cause to the
+Agent Cost dashboard. Its findings: the 400K auto-compact trial was inert (the observed ceiling was 168K both before and after),
+and the roughly 95–100K floor is the main cost lever.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
