@@ -13,6 +13,12 @@
 
 ### Fixed
 
+- **Bugs dashboard: "Open by priority over time" no longer looks like lost data.** Hub Prometheus keeps
+  3 days (`retention: 3d`), so a 30-day range showed an empty chart with a spike at the right edge, which read
+  as data lost in the M4 → M5 cutover. Nothing was lost: no hub ever held more than 3 days. The panel is now
+  pinned to the last 3 days (`timeFrom: 3d`) and its description names the retention. A 30-day trend needs
+  history derived from git, not a longer range.
+
 - **`make hub-cutover` hands the Hostinger app cluster to the new hub's ArgoCD.** The cutover moved only
   the launchd singletons. The M5 ArgoCD had no `cluster-ubuntu-hostinger` registration, so it ran 13
   Applications to the M4's 33, and once the M4 cluster stopped nothing would have managed the shop. The

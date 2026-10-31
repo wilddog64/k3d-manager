@@ -818,3 +818,15 @@ for label in ("Verified", "Live verified"):
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "open-by-priority trend is pinned to the 3d Prometheus retention and says so" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panel = next(p for p in data["panels"] if p["title"] == "Open by priority over time")
+assert panel.get("timeFrom") == "3d", panel.get("timeFrom")
+assert "retention: 3d" in panel["description"]
+PY
+  [ "${status}" -eq 0 ]
+}

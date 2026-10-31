@@ -27,7 +27,7 @@ open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Eac
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
 where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
-scan age, a **Bugs** table, and open-by-priority over time. Each document is classified by status:
+scan age, a **Bugs** table, and open-by-priority over time (pinned to the last 3 days, the hub Prometheus retention). Each document is classified by status:
 
 | Status | Doc `**Status:**` value begins with |
 |---|---|

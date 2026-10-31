@@ -1519,7 +1519,8 @@ data:
             "w": 24,
             "h": 8
           },
-          "description": "This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted.",
+          "description": "This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted. Hub Prometheus keeps 3 days (retention: 3d), so this panel always shows the last 3 days, whatever range the dashboard is set to. A new hub starts empty and fills to 3 days.",
+          "timeFrom": "3d",
           "targets": [
             {
               "refId": "A",
