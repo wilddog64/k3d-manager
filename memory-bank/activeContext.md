@@ -1718,3 +1718,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Causes: `k3dm-dispatch`/agent producers on the M4 push to the M4's own Pushgateway (localhost:19094); app-cve-scan needs `make platform-ops` on M5; E2E events not yet produced on M5.
 - VectorDB on M5: 200 rows of 2391 docs, drift backlog 2191, recall@5 = 0. The index store re-embeds from scratch about 100 docs per run. It did not migrate.
 - The other diffs are live values (cluster CPU/net, alerts, push ages), as expected. The 29 errors are probe artefacts (template vars such as `$release_mode`) and the same on both hubs.
+- 2026-10-30: copied the M4 Pushgateway `k3dm-dispatch` group to the M5 (8983 samples, PUT /metrics/job/k3dm-dispatch through the service proxy). The M5 Prometheus now has 8985 dispatch series. The operator re-pointed the M4 producers to the M5 and ran `make platform-ops` on the M5 (both platform-ops Secrets created, exporter rolled out).
