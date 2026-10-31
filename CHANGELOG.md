@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- Port-forward installs wait for launchd to unload and protect cutover tunnels; `make hub-migrate HUB_OLD_HOST=<old>` combines the migration stages and records the old hub.
+
 - **Bugs dashboard: "Open by priority over time" no longer looks like lost data.** Hub Prometheus keeps
   3 days (`retention: 3d`), so a 30-day range showed an empty chart with a spike at the right edge, which read
   as data lost in the M4 → M5 cutover. Nothing was lost: no hub ever held more than 3 days. The panel is now

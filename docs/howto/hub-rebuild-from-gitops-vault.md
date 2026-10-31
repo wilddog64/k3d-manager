@@ -221,36 +221,8 @@ Leave `k3d-k3d-cluster-recovery-server-data` alone.
 
 ### 3. Rebuild — hub only
 
-**Do not run `make up` for a hub-only rebuild.** Both obvious forms are wrong:
-
-- `make up CLUSTER_PROVIDER=k3d` **fails outright**: `bin/cluster-up:78` rejects it with
-  `Unsupported CLUSTER_PROVIDER: k3d (supported: k3s-aws, k3s-gcp, k3s-az)`. The k3d hub is not a
-  `bin/cluster-up` provider — it is the *local* cluster that script manages alongside a remote one.
-- Bare `make up` defaults to `CLUSTER_PROVIDER=k3s-aws` and runs the **full 12-step ACG path**:
-  Playwright AWS credential extraction, sandbox TTL checks, remote 3-node provisioning, SSH tunnel,
-  and an interactive `read -r -p "Press Enter once you are signed in..."` prompt. That is a
-  sandbox bring-up, not a hub rebuild.
-
-Run the hub-only sequence instead — this is exactly what `bin/cluster-up` Steps 3.5 and 3.6 do
-internally when it finds the hub missing:
-
-```bash
-./scripts/k3d-manager deploy_cluster --provider k3d k3d-cluster
-kubectl config use-context k3d-k3d-cluster
-./scripts/k3d-manager deploy_vault --confirm
-./scripts/k3d-manager deploy_ldap --confirm
-./scripts/k3d-manager deploy_argocd --confirm
-make observability
-make platform-ops
-```
-
-Timings from the 2026-09-20 run: cluster + Istio ~2 min, Vault ~2 min, LDAP ~1.5 min, ArgoCD
-~3.5 min (deploys 12/12 ApplicationSets itself), observability ~2 min. Grafana reaches `3/3` about
-3 min after the observability ApplicationSet syncs.
-
-Vault came back **initialized and unsealed** on this run — no `--re-unseal` was needed. If it does
-report sealed, `bin/cluster-up:417-432` handles it via `deploy_vault --re-unseal` from the cached
-shards.
+Run `make hub-recover-all` for the supported full rebuild. For a cluster-only rebuild,
+`make up CLUSTER_PROVIDER=k3d` routes to `bin/hub-up`.
 
 ### 4. Reapply the ApplicationSets — required, not optional
 

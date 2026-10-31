@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+label="$1"
+plist="$2"
+domain="gui/$(id -u)"
+rc=0
+launchctl bootout "$domain/$label" || rc=$?
+if (( rc != 0 && rc != 3 )); then
+  echo "launchd-reload: bootout failed for $label (exit $rc)" >&2
+  exit 1
+fi
+for ((i=0; i<${LAUNCHD_RELOAD_TRIES:-30}; i++)); do
+  if ! launchctl print "$domain/$label" >/dev/null 2>&1; then
+    launchctl bootstrap "$domain" "$plist"
+    exit $?
+  fi
+  if (( i + 1 < ${LAUNCHD_RELOAD_TRIES:-30} )); then sleep "${LAUNCHD_RELOAD_WAIT:-0.5}"; fi
+done
+echo "launchd-reload: $label still loaded after bootout" >&2
+exit 1

@@ -16,7 +16,8 @@ cd "$REPO_ROOT"
 STATE_DIR="${HUB_NEW_STATE_DIR:-${HOME}/.local/share/k3d-manager/hub-new}"
 STATE_FILE="${STATE_DIR}/state"
 REPORT_FILE="${STATE_DIR}/hub-new-report.json"
-OLD_HOST="${HUB_OLD_HOST:-m4-air.local}"
+OLD_HOST="${HUB_OLD_HOST:-}"
+[[ -n "$OLD_HOST" ]] || { echo "hub-new: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)" >&2; exit 2; }
 NEW_HOST="${HUB_NEW_HOST:-m5-air}"
 CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 SINGLETONS="${REPO_ROOT}/scripts/etc/machine/hub-singletons.list"
@@ -173,7 +174,7 @@ for _stage in "${STAGES[@]}"; do
 done
 if stage_passed verify; then
   jq -Rn '[inputs | capture("(?<stage>[^=]+)=(?<result>pass|fail) (?<epoch>[0-9]+)") | {stage:.stage,result:.result,epoch:(.epoch|tonumber)}]' "$STATE_FILE" > "${STATE_DIR}/stages.json"
-  jq -n --arg timestamp "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --slurpfile stages "${STATE_DIR}/stages.json" --slurpfile checks "${STATE_DIR}/verify.json" '{status:"pass",timestamp:$timestamp,stages:$stages[0],checks:$checks[0]}' > "${REPORT_FILE}.tmp"
+  jq -n --arg old_host "$OLD_HOST" --arg timestamp "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --slurpfile stages "${STATE_DIR}/stages.json" --slurpfile checks "${STATE_DIR}/verify.json" '{status:"pass",timestamp:$timestamp,old_host:$old_host,stages:$stages[0],checks:$checks[0]}' > "${REPORT_FILE}.tmp"
   mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
   say "Verify report: $REPORT_FILE"
 fi

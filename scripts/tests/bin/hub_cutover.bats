@@ -520,3 +520,41 @@ with open(sys.argv[1], 'rb') as f: assert plistlib.load(f)['ProgramArguments'] =
 PYCODE
   [ "$(grep -n 'command=python3 -.*restore' "$CALLS" | tail -1 | cut -d: -f1)" -lt "$(grep -n '^ssh .*command=launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" ]
 }
+
+@test "old host: report host is recorded and reused by recovery modes" {
+  python3 - "$HUB_NEW_STATE_DIR/hub-new-report.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+r = json.load(open(p)); r['old_host'] = 'old.example'
+open(p, 'w').write(json.dumps(r))
+PY
+  unset HUB_OLD_HOST
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]; [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-host")" = old.example ]
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [[ "$output" != *'set HUB_OLD_HOST'* ]]
+    grep -q '^ssh host=old.example ' "$CALLS"
+    if grep -q '^ssh host=m4-air.local ' "$CALLS"; then false; fi
+  done
+}
+@test "old host: absent host refuses before external commands" {
+  unset HUB_OLD_HOST
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  for mode in --verify --forwards --rollback; do
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [ ! -s "$CALLS" ]
+  done
+}
+@test "old host: conflicting report refuses before external commands" {
+  python3 - "$HUB_NEW_STATE_DIR/hub-new-report.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+r = json.load(open(p)); r['old_host'] = 'different.example'
+open(p, 'w').write(json.dumps(r))
+PY
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 2 ]; [[ "$output" == *differs* ]]; [ ! -s "$CALLS" ]
+}

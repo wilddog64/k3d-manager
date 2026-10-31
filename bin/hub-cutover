@@ -6,7 +6,7 @@ cd "$REPO_ROOT"
 SINGLETONS="$REPO_ROOT/scripts/etc/machine/hub-singletons.list"
 FORWARDS="$REPO_ROOT/scripts/etc/machine/hub-push-forwards.list"
 NEW_HOST="${HUB_NEW_HOST:-$(scutil --get LocalHostName).local}"
-OLD_HOST="${HUB_OLD_HOST:-m4-air.local}"
+OLD_HOST="${HUB_OLD_HOST:-}"
 STATE_DIR="${HUB_CUTOVER_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-cutover}"
 NEW_STATE_DIR="${HUB_NEW_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-new}"
 REPORT="$NEW_STATE_DIR/hub-new-report.json"
@@ -36,6 +36,7 @@ try:
     age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds()
     if report.get("status") != "pass" or age < 0 or age >= 86400:
         raise ValueError("report is not a passing report less than 24 hours old")
+    print(report.get("old_host") or "")
 except Exception as exc:
     print(f"hub-cutover: refusing: {exc}", file=sys.stderr)
     sys.exit(1)
@@ -324,6 +325,19 @@ rollback() {
   append_report rollback-pass
 }
 
+if [[ "${1:-}" == --rollback || "${1:-}" == --verify || "${1:-}" == --forwards ]]; then
+  if [[ -z "$OLD_HOST" && -f "$STATE_DIR/old-host" ]]; then OLD_HOST="$(cat "$STATE_DIR/old-host")"; fi
+else
+  if [[ -z "$OLD_HOST" && ! -f "$REPORT" ]]; then
+    echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2; exit 2
+  fi
+  report_host="$(read_report)" || exit 1
+  if [[ -n "$OLD_HOST" && -n "$report_host" && "$OLD_HOST" != "$report_host" ]]; then
+    echo 'hub-cutover: HUB_OLD_HOST differs from hub-new report' >&2; exit 2
+  fi
+  OLD_HOST="${OLD_HOST:-$report_host}"
+fi
+[[ -n "$OLD_HOST" ]] || { echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2; exit 2; }
 if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
 if [[ "${1:-}" == --verify ]]; then
   [[ -f "$STATE_DIR/stopped-on-old" ]] || { echo 'hub-cutover: no recorded cutover; refusing verify' >&2; exit 1; }
@@ -338,13 +352,13 @@ if [[ "${1:-}" == --forwards ]]; then
   repoint_forwards
   exit $?
 fi
-read_report || exit 1
 require_old_ssh || exit 1
 print_plan
 read_handoff || exit 1
 if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
 confirm cutover || exit 1
 mkdir -p "$STATE_DIR"
+printf '%s\n' "$OLD_HOST" > "$STATE_DIR/old-host"
 : > "$STATE_DIR/stopped-on-old"
 rm -f "$STATE_DIR/old-argocd-controller-replicas"
 for ((i=${#labels[@]}-1; i>=0; i--)); do

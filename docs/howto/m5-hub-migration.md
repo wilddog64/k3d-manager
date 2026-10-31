@@ -6,9 +6,9 @@ This guide moves the single-instance services from the M4 hub to a freshly built
 
 1. Complete [one-command machine setup](machine-setup.md), enable Remote Login on the M4, and confirm the M5 has its copied Keychain records and authenticated GitHub CLI. You do not need to copy the Cloudflare tunnel files or install `k3d` yourself: `hub-new` copies the files listed in `scripts/etc/machine/files.hub.list` from the M4 during its machine-setup stage, and its `hub-up` stage installs `k3d`.
 2. Open OrbStack on the M5 and wait until it is running. Confirm sleep prevention is enabled: `pmset -g` must show a `SleepDisabled 1` line (set it with `sudo pmset -a disablesleep 1`).
-3. Pull the release branch, then run `make hub-new HUB_OLD_HOST=m4-air.local`. It copies the Cloudflare tunnel credentials and origin cert from the M4 if missing (you may be asked for the M4 login), takes the Hostinger tunnel target from `scripts/etc/hostinger/vars.sh` (an exported `HOSTINGER_HOST` overrides it), builds the fresh local cluster, restores credentials without starting the Cloudflare tunnel, recovers the newest export (type the approval at its prompt), reconciles the hub (identity, Vault root token, smoke user, ArgoCD admin mirror, Cloudflare tunnel config) against the restored Vault data and the M5's own local Keycloak and ArgoCD port-forwards, prepares the single-instance plists without loading them, applies platform state, and waits for the read-only verification checks. Review `~/.local/share/k3d-manager/hub-new/hub-new-report.json`; it must report `status: pass` and be less than 24 hours old before cut-over.
+3. Pull the release branch, then run `make hub-migrate HUB_OLD_HOST=<old>` with the old hub hostname. This runs hub-new and hub-cutover in sequence and retains both typed confirmations. It copies the Cloudflare tunnel credentials and origin cert from the M4 if missing (you may be asked for the M4 login), takes the Hostinger tunnel target from `scripts/etc/hostinger/vars.sh` (an exported `HOSTINGER_HOST` overrides it), builds the fresh local cluster, restores credentials without starting the Cloudflare tunnel, recovers the newest export (type the approval at its prompt), reconciles the hub (identity, Vault root token, smoke user, ArgoCD admin mirror, Cloudflare tunnel config) against the restored Vault data and the M5's own local Keycloak and ArgoCD port-forwards, prepares the single-instance plists without loading them, applies platform state, and waits for the read-only verification checks. Review `~/.local/share/k3d-manager/hub-new/hub-new-report.json`; it must report `status: pass` and be less than 24 hours old before cut-over.
 
-If a stage stops, resolve its stated cause and rerun `make hub-new`. Passed stages are retained; use `HUB_NEW_FROM=<stage>` only when intentionally restarting from a named stage. Never run bare `make up` for this process.
+For the step-by-step path, run `make hub-new HUB_OLD_HOST=<old>` followed by `make hub-cutover HUB_OLD_HOST=<old>`. `HUB_OLD_HOST` is required for hub-new; cutover can also use the host recorded in its passing report. If a stage stops, resolve its stated cause and rerun `make hub-new HUB_OLD_HOST=<old>`. Passed stages are retained; use `HUB_NEW_FROM=<stage>` only when intentionally restarting from a named stage. Never run bare `make up` for this process.
 
 ## Agent classifications
 
@@ -20,7 +20,7 @@ The manifests under `scripts/etc/machine/` define ownership:
 
 Do not manually start a `hub-singletons.list` agent on either host during the move. The cut-over command checks the M4 is quiet before loading any singleton on the M5.
 
-## Cut over
+## Cut over (step-by-step and recovery)
 
 1. Review the printed agent plan with `make hub-cutover DRY_RUN=1`.
 2. Run `make hub-cutover` and type `cutover` when prompted. It stops the loaded singleton agents on the M4 over SSH, confirms that none remain loaded there, stops the old ArgoCD application controller, hands Hostinger to the new hub’s ArgoCD, loads the agents on the M5, and performs read-only checks for webhook health, public hostnames, the Cloudflare connector, Hostinger SSH tunnels and Hermes status.
@@ -41,3 +41,5 @@ After the new hub has remained healthy for seven days:
 3. Update remaining `HUB_*` defaults, SSH aliases and `docs/howto` pages that still name the M4 as the hub.
 
 These retirement steps are not automated by `hub-cutover` or its rollback command.
+
+On the old hub, installing a Pushgateway or Loki port-forward refuses while its `.pre-cutover` backup exists. Run `make hub-cutover-rollback` on the new hub to restore the old configuration, or explicitly set `HUB_FORWARD_OVERWRITE=1` to overwrite the tunnel while retaining the backup.

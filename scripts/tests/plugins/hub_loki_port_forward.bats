@@ -16,7 +16,7 @@ TEMPLATE="${ROOT}/etc/launchd/com.k3d-manager.hub-loki-port-forward.plist.tmpl"
   run make -n install-hub-loki-port-forward
   [ "$status" -eq 0 ]
   [[ "$output" == *"com.k3d-manager.hub-loki-port-forward.plist.tmpl"* ]]
-  [[ "$output" == *"launchctl bootstrap"* ]]
+  [[ "$output" == *"bin/launchd-reload com.k3d-manager.hub-loki-port-forward"* ]]
 }
 
 @test "hub restore installs the Loki agent beside Pushgateway" {

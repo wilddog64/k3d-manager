@@ -42,7 +42,10 @@ K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 argocd-upgrade:
 	@args=(); [ -z "$(TO)" ] || args+=(--to '$(TO)'); [ "$(DRY_RUN)" != 1 ] || args+=(--dry-run); ./scripts/k3d-manager argocd_upgrade "$${args[@]}"
 
-.PHONY: hub-new
+.PHONY: hub-new hub-migrate
+hub-migrate:
+	@HUB_OLD_HOST="$(HUB_OLD_HOST)" bin/hub-new && HUB_OLD_HOST="$(HUB_OLD_HOST)" bin/hub-cutover
+
 hub-new:
 	@bin/hub-new
 
@@ -646,9 +649,7 @@ install-vault-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.vault-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.vault-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
 	@echo "Vault port-forward agent installed — port 18200 will stay open while k3d-cluster is running"
 
 ## Stop and remove the Vault port-forward LaunchAgent
@@ -663,9 +664,7 @@ install-prometheus-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.prometheus-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.prometheus-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
 	@echo "Prometheus port-forward agent installed — raw backend port 19091 will stay open while the hub cluster is reachable"
 	@echo "Run: launchctl kickstart -k \"gui/$$(id -u)/com.k3d-manager.prometheus-auth-proxy\" to bind the authenticated port 19090"
 
@@ -675,13 +674,14 @@ uninstall-prometheus-port-forward:
 	@echo "Prometheus port-forward agent removed"
 
 install-hub-pushgateway-port-forward:
+	@if [ -e "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist.pre-cutover" ] && [ "$(HUB_FORWARD_OVERWRITE)" != 1 ]; then \
+	  echo "refusing: $(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist is a hub-cutover tunnel to the new hub; run make hub-cutover-rollback to restore it, or set HUB_FORWARD_OVERWRITE=1" >&2; exit 1; fi
 	sed \
 	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.hub-pushgateway-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-pushgateway-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.hub-pushgateway-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-pushgateway-port-forward.plist"
 	@echo "Hub Pushgateway port-forward agent installed — port 19094 will stay open while the hub is reachable"
 
 uninstall-hub-pushgateway-port-forward:
@@ -690,13 +690,14 @@ uninstall-hub-pushgateway-port-forward:
 	@echo "Hub Pushgateway port-forward agent removed"
 
 install-hub-loki-port-forward:
+	@if [ -e "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ] && [ "$(HUB_FORWARD_OVERWRITE)" != 1 ]; then \
+	  echo "refusing: $(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist is a hub-cutover tunnel to the new hub; run make hub-cutover-rollback to restore it, or set HUB_FORWARD_OVERWRITE=1" >&2; exit 1; fi
 	sed \
 	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.hub-loki-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.hub-loki-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.hub-loki-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
 	@echo "Hub Loki port-forward agent installed — port 19100 will stay open while the hub is reachable"
 
 uninstall-hub-loki-port-forward:
@@ -710,9 +711,7 @@ install-alertmanager-port-forward:
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+	bin/launchd-reload com.k3d-manager.alertmanager-port-forward "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
 	@echo "Alertmanager port-forward agent installed — raw backend now stays open on port 19093"
 
 uninstall-alertmanager-port-forward:
@@ -1607,6 +1606,7 @@ help:
 	@echo "  Targets (set CLUSTER_PROVIDER=k3d|k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
 	@echo "    make up            Provision full stack"
 	@echo "    make hub-up        Rebuild the local hub only (no AWS, no sandbox)"
+	@echo "    make hub-migrate HUB_OLD_HOST=<old>  Build and cut over a new hub"
 	@echo "    make hub-new       Build a fresh M5 hub and prepare single-instance agents (no cutover)"
 	@echo "    make hub-cutover  Move single-instance agents from the old hub to the new hub"
 	@echo "    make hub-cutover-verify    Re-run cutover verification and record the result"

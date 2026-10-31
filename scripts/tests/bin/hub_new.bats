@@ -432,3 +432,9 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ "$status" -ne 0 ]
   [[ "$output" == *'ArgoCD OIDC ExternalSecret cicd/argocd-oidc-secret is missing'* ]]
 }
+
+@test "old host: missing host refuses before stages" {
+  unset HUB_OLD_HOST
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+}
