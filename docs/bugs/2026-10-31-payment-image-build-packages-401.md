@@ -1,8 +1,8 @@
 # Bug: payment image build gets 401 from GitHub Packages since 10-30, so CVE fixes cannot ship
 
-**Status:** OPEN
+**Status:** FIXED — payment PR #99 `acc6284` (publish pulls with `GITHUB_TOKEN`); live E1 pending merge
 **Priority:** P2
-**Approval:** operator, 2026-10-31 (filing: "go ahead for 1 and 2"); fix pending
+**Approval:** operator, 2026-10-31 (filing: "go ahead for 1 and 2"; fix: "fix them so we have a clean release")
 **Filed:** 2026-10-31
 **Detected by:** Claude, answering the operator's "why these tables have no data" on the CVE autopatch
 dashboard
@@ -40,14 +40,36 @@ Effect: no new `sha-*` image exists, so the nightly `app-cve-scan` logs
 `failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment; reason=no-match
 — promotion skipped`. CVE-2026-111497 (brotli-libs, CRITICAL, fixed in 1.2.1-r0) stays open on payment.
 
+## Root cause (corrected 2026-10-31, after the operator showed the token list)
+
+The token is not expired or revoked: the classic PAT `platform-ops-app-rebuild` (`repo`,
+`write:packages`) is valid to 2027-01-25 and was used this week. Two facts locate the cause:
+
+1. **The 10-27 publish never used the token.** In run 40523071793 every builder step, including the
+   Maven `go-offline` step, is `CACHED`. Dependabot's `eclipse-temurin` bump (`dc54bbb4`, 10-27) changed
+   the builder base digest, so the 10-30 build ran `go-offline` for the first time since the 10-22
+   rotation, and got the 401. The rerun on 10-31 failed the same way.
+2. **`GITHUB_TOKEN` works on the same Dockerfile.** Payment PR #99's Image Build Check (run
+   41225248527) runs `go-offline` uncached with `GH_TOKEN=GITHUB_TOKEN` and ends `BUILD SUCCESS`. Both
+   paths send an empty username (no workflow passes the `GH_ACTOR` secret the Dockerfile mounts:
+   `cat: /run/secrets/GH_ACTOR: No such file or directory`), so the only difference is the token.
+
+So `maven.pkg.github.com` rejects the classic PAT that the API still accepts. Not confirmed why; it does
+not matter for the fix, because the publish job does not need a PAT at all: in
+`shopping-cart-infra/.github/workflows/build-push-deploy.yml`, `PACKAGES_TOKEN` is used only as the docker
+`GH_TOKEN` build secret, and GHCR login already uses `GITHUB_TOKEN`.
+
 ## Fix
 
-1. Operator: check the PAT behind `PACKAGES_TOKEN` (expiry, revocation, `read:packages` scope) and
-   refresh the payment repo secret from Keychain. Check `shopping-cart-order` too, which reads the same
-   package.
-2. Claude: rerun payment `main` CI and confirm the image push.
-3. Follow-up: the image build should fail with "PACKAGES_TOKEN rejected (401)" in one line, and an
-   expiry check should alert before the token lapses.
+Payment `ci.yaml` passes `PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}` to the reusable publish workflow
+(PR #99, `acc6284`). The caller job already has `packages: write`. This is the swap the 2026-08-08 PR-path
+fix (payment PR #60) left pending for publish.
+
+Follow-ups, not in v1.43.12:
+
+- `shopping-cart-order` passes `secrets.PACKAGES_TOKEN` to the same workflow and reads the same package.
+  It will 401 at its next cache miss. Same one-line fix.
+- The Dockerfile mounts a `GH_ACTOR` secret that no workflow provides; drop it or pass it.
 
 ## Acceptance
 
