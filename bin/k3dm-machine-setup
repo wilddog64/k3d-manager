@@ -7,20 +7,50 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/core.sh"
 
-usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--agents install|skip] [--check|--dry-run]\n'; }
-role='' from_host='' secrets_mode=ask agents_mode=install mode=setup failed=0 brew_available=0
+usage() { printf 'Usage: bin/k3dm-machine-setup --role hub|worker|console [--from HOST] [--secrets ask|skip] [--agents install|skip] [--check|--dry-run]\n       bin/k3dm-machine-setup --check-shell HOST\n'; }
+role='' shell_host='' from_host='' secrets_mode=ask agents_mode=install mode=setup failed=0 brew_available=0
 while (($#)); do
   case "$1" in
     --role) (($# >= 2)) || { usage >&2; exit 2; }; role="$2"; shift 2 ;;
     --from) (($# >= 2)) || { usage >&2; exit 2; }; from_host="$2"; shift 2 ;;
     --secrets) (($# >= 2)) || { usage >&2; exit 2; }; secrets_mode="$2"; shift 2 ;;
     --agents) (($# >= 2)) || { usage >&2; exit 2; }; agents_mode="$2"; shift 2 ;;
+    --check-shell) (($# >= 2)) || { usage >&2; exit 2; }; shell_host="$2"; shift 2 ;;
     --check) mode=check; shift ;;
     --dry-run) mode=dry-run; shift ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
+if [[ -n "$shell_host" ]]; then
+  python3 - "$shell_host" <<'PYTHON'
+import os, re, subprocess, sys
+timeout_text = os.environ.get("K3DM_CHECK_SHELL_TIMEOUT", "60")
+if not re.fullmatch(r"[0-9]+", timeout_text) or int(timeout_text) <= 0:
+    print("K3DM_CHECK_SHELL_TIMEOUT must be a positive integer", file=sys.stderr)
+    sys.exit(2)
+try:
+    result = subprocess.run(["ssh", "-tt", "-o", "BatchMode=yes", sys.argv[1], "$SHELL -lic exit"],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=int(timeout_text))
+    output = result.stdout.decode(errors="replace")
+    status = result.returncode
+except subprocess.TimeoutExpired as exc:
+    output = (exc.stdout or b"").decode(errors="replace") + "\nlogin shell timed out\n"
+    status = 1
+pattern = re.compile(r"Username for|Password for|command not found|insecure directories|compinit|_lastcomp|Permission denied|timed out", re.I)
+lines = [line for line in output.splitlines() if pattern.search(line)]
+for line in lines:
+    home = os.path.expanduser("~")
+    if home and home != "/":
+        line = line.replace(home, "[HOME]")
+    line = re.sub(r"(?i)(https?://)[^/\s@]+@", r"\1[REDACTED]@", line)
+    line = re.sub(r"(?:/Users|/home)/[^/\s:'\"]+(?:/[^\s:'\"]*)?", "[HOME]", line)
+    line = re.sub(r"(?i)(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|[A-Za-z0-9_-]{20,})", "[REDACTED]", line)
+    print(line)
+sys.exit(1 if status or lines else 0)
+PYTHON
+  exit $?
+fi
 case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
 case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
 case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
@@ -193,6 +223,55 @@ install_repos() {
   setup_shell_links
 }
 
+remote_one() {
+  local target="$1" actual normalized ssh_url
+  [[ -e "$target/.git" ]] || return 0
+  actual="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
+  normalized="$(normalize_github_remote "$actual")" || return 0
+  [[ "$normalized" == wilddog64/* ]] || return 0
+  if [[ "$actual" != https://github.com/* ]]; then report "remote:$target" ok; return; fi
+  if (( ! github_ssh )); then report "remote:$target" 'https (no GitHub SSH key yet)'; return; fi
+  if [[ "$mode" == check ]]; then record_failure "remote:$target" 'https (SSH available)'; return; fi
+  if [[ "$mode" != setup ]]; then report "remote:$target" 'would switch to ssh'; return; fi
+  ssh_url="git@github.com:${normalized}.git"
+  if git -C "$target" remote set-url origin "$ssh_url" && git -C "$target" ls-remote origin HEAD >/dev/null 2>&1; then
+    report "remote:$target" 'switched to ssh'
+  else
+    git -C "$target" remote set-url origin "$actual"
+    record_failure "remote:$target" 'https (SSH remote unavailable)'
+  fi
+}
+
+switch_ssh_remotes() {
+  local path remote branch roles github_ssh=0 target ssh_output
+  ssh_output="$(ssh -o BatchMode=yes -o ConnectTimeout=10 -T git@github.com 2>&1 || true)"
+  if [[ "$ssh_output" == *"successfully authenticated"* ]]; then github_ssh=1; fi
+  while IFS='|' read -r path remote branch roles <&3; do
+    [[ -n "$path" && "$path" != \#* ]] || continue
+    case ",$roles," in *",$role,"*) remote_one "$HOME/src/$path" ;; esac
+  done 3< "${manifest_dir}/repos.list"
+  if [[ "$role" == hub || "$role" == worker ]]; then
+    for target in "$HOME/.claude" "$HOME/.codex" "$HOME/.gemini" "$HOME/.copilot"; do remote_one "$target"; done
+  fi
+}
+
+check_completion_dirs() {
+  local prefix='' dir entry resolved home_real brew_real count=0 first=''
+  home_real="$(cd -P "$HOME" && pwd)"
+  if (( brew_available )); then prefix="$(brew --prefix 2>/dev/null || true)"; fi
+  brew_real="$(cd -P "${prefix:-/nonexistent}" 2>/dev/null && pwd || true)"
+  for dir in "$HOME/.zplug" "$HOME/.zsh" "${prefix:+$prefix/share/zsh}"; do
+    [[ -d "$dir" ]] || continue
+    resolved="$(cd -P "$dir" && pwd)"
+    if [[ "$mode" == setup && ( "$dir" == "$HOME/.zplug" || "$dir" == "$HOME/.zsh" ) && "$resolved" == "$home_real/"* && ( -z "$brew_real" || ( "$resolved" != "$brew_real" && "$resolved" != "$brew_real/"* && "$brew_real" != "$resolved/"* ) ) ]]; then chmod -R go-w "$resolved"; fi
+    while IFS= read -r entry; do
+      [[ -n "$entry" ]] || continue
+      ((count+=1)); [[ -n "$first" ]] || first="$entry"
+    done < <(find "$dir/" ! -type l \( -perm -g+w -o -perm -o+w \) -print)
+  done
+  if (( count )); then record_failure zsh:completion-dirs "$count insecure ($first)"; else report zsh:completion-dirs ok; fi
+}
+
 clone_config() {
   local repo="$1" target="$2" remote="https://github.com/wilddog64/${1}.git"
   if [[ -e "$target/.git" ]]; then
@@ -220,6 +299,7 @@ setup_shell_links() {
   for name in .zsh .zshrc .zshenv; do
     case "$name" in .zsh) dest="$src" ;; .zshrc) dest="$HOME/.zsh/zshrc" ;; .zshenv) dest="$HOME/.zsh/zshenv" ;; esac
     if [[ -L "$HOME/$name" && "$HOME/$name" -ef "$dest" ]]; then report "shell:${name}" ok; continue; fi
+    if [[ -L "$HOME/$name" ]]; then record_failure "shell:${name}" "skipped (linked elsewhere: $(readlink "$HOME/$name"))"; continue; fi
     if [[ "$mode" != setup ]]; then record_failure "shell:${name}" missing; continue; fi
     if [[ -e "$HOME/$name" && ! -L "$HOME/$name" ]]; then
       backup="$HOME/${name}.pre-machine-setup"
@@ -317,6 +397,15 @@ ensure_operator_include() {
     chmod 600 "$config"
     return 0
   fi
+  if [[ -L "$config" ]]; then
+    local target
+    target="$(readlink "$config")"
+    if [[ ! -w "$config" ]]; then report ssh:config "skipped (linked; add the Include in $target)"; return; fi
+    temp="$(mktemp "$HOME/.ssh/config.XXXXXX")"
+    { printf '%s\n' 'Include ~/.ssh/config.d/operator'; cat "$config"; } > "$temp"
+    cat "$temp" > "$config"; rm -f "$temp"
+    return
+  fi
   if [[ -e "$config" && ! -e "$backup" ]]; then cp -p "$config" "$backup"; fi
   temp="$(mktemp "$HOME/.ssh/config.XXXXXX")"
   { printf '%s\n' 'Include ~/.ssh/config.d/operator'; if [[ -f "$config" ]]; then cat "$config"; fi; } > "$temp"
@@ -332,6 +421,7 @@ copy_files() {
     [[ -n "$path" ]] || continue
     if [[ ! "$path" =~ ^[A-Za-z0-9._/-]+$ || "$path" == /* || "$path" == *..* || "$path" != */* ]]; then record_failure "file:${path}" 'rejected (bad path)'; continue; fi
     target="$HOME/$path"
+    if [[ -L "$target" && ! -s "$target" ]]; then record_failure "file:~/${path}" 'skipped (linked target unavailable)'; continue; fi
     if [[ -s "$target" ]]; then
       [[ "$path" != .ssh/config.d/operator ]] || ensure_operator_include
       report "file:~/${path}" ok; continue
@@ -410,6 +500,8 @@ preflight
 if (( brew_available )); then install_tools; else report brew-phase 'skipped (Homebrew unavailable)'; fi
 ensure_python_tools
 install_repos
+switch_ssh_remotes
+check_completion_dirs
 install_state_chain
 check_secrets
 copy_files

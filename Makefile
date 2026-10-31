@@ -1709,7 +1709,7 @@ help:
 	@echo ""
 
 ## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
-.PHONY: machine-setup machine-check machine-secrets-export machine-secrets-import
+.PHONY: machine-setup machine-check machine-check-shell machine-secrets-export machine-secrets-import
 machine-setup:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
@@ -1718,6 +1718,10 @@ machine-setup:
 machine-check:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" --check
+
+machine-check-shell:
+	@test -n "$(HOST)" || { echo 'Set HOST=<hostname>' >&2; exit 2; }
+	@bin/k3dm-machine-setup --check-shell "$(HOST)"
 
 machine-secrets-export:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }

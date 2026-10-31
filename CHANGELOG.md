@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Run a fast local gate on pushes and task landings to catch relevant lint and test failures early.
+- On the M5, direnv waited for an HTTPS credential prompt because setup had left managed GitHub remotes on HTTPS. Setup now switches those remotes to SSH when authentication works and restores HTTPS if verification fails. The M5 also had 10,585 group- or world-writable entries under `~/.zplug`, stopping compinit; setup repairs home completion permissions and reports insecure Homebrew paths. It preserves linked SSH configuration. The new interactive login-shell check catches these problems, which did not appear in the existing setup checks.
 
 ## [1.43.12] - 2026-10-31
 

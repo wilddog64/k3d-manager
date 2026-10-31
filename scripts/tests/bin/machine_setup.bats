@@ -833,3 +833,157 @@ SH
   [ "$(cat "$FIXHOME/.ssh/config")" = 'Include ~/.ssh/config.d/operator' ]
   [ ! -e "$FIXHOME/.ssh/config.pre-machine-setup" ]
 }
+
+@test "remote switching: authenticated SSH switches managed origins and restores failed probes" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* ]]
+  mkdir -p "$FIXHOME/src/a/.git" "$FIXHOME/src/b/.git" "$FIXHOME/src/other/.git"
+  printf '%s\n' 'a|https://github.com/wilddog64/a.git|-|console' 'b|https://github.com/wilddog64/b.git|-|console' 'other|https://github.com/cxreg/other.git|-|console' > "$FIXROOT/scripts/etc/machine/repos.list"
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+# Captured on m4-air.local, 2026-10-31T19:53:21Z:
+# ssh -o BatchMode=yes -o ConnectTimeout=10 -T git@github.com (exit 1).
+echo "Hi wilddog64! You've successfully authenticated, but GitHub does not provide shell access."
+exit 1
+SH
+  cat > "$STUBS/git" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$CALL_LOG"
+[ "$1" = -C ] || exit 0
+case "$3 $4" in
+  'remote get-url') case "$2" in */other) echo https://github.com/cxreg/other.git ;; *) echo "https://github.com/wilddog64/${2##*/}.git" ;; esac ;;
+  'ls-remote origin') case "$2" in */b) exit 1 ;; esac ;;
+esac
+SH
+  chmod +x "$STUBS/ssh" "$STUBS/git"
+  run_machine --role console
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'switched to ssh'* ]]
+  grep -Fq 'remote set-url origin git@github.com:wilddog64/a.git' "$CALL_LOG"
+  grep -Fq 'remote set-url origin https://github.com/wilddog64/b.git' "$CALL_LOG"
+  run ! grep -Fq 'set-url origin git@github.com:cxreg' "$CALL_LOG"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'https (SSH available)'* ]]
+  printf '#!/bin/sh\nexit 1\n' > "$STUBS/ssh"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'https (no GitHub SSH key yet)'* ]]
+}
+
+@test "completion permissions: check reports and setup repairs home only" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.zplug" "$BATS_TEST_TMPDIR/brew/share/zsh"
+  touch "$FIXHOME/.zplug/insecure" "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  chmod 777 "$FIXHOME/.zplug/insecure" "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  printf '#!/bin/sh\n[ "$1" != --prefix ] || echo "%s"\n' "$BATS_TEST_TMPDIR/brew" > "$STUBS/brew"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'insecure'* ]]
+  run_machine --role console
+  [ "$status" -eq 1 ]
+  [ "$(/usr/bin/python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$FIXHOME/.zplug/insecure")" = 0o755 ]
+  [ "$(/usr/bin/python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$BATS_TEST_TMPDIR/brew/share/zsh/insecure")" = 0o777 ]
+  chmod 755 "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  run_machine --role console --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'zsh:completion-dirs'*'ok'* ]]
+}
+
+@test "linked SSH config keeps its link and receives one Include" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh/config.d"
+  echo existing > "$FIXHOME/ssh-target"
+  ln -s "$FIXHOME/ssh-target" "$FIXHOME/.ssh/config"
+  echo fragment > "$FIXHOME/.ssh/config.d/operator"
+  echo .ssh/config.d/operator > "$FIXROOT/scripts/etc/machine/files.console.list"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [ -L "$FIXHOME/.ssh/config" ]
+  [ "$(grep -c '^Include ~/.ssh/config.d/operator$' "$FIXHOME/ssh-target")" -eq 1 ]
+}
+
+@test "login shell check invokes an interactive login shell and detects captured errors" {
+  setup_machine_fixture
+  rm "$STUBS/python3"
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+# Login messages reported by the operator on the M5, 2026-10-31.
+printf '%s\n' "$*" > "$SSH_CALL"
+[ "$5" = '$SHELL -lic exit' ] || exit 42
+printf '%s\n' "${SHELL_FIXTURE:-clean}"
+SH
+  chmod +x "$STUBS/ssh"
+  local message
+  for message in "Username for 'https://github.com': " 'zsh compinit: insecure directories, run compaudit for list.' 'compdef: command not found' '_main_complete:412: _lastcomp: assignment to invalid subscript range'; do
+    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"$message"* || "$output" == *"${message% }"* ]]
+    grep -Fxq -- '-tt -o BatchMode=yes fixture $SHELL -lic exit' "$CALL_LOG"
+  done
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="command not found /Users/alice/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 1 ]
+  [[ "$output" != *'/Users/alice'* && "$output" != *'ghp_abc'* ]]
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 0 ]
+  run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
+  [ "$status" -eq 42 ]
+}
+
+@test "login shell check times out and validates its timeout" {
+  setup_machine_fixture
+  rm "$STUBS/python3"
+  printf '#!/bin/sh\nexec sleep 5\n' > "$STUBS/ssh"
+  chmod +x "$STUBS/ssh"
+  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'timed out'* ]]
+  for value in 0 -1 abc 1.5 ''; do
+    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    [ "$status" -eq 2 ]
+  done
+}
+
+@test "completion permissions ignore symlinks" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.zplug"
+  (umask 000; ln -s missing "$FIXHOME/.zplug/link")
+  if [[ "$(/usr/bin/uname -s)" == Darwin ]]; then
+    link_mode="$(/usr/bin/stat -f %Lp "$FIXHOME/.zplug/link")"
+  else
+    link_mode="$(/usr/bin/stat -c %a "$FIXHOME/.zplug/link")"
+  fi
+  [ "$link_mode" != 755 ] || skip "platform gives symlinks mode 755"
+  [ "$link_mode" = 777 ]
+  run_machine --role console --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'zsh:completion-dirs'*'ok'* ]]
+}
+
+@test "linked SSH config with unwritable target is preserved" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh/config.d"
+  echo existing > "$FIXHOME/ssh-target"
+  cp "$FIXHOME/ssh-target" "$BATS_TEST_TMPDIR/snapshot"
+  chmod 444 "$FIXHOME/ssh-target"
+  ln -s "$FIXHOME/ssh-target" "$FIXHOME/.ssh/config"
+  echo fragment > "$FIXHOME/.ssh/config.d/operator"
+  echo .ssh/config.d/operator > "$FIXROOT/scripts/etc/machine/files.console.list"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ssh:config"*"skipped (linked; add the Include in $FIXHOME/ssh-target)"* ]]
+  [ -L "$FIXHOME/.ssh/config" ]
+  cmp "$FIXHOME/ssh-target" "$BATS_TEST_TMPDIR/snapshot"
+}
+
+@test "foreign shell links are reported and preserved" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/src/gitrepo/personal/zshdotfiles" "$FIXHOME/elsewhere"
+  for name in .zsh .zshrc .zshenv; do ln -s "$FIXHOME/elsewhere" "$FIXHOME/$name"; done
+  run_machine --role worker
+  [ "$status" -eq 1 ]
+  for name in .zsh .zshrc .zshenv; do
+    [[ "$output" == *"shell:$name"*"skipped (linked elsewhere: $FIXHOME/elsewhere)"* ]]
+    [ "$(readlink "$FIXHOME/$name")" = "$FIXHOME/elsewhere" ]
+  done
+}

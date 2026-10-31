@@ -55,3 +55,11 @@ Heartbeat setup renders disabled candidates for review; it does not install a sc
 ## After the cutover: old-hub forwards
 
 A successful cutover re-points the old hub’s Pushgateway and Loki loopback forwards over SSH to the new hub. Set `HUB_NEW_HOST` if the new hub’s local hostname is not reachable from the old hub; key-based SSH login from old to new is required. For an already completed cutover, run `make hub-cutover-forwards` on the new hub and type `forwards` when prompted. `make hub-cutover-forwards` runs `make hub-cutover-verify` first, which re-runs the cutover verification without changing anything and records a fresh result, so a cutover whose verification failed on a check that has since recovered is unblocked in the same command. The tunnels run `ssh -F /dev/null` so they ignore `~/.ssh/config`: a `RemoteForward` there for the new hub (a clipboard or notification relay) is taken by the first tunnel and, under `ExitOnForwardFailure=yes`, kills every later one. The command checks both endpoints and records the result. `make hub-cutover-rollback` restores the saved original forward plists before reloading the old hub’s singletons.
+
+## GitHub remotes and completion folders
+
+After GitHub SSH authentication is available, setup switches managed wilddog64 HTTPS remotes to SSH and verifies each remote, restoring HTTPS if verification fails. Without a key it reports HTTPS without failing. Check mode flags HTTPS when SSH is available. Setup removes group and world write access from completion directories under the home directory and reports insecure Homebrew completion paths without changing them. A linked SSH config keeps its link when the operator Include is added; an unwritable target is reported for manual editing.
+
+## Last step: check the login shell
+
+As the last new-Mac setup step, run `make machine-check-shell HOST=<new-Mac-hostname>` from the connecting Mac. This read-only check opens an SSH login shell, exits immediately, and fails on credential prompts, command errors, insecure completion directories, a nonzero exit or a 60-second timeout. Matched output is redacted.
