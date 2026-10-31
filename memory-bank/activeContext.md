@@ -1836,6 +1836,6 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 
 ## 2026-10-31 — v1.43.13 bug batch dispatched
 
-- Approved + dispatched to Codex: pre-push-gate P1, acceptance-copies, land-test-log, ask-docs-bug-count-truncation, ai-analysis-filter. Shared files: CHANGELOG.md (all), fast_gate.sh only in P1. Land one at a time, rebase the rest.
+- Approved + dispatched to Codex from d6025afc (pushed): pre-push-gate P1, acceptance-copies, land-test-log, ask-docs-bug-count-truncation, ai-analysis-filter. Shared files: CHANGELOG.md (all), fast_gate.sh only in P1. Land one at a time, rebase the rest.
 - None of the 5 v1.43.13 plans executed yet; agent-instruction-files-refresh is first in line.
-- Unfiled: machine_setup.bats test 32 tty hang (43 min in push gate).
+- tty hang filed P2 (machine-setup-tty-test-hangs-push-gate), dispatch after P1 lands (fast_gate.sh overlap). hub-migration Slack bot P2 dispatched.
