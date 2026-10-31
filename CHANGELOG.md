@@ -10,6 +10,10 @@ M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1
 
 - Re-point old-hub Pushgateway and Loki forwards during cutover, with standalone retry and rollback restoration; correct the platform-ops schedule message.
 
+### Removed
+
+- Retire the CI `stage2` and `detect` jobs, the `ci:cluster-tests` label and `scripts/ci/runner_lock.sh`. `stage2` ran against a long-lived cluster on the M2 that nothing else used or checked; it had drifted (no Vault, OrbStack stopped) and had not passed in weeks. The remote e2e on the M2 builds its own cluster per run and stays the live test path. A workflow test keeps self-hosted jobs out of `ci.yml`.
+
 ### Added
 
 - Add `make hub-new` to rebuild the M5 as a fresh hub, verify its recovery and platform state, and prepare single-instance agent plists without loading them.

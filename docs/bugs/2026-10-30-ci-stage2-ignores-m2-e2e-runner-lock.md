@@ -1,6 +1,6 @@
 # Bug: CI `stage2` on the M2 ignores the e2e runner lock, so it can run alongside a remote e2e
 
-**Status:** FIXED — `d478ed59` (Luna); live check E3 pending a `ci:cluster-tests` PR
+**Status:** SUPERSEDED — stage2 retired (docs/bugs/2026-10-31-ci-stage2-m2-cluster-has-no-vault.md)
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("we just want to ensure … only one can be executed"; "go ahead")
 **Filed:** 2026-10-30
