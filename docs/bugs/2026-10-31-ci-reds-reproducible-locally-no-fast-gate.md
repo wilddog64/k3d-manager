@@ -95,7 +95,7 @@ must:
   M2: a change to a non-test file runs the existing tests that name that file's path or basename, and only those plus the static set and touched tests
   M3: land refuses a task whose worktree fails the fast gate, even when its --test command passes
   M4: the gate prints PASS/FAIL/SKIP with seconds for each check and a total, and exits non-zero on any FAIL
-  M5: on the v1.43.12 merge diff the gate finishes in under 60 s on the M4
+  M5: on the v1.43.12 merge diff on the M4 the gate finishes within 30 s of its slowest selected suite run alone, and prints that suite as `SLOWEST <file> <n>s` (correction, Claude 2026-10-31: the first draft said under 60 s, but codex_dispatch.bats alone takes 186 s serially, 88 tests with 69 one-second sleeps, so no gate can meet it on that diff)
 must_not:
   N1: a missing tool (shellcheck, yamllint, pytest) is never a silent pass; it prints SKIP with the tool name
   N2: K3DM_SKIP_FAST_GATE=1 skips the gate only with a printed notice; without it the gate always runs, including under land --no-test
@@ -130,8 +130,8 @@ evidence:
     proves: [M5]
     kind: live
     intent: >-
-      You will see `make fast-gate` on the M4 against the v1.43.12 merge base finish under 60 s with a per-check
-      table. It failed if it takes longer or skips a check without saying so.
+      You will see `make fast-gate` on the M4 against the v1.43.12 merge base finish within 30 s of the SLOWEST line
+      it prints, with a per-check table. It failed if it takes longer or skips a check without saying so.
     what: Claude runs make fast-gate BASE=<v1.43.12 merge base> on the M4 and records the output
 interface:
   - scripts/ci/fast_gate.sh [BASE]
