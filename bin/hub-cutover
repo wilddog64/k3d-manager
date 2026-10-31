@@ -163,7 +163,8 @@ handoff() {
 
 verify_cutover() {
   local label output count frontend_code webhook_code
-  kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret cluster-ubuntu-hostinger -l k3d-manager/role=app-cluster -o name | grep -Fxq secret/cluster-ubuntu-hostinger || return 1
+  output="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret -l k3d-manager/role=app-cluster -o name)" || return 1
+  grep -Fxq secret/cluster-ubuntu-hostinger <<<"$output" || return 1
   kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
   [[ "$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" == 0 ]] || return 1
   make webhook-doctor || return 1

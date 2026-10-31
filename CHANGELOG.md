@@ -30,6 +30,11 @@
   `BatchMode=yes` and `ClearAllForwardings=yes`, and the cutover and rollback refuse up front when
   key login fails: the first M5 dry run prompted for the M4 password on each call and inherited a
   global `RemoteForward` that failed on every connection.
+- **`hub-cutover` verify no longer asks kubectl for a Secret by name and label at once.** kubectl refuses
+  that (`name cannot be provided when a selector is specified`), so on the first real cutover every
+  verify attempt failed and the run told the operator to roll back a handoff that had worked. It now
+  lists the `app-cluster` registrations and looks for `cluster-ubuntu-hostinger` among them. The test
+  stub now refuses the same combination, with the real error, so the suite goes red on the old call.
 - **The hub copy lists now carry the hub-data export key and the platform-ops PATs.** `files.hub.list`
   adds `~/.ssh/k3dm-hub-data-write` (and `.pub`) and the `~/.ssh/config.d/operator` fragment that defines
   the `github-k3dm-hub-data` alias; `secrets.hub.list` adds `platform-ops-app-rebuild` and

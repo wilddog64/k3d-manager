@@ -68,7 +68,9 @@ case "$*" in
   *'get statefulset'*) echo 0 ;;
   *'get pods'*) [[ "${STUB_NEW_POD:-0}" == 0 ]] || echo pod/controller ;;
   *'get application'*) [[ "${STUB_BAD_ESO:-0}" == 0 ]] || exit 1; echo '{"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}' ;;
-  *'get secret'*) [[ "${STUB_NO_REGISTRATION:-0}" == 0 ]] || exit 1; echo secret/cluster-ubuntu-hostinger ;;
+  # Real kubectl, M5 hub 2026-10-30 hub-cutover verify: a name together with -l is refused.
+  *'get secret '[a-z]*' -l '*) echo 'error: name cannot be provided when a selector is specified' >&2; exit 1 ;;
+  *'get secret'*) [[ "${STUB_NO_REGISTRATION:-0}" == 0 ]] || { echo secret/ubuntu-k3s-app-cluster; exit 0; }; printf '%s\n' secret/cluster-ubuntu-hostinger secret/ubuntu-k3s-app-cluster ;;
 esac
 STUB
   cat > "$WORK/stub/scp" <<'STUB'
