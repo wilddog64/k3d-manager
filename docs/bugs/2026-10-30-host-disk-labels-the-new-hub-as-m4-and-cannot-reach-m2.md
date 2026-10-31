@@ -99,3 +99,15 @@ paired with a check that `local` is present.
 
 - Do not read or copy ssh private keys, and do not touch `known_hosts` or `authorized_keys`.
 - Do not create a PR, skip hooks, commit to `main`, or modify files outside the list above.
+
+## Manual repair on the M5 (2026-10-30, operator)
+
+The Include line alone was not enough. The M5 also had no `m2-air.local` host key, and the M2 did not
+accept the M5's key. The operator fixed this by hand:
+- added the Include line;
+- ran `ssh-keyscan -t ed25519 m2-air.local` and appended the key after its fingerprint matched the M4's (`SHA256:sz6QWFAYNJmjbckthD8zfXl5OQfXjorVzAVscjrNkjs`);
+- ran `ssh-copy-id -i ~/.ssh/id_ed25519.pub m2jump`.
+
+`m2jump` now answers in batch mode. Hostinger needed the same two trust steps during the cutover. Copying
+`known_hosts` entries and authorizing the new hub's key on every fleet host stays an operator step, and is
+out of scope for this fix (see What NOT to do). Track it as a `hub-new` checklist item.
