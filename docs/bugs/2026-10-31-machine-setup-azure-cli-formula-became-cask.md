@@ -1,6 +1,6 @@
 # Bug: machine setup reports azure-cli missing on the M5, because Homebrew installed it as a cask
 
-**Status:** OPEN
+**Status:** FIXED (`9766a7b6`, Codex; Claude review, independent verifier, live E2 2026-10-31)
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("go ahead")
 **Filed:** 2026-10-31
@@ -73,3 +73,18 @@ interface:
   - bin/k3dm-machine-setup --role hub|worker|console --check
   - scripts/etc/machine/brew.<role>.list
 ```
+
+## Verification (Claude, 2026-10-31)
+
+- E1: Codex's two BATS tests, mutation-checked on a scratch copy. The accept-either test fails on the pre-fix script;
+  the strict-prefix test fails when the `"$raw" != *:*` guard is removed. An independent verifier, given only the
+  Acceptance block, wrote 9 tests: its M1 tests fail on pre-fix and all 9 pass on the fix. N1/N2 cannot go red on the
+  pre-fix script (it was already strict); they are regression guards.
+- E2: `bin/k3dm-machine-setup --role hub --check` from `HEAD` reports `brew:azure-cli ok` on the M4 (formula) and the
+  M5 (cask; 86/86 `brew:` lines ok). Both exit 1 only on other lines (heartbeat agent by design; M4 python-tools,
+  state-direnvrc, one https remote).
+- Brew exit codes behind the stubs, captured 2026-10-31: M5 `brew list --formula azure-cli` 1, `--cask` 0; M4 0 and 1.
+- No other unprefixed manifest entry is a cask on the M4 (Codex) or the M5 (all 86 ok).
+- Found on the way, not part of this fix: the M5's interactive login shell had no Homebrew on PATH at E2 time (the M4's
+  does; same `/etc/paths.d/homebrew`), so the E2 run on the M5 put brew on PATH with `brew shellenv`. `my_func.zsh:25`
+  also fails `zsh -n` on both Macs, and `--check-shell` does not match `parse error` or `unmatched`.
