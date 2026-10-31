@@ -2090,3 +2090,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-31: SPEC v1.43.13 plan 4/5 docs/plans/v1.43.13-fleet-host-cpu-memory-alerts.md (operator request; dispatch go pending; dispatch after v1.43.13 cut). Captures m2/m4/m5 13:41-13:42Z in spec.
 - 2026-10-31: operator GO to dispatch v1.43.13-fleet-host-cpu-memory-alerts to Luna once k3d-manager-v1.43.13 is cut (after v1.43.12 merges).
 - 2026-10-31: host-disk P2 FIXED — live E3 on M5 (m5 822 GiB, m4 173 GiB, m2, hostinger all probe 1). Handoff written.
+- 2026-10-31: Host Disk stat tiles pinned to one row (`f0a9cc8e`, orientation vertical; pin test updated, red without the change); hub-grafana-dashboards synced to f0a9cc8e on M5.

@@ -1751,7 +1751,7 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - **Changed files:** bin/launchd-reload (new), bin/hub-new, bin/hub-cutover, Makefile, 3 BATS + 2 new BATS, docs/howto/m5-hub-migration.md, docs/howto/hub-rebuild-from-gitops-vault.md, CHANGELOG.md.
 - **Open questions:** none blocking.
 - **Next, in order:** (1) dispatch docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md to Luna (recommended next objective); (2) read-only check of the Hermes vectordb fill on M5; (3) flip docs/bugs 2026-10-30 hub-cutover (old-hub producers on old Pushgateway) to FIXED, live-verified 2026-10-31; (4) hub-new checklist item for known_hosts/authorized_keys; (5) operator: cloudflared on M5 2026.10.6 -> 2026.10.7; (6) stop the M4 cluster only after M5 runs clean a while; (7) v1.43.13 plans (3/5) after v1.43.12 merges and the branch is cut.
-- **Verification status:** complete, offline and live.
+- **Verification status:** complete, offline and live. Follow-up `f0a9cc8e`: Host Disk tiles in one row (m5 no longer wraps), synced on M5.
 - 2026-10-31: AGENTS.md + GEMINI.md: newest Handoff section is the resume point after /clear; its Next list is Claude's queue, not a work order. Claude memory feedback_resume_from_handoff_after_clear.
 - 2026-10-31: DISPATCHED P2 host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2 to Luna (operator go; task branch task/v1.43.12/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2; PRIMARY_COORDINATOR=anthropic/claude-opus-5-5). Hold operator make commands until reviewed + landed. Meanwhile Claude does handoff Next items 2-4 (read-only/doc-only).
 - 2026-10-31: hub-cutover old-hub-producers P2 flipped to FIXED (8765c128 + 2d68e533; E4 live 2026-10-31).
@@ -1769,5 +1769,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - **Changed files:** bin/k3dm-disk-metrics, bin/k3dm-machine-setup, 2 tests, Host Disk guide, machine-setup how-to, CHANGELOG (Luna); docs/howto/m5-hub-migration.md, docs/roadmap.md, the new plan, 2 bug docs (Claude).
 - **Open questions:** none blocking. Watch `fseventsd` on the M4: if it regrows to GBs within a day, find the churning tree (Luna worktrees suspected).
 - **Next, in order:** (1) re-read VectorDB recall@5 after ~01:45Z 11-01 (expect >= floors bugs .81, issues .66, plans/retro .80); (2) operator: cloudflared on M5 2026.10.6 -> 2026.10.7; (3) v1.43.12 release prep + PR (CLAUDE.md gates); (4) after merge: cut v1.43.13, dispatch fleet-host-cpu-memory-alerts to Luna (go given); (5) M4 cleanup after the 7-day window (machine-setup ROLE=worker, remove hub plists).
-- **Verification status:** complete, offline and live.
+- **Verification status:** complete, offline and live. Follow-up `f0a9cc8e`: Host Disk tiles in one row (m5 no longer wraps), synced on M5.
 
