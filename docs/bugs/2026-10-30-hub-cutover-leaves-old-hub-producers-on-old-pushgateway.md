@@ -1,6 +1,6 @@
 # Bug: hub-cutover leaves producers on the old hub pushing to the old hub's Pushgateway and Loki
 
-**Status:** OPEN
+**Status:** FIXED
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("can you dispatch code fix hub-cutover should move metrics forwarding on its own and fix the make platform-ops outdate message?")
 **Filed:** 2026-10-30
@@ -120,3 +120,9 @@ captures named above: `OK` from Pushgateway `/-/ready`, `OK` from loki-gateway `
 - Do not make the new hub's forwards listen beyond loopback, and do not expose the Pushgateway or Loki on the LAN.
 - Do not change producer URLs (`localhost:19094`, `localhost:19100`).
 - Do not create a PR, skip hooks, commit to `main`, or modify files outside the list above.
+
+## Resolution (2026-10-31)
+
+- **Fix:** `8765c128` (re-point old-hub push forwards to the new hub; Luna, with Claude's `forwards_ready` readiness retry), followed by the reload-race fix in `2d68e533` (`docs/bugs/2026-10-31-hub-port-forward-reload-race-and-hub-migrate-entrypoint.md`).
+- **E1–E3 (offline):** `scripts/tests/bin/hub_cutover.bats` 31/31 green at landing, shellcheck clean; the readiness and reload tests were red on the earlier script.
+- **E4 (live, 2026-10-31):** after the operator ran `make hub-cutover-forwards`, the M5 Pushgateway held 112 `k3dm-dispatch` series naming a task slug that only exists on the M4. A fresh M4 push at 12:11:45Z landed on the M5 while the M4 Pushgateway stayed at 11:39:30Z. The only listener on M4 :19094 is the tunnel ssh to `m5-air.local`.
