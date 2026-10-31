@@ -3,3 +3,6 @@
 # The tunnel credentials name must match credentials-file in scripts/etc/cloudflared/config.yml.
 .cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json
 .cloudflared/cert.pem
+.ssh/k3dm-hub-data-write
+.ssh/k3dm-hub-data-write.pub
+.ssh/config.d/operator

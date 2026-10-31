@@ -792,3 +792,11 @@ SH
   grep -Fqx ".cloudflared/${creds##*/}" "$MACHINE_DIR/files.hub.list"
   grep -Fqx '.cloudflared/cert.pem' "$MACHINE_DIR/files.hub.list"
 }
+
+@test "files and secrets: the hub manifests carry what the hub-data export and platform-ops need" {
+  grep -Fqx '.ssh/k3dm-hub-data-write' "$MACHINE_DIR/files.hub.list"
+  grep -Fqx '.ssh/k3dm-hub-data-write.pub' "$MACHINE_DIR/files.hub.list"
+  grep -Fqx '.ssh/config.d/operator' "$MACHINE_DIR/files.hub.list"
+  grep -q '^platform-ops-app-rebuild|k3dm|' "$MACHINE_DIR/secrets.hub.list"
+  grep -q '^platform-ops-git-writer|k3dm|' "$MACHINE_DIR/secrets.hub.list"
+}

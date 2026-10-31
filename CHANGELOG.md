@@ -30,6 +30,11 @@
   `BatchMode=yes` and `ClearAllForwardings=yes`, and the cutover and rollback refuse up front when
   key login fails: the first M5 dry run prompted for the M4 password on each call and inherited a
   global `RemoteForward` that failed on every connection.
+- **The hub copy lists now carry the hub-data export key and the platform-ops PATs.** `files.hub.list`
+  adds `~/.ssh/k3dm-hub-data-write` (and `.pub`) and the `~/.ssh/config.d/operator` fragment that defines
+  the `github-k3dm-hub-data` alias; `secrets.hub.list` adds `platform-ops-app-rebuild` and
+  `platform-ops-git-writer`. The M5 had none of them, so after cutover the `hub-data-export` agent could
+  not push and `make platform-ops` could not create the two `platform-ops` Secrets the M4 runs with.
 
 - **`make hub-new` runs the hub reconcile after the data restore, not before it.** The reconcile ran
   inside `hub-restore`, two stages before `data` restores the Vault PVC from the old hub. On the M5
