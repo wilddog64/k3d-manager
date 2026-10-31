@@ -88,5 +88,5 @@ STUB
   grep -q '/caches/1$' "${CALLS}.urls"
   grep -q '/caches/101$' "${CALLS}.urls"
   tail -1 "${CALLS}.urls" | grep -q '/dispatches$'
-  ! grep -q 'secret-token' "${CALLS}.argv"
+  run ! grep -q 'secret-token' "${CALLS}.argv"
 }
