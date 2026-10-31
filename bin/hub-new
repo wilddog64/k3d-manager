@@ -138,7 +138,7 @@ for line in sys.stdin:
   if m:
    try: events.append(datetime.datetime.fromisoformat(m.group(1).replace("Z","+00:00")))
    except ValueError: pass
-print(len(events), int((events[-1]-events[-6]).total_seconds()) if len(events)>=6 else 0)')
+print(len(events), int((events[-1]-events[0]).total_seconds()) if len(events)>=6 else 0)')
   if (( count < 6 || elapsed < 1800 )); then
     retry_at="$(python3 -c 'import datetime,sys; print((datetime.datetime.now()+datetime.timedelta(seconds=max(0,1800-int(sys.argv[1])))).strftime("%H:%M"))' "$elapsed")"
     fail "Kine: ${count} of 6 compaction cycles over 30 minutes; rerun make hub-new after ${retry_at}" 'wait for six compaction cycles spanning 30 minutes, then rerun make hub-new'

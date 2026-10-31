@@ -28,6 +28,11 @@
   `~/.cloudflared/config.yml` and the Cloudflare tunnel installer skips (writing no plist) without it.
   Stage order: `preflight machine-setup secrets-present hub-up hub-restore data reconcile
   prepare-singletons platform verify`.
+- **hub-new's verify stage measures the Kine compaction window from the first logged cycle.** It
+  required the last six `COMPACT deleted` lines to span 30 minutes, but Kine compacts every five
+  minutes, so six cycles span 25 minutes and the gate could never pass (the M5 failed it with 24
+  cycles logged). It now needs at least six cycles and 30 minutes from the first to the last. The
+  test fixture's invented ten-minute gaps were replaced by lines captured from the M5's server.
 - **The hub reconcile skips the Hostinger CVE reader seed when the app context is missing, instead of
   exiting.** `_hub_recovery_seed_app_cluster_reader` guarded the seed with `if ! _kubectl -- --context
   ubuntu-hostinger get namespace platform`, but `_kubectl` exits the process on a failed call unless it

@@ -50,14 +50,24 @@ case "$(basename "$0")" in
       logs)
         if [[ "${STUB_KINE:-good}" == few ]]; then
           printf '%s\n' 'time="2026-10-30T08:00:00Z" level=info msg="COMPACT deleted 10 rows"'
-        else
+        elif [[ "${STUB_KINE:-good}" == short ]]; then
           printf '%s\n' \
-            'time="2026-10-30T08:00:00Z" level=info msg="COMPACT deleted 10 rows"' \
-            'time="2026-10-30T08:05:00Z" level=info msg="COMPACT deleted 10 rows"' \
-            'time="2026-10-30T08:10:00Z" level=info msg="COMPACT deleted 10 rows"' \
-            'time="2026-10-30T08:15:00Z" level=info msg="COMPACT deleted 10 rows"' \
-            'time="2026-10-30T08:25:00Z" level=info msg="COMPACT deleted 10 rows"' \
-            'time="2026-10-30T08:35:00Z" level=info msg="COMPACT deleted 10 rows"'
+            'time="2026-10-31T00:03:48Z" level=info msg="COMPACT deleted 520 rows from 520 revisions in 41.171018ms - compacted to 23183/24183"' \
+            'time="2026-10-31T00:08:48Z" level=info msg="COMPACT deleted 433 rows from 433 revisions in 39.153384ms - compacted to 23616/24616"' \
+            'time="2026-10-31T00:13:48Z" level=info msg="COMPACT deleted 511 rows from 511 revisions in 46.330374ms - compacted to 24127/25127"' \
+            'time="2026-10-31T00:18:48Z" level=info msg="COMPACT deleted 496 rows from 490 revisions in 11.032966ms - compacted to 24617/25617"' \
+            'time="2026-10-31T00:23:48Z" level=info msg="COMPACT deleted 588 rows from 537 revisions in 12.636181ms - compacted to 25154/26154"' \
+            'time="2026-10-31T00:28:48Z" level=info msg="COMPACT deleted 715 rows from 665 revisions in 13.376893ms - compacted to 25819/26819"'
+        else
+          # Captured read-only from m5-air.local, docker logs k3d-k3d-cluster-server-0, 2026-10-31.
+          printf '%s\n' \
+            'time="2026-10-31T00:03:48Z" level=info msg="COMPACT deleted 520 rows from 520 revisions in 41.171018ms - compacted to 23183/24183"' \
+            'time="2026-10-31T00:08:48Z" level=info msg="COMPACT deleted 433 rows from 433 revisions in 39.153384ms - compacted to 23616/24616"' \
+            'time="2026-10-31T00:13:48Z" level=info msg="COMPACT deleted 511 rows from 511 revisions in 46.330374ms - compacted to 24127/25127"' \
+            'time="2026-10-31T00:18:48Z" level=info msg="COMPACT deleted 496 rows from 490 revisions in 11.032966ms - compacted to 24617/25617"' \
+            'time="2026-10-31T00:23:48Z" level=info msg="COMPACT deleted 588 rows from 537 revisions in 12.636181ms - compacted to 25154/26154"' \
+            'time="2026-10-31T00:28:48Z" level=info msg="COMPACT deleted 715 rows from 665 revisions in 13.376893ms - compacted to 25819/26819"' \
+            'time="2026-10-31T00:33:48Z" level=info msg="COMPACT deleted 594 rows from 602 revisions in 60.554062ms - compacted to 26421/27421"'
           [[ "${STUB_KINE:-good}" != error ]] || echo 'time="2026-10-30T08:36:00Z" level=error msg="Compact failed: failed to record compact revision: sql: transaction has already been committed or rolled back"'
         fi ;;
       exec) echo 4096 ;;
@@ -127,7 +137,7 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ "$status" -eq 0 ]
   [ "$(grep -oE '^\[hub-new\] [a-z-]+: PASS' <<<"$output" | awk '{print $2}' | tr -d : | paste -sd' ' -)" = \
     'preflight machine-setup secrets-present hub-up hub-restore data reconcile prepare-singletons platform verify' ]
-  jq -e '.status == "pass" and ([.stages[].stage] | length) == 10 and .checks.kine_compaction_cycles == 6 and .checks.kine_datastore_bytes == "4096"' \
+  jq -e '.status == "pass" and ([.stages[].stage] | length) == 10 and .checks.kine_compaction_cycles == 7 and .checks.kine_datastore_bytes == "4096"' \
     "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
   grep -q '^make machine-setup ROLE=hub FROM=m4-air.local SECRETS=skip AGENTS=skip ' "$CALLS"
   grep -q '^hub-up ' "$CALLS"
@@ -354,6 +364,20 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   run "$HUB_NEW_BIN"
   [ "$status" -ne 0 ]
   [[ "$output" == *'Kine: 1 of 6 compaction cycles over 30 minutes; rerun make hub-new after'* ]]
+}
+
+@test "M3: verify fails when six compaction cycles span less than 30 minutes" {
+  export HUB_NEW_FROM=verify STUB_KINE=short
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Kine: 6 of 6 compaction cycles over 30 minutes; rerun make hub-new after'* ]]
+}
+
+@test "M3: verify passes on seven real five-minute compaction cycles spanning 30 minutes" {
+  export HUB_NEW_FROM=verify
+  run "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  jq -e '.checks.kine_compaction_cycles == 7' "$HUB_NEW_STATE_DIR/hub-new-report.json" >/dev/null
 }
 
 @test "M3: verify fails when a singleton is loaded" {
