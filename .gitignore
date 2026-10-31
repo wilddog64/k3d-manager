@@ -2,6 +2,7 @@ storage/
 scratch/
 .claude/*
 !.claude/settings.json
+!.claude/hooks/
 .envrc
 node_modules/
 bin/.ask-sandbox/
