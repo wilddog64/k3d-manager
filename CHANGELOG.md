@@ -24,6 +24,8 @@ M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1
 
 ### Fixed
 
+- The nightly CVE rebuild could not pick up fixed packages: every app build uses the GitHub Actions buildkit cache, so a dispatched rebuild with unchanged sources replayed the old `pip install`, `apt-get upgrade` and base layers and produced an image as vulnerable as the last one. `app-cve-scan` now deletes the service repo's `buildkit-blob-*` and `index-buildkit-*` cache entries before it dispatches a rebuild, keeping trivy and other caches; a failed delete only warns. A new alert, `CriticalCVEFixAvailableNotRemediated`, fires when a fixable CRITICAL CVE on a `wilddog64/` image stays open for two days, across digest changes, so a stuck rebuild loop is no longer visible only as an empty dashboard panel.
+
 - **Agent Cost: Claude cost per verified spec counts only real closes.** The verified-specs counter no longer counts a status backfill on an existing doc or a closed-to-closed status edit. Each counted doc carries a level label (live, verified, unverified), a cost-per-live-verified panel was added, and the per-spec panels aggregate Claude cost by window so they agree. (`docs/bugs/2026-10-29-claude-verified-specs-counts-status-backfill.md`)
 - Port-forward installs wait for launchd to unload and protect cutover tunnels; `make hub-migrate HUB_OLD_HOST=<old>` combines the migration stages and records the old hub.
 

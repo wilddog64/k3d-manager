@@ -57,3 +57,36 @@ setup() {
   [ "${status}" -eq 0 ]
   grep -Eq '(^| )--timeout=42s( |$)' "${CALLS}"
 }
+
+@test "app_cve_scan: clears only build caches across pages before dispatch, even on delete failure" {
+  sed '/^# === MAIN ===/,$d' "${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan.sh" >"${BATS_TEST_TMPDIR}/scan.sh"
+  cat >"${BATS_TEST_TMPDIR}/curl" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >>"${CALLS}.argv"
+for arg do config="$arg"; done
+python3 -c 'import os, sys; sys.exit((os.stat(sys.argv[1]).st_mode & 0o777) != 0o600)' "$config" || exit 7
+url=$(sed -n 's/^url = "\(.*\)"/\1/p' "$config")
+printf '%s\n' "$url" >>"${CALLS}.urls"
+# Key shapes captured from GET repos/wilddog64/shopping-cart-product-catalog/actions/caches (m4-air, 2026-10-31):
+# buildkit-blob-1-sha256:<hex>, index-buildkit-1-f921bd05#N, cache-trivy-<date>, trivy-binary-v0.69.3-Linux-X64.
+case "$url" in
+  *'page=1') jq -n '{actions_caches: ([{"id":1,"key":"buildkit-blob-1-sha256:0b6f1c9e2d4a"},{"id":2,"key":"cache-trivy-2026-10-31"}] + [range(3;101) | {id: ., key: "trivy-binary-v0.69.3-Linux-X64"}])}' ;;
+  *'page=2') printf '%s\n' '{"actions_caches":[{"id":101,"key":"index-buildkit-1-f921bd05#1"},{"id":102,"key":"cache-trivy-2026-10-30"}]}' ;;
+  */caches/1) exit 22 ;;
+  */caches/101|*/dispatches) exit 0 ;;
+  *) exit 8 ;;
+esac
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/curl"
+  export GH_TOKEN='secret-token' GH_OWNER=wilddog64
+  run sh -c '. "$1"; _CURL_BIN="$2"; _dispatch_rebuild shopping-cart-product-catalog ci.yaml' sh "${BATS_TEST_TMPDIR}/scan.sh" "${BATS_TEST_TMPDIR}/curl"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  [[ "$output" == *'warning: could not delete build cache 1'* ]]
+  [[ "$output" == *'cleared 1 build cache entries'* ]]
+  [ "$(wc -l <"${CALLS}.urls" | tr -d ' ')" -eq 5 ]
+  grep -q 'page=2' "${CALLS}.urls"
+  grep -q '/caches/1$' "${CALLS}.urls"
+  grep -q '/caches/101$' "${CALLS}.urls"
+  tail -1 "${CALLS}.urls" | grep -q '/dispatches$'
+  ! grep -q 'secret-token' "${CALLS}.argv"
+}
