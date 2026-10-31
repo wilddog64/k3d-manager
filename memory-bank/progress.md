@@ -2068,4 +2068,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-30: M5 Step 5 reconcile: signing `_err` exit contained (`42a4418d`); missing-app-context `_kubectl` probes get `--no-exit`.
 - 2026-10-30: M5 hub-new hub-reconcile fixes: signing restore subshell `42a4418d`, app-context `--no-exit` `38eb8b79`, reconcile moved to its own `reconcile` stage after `data` with local Keycloak/ArgoCD URLs (this commit); awaiting rerun.
 - 2026-10-30: M5 hub-new stage order — `prepare-singletons` moved after `reconcile` (Cloudflare config must exist before the tunnel plist); awaiting rerun.
-- 2026-10-31: M5 hub-new verify — Kine compaction gate could never pass at the real 5-minute cadence; window now spans from the first cycle. data/reconcile/prepare-singletons/platform PASS on the M5; awaiting the verify rerun.
+- 2026-10-31: M5 hub-new verify — Kine compaction gate could never pass at the real 5-minute cadence; window now spans from the first cycle. data/reconcile/prepare-singletons/platform PASS on the M5; verify PASS 2026-10-31; cutover blocked on Hostinger registration handoff + argocd-oidc-secret (see activeContext).
