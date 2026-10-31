@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.43.12] - 2026-10-31
+
+M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1.43.10 plans themselves are not implemented and stay queued.
+
 - Label the local Host Disk target from the Mac hostname, probe the other fleet Macs, and load the copied operator SSH configuration during machine setup.
 
 - Re-point old-hub Pushgateway and Loki forwards during cutover, with standalone retry and rollback restoration; correct the platform-ops schedule message.
@@ -20,6 +24,7 @@
 
 ### Fixed
 
+- **Agent Cost: Claude cost per verified spec counts only real closes.** The verified-specs counter no longer counts a status backfill on an existing doc or a closed-to-closed status edit. Each counted doc carries a level label (live, verified, unverified), a cost-per-live-verified panel was added, and the per-spec panels aggregate Claude cost by window so they agree. (`docs/bugs/2026-10-29-claude-verified-specs-counts-status-backfill.md`)
 - Port-forward installs wait for launchd to unload and protect cutover tunnels; `make hub-migrate HUB_OLD_HOST=<old>` combines the migration stages and records the old hub.
 
 - **Bugs dashboard: "Open by priority over time" no longer looks like lost data.** Hub Prometheus keeps
