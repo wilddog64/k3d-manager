@@ -1726,3 +1726,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-30: added `.claude/hooks/remind-clear-after-land.sh` (PostToolUse Bash) — after `make codex-land`, prompts a 6-field handoff + `/clear` once the objective is live-verified. D3 in the v1.43.13 plan reworded to one session per objective.
 - 2026-10-30: v1.43.13 plan gained turns lever — `k3dm_claude_turns_per_active_day` + C2 panel 5 (turns/active day, turns per verified spec); M6, N6 added.
 - 2026-10-30: Bugs dashboard "Open by priority over time" pinned to 3d (Prometheus retention 3d on both hubs; no cutover data loss). Follow-up candidate: git-derived bug history for a 30-day trend (v1.43.13 bug, not filed yet).
+- 2026-10-30: v1.43.13 plan 3 written — `docs/plans/v1.43.13-bug-open-history-from-git.md` (30-day open-bug history from git; dispatch after v1.43.13 branch cut). v1.43.13 at 3/5.

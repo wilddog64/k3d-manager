@@ -479,6 +479,8 @@ It adds per-turn context size, the post-compaction floor, the observed ceiling, 
 Agent Cost dashboard. Its findings: the 400K auto-compact trial was inert (the observed ceiling was 168K both before and after),
 and the roughly 95–100K floor is the main cost lever.
 
+**v1.43.13 plan 3:** [`bug-open-history-from-git`](plans/v1.43.13-bug-open-history-from-git.md) (operator, 2026-10-30): a 30-day open-bugs-by-priority trend computed from git (last commit of each UTC day), published as one Pushgateway group so Prometheus's 3-day retention no longer limits it. The transition ledger stays deferred. v1.43.13 is at 3 of 5 plans.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
