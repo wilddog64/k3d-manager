@@ -26,7 +26,18 @@ PYCODE
   printf '{"status":"pass","timestamp":"%s","stages":[],"checks":{}}\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$HUB_NEW_STATE_DIR/hub-new-report.json"
   cat > "$WORK/stub/launchctl" <<'STUB'
 #!/usr/bin/env bash
-if [[ "$HOME" == "$OLD_HOME" ]]; then printf 'remote-launchctl %s\n' "$*" >> "$CALLS"; exit 0; fi
+if [[ "$HOME" == "$OLD_HOME" ]]; then
+  printf 'remote-launchctl %s\n' "$*" >> "$CALLS"
+  # Exit codes captured on m4-air 2026-10-31T11:57Z for an unloaded label: bootout 3, print 113.
+  linger="$CALLS.linger"
+  case "$1" in
+    bootout) [[ "${STUB_REMOTE_NOT_LOADED:-0}" == 0 ]] || { echo 'Boot-out failed: 3: No such process' >&2; exit 3; }
+      echo "${STUB_REMOTE_LINGER:-0}" > "$linger" ;;
+    print) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n > 0 )) || exit 113; echo $((n - 1)) > "$linger" ;;
+    bootstrap) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n == 0 )) || { echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5; } ;;
+  esac
+  exit 0
+fi
 printf 'launchctl %s\n' "$*" >> "$CALLS"
 label="${*: -1}"
 label="${label##*/}"
@@ -445,6 +456,22 @@ PYCODE
   [ "$status" -eq 0 ]
   grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
   [ "$(cat "$CALLS.forward-probes")" -gt 3 ]
+}
+
+@test "forwards: waits for a lingering job to unload before bootstrapping it" {
+  export STUB_REMOTE_LINGER=2
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$(grep -c '^remote-launchctl print' "$CALLS")" -ge 3 ]
+}
+
+@test "forwards: a forward that is not loaded is still installed" {
+  export STUB_REMOTE_NOT_LOADED=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$(grep -c '^remote-launchctl bootstrap' "$CALLS")" -ge 2 ]
 }
 
 @test "forwards: standalone gate, confirmation, retry and backup preservation" {
