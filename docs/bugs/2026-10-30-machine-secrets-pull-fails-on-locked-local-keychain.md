@@ -1,6 +1,8 @@
 # Bug: secrets pull fails on a locked local keychain, and setup has no way to skip secret prompts
 
-**Status:** FIXED — `67391f97` (Luna, amended by Claude); E3 passed live on the M5 2026-10-30
+**Status:** LIVE-VERIFIED 2026-10-30 — `67391f97` (Luna, amended by Claude); E3 live on the M5 at `deef0217`: 15 records copied, every secret ok, no prompt
+**Fix commit:** 67391f97
+**Live evidence:** 2026-10-30 · run machine-setup-role-hub-from-m4 · env m5-air · scenario secrets-pull-with-unlocked-local-keychain · commit deef0217 · proves E3
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead", after the M5 pull run)
 **Filed:** 2026-10-30

@@ -1,11 +1,12 @@
 # Bug: hub port-forward installs race launchd, can undo a cutover, and a migration needs two targets with a stale old-host default
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED 2026-10-31 — `2d68e533`; E5 live on the M4 (install refused, tunnel kept) and E4 live on the M5 13:20:38Z (reload without error 5, 19094 accepts)
+**Live evidence:** 2026-10-31 · run install-hub-pushgateway-port-forward-1320z · env m5-air · scenario hub-forward-reload-without-bootstrap-race · commit 5431d452 · proves E4
 **Priority:** P2
 **Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's five-item proposal (hub-migrate, required old host, Makefile reload race, cutover-forward guard, docs)
 **Filed:** 2026-10-31
 **Fix commit:** `2d68e533`
-**Live evidence:** E5 2026-10-31 on m4-air (install refused, tunnel plist sha256 e0c1adafa3aef145 unchanged, tunnel ssh pid 26255 still on 19094); E4 2026-10-31T13:20:38Z on m5-air (reload without error 5, state = running, kubectl pid 36874 listening, 19094 accepts)
+**Live note:** E5 2026-10-31 on m4-air (install refused, tunnel plist sha256 e0c1adafa3aef145 unchanged, tunnel ssh pid 26255 still on 19094); E4 2026-10-31T13:20:38Z on m5-air (reload without error 5, state = running, kubectl pid 36874 listening, 19094 accepts)
 **Detected by:** Claude, after the live `Bootstrap failed: 5` in `make hub-cutover-forwards` (fixed in `bin/hub-cutover` by `ee9cedc5`)
 **Affected:** `Makefile` (`install-*-port-forward`, new `hub-migrate`); `bin/hub-new`; `bin/hub-cutover`; docs
 **Branch:** `k3d-manager-v1.43.12`

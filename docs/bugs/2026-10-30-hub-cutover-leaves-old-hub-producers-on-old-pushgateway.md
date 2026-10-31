@@ -1,6 +1,8 @@
 # Bug: hub-cutover leaves producers on the old hub pushing to the old hub's Pushgateway and Loki
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED 2026-10-31 — `8765c128` (then `2d68e533`); E4 live: after make hub-cutover-forwards, an M4 push at 12:11:45Z landed on the M5 Pushgateway
+**Fix commit:** 8765c128
+**Live evidence:** 2026-10-31 · run hub-cutover-forwards-1211z · env m4-air-to-m5-air · scenario old-hub-producer-push-lands-on-new-pushgateway · commit 1714bcef · proves E4
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("can you dispatch code fix hub-cutover should move metrics forwarding on its own and fix the make platform-ops outdate message?")
 **Filed:** 2026-10-30

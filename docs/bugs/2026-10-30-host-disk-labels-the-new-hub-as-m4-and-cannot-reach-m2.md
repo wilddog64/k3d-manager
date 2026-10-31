@@ -1,6 +1,8 @@
 # Bug: Host Disk dashboard labels the new hub's disk as "m4" and shows m2 down after the cutover
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED 2026-10-31 — `1708c97a` (Luna); E3 live on the M5 at `4f409ba6`: probe_success 1 for m5 (822 GiB), m4 (173 GiB), m2 and hostinger
+**Fix commit:** 1708c97a
+**Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30

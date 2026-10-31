@@ -1,6 +1,8 @@
 # Bug: machine setup installs live-hub agents on a new Mac before cut-over, and misses two Hermes credentials
 
-**Status:** FIXED — `30d1aab6` (Luna, amended by Claude); E2 passed live on the M5 2026-10-30
+**Status:** LIVE-VERIFIED 2026-10-30 — `30d1aab6` (Luna, amended by Claude); E2 live on the M5 at `9e59379c`: secrets ok, no agent installed with AGENTS=skip
+**Fix commit:** 30d1aab6
+**Live evidence:** 2026-10-30 · run machine-setup-role-hub-agents-skip · env m5-air · scenario hub-agents-not-installed-before-cutover · commit 9e59379c · proves E2
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("go ahead to file a bug and dispatch to Luna")
 **Filed:** 2026-10-30
