@@ -34,6 +34,7 @@ Before touching any file, read both:
 - `memory-bank/progress.md` — what is complete, what is pending
 
 These contain decisions already made. Do not re-derive them from scratch.
+The newest `## Handoff — <date> <objective>` section in `memory-bank/activeContext.md` is the resume point after a context reset (`/clear`): its objective, evidence, decisions and verification status are settled. Its `Next, in order` list is Claude's planning queue, not a work order; act only on the task you were dispatched or assigned.
 
 ### 2. Verify your machine
 First command of every session:

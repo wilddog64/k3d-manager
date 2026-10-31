@@ -1752,3 +1752,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - **Open questions:** none blocking.
 - **Next, in order:** (1) dispatch docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md to Luna (recommended next objective); (2) read-only check of the Hermes vectordb fill on M5; (3) flip docs/bugs 2026-10-30 hub-cutover (old-hub producers on old Pushgateway) to FIXED, live-verified 2026-10-31; (4) hub-new checklist item for known_hosts/authorized_keys; (5) operator: cloudflared on M5 2026.10.6 -> 2026.10.7; (6) stop the M4 cluster only after M5 runs clean a while; (7) v1.43.13 plans (3/5) after v1.43.12 merges and the branch is cut.
 - **Verification status:** complete, offline and live.
+- 2026-10-31: AGENTS.md + GEMINI.md: newest Handoff section is the resume point after /clear; its Next list is Claude's queue, not a work order. Claude memory feedback_resume_from_handoff_after_clear.
