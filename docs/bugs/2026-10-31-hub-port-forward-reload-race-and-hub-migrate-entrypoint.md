@@ -7,7 +7,7 @@
 **Detected by:** Claude, after the live `Bootstrap failed: 5` in `make hub-cutover-forwards` (fixed in `bin/hub-cutover` by `ee9cedc5`)
 **Affected:** `Makefile` (`install-*-port-forward`, new `hub-migrate`); `bin/hub-new`; `bin/hub-cutover`; docs
 **Branch:** `k3d-manager-v1.43.12`
-**Related:** `docs/bugs/2026-10-30-hub-cutover-leaves-old-hub-producers-on-old-pushgateway.md`; `docs/bugs/v1.7.1-bugfix-launchd-ensure-bootout-before-bootstrap.md` (same error class in `bin/cluster-refresh`)
+**Related:** `docs/bugs/2026-10-30-hub-cutover-leaves-old-hub-producers-on-old-pushgateway.md`; `docs/bugs/v1.7.1-bugfix-launchd-ensure-bootout-before-bootstrap.md` (same error class in `bin/cluster-refresh`); `docs/issues/2026-09-16-restart-webhook-bootstrap-io-error.md` and `docs/issues/2026-10-28-restart-webhook-user-domain-diagnostics.md` (same `Bootstrap failed: 5` on the webhook restart)
 
 ## Observed failures
 
@@ -98,6 +98,7 @@ to `.PHONY` and to `make help`.
 - `scripts/tests/bin/makefile_hub_port_forward.bats` (new)
 - `scripts/tests/bin/hub_new.bats`
 - `scripts/tests/bin/hub_cutover.bats`
+- `scripts/tests/plugins/hub_loki_port_forward.bats` (added at review, 2026-10-31: its assertion named the inline `launchctl bootstrap` that R1 replaces)
 - `docs/howto/m5-hub-migration.md`
 - `docs/howto/hub-rebuild-from-gitops-vault.md`
 - `CHANGELOG.md`
