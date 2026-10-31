@@ -1,6 +1,6 @@
 # Bug: CI `stage2` cannot pass — the M2's CI cluster has no Vault
 
-**Status:** OPEN
+**Status:** FIXED — stage2 retired (landed from `2d0aa1b2`); live E3 (PR #153 run) pending
 **Priority:** P3
 **Approval:** operator, 2026-10-31 (filing: "go ahead for 1 and 2"; fix: "Retire stage2", "fix them so we
 have a clean release")
