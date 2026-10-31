@@ -483,6 +483,8 @@ and the roughly 95–100K floor is the main cost lever.
 
 **v1.43.13 plan 4:** [`fleet-host-cpu-memory-alerts`](plans/v1.43.13-fleet-host-cpu-memory-alerts.md) (operator, 2026-10-31): CPU and memory for the M2, M4 and M5 on a Host Resources dashboard. The alerts trigger on the swap-in rate and on CPU idle or load (never on "memory used"), and route to `k3dm-analyze`, which posts a top-process diagnosis to Slack. v1.43.13 is at 4 of 5 plans.
 
+**v1.43.13 plan 5:** [`agent-instruction-files-refresh`](plans/v1.43.13-agent-instruction-files-refresh.md) (operator asked 2026-10-31; dispatch approval pending): rewrite `AGENTS.md` and `GEMINI.md` to match the dispatch prompt (no git writes, no memory-bank), drop the stale M2/ubuntu-k3s cluster facts and the SDET persona, carry the Acceptance and test-control rules, and guard a shared rules block with `make check-agent-docs`. v1.43.13 is now at its 5-plan cap; calibration, memory pruning, the thinking-budget trial and unspoken-rule mining wait for a later release.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
