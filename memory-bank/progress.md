@@ -2091,3 +2091,7 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-31: operator GO to dispatch v1.43.13-fleet-host-cpu-memory-alerts to Luna once k3d-manager-v1.43.13 is cut (after v1.43.12 merges).
 - 2026-10-31: host-disk P2 FIXED — live E3 on M5 (m5 822 GiB, m4 173 GiB, m2, hostinger all probe 1). Handoff written.
 - 2026-10-31: Host Disk stat tiles pinned to one row (`f0a9cc8e`, orientation vertical; pin test updated, red without the change); hub-grafana-dashboards synced to f0a9cc8e on M5.
+- 2026-10-31: M5 cloudflared restarted onto 2026.10.7 (was running the 2026.10.6 binary after the brew upgrade); 4 connections registered 14:30Z, argocd 200.
+- 2026-10-31: /ask-docs ephemeral on M5 = webhook plist had no SLACK_BOT_TOKEN/SLACK_CHANNEL_ID (k3dm-webhook-setup never writes them); operator ran update-webhook-slack 14:36Z, threads back. FILED P2 docs/bugs/2026-10-31-hub-migration-drops-webhook-slack-bot-config.md.
+- 2026-10-31: FILED P3 docs/bugs/2026-10-31-ai-analysis-filter-withholds-whole-prose-lines.md (identity OutOfSync alert analysis fully withheld; alert itself was the M5 bring-up window 21:44Z-00:34Z, Synced since 00:39Z).
+- 2026-10-31: ask-docs fixed-links P3 LIVE-VERIFIED (job 341fb904, commit 4f409ba6). Webhook prompt-injection P3 E2 still pending (alert sighting proves the filter path, not E2). Separate small defect noted: ask-docs truncation marker says "name a release" when one was named.

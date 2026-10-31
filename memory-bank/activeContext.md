@@ -1771,3 +1771,7 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - **Next, in order:** (1) re-read VectorDB recall@5 after ~01:45Z 11-01 (expect >= floors bugs .81, issues .66, plans/retro .80); (2) operator: cloudflared on M5 2026.10.6 -> 2026.10.7; (3) v1.43.12 release prep + PR (CLAUDE.md gates); (4) after merge: cut v1.43.13, dispatch fleet-host-cpu-memory-alerts to Luna (go given); (5) M4 cleanup after the 7-day window (machine-setup ROLE=worker, remove hub plists).
 - **Verification status:** complete, offline and live. Follow-up `f0a9cc8e`: Host Disk tiles in one row (m5 no longer wraps), synced on M5.
 
+- 2026-10-31: M5 cloudflared restarted onto 2026.10.7 (was running the 2026.10.6 binary after the brew upgrade); 4 connections registered 14:30Z, argocd 200.
+- 2026-10-31: /ask-docs ephemeral on M5 = webhook plist had no SLACK_BOT_TOKEN/SLACK_CHANNEL_ID (k3dm-webhook-setup never writes them); operator ran update-webhook-slack 14:36Z, threads back. FILED P2 docs/bugs/2026-10-31-hub-migration-drops-webhook-slack-bot-config.md.
+- 2026-10-31: FILED P3 docs/bugs/2026-10-31-ai-analysis-filter-withholds-whole-prose-lines.md (identity OutOfSync alert analysis fully withheld; alert itself was the M5 bring-up window 21:44Z-00:34Z, Synced since 00:39Z).
+- 2026-10-31: ask-docs fixed-links P3 LIVE-VERIFIED (job 341fb904, commit 4f409ba6). Webhook prompt-injection P3 E2 still pending (alert sighting proves the filter path, not E2). Separate small defect noted: ask-docs truncation marker says "name a release" when one was named.

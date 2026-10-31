@@ -1,6 +1,6 @@
 # Bug: webhook AI analysis pastes raw log and cluster text into the prompt and posts the reply unchecked (prompt injection)
 
-**Status:** FIXED — `e9cb9129` (Luna, amended by Claude); live check E2 pending a webhook restart
+**Status:** FIXED — `e9cb9129` (Luna, amended by Claude); live check E2 still pending (a `/diagnosis` on a real failed job). Partial live sighting 2026-10-30 17:21 PDT: the `ArgoCDAppOutOfSync` alert analysis for `shopping-cart-identity` went through `filter_suggestion` (M4 path `_run_analyze`), and both lines came back withheld. That shows the filter is live, but it is not E2, and it exposed `docs/bugs/2026-10-31-ai-analysis-filter-withholds-whole-prose-lines.md`.
 **Priority:** P3
 **Approval:** operator, 2026-10-30 ("go ahead to file a P3 bug and dispatch to Luna")
 **Filed:** 2026-10-30

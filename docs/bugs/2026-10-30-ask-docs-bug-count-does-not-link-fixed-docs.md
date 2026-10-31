@@ -1,6 +1,9 @@
 # Bug: ask-docs bug count does not link the fixed docs it counted
 
-**Status:** FIXED (offline) — 2026-10-30: E1 green (test_bug_count.py 59/59; the two link tests red on the pre-fix module). E2 pending: operator restarts the webhook and reruns the Slack question.
+**Status:** LIVE-VERIFIED 2026-10-31 — E1 green 2026-10-30 (test_bug_count.py 59/59; the two link tests red on the pre-fix module); E2 live on the M5 webhook (restarted 14:36Z on checkout `4f409ba6`): `/ask-docs how many bugs in v1.43.5` in #acg-automation (job `341fb904`, threaded) listed the open docs, then `Fixed:` Slack links for the fixed docs. The question named the release but no priority, so it proves M1 for a named release rather than the P1-only count E2 names.
+**Fix commit:** 88e35118
+**Live evidence:** 2026-10-31 · run 341fb904 · env m5-air-webhook · scenario ask-docs-named-release-bug-count-fixed-links · commit 4f409ba6 · proves E2
+**Live note:** the reply hit `MAX_REPLY_CHARS` after seven `Fixed:` lines, and `scripts/lib/webhook/ask_docs.py` appended `…(truncated; name a release to see the full list)`, which is wrong advice when a release was already named. That is a separate defect and is not covered by this fix.
 **Priority:** P3
 **Approval:** Claude-owned small defect fix (operator trial week of 10-26: Claude fixes small review defects itself)
 **Filed:** 2026-10-30
