@@ -1,6 +1,6 @@
 # Bug: the hub's system-notice Slack URL is lost on every rebuild, so notices stop silently
 
-**Status:** FIXED — `a4c90598` (Luna, amended by Claude); live check E2 pending: the operator seeds the Keychain record, then `make platform-ops`
+**Status:** FIXED — `a4c90598` (Luna, amended by Claude); live check E2 pending: the operator seeds the Keychain record, then `make platform-ops`. Partial 2026-10-31: on the rebuilt M5 hub, `kubectl -n platform-ops describe secret platform-ops-notifications` shows `slack-incoming-webhook-url: 79 bytes` (first half of E2). The Slack half (the next ACG expiry or rotation notice arrives) is still pending: no notice has fired since the rebuild.
 **Priority:** P2
 **Severity:** medium — ACG expiry warnings and every rotation notice have not been sent since 2026-10-16; the operator can restore the URL by hand
 **Release:** bug (does not count toward the five-plan cap). Restore before the 2026-10-29 hub rebuild drill, and add it to that drill's checklist.
