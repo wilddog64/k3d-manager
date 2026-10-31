@@ -159,4 +159,4 @@ interface:
   - ~/.ssh/config, ~/.zplug, git remotes of the clones setup manages
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-10-31 ("as well as those two bugs")

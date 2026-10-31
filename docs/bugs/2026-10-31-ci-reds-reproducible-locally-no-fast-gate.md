@@ -141,4 +141,4 @@ interface:
   - K3DM_SKIP_FAST_GATE
 ```
 
-**Intent approved:** pending
+**Intent approved:** operator, 2026-10-31 ("as well as those two bugs")
