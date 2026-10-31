@@ -64,6 +64,8 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 
 ## How-To guides
 
+- [Fast local gate](docs/howto/fast-gate.md) — check changed files before push and landing.
+
 - [One-command machine setup](docs/howto/machine-setup.md) — prepare hub, worker and console Macs from role manifests.
 - [M5 hub migration](docs/howto/m5-hub-migration.md) — build, cut over and roll back the single-instance hub agents.
 - [Hub disaster recovery snapshots](docs/howto/hub-snapshots.md)

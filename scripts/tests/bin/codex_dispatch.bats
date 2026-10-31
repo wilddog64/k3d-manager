@@ -42,6 +42,9 @@ METRICS
 | `docs/note.md` |
 | `docs/plans/v9.9.9-demo.md` |
 EOF
+  mkdir -p "$FIXTURE/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$FIXTURE/scripts/ci/fast_gate.sh"
+  chmod +x "$FIXTURE/scripts/ci/fast_gate.sh"
   git -C "$FIXTURE" add a.txt README.md docs scripts docs/plans/v9.9.9-demo.md memory-bank/.keep; git -C "$FIXTURE" commit -m base >/dev/null
   git -C "$FIXTURE" push -u origin k3d-manager-v9.9.9 >/dev/null
   cat >"$K3DM_CODEX_BIN" <<'STUB'
@@ -773,6 +776,10 @@ EOF
   git init --bare "$WORK_ORIGIN" >/dev/null
   git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'original\n' >"$WORK_REPO/a.txt"
   git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m work-base >/dev/null
@@ -809,6 +816,10 @@ EOF
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   touch "$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
   git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
@@ -830,6 +841,10 @@ EOF
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
   git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
@@ -849,6 +864,10 @@ EOF
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
   git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
@@ -872,6 +891,10 @@ EOF
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
   git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
@@ -897,6 +920,10 @@ EOF
   export WORK_ORIGIN="$BATS_TEST_TMPDIR/work-origin.git" WORK_REPO="$BATS_TEST_TMPDIR/work-repo"
   git init --bare "$WORK_ORIGIN" >/dev/null; git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
+  mkdir -p "$WORK_REPO/scripts/ci"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
+  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
+  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'base\n' >"$WORK_REPO/a.txt"; git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m base >/dev/null
   git -C "$WORK_REPO" push -u origin fix/cross-repo >/dev/null
@@ -1275,4 +1302,34 @@ EOF
     [ "$status" -eq 2 ]
     [ "$(cat "$K3DM_WORKTREE_ROOT/ledger.jsonl" 2>/dev/null || true)" = "$before" ]
   done
+}
+
+@test "codex dispatch: fast gate refuses land with or without task tests" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug gate >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/gate"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$task/scripts/ci/fast_gate.sh"
+  printf 'changed\n' > "$task/a.txt"
+  git -C "$task" add a.txt scripts/ci/fast_gate.sh
+  git -C "$task" commit -qm broken-gate
+  run dispatch land --slug gate --test true --allow-out-of-scope
+  [ "$status" -eq 2 ]; [[ "$output" == *'fast gate failed'* ]]
+  run dispatch land --slug gate --no-test --allow-out-of-scope
+  [ "$status" -eq 2 ]; [[ "$output" == *'fast gate failed'* && "$output" == *'land-fast-gate.log'* ]]
+  run bash -c 'cd "$1" && K3DM_SKIP_FAST_GATE=1 "$2" land --slug gate --no-test --allow-out-of-scope' _ "$FIXTURE" "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch"
+  [ "$status" -eq 0 ]; [[ "$output" == *'fast gate skipped'* ]]
+}
+
+@test "codex dispatch: fast gate receives isolated state and logs output" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug isolation >/dev/null; sleep 1
+  local task="$K3DM_WORKTREE_ROOT/v9.9.9/isolation" run_dir="$K3DM_WORKTREE_ROOT/v9.9.9/isolation.run"
+  printf '#!/usr/bin/env bash\nprintf "%%s\n%%s\n" "$K3DM_JOB_DIR" "$TMPDIR"\n' > "$task/scripts/ci/fast_gate.sh"
+  printf 'changed\n' > "$task/a.txt"
+  git -C "$task" add a.txt scripts/ci/fast_gate.sh
+  git -C "$task" commit -qm gate
+  run dispatch land --slug isolation --no-test --allow-out-of-scope
+  [ "$status" -eq 0 ]
+  [ "$(cat "$run_dir/land-fast-gate.log")" = "$(printf '%s\n%s' "$run_dir/state/jobs" "$run_dir/state/tmp")" ]
+  [[ "$output" == *"$run_dir/state/jobs"* && "$output" == *"$run_dir/state/tmp"* ]]
 }

@@ -62,4 +62,4 @@ catches bare pytest runs, absolute executable paths, sockets, and remote Git.
 shebang scripts. `make validate-manifests` runs strict kubeconform validation, including the pinned
 custom-resource catalog. CI runs both after the pytest suites.
 
-`--no-verify` is operator-only. An agent must fix the underlying finding and keep the hook active.
+`K3DM_SKIP_FAST_GATE=1` and `--no-verify` are operator-only. An agent must fix the underlying finding and keep the hook active.

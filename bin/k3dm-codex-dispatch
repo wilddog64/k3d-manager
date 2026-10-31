@@ -797,19 +797,27 @@ _dispatch_land() {
     _dispatch_schedule_metrics
     _dispatch_error "rebase of task/$version/$slug onto $target failed; resolve it in $task"
   fi
+  local -a land_env=(
+    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run"
+    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
+    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
+  )
   if (( no_test )); then
     echo "tests: skipped (--no-test)"
-  elif ! (cd "$task" && env \
-    "K3DM_REPO_ROOT=$task" "K3DM_JOB_DIR=$run/state/jobs" "K3DM_RUN_DIR=$run/state/run" \
-    "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp" \
-    "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp" \
-    bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
+  elif ! (cd "$task" && env "${land_env[@]}" bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
     tail -n 20 "$run/land-test.log"
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
     _dispatch_schedule_metrics
     _dispatch_error "tests failed after rebase onto $target; see $run/land-test.log"
   else
     echo "tests: passed"
+  fi
+  if [[ "${K3DM_SKIP_FAST_GATE:-0}" == 1 ]]; then
+    echo "land: fast gate skipped (K3DM_SKIP_FAST_GATE=1)"
+  elif ! (cd "$task" && env "${land_env[@]}" scripts/ci/fast_gate.sh "origin/$target" 2>&1 | tee "$run/land-fast-gate.log"); then
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason fast-gate '.reason=$reason'
+    _dispatch_schedule_metrics
+    _dispatch_error "fast gate failed after rebase onto $target; see $run/land-fast-gate.log"
   fi
   if [[ "$(git -C "$repo_path" rev-parse "$target")" != "$target_sha" ]]; then
     git -C "$task" reset --hard "$task_before" >/dev/null 2>&1 || true

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Run a fast local gate on pushes and task landings to catch relevant lint and test failures early.
+
 ## [1.43.12] - 2026-10-31
 
 M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1.43.10 plans themselves are not implemented and stay queued.
