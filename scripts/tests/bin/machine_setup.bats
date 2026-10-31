@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
@@ -191,8 +192,8 @@ run_machine() {
   [[ "$output" == *'agent:install-node-health-watch'*'skipped (AGENTS=skip)'* ]]
   [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'skipped (AGENTS=skip)'* ]]
   grep -q '^make -C .* install$' "$CALL_LOG"
-  ! grep -q 'install-node-health-watch' "$CALL_LOG" || false
-  ! grep -q '^bin/k3dm-' "$CALL_LOG" || false
+  run ! grep -q 'install-node-health-watch' "$CALL_LOG"
+  run ! grep -q '^bin/k3dm-' "$CALL_LOG"
 }
 
 @test "M2: machine-setup forwards AGENTS to the setup command" {
@@ -203,7 +204,7 @@ run_machine() {
 @test "M3/M4: hub secrets include Hermes credentials and rotator is excluded" {
   grep -Fqx 'k3dm-hermes-gh-token|k3dm|Hermes R4 CI re-run PAT|operator: see docs/guides/hermes.md' "$MACHINE_DIR/secrets.hub.list"
   grep -Fqx 'k3dm-slack-webhook|k3dm|Hermes Slack summary relay|operator: see docs/guides/hermes.md' "$MACHINE_DIR/secrets.hub.list"
-  ! grep -Fqx install-token-rotator "$MACHINE_DIR"/agents.*.list || false
+  run ! grep -Fqx install-token-rotator "$MACHINE_DIR"/agents.*.list
   grep -Fq 'install-token-rotator|not installed by setup:' "$MACHINE_DIR/not-installed.list"
 }
 
@@ -222,7 +223,7 @@ run_machine() {
     run_machine --role console --check
     if [ "$status" -ne 0 ] || ! grep -Eq '^repo:gitrepo/existing[[:space:]]+ok$' <<< "$output"; then printf '%s\n' "$output"; return 1; fi
   done
-  ! grep -Eq '^git (clone|.* (checkout|reset|pull|clean))' "$CALL_LOG"
+  run ! grep -Eq '^git (clone|.* (checkout|reset|pull|clean))' "$CALL_LOG"
 }
 
 @test "machine setup: another GitHub repository is rejected" {
@@ -250,7 +251,7 @@ run_machine() {
   printf '%s\n' 'smartcd-install' > "$FIXROOT/scripts/etc/machine/agents.worker.list"
   run_machine --role worker --check
   grep -Eq '^smartcd[[:space:]]+ok$' <<< "$output"
-  ! grep -Eq '^git clone .*smartcd' "$CALL_LOG"
+  run ! grep -Eq '^git clone .*smartcd' "$CALL_LOG"
 }
 
 @test "machine setup: smartcd installs from its source checkout" {
@@ -262,7 +263,7 @@ run_machine() {
   run_machine --role worker
   grep -Eq '^smartcd[[:space:]]+installed$' <<< "$output"
   grep -Fq "make -C $FIXHOME/src/gitrepo/personal/smartcd install" "$CALL_LOG"
-  ! grep -Eq '^git clone .*smartcd' "$CALL_LOG"
+  run ! grep -Eq '^git clone .*smartcd' "$CALL_LOG"
 }
 
 @test "machine setup: smartcd rejects a different source checkout" {
@@ -272,7 +273,7 @@ run_machine() {
   printf '%s\n' 'smartcd-install' > "$FIXROOT/scripts/etc/machine/agents.worker.list"
   run_machine --role worker
   grep -Eq '^smartcd[[:space:]]+skipped \(source clone has another remote\)$' <<< "$output"
-  ! grep -Fq "make -C $FIXHOME/src/gitrepo/personal/smartcd install" "$CALL_LOG"
+  run ! grep -Fq "make -C $FIXHOME/src/gitrepo/personal/smartcd install" "$CALL_LOG"
 }
 
 @test "machine setup: failed GitHub authentication does not stop the report" {
@@ -313,7 +314,7 @@ run_machine() {
   grep -Eq '^homebrew[[:space:]]+missing$' <<< "$output"
   grep -Eq '^brew-phase[[:space:]]+skipped \(Homebrew unavailable\)$' <<< "$output"
   grep -Eq '^secret:fixture[[:space:]]+missing' <<< "$output"
-  ! grep -q '^brew ' "$CALL_LOG"
+  run ! grep -q '^brew ' "$CALL_LOG"
 }
 
 @test "machine setup: links through intermediate directories resolve as ok" {
@@ -334,7 +335,7 @@ run_machine() {
   run_machine --role console --check
   [ "$status" -eq 1 ]
   grep -q '^security find-generic-password ' "$CALL_LOG"
-  ! grep -Eq '^security .* (-w|--password)( |$)' "$CALL_LOG"
+  run ! grep -Eq '^security .* (-w|--password)( |$)' "$CALL_LOG"
 }
 
 @test "machine setup: missing secrets do not prompt without a TTY" {
@@ -344,7 +345,7 @@ run_machine() {
   [ "$status" -eq 1 ]
   [[ "$output" == *'secret:fixture'*'missing'* ]]
   [[ "$output" != *'Run setup command now?'* ]]
-  ! grep -q '^make .*secret-setup' "$CALL_LOG"
+  run ! grep -q '^make .*secret-setup' "$CALL_LOG"
 }
 
 @test "N3: secrets option rejects unsupported values" {
@@ -360,7 +361,7 @@ run_machine() {
   [ "$(grep -c '^secrets pull --from old-mac.local --role console$' "$CALL_LOG")" -eq 1 ]
   [[ "$output" == *'missing (skipped: SECRETS=skip)'* ]]
   [[ "$output" != *'[y/N]'* ]]
-  ! grep -q '^make secret-setup' "$CALL_LOG"
+  run ! grep -q '^make secret-setup' "$CALL_LOG"
 }
 
 @test "N4: ask remains the default secret behavior" {
@@ -390,7 +391,7 @@ run_machine() {
   run_machine --role hub --dry-run --from old-mac.local
   [ "$status" -ne 0 ]
   [[ "$output" == *'would pull secrets from old-mac.local'* ]]
-  ! grep -q '^secrets pull ' "$CALL_LOG" || false
+  run ! grep -q '^secrets pull ' "$CALL_LOG"
 }
 
 tty_machine() {
@@ -435,8 +436,8 @@ tty_machine() {
   [[ "$output" == *'Rerun with FROM=<old Mac hostname>'* ]]
   run_machine --role console --from old-mac.local
   run_machine --role console --check --from old-mac.local
-  ! grep -q '^secrets pull' "$CALL_LOG" || false
-  ! grep -q '^ssh ' "$CALL_LOG" || false
+  run ! grep -q '^secrets pull' "$CALL_LOG"
+  run ! grep -q '^ssh ' "$CALL_LOG"
 }
 
 @test "machine setup: safety N3 worker rejects hub installers" {
@@ -445,7 +446,7 @@ tty_machine() {
   run_machine --role worker
   [ "$status" -eq 1 ]
   [[ "$output" == *'skipped (hub only)'* ]]
-  ! grep -Eq '^make .*install-cleanup' "$CALL_LOG"
+  run ! grep -Eq '^make .*install-cleanup' "$CALL_LOG"
 }
 
 @test "machine setup: safety N5 leaves existing clone untouched" {
@@ -455,7 +456,7 @@ tty_machine() {
   run_machine --role console
   [ "$status" -eq 0 ]
   [[ "$output" == *'repo:gitrepo/existing'*'ok'* ]]
-  ! grep -Eq '^git (clone|.* (checkout|reset|pull|clean))' "$CALL_LOG"
+  run ! grep -Eq '^git (clone|.* (checkout|reset|pull|clean))' "$CALL_LOG"
 }
 
 @test "machine setup: failed clone is reported and later phases run" {
@@ -495,7 +496,7 @@ tty_machine() {
   run_machine --role console
   [ "$status" -eq 0 ]
   grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
 }
 
 @test "machine setup: an existing data-dir virtualenv is recognized" {
@@ -506,7 +507,7 @@ tty_machine() {
   run_machine --role console --check
   [ "$status" -eq 0 ]
   grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
 }
 
 @test "machine setup: missing Python tools are reported read-only" {
@@ -516,7 +517,7 @@ tty_machine() {
     run_machine --role console "$mode"
     if [ "$status" -ne 1 ] || ! grep -Eq '^python-tools[[:space:]]+missing$' <<< "$output"; then printf '%s\n' "$output"; return 1; fi
   done
-  ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
   [ ! -e "$FIXHOME/.local/share/k3d-manager/venv" ]
   [ ! -e "$FIXROOT/.venv" ]
 }
@@ -535,7 +536,7 @@ tty_machine() {
   run_machine --role console
   [ "$status" -eq 0 ]
   grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
 }
 
 @test "machine setup: custom XDG data directory holds the Python virtualenv" {

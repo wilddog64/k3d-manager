@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
   export WORK="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-restore.XXXXXX")"
@@ -140,9 +141,9 @@ teardown() { rm -rf "${WORK}"; }
   export LOADED_PF=both
   _run_noninteractive_restore
   [ "$status" -eq 0 ]
-  ! grep -q 'cloudflare-tunnel' "$CALL_LOG"
   [ ! -e "${FAKE_HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" ]
   [[ "$output" == *'Cloudflare tunnel check: SKIP'* ]]
+  run ! grep -q 'cloudflare-tunnel' "$CALL_LOG"
 }
 
 @test "HUB_RESTORE_PLATFORM=skip defers observability, platform-ops and their checks on a hub with no data yet" {

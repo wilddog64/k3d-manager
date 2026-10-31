@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
 
 setup() {
   ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
@@ -71,7 +72,7 @@ SH
   [ "$status" -ne 0 ]
   [[ "$output" == *"could not unlock this Mac"* ]]
   [ ! -s "$SSH_LOG" ]
-  ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG"
+  run ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG"
 }
 
 @test "M1/M2/N1: locked local keychain unlocks once before streaming; unlocked keychain does not prompt" {
@@ -85,7 +86,7 @@ SH
   [ "$(grep -c '^argv: <unlock-keychain>' "$SECURITY_LOG")" -eq 2 ]
   [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
   grep -Fq 'add-generic-password -U -s k3dm-cloudflare-api-token -a k3dm -X 746f6b656e' "$SECURITY_LOG.stdin"
-  ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG" || false
+  run ! grep -Fq 'fixture-password' "$SECURITY_LOG" "$SSH_LOG"
   export LOCAL_LOCKED_KEYCHAIN=''
   : > "$SECURITY_LOG"
   tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role hub
@@ -136,10 +137,10 @@ SH
   grep -Fq '<old-mac.local>' "$SSH_LOG"
   grep -Fq 'export --role hub --stream --unlock' "$SSH_LOG"
   grep -q '^unlock-keychain .*login.keychain-db' "$SECURITY_LOG"
-  ! grep -Fq 'fixture-password' "$SSH_LOG" "$SECURITY_LOG" || false
-  ! grep -Fq '746f6b656e' "$SSH_LOG" "$SECURITY_LOG" || false
   [[ "$output" != *'fixture-password'* ]]
   [[ "$output" != *'746f6b656e'* ]]
+  run ! grep -Fq 'fixture-password' "$SSH_LOG" "$SECURITY_LOG"
+  run ! grep -Fq '746f6b656e' "$SSH_LOG" "$SECURITY_LOG"
 }
 
 @test "M9: a failed ssh connection exits non-zero and prints the file fallback" {
@@ -149,7 +150,7 @@ SH
   tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role hub
   [ "$status" -ne 0 ]
   [[ "$output" == *'Fallback: run make machine-secrets-export ROLE=hub on old-mac.local'* ]]
-  ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null || false
+  run ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null
 }
 
 @test "M9: a wrong old-Mac password exits non-zero and imports nothing" {
@@ -159,7 +160,7 @@ SH
   [ "$status" -ne 0 ]
   [[ "$output" == *'could not unlock the keychain'* ]]
   [[ "$output" == *'Fallback:'* ]]
-  ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null || false
+  run ! grep -q '^add-generic-password' "$SECURITY_LOG.stdin" 2>/dev/null
 }
 
 @test "N7: stream export refuses to write records to a terminal" {
@@ -204,7 +205,7 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *$'k3dm-cloudflare-api-token\tk3dm\t746f6b656e'* ]]
   [[ "$output" == *'exported k3dm-cloudflare-api-token k3dm'* ]]
-  ! grep -F 'fixture-password' "$SECURITY_LOG" || false
+  run ! grep -F 'fixture-password' "$SECURITY_LOG"
 }
 
 @test "N8: failed stream unlock emits no records" {
@@ -246,7 +247,7 @@ SH
   [[ "$output" == *'exported k3dm-vault-unseal-dr secrets/vault:count'* ]]
   [[ "$output" == *'exported k3dm-vault-unseal-dr secrets/vault:shard1'* ]]
   [[ "$output" != *'74617373'* ]]
-  ! grep -F '74617373' "$SECURITY_LOG" || false
+  run ! grep -F '74617373' "$SECURITY_LOG"
   run "$SCRIPT" export --role hub --out "$out"
   [ "$status" -ne 0 ]
   [[ "$output" == *'refusing to overwrite'* ]]
@@ -260,7 +261,7 @@ SH
   [ "$status" -eq 0 ] || { printf 'import status=%s output=%s\n' "$status" "$output"; return 1; }
   [ ! -e "$encrypted" ]
   grep -F 'add-generic-password -U -s svc -a acct -X 74657374' "$SECURITY_LOG.stdin"
-  ! grep -F '74657374' "$SECURITY_LOG" || false
+  run ! grep -F '74657374' "$SECURITY_LOG"
 }
 
 @test "M2: present records skip by default and force writes each record once" {
@@ -290,7 +291,7 @@ SH
   [ "$status" -ne 0 ]
   [[ "$output" == *'could not decrypt'* ]]
   [ -e "$encrypted" ]
-  ! grep -q 'add-generic-password' "$SECURITY_LOG.stdin" || false
+  run ! grep -q 'add-generic-password' "$SECURITY_LOG.stdin"
 }
 
 @test "N1: secret and hex are absent from child argv" {
@@ -299,9 +300,9 @@ SH
   printf 'svc\tacct\t74657374\n' | "$REAL_OPENSSL" enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass "file:$K3DM_SECRETS_PASSPHRASE_FILE" -out "$encrypted"
   run "$SCRIPT" import --in "$encrypted" --force
   [ "$status" -eq 0 ]
-  ! grep -F '74657374' "$SECURITY_LOG" || false
-  ! grep -F '74657374' "$OPENSSL_LOG" || false
-  ! grep -F 'test' "$SECURITY_LOG" || false
+  run ! grep -F '74657374' "$SECURITY_LOG"
+  run ! grep -F '74657374' "$OPENSSL_LOG"
+  run ! grep -F 'test' "$SECURITY_LOG"
 }
 
 @test "N2: secret and hex are absent from command output and side files" {
@@ -311,7 +312,7 @@ SH
   run "$SCRIPT" import --in "$encrypted" --force
   [ "$status" -eq 0 ]
   [[ "$output" != *'74657374'* && "$output" != *'test'* ]]
-  ! grep -F '74657374' "$SECURITY_LOG" || false
+  run ! grep -F '74657374' "$SECURITY_LOG"
 }
 
 @test "N3: empty and unsafe records never reach security stdin" {
@@ -321,7 +322,7 @@ SH
   run "$SCRIPT" import --in "$encrypted" --force
   [ "$status" -ne 0 ]
   [[ "$output" == *'rejected (bad name)'* ]]
-  ! grep -F 'add-generic-password' "$SECURITY_LOG.stdin" || false
+  run ! grep -F 'add-generic-password' "$SECURITY_LOG.stdin"
 }
 
 @test "N5: export does not leave plaintext records on disk" {
@@ -337,7 +338,7 @@ SH
 
 @test "machine secrets: manifest, setup hint and migration guide cover the workflow" {
   grep -Fqx 'k3dm-cloudflare-api-token|k3dm|Cloudflare Worker API token|operator: see docs/howto/machine-setup.md' "$ROOT/scripts/etc/machine/secrets.hub.list"
-  ! grep -Fq 'k3dm-cloudflare-api-token|k3dm|Cloudflare Worker API token|bin/k3dm-worker-setup' "$ROOT/scripts/etc/machine/secrets.hub.list" || false
+  run ! grep -Fq 'k3dm-cloudflare-api-token|k3dm|Cloudflare Worker API token|bin/k3dm-worker-setup' "$ROOT/scripts/etc/machine/secrets.hub.list"
   grep -Fq 'Moving from another Mac? Rerun with FROM=<old Mac hostname>' "$ROOT/bin/k3dm-machine-setup"
   grep -Fq 'Copy secrets from the old machine' "$ROOT/docs/howto/machine-setup.md"
   grep -Fq 'iCloud does not sync' "$ROOT/docs/howto/machine-setup.md"

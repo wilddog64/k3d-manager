@@ -38,8 +38,8 @@ record_failure() { failed=1; report "$1" "$2"; }
 verify_homebrew_package() {
   local signature
   signature="$(pkgutil --check-signature "$1" 2>&1)" || return 1
-  if ! printf '%s\n' "$signature" | grep -Eq 'Developer ID Installer:.*\(927JGANW46\)'; then return 1; fi
-  printf '%s\n' "$signature" | grep -Eq '^[[:space:]]*Notarization: trusted by the Apple notary service[[:space:]]*$'
+  if ! printf '%s\n' "$signature" | grep -E 'Developer ID Installer:.*\(927JGANW46\)' >/dev/null; then return 1; fi
+  printf '%s\n' "$signature" | grep -E '^[[:space:]]*Notarization: trusted by the Apple notary service[[:space:]]*$' >/dev/null
 }
 
 ensure_homebrew() {

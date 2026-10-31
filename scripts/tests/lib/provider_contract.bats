@@ -463,6 +463,7 @@ setup() {
   _hostinger_refresh_frontend_dns() { printf '%s\n' "frontend-dns" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _info() { :; }
+  kubectl() { [[ "$*" == "config get-contexts "* ]] && return 0; printf "unexpected kubectl %s\n" "$*" >> "${BATS_TEST_TMPDIR}/refresh.log"; return 1; }
   unset K3DM_EXCLUSIVE_APP_CLUSTER
 
   run _provider_k3s_hostinger_refresh_registration

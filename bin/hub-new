@@ -53,7 +53,7 @@ preflight() {
   host="$(hostname -s)"; old_short="${OLD_HOST%%.*}"
   [[ "$host" == "$NEW_HOST" ]] || fail "hostname is $host, expected $NEW_HOST" "set the M5 hostname to $NEW_HOST"
   [[ "$host" != "$old_short" ]] || fail 'refusing to build on the old hub host' "run this command on $NEW_HOST"
-  pmset -g | grep -Eq '(SleepDisabled|disablesleep)[[:space:]]+1' || fail 'sleep is not disabled' 'run: sudo pmset -a disablesleep 1, then rerun'
+  pmset -g | grep -E '(SleepDisabled|disablesleep)[[:space:]]+1' >/dev/null || fail 'sleep is not disabled' 'run: sudo pmset -a disablesleep 1, then rerun'
   [[ -f "${HUB_RECOVERY_INFRA_ROOT:-$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra}/argocd/config/argocd-secret.yaml" ]] || fail 'shopping-cart-infra ArgoCD secret manifest is missing' 'run make machine-setup ROLE=hub, or clone shopping-cart-infra beside k3d-manager'
   docker info >/dev/null 2>&1 || fail 'OrbStack is not running' 'start OrbStack and rerun'
   gh auth status >/dev/null 2>&1 || fail 'GitHub CLI is not authenticated' 'run gh auth login and rerun'
