@@ -858,7 +858,8 @@ SH
   chmod +x "$STUBS/ssh" "$STUBS/git"
   run_machine --role console
   [ "$status" -eq 1 ]
-  [[ "$output" == *'switched to ssh'* ]]
+  [[ "$output" == *'remote:~/src/a'*'switched to ssh'* ]]
+  [[ "$(printf '%s\n' "$output" | grep '^remote:')" != *"$FIXHOME"* ]]
   grep -Fq 'remote set-url origin git@github.com:wilddog64/a.git' "$CALL_LOG"
   grep -Fq 'remote set-url origin https://github.com/wilddog64/b.git' "$CALL_LOG"
   run ! grep -Fq 'set-url origin git@github.com:cxreg' "$CALL_LOG"
@@ -879,7 +880,8 @@ SH
   printf '#!/bin/sh\n[ "$1" != --prefix ] || echo "%s"\n' "$BATS_TEST_TMPDIR/brew" > "$STUBS/brew"
   run_machine --role console --check
   [ "$status" -eq 1 ]
-  [[ "$output" == *'insecure'* ]]
+  [[ "$output" == *'~/.zplug/insecure'* ]]
+  [[ "$(printf '%s\n' "$output" | grep '^zsh:completion-dirs')" != *"$FIXHOME"* ]]
   run_machine --role console
   [ "$status" -eq 1 ]
   [ "$(/usr/bin/python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$FIXHOME/.zplug/insecure")" = 0o755 ]
@@ -921,9 +923,9 @@ SH
     [[ "$output" == *"$message"* || "$output" == *"${message% }"* ]]
     grep -Fxq -- '-tt -o BatchMode=yes fixture $SHELL -lic exit' "$CALL_LOG"
   done
-  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="command not found /Users/alice/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
   [ "$status" -eq 1 ]
-  [[ "$output" != *'/Users/alice'* && "$output" != *'ghp_abc'* ]]
+  [[ "$output" == *'~/secret'* && "$output" != *"$FIXHOME"* && "$output" != *'ghp_abc'* ]]
   run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
   [ "$status" -eq 0 ]
   run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
@@ -971,7 +973,7 @@ SH
   echo .ssh/config.d/operator > "$FIXROOT/scripts/etc/machine/files.console.list"
   run_machine --role console
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ssh:config"*"skipped (linked; add the Include in $FIXHOME/ssh-target)"* ]]
+  [[ "$output" == *"ssh:config"*"skipped (linked; add the Include in ~/ssh-target)"* ]]
   [ -L "$FIXHOME/.ssh/config" ]
   cmp "$FIXHOME/ssh-target" "$BATS_TEST_TMPDIR/snapshot"
 }
@@ -983,7 +985,7 @@ SH
   run_machine --role worker
   [ "$status" -eq 1 ]
   for name in .zsh .zshrc .zshenv; do
-    [[ "$output" == *"shell:$name"*"skipped (linked elsewhere: $FIXHOME/elsewhere)"* ]]
+    [[ "$output" == *"shell:$name"*"skipped (linked elsewhere: ~/elsewhere)"* ]]
     [ "$(readlink "$FIXHOME/$name")" = "$FIXHOME/elsewhere" ]
   done
 }
