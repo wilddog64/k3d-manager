@@ -1761,3 +1761,13 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-31: host-disk P2 LANDED 1708c97a, VERIFIED (Claude review; pytest 9/9, machine_setup.bats 61/61 outside sandbox, shellcheck, diff --check; all 4 new tests red on pre-fix in scratch copy; docs/guides path in spec dir landed with --allow-out-of-scope). Pending live E3: M5 pulls branch, one Hermes cycle, k3dm_disk_probe_success m5/m4/m2/hostinger = 1. M4 slow: fseventsd 37G RSS+swap, mediaremoted killed by operator.
 - 2026-10-31: SPEC v1.43.13 plan 4/5 docs/plans/v1.43.13-fleet-host-cpu-memory-alerts.md (operator request; dispatch go pending; dispatch after v1.43.13 cut). Captures m2/m4/m5 13:41-13:42Z in spec.
 - 2026-10-31: operator GO to dispatch v1.43.13-fleet-host-cpu-memory-alerts to Luna once k3d-manager-v1.43.13 is cut (after v1.43.12 merges).
+
+## Handoff — 2026-10-31 host-disk labels + M4 load relief (DONE)
+- **Objective:** Host Disk labels the new hub correctly and reaches m2/m4 after the cutover; also relieve the hot/laggy M4.
+- **Evidence:** fix `1708c97a` (Luna; pytest 9/9, machine_setup.bats 61/61, 4 new tests red on pre-fix); live E3 on M5 (checkout ff to `4f409ba6`): probe_success 1 for m5 (822 GiB), m4 (173 GiB), m2, hostinger. Bug FIXED.
+- **Decisions:** old M4 k3d cluster STOPPED early (operator go; data kept, rollback `k3d cluster start k3d-cluster`); operator ran `sudo killall mediaremoted` and `sudo killall fseventsd` (fseventsd held 37 GB; swap 29.2 → 16.9 GB, sys 36% → 10%). New spec `docs/plans/v1.43.13-fleet-host-cpu-memory-alerts.md` (plan 4/5), dispatch GO once v1.43.13 is cut. Flipped hub-cutover old-producers bug FIXED; m5-hub-migration how-to gains key-SSH step.
+- **Changed files:** bin/k3dm-disk-metrics, bin/k3dm-machine-setup, 2 tests, Host Disk guide, machine-setup how-to, CHANGELOG (Luna); docs/howto/m5-hub-migration.md, docs/roadmap.md, the new plan, 2 bug docs (Claude).
+- **Open questions:** none blocking. Watch `fseventsd` on the M4: if it regrows to GBs within a day, find the churning tree (Luna worktrees suspected).
+- **Next, in order:** (1) re-read VectorDB recall@5 after ~01:45Z 11-01 (expect >= floors bugs .81, issues .66, plans/retro .80); (2) operator: cloudflared on M5 2026.10.6 -> 2026.10.7; (3) v1.43.12 release prep + PR (CLAUDE.md gates); (4) after merge: cut v1.43.13, dispatch fleet-host-cpu-memory-alerts to Luna (go given); (5) M4 cleanup after the 7-day window (machine-setup ROLE=worker, remove hub plists).
+- **Verification status:** complete, offline and live.
+

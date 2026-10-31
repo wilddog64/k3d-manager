@@ -1,6 +1,6 @@
 # Bug: Host Disk dashboard labels the new hub's disk as "m4" and shows m2 down after the cutover
 
-**Status:** VERIFIED
+**Status:** FIXED
 **Priority:** P2
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30
@@ -111,3 +111,8 @@ accept the M5's key. The operator fixed this by hand:
 `m2jump` now answers in batch mode. Hostinger needed the same two trust steps during the cutover. Copying
 `known_hosts` entries and authorizing the new hub's key on every fleet host stays an operator step, and is
 out of scope for this fix (see What NOT to do). Track it as a `hub-new` checklist item.
+
+## Resolution (2026-10-31)
+
+- **Fix:** `1708c97a` (Luna; Claude review). Offline: `test_disk_metrics.py` 9/9, `machine_setup.bats` 61/61 outside the sandbox, shellcheck clean; the four new tests were red on the pre-fix scripts.
+- **E3 (live, 2026-10-31 ~14:20Z):** the M5 checkout was fast-forwarded to `4f409ba6`. Running `bin/k3dm-disk-metrics` on the M5 pushed `k3dm_disk_probe_success` = 1 for m5, m4, m2 and hostinger. `m5` reports 822 GiB free (the M5's disk), and `m4` reports 173 GiB (the real M4, measured over ssh). The M5 reaches both `m4-air.local` and `m2jump` with key login.

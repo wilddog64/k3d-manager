@@ -2089,3 +2089,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-10-31: host-disk P2 LANDED 1708c97a, VERIFIED (Claude review; pytest 9/9, machine_setup.bats 61/61 outside sandbox, shellcheck, diff --check; all 4 new tests red on pre-fix in scratch copy; docs/guides path in spec dir landed with --allow-out-of-scope). Pending live E3: M5 pulls branch, one Hermes cycle, k3dm_disk_probe_success m5/m4/m2/hostinger = 1. M4 slow: fseventsd 37G RSS+swap, mediaremoted killed by operator.
 - 2026-10-31: SPEC v1.43.13 plan 4/5 docs/plans/v1.43.13-fleet-host-cpu-memory-alerts.md (operator request; dispatch go pending; dispatch after v1.43.13 cut). Captures m2/m4/m5 13:41-13:42Z in spec.
 - 2026-10-31: operator GO to dispatch v1.43.13-fleet-host-cpu-memory-alerts to Luna once k3d-manager-v1.43.13 is cut (after v1.43.12 merges).
+- 2026-10-31: host-disk P2 FIXED — live E3 on M5 (m5 822 GiB, m4 173 GiB, m2, hostinger all probe 1). Handoff written.
