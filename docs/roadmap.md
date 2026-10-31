@@ -463,7 +463,7 @@ the v1.43.10 branch (`2ceb59f2`). Plan 1 of 3 is [`one-command-machine-setup`](p
 v1.43.11). Plan 2 of 3 is [`m5-new-hub-one-command`](plans/v1.43.12-m5-new-hub-one-command.md): `make hub-new` builds and
 verifies a fresh hub on the M5 while the M4 keeps serving, and `make hub-cutover` moves the agents and the tunnels in one
 gated step, with rollback. Its live run is the recovery for the Kine compaction bug and the proof for the three
-2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending. Plan 3 of 3 is [`whole-system-api-cost-panels`](plans/v1.43.12-whole-system-api-cost-panels.md): Claude + Codex cost at API prices per live-verified spec, and the API run rate against the plans it would replace (operator, 2026-10-29).
+2026-10-15 hub-rebuild bugs. Prerequisite: the platform-ops Slack URL bug. Approval pending. Plan 3 of 3 is [`whole-system-api-cost-panels`](plans/v1.43.12-whole-system-api-cost-panels.md): Claude + Codex cost at API prices per live-verified spec, and the API run rate against the plans it would replace (operator, 2026-10-29). Plan 5 of 5 is [`hub-cutover-hostinger-handoff`](plans/v1.43.12-hub-cutover-hostinger-handoff.md) (2026-10-31, operator approved): the cutover hands the Hostinger app cluster to the M5's ArgoCD (old controller to 0 first, rollback by scaling, never by deleting a registration), and hub-new catches the missing `argocd-oidc-secret`. The release is now at its 5-plan cap; further work goes to v1.43.13.
 
 **Follow-on, not scheduled: a local LLM (Ollama) on the M5.** It runs on the macOS host (Metal; containers have no GPU),
 as a LaunchAgent with a model memory cap. Size it only after the M5 has run as the hub for a week and its free memory is
