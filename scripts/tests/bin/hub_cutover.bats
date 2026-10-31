@@ -7,8 +7,10 @@ setup() {
   mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$ROOT/bin" "$ROOT/scripts/etc/machine"
   cp "${HUB_CUTOVER_SOURCE:-$REPO/bin/hub-cutover}" "$ROOT/bin/hub-cutover"
   cp "$REPO/scripts/etc/machine/hub-singletons.list" "$ROOT/scripts/etc/machine/"
-  export HOME="$WORK/home" PATH="$WORK/stub:/usr/bin:/bin" CALLS="$WORK/calls"
+  export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
   export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local
+  [[ "$HOME" == "$WORK/home" ]]
+  export HUB_CUTOVER_CONTROLLER_WAIT_S=0
   export HUB_CUTOVER_TTY="$WORK/tty" HUB_CUTOVER_VERIFY_WAIT=0 HUB_CUTOVER_VERIFY_TRIES=3
   printf 'cutover\n' > "$HUB_CUTOVER_TTY"
   mkdir -p "$HUB_NEW_STATE_DIR"
@@ -31,6 +33,13 @@ STUB
   cat > "$WORK/stub/ssh" <<'STUB'
 #!/usr/bin/env bash
 printf 'ssh host=%s command=%s\n' "$1" "$2" >> "$CALLS"
+if [[ "$2" == *'get statefulset'* ]]; then
+  if [[ "$2" == *readyReplicas* ]]; then echo "${STUB_OLD_READY:-0}"; else cat "$WORK_OLD_REPLICAS"; fi
+  exit 0
+fi
+if [[ "$2" == *'get pods'* ]]; then [[ "${STUB_OLD_POD:-0}" == 0 ]] || echo pod/controller; exit 0; fi
+if [[ "$2" == *'scale statefulset'* ]]; then echo "${2##*--replicas=}" > "$WORK_OLD_REPLICAS"; exit 0; fi
+if [[ "$2" == *'test -f'* ]]; then exit 0; fi
 if [[ "$2" == *'launchctl print'* ]]; then
   label="${2##*com.k3d-manager.}"
   label="${label%\"*}"
@@ -43,6 +52,31 @@ if [[ "$2" == *'launchctl bootout'* ]]; then
 fi
 exit 0
 STUB
+  export WORK_OLD_REPLICAS="$WORK/old-replicas"
+  echo 1 > "$WORK_OLD_REPLICAS"
+  mkdir -p "$ROOT/scripts" "$HOME/.kube"
+  cat > "$WORK/stub/kubectl" <<'STUB'
+#!/usr/bin/env bash
+printf 'kubectl %s\n' "$*" >> "$CALLS"
+case "$*" in
+  *'config get-contexts'*) exit "${STUB_NO_CONTEXT:-0}" ;;
+  *'get statefulset'*readyReplicas*) echo "${STUB_NEW_READY:-0}" ;;
+  *'get statefulset'*) echo 0 ;;
+  *'get pods'*) [[ "${STUB_NEW_POD:-0}" == 0 ]] || echo pod/controller ;;
+  *'get application'*) [[ "${STUB_BAD_ESO:-0}" == 0 ]] || exit 1; echo '{"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}' ;;
+  *'get secret'*) [[ "${STUB_NO_REGISTRATION:-0}" == 0 ]] || exit 1; echo secret/cluster-ubuntu-hostinger ;;
+esac
+STUB
+  cat > "$WORK/stub/scp" <<'STUB'
+#!/usr/bin/env bash
+printf 'scp %s\n' "$*" >> "$CALLS"
+: > "${@: -1}"
+STUB
+  cat > "$ROOT/scripts/k3d-manager" <<'STUB'
+#!/usr/bin/env bash
+printf 'refresh_registration %s %s\n' "$CLUSTER_PROVIDER" "$*" >> "$CALLS"
+STUB
+  chmod +x "$ROOT/scripts/k3d-manager"
   for cmd in make curl cloudflared; do
     cat > "$WORK/stub/$cmd" <<STUB
 #!/usr/bin/env bash
@@ -93,7 +127,7 @@ teardown() { rm -rf "$WORK"; }
   run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
   [ "$status" -eq 0 ]
   [[ "$output" == *cloudflare-tunnel* ]]
-  [ ! -s "$CALLS" ]
+  ! grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
   [ ! -e "$HUB_CUTOVER_STATE_DIR" ]
 }
 
@@ -101,7 +135,7 @@ teardown() { rm -rf "$WORK"; }
   printf 'nope\n' > "$HUB_CUTOVER_TTY"
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
-  [ ! -s "$CALLS" ]
+  ! grep -Eq "scale statefulset|^scp |^refresh_registration |launchctl (bootout|bootstrap)" "$CALLS"
   [ ! -e "$HUB_CUTOVER_STATE_DIR" ]
 }
 
@@ -203,3 +237,83 @@ STUB
   [ "$status" -eq 1 ]
 }
 
+
+@test "N1: a running old controller pod blocks registration and singleton loading" {
+  export STUB_OLD_POD=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  run grep -Eq '^refresh_registration |^launchctl bootstrap' "$CALLS"
+  [ "$status" -eq 1 ]
+  grep -q '"verify": "old-controller-not-stopped"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+}
+
+@test "N3: rollback cannot restore old controller while the new pod remains" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 1 > "$HUB_CUTOVER_STATE_DIR/old-argocd-controller-replicas"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  export STUB_NEW_POD=1
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -ne 0 ]
+  run grep -q '^ssh .*scale statefulset.*--replicas=1' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M5: rollback stops the new controller before restoring the recorded old count" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 1 > "$HUB_CUTOVER_STATE_DIR/old-argocd-controller-replicas"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  new_stop="$(grep -n '^kubectl .*scale statefulset/argocd-application-controller --replicas=0' "$CALLS" | head -1 | cut -d: -f1)"
+  old_start="$(grep -n '^ssh .*scale statefulset/argocd-application-controller --replicas=1' "$CALLS" | head -1 | cut -d: -f1)"
+  [ -n "$new_stop" ] && [ -n "$old_start" ] && [ "$new_stop" -lt "$old_start" ]
+}
+
+@test "M5: rollback without a recorded handoff warns, leaves both controllers alone and still rolls back" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'no recorded controller handoff'* ]]
+  run grep -q 'scale statefulset' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M6/N5: dry run prints the handoff plan and makes no handoff change" {
+  export STUB_NO_CONTEXT=1 DRY_RUN=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Old controller replicas: 1'* ]]
+  [[ "$output" == *'Hostinger kubeconfig source: m4-air.local:'* ]]
+  [[ "$output" == *'Handoff plan:'* ]]
+  run grep -Eq 'scale statefulset|^scp |^refresh_registration |launchctl (bootstrap|bootout)' "$CALLS"
+  [ "$status" -eq 1 ]
+  [ ! -e "$HOME/.kube/hostinger.config" ]
+}
+
+@test "handoff scales and waits before copying and registration, then loads" {
+  export STUB_NO_CONTEXT=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-argocd-controller-replicas")" = 1 ]
+  old_scale="$(grep -n 'ssh .*scale statefulset.*--replicas=0' "$CALLS" | head -1 | cut -d: -f1)"
+  old_wait="$(grep -n 'ssh .*get pods' "$CALLS" | head -1 | cut -d: -f1)"
+  copy="$(grep -n '^scp ' "$CALLS" | cut -d: -f1)"
+  register="$(grep -n '^refresh_registration k3s-hostinger' "$CALLS" | cut -d: -f1)"
+  load="$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)"
+  [ "$old_scale" -lt "$old_wait" ] && [ "$old_wait" -lt "$copy" ] && [ "$copy" -lt "$register" ] && [ "$register" -lt "$load" ]
+  [ "$(stat -f %Lp "$HOME/.kube/hostinger.config")" = 600 ]
+}
+
+@test "verify requires the labeled registration and healthy ESO application" {
+  export STUB_NO_REGISTRATION=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  grep -q '"verify": "verify-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  export STUB_NO_REGISTRATION=0 STUB_BAD_ESO=1
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+}

@@ -19,6 +19,9 @@ setup() {
   echo fixture > "$WORK/home/.cloudflared/$TUNNEL_CREDS"
   echo fixture > "$WORK/home/.cloudflared/cert.pem"
   export HOME="$WORK/home" HUB_NEW_STATE_DIR="$WORK/state" CALLS="$WORK/calls" AGENTS_DIR="$WORK/home/Library/LaunchAgents"
+  [[ "$HOME" == "$WORK/home" ]]
+  mkdir -p "$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra/argocd/config"
+  : > "$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra/argocd/config/argocd-secret.yaml"
   export PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin"
   export HUB_NEW_HOST=m5-air HUB_OLD_HOST=m4-air.local HOSTINGER_HOST=vps.example.test
   unset HUB_NEW_FROM K3DM_AGENT_LOAD
@@ -77,6 +80,7 @@ case "$(basename "$0")" in
       *'get applications -o json'*)
         if [[ "${VERIFY_BAD_APP:-0}" == 1 ]]; then echo '{"items":[{"status":{"sync":{"status":"OutOfSync"},"health":{"status":"Degraded"}}}]}';
         else echo '{"items":[{"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}]}'; fi ;;
+      *'get externalsecret argocd-oidc-secret'*) [[ "${STUB_NO_OIDC:-0}" != 1 ]] || exit 1 ;;
       *'get externalsecrets -A -o json'*) echo '{"items":[{"status":{"conditions":[{"type":"Ready","status":"True","reason":"SecretSynced"}]}}]}' ;;
       *'vault status'*) echo 'Sealed          false' ;;
       *'get clustersecretstore'*'-o json'*) echo '{"status":{"conditions":[{"type":"Ready","status":"True"}]}}' ;;
@@ -413,4 +417,18 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ "$status" -eq 1 ]
   run grep -E '^security .* -w' "$CALLS"
   [ "$status" -eq 1 ]
+}
+
+@test "preflight requires the infra manifest" {
+  rm "$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra/argocd/config/argocd-secret.yaml"
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'shopping-cart-infra ArgoCD secret manifest is missing'* ]]
+}
+
+@test "verify requires the OIDC ExternalSecret" {
+  export HUB_NEW_FROM=verify STUB_NO_OIDC=1
+  run "$HUB_NEW_BIN"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'ArgoCD OIDC ExternalSecret cicd/argocd-oidc-secret is missing'* ]]
 }

@@ -23,10 +23,10 @@ Do not manually start a `hub-singletons.list` agent on either host during the mo
 ## Cut over
 
 1. Review the printed agent plan with `make hub-cutover DRY_RUN=1`.
-2. Run `make hub-cutover` and type `cutover` when prompted. It stops the loaded singleton agents on the M4 over SSH, confirms that none remain loaded there, loads them on the M5, and performs read-only checks for webhook health, public hostnames, the Cloudflare connector, Hostinger SSH tunnels and Hermes status.
-3. Confirm a Hermes message arrives in Slack. Hermes delivery is an operator check because the command does not send a test message.
-4. Review `~/.local/share/k3d-manager/hub-cutover/stopped-on-old` and `hub-cutover-report.json`. Verification retries for about three minutes while the webhook starts and Cloudflare drops the M4 connector. If it still fails it prints the rollback command; run `make hub-cutover-rollback` and type `rollback` to unload the M5 agents and restore exactly the recorded agents on the M4.
-5. Once the cut-over has passed, stop the M4 cluster on the M4 with `k3d cluster stop k3d-cluster`. The cut-over moves only the singleton agents; a running M4 cluster would keep its ArgoCD syncing and its alerts firing next to the M5's. The M4's `hub-local.list` port-forward agents will then fail to connect, which is expected.
+2. Run `make hub-cutover` and type `cutover` when prompted. It stops the loaded singleton agents on the M4 over SSH, confirms that none remain loaded there, stops the old ArgoCD application controller, hands Hostinger to the new hub’s ArgoCD, loads the agents on the M5, and performs read-only checks for webhook health, public hostnames, the Cloudflare connector, Hostinger SSH tunnels and Hermes status.
+3. Run `kubectl -n cicd get applications | grep ubuntu-hostinger` and confirm the applications are Synced. Confirm a Hermes message arrives in Slack. Hermes delivery is an operator check because the command does not send a test message.
+4. Review `~/.local/share/k3d-manager/hub-cutover/stopped-on-old` and `hub-cutover-report.json`. Verification retries for about three minutes while the webhook starts and Cloudflare drops the M4 connector. If it still fails it prints the rollback command; run `make hub-cutover-rollback` and type `rollback` to stop the M5 controller, restore the M4 controller, unload the M5 agents and restore exactly the recorded agents on the M4.
+5. Once the cut-over has passed, stop the M4 cluster on the M4 with `k3d cluster stop k3d-cluster`. The old controller has already stopped; the running M4 cluster would still have alerts firing next to the M5’s. The M4's `hub-local.list` port-forward agents will then fail to connect, which is expected.
 
 To roll back after step 5, start the M4 cluster first with `k3d cluster start k3d-cluster` on the M4, wait for its pods to be ready, then run `make hub-cutover-rollback` on the M5.
 

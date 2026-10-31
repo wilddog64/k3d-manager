@@ -53,6 +53,7 @@ preflight() {
   [[ "$host" == "$NEW_HOST" ]] || fail "hostname is $host, expected $NEW_HOST" "set the M5 hostname to $NEW_HOST"
   [[ "$host" != "$old_short" ]] || fail 'refusing to build on the old hub host' "run this command on $NEW_HOST"
   pmset -g | grep -Eq '(SleepDisabled|disablesleep)[[:space:]]+1' || fail 'sleep is not disabled' 'run: sudo pmset -a disablesleep 1, then rerun'
+  [[ -f "${HUB_RECOVERY_INFRA_ROOT:-$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra}/argocd/config/argocd-secret.yaml" ]] || fail 'shopping-cart-infra ArgoCD secret manifest is missing' 'run make machine-setup ROLE=hub, or clone shopping-cart-infra beside k3d-manager'
   docker info >/dev/null 2>&1 || fail 'OrbStack is not running' 'start OrbStack and rerun'
   gh auth status >/dev/null 2>&1 || fail 'GitHub CLI is not authenticated' 'run gh auth login and rerun'
   if command -v k3d >/dev/null 2>&1; then
@@ -123,6 +124,7 @@ verify_hub() {
   checks="${STATE_DIR}/verify.json"
   apps="$(kubectl --context "$context" -n cicd get applications -o json 2>/dev/null)" || fail 'cannot read ArgoCD Applications' 'repair ArgoCD access and rerun'
   printf '%s' "$apps" | jq -e '(.items | length) > 0 and all(.items[]; .status.sync.status == "Synced" and .status.health.status == "Healthy")' >/dev/null || fail 'one or more cicd Applications are not Synced and Healthy, or none exist' 'repair Applications and rerun'
+  kubectl --context "$context" -n cicd get externalsecret argocd-oidc-secret >/dev/null 2>&1 || fail 'ArgoCD OIDC ExternalSecret cicd/argocd-oidc-secret is missing' 'clone shopping-cart-infra, then HUB_NEW_FROM=reconcile make hub-new'
   externals="$(kubectl --context "$context" get externalsecrets -A -o json 2>/dev/null)" || fail 'cannot read ExternalSecrets' 'repair ESO access and rerun'
   printf '%s' "$externals" | jq -e '(.items | length) > 0 and all(.items[]; .status.conditions | any(.type == "Ready" and .status == "True" and .reason == "SecretSynced"))' >/dev/null || fail 'one or more ExternalSecrets are not SecretSynced, or none exist' 'repair ESO and rerun'
   kubectl --context "$context" -n secrets exec vault-0 -- vault status 2>/dev/null | grep -E '^Sealed[[:space:]]+false' >/dev/null || fail 'Vault is sealed or unavailable' 'unseal Vault, then rerun'

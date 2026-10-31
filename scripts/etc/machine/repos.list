@@ -35,7 +35,7 @@ gitrepo/personal/shopping-carts/shopping-cart-basket|https://github.com/wilddog6
 gitrepo/personal/shopping-carts/shopping-cart-e2e-tests|https://github.com/wilddog64/shopping-cart-e2e-tests.git|main|worker
 gitrepo/personal/shopping-carts/shopping-cart-frontend|https://github.com/wilddog64/shopping-cart-frontend.git|main|worker
 gitrepo/personal/shopping-carts/shopping-cart-frontend-tw4|https://github.com/wilddog64/shopping-cart-frontend.git|chore/tailwind-v4-migration|worker
-gitrepo/personal/shopping-carts/shopping-cart-infra|https://github.com/wilddog64/shopping-cart-infra.git|main|worker
+gitrepo/personal/shopping-carts/shopping-cart-infra|https://github.com/wilddog64/shopping-cart-infra.git|main|hub,worker
 gitrepo/personal/shopping-carts/shopping-cart-infra-ldap|https://github.com/wilddog64/shopping-cart-infra.git|fix/remove-orphan-osixia-ldap|worker
 gitrepo/personal/shopping-carts/shopping-cart-order|https://github.com/wilddog64/shopping-cart-order.git|fix/automerge-app-token|worker
 gitrepo/personal/shopping-carts/shopping-cart-payment|https://github.com/wilddog64/shopping-cart-payment.git|fix/spring-boot-tools-jarmode|worker

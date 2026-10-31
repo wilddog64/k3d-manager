@@ -10,6 +10,11 @@ NEW_STATE_DIR="${HUB_NEW_STATE_DIR:-$HOME/.local/share/k3d-manager/hub-new}"
 REPORT="$NEW_STATE_DIR/hub-new-report.json"
 TTY="${HUB_CUTOVER_TTY:-/dev/tty}"
 VERIFY_TRIES="${HUB_CUTOVER_VERIFY_TRIES:-18}"
+CONTEXT="${HUB_CUTOVER_CONTEXT:-k3d-k3d-cluster}"
+ARGOCD_NS="${HUB_CUTOVER_ARGOCD_NS:-cicd}"
+CONTROLLER_WAIT="${HUB_CUTOVER_CONTROLLER_WAIT_S:-180}"
+CONTROLLER=statefulset/argocd-application-controller
+SELECTOR=app.kubernetes.io/name=argocd-application-controller
 VERIFY_WAIT="${HUB_CUTOVER_VERIFY_WAIT:-10}"
 
 labels=()
@@ -83,8 +88,72 @@ with open(path, "w") as out: json.dump(rows, out, indent=2); out.write("\n")
 PY
 }
 
+remote_kubectl() {
+  # shellcheck disable=SC2029
+  ssh "$OLD_HOST" "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context '$CONTEXT' -n '$ARGOCD_NS' $*"
+}
+
+controller_stopped() {
+  local side="$1" ready pods
+  if [[ "$side" == old ]]; then
+    ready="$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.status.readyReplicas}')" || return 1
+    pods="$(remote_kubectl get pods -l "$SELECTOR" -o name)" || return 1
+  else
+    ready="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get "$CONTROLLER" -o 'jsonpath={.status.readyReplicas}')" || return 1
+    pods="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get pods -l "$SELECTOR" -o name)" || return 1
+  fi
+  [[ ( -z "$ready" || "$ready" == 0 ) && -z "$pods" ]]
+}
+
+wait_controller_stopped() {
+  local side="$1" elapsed=0
+  while ! controller_stopped "$side"; do
+    (( elapsed < CONTROLLER_WAIT )) || return 1
+    sleep 1
+    ((elapsed+=1))
+  done
+}
+
+read_handoff() {
+  OLD_REPLICAS="$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" || { echo 'hub-cutover: cannot read old controller replicas' >&2; return 1; }
+  [[ "$OLD_REPLICAS" =~ ^[0-9]+$ ]] || { echo 'hub-cutover: invalid old controller replicas' >&2; return 1; }
+  CONFIG_SOURCE=local
+  if ! kubectl config get-contexts ubuntu-hostinger >/dev/null 2>&1 && [[ ! -f "$HOME/.kube/hostinger.config" ]]; then
+    ssh "$OLD_HOST" 'test -f "$HOME/.kube/hostinger.config"' || { echo 'hub-cutover: Hostinger kubeconfig missing on old host' >&2; return 1; }
+    CONFIG_SOURCE="$OLD_HOST:~/.kube/hostinger.config"
+  fi
+  echo "Old controller replicas: $OLD_REPLICAS"
+  echo "Hostinger kubeconfig source: $CONFIG_SOURCE"
+  echo 'Handoff plan: stop old controller, register Hostinger, start new controller, then load singletons'
+}
+
+handoff() {
+  printf '%s\n' "$OLD_REPLICAS" > "$STATE_DIR/old-argocd-controller-replicas"
+  remote_kubectl scale "$CONTROLLER" --replicas=0 || return 1
+  if ! wait_controller_stopped old; then
+    echo 'hub-cutover: old controller did not stop; run make hub-cutover-rollback' >&2
+    append_report old-controller-not-stopped; return 1
+  fi
+  if [[ "$CONFIG_SOURCE" != local ]]; then
+    mkdir -p "$HOME/.kube"
+    scp "$OLD_HOST:.kube/hostinger.config" "$HOME/.kube/hostinger.config" || return 1
+    chmod 600 "$HOME/.kube/hostinger.config" || return 1
+  fi
+  if ! CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_registration; then
+    echo 'hub-cutover: registration failed; run make hub-cutover-rollback' >&2
+    append_report registration-failed; return 1
+  fi
+  local replicas
+  replicas="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" || return 1
+  [[ "$replicas" =~ ^[0-9]+$ ]] || return 1
+  if [[ "$replicas" == 0 ]]; then kubectl --context "$CONTEXT" -n "$ARGOCD_NS" scale "$CONTROLLER" --replicas=1 || return 1; fi
+}
+
 verify_cutover() {
   local label output count frontend_code webhook_code
+  kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret cluster-ubuntu-hostinger -l k3d-manager/role=app-cluster -o name | grep -Fxq secret/cluster-ubuntu-hostinger || return 1
+  kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
+  [[ "$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" == 0 ]] || return 1
   make webhook-doctor || return 1
   frontend_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://frontend.3ai-talk.org/)" || return 1
   [[ "$frontend_code" == 200 ]] || { echo "hub-cutover: frontend returned $frontend_code" >&2; return 1; }
@@ -118,6 +187,16 @@ rollback() {
   [[ -f "$stopped" ]] || { echo "hub-cutover: no stopped-on-old record; refusing rollback" >&2; return 1; }
   print_plan
   confirm rollback || return 1
+  if [[ -f "$STATE_DIR/old-argocd-controller-replicas" ]]; then
+    local replicas
+    read -r replicas < "$STATE_DIR/old-argocd-controller-replicas"
+    [[ "$replicas" =~ ^[0-9]+$ ]] || { echo 'hub-cutover: invalid saved replica count' >&2; return 1; }
+    kubectl --context "$CONTEXT" -n "$ARGOCD_NS" scale "$CONTROLLER" --replicas=0 || return 1
+    wait_controller_stopped new || { echo 'hub-cutover: new controller did not stop; old controller not restored' >&2; return 1; }
+    remote_kubectl scale "$CONTROLLER" "--replicas=$replicas" || return 1
+  else
+    echo "hub-cutover: no recorded controller handoff; ArgoCD controllers left as they are. If the old controller is at 0, run: ssh $OLD_HOST 'PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context $CONTEXT -n $ARGOCD_NS scale $CONTROLLER --replicas=1'" >&2
+  fi
   for ((i=${#labels[@]}-1; i>=0; i--)); do
     label="${labels[i]}"
     if local_loaded "$label"; then launchctl bootout "gui/$(id -u)/$label"; else rc=$?; [[ $rc -eq 1 ]] || return "$rc"; fi
@@ -137,10 +216,12 @@ rollback() {
 if [[ "${1:-}" == --rollback ]]; then rollback; exit $?; fi
 read_report || exit 1
 print_plan
+read_handoff || exit 1
 if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
 confirm cutover || exit 1
 mkdir -p "$STATE_DIR"
 : > "$STATE_DIR/stopped-on-old"
+rm -f "$STATE_DIR/old-argocd-controller-replicas"
 for ((i=${#labels[@]}-1; i>=0; i--)); do
   label="${labels[i]}"
   if old_loaded "$label"; then
@@ -156,6 +237,7 @@ for label in "${labels[@]}"; do
     exit 1
   else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
 done
+handoff || exit 1
 for label in "${labels[@]}"; do
   [[ -f "$HOME/Library/LaunchAgents/$label.plist" ]] || { echo "hub-cutover: missing plist $label" >&2; append_report load-failed; exit 1; }
   launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" || { echo "hub-cutover: could not load $label; run make hub-cutover-rollback" >&2; append_report load-failed; exit 1; }

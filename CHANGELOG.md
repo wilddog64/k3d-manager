@@ -13,6 +13,21 @@
 
 ### Fixed
 
+- **`make hub-cutover` hands the Hostinger app cluster to the new hub's ArgoCD.** The cutover moved only
+  the launchd singletons. The M5 ArgoCD had no `cluster-ubuntu-hostinger` registration, so it ran 13
+  Applications to the M4's 33, and once the M4 cluster stopped nothing would have managed the shop. The
+  cutover now scales the old hub's `argocd-application-controller` to 0 and waits for its pod to go,
+  copies `~/.kube/hostinger.config` when the M5 lacks it, registers Hostinger with
+  `refresh_registration` (which now merges a saved kubeconfig when the context is missing), and starts
+  the M5 controller. Only one controller is active at a time while both hubs register Hostinger, so the
+  two never sync the same Applications. Verify now also requires the labelled registration, a Synced
+  and Healthy `ubuntu-hostinger-eso`, and the old controller still at 0. Rollback moves the controller
+  back by scaling and never deletes a registration, because deleting one makes the ApplicationSets
+  prune the generated Applications, the hub's ESO among them. hub-new also clones `shopping-cart-infra`
+  on hubs, fails preflight without its `argocd-secret.yaml`, and fails verify without
+  `cicd/argocd-oidc-secret`. On the M5 that ExternalSecret had been skipped with only a warning, which
+  would have broken ArgoCD's Keycloak login after cutover.
+
 - **`make hub-new` runs the hub reconcile after the data restore, not before it.** The reconcile ran
   inside `hub-restore`, two stages before `data` restores the Vault PVC from the old hub. On the M5
   Vault was still empty, so `keycloak/admin` and `keycloak/clients` did not exist, the
