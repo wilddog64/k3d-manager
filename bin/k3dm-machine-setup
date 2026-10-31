@@ -25,6 +25,7 @@ case "$role" in hub|worker|console) ;; *) usage >&2; exit 2 ;; esac
 case "$secrets_mode" in ask|skip) ;; *) printf 'Invalid --secrets value: %s (expected ask or skip)\n' "$secrets_mode" >&2; usage >&2; exit 2 ;; esac
 case "$agents_mode" in install|skip) ;; *) printf 'Invalid --agents value: %s (expected install or skip)\n' "$agents_mode" >&2; usage >&2; exit 2 ;; esac
 manifest_dir="${REPO_ROOT}/scripts/etc/machine"
+sudoers_file="${K3DM_SUDOERS_FILE:-/etc/sudoers.d/k3d-manager}"
 [[ -r "${manifest_dir}/brew.${role}.list" && -r "${manifest_dir}/secrets.${role}.list" && -r "${manifest_dir}/agents.${role}.list" ]] || { printf 'Missing role manifest\n' >&2; exit 2; }
 
 setup_log="${XDG_STATE_HOME:-$HOME/.local/state}/k3d-manager/machine-setup.log"
@@ -389,7 +390,7 @@ run_one_agent() {
   if [[ "$target" == smartcd-install ]]; then install_smartcd; return; fi
   if [[ "$role" != hub ]] && is_hub_agent "$target"; then record_failure "agent:${target}" 'skipped (hub only)'; return; fi
   label="$(agent_label "$target")"
-  if [[ "$target" == install-sudoers && -f /etc/sudoers.d/k3d-manager ]]; then report "agent:${target}" ok; return; fi
+  if [[ "$target" == install-sudoers && -f "$sudoers_file" ]]; then report "agent:${target}" ok; return; fi
   if [[ -n "$label" && -f "$HOME/Library/LaunchAgents/com.k3d-manager.${label}.plist" ]]; then report "agent:${target}" ok; return; fi
   if [[ "$mode" != setup ]]; then record_failure "agent:${target}" missing; return; fi
   if [[ "$agents_mode" == skip ]]; then report "agent:${target}" 'skipped (AGENTS=skip)'; return; fi

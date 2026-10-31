@@ -343,7 +343,7 @@ STUB
   register="$(grep -n '^refresh_registration k3s-hostinger' "$CALLS" | cut -d: -f1)"
   load="$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)"
   [ "$old_scale" -lt "$old_wait" ] && [ "$old_wait" -lt "$copy" ] && [ "$copy" -lt "$register" ] && [ "$register" -lt "$load" ]
-  [ "$(stat -f %Lp "$HOME/.kube/hostinger.config")" = 600 ]
+  [ "$(stat -c %a "$HOME/.kube/hostinger.config" 2>/dev/null || stat -f %Lp "$HOME/.kube/hostinger.config")" = 600 ]
 }
 
 @test "verify mode: re-verifies a recorded cutover and unblocks forwards" {

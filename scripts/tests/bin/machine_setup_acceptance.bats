@@ -67,6 +67,7 @@ miss() { printf '%s\n' "$1" >> "$MISSING"; }
 complete_machine() {
   local role="$1" p u b r f
   touch "$T/complete"
+  mkdir -p "$T/sudoers.d"; : > "$T/sudoers.d/k3d-manager"
   for x in ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$STUBS/$x"; chmod +x "$STUBS/$x"; done
   mkdir -p "$HOME_FX/Library/LaunchAgents" "$HOME_FX/.claude/.git" "$HOME_FX/.codex/.git" "$HOME_FX/.gemini/.git" "$HOME_FX/.copilot/.git" "$HOME_FX/.smartcd/lib/core" "$HOME_FX/src/gitrepo/personal/zshdotfiles"
   touch "$HOME_FX/.smartcd/lib/core/smartcd" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshrc" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshenv"
@@ -81,6 +82,14 @@ complete_machine() {
   for f in "$TREE"/scripts/etc/launchd/*.plist.tmpl; do
     : > "$HOME_FX/Library/LaunchAgents/$(basename "$f" .tmpl)"
   done
+  if [ -f "$TREE/scripts/etc/machine/files.$role.list" ]; then
+    while IFS= read -r f; do
+      case "$f" in '#'*|'') continue ;; esac
+      mkdir -p "$(dirname "$HOME_FX/$f")"
+      printf "fixture\n" > "$HOME_FX/$f"
+      chmod 600 "$HOME_FX/$f"
+    done < "$TREE/scripts/etc/machine/files.$role.list"
+  fi
 }
 
 ensure_copy() {
@@ -95,12 +104,12 @@ ensure_copy() {
 
 ms() {
   case " $* " in *" --check "*|*" --dry-run "*) ;; *) ensure_copy ;; esac
-  run env -i HOME="$HOME_FX" PATH="$STUBS:/usr/bin:/bin" TERM=dumb \
+  run env -i HOME="$HOME_FX" K3DM_SUDOERS_FILE="$T/sudoers.d/k3d-manager" PATH="$STUBS:/usr/bin:/bin" TERM=dumb \
     /bin/bash "$TREE/bin/k3dm-machine-setup" "$@" < /dev/null
 }
 
 mk() {
-  run env -i HOME="$HOME_FX" PATH="$STUBS:/usr/bin:/bin" TERM=dumb \
+  run env -i HOME="$HOME_FX" K3DM_SUDOERS_FILE="$T/sudoers.d/k3d-manager" PATH="$STUBS:/usr/bin:/bin" TERM=dumb \
     /usr/bin/make -C "$TREE" "$@" < /dev/null
 }
 
