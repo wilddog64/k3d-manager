@@ -1,6 +1,6 @@
 # Bug: "Re-read share after compaction" counts only Read-tool calls and cannot tell a needed re-read from a wasted one
 
-**Status:** OPEN — dispatch next session
+**Status:** OPEN — dispatched to Luna 2026-11-01
 **Priority:** P3
 **Severity:** low — the panel showed 20.6% (30d) from 63 Read calls, while ~13,300 Bash commands read files in the same window; the number cannot support an efficiency judgement either way; no runtime impact
 **Approval:** operator, 2026-11-01 ("probably can file it and do that in next session")

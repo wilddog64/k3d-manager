@@ -1877,3 +1877,9 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Heartbeat P3 LIVE-VERIFIED (28ba803a). ApplicationSets reapplied on v1.43.13 (operator). CLAUDE.md reapply rule now: at branch cut + before ArgoCD live checks (d73fbc96).
 - Open question: does acg-up reapply app-cluster ApplicationSets after registering ubuntu-k3s? If not, istio-ambient keeps generic CNI dirs for it (warning seen in the 2026-11-01 reapply; harmless while unregistered).
 - Auto-sync plan (v1.43.14) amended with deploy-pending report + hub-sync summary (27e29885); intent approval still pending.
+
+## 2026-11-01 session (v1.43.13 close-out)
+
+- Auto-sync plan (v1.43.14) intent approved by operator; dispatch after the v1.43.14 cut (plan says so).
+- Filed P3 `docs/bugs/2026-11-01-agent-activity-repo-bar-gauges-lose-names-past-eight-rows.md` (dispatchable fix for the 2026-10-24 bug's 2026-11-01 recurrence).
+- Dispatching to Luna serially (both touch grafana-dashboard-agent-activity.yaml): re-read share P3 first, then the bar-names P3.
