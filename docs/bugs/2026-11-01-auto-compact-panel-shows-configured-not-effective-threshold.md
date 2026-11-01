@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P3
 **Severity:** low — the panel showed 400K from 2026-10-22 to 2026-11-01 while every auto-compaction ran at about 168K, so the context-window trial looked active when it measured nothing; no runtime impact
-**Approval:** pending — filed at the operator's prompt on 2026-11-01 ("did you file this bug already?"); dispatch needs a go because the dashboard deploys to the hub
+**Approval:** operator, 2026-11-01 ("please dispatch this one to Luna too")
 **Filed:** 2026-11-01
 **Detected by:** operator (dashboard 400K vs the statusline's ctx …/200k), root cause by Claude
 **Affected:** `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` (panel "Auto-compact threshold")
