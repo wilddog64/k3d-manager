@@ -7,7 +7,7 @@
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** `bin/k3dm-machine-setup` (hub role), `scripts/lib/foundation/scripts/lib/acg/acg.sh` (`acg_provision`, lines ~226-231; fix upstream in lib-foundation, then subtree-pull)
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-01-hub-secrets-manifest-omits-slack-role-map.md` (same migration, Keychain items); `docs/bugs/2026-11-01-acg-up-on-dev-node-restarts-retired-local-hub.md`
 
 ## Observed failure

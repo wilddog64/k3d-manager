@@ -4,7 +4,13 @@
 
 - Landed: pushgateway, vault list-kubeconfig, billable warning, run-outcome labels, cleanup env pin, webhook bot thread, machine-setup EC2 key, fast-gate skip `ce0f3f25`.
 - Docs audit applied `dbf62261`; deferrals recorded in `docs/roadmap.md`.
-- M5 appsets reapply/check + platform-ops done; PR #155 CI green at 63ba9b22, Copilot resolved; ready to merge.
+- M5 appsets reapply/check + platform-ops done; PR #155 CI green at 63ba9b22, Copilot resolved.
+- [x] PRs merged: #155 `abcde772`; tag + GitHub release `v1.43.13`; enforce_admins restored. Dependabot #154 closed (subtree lockfile; bump goes upstream first).
+- [ ] Three fixes have no stored verifier evidence (P1 pre-push gate, P2 hub-migration Slack config, P2 TTY hang); their verify events were withdrawn. Re-verify with evidence in v1.43.14.
+
+## 2026-11-01 v1.43.14 opened
+
+- Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
 
 ## 2026-10-23 API status channel bug filed
 

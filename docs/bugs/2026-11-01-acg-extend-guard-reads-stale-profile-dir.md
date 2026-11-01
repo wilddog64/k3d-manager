@@ -7,7 +7,7 @@
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** lib-foundation `scripts/lib/acg/playwright/acg_extend.js` (`AUTH_DIR`, `_isFirstRun`, line ~16/47/168), `acg_restart.js` (`AUTH_DIR`, line 29); k3d-manager's copy `scripts/playwright/acg_extend.js`. Fix upstream in lib-foundation, then subtree-pull.
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails.md` (same run)
 
 ## Observed failure

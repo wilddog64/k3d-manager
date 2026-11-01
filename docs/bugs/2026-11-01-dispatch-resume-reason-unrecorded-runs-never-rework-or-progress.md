@@ -7,7 +7,7 @@
 **Filed:** 2026-11-01
 **Detected by:** Claude, replaying the exporter over the M4 ledger (`~/.local/share/k3d-manager/worktrees/ledger.jsonl`, 2026-11-01)
 **Affected:** `bin/k3dm-codex-dispatch` (`_dispatch_resume`, `_dispatch_usage`), `bin/k3dm-dispatch-metrics` (`_run_outcomes`, ~lines 999-1100)
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.14`
 **Depends on:** `docs/bugs/2026-11-01-dispatch-run-outcome-unknown-lumps-missing-evidence.md` landing first (same function; this bug turns its `superseded` label into verdicts where the ledger has a reason)
 **Related:** `docs/plans/v1.43.6-dispatch-verified-delivery-cost.md` (defines the outcome classes); `docs/plans/v1.43.15-claude-cost-task-attribution.md` (the cost half of the same gap)
 

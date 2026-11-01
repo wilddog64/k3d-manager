@@ -7,7 +7,7 @@
 **Filed:** 2026-11-01
 **Detected by:** Claude, reading `bin/cluster-up` before the session's acg-up
 **Affected:** `bin/cluster-up` (hub bootstrap, lines ~528-545: `k3d cluster list` → `deploy_cluster --provider k3d` or `k3d cluster start`)
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/plans/v1.43.14-control-node-role.md` (machine roles); `docs/plans/v1.43.12-m5-new-hub-one-command.md` (cutover); `memory: project_m5_air_new_hub`
 
 ## Observed state
