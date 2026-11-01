@@ -2198,3 +2198,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: e7a0ecfb diagnosed (empty .pub); retry pending.
 - 2026-11-01: 4 hub fixes dispatched to Luna.
 - 2026-11-01: run-outcome P3 dispatched.
+- 2026-11-01: run-outcome P3 resumed for layout.
