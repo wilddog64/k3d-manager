@@ -1181,12 +1181,14 @@ SH
   [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
   [ -f "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist" ]
   [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
-  ! grep -q '^launchctl ' "$CALL_LOG"
+  run grep -q '^launchctl ' "$CALL_LOG"
+  [ "$status" -eq 1 ]
   rm "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist"
   touch "$CALL_LOG.fail-render"
   tty_machine --role hub
   [ "$status" -ne 0 ]
   [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'missing (candidate render failed)'* ]]
   [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
-  ! grep -q '^launchctl ' "$CALL_LOG"
+  run grep -q '^launchctl ' "$CALL_LOG"
+  [ "$status" -eq 1 ]
 }

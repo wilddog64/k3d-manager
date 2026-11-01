@@ -639,5 +639,6 @@ STUB
   [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'missing'* ]]
   [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
   [ ! -e "$agents/com.k3d-manager.heartbeat.plist" ]
-  ! grep -q '^launchctl ' "$CALLS"
+  run grep -q '^launchctl ' "$CALLS"
+  [ "$status" -eq 1 ]
 }
