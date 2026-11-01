@@ -171,9 +171,12 @@ It installs the SSM plugin first via `make ssm` then provisions the full CloudFo
 
 | Target | When to use |
 |---|---|
-| `make sudoers` | One-time setup: install `/etc/sudoers.d/k3d-manager` so `make up/down/refresh` run without sudo password prompts |
+| `make install-sudoers` | One-time setup: install `/etc/sudoers.d/k3d-manager` so `make up/down/refresh` run without sudo password prompts |
+| `make machine-setup ROLE=hub\|worker\|console [FROM=<mac>]` | Configure a Mac from its role manifest; `FROM=` copies missing Keychain items and listed files over SSH. See [machine setup](machine-setup.md) |
+| `make machine-check ROLE=...` | Read-only inventory of the same items; exits nonzero when one is missing |
+| `make machine-check-shell HOST=<mac>` | Read-only: open an SSH login shell on a new Mac and fail on prompts, errors or insecure completion directories |
 
-`make sudoers` delegates to `bin/install-sudoers.sh`. It validates the rules with
+`make install-sudoers` delegates to `bin/install-sudoers.sh`. It validates the rules with
 `visudo -c` before installing. To remove: `bin/install-sudoers.sh --uninstall`.
 
 ---
@@ -215,6 +218,7 @@ the store rather than truncating it. See
 | `make test-python-unit` | `python3 scripts/tests/bin/<suite>.py` | The stdlib-`unittest` suites — every `scripts/tests/bin/*.py` whose name is not `test_*.py` |
 | `make test-pytest` | `pytest scripts/tests/hermes scripts/tests/bin/test_*.py` | The pytest suites — Hermes plus the `test_*.py` files under `scripts/tests/bin` |
 | `make test-python` | `test-python-unit` + `test-pytest` | Both Python halves in one call |
+| `make fast-gate [BASE=<rev>]` | `scripts/ci/fast_gate.sh` | Changed-file lint and selected tests in under a minute; the pre-push hook and `codex-dispatch land` run it. See [fast gate](fast-gate.md) |
 | `make test-all` | `test` + `test-bin` + `test-python` + metrics publication | Everything that runs offline, with the result sent to the `k3dm Tests` dashboard |
 | `make bug-tally` | Count bug documents by release, status and priority | Deterministic bug inventory; use `RELEASE=vX.Y.Z` or `JSON=1` |
 | `make lint-python` | `ruff check -- <tracked Python files>` | Run Ruff's pyflakes rules over `.py` files and Python-shebang scripts |

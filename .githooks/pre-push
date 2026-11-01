@@ -3,7 +3,8 @@ set -euo pipefail
 
 remote="$1"
 
-while IFS=' ' read -r local_ref _ remote_ref _; do
+bases=()
+while IFS=' ' read -r local_ref _ remote_ref remote_sha; do
   if [[ "$remote_ref" == "refs/heads/main" ]] && \
      [[ "$local_ref" != "refs/heads/main" ]]; then
     if [[ "${ALLOW_MAIN_PUSH:-0}" == "1" ]]; then
@@ -15,4 +16,12 @@ while IFS=' ' read -r local_ref _ remote_ref _; do
       exit 1
     fi
   fi
+  if [[ "$local_ref" != "(delete)" && ! "$remote_sha" =~ ^0+$ ]]; then bases+=("$remote_sha"); fi
 done
+if [[ "${K3DM_SKIP_FAST_GATE:-0}" == 1 ]]; then
+  echo "pre-push: fast gate skipped (K3DM_SKIP_FAST_GATE=1)"
+elif (( ${#bases[@]} )); then
+  for base in "${bases[@]}"; do scripts/ci/fast_gate.sh "$base"; done
+else
+  scripts/ci/fast_gate.sh
+fi

@@ -1775,6 +1775,13 @@ function _argocd_keychain_value() {
    _no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "${_service}" "${_account}" 2>/dev/null || true
 }
 
+function _argocd_keychain_unreadable() {
+   local _service="${1:?service required}" _account="${2:?account required}"
+   [[ "$(uname -s)" == "Darwin" ]] || return 1
+   security find-generic-password -s "${_service}" -a "${_account}" >/dev/null 2>&1 || return 1
+   _warn "[argocd] ${_service} present in Keychain but unreadable (login Keychain locked?)"
+}
+
 function argocd_sync_webhook_token_secret() {
    local _ns="${1:-cicd}"
    local _service="k3dm-webhook-token"
@@ -1784,6 +1791,7 @@ function argocd_sync_webhook_token_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _warn "[argocd] ${_service} not found in Keychain (${_service}/${_account}) — run bin/k3dm-webhook-setup to create it, then re-run; skipping cluster Secret sync"
       return 0
    fi
@@ -1802,6 +1810,7 @@ function argocd_sync_app_rebuild_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       if _kubectl --no-exit get secret "${_name}" -n "${_ns}" >/dev/null 2>&1; then
          _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — Secret already present in ${_ns}; leaving as-is"
       elif _kubectl --no-exit get cronjob app-cve-scan -n "${_ns}" >/dev/null 2>&1; then
@@ -1826,6 +1835,7 @@ function argocd_sync_git_writer_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional CVE git-writer PAT; skipping (store a dedicated fine-grained PAT scoped to wilddog64/k3d-manager contents:write ONLY — do NOT reuse a broad gh CLI token)"
       return 0
    fi
@@ -1843,6 +1853,7 @@ function _argocd_sync_notifications_slack_secret_untraced() {
 
    _value=$(_argocd_keychain_value "${_service}" "${_account}")
    if [[ -z "${_value}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _info "[argocd] ${_service} not in Keychain"
       return 0
    fi
@@ -1867,15 +1878,55 @@ function argocd_sync_notifications_slack_secret() {
 
 function _argocd_apply_credential_rotator() {
    local _manifest="${ARGOCD_CONFIG_DIR}/platform-ops/argocd-credential-rotator.yaml"
-   [[ -f "${_manifest}" ]] || return 0
-   _kubectl apply -f "${_manifest}" >/dev/null \
-      && _info "[argocd] ArgoCD monthly credential rotator applied"
+   [[ -f "${_manifest}" ]] || { _err "[argocd] ArgoCD rotator manifest missing: ${_manifest}"; return 1; }
+   _kubectl apply -f "${_manifest}" >/dev/null || return 1
+   _info "[argocd] ArgoCD monthly credential rotator applied"
    if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
       _vault_configure_secret_writer_role "secrets" "vault" \
          "argocd-credential-rotator" "cicd" "secret" "argocd/admin" \
          "argocd-rotation" "argocd-rotation" \
-         || _err "[argocd] failed to configure ArgoCD rotation Vault role"
+         || { _err "[argocd] failed to configure ArgoCD rotation Vault role"; return 1; }
    fi
+}
+
+function _argocd_platform_ops_rotator() {
+   local name="$1" namespace="$2" func="$3"
+   if ! _kubectl --no-exit get namespace "$namespace" >/dev/null 2>&1; then
+      _info "[argocd] ${name} rotator: skipped (namespace ${namespace} absent)"
+      return 0
+   fi
+   if ! declare -F "$func" >/dev/null; then
+      printf 'ERROR: [argocd] rotator apply function %s is not defined\n' "$func" >&2
+      _info "[argocd] ${name} rotator: failed"
+      return 1
+   fi
+   if ( "$func" "$namespace" ); then
+      _info "[argocd] ${name} rotator: applied"
+   else
+      _info "[argocd] ${name} rotator: failed"
+      return 1
+   fi
+}
+
+function _argocd_platform_ops_rotators() {
+   local rc=0 plugin
+   for plugin in observability ldap; do
+      if [[ -r "${PLUGINS_DIR}/${plugin}.sh" ]]; then
+         # shellcheck disable=SC1090
+         source "${PLUGINS_DIR}/${plugin}.sh" || rc=1
+      else
+         printf 'ERROR: [argocd] cannot load %s plugin\n' "$plugin" >&2
+         rc=1
+      fi
+   done
+   _argocd_platform_ops_rotator ArgoCD "${ARGOCD_NAMESPACE:-cicd}" _argocd_apply_credential_rotator || rc=1
+   _argocd_platform_ops_rotator Grafana monitoring _observability_apply_grafana_rotator || rc=1
+   if [[ "${LDAP_ROTATOR_ENABLED:-1}" == 0 ]]; then
+      _info "[argocd] LDAP rotator: skipped (disabled)"
+   else
+      _argocd_platform_ops_rotator LDAP "${LDAP_NAMESPACE:-identity}" _ldap_deploy_password_rotator || rc=1
+   fi
+   return "$rc"
 }
 
 function deploy_argocd_platform_ops() {
@@ -1996,9 +2047,11 @@ EOF
       | jq -e '.data["slack-incoming-webhook-url"] | type == "string" and length > 0' >/dev/null 2>&1; then
       _warn "[argocd] platform-ops-notifications has no slack-incoming-webhook-url — system notices will not be sent"
    fi
-   _argocd_apply_credential_rotator
+   local _rotator_rc=0
+   _argocd_platform_ops_rotators || _rotator_rc=1
 
    _info "[argocd] platform-ops deployed — app CVE scan daily 01:00, ArgoCD CVE scan daily 01:30 (America/Los_Angeles), expiry check every 30m, remediation verify every 15m"
+   return "$_rotator_rc"
 }
 
 function argocd_check_values_branch() {

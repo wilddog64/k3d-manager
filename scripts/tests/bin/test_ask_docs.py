@@ -555,3 +555,14 @@ def test_source_metadata_is_per_answer_not_shared(monkeypatch, tmp_path):
         assert "[P1 · open]" not in other
     finally:
         ask_docs.REPO_ROOT = old_root
+
+
+def test_count_truncation_marker_depends_on_release(monkeypatch):
+    monkeypatch.setattr(ask_docs.bug_count, "reply", lambda _query: ("long line\n" * 1000))
+    named = ask_docs.answer("how many bugs in v1.43.5")
+    all_releases = ask_docs.answer("how many bugs")
+    assert 'add a priority, e.g. "P2 bugs in v1.43.5"' in named
+    assert "name a release to see the full list" not in named
+    assert ask_docs.TRUNCATION_MARKER in all_releases
+    assert len(named) <= ask_docs.MAX_REPLY_CHARS
+    assert len(all_releases) <= ask_docs.MAX_REPLY_CHARS

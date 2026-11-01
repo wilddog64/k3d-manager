@@ -620,6 +620,7 @@ SH
   [ "$(command -v kubectl)" = "${fakebin}/kubectl" ]
   source "${BATS_TEST_DIRNAME}/../../lib/foundation/scripts/lib/system.sh"
   _argocd_keychain_value() { :; }
+  _argocd_keychain_unreadable() { return 1; }
 }
 
 @test "app-rebuild sync with no Keychain item and no Secret returns 0 instead of exiting" {

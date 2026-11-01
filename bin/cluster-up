@@ -240,7 +240,16 @@ function _acg_up_cleanup() {
     _cf_stack_name="$(sed -n 's/^stack_name=//p' "${_cf_marker}" 2>/dev/null || true)"
     _cf_region="$(sed -n 's/^region=//p' "${_cf_marker}" 2>/dev/null || true)"
     if [[ -n "${_cf_stack_name}" && -n "${_cf_region}" ]]; then
-      _warn "[acg-up] CloudFormation stack '${_cf_stack_name}' (${_cf_region}) was created by this run and is still running — billable. Reclaim it with: make down"
+      local _cf_result _cf_confirmation=""
+      if _cf_result="$(_run_command --soft --quiet -- aws cloudformation describe-stacks --stack-name "${_cf_stack_name}" --region "${_cf_region}" 2>&1)"; then
+        :
+      elif [[ "${_cf_result}" == *"ValidationError"* && "${_cf_result}" == *"Stack with id ${_cf_stack_name} does not exist"* ]]; then
+        _info "[acg-up] no CloudFormation stack was created by this run"
+        return
+      else
+        _cf_confirmation=" (not confirmed)"
+      fi
+      _warn "[acg-up] CloudFormation stack '${_cf_stack_name}' (${_cf_region}) was created by this run and is still running — billable${_cf_confirmation}. Reclaim it with: make down"
     fi
   fi
 }

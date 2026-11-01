@@ -105,7 +105,7 @@ data:
           "description": "Compaction boundaries in the selected time window divided by verified specs in the window.",
           "gridPos": {
             "h": 6,
-            "w": 8,
+            "w": 6,
             "x": 0,
             "y": 1
           },
@@ -202,11 +202,11 @@ data:
             }
           },
           "title": "Re-read share after compaction",
-          "description": "Share of Read tool calls in the selected time window that re-read a file already read before the latest compaction boundary in the same session.",
+          "description": "Share of file reads in the selected window that first re-read a file after a compaction boundary in the same session.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 8,
+            "w": 6,
+            "x": 6,
             "y": 1
           },
           "datasource": {
@@ -300,12 +300,12 @@ data:
               "valueSize": 32
             }
           },
-          "title": "Auto-compact threshold",
-          "description": "Latest non-future auto_compact_tokens setting from docs/metrics/context-window-experiment.md.",
+          "title": "Auto-compact setting (configured)",
+          "description": "Latest non-future auto_compact_tokens setting from docs/metrics/context-window-experiment.md. It may not take effect: a setting above the session context window is ignored.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 16,
+            "w": 6,
+            "x": 12,
             "y": 1
           },
           "datasource": {
@@ -339,6 +339,47 @@ data:
           }
         },
         {
+          "id": 99,
+          "type": "stat",
+          "title": "Observed compaction point",
+          "description": "Mean context size at automatic compactions in the selected window, from transcript compactMetadata.preTokens; this is the threshold that actually applied.",
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 1},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "k3dm_claude_compaction_pre_tokens_sum{window=\"$window\",trigger=\"auto\"} / k3dm_claude_compactions{window=\"$window\",trigger=\"auto\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No auto-compactions in window",
+              "mappings": [
+                {"type": "special", "options": {"match": "nan", "result": {"text": "No auto-compactions in window"}}},
+                {"type": "special", "options": {"match": "null", "result": {"text": "No auto-compactions in window"}}}
+              ],
+              "color": {"mode": "fixed", "fixedColor": "blue"}
+            },
+            "overrides": []
+          },
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 100,
+          "type": "stat",
+          "title": "Wasted re-read share",
+          "description": "Share of reads that re-read content identical to the pre-compaction read.",
+          "gridPos": {"h": 6, "w": 24, "x": 0, "y": 13},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_claude_reads{window=\"$window\",kind=\"reread_unchanged\"} / ignoring(kind) (k3dm_claude_reads{window=\"$window\",kind=\"all\"} > 0)", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "fixed", "fixedColor": "blue"}, "noValue": "No reads in window", "mappings": [
+            {"type": "special", "options": {"match": "nan", "result": {"text": "No reads in window"}}},
+            {"type": "special", "options": {"match": "null", "result": {"text": "No reads in window"}}}
+          ]}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
           "id": 49,
           "type": "row",
           "title": "All Codex activity (including outside the dispatcher)",
@@ -347,7 +388,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 13
+            "y": 19
           }
         },
         {
@@ -364,7 +405,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -418,7 +459,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -472,7 +513,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -518,7 +559,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -563,7 +604,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -571,9 +612,14 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})",
+              "expr": "topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"}))",
               "instant": true,
               "legendFormat": "{{repo}} {{mode}}"
+            },
+            {
+              "expr": "(sum(sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})) - sum(topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})))) > 0",
+              "instant": true,
+              "legendFormat": "other"
             }
           ],
           "fieldConfig": {
@@ -614,7 +660,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -665,7 +711,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -673,9 +719,14 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (repo) (k3dm_codex_tokens{window=\"$window\"})",
+              "expr": "topk(8, sum by (repo) (k3dm_codex_tokens{window=\"$window\"}))",
               "instant": true,
               "legendFormat": "{{repo}}"
+            },
+            {
+              "expr": "(sum(sum by (repo) (k3dm_codex_tokens{window=\"$window\"})) - sum(topk(8, sum by (repo) (k3dm_codex_tokens{window=\"$window\"})))) > 0",
+              "instant": true,
+              "legendFormat": "other"
             }
           ],
           "fieldConfig": {
@@ -721,7 +772,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -767,7 +818,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 28
+            "y": 34
           },
           "datasource": {
             "type": "prometheus",
@@ -808,7 +859,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 40
           }
         },
         {
@@ -825,7 +876,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -871,7 +922,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -917,7 +968,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -963,7 +1014,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -1004,7 +1055,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 41
+            "y": 47
           }
         },
         {
@@ -1021,7 +1072,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1067,7 +1118,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1113,7 +1164,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1154,7 +1205,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1205,7 +1256,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 50
+            "y": 56
           },
           "datasource": {
             "type": "prometheus",
@@ -1261,7 +1312,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 50
+            "y": 56
           },
           "datasource": {
             "type": "prometheus",
@@ -1302,7 +1353,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 28
+            "y": 34
           },
           "datasource": {
             "type": "prometheus",

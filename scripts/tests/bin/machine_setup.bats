@@ -61,6 +61,7 @@ setup_machine_fixture() {
   FIXHOME="$BATS_TEST_TMPDIR/home"
   STUBS="$BATS_TEST_TMPDIR/stubs"
   CALL_LOG="$BATS_TEST_TMPDIR/calls"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]] || return 1
   mkdir -p "$FIXROOT/bin" "$FIXROOT/scripts/lib" "$FIXROOT/scripts/etc/machine" "$FIXHOME" "$STUBS"
   cp "$SCRIPT_SOURCE" "$FIXROOT/bin/k3dm-machine-setup"
   chmod +x "$FIXROOT/bin/k3dm-machine-setup"
@@ -105,6 +106,7 @@ SH
   cat > "$STUBS/security" <<'SH'
 #!/bin/sh
 printf 'security %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = show-keychain-info ] && exit 0
 exit 1
 SH
   cat > "$STUBS/git" <<'SH'
@@ -149,6 +151,15 @@ printf 'make %s\n' "$*" >> "$CALL_LOG"
 if [ -e "$CALL_LOG.installsmartcd" ]; then mkdir -p "$HOME/.smartcd/lib/core"; : > "$HOME/.smartcd/lib/core/smartcd"; fi
 exit 0
 SH
+  cat > "$STUBS/ssh-keygen" <<'SH'
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -f ]; then key="$2"; shift 2; else shift; fi
+done
+printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$key"
+printf '%s\n' 'public-test-key' > "$key.pub"
+printf 'ssh-keygen called\n' >> "$CALL_LOG"
+SH
   chmod +x "$STUBS"/*
 }
 
@@ -183,6 +194,8 @@ run_machine() {
     mkdir -p "$FIXHOME/$dir/.git"
   done
   mkdir -p "$FIXHOME/Library/LaunchAgents"
+  mkdir -p "$FIXHOME/.local/bin"
+  for name in agy gemini; do printf '#!/bin/sh\nexit 0\n' > "$FIXHOME/.local/bin/$name"; chmod +x "$FIXHOME/.local/bin/$name"; done
   : > "$FIXHOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
   mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
   touch "$CALL_LOG.installsmartcd"
@@ -305,6 +318,49 @@ run_machine() {
   grep -Eq '^secret:fixture[[:space:]]+missing' <<< "$output"
 }
 
+@test "machine setup: unprefixed brew packages accept either installation type" {
+  setup_machine_fixture
+  # Exit codes captured 2026-10-31: m5-air.local `brew list --formula azure-cli` 1, `--cask` 0; m4-air `--formula` 0, `--cask` 1.
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+case "$*" in
+  'list --cask azure-cli') echo 'azure-cli 2.91.0'; exit 0 ;;
+  'list --formula formula-package') echo 'formula-package 2.90.0'; exit 0 ;;
+  list*) exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  printf '%s\n' azure-cli formula-package > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  for mode in --check ''; do
+    run_machine --role console $mode
+    [ "$status" -eq 0 ]
+    grep -Eq '^brew:azure-cli[[:space:]]+ok$' <<< "$output"
+    grep -Eq '^brew:formula-package[[:space:]]+ok$' <<< "$output"
+  done
+  run ! grep -q '^brew install' "$CALL_LOG"
+}
+
+@test "machine setup: absent and explicitly typed brew packages remain strict" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+case "$*" in
+  'list --cask azure-cli'|'list --formula formula-package') exit 0 ;;
+  list*) exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  printf '%s\n' absent formula:azure-cli cask:formula-package > "$FIXROOT/scripts/etc/machine/brew.console.list"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  for name in absent azure-cli formula-package; do
+    grep -Eq "^brew:${name}[[:space:]]+missing$" <<< "$output"
+  done
+}
+
 @test "machine setup: missing Homebrew skips brew and continues reporting" {
   setup_machine_fixture
   rm "$STUBS/brew"
@@ -394,6 +450,35 @@ run_machine() {
   run ! grep -q '^secrets pull ' "$CALL_LOG"
 }
 
+tty_limited() {
+  perl -MPOSIX -e '
+    my $limit = shift;
+    $limit =~ /^[1-9][0-9]*$/ or die "timeout must be a positive integer\n";
+    my $pid = fork(); defined $pid or die "fork: $!\n";
+    if (!$pid) { POSIX::setsid() >= 0 or die "setsid: $!\n"; exec @ARGV; die "exec: $!\n"; }
+    my $expired = 0;
+    $SIG{ALRM} = sub { $expired = 1; die "timeout\n"; };
+    alarm $limit;
+    my $waited;
+    eval { $waited = waitpid($pid, 0); };
+    if ($expired) {
+      my %children;
+      open my $ps, "-|", "ps", "-axo", "pid=,ppid=" or die "ps: $!\n";
+      while (<$ps>) { if (/^\s*(\d+)\s+(\d+)/) { push @{$children{$2}}, $1; } }
+      close $ps;
+      my @pending = ($pid); my @descendants;
+      while (@pending) { my $p = shift @pending; push @descendants, $p; push @pending, @{$children{$p} || []}; }
+      kill "KILL", reverse @descendants;
+      kill "KILL", -$pid;
+      waitpid($pid, 0) unless defined $waited;
+      print STDERR "timed out after ${limit}s\n";
+      exit 124;
+    }
+    alarm 0;
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$@"
+}
+
 tty_machine() {
   command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
   local wrapper="$BATS_TEST_TMPDIR/tty-machine"
@@ -402,10 +487,11 @@ tty_machine() {
   printf '\n' >> "$wrapper"
   chmod +x "$wrapper"
   if [[ "$(uname -s)" == Darwin ]]; then
-    run bash -c "/bin/sleep 3 | script -q /dev/null '$wrapper'"
+    run tty_limited "${TTY_MACHINE_TIMEOUT:-60}" bash -c "/bin/sleep 3 | script -q /dev/null '$wrapper'"
   else
-    run bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
+    run tty_limited "${TTY_MACHINE_TIMEOUT:-60}" bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
   fi
+  if [[ "$status" -eq 124 ]]; then printf 'tty_machine %s\n' "$output"; return 1; fi
   [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox pseudo-terminal does not permit terminal reads'
 }
 
@@ -832,4 +918,364 @@ SH
   [[ "$output" == *"file:~/.ssh/config.d/operator"* ]]
   [ "$(cat "$FIXHOME/.ssh/config")" = 'Include ~/.ssh/config.d/operator' ]
   [ ! -e "$FIXHOME/.ssh/config.pre-machine-setup" ]
+}
+
+@test "remote switching: authenticated SSH switches managed origins and restores failed probes" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* ]]
+  mkdir -p "$FIXHOME/src/a/.git" "$FIXHOME/src/b/.git" "$FIXHOME/src/other/.git"
+  printf '%s\n' 'a|https://github.com/wilddog64/a.git|-|console' 'b|https://github.com/wilddog64/b.git|-|console' 'other|https://github.com/cxreg/other.git|-|console' > "$FIXROOT/scripts/etc/machine/repos.list"
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+# Captured on m4-air.local, 2026-10-31T19:53:21Z:
+# ssh -o BatchMode=yes -o ConnectTimeout=10 -T git@github.com (exit 1).
+echo "Hi wilddog64! You've successfully authenticated, but GitHub does not provide shell access."
+exit 1
+SH
+  cat > "$STUBS/git" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$CALL_LOG"
+[ "$1" = -C ] || exit 0
+case "$3 $4" in
+  'remote get-url') case "$2" in */other) echo https://github.com/cxreg/other.git ;; *) echo "https://github.com/wilddog64/${2##*/}.git" ;; esac ;;
+  'ls-remote origin') case "$2" in */b) exit 1 ;; esac ;;
+esac
+SH
+  chmod +x "$STUBS/ssh" "$STUBS/git"
+  run_machine --role console
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'remote:~/src/a'*'switched to ssh'* ]]
+  [[ "$(printf '%s\n' "$output" | grep '^remote:')" != *"$FIXHOME"* ]]
+  grep -Fq 'remote set-url origin git@github.com:wilddog64/a.git' "$CALL_LOG"
+  grep -Fq 'remote set-url origin https://github.com/wilddog64/b.git' "$CALL_LOG"
+  run ! grep -Fq 'set-url origin git@github.com:cxreg' "$CALL_LOG"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'https (SSH available)'* ]]
+  printf '#!/bin/sh\nexit 1\n' > "$STUBS/ssh"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'https (no GitHub SSH key yet)'* ]]
+}
+
+@test "completion permissions: check reports and setup repairs home only" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.zplug" "$BATS_TEST_TMPDIR/brew/share/zsh"
+  touch "$FIXHOME/.zplug/insecure" "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  chmod 777 "$FIXHOME/.zplug/insecure" "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  printf '#!/bin/sh\n[ "$1" != --prefix ] || echo "%s"\n' "$BATS_TEST_TMPDIR/brew" > "$STUBS/brew"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'~/.zplug/insecure'* ]]
+  [[ "$(printf '%s\n' "$output" | grep '^zsh:completion-dirs')" != *"$FIXHOME"* ]]
+  run_machine --role console
+  [ "$status" -eq 1 ]
+  [ "$(/usr/bin/python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$FIXHOME/.zplug/insecure")" = 0o755 ]
+  [ "$(/usr/bin/python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$BATS_TEST_TMPDIR/brew/share/zsh/insecure")" = 0o777 ]
+  chmod 755 "$BATS_TEST_TMPDIR/brew/share/zsh/insecure"
+  run_machine --role console --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'zsh:completion-dirs'*'ok'* ]]
+}
+
+@test "linked SSH config keeps its link and receives one Include" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh/config.d"
+  echo existing > "$FIXHOME/ssh-target"
+  ln -s "$FIXHOME/ssh-target" "$FIXHOME/.ssh/config"
+  echo fragment > "$FIXHOME/.ssh/config.d/operator"
+  echo .ssh/config.d/operator > "$FIXROOT/scripts/etc/machine/files.console.list"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [ -L "$FIXHOME/.ssh/config" ]
+  [ "$(grep -c '^Include ~/.ssh/config.d/operator$' "$FIXHOME/ssh-target")" -eq 1 ]
+}
+
+@test "login shell check invokes an interactive login shell and detects captured errors" {
+  setup_machine_fixture
+  rm "$STUBS/python3"
+  cat > "$STUBS/ssh" <<'SH'
+#!/bin/sh
+# Login messages reported by the operator on the M5, 2026-10-31.
+printf '%s\n' "$*" > "$SSH_CALL"
+[ "$5" = '$SHELL -lic exit' ] || exit 42
+printf '%s\n' "${SHELL_FIXTURE:-clean}"
+SH
+  chmod +x "$STUBS/ssh"
+  local message
+  for message in "Username for 'https://github.com': " 'zsh compinit: insecure directories, run compaudit for list.' 'compdef: command not found' '_main_complete:412: _lastcomp: assignment to invalid subscript range'; do
+    run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE="$message" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"$message"* || "$output" == *"${message% }"* ]]
+    grep -Fxq -- '-tt -o BatchMode=yes fixture $SHELL -lic exit' "$CALL_LOG"
+  done
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" HOME="$FIXHOME" SHELL_FIXTURE="command not found $FIXHOME/secret ghp_abcdefghijklmnopqrstuvwxyz123456" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'~/secret'* && "$output" != *"$FIXHOME"* && "$output" != *'ghp_abc'* ]]
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 0 ]
+  # zplug banner on a clean login, captured on m5-air.local and m2-air.local, 2026-10-31.
+  run env PATH="$STUBS:/usr/bin:/bin" SSH_CALL="$CALL_LOG" SHELL_FIXTURE=$'[zplug] \e[33mRun compinit\e[00m' "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 0 ]
+  run env SSH_CALL="$CALL_LOG" "$STUBS/ssh" -tt -o BatchMode=yes fixture exit
+  [ "$status" -eq 42 ]
+}
+
+@test "login shell check times out and validates its timeout" {
+  setup_machine_fixture
+  rm "$STUBS/python3"
+  printf '#!/bin/sh\nexec sleep 5\n' > "$STUBS/ssh"
+  chmod +x "$STUBS/ssh"
+  run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT=2 "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'timed out'* ]]
+  for value in 0 -1 abc 1.5 ''; do
+    run env PATH="$STUBS:/usr/bin:/bin" K3DM_CHECK_SHELL_TIMEOUT="$value" "$FIXROOT/bin/k3dm-machine-setup" --check-shell fixture
+    [ "$status" -eq 2 ]
+  done
+}
+
+@test "completion permissions ignore symlinks" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.zplug"
+  (umask 000; ln -s missing "$FIXHOME/.zplug/link")
+  if [[ "$(/usr/bin/uname -s)" == Darwin ]]; then
+    link_mode="$(/usr/bin/stat -f %Lp "$FIXHOME/.zplug/link")"
+  else
+    link_mode="$(/usr/bin/stat -c %a "$FIXHOME/.zplug/link")"
+  fi
+  [ "$link_mode" != 755 ] || skip "platform gives symlinks mode 755"
+  [ "$link_mode" = 777 ]
+  run_machine --role console --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'zsh:completion-dirs'*'ok'* ]]
+}
+
+@test "linked SSH config with unwritable target is preserved" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh/config.d"
+  echo existing > "$FIXHOME/ssh-target"
+  cp "$FIXHOME/ssh-target" "$BATS_TEST_TMPDIR/snapshot"
+  chmod 444 "$FIXHOME/ssh-target"
+  ln -s "$FIXHOME/ssh-target" "$FIXHOME/.ssh/config"
+  echo fragment > "$FIXHOME/.ssh/config.d/operator"
+  echo .ssh/config.d/operator > "$FIXROOT/scripts/etc/machine/files.console.list"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ssh:config"*"skipped (linked; add the Include in ~/ssh-target)"* ]]
+  [ -L "$FIXHOME/.ssh/config" ]
+  cmp "$FIXHOME/ssh-target" "$BATS_TEST_TMPDIR/snapshot"
+}
+
+@test "foreign shell links are reported and preserved" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/src/gitrepo/personal/zshdotfiles" "$FIXHOME/elsewhere"
+  for name in .zsh .zshrc .zshenv; do ln -s "$FIXHOME/elsewhere" "$FIXHOME/$name"; done
+  run_machine --role worker
+  [ "$status" -eq 1 ]
+  for name in .zsh .zshrc .zshenv; do
+    [[ "$output" == *"shell:$name"*"skipped (linked elsewhere: ~/elsewhere)"* ]]
+    [ "$(readlink "$FIXHOME/$name")" = "$FIXHOME/elsewhere" ]
+  done
+}
+
+@test "tty_machine: timeout kills the fixture and a short command completes" {
+  local TTY_MACHINE_TIMEOUT=5
+  setup_machine_fixture
+  [[ "$FIXROOT" == "$BATS_TEST_TMPDIR"/* && "$FIXROOT/bin/k3dm-machine-setup" != "$SCRIPT_SOURCE" ]]
+  cat > "$FIXROOT/bin/k3dm-machine-setup" <<'SH'
+#!/bin/sh
+printf '%s\n' "$$" > "$CALL_LOG.pid"
+exec sleep 300
+SH
+  chmod +x "$FIXROOT/bin/k3dm-machine-setup"
+  run tty_machine --role console
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"timed out after ${TTY_MACHINE_TIMEOUT:-60}s"* ]]
+  run kill -0 "$(cat "$CALL_LOG.pid")"
+  [ "$status" -ne 0 ]
+  printf '#!/bin/sh\nsleep 1\necho fixture-complete\n' > "$FIXROOT/bin/k3dm-machine-setup"
+  tty_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *fixture-complete* ]]
+}
+
+@test "machine setup: AI CLI manifests select the correct packages" {
+  for role in hub worker; do
+    grep -Fxq 'cask:antigravity-cli' "$MACHINE_DIR/brew.$role.list"
+    grep -Fxq 'cask:antigravity' "$MACHINE_DIR/brew.$role.list"
+  done
+  run grep -Exq 'gemini-cli|cask:gemini' "$MACHINE_DIR"/brew.hub.list "$MACHINE_DIR"/brew.worker.list "$MACHINE_DIR"/brew.console.list
+  [ "$status" -eq 1 ]
+}
+
+@test "machine setup: AI CLI checks use webhook PATH for hub and worker without invoking tools" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS/brew" == "$BATS_TEST_TMPDIR/"* ]]
+  [ -x "$STUBS/brew" ]
+  # Replace only the fixed system directories in the copied script, so host-installed
+  # CLIs cannot affect the missing case; the HOME component remains unchanged.
+  local fixed="$BATS_TEST_TMPDIR/webhook-system" role name
+  mkdir -p "$fixed" "$FIXHOME/.local/bin"
+  sed "s|/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin|$fixed|" "$SCRIPT_SOURCE" > "$FIXROOT/bin/k3dm-machine-setup"
+  grep -Fq '{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' "$REPO_ROOT/scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl"
+  for name in agy gemini; do
+    printf '#!/bin/sh\nprintf "%s %%s\\n" "$*" >> "$CALL_LOG"\n' "$name" > "$STUBS/$name"
+    chmod +x "$STUBS/$name"
+  done
+  for role in hub worker; do
+    run_machine --role "$role" --check --secrets skip --agents skip
+    grep -Eq "^ai:agy[[:space:]]+missing$" <<< "$output"
+    grep -Eq "^ai:gemini[[:space:]]+skipped \(optional; deprecated\)$" <<< "$output"
+    cp "$STUBS/agy" "$STUBS/gemini" "$FIXHOME/.local/bin/"
+    run_machine --role "$role" --check --secrets skip --agents skip
+    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+ok$" <<< "$output"; done
+    run_machine --role "$role" --secrets skip --agents skip
+    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+ok$" <<< "$output"; done
+    rm "$FIXHOME/.local/bin/agy" "$FIXHOME/.local/bin/gemini"
+  done
+  grep -q "^brew " "$CALL_LOG"
+  run grep -Eq '^(brew uninstall|agy |gemini |security find-generic-password)' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "machine setup: login Keychain status uses exit code without reading values" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  printf 'fixture|k3dm|test|operator:test\n' > "$FIXROOT/scripts/etc/machine/secrets.hub.list"
+  cat > "$STUBS/security" <<'SH'
+#!/bin/sh
+printf 'security %s\n' "$*" >> "$CALL_LOG"
+case "$1" in
+  # m5-air.local, 2026-11-01: operator's unlocked local Terminal capture.
+  show-keychain-info) if [ -e "$CALL_LOG.locked" ]; then
+    # m4-air.local and m5-air.local, 2026-11-01: SSH capture, rc 36.
+    echo 'security: SecKeychainCopySettings: User interaction is not allowed.' >&2; exit 36
+  fi; printf 'Keychain "%s/Library/Keychains/login.keychain-db" no-timeout\n' "$HOME"; exit 0 ;;
+  find-generic-password) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$STUBS/security"
+  run_machine --role hub --check
+  [[ "$output" == *'keychain:login'*'ok'* ]]
+  touch "$CALL_LOG.locked"
+  for mode in check setup; do
+    if [[ "$mode" == check ]]; then run_machine --role hub --check
+    else run_machine --role hub; fi
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
+  done
+  run grep -E 'security .* -(w|g)( |$)|security unlock-keychain' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *SECRETVALUE_LEAK* ]]
+}
+
+@test "machine setup: heartbeat renders candidates without loading and reports render failures" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* && "$FIXROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  printf '%s\n' bin/k3dm-heartbeat-setup > "$FIXROOT/scripts/etc/machine/agents.hub.list"
+  cat > "$FIXROOT/bin/k3dm-heartbeat-setup" <<'SH'
+#!/bin/bash
+printf 'heartbeat-render %s\n' "$*" >> "$CALL_LOG"
+[ ! -e "$CALL_LOG.fail-render" ] || exit 1
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --output-dir ]; then mkdir -p "$2"; touch "$2/com.k3d-manager.heartbeat.plist"; break; fi
+  shift
+done
+SH
+  chmod +x "$FIXROOT/bin/k3dm-heartbeat-setup"
+  printf '#!/bin/sh\nprintf "launchctl %%s\\n" "$*" >> "$CALL_LOG"\n' > "$STUBS/launchctl"
+  chmod +x "$STUBS/launchctl"
+  tty_machine --role hub
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
+  [ -f "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist" ]
+  [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
+  run grep -q '^launchctl ' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+  rm "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist"
+  touch "$CALL_LOG.fail-render"
+  tty_machine --role hub
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'missing (candidate render failed)'* ]]
+  [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
+  run grep -q '^launchctl ' "$CALL_LOG"
+  [ "$status" -eq 1 ]
+}
+
+@test "machine setup: hub credentials are checked and missing role map triggers FROM pull" {
+  setup_machine_fixture
+  cp "$MACHINE_DIR/secrets.hub.list" "$FIXROOT/scripts/etc/machine/secrets.hub.list"
+  # macOS security find-generic-password exits 44 for a missing item (m4-air.local, 2026-11-01; spec observation).
+  cat > "$STUBS/security" <<'SH'
+#!/bin/sh
+printf 'security %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = show-keychain-info ] && exit 0
+[ -e "$CALL_LOG.present" ] && exit 0
+exit 44
+SH
+  chmod +x "$STUBS/security"
+  run_machine --role hub --check
+  [ "$status" -ne 0 ]
+  while IFS='|' read -r service account _; do
+    [[ -n "$service" && "$service" != \#* ]] || continue
+    [[ "$output" == *"secret:$service"* ]]
+  done < "$MACHINE_DIR/secrets.hub.list"
+  [[ "$output" == *'secret:k3dm-slack-role-map'*'missing'* ]]
+  tty_machine --role hub --from old-mac.local --secrets skip
+  grep -q '^secrets pull --from old-mac.local --role hub$' "$CALL_LOG"
+  touch "$CALL_LOG.present"
+  run_machine --role hub --check
+  [[ "$output" == *'secret:k3dm-slack-role-map:k3dm'*'ok'* ]]
+}
+
+@test "machine setup: hub manifest includes each hub-read service and account" {
+  for entry in \
+    'k3dm-slack-role-map|k3dm' 'k3dm-acg-pluralsight|username' 'k3dm-acg-pluralsight|password' \
+    'k3d-manager-cloudflared-cert|cloudflared' 'k3d-manager-cloudflared-credentials|cloudflared' \
+    'k3d-manager-signing|k3dm-cosign-key' 'k3d-manager-signing|k3dm-cosign-password' \
+    'k3dm-webhook-token-cloud-runner|k3dm'; do
+    grep -Fq "$entry|" "$MACHINE_DIR/secrets.hub.list"
+  done
+  for account in redis/cart redis/orders-cache postgres/orders postgres/products postgres/payment payment/encryption payment/stripe payment/paypal rabbitmq/default minio/credentials ldap/admin keycloak/admin keycloak/clients github/pat; do
+    grep -Fq "k3d-manager-app-cluster-secrets|$account|" "$MACHINE_DIR/secrets.hub.list"
+  done
+}
+
+@test "machine setup: hub creates its EC2 key privately and reports it without contents" {
+  setup_machine_fixture
+  run_machine --role hub --agents skip --secrets skip
+  [ -f "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [ -f "$FIXHOME/.ssh/k3d-manager-key.pub" ]
+  [ -n "$(find "$FIXHOME/.ssh/k3d-manager-key.pem" -perm 600)" ]
+  [[ "$output" == *'ec2 ssh key:'*present* ]]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run_machine --role hub --check
+  [[ "$output" == *'ec2 ssh key:'*present* ]]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run ! grep -R -F 'PRIVATE-KEY-TEST-MATERIAL' "$FIXHOME/.local/state"
+}
+
+@test "machine setup: hub check reports missing and does not create a key" {
+  setup_machine_fixture
+  run_machine --role hub --check
+  [[ "$output" == *'ec2 ssh key:'*missing* ]]
+  [ ! -e "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  run_machine --role hub --dry-run
+  [ ! -e "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+}
+
+@test "machine setup: hub preserves an existing EC2 private key" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh"
+  printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$FIXHOME/.ssh/k3d-manager-key.pem"
+  touch -t 202001010101 "$FIXHOME/.ssh/k3d-manager-key.pem"
+  cp -p "$FIXHOME/.ssh/k3d-manager-key.pem" "$BATS_TEST_TMPDIR/original"
+  run_machine --role hub --agents skip --secrets skip
+  cmp "$BATS_TEST_TMPDIR/original" "$FIXHOME/.ssh/k3d-manager-key.pem"
+  [ "$FIXHOME/.ssh/k3d-manager-key.pem" -ot "$FIXROOT/bin/k3dm-machine-setup" ]
+  [ ! "$BATS_TEST_TMPDIR/original" -nt "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [ ! "$BATS_TEST_TMPDIR/original" -ot "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run ! grep -q '^ssh-keygen called' "$CALL_LOG"
 }

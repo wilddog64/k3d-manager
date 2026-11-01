@@ -1,13 +1,13 @@
 # Bug: the AI-analysis filter withholds whole prose lines, so an alert can arrive with no diagnosis at all
 
-**Status:** OPEN
+**Status:** FIXED — `7b961caf` (Codex; Claude review, independent verifier PASS; a tool name as the first word after a label withholds the line whole, by design for N4); live check pending
 **Priority:** P3
 **Severity:** low — no unsafe text reaches Slack; the alert's advice is lost, and the operator reads the log instead
 **Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's proposal to file it
 **Filed:** 2026-10-31
 **Detected by:** operator (Slack `ArgoCDAppOutOfSync` for `shopping-cart-identity`, 17:21 PDT 2026-10-30)
 **Affected:** `scripts/lib/webhook/untrusted.py` (`_COMMAND`, `filter_suggestion`)
-**Branch:** `k3d-manager-v1.43.12`
+**Branch:** `k3d-manager-v1.43.13`
 **Related:** `docs/bugs/2026-10-30-webhook-ai-analysis-trusts-log-text-prompt-injection.md` (the fix that added the filter; its "Known limit (accepted)" says to tighten the regex once Slack replies show it in practice)
 
 ## Observed failure
@@ -30,6 +30,12 @@ The alert itself was real and has cleared. Hub Prometheus shows the app OutOfSyn
 1. Only these count as a command candidate: a backticked span that starts with a tool word, a line whose first token (after list markers and `$ `) is a tool word, or text after an imperative lead-in such as `Run:` or `run`. A tool word inside a sentence is prose.
 2. A disallowed candidate is replaced in place with `(withheld command)`, and the rest of the line is kept. A line that is nothing but a disallowed command still becomes the existing full-line notice.
 3. Every existing protection stays: links withheld, `secret` withheld, unsafe characters withheld, and the allow-list unchanged.
+
+## Files
+
+- `scripts/lib/webhook/untrusted.py`
+- `scripts/tests/bin/test_webhook_untrusted_input.py`
+- `CHANGELOG.md`
 
 ## Acceptance
 

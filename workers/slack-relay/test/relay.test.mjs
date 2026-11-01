@@ -278,6 +278,48 @@ test('an explicit cluster still reaches /api/v1/cluster for both actions', async
   }
 })
 
+test('cluster up and down forward channel and optional thread context', async () => {
+  for (const [command, action] of [['/cluster-up', 'up'], ['/cluster-down', 'down']]) {
+    for (const threadTs of ['', '1700000000.000001']) {
+      const worker = loadWorker()
+      const body = `command=${encodeURIComponent(command)}&text=aws&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp${threadTs ? `&thread_ts=${threadTs}` : ''}`
+      await worker.dispatch(signed('/slack/commands', body))
+      const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster')
+      assert.ok(call)
+      assert.deepEqual(JSON.parse(call.init.body), {
+        action, provider: 'aws', response_url: 'https://hooks.slack.test/resp', channel_id: 'C123',
+        ...(threadTs ? { thread_ts: threadTs } : {}), slack_user_id: 'UOP1',
+      })
+    }
+  }
+})
+
+test('cluster resume forwards channel and optional thread context', async () => {
+  for (const threadTs of ['', '1700000000.000001']) {
+    const worker = loadWorker()
+    const body = `command=%2Fcluster-resume&text=aws&channel_id=C123&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp${threadTs ? `&thread_ts=${threadTs}` : ''}`
+    await worker.dispatch(signed('/slack/commands', body))
+    const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-resume')
+    assert.ok(call)
+    assert.deepEqual(JSON.parse(call.init.body), {
+      provider: 'aws', response_url: 'https://hooks.slack.test/resp', channel_id: 'C123',
+      ...(threadTs ? { thread_ts: threadTs } : {}), slack_user_id: 'UOP1',
+    })
+  }
+})
+
+test('cluster status forwarded body is unchanged', async () => {
+  const worker = loadWorker()
+  const body = 'command=%2Fcluster-status&text=aws&channel_id=C123&thread_ts=1700000000.000001&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'
+  await worker.dispatch(signed('/slack/commands', body))
+  const call = worker.fetches.find(item => item.url === 'https://webhook.test/api/v1/cluster-status')
+  assert.ok(call)
+  assert.deepEqual(JSON.parse(call.init.body), {
+    provider: 'aws', response_url: 'https://hooks.slack.test/resp', channel_id: 'C123',
+    thread_ts: '1700000000.000001', slack_user_id: 'UOP1',
+  })
+})
+
 test('read-only cluster commands keep their default provider', async () => {
   const worker = loadWorker()
   const body = 'command=%2Fcluster-status&user_id=UOP1&response_url=https%3A%2F%2Fhooks.slack.test%2Fresp'

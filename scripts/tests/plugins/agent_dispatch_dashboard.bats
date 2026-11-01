@@ -46,7 +46,7 @@ text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
 d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
 by_id={p["id"]:p for p in d["panels"]}; row=by_id[33]
 assert row["title"]=="Claude context and compaction" and row["type"]=="row"
-expected={35:("Compactions per verified spec","stat","short"),36:("Compactions by trigger","bargauge","none"),37:("Re-read share after compaction","stat","percentunit"),38:("Context incidents","bargauge","none"),39:("Auto-compact threshold","stat","short")}
+expected={35:("Compactions per verified spec","stat","short"),36:("Compactions by trigger","bargauge","none"),37:("Re-read share after compaction","stat","percentunit"),38:("Context incidents","bargauge","none"),39:("Auto-compact setting (configured)","stat","short")}
 for panel_id,(title,ptype,unit) in expected.items():
     panel=by_id[panel_id]
     assert panel["title"]==title and panel["type"]==ptype
@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98}
-assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 82 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 84 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,13 +243,13 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
         continue
-      if panel["id"]==12:
+      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56)):
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
@@ -327,10 +327,10 @@ from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
 panels=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
 by_id={p["id"]:p for p in panels}
-claude=[by_id[i] for i in (35,36,37,38,39)]
+claude=[by_id[i] for i in (35,36,37,38,39,99)]
 assert min(p["gridPos"]["x"] for p in claude)==0
 for p in claude:
-  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 8),(p["id"],p["gridPos"])
+  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 6),(p["id"],p["gridPos"])
 for y in {p["gridPos"]["y"] for p in claude}:
   assert sum(p["gridPos"]["w"] for p in claude if p["gridPos"]["y"]==y)==24,y
 for p in panels:
@@ -745,4 +745,102 @@ print("ok: 7d = $3.21/live-verified; missing unledgered release term = zero")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"7d ="* && "$output" == *"missing unledgered release term = zero"* ]]
+}
+
+@test "agent activity: configured setting and observed compaction point are distinct" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+import json,sys
+text=open(sys.argv[1]).read()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
+panels={p["title"]:p for p in d["panels"]}
+assert "Auto-compact threshold" not in panels
+configured=panels["Auto-compact setting (configured)"]
+assert configured["targets"][0]["expr"]=="k3dm_claude_auto_compact_tokens"
+assert "docs/metrics/context-window-experiment.md" in configured["description"]
+assert "may not take effect" in configured["description"] and "effective threshold" not in configured["description"].lower()
+observed=panels["Observed compaction point"]
+assert observed["type"]=="stat"
+expr=observed["targets"][0]["expr"]
+assert expr=='k3dm_claude_compaction_pre_tokens_sum{window="$window",trigger="auto"} / k3dm_claude_compactions{window="$window",trigger="auto"}'
+assert "k3dm_claude_auto_compact_tokens" not in expr
+defaults=observed["fieldConfig"]["defaults"]
+assert defaults["unit"]=="short" and defaults["noValue"]=="No auto-compactions in window"
+assert {m["options"]["match"] for m in defaults["mappings"] if m["type"]=="special" and m["options"]["result"]["text"]==defaults["noValue"]} >= {"nan","null"}
+a,b=configured["gridPos"],observed["gridPos"]
+assert a["y"]==b["y"] and a["x"]+a["w"]==b["x"]
+PYTEST
+  [ "$status" -eq 0 ]
+}
+
+@test "agent activity: wasted reread share and empty mapping" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json, sys
+from pathlib import Path
+text=Path(sys.argv[1]).read_text()
+panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+by_title={p["title"]:p for p in panels}
+assert "Re-read share after compaction" in by_title
+panel=by_title["Wasted re-read share"]
+assert panel["targets"][0]["expr"]=='k3dm_claude_reads{window="$window",kind="reread_unchanged"} / ignoring(kind) (k3dm_claude_reads{window="$window",kind="all"} > 0)'
+assert panel["fieldConfig"]["defaults"]["unit"]=="percentunit"
+assert panel["fieldConfig"]["defaults"]["noValue"]=="No reads in window"
+assert any(m["options"]["result"]["text"]=="No reads in window" for m in panel["fieldConfig"]["defaults"]["mappings"])
+for i,a in enumerate(panels):
+ for b in panels[i+1:]:
+  x,y=a["gridPos"],b["gridPos"]
+  assert not (x["x"]<y["x"]+y["w"] and y["x"]<x["x"]+x["w"] and x["y"]<y["y"]+y["h"] and y["y"]<x["y"]+x["h"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: repo gauges cap named series and preserve the remainder" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+import json,sys
+from pathlib import Path
+text=Path(sys.argv[1]).read_text()
+panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+by_title={p["title"]:p for p in panels}
+for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
+    panel=by_title[title]
+    base=f'sum by ({group}) ({metric}{{window="$window"}})'
+    named,other=panel["targets"]
+    assert named["expr"]==f'topk(8, {base})' and named["legendFormat"]==legend and named["instant"]
+    assert other["expr"]==f'(sum({base}) - sum(topk(8, {base}))) > 0'
+    assert other["legendFormat"]=="other" and other["instant"]
+    assert panel["gridPos"]["h"]>=5 and panel["options"]["namePlacement"]=="top"
+PYTEST
+  [ "$status" -eq 0 ]
+}
+
+@test "agent dispatch: outcome row accommodates nine labels and preserves subsequent layout" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["title"]:p for p in d["panels"]}
+row=("Run outcomes", "Rejected-attempt Codex tokens", "Run outcome coverage", "Codex tokens per live-verified bug")
+for x,title in enumerate(row):
+    assert panels[title]["gridPos"]=={"h":9,"w":6,"x":6*x,"y":33}, (title,panels[title]["gridPos"])
+options=panels["Run outcomes"]["options"]
+assert options["orientation"]=="horizontal" and options["namePlacement"]=="left" and options["minVizHeight"]==20
+# Original positions before expanding the outcome row; all other dimensions stay fixed.
+later={"Per run evidence":(10,18,6,39), "First-pass live verification":(10,6,0,39),
+       "Lines changed total":(4,6,0,49), "Median lines / spec":(4,6,6,49),
+       "Acceptance items total":(4,6,12,49), "Measured":(4,6,18,49),
+       "Final worker exit → land":(8,6,0,54), "Human continuation prompts":(8,18,6,54)}
+assert {p["title"] for p in d["panels"] if p["gridPos"]["y"]>=42}==set(later)
+for title,(h,w,x,y) in later.items():
+    assert panels[title]["gridPos"]=={"h":h,"w":w,"x":x,"y":y+3},title
+# The expanded row and the immediately following row tile the whole width without gaps or overlaps.
+for y in range(33,52):
+    cells=[x for p in d["panels"] for x in range(p["gridPos"]["x"],p["gridPos"]["x"]+p["gridPos"]["w"])
+           if p["gridPos"]["y"]<=y<p["gridPos"]["y"]+p["gridPos"]["h"]]
+    assert sorted(cells)==list(range(24)),y
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
 }

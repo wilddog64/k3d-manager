@@ -76,3 +76,20 @@ Test 18 now requires top placement below 12 columns and fixed sizes, red on the 
 Second pass (2026-10-25, operator screenshot 264): names now read in full, but Untracked by repo's six
 rows cropped their values at 6 units high. Rows holding a narrow gauge (54–57, 66–69, 70–71) are now 8
 high, panels below shift down; test 18 requires h ≥ 8 for top-placed gauges, red on the previous file.
+
+## Recurrence (2026-11-01)
+
+Operator screenshot 514 (agent-activity, Window 30d): "Untracked by repo" and "Tokens by repo" show bars and values
+but no names at all. The legends are still `{{repo}} {{mode}}` and `{{repo}}`, with top placement and `minVizHeight: 8`.
+The cause is the row count, not the layout: in October the 2026-10-25 fix sized the gauge for six rows, and 30d now
+holds about 20 repo values, because the exporter names a session's repo after its `cwd` basename, so one-off clones
+(`shopping-cart-frontend-nocache`, `shopping-cart-frontend-tw4`, `shopping-cart-payment-stripe-fix`,
+`shopping-cart-infra-ldap`, `k3d-manager-v1.41.0-wt`, `shopping-carts`) each get a row. At about 20 rows in 8 units,
+Grafana has no height left for the names.
+
+Proposed fix (not yet dispatched): show at most 8 rows (`topk(8, ...)`, the remainder summed as `other`) and keep h so
+each row has its name line; a dashboard test asserts the row cap and fails on the current file. Normalising clone
+names to their repo is out of scope here; `docs/plans/v1.43.15-cost-attribution-coverage.md` changes the same panels'
+data, so do this fix first or fold it into that plan's dashboard step.
+
+Dispatchable fix filed as `docs/bugs/2026-11-01-agent-activity-repo-bar-gauges-lose-names-past-eight-rows.md` (P3, 2026-11-01).

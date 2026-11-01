@@ -509,6 +509,64 @@ def test_live_delivery_requires_status_and_well_formed_evidence(tmp_path):
     assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
     assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 107.0' in output
 
+def test_run_outcome_missing_evidence_classes_and_coverage(tmp_path, monkeypatch):
+    now = int(time.time())
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    root.mkdir(parents=True)
+    # Event shapes copied from the M4 ledger, 2026-11-01.
+    rows = [
+        event(now - 100, "start", "unrecorded", run=1),
+        event(now - 90, "codex_exit", "unrecorded", run=1, exit=0),
+        event(now - 80, "land", "unrecorded"),
+        event(now - 100, "start", "superseded", run=1),
+        event(now - 90, "codex_exit", "superseded", run=1, exit=0),
+        event(now - 80, "resume", "superseded", n=2),
+        event(now - 100, "start", "open", run=1),
+        event(now - 90, "codex_exit", "open", run=1, exit=0),
+        event(now - 7 * 86400 - 10, "start", "stale", run=1),
+        event(now - 7 * 86400, "codex_exit", "stale", run=1, exit=0),
+        event(now - 100, "start", "accepted", run=1),
+        event(now - 90, "codex_exit", "accepted", run=1, exit=0, tree="a"),
+        event(now - 80, "land", "accepted", tree="a", test_result="passed"),
+        event(now - 100, "start", "rework", run=1),
+        event(now - 90, "codex_exit", "rework", run=1, exit=0),
+        event(now - 80, "land_refused", "rework", reason="tests"),
+        event(now - 70, "resume", "rework", n=2),
+        event(now - 100, "start", "failed", run=1),
+        event(now - 90, "codex_exit", "failed", run=1, exit=1),
+        event(now - 80, "land", "failed"),
+    ]
+    ledger = root / "ledger.jsonl"
+    ledger.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+    result = dispatch_metrics._run_outcome_metrics(rows, tmp_path, now=now)
+    assert result["outcomes"] == {"accepted": 1, "progress": 0, "rework": 1, "failed": 1,
+                                  "unrecorded": 1, "superseded": 1, "open": 1, "stale": 1, "unknown": 0}
+    assert sum(result["outcomes"].values()) == 7
+    assert result["coverage"] == 3 / 7
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    original = dispatch_metrics._run_outcome_metrics
+
+    def old_fallback(*args, **kwargs):
+        metrics = original(*args, **kwargs)
+        for label in ("unrecorded", "superseded", "open", "stale"):
+            metrics["outcomes"]["unknown"] += metrics["outcomes"].pop(label)
+        for _, _, _, task_rows in metrics["rows"]:
+            for row in task_rows:
+                if row["outcome"] in {"unrecorded", "superseded", "open", "stale"}:
+                    row["outcome"] = "unknown"
+        return metrics
+
+    monkeypatch.setattr(dispatch_metrics, "_run_outcome_metrics", old_fallback)
+    baseline = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    def unaffected(text):
+        return [line for line in text.splitlines() if not line.startswith((
+            "k3dm_dispatch_run_outcomes{", "k3dm_dispatch_task_run_outcome{"))]
+    assert unaffected(output) == unaffected(baseline)
+    assert 'k3dm_dispatch_run_outcome_coverage{window="30d"} 0.42857142857142855' in output
+
+
 def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     now = int(time.time())
     rows = [
@@ -950,7 +1008,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 81  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec
+    assert sum("$window" in expr for expr in expressions) == 85  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec; observed compaction point panel; repo bar gauges add an other series each
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -2259,3 +2317,98 @@ def test_run_spec_link_accepts_recorded_doc_kinds(tmp_path, directory):
     ], 0, 100, repo_root=tmp_path)
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
     assert f'spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/{spec}"' in line
+
+
+def test_attempt_evidence_uses_ledger_paths_and_redacts(tmp_path, monkeypatch):
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path))
+    run = tmp_path / "9.9.9" / "attempt.run"
+    run.mkdir(parents=True)
+    secret = "ghp_" + "a" * 36
+    (run / "land-test.1.log").write_text("".join(f"ok {i} - pass\n" for i in range(100)) + f"not ok 101 - {Path.home()}/private {secret}\n")
+    (run / "land-test.2.log").write_text("1 passed in 0.1s\n")
+    now = int(time.time())
+    rows = [event(now-6, "start", "attempt", run=1), event(now-5, "codex_exit", "attempt", run=1, tree="a"),
+            event(now-4, "land_refused", "attempt", reason="tests", validation=str(run / "land-test.1.log")),
+            event(now-3, "resume", "attempt", run=2), event(now-2, "codex_exit", "attempt", run=2, tree="b"),
+            event(now-1, "land", "attempt", tree="b", test_result="passed", validation=str(run / "land-test.2.log"))]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert '100/101 ok; first fail: 101 - ~/private <redacted>' in output
+    assert 'attempt.run/land-test.1.log' in output and 'attempt.run/land-test.2.log' in output
+    assert secret not in output and str(Path.home()) not in output
+
+
+def test_refused_pytest_summary(tmp_path, monkeypatch):
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path))
+    run = tmp_path / "v1.2.3" / "sample.run"
+    run.mkdir(parents=True)
+    (run / "land-test.1.log").write_text("FAILED tests/test_a.py::test_bad - error\n1 failed, 2 passed in 1.0s\n")
+    summary, path = dispatch_metrics._evidence_details("v1.2.3", "sample", "land_refused.tests", {"validation": "land-test.1.log"})
+    assert summary == "1 failed, 2 passed; first fail: tests/test_a.py::test_bad"
+    assert path.endswith("land-test.1.log")
+
+
+def test_claude_bash_rereads_classification_and_privacy(tmp_path):
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    assert projects.resolve() != (Path.home() / ".claude").resolve()
+    now = time.time()
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    entries = []
+
+    def call(ident, name, inp, result=None):
+        entries.append({"type": "assistant", "timestamp": timestamp, "message": {"content": [
+            {"type": "tool_use", "id": ident, "name": name, "input": inp}]}})
+        if result is not None:
+            entries.append({"type": "user", "message": {"content": [
+                {"type": "tool_result", "tool_use_id": ident, "content": result}]}})
+
+    paths = [f"/private-fixture/secret-{i}" for i in range(5)]
+    commands = [f"cat {paths[0]}", f"sed -n '1,2p' {paths[1]}",
+                f"head -n 2 {paths[2]}", f"grep secret {paths[3]}"]
+    for i, command in enumerate(commands):
+        call(f"before{i}", "Bash", {"command": command}, "private-result")
+    call("read-before", "Read", {"file_path": paths[4]}, "private-result")
+    entries.append({"type": "system", "subtype": "compact_boundary", "timestamp": timestamp})
+    call("same", "Bash", {"command": commands[0]}, "private-result")
+    call("repeat", "Bash", {"command": commands[0]}, "private-result")
+    call("changed", "Bash", {"command": commands[1]}, "different-result")
+    call("range", "Bash", {"command": f"head -n 3 {paths[2]}"}, "private-result")
+    call("edit", "Edit", {"file_path": paths[3]})
+    call("edited", "Bash", {"command": commands[3]}, "private-result")
+    call("same-read", "Read", {"file_path": paths[4]}, "private-result")
+    for i, command in enumerate((f"sed -i x {paths[0]}", f"cat {paths[0]} > {paths[1]}",
+                                 f"cat {paths[0]} | tee {paths[1]}", "cat 'unterminated")):
+        call(f"write{i}", "Bash", {"command": command}, "private-result")
+    (projects / "session.jsonl").write_text("\n".join(map(json.dumps, entries)))
+    cache = tmp_path / "cache.json"
+    ctx = {}
+    dispatch_metrics._claude_rollup(projects, cache, ctx)
+    output = dispatch_metrics.render([], 0, now, claude_context=ctx, repo_root=tmp_path)
+    for window in ("1d", "7d", "30d"):
+        for kind, count in (("all", 11), ("reread_after_compaction", 5),
+                            ("reread_unchanged", 2), ("reread_changed", 3)):
+            assert f'k3dm_claude_reads{{window="{window}",kind="{kind}"}} {count}' in output
+        for tool, count in (("bash", 9), ("read", 2)):
+            assert f'k3dm_claude_reads_by_tool{{window="{window}",tool="{tool}"}} {count}' in output
+    for secret in (*paths, *commands, "private-result", "different-result"):
+        assert secret not in output
+        assert secret not in cache.read_text()
+
+
+def test_bash_read_operands_and_rejected_commands(tmp_path, monkeypatch):
+    monkeypatch.setattr(dispatch_metrics, "_repo_root", lambda: tmp_path)
+    parse = dispatch_metrics._bash_reads
+    assert len(parse("cat one two | head -n 1", str(tmp_path))) == 2
+    assert len(parse("grep -n needle one", str(tmp_path))) == 1
+    assert not parse("cat " + " ".join(f"file{i}" for i in range(6)), str(tmp_path))
+    assert not parse("cat ../outside", str(tmp_path))
+    assert not parse("cat one || cat two", str(tmp_path))
+    assert not parse(None, str(tmp_path))
+
+
+def test_claude_result_hash_rejects_errors_and_truncation():
+    digest = dispatch_metrics._result_hash
+    assert digest({"content": "same"}) == digest({"content": "same"})
+    assert digest({"content": "same", "is_error": True}) is None
+    assert digest({"content": "Output truncated: secret"}) is None

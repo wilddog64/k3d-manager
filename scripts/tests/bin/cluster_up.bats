@@ -827,12 +827,50 @@ _load_acg_up_marker_clear() {
     export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
     mkdir -p "${_ACG_STATE_DIR}/run"
     printf "stack_name=k3d-manager-cluster\nregion=us-west-2\n" > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    aws() { printf "%s\n" "$*" >> "${BATS_TEST_TMPDIR}/aws.calls"; }
     _load_acg_up_cleanup
     ( exit 1 ); _acg_up_cleanup
   '
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"CloudFormation stack 'k3d-manager-cluster' (us-west-2) was created by this run"* ]]
   [[ "${output}" == *"make down"* ]]
+  [[ "${output}" != *"(not confirmed)"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/aws.calls")" = "cloudformation describe-stacks --stack-name k3d-manager-cluster --region us-west-2" ]
+}
+
+@test "acg-up failure cleanup reports a missing marked stack" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "stack_name=k3d-manager-cluster\nregion=us-west-2\n" > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    aws() {
+      printf "%s\n" "$*" >> "${BATS_TEST_TMPDIR}/aws.calls"
+      echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id k3d-manager-cluster does not exist" >&2
+      return 255
+    }
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"no CloudFormation stack was created by this run"* ]]
+  [[ "${output}" != *"still running — billable"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/aws.calls")" = "cloudformation describe-stacks --stack-name k3d-manager-cluster --region us-west-2" ]
+}
+
+@test "acg-up failure cleanup keeps an unconfirmed warning on AWS failure" {
+  run bash -c '
+    '"$(declare -f _load_acg_up_cleanup)"'
+    export _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+    mkdir -p "${_ACG_STATE_DIR}/run"
+    printf "stack_name=k3d-manager-cluster\nregion=us-west-2\n" > "${_ACG_STATE_DIR}/run/cf-stack-created"
+    aws() { printf "%s\n" "$*" >> "${BATS_TEST_TMPDIR}/aws.calls"; echo "Unable to locate credentials" >&2; return 255; }
+    _load_acg_up_cleanup
+    ( exit 1 ); _acg_up_cleanup
+  '
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"still running — billable (not confirmed)"* ]]
+  [ "$(cat "${BATS_TEST_TMPDIR}/aws.calls")" = "cloudformation describe-stacks --stack-name k3d-manager-cluster --region us-west-2" ]
 }
 
 @test "acg-up failure cleanup does not warn for a reused stack" {

@@ -9,6 +9,12 @@ This guide moves the single-instance services from the M4 hub to a freshly built
 3. Open OrbStack on the M5 and wait until it is running. Confirm sleep prevention is enabled: `pmset -g` must show a `SleepDisabled 1` line (set it with `sudo pmset -a disablesleep 1`).
 4. Pull the release branch, then run `make hub-migrate HUB_OLD_HOST=<old>` with the old hub hostname. This runs hub-new and hub-cutover in sequence and retains both typed confirmations. It copies the Cloudflare tunnel credentials and origin cert from the M4 if missing (you may be asked for the M4 login), takes the Hostinger tunnel target from `scripts/etc/hostinger/vars.sh` (an exported `HOSTINGER_HOST` overrides it), builds the fresh local cluster, restores credentials without starting the Cloudflare tunnel, recovers the newest export (type the approval at its prompt), reconciles the hub (identity, Vault root token, smoke user, ArgoCD admin mirror, Cloudflare tunnel config) against the restored Vault data and the M5's own local Keycloak and ArgoCD port-forwards, prepares the single-instance plists without loading them, applies platform state, and waits for the read-only verification checks. Review `~/.local/share/k3d-manager/hub-new/hub-new-report.json`; it must report `status: pass` and be less than 24 hours old before cut-over.
 
+After setup, run the required `agy` CLI in the operator shell on the new hub and complete its interactive Google login. Gemini is optional and no longer installed by setup; if already installed, it remains a fallback and can be logged in separately. After cutover, ask the Slack bot a question outside the count matcher and confirm it returns an AI answer.
+
+If the MacPaw Gemini disk cleaner was installed by an earlier setup, remove it separately if desired.
+
+For Slack bot threads, run `SLACK_CHANNEL_ID=<id> make update-webhook-slack` on the new hub in a local terminal: it reads the login Keychain. After cutover, ask `/ask-docs` in that channel and confirm the reply appears in a thread.
+
 For the step-by-step path, run `make hub-new HUB_OLD_HOST=<old>` followed by `make hub-cutover HUB_OLD_HOST=<old>`. `HUB_OLD_HOST` is required for hub-new; cutover can also use the host recorded in its passing report. If a stage stops, resolve its stated cause and rerun `make hub-new HUB_OLD_HOST=<old>`. Passed stages are retained; use `HUB_NEW_FROM=<stage>` only when intentionally restarting from a named stage. Never run bare `make up` for this process.
 
 ## Agent classifications

@@ -192,14 +192,14 @@ function _observability_apply_grafana_rotator() {
   _observability_seed_grafana_if_absent "secrets" "vault" \
     || _err "[observability] Grafana credential seed skipped/failed"
   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"
-  [[ -f "${manifest}" ]] || return 0
-  _kubectl apply -f "${manifest}" >/dev/null \
-    && _info "[observability] Grafana monthly credential rotator applied"
+  [[ -f "${manifest}" ]] || { _err "[observability] Grafana rotator manifest missing: ${manifest}"; return 1; }
+  _kubectl apply -f "${manifest}" >/dev/null || return 1
+  _info "[observability] Grafana monthly credential rotator applied"
   if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
     _vault_configure_secret_writer_role "secrets" "vault" \
       "grafana-credential-rotator" "monitoring" "secret" "observability/grafana" \
       "grafana-rotation" "grafana-rotation" \
-      || _err "[observability] failed to configure Grafana rotation Vault role"
+      || { _err "[observability] failed to configure Grafana rotation Vault role"; return 1; }
   fi
 }
 
@@ -690,6 +690,10 @@ function _deploy_pushgateway_acg() {
   _info "[observability] Deploying Prometheus Pushgateway on ${_app_context}..."
   if ! command -v helm >/dev/null 2>&1; then
     _warn "[observability] helm not found — skipping Pushgateway install"
+    return 0
+  fi
+  if ! helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null; then
+    _warn "[observability] Pushgateway Helm repo add failed — deployment metrics disabled"
     return 0
   fi
   if helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \

@@ -7,6 +7,13 @@ _ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07")
 _COMMAND = re.compile(
     r"(?<![\w/.-])(make|kubectl|helm|vault|aws|ssh|scp|curl|wget|rm|sudo|bash|sh|zsh|python3?|git|launchctl|security|docker|k3d|orb|bin/[\w./-]+|\./[\w./-]+)\b[^`\n]*"
 )
+_BACKTICK = re.compile(r"`([^`]+)`")
+_COMMAND_START = re.compile(
+    r"\s*(?:(?:[-*+>]|\d+[.)]|\$)\s+|run:?\s+|"
+    r"(?:[A-Za-z]+(?:\s+[A-Za-z]+){0,3}):\s*)*", re.IGNORECASE
+)
+_LEAD_IN = re.compile(r"\brun\b\s*:?\s+", re.IGNORECASE)
+_NOTICE = "(withheld: the suggested command is not on the read-only allow-list; decide the next step from the log)"
 _SAFE = re.compile(
     r"(?:kubectl (?:get|describe|logs|events|top)(?: [A-Za-z0-9_./:=,@-]+)*|"
     r"aws (?:cloudformation|ec2) describe-[a-z-]+(?: [A-Za-z0-9_./:=,@-]+)*)"
@@ -47,16 +54,35 @@ def filter_suggestion(reply):
         if "http://" in line or "https://" in line:
             lines.append("(withheld: the reply contained a link)" + ending)
             continue
-        candidates = [match.group(0).strip().rstrip(".,;").strip() for match in _COMMAND.finditer(line)]
-        for span in re.findall(r"`([^`]+)`", line):
-            if _COMMAND.search(span):
-                candidates.extend(m.group(0).strip().rstrip(".,;").strip() for m in _COMMAND.finditer(span))
-            elif " " in span:
-                candidates.append(span)
-        if any(not _allowed(candidate) for candidate in candidates):
-            lines.append("(withheld: the suggested command is not on the read-only allow-list; decide the next step from the log)" + ending)
-        else:
-            lines.append(original)
+        spans = []
+        for match in _BACKTICK.finditer(line):
+            content = match.group(1)
+            if _COMMAND.match(content) or " " in content:
+                spans.append((match.start(), match.end(), content))
+
+        # Ignore backticked text while looking for unquoted commands.
+        masked = list(line)
+        for match in _BACKTICK.finditer(line):
+            masked[match.start():match.end()] = " " * (match.end() - match.start())
+        plain = "".join(masked)
+        starts = [_COMMAND_START.match(plain).end()]
+        starts.extend(_COMMAND_START.match(plain, match.end()).end() for match in _LEAD_IN.finditer(plain))
+        for start in starts:
+            match = _COMMAND.match(plain, start)
+            if match:
+                spans.append((match.start(), match.end(), line[match.start():match.end()]))
+
+        for start, end, candidate in sorted(spans, reverse=True):
+            if not _allowed(candidate):
+                prefix = line[:start]
+                suffix = line[end:]
+                if not _COMMAND_START.fullmatch(prefix) and (prefix.strip() or suffix.strip()):
+                    line = prefix + "(withheld command)" + suffix
+                elif suffix.strip():
+                    line = prefix + "(withheld command)" + suffix
+                else:
+                    line = _NOTICE
+        lines.append(line + ending)
     return _wrap(reply, "".join(lines))
 
 

@@ -1,4 +1,7 @@
 import sys
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -8,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
-from webhook import bug_count  # noqa: E402
+from webhook import ask_docs, bug_count  # noqa: E402
 
 
 @pytest.mark.parametrize("question, expected", [
@@ -124,6 +127,7 @@ def _tally_and_rev_parse(payload, sha_rc, sha):
 
 
 def test_footer_uses_original_ref_without_commit(monkeypatch):
+    monkeypatch.setenv("K3DM_INDEX_REF", "HEAD")
     payload = '{"ref":"HEAD","releases":{"v1.43.5":{"total":81,"closed":75,"open":6,"unknown":0,"by_priority":{},"open_paths":[],"unknown_paths":[]}}}'
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text",
                         _tally_and_rev_parse(payload, 0, "5a31cf25" + "0" * 32 + "\n"))
@@ -222,6 +226,7 @@ def _closed_payload(count, priority="P1"):
 
 
 def test_reply_links_fixed_docs_for_a_release(monkeypatch):
+    monkeypatch.setenv("K3DM_INDEX_REF", "HEAD")
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(2), False))
     answer = bug_count.reply(bug_count.CountQuery("v1.43.5", "P1", None))
     assert "Fixed: <https://github.com/" in answer
@@ -244,3 +249,108 @@ def test_reply_caps_fixed_links_at_ten(monkeypatch):
 def test_reply_omits_fixed_links_for_open_or_all_release_questions(monkeypatch, query):
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(2), False))
     assert "Fixed: " not in bug_count.reply(query)
+
+
+def test_named_release_budget_reports_exact_omissions(monkeypatch):
+    data = _release(87)
+    data.update(open=6, closed=81, open_paths=[
+        {"path": f"docs/bugs/2026-10-31-open-example-long-description-{i}.md"} for i in range(6)],
+        closed_paths=[{"path": f"docs/bugs/2026-10-31-fixed-example-long-description-{i}.md"}
+                      for i in range(81)])
+    _reply_with(monkeypatch, {"v1.43.5": data}, bug_count.CountQuery("v1.43.5", None, None))
+    answer = ask_docs.answer("how many bugs in v1.43.5")
+    assert "87 bug docs — 81 fixed, 6 open" in answer
+    assert answer.count("Open: ") == 6
+    assert f"…and {81 - answer.count('Fixed: ')} more fixed." in answer
+    assert answer.index("Open: ") < answer.index("Fixed: ")
+    assert "name a release to see the full list" not in answer
+    assert len(answer) <= ask_docs.MAX_REPLY_CHARS
+    assert answer.count("<") == answer.count(">")
+
+
+def test_open_links_are_dropped_last_and_counted(monkeypatch):
+    data = _release(30)
+    data.update(open=20, closed=10, open_paths=[
+        {"path": f"docs/bugs/{'open-long-description-' * 5}{i}.md"} for i in range(20)],
+        closed_paths=[{"path": f"docs/bugs/fixed-{i}.md"} for i in range(10)])
+    answer = _reply_with(monkeypatch, {"v1.43.5": data}, bug_count.CountQuery("v1.43.5", None, None))
+    assert "Fixed: " not in answer
+    assert f"…and {20 - answer.count('Open: ')} more open." in answer
+    assert "…and 10 more fixed." in answer  # agent-audit: allow assert-removed same assertion, f prefix dropped (ruff F541)
+    assert len(answer) + len("\n\nSources: none") <= ask_docs.MAX_REPLY_CHARS
+    assert answer.count("<") == answer.count(">")
+
+
+def test_fetched_upstream_and_local_fallback(monkeypatch, tmp_path):
+    git = shutil.which("git")
+    upstream, clone = tmp_path / "upstream", tmp_path / "clone"
+
+    def run(*args, cwd=None):
+        return subprocess.run([git, *map(str, args)], cwd=cwd, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    run("init", "-b", "k3d-manager-v1.43.13", upstream)
+    run("config", "user.email", "test@example.com", cwd=upstream)
+    run("config", "user.name", "Test", cwd=upstream)
+    def import_commit(message, files, parent=None):
+        data = f"commit refs/heads/k3d-manager-v1.43.13\ncommitter Test <test@example.com> 1 +0000\ndata {len(message)}\n{message}\n"
+        if parent:
+            data += f"from {parent}\n"
+        for name, content in files.items():
+            data += f"M 100644 inline {name}\ndata {len(content)}\n{content}\n"
+        subprocess.run([git, "fast-import", "--quiet"], cwd=upstream, input=data,
+                       text=True, check=True, capture_output=True)
+
+    initial_bug = "**Status:** OPEN\n**Priority:** P3\n**Branch:** k3d-manager-v1.43.13\n"
+    import_commit("initial", {"docs/bugs/initial.md": initial_bug})
+    run("clone", upstream, clone)
+    content = "**Status:** OPEN\n**Priority:** P2\n**Branch:** k3d-manager-v1.43.13\n"
+    import_commit("add bugs", {f"docs/bugs/{name}.md": content for name in ("one", "two")},
+                  run("rev-parse", "HEAD", cwd=upstream))
+    run("fetch", "origin", cwd=clone)
+
+    scripts = clone / "scripts"
+    (scripts / "lib" / "webhook").mkdir(parents=True)
+    shutil.copy(ROOT / "scripts" / "bug-tally.py", scripts)
+    shutil.copytree(ROOT / "scripts" / "lib" / "hermes", scripts / "lib" / "hermes")
+    monkeypatch.setattr(bug_count, "__file__", str(scripts / "lib" / "webhook" / "bug_count.py"))
+    assert Path(bug_count.__file__).resolve().parents[3] == clone
+    assert clone != ROOT
+
+    log = tmp_path / "git.log"
+    wrapper = tmp_path / "bin"
+    wrapper.mkdir()
+    (wrapper / "git").write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{log}"\nexec "{git}" "$@"\n')
+    (wrapper / "git").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{wrapper}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.delenv("K3DM_INDEX_REF", raising=False)
+    head = run("rev-parse", "HEAD", cwd=clone)
+    reflog = run("reflog", "--format=%H %gs", cwd=clone)
+    query = bug_count.CountQuery("v1.43.13", "P2", None)
+    answer = bug_count.reply(query)
+    assert "v1.43.13: 2 P2 bug docs" in answer
+    assert "Counted at local HEAD (no upstream)." not in answer
+    assert "origin/k3d-manager-v1.43.13" in answer
+    monkeypatch.setenv("K3DM_INDEX_REF", "HEAD")
+    assert "0 P2 bug docs" in bug_count.reply(query)
+    monkeypatch.delenv("K3DM_INDEX_REF")
+    run("branch", "--unset-upstream", cwd=clone)
+    answer = bug_count.reply(query)
+    assert "Counted at local HEAD (no upstream)." in answer
+    assert "0 P2 bug docs" in answer
+    assert run("rev-parse", "HEAD", cwd=clone) == head
+    assert run("reflog", "--format=%H %gs", cwd=clone) == reflog
+    assert not any(line.split()[0] in {"fetch", "pull", "merge", "reset", "checkout"}
+                   for line in log.read_text().splitlines())
+
+
+@pytest.mark.parametrize("result", [(1, "error", False), (0, "", True), (0, "", False)])
+def test_upstream_resolution_failure_falls_back(monkeypatch, result):
+    monkeypatch.delenv("K3DM_INDEX_REF", raising=False)
+    payload = '{"releases":{"v1.43.13":{"total":0}}}'
+    def spawn(cmd, **kwargs):
+        return result if cmd[0] == "git" else (0, payload, False)
+    monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", spawn)
+    answer = bug_count.reply(bug_count.CountQuery("v1.43.13", None, None))
+    assert "Counted at local HEAD (no upstream)." in answer
+    assert "at HEAD;" in answer

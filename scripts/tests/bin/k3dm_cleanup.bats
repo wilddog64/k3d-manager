@@ -59,7 +59,7 @@ _inode_for_file() {
   _touch_old "${jobs}/deadbeef"
   _touch_old "${jobs}/feedface"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [ ! -e "${jobs}/deadbeef" ]
   [ -e "${jobs}/feedface" ]
@@ -77,7 +77,7 @@ _inode_for_file() {
   touch -t 202601010102 "${jobs}/feedface"
   touch -t 202601010103 "${jobs}/cafe1234"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" \
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_JOB_DIR="${jobs}" \
     K3DM_JOB_RETENTION_DAYS=999 K3DM_JOB_RETENTION_MAX=2 "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [ ! -e "${jobs}/deadbeef" ]
@@ -91,7 +91,7 @@ _inode_for_file() {
   dd if=/dev/zero of="${log}" bs=1048576 count=11 >/dev/null 2>&1
   local inode
   inode="$(_inode_for_file "${log}")"
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_LOG_DIR="${logs}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_LOG_DIR="${logs}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [ -f "${log}.1.gz" ]
   [ ! -s "${log}" ]
@@ -114,7 +114,7 @@ _inode_for_file() {
   _touch_old "${TMP_ROOT}/k3d-manager-acg-watch.out"
   _touch_old "${TMP_ROOT}/k3dm-gcp-creds.old"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"playwright artifact dirs"* ]]
   [[ "${output}" == *"ask transcript files"* ]]
@@ -145,7 +145,7 @@ _inode_for_file() {
   _touch_old "${RUN_ROOT}/alertproxy-bats.log"
   _touch_old "${RUN_ROOT}/k3dm-products.json"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_RUN_DIR="${RUN_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_RUN_DIR="${RUN_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"${RUN_ROOT}"* ]]
 
@@ -166,7 +166,7 @@ _inode_for_file() {
   _touch_old "${TMP_ROOT}/TemporaryDirectory.stale"
   _touch_old "${TMP_ROOT}/TemporaryDirectory.live"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"TemporaryDirectory placeholders"* ]]
 
@@ -181,7 +181,7 @@ _inode_for_file() {
     touch -t "20250701010${i}" "${TMP_ROOT}/k3dm-acg-screenshot-${i}.png"
   done
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
 
   run bash -lc "find '${TMP_ROOT}' -maxdepth 1 -name 'k3dm-acg-screenshot-*.png' | sort"
@@ -205,7 +205,7 @@ _inode_for_file() {
   _touch_old "${packer_dir}/old.lock"
   _touch_old "${port_dir}/old-marker"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" \
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${port_dir}" K3DM_TMP_ROOT="${TMP_ROOT}" \
     K3DM_PACKER_RETENTION_DAYS=30 K3DM_PORT_RETENTION_DAYS=7 \
     "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
@@ -226,7 +226,7 @@ _inode_for_file() {
     'k3dm-gobuild-cache created=2026-01-01T00:00:00Z' \
     'anonold anon' 'anonnew anon' 'k3dm-gobuild-cache anon' > "${BATS_TEST_TMPDIR}/meta"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   run grep -c 'volume rm k3d-old-server-data' "${BATS_TEST_TMPDIR}/calls"
   [ "${output}" -eq 1 ]
@@ -246,14 +246,14 @@ _inode_for_file() {
     'k3d-old-server-data created=2026-01-01T00:00:00Z' \
     'anonold created=2026-01-01T00:00:00Z' 'anonold anon' > "${BATS_TEST_TMPDIR}/meta"
 
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_DOCKER_VOLUME_PRUNE=0 "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_DOCKER_VOLUME_PRUNE=0 "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   run grep -c 'volume rm' "${BATS_TEST_TMPDIR}/calls"
   [ "${output}" -eq 0 ]
 }
 
 @test "k3dm-cleanup prunes weekly caches on the prune day" {
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="$(date +%u)" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="$(date +%u)" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   run grep -c 'clean --all' "${BATS_TEST_TMPDIR}/calls"
   [ "${output}" -eq 1 ]
@@ -263,7 +263,7 @@ _inode_for_file() {
 
 @test "k3dm-cleanup skips weekly caches off the prune day" {
   other_day=$(( $(date +%u) % 7 + 1 ))
-  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="${other_day}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  run env HOME="${HOME_ROOT}" K3DM_PORT_CACHE_DIR="${HOME_ROOT}/.cache/port" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_WEEKLY_CACHE_PRUNE_DAY="${other_day}" "${REPO_ROOT}/bin/k3dm-cleanup"
   [ "${status}" -eq 0 ]
   run grep -c 'clean --all' "${BATS_TEST_TMPDIR}/calls"
   [ "${output}" -eq 0 ]

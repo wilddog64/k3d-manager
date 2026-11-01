@@ -1280,9 +1280,13 @@ def _notify_job(job_id, text):
     intended_channel = channel_id or ""
     failure = "not_delivered"
     try:
-        if SLACK_BOT_TOKEN and channel_id and thread_ts:
+        if SLACK_BOT_TOKEN and channel_id:
             route = "bot_thread"
-            posted = bool(_post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id))
+            ts = _post_slack_bot(text, thread_ts=thread_ts, channel_id=channel_id)
+            posted = bool(ts)
+            if ts and not thread_ts:
+                thread_ts_file.write_text(ts)
+                thread_ts = ts
             if not posted:
                 failure = "thread_post_rejected"
         if not posted and response_url:

@@ -28,13 +28,15 @@ For the staged one-command build and safe agent cut-over, follow the [M5 hub mig
 
 ### Copy secrets from the old machine
 
+Hub setup generates its own EC2 SSH key at `~/.ssh/k3d-manager-key.pem` and reports its presence in machine-check. Each node has its own key; private keys are never copied between nodes.
+
 The preferred M5 workflow is `make machine-setup ROLE=hub FROM=m4-air.local`. It streams missing Keychain items through SSH without creating a transfer file. Enable **Remote Login** in Sharing settings on the M4. If the M5 login Keychain is locked, including in an SSH session, pull prompts to unlock this Mac's Keychain before asking for the M4 SSH login password and M4 Keychain unlock password; the latter two are normally the same. Use `SECRETS=skip` on a new Mac to suppress all missing-secret setup prompts while the `FROM=` pull still runs. `FROM=` also copies, with `scp`, each file listed in `scripts/etc/machine/files.<role>.list` that is missing on this Mac (for a hub: the Cloudflare tunnel credentials and origin cert under `~/.cloudflared`). It saves them with mode 600, never overwrites a file that is present, and copies nothing in check mode or a dry run. When the operator SSH fragment is installed, setup adds its Include to `~/.ssh/config` and preserves a one-time backup of the previous config.
 
 If SSH is unavailable, an item needs GUI approval, or you prefer a file, run `make machine-secrets-export ROLE=hub` on the old Mac in a local terminal with the login Keychain unlocked. Enter and confirm a strong passphrase. Transfer the encrypted `.enc` file to the new Mac with AirDrop or `scp`, then run `make machine-secrets-import FILE=<path>` there and enter the passphrase. A successful import deletes the encrypted transfer file; if an item fails, the file is kept for another attempt. Add `FORCE=1` only when intentionally replacing an existing item.
 
 iCloud does not sync these credentials: `security add-generic-password` writes to each Mac's local file-based login Keychain. When setup later prompts to create missing secrets, answer **N** for secrets being copied; the transfer command copies existing values without rotating tokens or changing their live consumers.
 
-The script checks Keychain **presence only**; it never reads values. Missing credentials are re-entered or rotated on the new Mac, never copied from another Mac. Without a TTY, prompts are skipped and the report remains missing. Sign in to Claude (`/login`), Codex (`codex login`), Gemini/agy, and GitHub (`gh auth login`) at the terminal.
+The script checks Keychain **presence only**; it never reads values. It reports `keychain:login` as missing when the login Keychain is locked in the current session (for example over SSH), because later reads would fail; run setup from a local Terminal. Missing credentials are re-entered or rotated on the new Mac, never copied from another Mac. Without a TTY, prompts are skipped and the report remains missing. Sign in to Claude (`/login`), Codex (`codex login`), agy (Gemini is an optional fallback), and GitHub (`gh auth login`) at the terminal.
 
 SSH and cosign private keys are not copied or read by machine setup. Transfer/recreate them using the operator's approved secure process, then verify their file names and permissions manually. Keep the Bitbucket SSH key available before setting up Bitbucket repositories. Existing checkouts are left untouched; unavailable branches and inaccessible remotes are reported as skipped.
 
@@ -55,3 +57,11 @@ Heartbeat setup renders disabled candidates for review; it does not install a sc
 ## After the cutover: old-hub forwards
 
 A successful cutover re-points the old hub’s Pushgateway and Loki loopback forwards over SSH to the new hub. Set `HUB_NEW_HOST` if the new hub’s local hostname is not reachable from the old hub; key-based SSH login from old to new is required. For an already completed cutover, run `make hub-cutover-forwards` on the new hub and type `forwards` when prompted. `make hub-cutover-forwards` runs `make hub-cutover-verify` first, which re-runs the cutover verification without changing anything and records a fresh result, so a cutover whose verification failed on a check that has since recovered is unblocked in the same command. The tunnels run `ssh -F /dev/null` so they ignore `~/.ssh/config`: a `RemoteForward` there for the new hub (a clipboard or notification relay) is taken by the first tunnel and, under `ExitOnForwardFailure=yes`, kills every later one. The command checks both endpoints and records the result. `make hub-cutover-rollback` restores the saved original forward plists before reloading the old hub’s singletons.
+
+## GitHub remotes and completion folders
+
+After GitHub SSH authentication is available, setup switches managed wilddog64 HTTPS remotes to SSH and verifies each remote, restoring HTTPS if verification fails. Without a key it reports HTTPS without failing. Check mode flags HTTPS when SSH is available. Setup removes group and world write access from completion directories under the home directory and reports insecure Homebrew completion paths without changing them. A linked SSH config keeps its link when the operator Include is added; an unwritable target is reported for manual editing.
+
+## Last step: check the login shell
+
+As the last new-Mac setup step, run `make machine-check-shell HOST=<new-Mac-hostname>` from the connecting Mac. This read-only check opens an SSH login shell, exits immediately, and fails on credential prompts, command errors, insecure completion directories, a nonzero exit or a 60-second timeout. Matched output is redacted.

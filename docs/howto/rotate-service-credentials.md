@@ -40,6 +40,12 @@ Keycloak is the exception: its database is authoritative. Its rotator resets the
 admin password inside Keycloak first, then writes Vault, with a rollback trap installed before
 the reset so a later failure can restore the old Keycloak password.
 
+### How the rotators reach the hub
+
+`make platform-ops` reapplies the ArgoCD, Grafana and (unless `LDAP_ROTATOR_ENABLED=0`) LDAP rotators
+and prints `[argocd] <name> rotator: applied`, `skipped` (namespace absent or disabled) or `failed` for
+each. Run it on every release after `make appsets-reapply`; a rotator change is not live until then.
+
 ## Trigger a rotation on demand
 
 Rotate immediately when a password has been exposed — pasted into a chat or terminal, printed
@@ -86,7 +92,9 @@ Grafana and ArgoCD jobs wait on `kubectl rollout status --timeout=5m` for the wo
 so two to three minutes is normal. Keycloak changes its database directly and does not restart
 the workload. **Logs are empty by design** — every step redirects to `/dev/null` so no credential
 can reach container logs. The corollary is worth internalising: on a successful run there is
-nothing to read, so *any* log output is a defect. That is how the `base64 --decode` bug was found
+nothing to read, so any log output other than a `WARN slack notice` line is a defect. A failed
+or skipped Slack notice prints `WARN slack notice not delivered: HTTP <code> ...` or
+`WARN slack notice skipped: no webhook configured`, never the URL, and does not fail the rotation. That is how the `base64 --decode` bug was found
 — the image's `base64` is BusyBox and accepts only `-d`, and the usage error it printed was the
 only sign that every Slack notification was being silently dropped.
 

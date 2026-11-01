@@ -3,6 +3,8 @@
 
 import argparse
 import glob
+import hashlib
+import shlex
 import json
 import math
 import os
@@ -16,6 +18,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from hermes.e2e_triage import redact  # noqa: E402
 from hermes.prior_art import _CLOSED_RE, doc_live_evidence, doc_verification  # noqa: E402
 
 WINDOWS = {"1d": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
@@ -78,6 +81,68 @@ def _spec_stats(path):
     return result
 
 
+def _bash_reads(command, cwd):
+    """Conservatively identify file operands in a read-only first pipeline stage."""
+    if not isinstance(command, str):
+        return []
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="|&;<>")
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except (ValueError, TypeError):
+        return []
+    if not tokens or any(any(c in token for c in ";&<>") or ("|" in token and token != "|") for token in tokens):
+        return []
+    if any(token == "tee" or token.startswith("-i") for token in tokens):
+        return []
+    stage = tokens[:tokens.index("|")] if "|" in tokens else tokens
+    if not stage or stage[0] not in ("cat", "head", "tail", "sed", "awk", "grep", "rg"):
+        return []
+    program = stage[0]
+    options, operands = [], []
+    skip = False
+    has_pattern = program not in ("sed", "awk", "grep", "rg")
+    for token in stage[1:]:
+        if skip:
+            options.append(token)
+            skip = False
+        elif token.startswith("-"):
+            options.append(token)
+            skip = token in ("-e", "--regexp", "-f", "--file") or (program in ("head", "tail") and token in ("-n", "--lines", "-c", "--bytes"))
+            if token in ("-e", "--regexp", "-f", "--file"):
+                has_pattern = True
+        elif not has_pattern:
+            options.append(token)
+            has_pattern = True
+        else:
+            operands.append(token)
+    if program == "sed" and "-n" not in options:
+        return []
+    if not operands or len(operands) > 5:
+        return []
+    repo = _repo_root().resolve()
+    result = []
+    for operand in operands:
+        path = Path(operand)
+        if not path.is_absolute():
+            path = Path(cwd or repo) / path
+            path = path.resolve()
+            if not path.is_relative_to(repo):
+                return []
+        result.append((str(path), (program, *options)))
+    return result
+
+
+def _result_hash(block):
+    content = block.get("content")
+    if block.get("is_error") or content is None:
+        return None
+    body = content if isinstance(content, str) else json.dumps(content, sort_keys=True, ensure_ascii=False)
+    if re.search(r"(?:<persisted-output>|output truncated|truncated output|exceeded.*(?:limit|characters))", body, re.I):
+        return None
+    return hashlib.sha256(body.encode()).digest()
+
+
 def _claude_rollup(projects_dir, cache_path, context_out=None):
     cache = {"offsets": {}, "records": {}}
     try:
@@ -98,9 +163,11 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                 if size < offset:
                     offset = 0
                 start_offset = 0 if context_out is not None else offset
-                seen_paths = set()
-                pre_boundary_paths = set()
-                has_compacted = False
+                latest = {}
+                before = {}
+                edited = defaultdict(int)
+                segment_seen = set()
+                pending = {}
                 seen_read_calls = set()
                 pos = start_offset
                 with path.open("rb") as stream:
@@ -111,7 +178,7 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                         stripped = raw.replace(b" ", b"")
                         is_assistant = b'"type":"assistant"' in stripped
                         is_boundary = context_out is not None and b'"subtype":"compact_boundary"' in stripped
-                        if not is_assistant and not is_boundary:
+                        if not is_assistant and not is_boundary and not (context_out is not None and b'"type":"user"' in stripped):
                             continue
                         try:
                             item = json.loads(raw)
@@ -127,8 +194,19 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
-                            has_compacted = True
-                            pre_boundary_paths = set(seen_paths)
+                            before = {name: dict(ranges) for name, ranges in latest.items()}
+                            segment_seen.clear()
+                            continue
+                        if item.get("type") == "user" and context_out is not None:
+                            content = (item.get("message") or {}).get("content")
+                            for block in content if isinstance(content, list) else []:
+                                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                                    continue
+                                digest = _result_hash(block)
+                                for fpath, read_range, record, generation, previous in pending.pop(block.get("tool_use_id"), []):
+                                    if record["reread"] and digest is not None and previous == (digest, generation):
+                                        record["classification"] = "unchanged"
+                                    latest.setdefault(fpath, {})[read_range] = (digest, generation)
                             continue
                         if item.get("type") != "assistant":
                             continue
@@ -140,17 +218,35 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                     for idx, block in enumerate(content):
                                         if not isinstance(block, dict):
                                             continue
-                                        if block.get("type") == "tool_use" and block.get("name") == "Read":
-                                            call_id = block.get("id") or (message.get("id"), idx)
-                                            if call_id in seen_read_calls:
-                                                continue
-                                            seen_read_calls.add(call_id)
-                                            inp = block.get("input")
-                                            fpath = inp.get("file_path") if isinstance(inp, dict) else None
-                                            if isinstance(fpath, str) and fpath:
-                                                is_reread = has_compacted and fpath in pre_boundary_paths
-                                                reads.append({"ts": item.get("timestamp"), "reread": is_reread})
-                                                seen_paths.add(fpath)
+                                        if block.get("type") != "tool_use":
+                                            continue
+                                        call_id = block.get("id") or (message.get("id"), idx)
+                                        if call_id in seen_read_calls:
+                                            continue
+                                        seen_read_calls.add(call_id)
+                                        inp = block.get("input") or {}
+                                        if not isinstance(inp, dict):
+                                            continue
+                                        name = block.get("name")
+                                        fpath = inp.get("file_path") or inp.get("notebook_path")
+                                        if name in ("Edit", "Write", "NotebookEdit") and isinstance(fpath, str):
+                                            edited[fpath] += 1
+                                        candidates = []
+                                        if name == "Read" and isinstance(fpath, str) and fpath:
+                                            candidates = [(fpath, (inp.get("offset"), inp.get("limit"), inp.get("pages")))]
+                                        elif name == "Bash":
+                                            candidates = _bash_reads(inp.get("command"), item.get("cwd"))
+                                        for fpath, read_range in candidates:
+                                            reread = fpath in before and fpath not in segment_seen
+                                            record = {"ts": item.get("timestamp"), "reread": reread,
+                                                      "classification": "changed" if reread else None,
+                                                      "tool": name.lower()}
+                                            reads.append(record)
+                                            segment_seen.add(fpath)
+                                            previous = before.get(fpath, {}).get(read_range)
+                                            generation = edited[fpath]
+                                            pending.setdefault(call_id, []).append((fpath, read_range, record, generation, previous))
+                                            latest.setdefault(fpath, {})[read_range] = (None, generation)
                             if line_pos < offset:
                                 continue
                             mid, model = message.get("id"), message.get("model")
@@ -565,7 +661,7 @@ def _root():
 
 def _display_path(path):
     """Show a local path without the operator's home directory, so labels carry no username."""
-    resolved = path.resolve()
+    resolved = path.absolute()
     try:
         return "~/" + str(resolved.relative_to(Path.home().resolve()))
     except ValueError:
@@ -576,26 +672,37 @@ def _display_path(path):
         return resolved.name
 
 
-def _evidence_details(version, slug, evidence):
-    """Return a bounded summary and local evidence path for one run outcome."""
+def _evidence_details(version, slug, evidence, event=None):
+    """Return a bounded, redacted summary and local evidence path."""
     run_dir = _root() / version / f"{slug}.run"
     path = ""
     summary = evidence
     if evidence in {"land-test.log", "land_refused.tests"}:
-        log_path = run_dir / "land-test.log"
+        validation = (event or {}).get("validation")
+        name = Path(validation).name if isinstance(validation, str) and validation else "land-test.log"
+        if not re.fullmatch(r"land-test(?:\.\d+)?\.log", name):
+            name = "land-test.log"
+        log_path = run_dir / name
         path = _display_path(log_path)
-        if evidence == "land-test.log":
-            try:
-                content = log_path.read_text(errors="replace")
-            except OSError:
-                content = ""
-            tap_ok = sum(1 for line in content.splitlines() if line.startswith("ok "))
-            tap_bad = sum(1 for line in content.splitlines() if line.startswith("not ok "))
-            tap = f"{tap_ok}/{tap_ok + tap_bad} ok" if tap_ok + tap_bad else None
-            pytest = re.findall(r"(?m)^(\d+ (?:passed|failed)[^\n]*?)(?: in |$)", content)
-            pytest_summary = pytest[-1].strip() if pytest else None
-            summaries = [value for value in (tap, pytest_summary) if value]
-            summary = "; ".join(summaries) if summaries else "unknown"
+        try:
+            content = log_path.read_text(errors="replace")
+        except OSError:
+            content = ""
+        lines = content.splitlines()
+        tap_ok = sum(line.startswith("ok ") for line in lines)
+        tap_bad = sum(line.startswith("not ok ") for line in lines)
+        tap = f"{tap_ok}/{tap_ok + tap_bad} ok" if tap_ok + tap_bad else None
+        pytest = re.findall(r"(?m)^(\d+ (?:passed|failed)[^\n]*?)(?: in |$)", content)
+        summaries = [value for value in (tap, pytest[-1].strip() if pytest else None) if value]
+        summary = "; ".join(summaries) if summaries else (evidence if evidence == "land_refused.tests" else "unknown")
+        if evidence == "land_refused.tests":
+            failure = next((line[7:].strip() for line in lines if line.startswith("not ok ")), None)
+            if failure is None:
+                failure = next((line.split()[1] for line in lines if line.startswith("FAILED ") and len(line.split()) > 1), None)
+            if failure:
+                failure = redact(failure.replace(str(Path.home()), "~"))
+                failure = re.sub(r"(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|hvs\.[A-Za-z0-9]{20,}|sk_(?:test|live)_[A-Za-z0-9]{10,}|xox[abpr]-[A-Za-z0-9-]{6,}|AKIA[0-9A-Z]{16}|hooks\.slack\.com/services/\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----)", "<redacted>", failure)
+                summary += "; first fail: " + failure[:80]
     elif evidence == "codex_exit.exit":
         path = _display_path(run_dir / "codex.log")
         summary = "local only (not shipped)"
@@ -887,9 +994,10 @@ def _run_spec_url(version, launches, launch):
     return f"{base}/tree/{branch}"
 
 
-def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
+def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None):
+    now = time.time() if now is None else now
     states = _task_states(events)
-    outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unknown")}
+    outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unrecorded", "superseded", "open", "stale", "unknown")}
     rows = []
     rejected_tokens = 0
     rejected_known = False
@@ -942,8 +1050,9 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 previous_tokens = token_count
             exit_ts = exit_event.get("ts", 0)
             next_launch = next((event.get("ts", 0) for event in all_launches if event.get("ts", 0) > exit_ts), None)
-            test_refusal = any(event.get("ts", 0) > exit_ts and
-                               (next_launch is None or event.get("ts", 0) < next_launch) for event in refusals)
+            refusal = next ( (event for event in refusals if event.get("ts", 0) > exit_ts and
+                               (next_launch is None or event.get("ts", 0) < next_launch)), None)
+            test_refusal = refusal is not None
             accepted = bool(land and land.get("test_result") == "passed" and land.get("tree")
                             and land.get("tree") == exit_event.get("tree"))
             if accepted:
@@ -956,11 +1065,18 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 outcome, evidence = "failed", "codex_exit.exit"
             elif abandon and land is None:
                 outcome, evidence = "failed", "abandon.event"
+            elif land and (not land.get("tree") or not land.get("test_result")):
+                outcome, evidence = "unrecorded", "none"
+            elif next_launch is not None:
+                outcome, evidence = "superseded", "none"
+            elif land is None and not abandon:
+                outcome = "open" if ordered[-1][1].get("ts", 0) > now - 7 * 86400 else "stale"
+                evidence = "none"
             else:
                 outcome, evidence = "unknown", "none"
             if matching_launch not in launches:
                 continue
-            evidence_summary, evidence_path = _evidence_details(version, slug, evidence)
+            evidence_summary, evidence_path = _evidence_details(version, slug, evidence, land if accepted else refusal)
             if evidence == "codex_exit.exit":
                 evidence_summary = f"exit {exit_event.get('exit', 'unknown')}; {evidence_summary}"
             outcomes[outcome] += 1
@@ -985,7 +1101,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     run_total = sum(outcomes.values())
     return {
         "outcomes": outcomes,
-        "coverage": sum(count for name, count in outcomes.items() if name != "unknown") / run_total if run_total else None,
+        "coverage": sum(count for name, count in outcomes.items() if name in {"accepted", "progress", "rework", "failed"}) / run_total if run_total else None,
         "rejected_tokens": (rejected_tokens if rejected_known else 0 if run_total and not rejected_seen else None),
         "bug_cost": bug_cost,
         "bug_first_pass": bug_first_pass,
@@ -1055,7 +1171,7 @@ def _direct_bug_costs(states, repo_root, release=None, cutoff=None):
 
 
 def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, release=None,
-                   verification_landed=None, repo_root=None):
+                   verification_landed=None, repo_root=None, now=None):
     attempts = {result: 0 for result in RESULTS}
     for event in selected:
         if event.get("event") == "land":
@@ -1077,7 +1193,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
     post_exit_land_values = []
     verification = _verification_metrics(events, verification_landed if verification_landed is not None else landed_selected,
                                          repo_root or _repo_root(), cutoff, release)
-    run_outcomes = _run_outcome_metrics(events, repo_root or _repo_root(), cutoff, release)
+    run_outcomes = _run_outcome_metrics(events, repo_root or _repo_root(), cutoff, release, now)
     rework = {cause: 0 for cause in REWORK_CAUSES}
     tasks = []
     for key, event in landed.items():
@@ -1149,7 +1265,7 @@ def _window_metrics(events, now, seconds, prices=None, repo_root=None):
             latest_lands[key] = event
     landed_selected = [event for event in latest_lands.values() if event["ts"] >= cutoff]
     return _scope_metrics(events, selected, landed_selected, prices, cutoff=cutoff,
-                          verification_landed=list(latest_lands.values()), repo_root=repo_root)
+                          verification_landed=list(latest_lands.values()), repo_root=repo_root, now=now)
 
 
 def _normalize_version(value):
@@ -1165,7 +1281,7 @@ def _releases(events):
     return sorted(releases, key=lambda version: tuple(int(part) for part in version[1:].split(".")))
 
 
-def _release_metrics(events, release, prices=None, repo_root=None):
+def _release_metrics(events, release, prices=None, repo_root=None, now=None):
     selected = [event for event in events
                 if _normalize_version(event.get("version")) == release
                 and event.get("event") in {"land", "land_refused"}]
@@ -1177,7 +1293,7 @@ def _release_metrics(events, release, prices=None, repo_root=None):
         if key not in latest_lands or event["ts"] >= latest_lands[key]["ts"]:
             latest_lands[key] = event
     return _scope_metrics(events, selected, list(latest_lands.values()), prices, release=release,
-                          repo_root=repo_root)
+                          repo_root=repo_root, now=now)
 
 
 def _render_release_duration(lines, window, events):
@@ -1756,6 +1872,12 @@ def _render_claude_context(lines, now, claude_context, repo_root):
                         rereads += 1
             lines.append(f'k3dm_claude_reads{{window="{window}",kind="all"}} {all_reads}')
             lines.append(f'k3dm_claude_reads{{window="{window}",kind="reread_after_compaction"}} {rereads}')
+            for kind in ("unchanged", "changed"):
+                count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("classification") == kind)
+                lines.append(f'k3dm_claude_reads{{window="{window}",kind="reread_{kind}"}} {count}')
+            for tool in ("read", "bash"):
+                count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("tool") == tool)
+                lines.append(f'k3dm_claude_reads_by_tool{{window="{window}",tool="{tool}"}} {count}')
         for level in ("live", "verified", "unverified"):
             lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
         for kind in INCIDENT_KINDS:
@@ -1776,7 +1898,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         _render_scope(lines, window, _window_metrics(events, now, seconds, prices, doc_root), events,
                       prices, coverage, True, now, claude_records, claude_prices, now-seconds)
     for release in _releases(events):
-        _render_scope(lines, release, _release_metrics(events, release, prices, doc_root), events, prices,
+        _render_scope(lines, release, _release_metrics(events, release, prices, doc_root, now), events, prices,
                       now=now, claude_records=claude_records, claude_prices=claude_prices)
     if claude_records is not None:
         if claude_records:

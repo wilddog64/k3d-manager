@@ -105,7 +105,8 @@ sequenceDiagram
     WH->>Worker: 202 {job_id}
     Job->>Bin: subprocess (make up)
     Bin-->>Job: stdout/stderr → output file
-    Job->>Slack: POST response_url ✅/❌ result
+    Job->>Slack: chat.postMessage to channel_id (starts bot thread; response_url fallback)
+    Job->>Slack: thread replies ✅/❌ result
 
     note over User,Bin: Path B — Thread reply (Events API)
     User->>Slack: /claude why is basket crashing?

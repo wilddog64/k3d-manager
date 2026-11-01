@@ -71,13 +71,35 @@ fi
 WEBHOOK_BIN="${SCRIPT_DIR}/k3dm-webhook"
 WEBHOOK_LOG="${HOME}/Library/Logs/k3dm-webhook.log"
 
+_rendered="$(mktemp "${PLIST_DST}.XXXXXX")"
+trap 'rm -f "${_rendered}"' EXIT
 sed \
   -e "s|{{WEBHOOK_BIN}}|${WEBHOOK_BIN}|g" \
   -e "s|{{K3DM_REPO_ROOT}}|${REPO_ROOT}|g" \
   -e "s|{{HOME}}|${HOME}|g" \
   -e "s|{{WEBHOOK_LOG}}|${WEBHOOK_LOG}|g" \
   "${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl" \
-  > "${PLIST_DST}"
+  > "${_rendered}"
+python3 - "${PLIST_DST}" "${_rendered}" <<'PY'
+import os
+import plistlib
+import sys
+
+old, new = sys.argv[1:]
+with open(new, 'rb') as handle:
+    rendered = plistlib.load(handle)
+if os.path.exists(old):
+    with open(old, 'rb') as handle:
+        previous = plistlib.load(handle)
+    source = previous.get('EnvironmentVariables', {})
+    target = rendered.setdefault('EnvironmentVariables', {})
+    for key in ('SLACK_BOT_TOKEN', 'SLACK_CHANNEL_ID', 'K3DM_STATUS_CHANNEL_ID'):
+        if key in source:
+            target[key] = source[key]
+with open(new, 'wb') as handle:
+    plistlib.dump(rendered, handle, sort_keys=False)
+PY
+mv "${_rendered}" "${PLIST_DST}"
 
 if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
   launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true

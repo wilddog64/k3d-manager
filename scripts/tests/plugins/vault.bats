@@ -954,3 +954,70 @@ JSON
   [[ "$output" == *"[OK] LDAP service account secret"* ]]
   [[ "$output" == *"[OK] PKI mount"* ]]
 }
+
+setup_app_auth_kubectl_stub() {
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
+  export APP_AUTH_LOG="$BATS_TEST_TMPDIR/app-auth-kubectl.log"
+  export APP_AUTH_CA="$BATS_TEST_TMPDIR/ca.crt"
+  printf 'test CA\n' > "$APP_AUTH_CA"
+  export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+  cat > "$BATS_TEST_TMPDIR/bin/kubectl" <<'STUB'
+#!/usr/bin/env bash
+printf 'KUBECONFIG=%s argv=' "${KUBECONFIG:-}" >> "$APP_AUTH_LOG"
+printf '<%s>' "$@" >> "$APP_AUTH_LOG"
+printf '\n' >> "$APP_AUTH_LOG"
+if [[ "${1:-}" == --kubeconfig ]]; then
+  [[ "$2" != *:* ]] || exit 1
+  shift 2
+fi
+case "$*" in
+  *current-context*) printf 'previous' ;;
+  *use-context*) ;;
+  *context.cluster*) [[ "${APP_AUTH_MISSING:-false}" == true ]] || printf 'app-cluster' ;;
+  *cluster.server*) [[ "${APP_AUTH_MISSING:-false}" == true ]] || printf 'https://app.example' ;;
+  *certificate-authority-data*) ;;
+  *certificate-authority*) printf '%s' "$APP_AUTH_CA" ;;
+esac
+exit 0
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+  configure_vault_app_auth() {
+    printf '%s %s\n' "$APP_CLUSTER_API_URL" "$APP_CLUSTER_CA_CERT_PATH" > "$BATS_TEST_TMPDIR/configured"
+  }
+}
+
+@test "vault: kubeconfig list resolves app auth and never uses the single-file flag" {
+  setup_app_auth_kubectl_stub
+  export KUBECONFIG="$HOME/a:$HOME/b:$HOME/c"
+  export HUB_VAULT_USE_BRIDGE=0
+  run configure_vault_app_auth_for_context app
+  [ "$status" -eq 0 ]
+  [ -f "$BATS_TEST_TMPDIR/configured" ]
+  grep -F "https://app.example $APP_AUTH_CA" "$BATS_TEST_TMPDIR/configured"
+  [ "$(wc -l < "$APP_AUTH_LOG" | tr -d ' ')" -eq 7 ]
+  run grep -F -- '<--kubeconfig>' "$APP_AUTH_LOG"
+  [ "$status" -eq 1 ]
+  [ "$(grep -Fc "KUBECONFIG=$KUBECONFIG argv=" "$APP_AUTH_LOG")" -eq 7 ]
+}
+
+@test "vault: single kubeconfig retains the kubectl flag" {
+  setup_app_auth_kubectl_stub
+  run configure_vault_app_auth_for_context app "$HOME/config"
+  [ "$status" -eq 0 ]
+  [ -f "$BATS_TEST_TMPDIR/configured" ]
+  [ "$(grep -Fc "<--kubeconfig><$HOME/config>" "$APP_AUTH_LOG")" -eq 4 ]
+}
+
+@test "vault: missing app context warns and honors required auth" {
+  setup_app_auth_kubectl_stub
+  export KUBECONFIG="$HOME/a:$HOME/b:$HOME/c" APP_AUTH_MISSING=true
+  run configure_vault_app_auth_for_context missing
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no API server for context 'missing' — skipping app-cluster Vault auth"* ]]
+  [ ! -f "$BATS_TEST_TMPDIR/configured" ]
+  export APP_VAULT_AUTH_REQUIRED=true
+  run configure_vault_app_auth_for_context missing
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"no API server for context 'missing' — skipping app-cluster Vault auth"* ]]
+}

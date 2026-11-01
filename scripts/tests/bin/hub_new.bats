@@ -114,7 +114,15 @@ STUB
     cat >> "$ROOT/$script" <<'STUB'
 record "$(basename "$0")" "$* HUB_RESTORE_TUNNEL=${HUB_RESTORE_TUNNEL:-unset} HUB_RESTORE_PLATFORM=${HUB_RESTORE_PLATFORM:-unset} HUB_RESTORE_RECONCILE=${HUB_RESTORE_RECONCILE:-unset} KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-unset} HUB_RECOVERY_ARGOCD_URL=${HUB_RECOVERY_ARGOCD_URL:-unset} TUNNEL_SSH_HOST=${TUNNEL_SSH_HOST:-unset}"
 case "$(basename "$0") ${1:-}" in
-  'k3dm-webhook-setup '*) plist webhook ;;
+  'k3dm-webhook-setup '*)
+    if [[ "${STUB_SLACK_ENV:-configured}" != empty ]]; then
+      python3 - "$AGENTS_DIR/com.k3d-manager.webhook.plist" "${STUB_SLACK_ENV:-configured}" <<'PYPLIST'
+import plistlib, sys
+env = {'SLACK_BOT_TOKEN': 'xoxb-QZ7K-fixture-secret-token'} if sys.argv[2] != 'no_token' else {}
+if sys.argv[2] != 'no_channel': env['SLACK_CHANNEL_ID'] = 'C123'
+with open(sys.argv[1], 'wb') as f: plistlib.dump({'EnvironmentVariables': env}, f)
+PYPLIST
+    else plist webhook; fi ;;
   'k3dm-hermes-setup '*) plist hermes ;;
   'k3d-manager vault_install_failover_watchdog') plist vault-failover ;;
   'k3d-manager acg_watch_start') plist acg-watch ;;
@@ -437,4 +445,28 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   unset HUB_OLD_HOST
   run "$HUB_NEW_BIN"
   [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+}
+
+@test "Slack bot: missing token or channel fails without revealing the secret" {
+  export STUB_BOT=1
+  for STUB_SLACK_ENV in no_token no_channel; do
+    export STUB_SLACK_ENV
+    run bash -c '"$1" 2>&1' _ "$HUB_NEW_BIN"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'make update-webhook-slack'* ]]
+    [[ "$output" != *xoxb-QZ7K-fixture-secret-token* ]]
+    [[ "$output" != *xoxb-QZ7* ]]
+    [[ "$output" != *QZ7K* ]]
+    grep -q '^prepare-singletons=fail ' "$HUB_NEW_STATE_DIR/state"
+  done
+}
+
+@test "Slack bot: configured plist passes without revealing the secret" {
+  export STUB_BOT=1 STUB_SLACK_ENV=configured
+  run bash -c '"$1" 2>&1' _ "$HUB_NEW_BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *xoxb-QZ7K-fixture-secret-token* ]]
+  [[ "$output" != *xoxb-QZ7* ]]
+  [[ "$output" != *QZ7K* ]]
+  grep -q '^prepare-singletons=pass ' "$HUB_NEW_STATE_DIR/state"
 }

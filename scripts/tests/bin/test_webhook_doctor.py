@@ -3,6 +3,7 @@ import importlib.util
 import io
 from importlib.machinery import SourceFileLoader
 import json
+import pytest
 import subprocess
 import sys
 import time
@@ -16,6 +17,12 @@ MODULE_PATH = Path(__file__).resolve().parents[3] / "bin" / "k3dm-webhook-doctor
 SPEC = importlib.util.spec_from_loader("webhook_doctor", SourceFileLoader("webhook_doctor", str(MODULE_PATH)))
 doctor = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(doctor)
+
+
+@pytest.fixture(autouse=True)
+def isolate_role_map_probe(monkeypatch, request):
+    if request.node.name != "test_slack_role_map_status_parses_and_redacts":
+        monkeypatch.setattr(doctor, "_slack_role_map_status", lambda: "missing")
 
 
 class Response:
@@ -476,3 +483,50 @@ def test_health_header_and_body_share_one_deadline(monkeypatch):
     result = doctor._health_probe("reader", timeout=10, opener=lambda *_args, **_kwargs: Response({}))
     assert result["status"] == "healthy_http"
     assert remaining == [3.0]
+
+
+def test_slack_bot_plist_presence_and_redaction(monkeypatch, tmp_path, capsys):
+    import plistlib
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
+    monkeypatch.setattr(doctor, "_launchd_facts", lambda *_a: {"status": "missing", "port": None})
+    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": []})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_k: {"status": "no_listener"})
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_a, **_k: {"status": "local_timeout", "http_responsive": False})
+    path = tmp_path / "Library/LaunchAgents" / (doctor.LABEL + ".plist")
+    path.parent.mkdir(parents=True)
+    for env, expected in [({}, "missing_token"), ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token"}, "missing_channel"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123"}, "configured")]:
+        path.write_bytes(plistlib.dumps({"EnvironmentVariables": env}))
+        assert doctor.main(["--check"]) == 0
+        captured = capsys.readouterr()
+        output = captured.out + captured.err
+        assert json.loads(captured.out)["slack_bot"] == expected
+        assert "xoxb-QZ7K-fixture-secret-token" not in output
+        assert "xoxb-QZ7" not in output
+        assert "QZ7K" not in output
+
+
+def test_slack_role_map_status_parses_and_redacts(monkeypatch, tmp_path):
+    _stub_local_facts(monkeypatch, tmp_path)
+    monkeypatch.delenv("K3DM_SLACK_ROLE_MAP", raising=False)
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_a, **_k: {"status": "auth_unavailable", "http_responsive": False, "all_ok": None})
+    # security rc 44 for a missing item was observed on m4-air.local, 2026-11-01 (spec).
+    for code, value, expected in [(44, "", "missing"), (0, "", "missing"),
+                                  (0, "UQZ7FIXTURE:bogus", "missing"),
+                                  (0, "UQZ7FIXTURE:admin", "present")]:
+        monkeypatch.setattr(doctor, "_run", lambda _args, code=code, value=value: {"returncode": code, "stdout": value})
+        result = doctor.diagnose(check=True)
+        assert result["slack_role_map"] == expected
+        assert "UQZ7FIXTURE" not in json.dumps(result)
+        assert "admin" not in json.dumps(result)
+
+
+def test_unmapped_slack_user_remains_reader():
+    import ast
+    auth = MODULE_PATH.parents[1] / "scripts/lib/webhook/auth.py"
+    tree = ast.parse(auth.read_text())
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_slack_user_role")
+    namespace = {"SLACK_ROLE_MAP": {"fixture-known": "admin"}}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(auth), "exec"), namespace)
+    assert namespace["_slack_user_role"]("fixture-unknown") == "reader"

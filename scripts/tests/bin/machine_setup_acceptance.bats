@@ -69,6 +69,13 @@ complete_machine() {
   touch "$T/complete"
   mkdir -p "$T/sudoers.d"; : > "$T/sudoers.d/k3d-manager"
   for x in ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$STUBS/$x"; chmod +x "$STUBS/$x"; done
+  if [ "$role" = hub ]; then
+    mkdir -p "$HOME_FX/.ssh"
+    (umask 077; printf 'fixture private key\n' > "$HOME_FX/.ssh/k3d-manager-key.pem")
+    printf 'fixture public key\n' > "$HOME_FX/.ssh/k3d-manager-key.pub"
+  fi
+  mkdir -p "$HOME_FX/.local/bin"
+  for x in agy gemini; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/bin/$x"; chmod +x "$HOME_FX/.local/bin/$x"; done
   mkdir -p "$HOME_FX/Library/LaunchAgents" "$HOME_FX/.claude/.git" "$HOME_FX/.codex/.git" "$HOME_FX/.gemini/.git" "$HOME_FX/.copilot/.git" "$HOME_FX/.smartcd/lib/core" "$HOME_FX/src/gitrepo/personal/zshdotfiles"
   touch "$HOME_FX/.smartcd/lib/core/smartcd" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshrc" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshenv"
   ln -sfn "$HOME_FX/src/gitrepo/personal/zshdotfiles" "$HOME_FX/.zsh"
@@ -95,11 +102,27 @@ complete_machine() {
 ensure_copy() {
   if [ "$TREE" = "$SRC" ] || [ ! -d "$T/tree" ]; then
     mkdir -p "$T/tree"
-    cp -R "$TREE"/. "$T/tree"/
-    rm -rf "$T/tree/.venv"
+    git -C "$TREE" ls-files -z > "$T/tracked-files" || return 1
+    tar -C "$TREE" --null -T "$T/tracked-files" -cf "$T/tracked.tar" || return 1
+    tar -C "$T/tree" -xf "$T/tracked.tar" || return 1
     TREE="$T/tree"
     make_stubs
   fi
+}
+
+@test "fixture copy includes tracked working edits only" {
+  git clone --quiet --no-hardlinks "$SRC" "$T/source"
+  TREE="$T/source"
+  printf '\n# fixture working edit\n' >> "$TREE/bin/k3dm-machine-setup"
+  printf 'ignored-fixture\n' >> "$TREE/.git/info/exclude"
+  dd if=/dev/zero of="$TREE/ignored-fixture" bs=1024 count=1024 2>/dev/null
+  printf 'untracked\n' > "$TREE/untracked-fixture"
+
+  ensure_copy
+  grep -q '^# fixture working edit$' "$TREE/bin/k3dm-machine-setup"
+  [ ! -e "$TREE/ignored-fixture" ]
+  [ ! -e "$TREE/untracked-fixture" ]
+  [ ! -e "$TREE/.git" ]
 }
 
 ms() {
@@ -479,13 +502,14 @@ STUB
 }
 
 @test "N4: report output has no username and no home path" {
-  local r m
+  local r m user_re
+  user_re="(^|[^A-Za-z0-9_.-])$(id -un)(\$|[^A-Za-z0-9_.-])"
   for r in hub worker console; do
     for m in --check --dry-run ""; do
       if [ -n "$m" ]; then ms --role "$r" "$m"; else ms --role "$r"; fi
       if [[ "$output" == *"$UNAME_USER"* ]]; then false; fi
       if [[ "$output" == *"$HOME_FX"* ]]; then false; fi
-      if [[ "$output" == *"$(id -un)"* ]]; then false; fi
+      if [[ "$output" =~ $user_re ]]; then false; fi
       if [[ "$output" == *"/Users/"* ]]; then false; fi
     done
   done
@@ -499,7 +523,7 @@ STUB
   complete_machine hub
   mkdir -p "$HOME_FX/src/gitrepo/personal/tax-returns/.git"
   ms --role hub
-  if grep -E '^git .*(checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore|commit|gc|branch -[dDmM])' "$CALLS"; then false; fi
+  if grep -E '^git .*[[:space:]](checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore|commit|gc|branch -[dDmM])([[:space:]]|$)' "$CALLS"; then false; fi
 }
 
 @test "N5: clone with a foreign remote is left alone and no mutation is attempted" {
@@ -511,7 +535,7 @@ case "\$*" in *get-url*|*remote.origin.url*) echo https://example.invalid/other.
 exit 0
 STUB
   ms --role hub
-  if grep -E '^git .*(checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore)' "$CALLS"; then false; fi
+  if grep -E '^git .*[[:space:]](checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore)([[:space:]]|$)' "$CALLS"; then false; fi
   if grep -E "^git .*clone .* $HOME_FX/src/" "$CALLS"; then false; fi
 }
 
@@ -547,4 +571,80 @@ STUB
   ms --role console
   [ -d "$HOME_FX/.local/share/k3d-manager/venv/bin" ]
   if find "$TREE" -name .venv -maxdepth 3 | grep .; then false; fi
+}
+
+@test "AI CLI checks isolate webhook PATH and require agy for hub and worker" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  [ -x "$STUBS/brew" ]
+  for role in hub worker; do
+    grep -Fxq 'cask:antigravity-cli' "$TREE/scripts/etc/machine/brew.$role.list"
+  done
+  run grep -Exq 'gemini-cli|cask:gemini' "$TREE"/scripts/etc/machine/brew.*.list
+  [ "$status" -eq 1 ]
+  ensure_copy
+  local fixed="$T/webhook-system" role name
+  mkdir -p "$fixed"
+  sed "s|/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin|$fixed|" "$TREE/bin/k3dm-machine-setup" > "$T/setup"
+  mv "$T/setup" "$TREE/bin/k3dm-machine-setup"
+  for role in hub worker; do
+    complete_machine "$role"
+    for name in agy gemini; do
+      printf '#!/bin/bash\necho "%s $*" >> "%s"\n' "$name" "$CALLS" > "$HOME_FX/.local/bin/$name"
+      chmod +x "$HOME_FX/.local/bin/$name"
+    done
+    : > "$CALLS"
+    ms --role "$role" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ai:agy[[:space:]]+ok && "$output" =~ ai:gemini[[:space:]]+ok ]]
+    rm "$HOME_FX/.local/bin/gemini"
+    ms --role "$role" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'skipped (optional; deprecated)'* ]]
+    grep -Eq '^ai:gemini[[:space:]]+skipped \(optional; deprecated\)$' <<< "$output"
+    mv "$HOME_FX/.local/bin/agy" "$HOME_FX/.local/bin/gemini"
+    ms --role "$role" --check
+    [ "$status" -eq 1 ]
+    grep -Eq '^ai:agy[[:space:]]+missing$' <<< "$output"
+    grep -Eq '^ai:gemini[[:space:]]+ok$' <<< "$output"
+    ms --role "$role" --secrets skip --agents skip
+    run grep -Eq '^(brew uninstall|agy |gemini )' "$CALLS"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test "keychain: locked login makes an otherwise complete hub check fail" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  complete_machine hub
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keychain:login'*'ok'* ]]
+  miss "security show-keychain-info $HOME_FX/Library/Keychains/login.keychain-db"
+  ms --role hub --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
+  run grep -E '^security (unlock-keychain|.* -(w|g)( |$))' "$CALLS"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *SECRETVALUE_LEAK* ]]
+}
+
+@test "heartbeat: optional unloaded, loaded, and missing webhook on a complete hub" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  complete_machine hub
+  local agents="$HOME_FX/Library/LaunchAgents"
+  rm -f "$agents/com.k3d-manager.heartbeat.plist"
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)'* ]]
+  touch "$agents/com.k3d-manager.heartbeat.plist"
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'ok'* ]]
+  rm "$agents/com.k3d-manager.heartbeat.plist" "$agents/com.k3d-manager.webhook.plist"
+  ms --role hub --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'missing'* ]]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
+  [ ! -e "$agents/com.k3d-manager.heartbeat.plist" ]
+  run grep -q '^launchctl ' "$CALLS"
+  [ "$status" -eq 1 ]
 }

@@ -16,7 +16,7 @@ from webhook.log import get_logger
 from webhook.redact import scrub_credentials
 
 
-logger = get_logger(__name__)
+logger = get_logger("webhook")
 _SLACK_POST_ALLOWED_HOSTS = frozenset({"hooks.slack.com", "slack.com"})
 
 

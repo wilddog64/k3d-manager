@@ -115,8 +115,15 @@ def _select(releases, release, ref, root):
 
 
 def reply(query):
-    ref = os.environ.get("K3DM_INDEX_REF", "HEAD")
     root = Path(__file__).resolve().parents[2].parent
+    ref = os.environ.get("K3DM_INDEX_REF")
+    no_upstream = False
+    if not ref:
+        rc, output, timed_out = proc._spawn_capture_text(
+            ["git", "rev-parse", "--abbrev-ref", "@{upstream}"], cwd=root, timeout=10)
+        ref = output.strip() if rc == 0 and not timed_out else ""
+        if not ref:
+            ref, no_upstream = "HEAD", True
     cmd = [sys.executable, str(Path(__file__).resolve().parents[2] / "bug-tally.py"),
            "--json", "--counts-only", "--ref", ref]
     rc, output, timed_out = proc._spawn_capture_text(cmd, cwd=root, timeout=30)
@@ -132,9 +139,10 @@ def reply(query):
     names, header = _select(releases, query.release, ref, root)
     selected = {name: releases[name] for name in names if releases.get(name) is not None}
     if not selected:
+        fallback = "\nCounted at local HEAD (no upstream)." if no_upstream else ""
         if header:
-            return header + "\nNo bug docs in those releases."
-        return f"No bug tally found for {query.release}."
+            return header + "\nNo bug docs in those releases." + fallback
+        return f"No bug tally found for {query.release}." + fallback
 
     def counts_of(data):
         return data.get("by_priority", {}).get(query.priority, {}) if query.priority else data
@@ -144,6 +152,7 @@ def reply(query):
         return counts.get(query.state, 0) if query.state else counts.get("total", 0)
 
     lines = [header] if header else []
+    omissions = {}
     unset_total = sum(data.get("by_priority", {}).get("unset", {}).get("total", 0)
                       for data in selected.values()) if query.priority else 0
     if query.release == "*":
@@ -173,6 +182,7 @@ def reply(query):
         if deferred_count:
             lines[-1] = lines[-1].replace(f"{counts.get('open', 0)} open,",
                                           f"{counts.get('open', 0)} open ({deferred_count} deferred),")
+        omissions[release] = {"open": max(0, len(open_items) - 10), "fixed": 0}
         for item in open_items[:10]:
             from webhook.ask_docs import _doc_link
             path = item["path"] if isinstance(item, dict) else item
@@ -191,9 +201,41 @@ def reply(query):
                 from webhook.ask_docs import _doc_link
                 path = item["path"] if isinstance(item, dict) else item
                 lines.append(f"Fixed: {_doc_link(path)}")
-            if len(closed_items) > 10:
-                lines.append(f"…and {len(closed_items) - 10} more fixed.")
+            omissions[release]["fixed"] = max(0, len(closed_items) - 10)
     if unset_total:
         lines.append(f"{unset_total} docs in these releases have no Priority line, so they are not counted here.")
+    if no_upstream:
+        lines.append("Counted at local HEAD (no upstream).")
     lines.append(f"_Counted from docs/bugs/ at {ref}; release = Branch: line, else the release the doc was added in._")
-    return "\n".join(lines)
+    # Reserve the ask-docs source wrapper and omission notices before returning.
+    from webhook.ask_docs import MAX_REPLY_CHARS
+    budget = MAX_REPLY_CHARS - len("\n\nSources: none")
+
+    def render():
+        notices = []
+        for release, counts in omissions.items():
+            for kind in ("fixed", "open"):
+                if counts[kind]:
+                    prefix = f"{release}: " if len(omissions) > 1 else ""
+                    notices.append(f"{prefix}…and {counts[kind]} more {kind}.")
+        return "\n".join(lines + notices)
+
+    while len(render()) > budget:
+        # Preserve count lines and prefer open links to fixed and unknown links.
+        removed = False
+        for label, kind in (("Fixed: ", "fixed"), ("Unknown: ", None),
+                            ("Open: ", "open"), ("Deferred: ", "open")):
+            for index in range(len(lines) - 1, -1, -1):
+                if lines[index].startswith(label):
+                    release = next((line.split(":", 1)[0] for line in reversed(lines[:index])
+                                    if line.split(":", 1)[0] in omissions), None)
+                    lines.pop(index)
+                    if kind and release:
+                        omissions[release][kind] += 1
+                    removed = True
+                    break
+            if removed:
+                break
+        if not removed:
+            break
+    return render()

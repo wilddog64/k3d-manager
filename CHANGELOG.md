@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+## [1.43.13] - 2026-11-01
+
+Machine-setup and bug-fix release for the M5 hub. The five plans first planned for v1.43.13 moved to v1.43.14, and v1.43.14's plans moved to v1.43.15; no plan work ships here.
+
+- Allow cross-repository task landings to use their required tests when the task repository has no executable fast gate.
+
+- Add the Prometheus Community Helm repo before installing the sandbox Pushgateway on a new hub.
+
+- Configure app-cluster Vault auth when KUBECONFIG contains multiple files.
+
+- Check whether the marked CloudFormation stack exists before warning that a failed ACG bring-up left it billable.
+
+- Split unknown dispatch run outcomes into unrecorded, superseded, open and stale ledger facts without changing coverage.
+
+- Start Slack job threads with the bot when a channel is known, and log Slack API rejections through the webhook logger.
+
+- Generate a per-node EC2 SSH key during hub machine setup and report it in machine-check.
+
+- Include hub-read credentials in machine setup and report a missing or empty Slack role map in webhook diagnostics.
+
+- Preserve Slack channel and thread context for cluster-up, cluster-down and cluster-resume job updates.
+
+- Keep repo names readable in Agent Activity bar gauges by showing the top eight and an other total.
+
+- Count Bash file reads and distinguish unchanged re-reads after compaction in the agent activity dashboard.
+
+- Show the observed automatic compaction point beside the configured setting on the agent activity dashboard.
+
+- Report an unloaded optional heartbeat without failing the hub machine check; candidate rendering failures remain errors.
+
+- Report a locked login Keychain during machine setup and distinguish unreadable Keychain items in Argo CD secret sync.
+
+- Reapply the Grafana and enabled LDAP credential rotators during platform-ops deployment, reporting each rotator's outcome.
+
+- Install Antigravity CLI for hub and worker setup and require `agy` on the webhook PATH. Gemini is an optional fallback and is no longer installed by setup because its Homebrew formula is deprecated.
+
+- Fix the LDAP password rotator's Slack URL decoding for BusyBox so it can send rotation notices.
+- Log failed or skipped rotator Slack notices without failing a successful password rotation.
+- Bound pseudo-terminal machine setup tests and fast-gate checks with timeouts that terminate hung processes and report the limit.
+- Count ask-docs bugs at the fetched upstream ref by default, and identify a fallback to local HEAD when no upstream is available.
+- Isolate fast-gate test Git commands from linked-worktree hook variables and detect changes to repository configuration, branches, and worktrees.
+- Preserve each land test attempt’s log and show test counts and the first failure for refused runs.
+- Preserve diagnostic prose when the AI reply filter withholds an inline command, and stop treating tool names in ordinary sentences as commands. Commands after short labels and stacked list, blockquote, shell prompt, or run markers are still withheld when disallowed.
+- Bug-count replies fit whole links within the Slack limit and report the exact number of omitted open and fixed docs; named-release truncation suggests a priority filter.
+- Preserve webhook Slack bot settings during setup, and flag missing bot configuration during hub migration and webhook diagnostics.
+- Machine setup reported `brew:azure-cli missing` on the M5 and failed every run, because Homebrew now installs azure-cli as a cask while the check only asked `brew list --formula`; `brew install` could not repair it. A manifest entry with no `cask:` or `formula:` prefix now counts as present when either kind is installed, so the M5 (cask) and the M4 (older formula) both pass. Prefixed entries stay strict.
+- Run a fast local gate on pushes and task landings to catch relevant lint and test failures early.
+- Pass `K` to `make find-similar-docs` as its own argument; `K=10` was glued into `--k10--` and rejected.
+- On the M5, direnv waited for an HTTPS credential prompt because setup had left managed GitHub remotes on HTTPS. Setup now switches those remotes to SSH when authentication works and restores HTTPS if verification fails. The M5 also had 10,585 group- or world-writable entries under `~/.zplug`, stopping compinit; setup repairs home completion permissions and reports insecure Homebrew paths. It preserves linked SSH configuration. The new interactive login-shell check catches these problems, which did not appear in the existing setup checks.
+
 ## [1.43.12] - 2026-10-31
 
 M5 hub release. It also carries the v1.43.10 branch's verified-specs fix; the v1.43.10 plans themselves are not implemented and stay queued.

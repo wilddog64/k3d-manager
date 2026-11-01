@@ -265,3 +265,61 @@ def test_cleanup_thread_header_uses_confirm_label(monkeypatch, tmp_path):
     monkeypatch.setattr(webhook, "_notify_job", lambda *_args: None)
     webhook._run_stale_sandbox_cleanup("job1", confirm=True, channel_id="C123")
     assert headers == ["🧹 *cleanup-stale-sandbox* (confirm) queued"]
+
+
+def test_notify_job_starts_and_replies_in_bot_thread(monkeypatch, tmp_path):
+    import json
+
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "channel_id").write_text("C123")
+    (job_dir / "response_url").write_text("https://example.test/response")
+    calls = []
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda text, **kw: calls.append((text, kw)) or "123.456")
+    monkeypatch.setattr(webhook, "_slack_post", lambda *a, **kw: calls.append((a, kw)))
+
+    assert webhook._notify_job("deadbeef", "first")
+    assert webhook._notify_job("deadbeef", "second")
+    assert (job_dir / "thread_ts").read_text() == "123.456"
+    assert calls == [("first", {"thread_ts": None, "channel_id": "C123"}),
+                     ("second", {"thread_ts": "123.456", "channel_id": "C123"})]
+    records = [json.loads(line) for line in (job_dir / "delivery.jsonl").read_text().splitlines()]
+    assert [record["route"] for record in records] == ["bot_thread", "bot_thread"]
+    assert all(record["delivered"] for record in records)
+
+
+def test_notify_job_new_thread_rejection_falls_back(monkeypatch, tmp_path):
+    import json
+
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "channel_id").write_text("C123")
+    (job_dir / "response_url").write_text("https://example.test/response")
+    calls = []
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *a, **kw: calls.append("bot") or "")
+    monkeypatch.setattr(webhook, "_slack_post", lambda *a, **kw: calls.append("response") or True)
+
+    assert webhook._notify_job("deadbeef", "first")
+    assert calls == ["bot", "response"]
+    assert not (job_dir / "thread_ts").exists()
+    assert json.loads((job_dir / "delivery.jsonl").read_text())["route"] == "response_url"
+
+
+def test_notify_job_without_channel_uses_response_url_for_first_post(monkeypatch, tmp_path):
+    job_dir = tmp_path / "deadbeef"
+    job_dir.mkdir()
+    (job_dir / "response_url").write_text("https://example.test/response")
+    calls = []
+    monkeypatch.setattr(webhook, "JOB_DIR", tmp_path)
+    monkeypatch.setattr(webhook, "SLACK_BOT_TOKEN", "bot-token")
+    monkeypatch.setattr(webhook, "SLACK_CHANNEL_ID", "wrong-channel")
+    monkeypatch.setattr(webhook, "_post_slack_bot", lambda *a, **kw: calls.append("bot") or "ts")
+    monkeypatch.setattr(webhook, "_slack_post", lambda *a, **kw: calls.append("response") or True)
+
+    assert webhook._notify_job("deadbeef", "first")
+    assert calls == ["response"]
+    assert '"route": "response_url"' in (job_dir / "delivery.jsonl").read_text()

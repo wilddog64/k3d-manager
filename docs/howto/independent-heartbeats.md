@@ -29,3 +29,5 @@ For an explicit failing check, inspect that machine's local logs and the compone
 For planned downtime, disable the individual check in provider UI (or set local `disabled: true` / a numeric `maintenance_until` epoch in its config) before stopping the service, then restore it after maintenance. Do not leave duplicated senders active: each identity should have exactly one scheduler. Disable/load the local schedule only through the operator's normal launchd or systemd procedure.
 
 There is no watchdog restart, remote reboot, or automatic infrastructure mutation. A powered-off m4 cannot report its own failure or recover itself; Hostinger is an independent observer, not a control path to m4. A provider outage can make all reports unavailable. Operator live validation of failure, recovery, alert delivery, and maintenance suppression is still required before claiming end-to-end alerting works.
+
+Machine setup reports the heartbeat as `not loaded (optional)` until the operator loads it, and `ok` afterward.

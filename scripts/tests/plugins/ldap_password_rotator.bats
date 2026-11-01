@@ -31,6 +31,20 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "LDAP rotator decodes the Slack URL and passes it to curl" {
+  notice="${BATS_TEST_TMPDIR}/notice.sh"
+  capture="${BATS_TEST_TMPDIR}/curl-args"
+  sed -n '/^[[:space:]]*slack_url=$(kubectl/,/^[[:space:]]*fi$/p' "$ROTATE" > "$notice"
+  CAPTURE="$capture" /bin/sh -c '
+    kubectl() { printf %s aHR0cHM6Ly9leGFtcGxlLmNvbS9ob29r; }
+    base64() { [ "$1" = -d ] || return 1; command base64 -d; }
+    curl() { printf "%s\n" "$@" > "$CAPTURE"; }
+    . "$1"
+  ' sh "$notice"
+  run grep -Fx 'https://example.com/hook' "$capture"
+  [ "$status" -eq 0 ]
+}
+
 @test "generate_password returns 48 lowercase hexadecimal characters without openssl" {
   function_text="${BATS_TEST_TMPDIR}/generate-password.sh"
   sed -n '/^generate_password() {/,/^}/p' "$ROTATE" > "$function_text"
@@ -77,4 +91,32 @@ setup() {
   [ "$(<"$capture")" = 'http://vault.secrets.svc:8200' ]
   run grep -Fq 'vault.vault.svc' "${REPO_ROOT}/plugins/ldap.sh"
   [ "$status" -ne 0 ]
+}
+
+@test "LDAP rotator notice reports failures, skips and success safely" {
+  block="$BATS_TEST_TMPDIR/notice.sh"
+  awk '/if \[ -n "\$slack_url" \]; then/ { print "set -eu"; capture=1 } capture { sub(/^ +/, ""); print; if ($0 == "fi") exit }' "$ROTATE" > "$block"
+  mkdir -p "$BATS_TEST_TMPDIR/stubs"
+  cat > "$BATS_TEST_TMPDIR/stubs/curl" <<'STUB'
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then shift; printf '%s' "${REPLY_BODY:-no_service}" > "$1"; fi
+  shift
+done
+printf '%s' "$HTTP_STATUS"
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/stubs/curl"
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=404 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'WARN slack notice not delivered: HTTP 404 no_service'* ]]
+  [[ "$output" != *'secret-webhook-marker'* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=200 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *WARN* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='' HTTP_STATUS=200 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'WARN slack notice skipped'* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=404 REPLY_BODY='https://secret-webhook-marker' /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'secret-webhook-marker'* ]]
 }

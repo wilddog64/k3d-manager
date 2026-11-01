@@ -76,7 +76,7 @@ install-test-metrics:
 	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
 
-.PHONY: up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -1454,7 +1454,7 @@ embed-cache-restore:
 
 ## Find prior art in docs/ by similarity: make find-similar-docs Q="..." [K=5]
 find-similar-docs:
-	@python3 -c 'import base64, os, sys; q = base64.b64decode(sys.argv[1], validate=True).decode("ascii") if sys.argv[1] else os.environ.get("Q", ""); os.execv(sys.executable, [sys.executable, "scripts/find-similar-docs.py", $(if $(K),"--k",) $(if $(K),"$(K)",) "--", q])' "$(Q_B64)"
+	@python3 -c 'import base64, os, sys; q = base64.b64decode(sys.argv[1], validate=True).decode("ascii") if sys.argv[1] else os.environ.get("Q", ""); os.execv(sys.executable, [sys.executable, "scripts/find-similar-docs.py"] + (["--k", sys.argv[2]] if sys.argv[2] else []) + ["--", q])' "$(Q_B64)" "$(K)"
 
 ## Compare services/*/kustomization.yaml image digests with :latest in GHCR (read-only; needs gh read:packages)
 image-pin-drift:
@@ -1463,6 +1463,9 @@ image-pin-drift:
 ## Fail if test/job debris (empty-mktemp derived paths) exists at the repo root
 check-repo-root:
 	@./scripts/check-repo-root-debris.sh
+
+fast-gate:
+	@scripts/ci/fast_gate.sh $(BASE)
 
 test-pytest:
 	@set -euo pipefail; \
@@ -1616,6 +1619,8 @@ help:
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
 	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
 	@echo "    make machine-check ROLE=hub|worker|console  Read-only workstation inventory (docs/howto/machine-setup.md)"
+	@echo "    make machine-check-shell HOST=<mac>  Read-only SSH login-shell check of a new Mac"
+	@echo "    make fast-gate [BASE=<rev>]  Changed-file lint and tests before push (docs/howto/fast-gate.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
 	@echo "    make webhook-doctor  Read-only webhook diagnostics (DRY_RUN=1 for probe plan)"
 	@echo "    make restart-webhook  Restart webhook and cloud bridge"
@@ -1706,7 +1711,7 @@ help:
 	@echo ""
 
 ## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
-.PHONY: machine-setup machine-check machine-secrets-export machine-secrets-import
+.PHONY: machine-setup machine-check machine-check-shell machine-secrets-export machine-secrets-import
 machine-setup:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
@@ -1715,6 +1720,10 @@ machine-setup:
 machine-check:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" --check
+
+machine-check-shell:
+	@test -n "$(HOST)" || { echo 'Set HOST=<hostname>' >&2; exit 2; }
+	@bin/k3dm-machine-setup --check-shell "$(HOST)"
 
 machine-secrets-export:
 	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }

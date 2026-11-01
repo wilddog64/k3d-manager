@@ -1,13 +1,13 @@
 # Bug: hub migration drops the webhook Slack bot config, so every /ask-docs and /ask reply is ephemeral
 
-**Status:** OPEN
+**Status:** FIXED — `a841d34c` (Codex, one correction round for a token-prefix leak the tests missed; Claude review, independent verifier PASS, prefix mutant red); E2 live: doctor slack_bot=configured on the M5 2026-10-31
 **Priority:** P2
 **Severity:** medium — Slack answers still arrive, but only as "Only visible to you"; no bot threads, no thread follow-ups
-**Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's proposal to file it
+**Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's proposal to file it; dispatch go: operator, 2026-10-31 ("go ahead to dispatch these two")
 **Filed:** 2026-10-31
 **Detected by:** operator (`/ask-docs` in #acg-automation answered "Only visible to you" at 07:32 and 07:33 PDT)
 **Affected:** `bin/k3dm-webhook-setup` (called by `bin/hub-new`), `bin/k3dm-webhook-doctor`, `docs/howto/m5-hub-migration.md`
-**Branch:** `k3d-manager-v1.43.12`
+**Branch:** `k3d-manager-v1.43.13`
 **Related:** `docs/plans/v1.43.12-m5-new-hub-one-command.md`; `docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md` (same class: a hub rebuild loses a Slack setting that lived outside git)
 
 ## Observed failure
@@ -33,6 +33,17 @@ The operator ran `SLACK_CHANNEL_ID=C0B7ZHG2LR4 make update-webhook-slack` on the
 2. `bin/hub-new` gets a check: when the hub Keychain holds `k3d-manager-slack-bot-token-bot` and the rendered plist has no `SLACK_BOT_TOKEN` or `SLACK_CHANNEL_ID`, the report records a failure that names `make update-webhook-slack` with `SLACK_CHANNEL_ID` exported. `hub-new` never reads or prints the token value.
 3. `bin/k3dm-webhook-doctor --check` reports `slack_bot: configured | missing_token | missing_channel` from the plist's key presence only, never the values.
 4. `docs/howto/m5-hub-migration.md` adds the step `SLACK_CHANNEL_ID=<id> make update-webhook-slack`, run in a local terminal because it reads the login Keychain, and the check that a `/ask-docs` question in the channel replies in a thread.
+
+## Files
+
+- `bin/k3dm-webhook-setup`
+- `bin/hub-new`
+- `bin/k3dm-webhook-doctor`
+- `scripts/tests/bin/webhook_setup.bats` (new)
+- `scripts/tests/bin/hub_new.bats`
+- `scripts/tests/bin/test_webhook_doctor.py`
+- `docs/howto/m5-hub-migration.md`
+- `CHANGELOG.md`
 
 ## Acceptance
 
