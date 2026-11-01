@@ -142,3 +142,8 @@ values, so real external credentials (`payment/stripe`, `payment/paypal`, `githu
 `prior_art.py`, and the worker manifest already carries it, so Claude removed the line from `secrets.hub.list`
 rather than leave a permanent `--check` failure on the hub. An earlier run the same morning used the pre-fix checkout
 (`⇣20`), so it checked the old list and pulled nothing.
+
+## Live evidence (2026-11-01, Claude)
+
+- Slack `/cluster-up aws` was accepted on the M5 and job `cdff3cea` ran to `up complete` (exit 0, 13m). Half of E-live.
+- Still open: the `--check` line `secret:k3dm-slack-role-map ok`. It needs the operator's M5 shell, because the Keychain is locked over SSH.
