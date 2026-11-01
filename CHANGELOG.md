@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Install the Gemini CLI and Antigravity CLI for hub and worker setup, and report whether each resolves on the webhook PATH.
+
 - Fix the LDAP password rotator's Slack URL decoding for BusyBox so it can send rotation notices.
 - Log failed or skipped rotator Slack notices without failing a successful password rotation.
 - Bound pseudo-terminal machine setup tests and fast-gate checks with timeouts that terminate hung processes and report the limit.

@@ -75,11 +75,12 @@ zsh
 # M4 casks retained for agent/development workstations.
 cask:nikitabobko/tap/aerospace
 cask:antigravity
+cask:antigravity-cli
 cask:claude
 cask:facescreen
 cask:font-hack-nerd-font
 cask:gcloud-cli
-cask:gemini
+gemini-cli
 cask:google-chrome
 cask:iterm2
 cask:openusage

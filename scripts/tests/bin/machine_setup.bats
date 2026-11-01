@@ -1086,3 +1086,40 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *fixture-complete* ]]
 }
+
+@test "machine setup: AI CLI manifests select the correct packages" {
+  for role in hub worker; do
+    grep -Fxq 'gemini-cli' "$MACHINE_DIR/brew.$role.list"
+    grep -Fxq 'cask:antigravity-cli' "$MACHINE_DIR/brew.$role.list"
+    grep -Fxq 'cask:antigravity' "$MACHINE_DIR/brew.$role.list"
+  done
+  ! grep -Fxq 'cask:gemini' "$MACHINE_DIR"/brew.*.list
+}
+
+@test "machine setup: AI CLI checks use webhook PATH for hub and worker without invoking tools" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS/brew" == "$BATS_TEST_TMPDIR/"* ]]
+  [ -x "$STUBS/brew" ]
+  # Replace only the fixed system directories in the copied script, so host-installed
+  # CLIs cannot affect the missing case; the HOME component remains unchanged.
+  local fixed="$BATS_TEST_TMPDIR/webhook-system" role name
+  mkdir -p "$fixed" "$FIXHOME/.local/bin"
+  sed "s|/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin|$fixed|" "$SCRIPT_SOURCE" > "$FIXROOT/bin/k3dm-machine-setup"
+  grep -Fq '{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' "$REPO_ROOT/scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl"
+  for name in agy gemini; do
+    printf '#!/bin/sh\nprintf "%s %%s\\n" "$*" >> "$CALL_LOG"\n' "$name" > "$STUBS/$name"
+    chmod +x "$STUBS/$name"
+  done
+  for role in hub worker; do
+    run_machine --role "$role" --check --secrets skip --agents skip
+    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+missing$" <<< "$output"; done
+    cp "$STUBS/agy" "$STUBS/gemini" "$FIXHOME/.local/bin/"
+    run_machine --role "$role" --check --secrets skip --agents skip
+    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+ok$" <<< "$output"; done
+    run_machine --role "$role" --secrets skip --agents skip
+    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+ok$" <<< "$output"; done
+    rm "$FIXHOME/.local/bin/agy" "$FIXHOME/.local/bin/gemini"
+  done
+  grep -q "^brew " "$CALL_LOG"
+  ! grep -Eq '^(brew uninstall|agy |gemini |security find-generic-password)' "$CALL_LOG"
+}
