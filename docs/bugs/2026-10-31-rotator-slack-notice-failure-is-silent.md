@@ -1,6 +1,8 @@
 # Bug: a rotator whose Slack notice fails says nothing, so a revoked webhook hides every rotation
 
-**Status:** FIXED — `a5ffefb0` (Codex; Claude review, independent verifier PASS; restore trap now disarmed before the notice); live check pending
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run argocd-rotator-manual-1101 · env m5-air · scenario revoked-slack-webhook-manual-rotation · commit a5ffefb0 · proves E2
+**Fix commit:** a5ffefb0
 **Priority:** P3
 **Severity:** low — passwords rotate correctly; the operator is not told, and nothing shows the notice failed
 **Approval:** operator, 2026-10-31 ("got ahead to file rotator bugs and dispatch to Luna")
@@ -80,3 +82,14 @@ evidence:
 interface:
   - the notice block inside each rotator's container script (env/secret platform-ops-notifications slack-incoming-webhook-url)
 ```
+
+## Live verification (E2), 2026-11-01
+
+- Before: job `grafana-rotator-manual-1101` (monitoring, 12:09Z) ran the pre-fix script. It completed, and its only
+  log line was `curl: (22) The requested URL returned error: 404`, with no statement that the notice failed.
+- After `make platform-ops` on the M5 (release branch), the ArgoCD rotator CronJob carried the fix. Job
+  `argocd-rotator-manual-1101` (cicd) logged `WARN slack notice not delivered: HTTP 404 no_service` and completed
+  (succeeded=1).
+- Gap found: `make platform-ops` updates only the ArgoCD rotator. The Grafana rotator is applied by
+  `scripts/plugins/observability.sh`, and the LDAP rotator by the LDAP plugin, so on the M5 both still run the
+  pre-fix script after the release steps. Keycloak's rotator is not deployed on the M5.
