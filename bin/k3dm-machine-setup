@@ -510,6 +510,8 @@ check_ai_clis() {
   for name in agy gemini; do
     if (PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"; export PATH; hash -r; command -v "$name" >/dev/null 2>&1); then
       report "ai:${name}" ok
+    elif [[ "$name" == gemini ]]; then
+      report "ai:${name}" "skipped (optional; deprecated)"
     else
       record_failure "ai:${name}" missing
     fi

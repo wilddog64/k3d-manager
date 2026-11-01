@@ -4,7 +4,7 @@
 
 - Reapply the Grafana and enabled LDAP credential rotators during platform-ops deployment, reporting each rotator's outcome.
 
-- Install the Gemini CLI and Antigravity CLI for hub and worker setup, and report whether each resolves on the webhook PATH.
+- Install Antigravity CLI for hub and worker setup and require `agy` on the webhook PATH. Gemini is an optional fallback and is no longer installed by setup because its Homebrew formula is deprecated.
 
 - Fix the LDAP password rotator's Slack URL decoding for BusyBox so it can send rotation notices.
 - Log failed or skipped rotator Slack notices without failing a successful password rotation.

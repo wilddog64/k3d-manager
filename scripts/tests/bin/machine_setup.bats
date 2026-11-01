@@ -1091,11 +1091,10 @@ SH
 
 @test "machine setup: AI CLI manifests select the correct packages" {
   for role in hub worker; do
-    grep -Fxq 'gemini-cli' "$MACHINE_DIR/brew.$role.list"
     grep -Fxq 'cask:antigravity-cli' "$MACHINE_DIR/brew.$role.list"
     grep -Fxq 'cask:antigravity' "$MACHINE_DIR/brew.$role.list"
   done
-  run grep -Fxq 'cask:gemini' "$MACHINE_DIR"/brew.hub.list "$MACHINE_DIR"/brew.worker.list "$MACHINE_DIR"/brew.console.list
+  run grep -Exq 'gemini-cli|cask:gemini' "$MACHINE_DIR"/brew.hub.list "$MACHINE_DIR"/brew.worker.list "$MACHINE_DIR"/brew.console.list
   [ "$status" -eq 1 ]
 }
 
@@ -1115,7 +1114,8 @@ SH
   done
   for role in hub worker; do
     run_machine --role "$role" --check --secrets skip --agents skip
-    for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+missing$" <<< "$output"; done
+    grep -Eq "^ai:agy[[:space:]]+missing$" <<< "$output"
+    grep -Eq "^ai:gemini[[:space:]]+skipped \(optional; deprecated\)$" <<< "$output"
     cp "$STUBS/agy" "$STUBS/gemini" "$FIXHOME/.local/bin/"
     run_machine --role "$role" --check --secrets skip --agents skip
     for name in agy gemini; do grep -Eq "^ai:${name}[[:space:]]+ok$" <<< "$output"; done

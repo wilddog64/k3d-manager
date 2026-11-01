@@ -80,7 +80,6 @@ cask:claude
 cask:facescreen
 cask:font-hack-nerd-font
 cask:gcloud-cli
-gemini-cli
 cask:google-chrome
 cask:iterm2
 cask:openusage

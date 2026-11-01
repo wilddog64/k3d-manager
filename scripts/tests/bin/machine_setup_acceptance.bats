@@ -566,3 +566,42 @@ STUB
   [ -d "$HOME_FX/.local/share/k3d-manager/venv/bin" ]
   if find "$TREE" -name .venv -maxdepth 3 | grep .; then false; fi
 }
+
+@test "AI CLI checks isolate webhook PATH and require agy for hub and worker" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  [ -x "$STUBS/brew" ]
+  for role in hub worker; do
+    grep -Fxq 'cask:antigravity-cli' "$TREE/scripts/etc/machine/brew.$role.list"
+  done
+  run grep -Exq 'gemini-cli|cask:gemini' "$TREE"/scripts/etc/machine/brew.*.list
+  [ "$status" -eq 1 ]
+  ensure_copy
+  local fixed="$T/webhook-system" role name
+  mkdir -p "$fixed"
+  sed "s|/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin|$fixed|" "$TREE/bin/k3dm-machine-setup" > "$T/setup"
+  mv "$T/setup" "$TREE/bin/k3dm-machine-setup"
+  for role in hub worker; do
+    complete_machine "$role"
+    for name in agy gemini; do
+      printf '#!/bin/bash\necho "%s $*" >> "%s"\n' "$name" "$CALLS" > "$HOME_FX/.local/bin/$name"
+      chmod +x "$HOME_FX/.local/bin/$name"
+    done
+    : > "$CALLS"
+    ms --role "$role" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ai:agy[[:space:]]+ok && "$output" =~ ai:gemini[[:space:]]+ok ]]
+    rm "$HOME_FX/.local/bin/gemini"
+    ms --role "$role" --check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'skipped (optional; deprecated)'* ]]
+    grep -Eq '^ai:gemini[[:space:]]+skipped \(optional; deprecated\)$' <<< "$output"
+    mv "$HOME_FX/.local/bin/agy" "$HOME_FX/.local/bin/gemini"
+    ms --role "$role" --check
+    [ "$status" -eq 1 ]
+    grep -Eq '^ai:agy[[:space:]]+missing$' <<< "$output"
+    grep -Eq '^ai:gemini[[:space:]]+ok$' <<< "$output"
+    ms --role "$role" --secrets skip --agents skip
+    run grep -Eq '^(brew uninstall|agy |gemini )' "$CALLS"
+    [ "$status" -eq 1 ]
+  done
+}
