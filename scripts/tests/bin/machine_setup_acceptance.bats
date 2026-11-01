@@ -95,11 +95,27 @@ complete_machine() {
 ensure_copy() {
   if [ "$TREE" = "$SRC" ] || [ ! -d "$T/tree" ]; then
     mkdir -p "$T/tree"
-    cp -R "$TREE"/. "$T/tree"/
-    rm -rf "$T/tree/.venv"
+    git -C "$TREE" ls-files -z > "$T/tracked-files" || return 1
+    tar -C "$TREE" --null -T "$T/tracked-files" -cf "$T/tracked.tar" || return 1
+    tar -C "$T/tree" -xf "$T/tracked.tar" || return 1
     TREE="$T/tree"
     make_stubs
   fi
+}
+
+@test "fixture copy includes tracked working edits only" {
+  git clone --quiet --no-hardlinks "$SRC" "$T/source"
+  TREE="$T/source"
+  printf '\n# fixture working edit\n' >> "$TREE/bin/k3dm-machine-setup"
+  printf 'ignored-fixture\n' >> "$TREE/.git/info/exclude"
+  dd if=/dev/zero of="$TREE/ignored-fixture" bs=1024 count=1024 2>/dev/null
+  printf 'untracked\n' > "$TREE/untracked-fixture"
+
+  ensure_copy
+  grep -q '^# fixture working edit$' "$TREE/bin/k3dm-machine-setup"
+  [ ! -e "$TREE/ignored-fixture" ]
+  [ ! -e "$TREE/untracked-fixture" ]
+  [ ! -e "$TREE/.git" ]
 }
 
 ms() {
