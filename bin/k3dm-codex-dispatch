@@ -830,6 +830,8 @@ _dispatch_land() {
   fi
   if [[ "${K3DM_SKIP_FAST_GATE:-0}" == 1 ]]; then
     echo "land: fast gate skipped (K3DM_SKIP_FAST_GATE=1)"
+  elif [[ ! -x "$task/scripts/ci/fast_gate.sh" ]]; then
+    echo "land: fast gate not available in $_dispatch_event_repo; --test is the gate"
   elif ! (cd "$task" && env "${land_env[@]}" scripts/ci/fast_gate.sh "origin/$target" 2>&1 | tee "$run/land-fast-gate.log"); then
     _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason fast-gate '.reason=$reason'
     _dispatch_schedule_metrics

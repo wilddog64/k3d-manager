@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Allow cross-repository task landings to use their required tests when the task repository has no executable fast gate.
+
 - Add the Prometheus Community Helm repo before installing the sandbox Pushgateway on a new hub.
 
 - Configure app-cluster Vault auth when KUBECONFIG contains multiple files.

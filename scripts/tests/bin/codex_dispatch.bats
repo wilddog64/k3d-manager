@@ -778,10 +778,6 @@ EOF
   git init --bare "$WORK_ORIGIN" >/dev/null
   git clone "$WORK_ORIGIN" "$WORK_REPO" >/dev/null
   git -C "$WORK_REPO" config user.email test@example.com; git -C "$WORK_REPO" config user.name Test
-  mkdir -p "$WORK_REPO/scripts/ci"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK_REPO/scripts/ci/fast_gate.sh"
-  chmod +x "$WORK_REPO/scripts/ci/fast_gate.sh"
-  git -C "$WORK_REPO" add scripts/ci/fast_gate.sh
   git -C "$WORK_REPO" checkout -b fix/cross-repo >/dev/null
   printf 'original\n' >"$WORK_REPO/a.txt"
   git -C "$WORK_REPO" add a.txt; git -C "$WORK_REPO" commit -m work-base >/dev/null
@@ -802,13 +798,18 @@ EOF
   [ "$(jq -r -s '.[0].repo' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = work-origin ]
   printf 'edited\n' >"$task/a.txt"
   git -C "$task" add a.txt; git -C "$task" commit -m task-edit >/dev/null
+  run dispatch land --slug cross --test false
+  [ "$status" -eq 2 ]; [[ "$output" == *'tests failed'* ]]
+  jq -e -s 'any(.[]; .slug=="cross" and .event=="land_refused" and .reason=="tests")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   run dispatch land --slug cross --test true
   [ "$status" -eq 0 ]; [[ "$output" == *"git -C $(git -C "$WORK_REPO" rev-parse --show-toplevel) push origin fix/cross-repo"* ]]
+  [[ "$output" == *'land: fast gate not available in work-origin; --test is the gate'* ]]
+  jq -e -s 'all(.[]; .slug!="cross" or .event!="land_refused" or .reason!="fast-gate")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   [ "$(git -C "$WORK_REPO" show fix/cross-repo:a.txt)" = edited ]
   [ "$(git -C "$WORK_REPO" rev-parse origin/fix/cross-repo)" = "$remote_before" ]
   [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$manager_before" ]
   [ "$(jq -r -s 'map(select(.slug=="cross"))[-1].repo' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = work-origin ]
-  [ "$(jq -r -s '[.[]|select(.slug=="cross" and .repo=="work-origin")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 4 ]
+  [ "$(jq -r -s '[.[]|select(.slug=="cross" and .repo=="work-origin")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 5 ]
   jq -e -s 'map(select(.slug=="cross" and .event=="primary_coordinator"))[-1] | .repo=="work-origin" and .primary_coordinator_identity.source=="unknown"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   jq -e -s 'map(select(.slug=="cross" and .event=="land"))[-1] | has("verifier_lines") and has("wait_seconds")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   [ "$(jq -r -s 'map(select(.slug=="cross" and .event=="land"))[-1].target_moved_commits' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 0 ]
@@ -1316,6 +1317,7 @@ EOF
   git -C "$task" commit -qm broken-gate
   run dispatch land --slug gate --test true --allow-out-of-scope
   [ "$status" -eq 2 ]; [[ "$output" == *'fast gate failed'* ]]
+  jq -e -s 'any(.[]; .slug=="gate" and .event=="land_refused" and .reason=="fast-gate")' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
   run dispatch land --slug gate --no-test --allow-out-of-scope
   [ "$status" -eq 2 ]; [[ "$output" == *'fast gate failed'* && "$output" == *'land-fast-gate.log'* ]]
   run bash -c 'cd "$1" && K3DM_SKIP_FAST_GATE=1 "$2" land --slug gate --no-test --allow-out-of-scope' _ "$FIXTURE" "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch"
