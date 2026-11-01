@@ -1141,7 +1141,7 @@ case "$1" in
   show-keychain-info) if [ -e "$CALL_LOG.locked" ]; then
     # m4-air.local and m5-air.local, 2026-11-01: SSH capture, rc 36.
     echo 'security: SecKeychainCopySettings: User interaction is not allowed.' >&2; exit 36
-  fi; echo 'Keychain "login.keychain-db" no-timeout'; exit 0 ;;
+  fi; printf 'Keychain "%s/Library/Keychains/login.keychain-db" no-timeout\n' "$HOME"; exit 0 ;;
   find-generic-password) exit 0 ;;
 esac
 exit 1
@@ -1156,6 +1156,7 @@ SH
     [ "$status" -ne 0 ]
     [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
   done
-  ! grep -E 'security .* -(w|g)( |$)|security unlock-keychain' "$CALL_LOG"
+  run grep -E 'security .* -(w|g)( |$)|security unlock-keychain' "$CALL_LOG"
+  [ "$status" -eq 1 ]
   [[ "$output" != *SECRETVALUE_LEAK* ]]
 }

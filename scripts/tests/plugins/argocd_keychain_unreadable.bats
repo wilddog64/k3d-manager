@@ -29,5 +29,6 @@ SH
     [[ "$output" == *'not in Keychain'* || "$output" == *'not found in Keychain'* || "$output" == *'MISSING from Keychain'* ]]
     [[ "$output" != *SECRETVALUE_LEAK* ]]
   done
-  ! grep -q unlock-keychain "$CALLS"
+  run grep -q unlock-keychain "$CALLS"
+  [ "$status" -eq 1 ]
 }

@@ -616,6 +616,7 @@ STUB
   ms --role hub --check
   [ "$status" -eq 1 ]
   [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
-  ! grep -E '^security (unlock-keychain|.* -(w|g)( |$))' "$CALLS"
+  run grep -E '^security (unlock-keychain|.* -(w|g)( |$))' "$CALLS"
+  [ "$status" -eq 1 ]
   [[ "$output" != *SECRETVALUE_LEAK* ]]
 }
