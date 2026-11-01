@@ -28,7 +28,7 @@ Uses a dispatcher pattern with lazy plugin loading.
 
 ## Environment Constraints
 - **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
-- **Context Management:** Auto-compaction runs at 400K tokens (raised from 200K on 2026-10-22 as a trial; `autoCompactWindow` in `.claude/settings.json`). Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
+- **Context Management:** Sessions run in a 200K context window, and auto-compaction runs at about 167K. The 2026-10-22 trial of `autoCompactWindow: 400000` never applied, because the setting cannot exceed the window; it was set back to 200000 on 2026-11-01. Run a manual `/compact` at a natural break (between tasks, never mid-step) before that point, so it never lands mid-step. The threshold is under measurement: `docs/plans/v1.43.6-claude-context-compaction-metrics.md`.
 - **Output Compression:** RTK (Rust Token Killer) is active for all CLI output.
 
 ---

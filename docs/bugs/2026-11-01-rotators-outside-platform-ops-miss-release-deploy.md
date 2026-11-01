@@ -1,6 +1,6 @@
 # Bug: the release steps leave the Grafana and LDAP rotators on old scripts
 
-**Status:** OPEN
+**Status:** FIXED
 **Priority:** P2
 **Severity:** medium — a merged rotator fix stays inert on the hub after the release steps; the Grafana and LDAP rotators ran their pre-fix scripts on 2026-11-01 after `make platform-ops`; workaround is a full `make observability` or LDAP redeploy
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -121,3 +121,19 @@ interface:
   - scripts/plugins/observability.sh _observability_apply_grafana_rotator
   - scripts/plugins/ldap.sh _ldap_deploy_password_rotator
 ```
+
+## Resolution
+
+- `3cc9abcf` (Luna; Claude at land): `deploy_argocd_platform_ops` loads the observability and LDAP plugins and reapplies
+  the Grafana and LDAP rotator CronJobs when `monitoring` / `identity` exist, honouring `LDAP_ROTATOR_ENABLED`, with one
+  applied/skipped/failed line per rotator and a nonzero return on failure. Each apply function runs in a subshell, so
+  an `_err` exit inside one is reported as failed and the run continues.
+- Luna's first run stopped and reported that the Prometheus rotator is a LaunchAgent, not a CronJob; the spec was
+  corrected (Prometheus out of scope) and the session resumed.
+- Claude at land: bare `! grep` assertions became `run` + status checks; added a test that the LDAP CronJob renders
+  `VAULT_ADDR=http://vault.secrets.svc:8200` (captured from the live M5 CronJob); `e388c471` stubs the new wrapper in
+  `argocd_platform_ops_notifications_slack.bats` (landed `--allow-out-of-scope`).
+- E1: new suite 7/7; all 7 fail against the pre-fix plugins in a scratch copy. Related suites (notifications Slack,
+  bootstrap, `makefile_platform_ops`, `hub_up`, Grafana seed, LDAP rotator) green.
+- E2 pending: operator runs `make platform-ops` on the M5 from the release branch; Claude checks the Grafana and LDAP
+  CronJobs carry the `WARN slack notice` lines and that no Job was created.
