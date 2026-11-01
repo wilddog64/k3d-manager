@@ -692,6 +692,10 @@ function _deploy_pushgateway_acg() {
     _warn "[observability] helm not found — skipping Pushgateway install"
     return 0
   fi
+  if ! helm repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null; then
+    _warn "[observability] Pushgateway Helm repo add failed — deployment metrics disabled"
+    return 0
+  fi
   if helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
       --kube-context "${_app_context}" \
       --namespace monitoring \

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add the Prometheus Community Helm repo before installing the sandbox Pushgateway on a new hub.
+
 - Include hub-read credentials in machine setup and report a missing or empty Slack role map in webhook diagnostics.
 
 - Preserve Slack channel and thread context for cluster-up, cluster-down and cluster-resume job updates.

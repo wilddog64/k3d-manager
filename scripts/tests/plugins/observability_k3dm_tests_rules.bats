@@ -138,3 +138,42 @@ PY
   [ "${status}" -eq 0 ]
   [ "$(grep -c 'apply.*rules-acg' "${calls}" || true)" -eq 0 ]
 }
+
+setup_pushgateway_helm_stub() {
+  export SCRIPT_DIR="${BATS_TEST_TMPDIR}/empty"
+  source "${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
+  mkdir -p "${BATS_TEST_TMPDIR}/bin" "${SCRIPT_DIR}"
+  export PATH="${BATS_TEST_TMPDIR}/bin:${PATH}"
+  export HELM_CALLS="${BATS_TEST_TMPDIR}/helm-calls"
+  cat > "${BATS_TEST_TMPDIR}/bin/helm" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${HELM_CALLS}"
+[[ "${1}" != repo || "${HELM_REPO_FAIL:-0}" != 1 ]]
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/helm"
+  _info() { :; }
+  _warn() { printf '%s\n' "$*"; }
+  _observability_apply_trivy_dashboard() { :; }
+}
+
+@test "pushgateway: adds the Helm repo before installing the pinned chart" {
+  setup_pushgateway_helm_stub
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -eq 0 ]
+  local expected
+  expected=$(cat <<'CALLS'
+repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts
+upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway --kube-context test-context --namespace monitoring --create-namespace --version 2.14.0 --set service.type=ClusterIP --set replicaCount=1 --wait --timeout 120s
+CALLS
+)
+  [ "$(cat "${HELM_CALLS}")" = "${expected}" ]
+}
+
+@test "pushgateway: failed Helm repo add warns and skips install" {
+  setup_pushgateway_helm_stub
+  export HELM_REPO_FAIL=1
+  run _deploy_pushgateway_acg test-context
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Pushgateway"* && "${output}" == *"deployment metrics disabled"* ]]
+  [ "$(cat "${HELM_CALLS}")" = 'repo add --force-update prometheus-community https://prometheus-community.github.io/helm-charts' ]
+}
