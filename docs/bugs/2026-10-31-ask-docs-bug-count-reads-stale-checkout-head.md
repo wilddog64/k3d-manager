@@ -1,6 +1,6 @@
 # Bug: ask-docs bug counts read the hub checkout's HEAD, which goes stale, instead of the fetched upstream ref
 
-**Status:** OPEN
+**Status:** FIXED — `e2b62aa2` (Luna; Claude review, independent verifier PASS, N1/N2 red on pre-fix and on mutants); live E2 (Slack count after an unpulled push) pending
 **Priority:** P2
 **Severity:** medium — the Slack bot gives wrong bug counts whenever the hub checkout is behind; workaround is a manual `git pull` on the hub
 **Approval:** operator, 2026-10-31 ("go ahead to file the bug and dispatch it")
