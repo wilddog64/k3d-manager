@@ -1,6 +1,6 @@
 # Bug: `codex-dispatch verify` records a pass with no evidence, so "verified" on the dashboard can be a bare claim
 
-**Status:** OPEN
+**Status:** VERIFIED — 2026-11-01: fixed `6fe94bda` (Luna; Claude added cross-repo SHA resolution from `<run>/repo`); land TEST codex_dispatch.bats + agent_dispatch_dashboard.bats + test_dispatch_metrics.py passed; independent Acceptance-only suite (Sonnet verifier) 12/12 on `6fe94bda`, 11/12 red on pre-fix `90380e17` (M3 green on both, as expected); verify recorded with evidence sha256 `e6a2c500…`. E3 live (dashboard "Claimed, no evidence" panel) pending — needs `make platform-ops` on the M5
 **Priority:** P1
 **Severity:** high — the release gate trusts a `verified` column that nothing backs; the operator cannot tell a verified fix from one Claude said was verified. Second occurrence (operator, 2026-11-01: "this is the second time that this happened")
 **Approval:** operator, 2026-11-01 ("we need to fix this problem otherwise, I have no idea if they have been verified or just you said so"); dispatch go: operator, 2026-11-01 ("go ahead to dispatch P1 bug to Luna")

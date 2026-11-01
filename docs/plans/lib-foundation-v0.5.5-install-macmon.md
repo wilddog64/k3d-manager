@@ -1,7 +1,7 @@
 # v0.5.5 — `_install_macmon`: a standard installer for the Apple Silicon temperature reader
 
 **Source:** k3d-manager copy of `lib-foundation/docs/plans/v0.5.5-install-macmon.md` (`9758f5f`), the dispatch source for work in lib-foundation; it does not count toward a k3d-manager release cap.
-**Status:** PLANNED
+**Status:** VERIFIED (offline) — 2026-11-01: lib-foundation `db56238` on `feat/install-macmon` (pushed); system.bats 51/51; independent Acceptance-only suite 7/7 on `db56238`, 6/7 red on `9758f5f` (fixture check green on both); verify recorded with evidence sha256 `0c3aab8b…`. E2 live on the M4 waits for v0.5.5 subtree pull
 **Approval:** operator, 2026-11-01 (k3d-manager session: "this should be part of _install_macmon stand installation procedure. probably from upstream")
 **Branch:** `feat/install-macmon`
 **Requested by:** k3d-manager `docs/plans/v1.43.14-fleet-host-cpu-memory-alerts.md` (laptop temperature on the fleet Macs; the producer reads CPU/GPU °C from `macmon` without sudo)
