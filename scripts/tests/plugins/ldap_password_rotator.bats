@@ -31,6 +31,20 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "LDAP rotator decodes the Slack URL and passes it to curl" {
+  notice="${BATS_TEST_TMPDIR}/notice.sh"
+  capture="${BATS_TEST_TMPDIR}/curl-args"
+  sed -n '/^[[:space:]]*slack_url=$(kubectl/,/^[[:space:]]*fi$/p' "$ROTATE" > "$notice"
+  CAPTURE="$capture" /bin/sh -c '
+    kubectl() { printf %s aHR0cHM6Ly9leGFtcGxlLmNvbS9ob29r; }
+    base64() { [ "$1" = -d ] || return 1; command base64 -d; }
+    curl() { printf "%s\n" "$@" > "$CAPTURE"; }
+    . "$1"
+  ' sh "$notice"
+  run grep -Fx 'https://example.com/hook' "$capture"
+  [ "$status" -eq 0 ]
+}
+
 @test "generate_password returns 48 lowercase hexadecimal characters without openssl" {
   function_text="${BATS_TEST_TMPDIR}/generate-password.sh"
   sed -n '/^generate_password() {/,/^}/p' "$ROTATE" > "$function_text"

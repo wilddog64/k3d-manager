@@ -6,9 +6,22 @@ setup() {
   platform_ops_dir="${SCRIPT_DIR}/etc/argocd/platform-ops"
 }
 
-@test "platform-ops rotators use BusyBox-compatible base64 -d" {
-  run grep -rn -- 'base64 --decode' "${platform_ops_dir}"
-  [ "$status" -ne 0 ]
+scan_legacy_base64() {
+  grep -rn -- 'base64 --decode' "$1"
+}
+
+@test "container templates use BusyBox-compatible base64 -d" {
+  run scan_legacy_base64 "${SCRIPT_DIR}/etc"
+  [ "$status" -eq 1 ]
+}
+
+@test "base64 guard detects a planted invocation in a scratch tree" {
+  scratch_etc="${BATS_TEST_TMPDIR}/etc"
+  mkdir -p "${scratch_etc}/ldap"
+  printf '%s\n' 'base64 --decode' > "${scratch_etc}/ldap/planted.yaml.tmpl"
+  run scan_legacy_base64 "$scratch_etc"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"${scratch_etc}/ldap/planted.yaml.tmpl"* ]]
 }
 
 @test "platform-ops rotators decode Kubernetes Secret data" {
