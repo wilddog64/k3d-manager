@@ -183,6 +183,8 @@ run_machine() {
     mkdir -p "$FIXHOME/$dir/.git"
   done
   mkdir -p "$FIXHOME/Library/LaunchAgents"
+  mkdir -p "$FIXHOME/.local/bin"
+  for name in agy gemini; do printf '#!/bin/sh\nexit 0\n' > "$FIXHOME/.local/bin/$name"; chmod +x "$FIXHOME/.local/bin/$name"; done
   : > "$FIXHOME/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
   mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
   touch "$CALL_LOG.installsmartcd"
@@ -1093,7 +1095,8 @@ SH
     grep -Fxq 'cask:antigravity-cli' "$MACHINE_DIR/brew.$role.list"
     grep -Fxq 'cask:antigravity' "$MACHINE_DIR/brew.$role.list"
   done
-  ! grep -Fxq 'cask:gemini' "$MACHINE_DIR"/brew.*.list
+  run grep -Fxq 'cask:gemini' "$MACHINE_DIR"/brew.hub.list "$MACHINE_DIR"/brew.worker.list "$MACHINE_DIR"/brew.console.list
+  [ "$status" -eq 1 ]
 }
 
 @test "machine setup: AI CLI checks use webhook PATH for hub and worker without invoking tools" {
@@ -1121,5 +1124,6 @@ SH
     rm "$FIXHOME/.local/bin/agy" "$FIXHOME/.local/bin/gemini"
   done
   grep -q "^brew " "$CALL_LOG"
-  ! grep -Eq '^(brew uninstall|agy |gemini |security find-generic-password)' "$CALL_LOG"
+  run grep -Eq '^(brew uninstall|agy |gemini |security find-generic-password)' "$CALL_LOG"
+  [ "$status" -eq 1 ]
 }

@@ -69,6 +69,8 @@ complete_machine() {
   touch "$T/complete"
   mkdir -p "$T/sudoers.d"; : > "$T/sudoers.d/k3d-manager"
   for x in ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$STUBS/$x"; chmod +x "$STUBS/$x"; done
+  mkdir -p "$HOME_FX/.local/bin"
+  for x in agy gemini; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/bin/$x"; chmod +x "$HOME_FX/.local/bin/$x"; done
   mkdir -p "$HOME_FX/Library/LaunchAgents" "$HOME_FX/.claude/.git" "$HOME_FX/.codex/.git" "$HOME_FX/.gemini/.git" "$HOME_FX/.copilot/.git" "$HOME_FX/.smartcd/lib/core" "$HOME_FX/src/gitrepo/personal/zshdotfiles"
   touch "$HOME_FX/.smartcd/lib/core/smartcd" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshrc" "$HOME_FX/src/gitrepo/personal/zshdotfiles/zshenv"
   ln -sfn "$HOME_FX/src/gitrepo/personal/zshdotfiles" "$HOME_FX/.zsh"

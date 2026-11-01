@@ -511,7 +511,7 @@ check_ai_clis() {
     if (PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"; export PATH; hash -r; command -v "$name" >/dev/null 2>&1); then
       report "ai:${name}" ok
     else
-      report "ai:${name}" missing
+      record_failure "ai:${name}" missing
     fi
   done
 }
