@@ -1869,3 +1869,11 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
   v1.43.14 auto-sync plan approval, remaining v1.43.13 plans, then the v1.43.13 PR). Background watcher b33xawkw0 still
   waits on the five 2026-10-31 Codex tasks.
 - 2026-11-01: heartbeat P3 dispatched to Luna; on land, E2 = operator's local make machine-check ROLE=hub exits 0 (also closes v1.43.12 plan E4).
+
+## Handoff 2026-11-01 (late)
+
+- Next session: dispatch `docs/bugs/2026-11-01-reread-share-ignores-bash-reads-and-file-changes.md` to Luna (operator go given: "do that in next session"); land TEST must cover test_dispatch_metrics.py AND agent_dispatch_dashboard.bats.
+- Pending operator glance: agent-activity panel ("Auto-compact setting (configured)" 200 K beside "Observed compaction point" ~169 K) → then mark docs/bugs/2026-11-01-auto-compact-panel-shows-configured-not-effective-threshold.md LIVE-VERIFIED.
+- Heartbeat P3 LIVE-VERIFIED (28ba803a). ApplicationSets reapplied on v1.43.13 (operator). CLAUDE.md reapply rule now: at branch cut + before ArgoCD live checks (d73fbc96).
+- Open question: does acg-up reapply app-cluster ApplicationSets after registering ubuntu-k3s? If not, istio-ambient keeps generic CNI dirs for it (warning seen in the 2026-11-01 reapply; harmless while unregistered).
+- Auto-sync plan (v1.43.14) amended with deploy-pending report + hub-sync summary (27e29885); intent approval still pending.
