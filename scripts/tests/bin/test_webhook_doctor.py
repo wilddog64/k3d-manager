@@ -476,3 +476,25 @@ def test_health_header_and_body_share_one_deadline(monkeypatch):
     result = doctor._health_probe("reader", timeout=10, opener=lambda *_args, **_kwargs: Response({}))
     assert result["status"] == "healthy_http"
     assert remaining == [3.0]
+
+
+def test_slack_bot_plist_presence_and_redaction(monkeypatch, tmp_path, capsys):
+    import plistlib
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
+    monkeypatch.setattr(doctor, "_launchd_facts", lambda *_a: {"status": "missing", "port": None})
+    monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": []})
+    monkeypatch.setattr(doctor, "_listener_facts", lambda **_k: {"status": "no_listener"})
+    monkeypatch.setattr(doctor, "_health_probe", lambda *_a, **_k: {"status": "local_timeout", "http_responsive": False})
+    path = tmp_path / "Library/LaunchAgents" / (doctor.LABEL + ".plist")
+    path.parent.mkdir(parents=True)
+    for env, expected in [({}, "missing_token"), ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token"}, "missing_channel"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123"}, "configured")]:
+        path.write_bytes(plistlib.dumps({"EnvironmentVariables": env}))
+        assert doctor.main(["--check"]) == 0
+        captured = capsys.readouterr()
+        output = captured.out + captured.err
+        assert json.loads(captured.out)["slack_bot"] == expected
+        assert "xoxb-QZ7K-fixture-secret-token" not in output
+        assert "xoxb-QZ7" not in output
+        assert "QZ7K" not in output

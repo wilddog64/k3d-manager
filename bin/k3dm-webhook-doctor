@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import plistlib
 import re
 import selectors
 import subprocess
@@ -220,6 +221,17 @@ def _health_probe(token, timeout=HEALTH_TIMEOUT, opener=None, port=PORT):
             "http_responsive": True, "all_ok": payload["all_ok"]}
 
 
+def _slack_bot_status(path):
+    try:
+        with path.open('rb') as handle:
+            env = plistlib.load(handle).get('EnvironmentVariables', {})
+        if 'SLACK_BOT_TOKEN' not in env:
+            return 'missing_token'
+        return 'configured' if 'SLACK_CHANNEL_ID' in env else 'missing_channel'
+    except (OSError, ValueError, TypeError):
+        return 'missing_token'
+
+
 def diagnose(check=False):
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     if not check:
@@ -242,7 +254,7 @@ def diagnose(check=False):
     reliable_unhealthy = job["status"] == "missing" or (
         job["status"] == "loaded" and listener["status"] == "no_listener"
         and probe["http_responsive"] is False)
-    return {"timestamp_utc": now, "mode": "check", "launchd": job, "process": process, "listener": listener,
+    return {"timestamp_utc": now, "mode": "check", "slack_bot": _slack_bot_status(home / 'Library/LaunchAgents' / f'{LABEL}.plist'), "launchd": job, "process": process, "listener": listener,
             "log": log, "health": probe, "health_timeout_seconds": HEALTH_TIMEOUT, "classification": classification,
             "credential": credential, "credential_action": _credential_action(credential),
             "recovery_recommended": reliable_unhealthy,

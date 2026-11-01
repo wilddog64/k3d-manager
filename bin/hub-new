@@ -112,6 +112,19 @@ prepare_singletons() {
     [[ -f "$plist" ]] || fail "installer did not write ${plist}" "inspect ${installer} and rerun"
   done < "$SINGLETONS"
   [[ -z "$missing" ]] || fail "no supported non-loading installer for:${missing}" 'add safe installers for the reported labels, then rerun hub-new'
+  if security find-generic-password -s k3d-manager-slack-bot-token-bot >/dev/null 2>&1; then
+    python3 - "$HOME/Library/LaunchAgents/com.k3d-manager.webhook.plist" <<'PY' || fail 'webhook Slack bot configuration is missing' 'export SLACK_CHANNEL_ID=<id>, then run make update-webhook-slack in a local terminal and rerun hub-new'
+import plistlib
+import sys
+try:
+    with open(sys.argv[1], 'rb') as handle:
+        env = plistlib.load(handle).get('EnvironmentVariables', {})
+    ok = all(key in env for key in ('SLACK_BOT_TOKEN', 'SLACK_CHANNEL_ID'))
+except (OSError, ValueError, TypeError):
+    ok = False
+sys.exit(0 if ok else 1)
+PY
+  fi
   while IFS='|' read -r label _installer _note; do
     [[ -n "$label" && "$label" != \#* ]] || continue
     ! label_loaded "$label" || fail "singleton ${label} loaded during preparation" 'unload it and inspect its installer'
