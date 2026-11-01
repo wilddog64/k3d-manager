@@ -1849,3 +1849,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: next: review/land gemini-cli P3 (Luna exit 0 but acceptance test line 600 red, wrote docs/issues gate-environment note), then dispatch Keychain P3. Rotator E2 needs operator make platform-ops from M5 local Terminal.
 - 2026-11-01: Keychain P3 ready to dispatch but needs operator's unlocked capture of security show-keychain-info from an M5 local Terminal (spec forbids inventing it).
 - 2026-11-01: machine-check ROLE=hub on M5 exits 1 only on agent:bin/k3dm-heartbeat-setup missing (heartbeat = review candidate, not loaded). Keychain P3 still waits on operator's unlocked show-keychain-info capture. find-similar-docs K E2 still pending (Slack retry).
+- 2026-11-01: all 4 v1.43.13 bugs from today live-verified except Keychain P3 E2. Gotcha: cd $WORKTREE fails silently (smartcd) — a later relative-path edit hit the main checkout; always absolute paths.

@@ -1,6 +1,6 @@
 # Bug: a locked login Keychain reads as "ok" in machine setup and as "not in Keychain" in platform-ops
 
-**Status:** OPEN
+**Status:** FIXED
 **Priority:** P3
 **Severity:** low — misleading output; on 2026-11-01 `make platform-ops` skipped two Keychain-backed Secrets while machine setup had reported both items ok
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -94,3 +94,19 @@ interface:
   - bin/k3dm-machine-setup (role hub; --check; scratch HOME; security on PATH)
   - scripts/plugins/argocd.sh argocd_sync_git_writer_secret, _argocd_sync_notifications_slack_secret_untraced, _argocd_keychain_value
 ```
+
+## Resolution
+
+- `7d9d3d5f` (Luna): machine setup prints one `keychain:login` line before the secret lines, `ok` or `locked (reads will
+  fail ...)` from `show-keychain-info`'s exit code (locked goes through `record_failure`). `argocd.sh` adds
+  `_argocd_keychain_unreadable`: when a read comes back empty but the item exists, the four Keychain-backed syncs warn
+  `<service> present in Keychain but unreadable (login Keychain locked?)` and skip as before.
+- Claude at land: the unlocked stub prints the operator's exact capture; bare `! grep` assertions became `run` +
+  status checks. `76aea93e`: `argocd.bats` and `argocd_platform_ops_notifications_slack.bats` stub
+  `_argocd_keychain_value` empty, so the new existence check had run the real `security` against the operator's login
+  Keychain (seen when the Slack suite went red on the M4, where the item exists). Both now stub
+  `_argocd_keychain_unreadable` too (landed `--allow-out-of-scope`).
+- E1: the three new tests fail on the pre-fix code and pass after; machine setup suites 124/124; land gate also ran
+  the argocd, rotators, bootstrap and notifications Slack suites, all green.
+- E2 pending: on the M5 at the fix, `make machine-check ROLE=hub` over SSH prints `keychain:login locked`, and from a
+  local Terminal prints `keychain:login ok`.
