@@ -1,6 +1,8 @@
 # Bug: a locked login Keychain reads as "ok" in machine setup and as "not in Keychain" in platform-ops
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run machine-check-m5-ssh-and-local · env m5-air · scenario keychain-login-locked-vs-unlocked · commit 88813427 · proves E2
+**Fix commit:** 7d9d3d5f
 **Priority:** P3
 **Severity:** low — misleading output; on 2026-11-01 `make platform-ops` skipped two Keychain-backed Secrets while machine setup had reported both items ok
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -108,5 +110,11 @@ interface:
   `_argocd_keychain_unreadable` too (landed `--allow-out-of-scope`).
 - E1: the three new tests fail on the pre-fix code and pass after; machine setup suites 124/124; land gate also ran
   the argocd, rotators, bootstrap and notifications Slack suites, all green.
-- E2 pending: on the M5 at the fix, `make machine-check ROLE=hub` over SSH prints `keychain:login locked`, and from a
-  local Terminal prints `keychain:login ok`.
+
+## Live verification (E2), 2026-11-01
+
+- M5 at `88813427`, Claude over SSH: `bin/k3dm-machine-setup --role hub --check` printed
+  `keychain:login locked (reads will fail in this session; run from a local Terminal)`; the secret lines stayed `ok`
+  (existence only).
+- Same commit, operator in a local M5 Terminal: `make machine-check ROLE=hub | grep keychain:login` printed
+  `keychain:login ok`. That run still exits 1 on the unrelated `agent:bin/k3dm-heartbeat-setup missing` line.
