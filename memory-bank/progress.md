@@ -2183,3 +2183,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: auto-compact panel P3 LIVE-VERIFIED (operator screenshot 514: configured 200 K, observed 168 K). Same screenshot: Untracked by repo / Tokens by repo bars lost their names (~20 rows) — recorded as Recurrence 2026-11-01 on docs/bugs/2026-10-24-agent-activity-titles-and-bar-labels-truncated.md, not dispatched.
 - 2026-11-01: auto-sync plan intent approved; bar-names P3 filed; re-read share P3 dispatched to Luna (bar-names P3 queued behind it, same dashboard file).
 - 2026-11-01: release split (v1.43.13 plans → v1.43.14, v1.43.14 plans → v1.43.15); acg-up-on-dev-node P2 filed.
+- 2026-11-01: re-read share P3 VERIFIED (65cb87cc, Luna; Claude independent verify); E3 live pending. Bar-names P3 dispatched to Luna.

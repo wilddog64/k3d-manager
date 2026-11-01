@@ -1885,3 +1885,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Dispatching to Luna serially (both touch grafana-dashboard-agent-activity.yaml): re-read share P3 first, then the bar-names P3.
 - Release split (operator: "we can split the plans out"): v1.43.13's 5 unstarted plans → v1.43.14; v1.43.14's 4 plans → v1.43.15 (order kept: control-node-linux needs control-node-role, intent-verification needs agent-instruction-files-refresh). v1.43.13 = bug-fix release; roadmap updated.
 - Filed P2 `docs/bugs/2026-11-01-acg-up-on-dev-node-restarts-retired-local-hub.md`: the M4 still has the stopped pre-cutover k3d hub; `bin/cluster-up` would `k3d cluster start` it. acg-up must run on the M5 — operator will use Slack /cluster-up (runs on the hub) as the acg-up live check.
+- Re-read share P3 VERIFIED 65cb87cc; bar-names P3 dispatched to Luna.

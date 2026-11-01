@@ -1,6 +1,6 @@
 # Bug: Agent Activity "Untracked by repo" and "Tokens by repo" lose every bar name once the window holds ~20 repos
 
-**Status:** OPEN — dispatch to Luna after the re-read share bug lands (same dashboard file)
+**Status:** OPEN — dispatched to Luna 2026-11-01 (after the re-read share fix landed at 65cb87cc)
 **Priority:** P3
 **Severity:** low — the bar values are correct; the operator cannot tell which repo a bar belongs to; no runtime impact
 **Approval:** operator, 2026-11-01 ("file two P3 bug then all to Luna")

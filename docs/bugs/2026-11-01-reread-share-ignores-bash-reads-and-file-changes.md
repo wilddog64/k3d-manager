@@ -1,6 +1,7 @@
 # Bug: "Re-read share after compaction" counts only Read-tool calls and cannot tell a needed re-read from a wasted one
 
-**Status:** OPEN — dispatched to Luna 2026-11-01
+**Status:** VERIFIED — `65cb87cc` (Luna; Claude review, independent verify). offline: pytest test_dispatch_metrics + test_dashboard_queries 158 passed, agent_dispatch_dashboard.bats 35/35, validate-manifests 85 valid, `_agent_audit` ok; Luna's 3 new tests and Claude's Acceptance-only verifier red on the pre-fix code. E3 (live) pending.
+**Fix commit:** 65cb87cc
 **Priority:** P3
 **Severity:** low — the panel showed 20.6% (30d) from 63 Read calls, while ~13,300 Bash commands read files in the same window; the number cannot support an efficiency judgement either way; no runtime impact
 **Approval:** operator, 2026-11-01 ("probably can file it and do that in next session")
@@ -115,3 +116,16 @@ interface:
   - Prometheus metrics k3dm_claude_reads{window,kind}, k3dm_claude_reads_by_tool{window,tool}
   - scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Independent verifier written from the Acceptance block only (scratchpad `verify_reread.py`, not committed): tail/awk/rg/Read
+  reads, `>>` / `sed -i.bak` / unbalanced-quote rejects, a repeat in the same segment, a re-read after `Write`, a different
+  `rg` pattern, and a second compaction segment. Fix: all = 9, bash 7 / read 2, re-reads 4 = 1 unchanged + 3 changed in
+  1d/7d/30d; no fixture path, command, body or 64-hex hash in the output or cache. Pre-fix: M1–M3 fail (all = 2, no new series).
+- Errors seen: the first verifier run flagged `delta` as a leak; it is the metric name
+  `k3dm_codex_weekly_quota_delta_percentage_points`, not fixture data. Tightened to full fixture names; rerun clean.
+- Review note (not a defect): `-i` anywhere rejects the command, so `grep -i` is not counted as a read; this follows the
+  spec's conservative rule.
+- E3 next: after the M4 exporter runs and the hub syncs the dashboard, `k3dm_claude_reads_by_tool{window="30d",tool="bash"}`
+  should be in the thousands and "Wasted re-read share" should show a value.
