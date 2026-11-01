@@ -528,7 +528,20 @@ check_ai_clis() {
   done
 }
 
+ensure_ec2_ssh_key() {
+  [[ "$role" == hub ]] || return 0
+  local key="$HOME/.ssh/k3d-manager-key.pem" public="$HOME/.ssh/k3d-manager-key.pub"
+  if [[ -e "$key" || -L "$key" ]]; then report 'ec2 ssh key:' present; return; fi
+  if [[ "$mode" != setup ]]; then record_failure 'ec2 ssh key:' missing; return; fi
+  if mkdir -p "$HOME/.ssh" && (umask 077; ssh-keygen -q -t ed25519 -N "" -C "k3d-manager@$(hostname -s)" -f "$key" >/dev/null 2>&1) && chmod 600 "$key" && mv "$key.pub" "$public"; then
+    report 'ec2 ssh key:' present
+  else
+    record_failure 'ec2 ssh key:' missing
+  fi
+}
+
 preflight
+ensure_ec2_ssh_key
 if (( brew_available )); then install_tools; else report brew-phase 'skipped (Homebrew unavailable)'; fi
 check_ai_clis
 ensure_python_tools

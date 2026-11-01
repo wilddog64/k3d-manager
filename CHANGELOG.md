@@ -12,6 +12,8 @@
 
 - Start Slack job threads with the bot when a channel is known, and log Slack API rejections through the webhook logger.
 
+- Generate a per-node EC2 SSH key during hub machine setup and report it in machine-check.
+
 - Include hub-read credentials in machine setup and report a missing or empty Slack role map in webhook diagnostics.
 
 - Preserve Slack channel and thread context for cluster-up, cluster-down and cluster-resume job updates.

@@ -61,6 +61,7 @@ setup_machine_fixture() {
   FIXHOME="$BATS_TEST_TMPDIR/home"
   STUBS="$BATS_TEST_TMPDIR/stubs"
   CALL_LOG="$BATS_TEST_TMPDIR/calls"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]] || return 1
   mkdir -p "$FIXROOT/bin" "$FIXROOT/scripts/lib" "$FIXROOT/scripts/etc/machine" "$FIXHOME" "$STUBS"
   cp "$SCRIPT_SOURCE" "$FIXROOT/bin/k3dm-machine-setup"
   chmod +x "$FIXROOT/bin/k3dm-machine-setup"
@@ -149,6 +150,15 @@ SH
 printf 'make %s\n' "$*" >> "$CALL_LOG"
 if [ -e "$CALL_LOG.installsmartcd" ]; then mkdir -p "$HOME/.smartcd/lib/core"; : > "$HOME/.smartcd/lib/core/smartcd"; fi
 exit 0
+SH
+  cat > "$STUBS/ssh-keygen" <<'SH'
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -f ]; then key="$2"; shift 2; else shift; fi
+done
+printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$key"
+printf '%s\n' 'public-test-key' > "$key.pub"
+printf 'ssh-keygen called\n' >> "$CALL_LOG"
 SH
   chmod +x "$STUBS"/*
 }
@@ -1230,4 +1240,42 @@ SH
   for account in redis/cart redis/orders-cache postgres/orders postgres/products postgres/payment payment/encryption payment/stripe payment/paypal rabbitmq/default minio/credentials ldap/admin keycloak/admin keycloak/clients github/pat; do
     grep -Fq "k3d-manager-app-cluster-secrets|$account|" "$MACHINE_DIR/secrets.hub.list"
   done
+}
+
+@test "machine setup: hub creates its EC2 key privately and reports it without contents" {
+  setup_machine_fixture
+  run_machine --role hub --agents skip --secrets skip
+  [ -f "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [ -f "$FIXHOME/.ssh/k3d-manager-key.pub" ]
+  [ -n "$(find "$FIXHOME/.ssh/k3d-manager-key.pem" -perm 600)" ]
+  [[ "$output" == *'ec2 ssh key:'*present* ]]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run_machine --role hub --check
+  [[ "$output" == *'ec2 ssh key:'*present* ]]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run ! grep -R -F 'PRIVATE-KEY-TEST-MATERIAL' "$FIXHOME/.local/state"
+}
+
+@test "machine setup: hub check reports missing and does not create a key" {
+  setup_machine_fixture
+  run_machine --role hub --check
+  [[ "$output" == *'ec2 ssh key:'*missing* ]]
+  [ ! -e "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  run_machine --role hub --dry-run
+  [ ! -e "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+}
+
+@test "machine setup: hub preserves an existing EC2 private key" {
+  setup_machine_fixture
+  mkdir -p "$FIXHOME/.ssh"
+  printf '%s\n' 'PRIVATE-KEY-TEST-MATERIAL' > "$FIXHOME/.ssh/k3d-manager-key.pem"
+  touch -t 202001010101 "$FIXHOME/.ssh/k3d-manager-key.pem"
+  cp -p "$FIXHOME/.ssh/k3d-manager-key.pem" "$BATS_TEST_TMPDIR/original"
+  run_machine --role hub --agents skip --secrets skip
+  cmp "$BATS_TEST_TMPDIR/original" "$FIXHOME/.ssh/k3d-manager-key.pem"
+  [ "$FIXHOME/.ssh/k3d-manager-key.pem" -ot "$FIXROOT/bin/k3dm-machine-setup" ]
+  [ ! "$BATS_TEST_TMPDIR/original" -nt "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [ ! "$BATS_TEST_TMPDIR/original" -ot "$FIXHOME/.ssh/k3d-manager-key.pem" ]
+  [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
+  run ! grep -q '^ssh-keygen called' "$CALL_LOG"
 }
