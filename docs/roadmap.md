@@ -493,6 +493,8 @@ Split from v1.43.13 on 2026-10-31 by Claude (v1.43.13 is at its 5-plan cap). Bra
 
 **v1.43.14 plan 2:** [`control-node-linux`](plans/v1.43.14-control-node-linux.md) (operator, 2026-10-31): the `control` role from v1.43.13 runs on Linux, to test the one-command setup on another OS. It needs no secrets, never runs sudo and refuses root. It installs tools with Homebrew on Linux, for the same versions as the Macs. It is proven first in a Vagrant (VirtualBox) Ubuntu 24.04 VM on the M4, then on Hostinger as a dedicated non-sudo user, with k3s left untouched. Starts after v1.43.13's `control` role lands.
 
+**v1.43.14 plan 3:** [`checkout-auto-sync`](plans/v1.43.14-checkout-auto-sync.md) (operator, 2026-10-31): each machine fast-forwards its own checkouts on a 300 s launchd timer (`bin/k3dm-repo-sync`, ff-only, never touches local commits or edits), the hub pushes lag metrics and alerts on `K3dmRepoSyncStale`, and `make hub-sync` nudges the hub after a push. A webhook restart stays manual; the sync only flags it.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
