@@ -42,12 +42,17 @@ the new labels do not count as covered, because none of them is a verdict. Updat
 panels to define each label in one line, and list the new labels in "Run outcomes" in the order above, after
 `failed`.
 
+Layout: "Run outcomes" (panel 43, `h: 6`, `w: 6`, `y: 33`, `namePlacement: left`) goes from 5 to 9 rows. Raise the
+whole `y: 33` row to `h: 9` (panels 43, 44, 45, 46, so the row stays level) and shift every panel at `y >= 39`
+down by 3. Keep `namePlacement: left` and `orientation: horizontal`, and set `minVizHeight: 20` so each of the 9
+rows keeps a readable bar and its full name ("superseded" and "unrecorded" untruncated at `w: 6`).
+
 ## Files
 
 - `bin/k3dm-dispatch-metrics`
 - `scripts/tests/bin/test_dispatch_metrics.py`
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
-- `scripts/tests/plugins/agent_dispatch_dashboard.bats` (only if it pins these panels)
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats`
 - `CHANGELOG.md`
 
 ## What NOT to do
@@ -66,20 +71,22 @@ must:
   M2: a run exiting 0 that is followed by a later launch of the same task, with no refusal between, is labelled superseded
   M3: a run of a task with no land and no abandon is labelled open when the task's last event is under 7 days old, stale at 7 days or more
   M4: the sum over all outcome labels equals the run total before the change for the same ledger
+  M5: panels 43-46 have h 9 at y 33, panel 43 keeps namePlacement left with minVizHeight 20, and every panel previously at y >= 39 moves down by exactly 3
 must_not:
   N1: a run that meets the accepted, rework or failed rule never gets a new label (paired control: the same fixtures still yield accepted/rework/failed)
   N2: k3dm_dispatch_run_outcome_coverage is unchanged for the same ledger
   N3: no other metric name or label set changes
+  N4: no gridPos rectangles overlap or leave a gap, and no panel other than 43-46 changes anything but its y
 evidence:
   E1:
-    proves: [M1, M2, M3, M4, N1, N2, N3]
+    proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
     kind: offline
     intent: You will see pytest build a scratch ledger with one task per case and assert each label (M1-M3 red on the pre-fix exporter, which says unknown), the label total equals the old total, the accepted/rework/failed fixtures keep their labels, and coverage is equal to the pre-fix value.
-    what: pytest scripts/tests/bin/test_dispatch_metrics.py
+    what: pytest scripts/tests/bin/test_dispatch_metrics.py; bats scripts/tests/plugins/agent_dispatch_dashboard.bats (layout assertions for M5/N4)
   E2:
     proves: [M1, M2, M3]
     kind: live
-    intent: You will see, after the hub syncs, Run outcomes on Window 30d show unrecorded about 144, superseded about 34, open plus stale about 21, and unknown near 0.
+    intent: You will see, after the hub syncs, Run outcomes on Window 30d show unrecorded about 144, superseded about 34, open plus stale about 21, and unknown near 0, every name readable beside its bar.
     what: operator screenshot of /d/k3dm-agent-dispatch
 interface:
   - bin/k3dm-dispatch-metrics (Prometheus text output)
