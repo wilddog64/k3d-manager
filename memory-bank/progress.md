@@ -2195,3 +2195,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: hub secrets live on M5; gemini key dropped from hub manifest.
 - 2026-11-01: M5 ACG manual login done; auto-login email-field recurrence pending upstream.
 - 2026-11-01: 3 new M5 acg-up bugs + relay reopen filed (76856a12); awaiting dispatch go.
+- 2026-11-01: e7a0ecfb diagnosed (empty .pub); retry pending.
