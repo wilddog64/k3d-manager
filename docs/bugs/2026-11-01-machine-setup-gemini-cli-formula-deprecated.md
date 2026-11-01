@@ -1,6 +1,6 @@
 # Bug: machine setup installs the gemini-cli formula, which Homebrew disables on 2026-12-18
 
-**Status:** OPEN
+**Status:** FIXED
 **Priority:** P3
 **Severity:** low — today it installs and works; from 2026-12-18 `brew install gemini-cli` fails, so setup on a new machine reports `brew:gemini-cli missing` and exits 1
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -82,3 +82,16 @@ interface:
   - bin/k3dm-machine-setup (role hub/worker; --check; scratch HOME; PATH)
   - scripts/etc/machine/brew.hub.list, brew.worker.list
 ```
+
+## Resolution
+
+- `955b979e` (Luna): `gemini-cli` removed from the hub and worker manifests; `ai:agy` stays a failure when missing;
+  `ai:gemini` reports `skipped (optional; deprecated)` when absent, through `report`. The migration howto says agy
+  is required and gemini optional.
+- E1: `machine_setup.bats` + `machine_setup_acceptance.bats` 121/121 when run outside Codex's sandbox. Luna's
+  sandbox could not run the terminal tests and reported one failure, which did not reproduce here.
+  The 3 AI CLI tests all fail on the pre-fix script and manifests. A mutant that makes `ai:agy` optional fails both
+  check tests (N1).
+- Claude at land: dropped Luna's sandbox-limits issue note (covered by the run above); resolved a CHANGELOG conflict
+  with the rotator entry.
+- E2 pending: `make machine-check ROLE=hub` on the M5 shows `ai:agy ok` and no `brew:gemini-cli` line.
