@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Keep repo names readable in Agent Activity bar gauges by showing the top eight and an other total.
+
 - Count Bash file reads and distinguish unchanged re-reads after compaction in the agent activity dashboard.
 
 - Show the observed automatic compaction point beside the configured setting on the agent activity dashboard.

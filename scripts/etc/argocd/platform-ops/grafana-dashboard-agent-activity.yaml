@@ -612,9 +612,14 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})",
+              "expr": "topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"}))",
               "instant": true,
               "legendFormat": "{{repo}} {{mode}}"
+            },
+            {
+              "expr": "(sum(sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})) - sum(topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window=\"$window\"})))) > 0",
+              "instant": true,
+              "legendFormat": "other"
             }
           ],
           "fieldConfig": {
@@ -714,9 +719,14 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (repo) (k3dm_codex_tokens{window=\"$window\"})",
+              "expr": "topk(8, sum by (repo) (k3dm_codex_tokens{window=\"$window\"}))",
               "instant": true,
               "legendFormat": "{{repo}}"
+            },
+            {
+              "expr": "(sum(sum by (repo) (k3dm_codex_tokens{window=\"$window\"})) - sum(topk(8, sum by (repo) (k3dm_codex_tokens{window=\"$window\"})))) > 0",
+              "instant": true,
+              "legendFormat": "other"
             }
           ],
           "fieldConfig": {

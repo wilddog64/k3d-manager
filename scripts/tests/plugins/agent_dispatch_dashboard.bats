@@ -249,7 +249,7 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
       if field=="options" and panel["id"]==48:
         continue
-      if panel["id"]==12:
+      if panel["id"]==12 or (field=="targets" and panel["id"] in (54,56)):
         continue
       if field=="options" and panel["type"]=="bargauge":
         new={k:v for k,v in (new or {}).items() if k not in ("orientation","namePlacement","minVizHeight","text")} or None
@@ -793,4 +793,23 @@ print("ok")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: repo gauges cap named series and preserve the remainder" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+import json,sys
+from pathlib import Path
+text=Path(sys.argv[1]).read_text()
+panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+by_title={p["title"]:p for p in panels}
+for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_untracked_sessions","{{repo}} {{mode}}"),("Tokens by repo","repo","k3dm_codex_tokens","{{repo}}")):
+    panel=by_title[title]
+    base=f'sum by ({group}) ({metric}{{window="$window"}})'
+    named,other=panel["targets"]
+    assert named["expr"]==f'topk(8, {base})' and named["legendFormat"]==legend and named["instant"]
+    assert other["expr"]==f'(sum({base}) - sum(topk(8, {base}))) > 0'
+    assert other["legendFormat"]=="other" and other["instant"]
+    assert panel["gridPos"]["h"]>=5 and panel["options"]["namePlacement"]=="top"
+PYTEST
+  [ "$status" -eq 0 ]
 }
