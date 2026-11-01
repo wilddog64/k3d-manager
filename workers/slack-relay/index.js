@@ -402,7 +402,8 @@ async function handle(req, event) {
   if (command === '/cluster-up') {
     const { provider, error } = resolveProviderStrict(text)
     if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
-    const payload = { action: 'up', provider, response_url: responseUrl }
+    const payload = { action: 'up', provider, response_url: responseUrl, channel_id: channelId }
+    if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
@@ -417,7 +418,8 @@ async function handle(req, event) {
   if (command === '/cluster-down') {
     const { provider, error } = resolveProviderStrict(text)
     if (error) return jsonReply(`⚠️ ${error}\nUsage: ${command} <cluster>\nClusters: aws, gcp, az, hostinger\nExample: ${command} aws\n${CLUSTER_ARG_USAGE}`, threadTs, true)
-    const payload = { action: 'down', provider, response_url: responseUrl }
+    const payload = { action: 'down', provider, response_url: responseUrl, channel_id: channelId }
+    if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
@@ -486,7 +488,8 @@ async function handle(req, event) {
     if (!VALID_PROVIDERS.has(provider)) {
       return jsonReply(CLUSTER_RESUME_USAGE, threadTs)
     }
-    const payload = { provider, response_url: responseUrl }
+    const payload = { provider, response_url: responseUrl, channel_id: channelId }
+    if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
       const { ok, conflict } = await relay('/api/v1/cluster-resume', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
