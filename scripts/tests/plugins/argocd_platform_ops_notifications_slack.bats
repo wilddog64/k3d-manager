@@ -11,6 +11,7 @@ setup() {
 
 @test "N1: deploy warns when notification Slack key is absent" {
   _argocd_keychain_value() { :; }
+  _argocd_keychain_unreadable() { return 1; }
   _argocd_apply_credential_rotator() { :; }
   _argocd_platform_ops_rotators() { :; }
   _kubectl() {
@@ -32,6 +33,7 @@ setup() {
 
 @test "deploy warns when the notification Slack key is empty" {
   _argocd_keychain_value() { :; }
+  _argocd_keychain_unreadable() { return 1; }
   _argocd_apply_credential_rotator() { :; }
   _argocd_platform_ops_rotators() { :; }
   _kubectl() {
@@ -100,6 +102,7 @@ setup() {
 
 @test "Keychain sync reports missing record without failing" {
   _argocd_keychain_value() { :; }
+  _argocd_keychain_unreadable() { return 1; }
   run argocd_sync_notifications_slack_secret platform-ops
   [ "$status" -eq 0 ]
   [[ "$output" == *"k3dm-platform-ops-slack-url not in Keychain"* ]]
