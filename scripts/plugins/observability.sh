@@ -192,14 +192,14 @@ function _observability_apply_grafana_rotator() {
   _observability_seed_grafana_if_absent "secrets" "vault" \
     || _err "[observability] Grafana credential seed skipped/failed"
   local manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-credential-rotator.yaml"
-  [[ -f "${manifest}" ]] || return 0
-  _kubectl apply -f "${manifest}" >/dev/null \
-    && _info "[observability] Grafana monthly credential rotator applied"
+  [[ -f "${manifest}" ]] || { _err "[observability] Grafana rotator manifest missing: ${manifest}"; return 1; }
+  _kubectl apply -f "${manifest}" >/dev/null || return 1
+  _info "[observability] Grafana monthly credential rotator applied"
   if declare -f _vault_configure_secret_writer_role >/dev/null 2>&1; then
     _vault_configure_secret_writer_role "secrets" "vault" \
       "grafana-credential-rotator" "monitoring" "secret" "observability/grafana" \
       "grafana-rotation" "grafana-rotation" \
-      || _err "[observability] failed to configure Grafana rotation Vault role"
+      || { _err "[observability] failed to configure Grafana rotation Vault role"; return 1; }
   fi
 }
 
