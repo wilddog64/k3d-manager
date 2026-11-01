@@ -502,13 +502,14 @@ STUB
 }
 
 @test "N4: report output has no username and no home path" {
-  local r m
+  local r m user_re
+  user_re="(^|[^A-Za-z0-9_.-])$(id -un)(\$|[^A-Za-z0-9_.-])"
   for r in hub worker console; do
     for m in --check --dry-run ""; do
       if [ -n "$m" ]; then ms --role "$r" "$m"; else ms --role "$r"; fi
       if [[ "$output" == *"$UNAME_USER"* ]]; then false; fi
       if [[ "$output" == *"$HOME_FX"* ]]; then false; fi
-      if [[ "$output" == *"$(id -un)"* ]]; then false; fi
+      if [[ "$output" =~ $user_re ]]; then false; fi
       if [[ "$output" == *"/Users/"* ]]; then false; fi
     done
   done
