@@ -12,7 +12,7 @@
 
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
 - [x] M5 appsets-reapply (hub 5/5, app-cluster 8/8) + appsets-check PASS on v1.43.14, from the operator's pasted output (2026-11-01). The first rerun went to the M4/retired hub by mistake (no change).
-- [ ] `make platform-ops` on the M5 for v1.43.14 (run before the PR).
+- [x] `make platform-ops` on the M5 for v1.43.14 (operator paste 2026-11-01). The Keychain was locked, so the 4 DR secret syncs were skipped; the existing Secrets are intact. Rerun it before the PR if v1.43.14 changes platform-ops.
 
 ## 2026-10-23 API status channel bug filed
 
