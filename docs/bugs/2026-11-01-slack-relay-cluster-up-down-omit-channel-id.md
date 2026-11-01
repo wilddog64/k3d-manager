@@ -1,6 +1,6 @@
 # Bug: Slack relay drops `channel_id` for `/cluster-up` and `/cluster-down`, so job updates are never threaded and the 6th is lost
 
-**Status:** VERIFIED — `63be0e33` (Luna; Claude review + scope widened to `/cluster-resume`); E2 live pending (`make deploy-worker`, then `/cluster-up aws`)
+**Status:** OPEN — relay half `63be0e33` live-confirmed (job `87c78389` has `channel_id`); webhook half missing, see "Second cause"
 **Fix commit:** 63be0e33
 **Priority:** P2
 **Severity:** medium — every `/cluster-up` / `/cluster-down` update goes to `response_url` instead of a bot thread; Slack accepts at most five posts per `response_url`, so a long job's later updates (the failure analysis or the final result) are rejected and never shown
@@ -93,3 +93,51 @@ interface:
 - Errors seen: the refused land above (explained). None other.
 - Pending: E2 — operator `make deploy-worker`, then `/cluster-up aws` in #acg-automation; Claude reads the job's
   `delivery.jsonl` (expect `route: bot_thread`, a channel_id, no `delivery_rejected`).
+
+## Second cause (2026-11-01, live E2 on job `87c78389`)
+
+E2 failed after `make deploy-worker` (Version `64998a50`). The relay half works: the job dir has `channel_id`
+`C0B7ZHG2LR4`. All five posts still went `route: response_url`, `thread_ts: null`.
+
+`_notify_job` in `bin/k3dm-webhook` (~line 1283) takes `bot_thread` only when the job has **both** `channel_id` and
+`thread_ts`. A slash command typed in the channel (not in a thread) has no `thread_ts`, so the first post goes to
+`response_url`, which returns no `ts`. No thread is ever started, and the 6th post is rejected. The original root
+cause ("`_notify_job` uses `bot_thread` when the job has a `channel_id`") was wrong.
+
+### Fix (webhook half)
+
+In `_notify_job`: when `SLACK_BOT_TOKEN` is set, the job has `channel_id`, and there is no `thread_ts`, post the
+message with the bot to `channel_id` first, write the returned `ts` to the job's `thread_ts`, and record
+`route: bot_thread`. Later posts then reply in that thread. If the bot post fails, keep the current `response_url`
+path. A job without `channel_id` behaves exactly as today.
+
+### Files (webhook half)
+
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_notify*.py` (or the existing `_notify_job` test file)
+
+### Acceptance (webhook half)
+
+```yaml
+must:
+  M3: a job with channel_id, no thread_ts and a bot token posts its first message with the bot to channel_id, writes thread_ts, and records route bot_thread
+  M4: the next post for that job replies in that thread (thread_ts set) with route bot_thread
+must_not:
+  N2: a job without channel_id never posts with the bot to SLACK_CHANNEL_ID; it keeps the response_url route (paired control for M3)
+  N3: when the first bot post fails, the message is still delivered via response_url
+evidence:
+  E3:
+    proves: [M3, M4, N2, N3]
+    kind: offline
+    intent: You will see pytest with a stubbed _post_slack_bot/_slack_post and a scratch JOB_DIR route the first post to the bot and the second into its thread, a channel-less job stay on response_url, and a failed bot post fall back (M3/M4 red on the pre-fix webhook).
+    what: pytest on the notify tests
+  E4:
+    proves: [M3, M4]
+    kind: live
+    intent: You will see /cluster-up aws in #acg-automation post all updates in one thread, and delivery.jsonl show route bot_thread.
+    what: operator Slack + Claude reads delivery.jsonl on the M5
+interface:
+  - bin/k3dm-webhook _notify_job(job_id, text)
+  - job dir files channel_id, thread_ts, response_url, delivery.jsonl
+  - env SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
+```
