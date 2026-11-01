@@ -1868,3 +1868,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
   items (AI filter passive E2, P1 linked-worktree push live check, revoked Slack incoming webhook, agy OAuth Bad Request,
   v1.43.14 auto-sync plan approval, remaining v1.43.13 plans, then the v1.43.13 PR). Background watcher b33xawkw0 still
   waits on the five 2026-10-31 Codex tasks.
+- 2026-11-01: heartbeat P3 dispatched to Luna; on land, E2 = operator's local make machine-check ROLE=hub exits 0 (also closes v1.43.12 plan E4).

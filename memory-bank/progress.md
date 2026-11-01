@@ -2172,3 +2172,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: find-similar-docs K P2 LIVE-VERIFIED (Slack job 04bccbb3). Keychain P3: operator's unlocked capture recorded; dispatched to Luna.
 - 2026-11-01: Keychain P3 landed (7d9d3d5f, 76aea93e). Found+fixed tests that hit the real login Keychain via the new existence check. E2 pending: machine-check on M5 over SSH (locked) vs local Terminal (ok).
 - 2026-11-01: Keychain P3 LIVE-VERIFIED (M5: SSH locked, local Terminal ok). All four 2026-11-01 bugs live-verified.
+- 2026-11-01: filed P3 docs/bugs/2026-11-01-machine-check-fails-on-unloaded-optional-heartbeat.md (heartbeat 'not loaded (optional)' instead of failing machine-check); dispatched to Luna.
