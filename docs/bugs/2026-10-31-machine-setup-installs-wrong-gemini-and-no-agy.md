@@ -1,6 +1,8 @@
 # Bug: machine setup installs MacPaw's "Gemini" disk cleaner instead of the Gemini CLI, and never installs agy
 
-**Status:** FIXED (87c8d685, 20c9bc74); live E2 pending on the M5
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run webhook-job-85c3cb61 · env m5-air · scenario slack-gemini-after-machine-setup · commit 20c9bc74 · proves E2
+**Fix commit:** 20c9bc74
 **Priority:** P2
 **Severity:** medium — the hub's Slack AI analysis is unavailable ("agy: not-installed; gemini: not-installed"); workaround is a manual install and login on the hub
 **Approval:** operator, 2026-10-31 ("go ahead" to dispatch, after choosing the make machine-setup route over a manual install)
@@ -104,3 +106,13 @@ interface:
   mutant; pre-fix printed no `ai:` lines).
 - Note: the presence check reads `ok` straight after install. The Google login is separate; the Slack AI answer
   (E2) is what proves it.
+
+## Live verification (E2), 2026-11-01
+
+- M5 at `20c9bc74`: `make machine-setup ROLE=hub AGENTS=skip SECRETS=skip` reported `brew:antigravity-cli installed`
+  and `brew:gemini-cli installed`, no `ai:` failure lines, and exited 0.
+- Slack `/gemini` (webhook job `85c3cb61`, status success) returned a model answer instead of "AI analysis
+  unavailable". The earlier job `e69b085e` had failed with `agy: not-logged-in; gemini: exit 41`.
+- Open, not part of this fix: the agy OAuth URL returned Bad Request when opened. `~/.gemini/settings.json` (synced
+  from the M4) selects `gemini-api-key` auth, so whether the webhook's gemini can authenticate depends on that
+  setting. Homebrew deprecates the `gemini-cli` formula (disabled 2026-12-18; replacement `antigravity-cli`).
