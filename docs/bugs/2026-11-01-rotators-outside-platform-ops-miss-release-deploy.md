@@ -1,4 +1,4 @@
-# Bug: the release steps leave the Grafana, Prometheus and LDAP rotators on old scripts
+# Bug: the release steps leave the Grafana and LDAP rotators on old scripts
 
 **Status:** OPEN
 **Priority:** P2
@@ -25,18 +25,44 @@ The rotator CronJobs are applied by three different entry points:
 | Rotator | Applied by | Make target |
 |---|---|---|
 | ArgoCD | `deploy_argocd_platform_ops` | `make platform-ops` |
-| Grafana, Prometheus | `_observability_apply_grafana_rotator`, `_observability_install_prometheus_rotator` inside `deploy_observability` | `make observability` |
+| Grafana | `_observability_apply_grafana_rotator` inside `deploy_observability` | `make observability` |
 | LDAP | `_ldap_deploy_password_rotator` in `_ldap_run_post_deploy` | LDAP deploy |
 
-The release rules in `CLAUDE.md` run the ApplicationSet reapply and `make platform-ops`. Neither reaches the Grafana,
-Prometheus or LDAP rotators, and `make observability` is a full stack redeploy that the release does not run.
+The release rules in `CLAUDE.md` run the ApplicationSet reapply and `make platform-ops`. Neither reaches the Grafana
+or LDAP rotators, and `make observability` is a full stack redeploy that the release does not run.
+
+## Captured hub state (for test stubs)
+
+Read-only, m5-air.local, 2026-11-01T12:20:58Z, `kubectl --context k3d-k3d-cluster`:
+
+    $ kubectl get namespace
+    NAME              STATUS   AGE
+    cicd              Active   39h
+    default           Active   39h
+    identity          Active   39h
+    istio-system      Active   39h
+    kube-node-lease   Active   39h
+    kube-public       Active   39h
+    kube-system       Active   39h
+    monitoring        Active   39h
+    platform-ops      Active   39h
+    secrets           Active   39h
+    staging           Active   39h
+    trivy-system      Active   39h
+    vectordb          Active   39h
+
+    $ kubectl get cronjob -A | grep -i rotat
+    cicd           argocd-credential-rotator    0 0 1 * *      <none>                False     0        12h             39h
+    identity       ldap-password-rotator        0 0 1 * *      <none>                False     0        12h             39h
+    monitoring     grafana-credential-rotator   0 0 1 * *      <none>                False     0        12h             38h
 
 ## Fix
 
-1. `deploy_argocd_platform_ops` also reapplies the Grafana, Prometheus and LDAP rotator CronJobs (and the Vault roles
+1. `deploy_argocd_platform_ops` also reapplies the Grafana and LDAP rotator CronJobs (and the Vault roles
    their existing apply functions configure), by calling the existing apply functions, not by copying their bodies.
-2. Each rotator is reapplied only when its namespace exists on the target cluster (`monitoring`, `identity` or the LDAP
-   namespace the LDAP plugin uses). When a namespace is absent, log one INFO line naming the rotator as skipped and
+2. Each rotator is reapplied only when its namespace exists on the target cluster: `monitoring` for Grafana, `identity`
+   for LDAP. The LDAP rotator also honours `LDAP_ROTATOR_ENABLED` (default 1 in `scripts/etc/ldap/vars.sh`); when it is
+   0, log one INFO line and skip it. When a namespace is absent, log one INFO line naming the rotator as skipped and
    continue.
 3. Cross-plugin calls are made with the plugin explicitly loaded. If an apply function is still not defined after
    loading, log an ERROR naming it and make `platform-ops` report a problem. It must never silently do nothing (see
@@ -54,6 +80,8 @@ Prometheus or LDAP rotators, and `make observability` is a full stack redeploy t
 
 ## What NOT to do
 
+- Do not touch the Prometheus rotator. It is a LaunchAgent (`_observability_install_prometheus_rotator`) that runs the
+  checkout's `k3d-manager`, so it already runs current code (scope correction, 2026-11-01, raised by Luna).
 - Do not redeploy the Grafana or Prometheus Helm releases, or the LDAP server, from `platform-ops`.
 - Do not create Jobs from the CronJobs.
 - Do not edit `CLAUDE.md`; Claude updates the release rule after the fix lands.
@@ -63,7 +91,7 @@ Prometheus or LDAP rotators, and `make observability` is a full stack redeploy t
 
 ```yaml
 must:
-  M1: a platform-ops run against a cluster where the monitoring and LDAP namespaces exist applies the Grafana, Prometheus and LDAP rotator CronJob manifests from the checkout, in addition to the ArgoCD rotator
+  M1: a platform-ops run against a cluster where the monitoring and LDAP namespaces exist applies the Grafana and LDAP rotator CronJob manifests from the checkout, in addition to the ArgoCD rotator
   M2: a rotator whose namespace is absent is skipped with one INFO line naming it, and the run continues to the remaining rotators (paired with M1)
   M3: platform-ops prints one summary line per rotator stating applied, skipped or failed
 must_not:
@@ -76,8 +104,7 @@ evidence:
     intent: >-
       You will see a bats suite run deploy_argocd_platform_ops against a kubectl stub (the fixture first asserts the
       stub is first on PATH and the kubeconfig points at no real cluster) that records every call. With all namespaces
-      present, the log shows apply of each rotator manifest; with monitoring absent, the Grafana and Prometheus
-      rotators are skipped with INFO lines and LDAP is still applied. A mutant that leaves an apply function undefined
+      present, the log shows apply of each rotator manifest; with monitoring absent, the Grafana rotator is skipped with INFO lines and LDAP is still applied. A mutant that leaves an apply function undefined
       makes the run log an ERROR. The call log has no "create job", no helm install or upgrade, and no delete cronjob.
       Stub kubectl output for "get namespace" comes from a real read-only capture on the M5 hub, with host and date in
       a comment.
@@ -91,6 +118,6 @@ evidence:
     what: Claude reads the CronJobs with kubectl get -o yaml after the operator runs make platform-ops
 interface:
   - scripts/plugins/argocd.sh deploy_argocd_platform_ops (make platform-ops)
-  - scripts/plugins/observability.sh _observability_apply_grafana_rotator, _observability_install_prometheus_rotator
+  - scripts/plugins/observability.sh _observability_apply_grafana_rotator
   - scripts/plugins/ldap.sh _ldap_deploy_password_rotator
 ```
