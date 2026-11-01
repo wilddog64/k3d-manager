@@ -76,3 +76,9 @@ interface:
   - Keychain item k3dm-slack-role-map (account k3dm)
   - ~/.local/share/k3d-manager/audit/remote-operator.jsonl
 ```
+
+## Workaround applied (2026-11-01)
+
+The operator added `k3dm-slack-role-map` (account `k3dm`) on the M5 and restarted `com.k3d-manager.webhook`. The next
+`/cluster-up` (job `ec9ce66c`) was accepted: audit `2026-11-01T15:23:38Z /api/v1/cluster actor slack:wilddog64:U4C9LDQP2
+role admin allowed True`. The manifest fix is still open.

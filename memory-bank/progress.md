@@ -2186,3 +2186,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: re-read share P3 VERIFIED (65cb87cc, Luna; Claude independent verify); E3 live pending. Bar-names P3 dispatched to Luna.
 - 2026-11-01: bar-names P3 VERIFIED (badbb970, Luna; Claude independent verify); E2 live pending. Filed P3 make-fast-gate-base-leaks-into-dashboard-suite (found in fast-gate E4).
 - 2026-11-01: filed P2 hub-secrets-manifest-omits-slack-role-map (/cluster-up forbidden on the M5).
+- 2026-11-01: Slack role map workaround applied on M5; /cluster-up job ec9ce66c accepted (admin).
