@@ -1,6 +1,8 @@
 # Bug: the release steps leave the Grafana and LDAP rotators on old scripts
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run make-platform-ops-m5-1247z · env m5-air · scenario platform-ops-reapplies-rotators · commit f2369dbb · proves E2
+**Fix commit:** 3cc9abcf
 **Priority:** P2
 **Severity:** medium — a merged rotator fix stays inert on the hub after the release steps; the Grafana and LDAP rotators ran their pre-fix scripts on 2026-11-01 after `make platform-ops`; workaround is a full `make observability` or LDAP redeploy
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -135,5 +137,14 @@ interface:
   `argocd_platform_ops_notifications_slack.bats` (landed `--allow-out-of-scope`).
 - E1: new suite 7/7; all 7 fail against the pre-fix plugins in a scratch copy. Related suites (notifications Slack,
   bootstrap, `makefile_platform_ops`, `hub_up`, Grafana seed, LDAP rotator) green.
-- E2 pending: operator runs `make platform-ops` on the M5 from the release branch; Claude checks the Grafana and LDAP
-  CronJobs carry the `WARN slack notice` lines and that no Job was created.
+
+## Live verification (E2), 2026-11-01
+
+- The operator ran `make platform-ops` on the M5 at `f2369dbb` (pulled 12:46:37Z). The output printed
+  `ArgoCD rotator: applied`, `Grafana rotator: applied` and `LDAP rotator: applied`.
+- `monitoring/grafana-credential-rotator`: last kubectl apply at 12:47:35Z, generation 2, 4 `WARN slack notice` lines.
+- LDAP: the script lives in the `identity/ldap-password-rotator` **ConfigMap**, not the CronJob. The ConfigMap was
+  last applied at 12:47:36Z and has the `WARN slack notice` lines. The CronJob was unchanged (generation 1), because the
+  rendered CronJob already matched; its `VAULT_ADDR` is `http://vault.secrets.svc:8200`.
+- No Job was created by the run: the only rotator Jobs are the 00:00 scheduled runs and the earlier manual
+  `*-rotator-manual-1101` checks.

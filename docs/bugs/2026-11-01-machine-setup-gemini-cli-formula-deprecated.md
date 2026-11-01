@@ -1,6 +1,8 @@
 # Bug: machine setup installs the gemini-cli formula, which Homebrew disables on 2026-12-18
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run machine-check-m5-hub · env m5-air · scenario machine-check-role-hub · commit f2369dbb · proves E2
+**Fix commit:** 955b979e
 **Priority:** P3
 **Severity:** low — today it installs and works; from 2026-12-18 `brew install gemini-cli` fails, so setup on a new machine reports `brew:gemini-cli missing` and exits 1
 **Approval:** operator, 2026-11-01 ("file as you ranked and dispatch to Luna")
@@ -94,4 +96,10 @@ interface:
   check tests (N1).
 - Claude at land: dropped Luna's sandbox-limits issue note (covered by the run above); resolved a CHANGELOG conflict
   with the rotator entry.
-- E2 pending: `make machine-check ROLE=hub` on the M5 shows `ai:agy ok` and no `brew:gemini-cli` line.
+
+## Live verification (E2), 2026-11-01
+
+- M5 at `f2369dbb`, `bin/k3dm-machine-setup --role hub --check` (read-only, by Claude over SSH): `brew:antigravity-cli ok`,
+  `ai:agy ok`, `ai:gemini ok` (the existing install is kept), and no `brew:gemini-cli` line.
+- The run still exits 1 on `agent:bin/k3dm-heartbeat-setup missing`. That is unrelated: the heartbeat agent is only
+  rendered as a review candidate (`scripts/etc/machine/not-installed.list`) until the operator loads it.
