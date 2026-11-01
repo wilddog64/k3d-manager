@@ -1,6 +1,6 @@
 # Bug: hub migration drops the webhook Slack bot config, so every /ask-docs and /ask reply is ephemeral
 
-**Status:** FIXED — `a841d34c` (Codex, one correction round for a token-prefix leak the tests missed; Claude review, independent verifier PASS, prefix mutant red); live doctor slack_bot check pending
+**Status:** FIXED — `a841d34c` (Codex, one correction round for a token-prefix leak the tests missed; Claude review, independent verifier PASS, prefix mutant red); E2 live: doctor slack_bot=configured on the M5 2026-10-31
 **Priority:** P2
 **Severity:** medium — Slack answers still arrive, but only as "Only visible to you"; no bot threads, no thread follow-ups
 **Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's proposal to file it; dispatch go: operator, 2026-10-31 ("go ahead to dispatch these two")
