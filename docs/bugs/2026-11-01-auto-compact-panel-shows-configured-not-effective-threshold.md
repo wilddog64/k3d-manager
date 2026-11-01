@@ -1,6 +1,8 @@
 # Bug: the "Auto-compact threshold" panel shows the configured value, which never took effect
 
-**Status:** FIXED — `3fce5b0b` (Luna; Claude review); live check E2 pending
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run agent-activity-panel-30d · env m5-air · scenario dashboard-auto-compact-panels · commit 27e29885 · proves E2
+**Fix commit:** 3fce5b0b
 **Priority:** P3
 **Severity:** low — the panel showed 400K from 2026-10-22 to 2026-11-01 while every auto-compaction ran at about 168K, so the context-window trial looked active when it measured nothing; no runtime impact
 **Approval:** operator, 2026-11-01 ("please dispatch this one to Luna too")
@@ -100,3 +102,11 @@ interface:
   number of `$window` expressions on the dashboard, 81 → 82; landed `--allow-out-of-scope` with both suites
   (pytest 154 passed). The spec missed that second suite.
 - Hub Prometheus at filing (read-only, M5): observed point 168.8K (7d), 168.5K (1d), 168.5K (30d) against 200K configured.
+
+## Live verification (E2), 2026-11-01
+
+- After the operator reapplied the ApplicationSets on `k3d-manager-v1.43.13` (`hub-grafana-dashboards` synced at
+  `27e29885`; `make platform-ops` alone could not deploy this dashboard), the operator's screenshot of the agent-activity
+  dashboard (Window 30d) shows "Auto-compact setting (configured) 200 K" beside "Observed compaction point 168 K".
+- Hub Prometheus, read-only by Claude: `k3dm_claude_auto_compact_tokens` 200000; sum/count of auto compactions (7d)
+  168856.9.
