@@ -8,7 +8,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 
-from webhook import bug_count  # noqa: E402
+from webhook import ask_docs, bug_count  # noqa: E402
 
 
 @pytest.mark.parametrize("question, expected", [
@@ -244,3 +244,33 @@ def test_reply_caps_fixed_links_at_ten(monkeypatch):
 def test_reply_omits_fixed_links_for_open_or_all_release_questions(monkeypatch, query):
     monkeypatch.setattr(bug_count.proc, "_spawn_capture_text", lambda *_a, **_k: (0, _closed_payload(2), False))
     assert "Fixed: " not in bug_count.reply(query)
+
+
+def test_named_release_budget_reports_exact_omissions(monkeypatch):
+    data = _release(87)
+    data.update(open=6, closed=81, open_paths=[
+        {"path": f"docs/bugs/2026-10-31-open-example-long-description-{i}.md"} for i in range(6)],
+        closed_paths=[{"path": f"docs/bugs/2026-10-31-fixed-example-long-description-{i}.md"}
+                      for i in range(81)])
+    _reply_with(monkeypatch, {"v1.43.5": data}, bug_count.CountQuery("v1.43.5", None, None))
+    answer = ask_docs.answer("how many bugs in v1.43.5")
+    assert "87 bug docs — 81 fixed, 6 open" in answer
+    assert answer.count("Open: ") == 6
+    assert f"…and {81 - answer.count('Fixed: ')} more fixed." in answer
+    assert answer.index("Open: ") < answer.index("Fixed: ")
+    assert "name a release to see the full list" not in answer
+    assert len(answer) <= ask_docs.MAX_REPLY_CHARS
+    assert answer.count("<") == answer.count(">")
+
+
+def test_open_links_are_dropped_last_and_counted(monkeypatch):
+    data = _release(30)
+    data.update(open=20, closed=10, open_paths=[
+        {"path": f"docs/bugs/{'open-long-description-' * 5}{i}.md"} for i in range(20)],
+        closed_paths=[{"path": f"docs/bugs/fixed-{i}.md"} for i in range(10)])
+    answer = _reply_with(monkeypatch, {"v1.43.5": data}, bug_count.CountQuery("v1.43.5", None, None))
+    assert "Fixed: " not in answer
+    assert f"…and {20 - answer.count('Open: ')} more open." in answer
+    assert f"…and 10 more fixed." in answer
+    assert len(answer) + len("\n\nSources: none") <= ask_docs.MAX_REPLY_CHARS
+    assert answer.count("<") == answer.count(">")

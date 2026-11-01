@@ -200,7 +200,8 @@ def _sources(results):
     return kept, excerpts, source_meta
 
 
-def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, source_meta=None):
+def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, source_meta=None,
+           truncation_marker=TRUNCATION_MARKER):
     def source_line(path):
         suffix = ""
         if str(path).startswith("docs/bugs/") and source_meta and path in source_meta:
@@ -217,7 +218,7 @@ def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, s
     if available < 0:
         available = 0
     if len(prose) > available:
-        content_limit = max(0, available - len(TRUNCATION_MARKER) - 1)
+        content_limit = max(0, available - len(truncation_marker) - 1)
         newline = prose.rfind("\n", 0, content_limit + 1)
         if newline >= 0:
             prose = prose[:newline].rstrip()
@@ -232,7 +233,7 @@ def _reply(prose, paths, *, scrub_prose=True, status="success", metadata=None, s
                 elif character.isspace() and not in_link:
                     boundary = index
             prose = prose[:boundary].rstrip() if boundary >= 0 else ""
-        prose = f"{prose}\n{TRUNCATION_MARKER}" if prose else TRUNCATION_MARKER
+        prose = f"{prose}\n{truncation_marker}" if prose else truncation_marker
     return AskDocsResult(
         prose + "\n\n" + source_lines,
         status=status,
@@ -247,7 +248,10 @@ def answer(question, *, retrieve=prior_art.search, model=agent._call_gemini, k=5
         return _reply("Question rejected — too long or contains disallowed patterns.", [])
     query = bug_count.match(question)
     if query is not None:
-        return _reply(bug_count.reply(query), [], scrub_prose=False)
+        marker = TRUNCATION_MARKER
+        if query.release != "*":
+            marker = '…(truncated; add a priority, e.g. "P2 bugs in v1.43.5", to narrow it)'
+        return _reply(bug_count.reply(query), [], scrub_prose=False, truncation_marker=marker)
     recent = _wants_recent(question)
     try:
         results = _recent_docs(question, k) if recent else []
