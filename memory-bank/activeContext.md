@@ -1850,3 +1850,21 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: Keychain P3 ready to dispatch but needs operator's unlocked capture of security show-keychain-info from an M5 local Terminal (spec forbids inventing it).
 - 2026-11-01: machine-check ROLE=hub on M5 exits 1 only on agent:bin/k3dm-heartbeat-setup missing (heartbeat = review candidate, not loaded). Keychain P3 still waits on operator's unlocked show-keychain-info capture. find-similar-docs K E2 still pending (Slack retry).
 - 2026-11-01: all 4 v1.43.13 bugs from today live-verified except Keychain P3 E2. Gotcha: cd $WORKTREE fails silently (smartcd) — a later relative-path edit hit the main checkout; always absolute paths.
+
+## Handoff — 2026-11-01 (v1.43.13 bug batch: rotators, gemini-cli, find-similar-docs K, locked Keychain)
+
+| Bug | Fix | Status |
+|---|---|---|
+| `docs/bugs/2026-11-01-rotators-outside-platform-ops-miss-release-deploy.md` (P2) | `3cc9abcf`, `e388c471` | LIVE-VERIFIED (platform-ops 12:47Z; Grafana CronJob + LDAP ConfigMap carry WARN lines; no Jobs) |
+| `docs/bugs/2026-11-01-machine-setup-gemini-cli-formula-deprecated.md` (P3) | `955b979e` | LIVE-VERIFIED (M5 check: ai:agy ok, no brew:gemini-cli) |
+| `docs/bugs/2026-11-01-find-similar-docs-k-option-glued-into-one-argument.md` (P2) | `bdfe2b8e` | LIVE-VERIFIED (Slack job 04bccbb3) |
+| `docs/bugs/2026-11-01-machine-setup-secret-check-ignores-unreadable-value.md` (P3) | `7d9d3d5f` + test stubs | LIVE-VERIFIED (M5: SSH locked, local ok) |
+
+- Also: `autoCompactWindow` back to 200000 (`48b16c32`); the 400K trial never applied.
+- Decisions: the LDAP rotator script lives in its ConfigMap, so "CronJob unchanged" after a reapply is expected.
+  `make machine-check ROLE=hub` on the M5 exits 1 only on `agent:bin/k3dm-heartbeat-setup missing` (by design: a review
+  candidate until the operator loads it; a P3 to report it as "not loaded" without failing was offered, not filed).
+- Open: P3 to make the dashboard "Auto-compact threshold" panel show the effective value (offered, not filed); earlier
+  items (AI filter passive E2, P1 linked-worktree push live check, revoked Slack incoming webhook, agy OAuth Bad Request,
+  v1.43.14 auto-sync plan approval, remaining v1.43.13 plans, then the v1.43.13 PR). Background watcher b33xawkw0 still
+  waits on the five 2026-10-31 Codex tasks.
