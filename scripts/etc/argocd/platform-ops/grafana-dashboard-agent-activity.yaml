@@ -105,7 +105,7 @@ data:
           "description": "Compaction boundaries in the selected time window divided by verified specs in the window.",
           "gridPos": {
             "h": 6,
-            "w": 8,
+            "w": 6,
             "x": 0,
             "y": 1
           },
@@ -205,8 +205,8 @@ data:
           "description": "Share of Read tool calls in the selected time window that re-read a file already read before the latest compaction boundary in the same session.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 8,
+            "w": 6,
+            "x": 6,
             "y": 1
           },
           "datasource": {
@@ -300,12 +300,12 @@ data:
               "valueSize": 32
             }
           },
-          "title": "Auto-compact threshold",
-          "description": "Latest non-future auto_compact_tokens setting from docs/metrics/context-window-experiment.md.",
+          "title": "Auto-compact setting (configured)",
+          "description": "Latest non-future auto_compact_tokens setting from docs/metrics/context-window-experiment.md. It may not take effect: a setting above the session context window is ignored.",
           "gridPos": {
             "h": 6,
-            "w": 8,
-            "x": 16,
+            "w": 6,
+            "x": 12,
             "y": 1
           },
           "datasource": {
@@ -337,6 +337,33 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "id": 99,
+          "type": "stat",
+          "title": "Observed compaction point",
+          "description": "Mean context size at automatic compactions in the selected window, from transcript compactMetadata.preTokens; this is the threshold that actually applied.",
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 1},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "k3dm_claude_compaction_pre_tokens_sum{window=\"$window\",trigger=\"auto\"} / k3dm_claude_compactions{window=\"$window\",trigger=\"auto\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "noValue": "No auto-compactions in window",
+              "mappings": [
+                {"type": "special", "options": {"match": "nan", "result": {"text": "No auto-compactions in window"}}},
+                {"type": "special", "options": {"match": "null", "result": {"text": "No auto-compactions in window"}}}
+              ],
+              "color": {"mode": "fixed", "fixedColor": "blue"}
+            },
+            "overrides": []
+          },
+          "options": {"text": {"valueSize": 32}}
         },
         {
           "id": 49,

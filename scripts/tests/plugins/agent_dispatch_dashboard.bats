@@ -46,7 +46,7 @@ text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
 d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
 by_id={p["id"]:p for p in d["panels"]}; row=by_id[33]
 assert row["title"]=="Claude context and compaction" and row["type"]=="row"
-expected={35:("Compactions per verified spec","stat","short"),36:("Compactions by trigger","bargauge","none"),37:("Re-read share after compaction","stat","percentunit"),38:("Context incidents","bargauge","none"),39:("Auto-compact threshold","stat","short")}
+expected={35:("Compactions per verified spec","stat","short"),36:("Compactions by trigger","bargauge","none"),37:("Re-read share after compaction","stat","percentunit"),38:("Context incidents","bargauge","none"),39:("Auto-compact setting (configured)","stat","short")}
 for panel_id,(title,ptype,unit) in expected.items():
     panel=by_id[panel_id]
     assert panel["title"]==title and panel["type"]==ptype
@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98}
-assert set(p["id"] for p in new[2]["panels"])=={33,83}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[2]["panels"])=={33,83,99}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 82 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 83 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -327,10 +327,10 @@ from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-activity.yaml").read_text()
 panels=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
 by_id={p["id"]:p for p in panels}
-claude=[by_id[i] for i in (35,36,37,38,39)]
+claude=[by_id[i] for i in (35,36,37,38,39,99)]
 assert min(p["gridPos"]["x"] for p in claude)==0
 for p in claude:
-  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 8),(p["id"],p["gridPos"])
+  assert p["gridPos"]["w"]>=(12 if p["type"]=="bargauge" else 6),(p["id"],p["gridPos"])
 for y in {p["gridPos"]["y"] for p in claude}:
   assert sum(p["gridPos"]["w"] for p in claude if p["gridPos"]["y"]==y)==24,y
 for p in panels:
@@ -745,4 +745,29 @@ print("ok: 7d = $3.21/live-verified; missing unledgered release term = zero")
 PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"7d ="* && "$output" == *"missing unledgered release term = zero"* ]]
+}
+
+@test "agent activity: configured setting and observed compaction point are distinct" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PYTEST'
+import json,sys
+text=open(sys.argv[1]).read()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
+panels={p["title"]:p for p in d["panels"]}
+assert "Auto-compact threshold" not in panels
+configured=panels["Auto-compact setting (configured)"]
+assert configured["targets"][0]["expr"]=="k3dm_claude_auto_compact_tokens"
+assert "docs/metrics/context-window-experiment.md" in configured["description"]
+assert "may not take effect" in configured["description"] and "effective threshold" not in configured["description"].lower()
+observed=panels["Observed compaction point"]
+assert observed["type"]=="stat"
+expr=observed["targets"][0]["expr"]
+assert expr=='k3dm_claude_compaction_pre_tokens_sum{window="$window",trigger="auto"} / k3dm_claude_compactions{window="$window",trigger="auto"}'
+assert "k3dm_claude_auto_compact_tokens" not in expr
+defaults=observed["fieldConfig"]["defaults"]
+assert defaults["unit"]=="short" and defaults["noValue"]=="No auto-compactions in window"
+assert {m["options"]["match"] for m in defaults["mappings"] if m["type"]=="special" and m["options"]["result"]["text"]==defaults["noValue"]} >= {"nan","null"}
+a,b=configured["gridPos"],observed["gridPos"]
+assert a["y"]==b["y"] and a["x"]+a["w"]==b["x"]
+PYTEST
+  [ "$status" -eq 0 ]
 }

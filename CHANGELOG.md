@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Show the observed automatic compaction point beside the configured setting on the agent activity dashboard.
+
 - Report an unloaded optional heartbeat without failing the hub machine check; candidate rendering failures remain errors.
 
 - Report a locked login Keychain during machine setup and distinguish unreadable Keychain items in Argo CD secret sync.
