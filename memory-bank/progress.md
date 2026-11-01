@@ -2191,3 +2191,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: /cluster-up ec9ce66c failed (no ACG creds on M5); P2 broadened to all hub-read Keychain items missing from secrets.hub.list.
 - 2026-11-01: hub-secrets-manifest P2 dispatched (Luna); relay channel_id P2 filed.
 - 2026-11-01: relay channel_id fix 63be0e33 VERIFIED offline.
+- 2026-11-01: hub-secrets manifest fix fd25a55d VERIFIED offline.

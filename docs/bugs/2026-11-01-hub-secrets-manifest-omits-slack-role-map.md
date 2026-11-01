@@ -1,6 +1,7 @@
 # Bug: hub secrets manifest omits `k3dm-slack-role-map`, so the new hub's webhook maps every Slack user to `reader`
 
-**Status:** OPEN
+**Status:** VERIFIED — `fd25a55d` (Luna; Claude review); live: operator `make machine-setup ROLE=hub FROM=m4-air.local` on the M5, then `/cluster-up aws`
+**Fix commit:** fd25a55d
 **Priority:** P2
 **Severity:** medium — after the M5 cutover every Slack command above `reader` is refused (`/cluster-up`: "forbidden: cluster-up requires role admin"); workaround: add the Keychain item on the hub by hand and restart the webhook
 **Approval:** operator, 2026-11-01 (Slack screenshot 515, "seems this come from machine-setup for m5"; hub-migration gaps are filed as found)
@@ -110,3 +111,22 @@ that are missing on the M5, and none of them is in `secrets.hub.list`. Items tha
 Missing items with no hub code reader: `copilot-cli`, `GitHub - https://api.github.com`, `github-packages-token`,
 `k3dm-cloudflare-cache-purge-token`. The app-cluster seed matters most: on a missing item `vault.sh` generates new
 values, so real external credentials (`payment/stripe`, `payment/paypal`, `github/pat`) would be replaced by random ones.
+
+## Verification (2026-11-01, Claude)
+
+- Review: `secrets.hub.list` gains the role map plus the 24 service/account lines from the "Second failure" table;
+  every one exists on the M4 (`security find-generic-password -s S -a A`, names only, 24/24). `bin/k3dm-webhook-doctor`
+  adds `slack_role_map: present|missing`, using the same parse rules as `auth.py:_load_slack_role_map`; no IDs or roles
+  in its output. The howto names the Keychain item and the restart.
+- Claude changes: the doctor test now clears `K3DM_SLACK_ROLE_MAP` so a real map in the environment cannot leak
+  in; dropped Luna's `docs/issues/2026-11-01-hub-secrets-test-sandbox-tty.md` (a sandbox run log, not an incident).
+- Pre-fix red (scratch copy of `HEAD` with the new tests): `test_slack_role_map_status_parses_and_redacts` FAILED;
+  `machine setup: hub credentials are checked and missing role map triggers FROM pull` and
+  `hub manifest includes each hub-read service and account` not ok.
+- Post-fix: `test_webhook_doctor.py` 38 passed; `machine_setup.bats` 78/78. Land fast gate PASS (111 s).
+- Land: refused once on a `CHANGELOG.md` rebase conflict with the relay fix `63be0e33` (both lines kept), then landed
+  with `--allow-out-of-scope` (Files names the `scripts/tests/bin/` directory).
+- Errors seen: the 37 pre-fix test errors come from the autouse fixture patching `_slack_role_map_status`, which the
+  pre-fix doctor lacks (expected); the rebase conflict above. None other.
+- Pending live: on the M5 run `make machine-setup ROLE=hub FROM=m4-air.local`; `--check` reports no hub item missing;
+  then `/cluster-up aws` gets past the ACG login.
