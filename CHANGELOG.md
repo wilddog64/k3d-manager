@@ -6,6 +6,8 @@
 
 - Configure app-cluster Vault auth when KUBECONFIG contains multiple files.
 
+- Check whether the marked CloudFormation stack exists before warning that a failed ACG bring-up left it billable.
+
 - Include hub-read credentials in machine setup and report a missing or empty Slack role map in webhook diagnostics.
 
 - Preserve Slack channel and thread context for cluster-up, cluster-down and cluster-resume job updates.
