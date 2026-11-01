@@ -1894,3 +1894,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - https-remotes E5 LIVE-VERIFIED; zshdotfiles 98759b2 removed truncated _gemini (M5 pulled; M2 needs operator pull).
 - acg-up job ec9ce66c failed: M5 lacks k3dm-acg-pluralsight; M4/M5 keychain diff: 27 items missing on M5, none in secrets.hub.list (app-cluster-secrets, cloudflared, signing, cloud-runner token…). Broadened P2 hub-secrets-manifest bug. acg-up live check blocked on copying secrets to M5.
 - Filed P2 docs/bugs/2026-11-01-slack-relay-cluster-up-down-omit-channel-id.md: relay /cluster-up,/cluster-down omit channel_id → response_url only, 6th post rejected (job ec9ce66c). Hub-secrets P2 dispatched to Luna.
+- Relay channel_id P2 landed 63be0e33 (scope widened to /cluster-resume), VERIFIED; E2 needs operator make deploy-worker + /cluster-up.
