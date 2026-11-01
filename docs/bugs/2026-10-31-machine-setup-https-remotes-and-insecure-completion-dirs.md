@@ -1,6 +1,8 @@
 # Bug: machine setup leaves HTTPS remotes and a world-writable ~/.zplug, and its check never opens a shell
 
-**Status:** FIXED — `8210a0eb`, `087b87fc`, `61dc0c04` (Codex; Claude review, independent verifier 20/20; E5 live on M4/M5)
+**Status:** LIVE-VERIFIED — `8210a0eb`, `087b87fc`, `61dc0c04` (Codex; Claude review, independent verifier 20/20; E5 live 2026-11-01)
+**Live evidence:** 2026-11-01 · run machine-check-shell-m5-m2-20261101 · env m5-air/m2-air · scenario hub-check-remotes-and-completion-dirs · commit 2a8e1479 · proves E5
+**Fix commit:** 61dc0c04 (last of 8210a0eb, 087b87fc, 61dc0c04)
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("yes, file a v1.43.13 bug")
 **Filed:** 2026-10-31
@@ -166,3 +168,19 @@ interface:
 ```
 
 **Intent approved:** operator, 2026-10-31 ("as well as those two bugs")
+
+## Live E5 (2026-11-01, Claude from the M4)
+
+- `make machine-check-shell HOST=m5-air.local`: rc 0, no output. `HOST=m2-air.local`: rc 0, no output.
+- M5 `bin/k3dm-machine-setup --role hub --check` (via `ssh m5-air.local 'zsh -lic …'`): 19 `remote:` lines all `ok` (every
+  managed clone plus `~/.claude`, `~/.codex`, `~/.gemini`, `~/.copilot`); `zsh:completion-dirs ok`.
+- Errors seen and explained:
+  - First run: `~/.zsh/my_func.zsh:256: parse error near timestamp=$(date +'%...'` (and `:25: unmatched '`) — a truncated
+    duplicate `_gemini()` block in the operator's zshdotfiles (`c5ccc33`), present on every host. Removed with the
+    operator's go in zshdotfiles `98759b2`; M5 fast-forwarded, `zsh -n` clean. The M2 could not fetch non-interactively
+    (`Permission denied (publickey)`); operator to pull there.
+  - `--check` rc 1, from `keychain:login locked (reads will fail in this session; run from a local Terminal)`; the SSH
+    session cannot unlock the login keychain, as designed. Other non-ok lines are by design: `github-auth-storage skipped`,
+    two Bitbucket repos `skipped`, heartbeat agent `not loaded (optional)`.
+  - `(eval):1: can't change option: zle` and keychain-agent `Can't find key ~/.ssh/id_rsa`: artifacts of forcing `zsh -i`
+    with no TTY over SSH; `machine-check-shell` (the E5 shell check) printed nothing.

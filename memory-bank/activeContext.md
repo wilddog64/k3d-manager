@@ -1891,3 +1891,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Seen on M4: `make find-similar-docs` falls back to hub Vault at 127.0.0.1:55730 (retired local hub) — advisory only; not yet filed.
 - Slack /cluster-up refused (role reader): M5 lacks Keychain k3dm-slack-role-map (M4 has it, acct k3dm); hub secrets manifest omits it. Filed P2 docs/bugs/2026-11-01-hub-secrets-manifest-omits-slack-role-map.md. Operator to add the item on the M5 + restart webhook, then retry /cluster-up.
 - Role map added on M5 by operator; /cluster-up accepted as admin (job ec9ce66c, 15:23:38Z), job running.
+- https-remotes E5 LIVE-VERIFIED; zshdotfiles 98759b2 removed truncated _gemini (M5 pulled; M2 needs operator pull).
