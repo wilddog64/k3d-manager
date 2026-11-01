@@ -473,7 +473,7 @@ render_heartbeat() {
       record_failure "agent:${target}" 'missing (candidate render failed)'; return
     fi
   fi
-  record_failure "agent:${target}" 'missing (review candidates: docs/howto/independent-heartbeats.md)'
+  report "agent:${target}" 'not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)'
 }
 
 perform_agent_install() {
@@ -495,7 +495,12 @@ run_one_agent() {
   label="$(agent_label "$target")"
   if [[ "$target" == install-sudoers && -f "$sudoers_file" ]]; then report "agent:${target}" ok; return; fi
   if [[ -n "$label" && -f "$HOME/Library/LaunchAgents/com.k3d-manager.${label}.plist" ]]; then report "agent:${target}" ok; return; fi
-  if [[ "$mode" != setup ]]; then record_failure "agent:${target}" missing; return; fi
+  if [[ "$mode" != setup ]]; then
+    if [[ "$target" == bin/k3dm-heartbeat-setup ]]; then
+      report "agent:${target}" 'not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)'
+    else record_failure "agent:${target}" missing; fi
+    return
+  fi
   if [[ "$agents_mode" == skip ]]; then report "agent:${target}" 'skipped (AGENTS=skip)'; return; fi
   perform_agent_install "$target"
 }

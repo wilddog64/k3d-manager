@@ -620,3 +620,24 @@ STUB
   [ "$status" -eq 1 ]
   [[ "$output" != *SECRETVALUE_LEAK* ]]
 }
+
+@test "heartbeat: optional unloaded, loaded, and missing webhook on a complete hub" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  complete_machine hub
+  local agents="$HOME_FX/Library/LaunchAgents"
+  rm -f "$agents/com.k3d-manager.heartbeat.plist"
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)'* ]]
+  touch "$agents/com.k3d-manager.heartbeat.plist"
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'ok'* ]]
+  rm "$agents/com.k3d-manager.heartbeat.plist" "$agents/com.k3d-manager.webhook.plist"
+  ms --role hub --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'agent:bin/k3dm-webhook-setup'*'missing'* ]]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
+  [ ! -e "$agents/com.k3d-manager.heartbeat.plist" ]
+  ! grep -q '^launchctl ' "$CALLS"
+}

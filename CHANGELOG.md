@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Report an unloaded optional heartbeat without failing the hub machine check; candidate rendering failures remain errors.
+
 - Report a locked login Keychain during machine setup and distinguish unreadable Keychain items in Argo CD secret sync.
 
 - Reapply the Grafana and enabled LDAP credential rotators during platform-ops deployment, reporting each rotator's outcome.

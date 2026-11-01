@@ -1160,3 +1160,33 @@ SH
   [ "$status" -eq 1 ]
   [[ "$output" != *SECRETVALUE_LEAK* ]]
 }
+
+@test "machine setup: heartbeat renders candidates without loading and reports render failures" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* && "$FIXROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  printf '%s\n' bin/k3dm-heartbeat-setup > "$FIXROOT/scripts/etc/machine/agents.hub.list"
+  cat > "$FIXROOT/bin/k3dm-heartbeat-setup" <<'SH'
+#!/bin/bash
+printf 'heartbeat-render %s\n' "$*" >> "$CALL_LOG"
+[ ! -e "$CALL_LOG.fail-render" ] || exit 1
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --output-dir ]; then mkdir -p "$2"; touch "$2/com.k3d-manager.heartbeat.plist"; break; fi
+  shift
+done
+SH
+  chmod +x "$FIXROOT/bin/k3dm-heartbeat-setup"
+  printf '#!/bin/sh\nprintf "launchctl %%s\\n" "$*" >> "$CALL_LOG"\n' > "$STUBS/launchctl"
+  chmod +x "$STUBS/launchctl"
+  tty_machine --role hub
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'not loaded (optional;'* ]]
+  [ -f "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist" ]
+  [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
+  ! grep -q '^launchctl ' "$CALL_LOG"
+  rm "$FIXHOME/.local/share/k3d-manager/heartbeat-candidates/com.k3d-manager.heartbeat.plist"
+  touch "$CALL_LOG.fail-render"
+  tty_machine --role hub
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'agent:bin/k3dm-heartbeat-setup'*'missing (candidate render failed)'* ]]
+  [ ! -e "$FIXHOME/Library/LaunchAgents/com.k3d-manager.heartbeat.plist" ]
+  ! grep -q '^launchctl ' "$CALL_LOG"
+}
