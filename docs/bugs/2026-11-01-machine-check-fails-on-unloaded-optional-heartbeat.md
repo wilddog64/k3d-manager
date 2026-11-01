@@ -1,6 +1,6 @@
 # Bug: `make machine-check ROLE=hub` can never pass, because the never-loaded heartbeat agent counts as missing
 
-**Status:** OPEN
+**Status:** FIXED — `59b5fde6`, `4b47e7d7`, `78800eb7` (Luna; Claude review); live check E2 pending
 **Priority:** P3
 **Severity:** low — the hub check exits 1 on every run even when every real item is ok, so a real failure is hidden behind a permanent red; no runtime impact
 **Approval:** operator, 2026-11-01 ("then file a P3 and dispatch to Luna")
@@ -90,3 +90,17 @@ interface:
   - bin/k3dm-machine-setup (role hub; --check and setup; AGENTS; scratch HOME with Library/LaunchAgents)
   - scripts/etc/machine/agents.hub.list
 ```
+
+## Resolution
+
+- `59b5fde6` (Luna): with no heartbeat plist in LaunchAgents, check mode and setup mode report
+  `agent:bin/k3dm-heartbeat-setup not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)` through
+  `report`; a candidate render failure stays `missing (candidate render failed)`. Every other agent still fails when
+  its plist is missing. The howto says so in one sentence.
+- E1: both new tests fail on the pre-fix script. A mutant that reports every missing agent through `report` turns the
+  N2 test red (missing webhook still exits 1).
+- Claude at land: `4b47e7d7` turned three bare `! grep '^launchctl '` assertions into `run` + status checks.
+  `78800eb7` fixed an older, random flake in the N5 acceptance test found by the fast gate: its git-subcommand regex
+  matched `gc` inside the bats temp dir `bats-run-7gccFg`, so every `git -C <path>` call counted as a mutation. The
+  subcommands now match as whole words (a real `git gc` still matches).
+- Land tests: `machine_setup.bats` + `machine_setup_acceptance.bats` 125/125; fast gate green.

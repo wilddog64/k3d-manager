@@ -1,6 +1,6 @@
 # Bug: the "Auto-compact threshold" panel shows the configured value, which never took effect
 
-**Status:** OPEN
+**Status:** FIXED — `3fce5b0b` (Luna; Claude review); live check E2 pending
 **Priority:** P3
 **Severity:** low — the panel showed 400K from 2026-10-22 to 2026-11-01 while every auto-compaction ran at about 168K, so the context-window trial looked active when it measured nothing; no runtime impact
 **Approval:** operator, 2026-11-01 ("please dispatch this one to Luna too")
@@ -87,3 +87,16 @@ interface:
   - scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml (ConfigMap with dashboard JSON)
   - Prometheus metrics k3dm_claude_auto_compact_tokens, k3dm_claude_compactions, k3dm_claude_compaction_pre_tokens_sum
 ```
+
+## Resolution
+
+- `3fce5b0b` (Luna): "Auto-compact threshold" is now "Auto-compact setting (configured)", with a description that it
+  may not take effect. New stat panel "Observed compaction point" (id 99) shows
+  `k3dm_claude_compaction_pre_tokens_sum{window="$window",trigger="auto"} / k3dm_claude_compactions{window="$window",trigger="auto"}`,
+  unit short, mapping NaN, null and no value to "No auto-compactions in window". The row's four stats are 6 wide.
+- E1: `agent_dispatch_dashboard.bats` 34/34; the new test fails on the pre-fix YAML (with 3 existing tests Luna updated
+  for the new id and widths). A mutant that appends `or k3dm_claude_auto_compact_tokens` to the observed expr turns it red.
+- Claude at land: resolved a CHANGELOG conflict; `test_dispatch_metrics.py` (outside the spec's Files) hard-codes the
+  number of `$window` expressions on the dashboard, 81 → 82; landed `--allow-out-of-scope` with both suites
+  (pytest 154 passed). The spec missed that second suite.
+- Hub Prometheus at filing (read-only, M5): observed point 168.8K (7d), 168.5K (1d), 168.5K (30d) against 200K configured.
