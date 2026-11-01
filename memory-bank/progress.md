@@ -11,6 +11,7 @@
 ## 2026-11-01 v1.43.14 opened
 
 - [ ] P1 verify-evidence DISPATCHED to Luna (spec corrected 90380e17). Then verify with an evidence-backed independent verifier and land.
+- [ ] Fleet-host plan: temperature added (pmset alert + macmon °C). Before dispatch: store a real macmon capture in the plan.
 - [x] Dev-node P2 scope widened to hub release targets (operator approval recorded 90380e17).
 
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
