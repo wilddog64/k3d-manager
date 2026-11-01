@@ -149,3 +149,11 @@ interface:
   - job dir files channel_id, thread_ts, response_url, delivery.jsonl
   - env SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
 ```
+
+## Live evidence (2026-11-01, job `cdff3cea`)
+
+`delivery.jsonl` on the M5: updates 1-5 `response_url` delivered; update 6 `bot_fallback` delivered with reason
+`delivery_rejected` (the 6th `response_url` post was refused at Slack's 5-post cap) and recorded thread_ts
+`1793551009.895759`; updates 7-8 `bot_thread` in that thread. The operator saw "two out of thread, the third one
+replied in a thread" (screenshot 521). This is the pre-fix behavior the webhook half fixes: the thread should start
+at update 1, not at update 6. Not a regression.
