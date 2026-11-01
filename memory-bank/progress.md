@@ -2193,3 +2193,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: relay channel_id fix 63be0e33 VERIFIED offline.
 - 2026-11-01: hub-secrets manifest fix fd25a55d VERIFIED offline.
 - 2026-11-01: hub secrets live on M5; gemini key dropped from hub manifest.
+- 2026-11-01: M5 ACG manual login done; auto-login email-field recurrence pending upstream.
