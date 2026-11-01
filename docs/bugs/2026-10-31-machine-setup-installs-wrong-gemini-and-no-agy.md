@@ -1,6 +1,6 @@
 # Bug: machine setup installs MacPaw's "Gemini" disk cleaner instead of the Gemini CLI, and never installs agy
 
-**Status:** OPEN
+**Status:** FIXED (87c8d685, 20c9bc74); live E2 pending on the M5
 **Priority:** P2
 **Severity:** medium — the hub's Slack AI analysis is unavailable ("agy: not-installed; gemini: not-installed"); workaround is a manual install and login on the hub
 **Approval:** operator, 2026-10-31 ("go ahead" to dispatch, after choosing the make machine-setup route over a manual install)
@@ -89,3 +89,18 @@ interface:
   - bin/k3dm-machine-setup (role hub/worker; scratch HOME; PATH; manifests under scripts/etc/machine/)
   - scripts/etc/machine/brew.hub.list, brew.worker.list
 ```
+
+## Resolution
+
+- `87c8d685` (Codex): the hub and worker manifests install `gemini-cli` and `cask:antigravity-cli`; setup reports
+  `ai:agy` / `ai:gemini` on the webhook LaunchAgent PATH without running either tool; the migration howto names the
+  one-time login.
+- `20c9bc74` (Claude, at land): a missing AI CLI goes through `record_failure` like every other missing item, so
+  `make machine-check` exits 1 on a hub without them. The complete-machine fixtures in `machine_setup.bats` and
+  `machine_setup_acceptance.bats` place both commands on the webhook PATH; the acceptance suite was outside the
+  spec's file list and was landed with `--allow-out-of-scope`. Bare `! grep` assertions became `run` + status checks.
+- E1: `machine_setup.bats` 74/74, `machine_setup_acceptance.bats` 46/46, `machine_secrets.bats` and `hub_new.bats`
+  green. A mutant that checks the caller's PATH fails the N1 test. Blind verifier: M1, M2, N1, N2 pass (red on the
+  mutant; pre-fix printed no `ai:` lines).
+- Note: the presence check reads `ok` straight after install. The Google login is separate; the Slack AI answer
+  (E2) is what proves it.
