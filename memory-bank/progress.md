@@ -2200,3 +2200,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: run-outcome P3 dispatched.
 - 2026-11-01: run-outcome P3 resumed for layout.
 - 2026-11-01: acg-up live on M5 OK (cdff3cea); 2 P3 gaps dispatched.
+- 2026-11-01: gap P2 bug filed (held behind labels P3); v1.43.15 plan 5 claude cost attribution filed.
