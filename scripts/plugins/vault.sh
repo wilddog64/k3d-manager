@@ -2005,7 +2005,10 @@ function configure_vault_app_auth_for_context() {
   fi
 
   local -a kctl=(kubectl)
-  [[ -n "${app_kubeconfig}" ]] && kctl=(kubectl --kubeconfig "${app_kubeconfig}")
+  case "${app_kubeconfig}" in
+    *:*) kctl=(env "KUBECONFIG=${app_kubeconfig}" kubectl) ;;
+    ?*) kctl=(kubectl --kubeconfig "${app_kubeconfig}") ;;
+  esac
 
   local cluster_name
   cluster_name="$("${kctl[@]}" config view --raw \
