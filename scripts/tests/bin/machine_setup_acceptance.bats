@@ -517,7 +517,7 @@ STUB
   complete_machine hub
   mkdir -p "$HOME_FX/src/gitrepo/personal/tax-returns/.git"
   ms --role hub
-  if grep -E '^git .*(checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore|commit|gc|branch -[dDmM])' "$CALLS"; then false; fi
+  if grep -E '^git .*[[:space:]](checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore|commit|gc|branch -[dDmM])([[:space:]]|$)' "$CALLS"; then false; fi
 }
 
 @test "N5: clone with a foreign remote is left alone and no mutation is attempted" {
@@ -529,7 +529,7 @@ case "\$*" in *get-url*|*remote.origin.url*) echo https://example.invalid/other.
 exit 0
 STUB
   ms --role hub
-  if grep -E '^git .*(checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore)' "$CALLS"; then false; fi
+  if grep -E '^git .*[[:space:]](checkout|reset|pull|clean|switch|merge|rebase|stash|fetch|restore)([[:space:]]|$)' "$CALLS"; then false; fi
   if grep -E "^git .*clone .* $HOME_FX/src/" "$CALLS"; then false; fi
 }
 
