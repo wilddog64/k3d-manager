@@ -1,5 +1,11 @@
 # Progress — compressed operational log
 
+## 2026-11-01 v1.43.13 release prep
+
+- Landed: pushgateway, vault list-kubeconfig, billable warning, run-outcome labels, cleanup env pin, webhook bot thread, machine-setup EC2 key, fast-gate skip `ce0f3f25`.
+- Docs audit applied `dbf62261`; deferrals recorded in `docs/roadmap.md`.
+- Remaining: appsets reapply/check, platform-ops, PR gates, PR.
+
 ## 2026-10-23 API status channel bug filed
 
 - [x] P2 tunnel E2 PASSED 18:58 PDT (agents → Hostinger host, store Ready, 20/20 synced). Hostinger ESO outage over.
