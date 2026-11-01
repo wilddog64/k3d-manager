@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P2
 **Severity:** medium — `/cluster-up aws` on the M5 hub fails before provisioning; workaround: create the key by hand on the M5
-**Approval:** operator, 2026-11-01 ("should each node has its own ssh key intead of copying over?" — yes, one key per node; hub-migration gaps are filed as found)
+**Approval:** operator, 2026-11-01 ("should each node has its own ssh key intead of copying over?" — yes, one key per node; hub-migration gaps are filed as found); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** `bin/k3dm-machine-setup` (hub role), `scripts/lib/foundation/scripts/lib/acg/acg.sh` (`acg_provision`, lines ~226-231; fix upstream in lib-foundation, then subtree-pull)
@@ -115,3 +115,12 @@ must_not:
   N4: a failed ssh-keygen derivation never leaves a k3d-manager-key.pub behind
   N5: create-stack is never called when the key pair is absent from the sandbox after import
 ```
+
+## Dispatch split (2026-11-01)
+
+- **This k3d-manager dispatch:** Fix step 1 and step 3 only (`bin/k3dm-machine-setup` key creation and
+  `--check`, `docs/howto/machine-setup.md`), proving M1, M2, N1 and N3 with E1. Do not edit
+  `scripts/lib/foundation/` — it is a subtree.
+- **lib-foundation:** Fix step 2, the recurrence additions, M3-M5, N2, N4 and N5. Dispatched upstream as
+  lib-foundation `docs/bugs/2026-11-01-acg-new-hub-ec2-key-import-and-extend-profile.md` (branch
+  `fix/acg-hub-ec2-key-and-extend-profile`), then subtree-pulled.

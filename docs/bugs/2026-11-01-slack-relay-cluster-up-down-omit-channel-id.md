@@ -4,7 +4,7 @@
 **Fix commit:** 63be0e33
 **Priority:** P2
 **Severity:** medium — every `/cluster-up` / `/cluster-down` update goes to `response_url` instead of a bot thread; Slack accepts at most five posts per `response_url`, so a long job's later updates (the failure analysis or the final result) are rejected and never shown
-**Approval:** operator, 2026-11-01 ("the cluster-up does not post result in a thread")
+**Approval:** operator, 2026-11-01 ("the cluster-up does not post result in a thread"); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** operator (Slack, job `ec9ce66c`), root cause by Claude
 **Affected:** `workers/slack-relay/index.js` (`/cluster-up` branch line ~405, `/cluster-down` line ~420)
@@ -111,10 +111,17 @@ message with the bot to `channel_id` first, write the returned `ts` to the job's
 `route: bot_thread`. Later posts then reply in that thread. If the bot post fails, keep the current `response_url`
 path. A job without `channel_id` behaves exactly as today.
 
+Also make the webhook's Slack API rejections visible: on the M5 (job `e7a0ecfb`) the 6th post went
+`route: bot_fallback`, `delivery_rejected`, but `~/Library/Logs/k3dm-webhook.log` has 0 `chat.postMessage` lines.
+The `render.py` logger (`get_logger(__name__)`) does not reach the webhook's log handler. Route it to the same
+handler, so `slack chat.postMessage rejected channel=... error=...` appears in the log (never the token).
+
 ### Files (webhook half)
 
 - `bin/k3dm-webhook`
 - `scripts/tests/bin/test_webhook_notify*.py` (or the existing `_notify_job` test file)
+- `scripts/lib/webhook/render.py`, `scripts/lib/webhook/` logging setup (only if needed to reach the handler)
+- `CHANGELOG.md`
 
 ### Acceptance (webhook half)
 
@@ -125,9 +132,10 @@ must:
 must_not:
   N2: a job without channel_id never posts with the bot to SLACK_CHANNEL_ID; it keeps the response_url route (paired control for M3)
   N3: when the first bot post fails, the message is still delivered via response_url
+  N4: a chat.postMessage rejection is never silent — the webhook log gets a line with the Slack error code and channel, and no token
 evidence:
   E3:
-    proves: [M3, M4, N2, N3]
+    proves: [M3, M4, N2, N3, N4]
     kind: offline
     intent: You will see pytest with a stubbed _post_slack_bot/_slack_post and a scratch JOB_DIR route the first post to the bot and the second into its thread, a channel-less job stay on response_url, and a failed bot post fall back (M3/M4 red on the pre-fix webhook).
     what: pytest on the notify tests

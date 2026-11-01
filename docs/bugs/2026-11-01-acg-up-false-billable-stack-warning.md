@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P3
 **Severity:** low — a false alarm that tells the operator to run `make down`; no stack exists
-**Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; found in job `87c78389`)
+**Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; found in job `87c78389`); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** `scripts/lib/providers/k3s-aws.sh` (`_provider_k3s_aws_mark_stack_created`, called before `acg_provision`), `bin/cluster-up` (cleanup warning, ~line 237)

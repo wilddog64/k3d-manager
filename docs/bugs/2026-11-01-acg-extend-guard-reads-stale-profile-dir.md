@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P2
 **Severity:** medium — on the M5 every sandbox extend fails (acg-up pre-flight and the 30-minute ACG watcher), so a sandbox dies at its first deadline; the M4 works only because a stale `profile/` dir from before October still exists there
-**Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; hub-migration gaps are filed as found)
+**Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; hub-migration gaps are filed as found); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** lib-foundation `scripts/lib/acg/playwright/acg_extend.js` (`AUTH_DIR`, `_isFirstRun`, line ~16/47/168), `acg_restart.js` (`AUTH_DIR`, line 29); k3d-manager's copy `scripts/playwright/acg_extend.js`. Fix upstream in lib-foundation, then subtree-pull.
@@ -73,3 +73,9 @@ interface:
   - node scripts/lib/acg/playwright/acg_restart.js
   - env PLAYWRIGHT_AUTH_DIR; CDP http://localhost:9222
 ```
+
+## Dispatch (2026-11-01)
+
+Fixed upstream only: lib-foundation `docs/bugs/2026-11-01-acg-new-hub-ec2-key-import-and-extend-profile.md`
+Part B (branch `fix/acg-hub-ec2-key-and-extend-profile`). k3d-manager's own `scripts/playwright/acg_extend.js`
+is handled after the subtree pull.
