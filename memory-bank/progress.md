@@ -11,6 +11,7 @@
 ## 2026-11-01 v1.43.14 opened
 
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
+- [x] M5 appsets-reapply + appsets-check on v1.43.14 (operator-reported; output not seen by Claude).
 
 ## 2026-10-23 API status channel bug filed
 
