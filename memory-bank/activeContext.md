@@ -1839,3 +1839,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Approved + dispatched to Codex from d6025afc (pushed): pre-push-gate P1, acceptance-copies, land-test-log, ask-docs-bug-count-truncation, ai-analysis-filter. Shared files: CHANGELOG.md (all), fast_gate.sh only in P1. Land one at a time, rebase the rest.
 - None of the 5 v1.43.13 plans executed yet; agent-instruction-files-refresh is first in line.
 - tty hang filed P2 (machine-setup-tty-test-hangs-push-gate), dispatch after P1 lands (fast_gate.sh overlap). hub-migration Slack bot P2 dispatched.
+- 2026-10-31: land queue (serial, push between): ldap-base64 → rotator-silent → tty-hang → AI-filter (6eec472d) → ask-docs → hub-migration (N1 mutation check first) → bug-count-stale-head (Luna running). Then mark FIXED with SHAs, pull M5 + restart webhook, live E2s. Operator: replace revoked Slack webhook.
