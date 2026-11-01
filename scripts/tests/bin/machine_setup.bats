@@ -1234,7 +1234,7 @@ SH
     'k3dm-slack-role-map|k3dm' 'k3dm-acg-pluralsight|username' 'k3dm-acg-pluralsight|password' \
     'k3d-manager-cloudflared-cert|cloudflared' 'k3d-manager-cloudflared-credentials|cloudflared' \
     'k3d-manager-signing|k3dm-cosign-key' 'k3d-manager-signing|k3dm-cosign-password' \
-    'k3dm-webhook-token-cloud-runner|k3dm' 'k3d-manager-slack-bot-token|cliang'; do
+    'k3dm-webhook-token-cloud-runner|k3dm'; do
     grep -Fq "$entry|" "$MACHINE_DIR/secrets.hub.list"
   done
   for account in redis/cart redis/orders-cache postgres/orders postgres/products postgres/payment payment/encryption payment/stripe payment/paypal rabbitmq/default minio/credentials ldap/admin keycloak/admin keycloak/clients github/pat; do

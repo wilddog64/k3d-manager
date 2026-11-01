@@ -347,11 +347,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-11-01 | [PR #155 review findings](docs/issues/2026-11-01-copilot-pr155-review-findings.md) | Copilot: a hub-manifest Keychain entry no code reads, with a hardcoded account |
 | 2026-10-29 | [PR #152 review findings](docs/issues/2026-10-29-copilot-pr152-review-findings.md) | Copilot: a second, unbracketed `## Unreleased` heading in CHANGELOG; CodeQL TLS 1.0/1.1 finding dismissed (the probe is deliberate) |
 | 2026-10-24 | [PR #149 review findings](docs/issues/2026-10-24-copilot-pr149-review-findings.md) | Copilot: agy section heading in the dispatch how-to was H1 |
 | 2026-10-13 | [Repeated CVE remediation marked applied](docs/issues/2026-10-13-repeated-cve-remediation-applied-history-investigation.md) | Investigation superseded by a bug doc; CVE remediation events repeat and read as applied |
 | 2026-10-11 | [PR #139 review findings](docs/issues/2026-10-11-copilot-pr139-review-findings.md) | Copilot flagged an `rg` call in a new test suite, which exited 127 on the CI runner (now `grep`). CI also failed two pre-commit priority tests: the lint job's `K3DM_ENABLE_AI=1` sent the hook into AI lint. Both reproduced in `ubuntu:24.04`, and the test now pins the switch |
-| 2026-10-09 | [PR #138 review findings](docs/issues/2026-10-09-copilot-pr138-review-findings.md) | Copilot found nothing; CI lint caught `bin/k3dm-webhook` calling an undefined `REPO_ROOT` in the test-metrics fallback publisher, which a broad `except` had hidden as a log warning. Fixed with a direct test that fails on the old code; a CodeQL ambiguous-regex alert in a test is left to the operator (the edit trips the assertion audit) |
 [All issues →](docs/issues/)
 
 ---
