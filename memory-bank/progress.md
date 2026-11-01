@@ -12,6 +12,7 @@
 
 - [ ] P1 verify-evidence DISPATCHED to Luna (spec corrected 90380e17). Then verify with an evidence-backed independent verifier and land.
 - [ ] Fleet-host plan: temperature added (pmset alert + macmon °C). macmon via lib-foundation `_install_macmon` (v0.5.5 spec 9758f5f). Before dispatch: v0.5.5 subtree pull, then a real macmon capture.
+- [ ] lib-foundation `_install_macmon` DISPATCHED to Luna (slug lib-foundation-v0.5.5-install-macmon). Then verify, land on feat/install-macmon, open a lib PR, and include it in v0.5.5.
 - [x] Dev-node P2 scope widened to hub release targets (operator approval recorded 90380e17).
 
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
