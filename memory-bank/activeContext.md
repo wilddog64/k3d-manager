@@ -129,6 +129,7 @@ If a local-server suite fails only because the sandbox cannot bind localhost, re
 
 ## Open / pending
 
+- 2026-11-01 PR #155 OPEN (v1.43.13): M5 appsets-reapply 5/5+8/8, appsets-check 31 refs OK, platform-ops OK. Copilot requested; CI running. Pending: bot-thread live /cluster-up, Copilot fixes, enforce_admins DELETE, then /post-merge.
 - 2026-11-01 HANDOFF (v1.43.13, quota ~5%): all fixes landed+verified incl. fast-gate `ce0f3f25`; release docs + CHANGELOG [1.43.13] committed `dbf62261` (pushed). Deferred to v1.43.14: P2 resume-reason, P3 ACG node deps (Luna run still open), lib-foundation PR #73 merge/tag v0.5.5/subtree pull (hub EC2 key lib half). Grace-window Grafana metric queued as v1.43.16 candidate. NEXT: `make appsets-reapply` + `make appsets-check`; operator `make platform-ops` on M5 tmux; M5 pull + restart-webhook, bot-thread live check; CI green, Gemini smoke, scope check, /create-pr, Copilot.
 - 2026-10-30: aerospace tap fix be02d2de; Part 2 spec 8d9f3016; Part 2 DISPATCHED to Luna (slug machine-secrets-pull, gpt-6-luna). Hold operator make commands until reviewed + landed. The 18 machine_setup_acceptance failures were the stray `-e` socket in the repo root (cp -R cannot copy it), not the code: the socket belongs to the operator's live `dtach -A -e zsh` (PIDs 50842/50843, since 10-26 15:19). Clean worktree: 85/85. Ask the operator before removing it.
 

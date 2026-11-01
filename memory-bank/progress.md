@@ -4,7 +4,7 @@
 
 - Landed: pushgateway, vault list-kubeconfig, billable warning, run-outcome labels, cleanup env pin, webhook bot thread, machine-setup EC2 key, fast-gate skip `ce0f3f25`.
 - Docs audit applied `dbf62261`; deferrals recorded in `docs/roadmap.md`.
-- Remaining: appsets reapply/check, platform-ops, PR gates, PR.
+- M5 appsets reapply/check + platform-ops done; PR #155 opened (CI + Copilot pending).
 
 ## 2026-10-23 API status channel bug filed
 
