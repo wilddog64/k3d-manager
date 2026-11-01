@@ -92,3 +92,22 @@ def test_success_returns_timestamp_without_warning(monkeypatch, caplog):
         assert _post(monkeypatch, {"ok": True, "ts": "1.2"}) == "1.2"
 
     assert not caplog.records
+
+
+def test_rejection_reaches_webhook_handler_without_token(monkeypatch):
+    import io
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    webhook_logger = logging.getLogger("webhook")
+    assert render.logger is webhook_logger
+    monkeypatch.setattr(render, "SLACK_BOT_TOKEN", "xoxb-TESTTOKEN")
+    monkeypatch.setattr(render.urllib.request, "urlopen", lambda *_a, **_kw: _Response(
+        {"ok": False, "error": "not_in_channel"}))
+    webhook_logger.addHandler(handler)
+    try:
+        assert render._post_slack_bot("message", channel_id=CHANNEL) == ""
+    finally:
+        webhook_logger.removeHandler(handler)
+    assert "chat.postMessage rejected channel=C123TEST error=not_in_channel" in stream.getvalue()
+    assert "xoxb-TESTTOKEN" not in stream.getvalue()

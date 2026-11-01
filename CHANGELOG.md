@@ -10,6 +10,8 @@
 
 - Split unknown dispatch run outcomes into unrecorded, superseded, open and stale ledger facts without changing coverage.
 
+- Start Slack job threads with the bot when a channel is known, and log Slack API rejections through the webhook logger.
+
 - Include hub-read credentials in machine setup and report a missing or empty Slack role map in webhook diagnostics.
 
 - Preserve Slack channel and thread context for cluster-up, cluster-down and cluster-resume job updates.
