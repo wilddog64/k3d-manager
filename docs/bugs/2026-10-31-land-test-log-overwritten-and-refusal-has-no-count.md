@@ -1,6 +1,6 @@
 # Bug: a retried land overwrites the failed test log, and a refused run shows no test count
 
-**Status:** OPEN
+**Status:** FIXED — `e3bfb6a3` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("go ahead to file two gaps as a separate small bug for v1.43.13"); dispatch go: operator, 2026-10-31 ("go ahead to dispatch all approved P3 bugs")
 **Filed:** 2026-10-31

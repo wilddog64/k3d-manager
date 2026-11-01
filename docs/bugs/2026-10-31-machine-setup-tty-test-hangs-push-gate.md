@@ -1,6 +1,6 @@
 # Bug: a machine_setup.bats pseudo-terminal test can hang for 43 minutes, and the push gate waits with it
 
-**Status:** OPEN
+**Status:** FIXED — `29e6c3af` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P2
 **Severity:** medium — an intermittent hang stalls every push and land that runs the suite; nothing reports it
 **Approval:** operator, 2026-10-31 ("go ahead to dispatch these two"), in reply to Claude's proposal to file it as P2

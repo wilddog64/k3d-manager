@@ -1,6 +1,6 @@
 # Bug: the LDAP rotator decodes the Slack URL with `base64 --decode`, which BusyBox rejects, so it never posts
 
-**Status:** OPEN
+**Status:** FIXED — `0287097b` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P3
 **Severity:** low — LDAP passwords rotate; the rotation notice is never sent
 **Approval:** operator, 2026-10-31 ("got ahead to file rotator bugs and dispatch to Luna")

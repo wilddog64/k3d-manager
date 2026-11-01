@@ -1,6 +1,6 @@
 # Bug: machine_setup_acceptance.bats copies the whole working tree, so it takes 7 minutes in the main checkout
 
-**Status:** OPEN
+**Status:** FIXED — `72cae3f0` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P3
 **Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31

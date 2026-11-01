@@ -1,6 +1,6 @@
 # Bug: an ask-docs bug count for a named release is cut by the reply limit, losing the "more fixed" line and telling the operator to name a release they already named
 
-**Status:** OPEN
+**Status:** FIXED — `faba1f4b` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P3
 **Severity:** low — the count line is correct; some links are lost and the closing hint is wrong
 **Approval:** operator, 2026-10-31 ("go ahead to file a P3 for what you found")

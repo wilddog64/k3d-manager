@@ -1,6 +1,6 @@
 # Bug: a rotator whose Slack notice fails says nothing, so a revoked webhook hides every rotation
 
-**Status:** OPEN
+**Status:** FIXED — `a5ffefb0` (Codex; Claude review, independent verifier PASS; restore trap now disarmed before the notice); live check pending
 **Priority:** P3
 **Severity:** low — passwords rotate correctly; the operator is not told, and nothing shows the notice failed
 **Approval:** operator, 2026-10-31 ("got ahead to file rotator bugs and dispatch to Luna")

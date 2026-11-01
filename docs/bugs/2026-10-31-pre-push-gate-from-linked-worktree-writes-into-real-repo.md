@@ -1,6 +1,6 @@
 # Bug: the pre-push fast gate, run from a linked worktree, lets test fixtures write into the real repository
 
-**Status:** OPEN
+**Status:** FIXED — `9942c413` (Codex; Claude review, independent verifier PASS); live check pending
 **Priority:** P1
 **Approval:** operator, 2026-10-31 ("approve P1 and P3 bugs then you can dispatch them")
 **Filed:** 2026-10-31

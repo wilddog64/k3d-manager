@@ -1,6 +1,6 @@
 # Bug: the AI-analysis filter withholds whole prose lines, so an alert can arrive with no diagnosis at all
 
-**Status:** OPEN
+**Status:** FIXED — `7b961caf` (Codex; Claude review, independent verifier PASS; a tool name as the first word after a label withholds the line whole, by design for N4); live check pending
 **Priority:** P3
 **Severity:** low — no unsafe text reaches Slack; the alert's advice is lost, and the operator reads the log instead
 **Approval:** operator, 2026-10-31 ("go ahead"), in reply to Claude's proposal to file it
