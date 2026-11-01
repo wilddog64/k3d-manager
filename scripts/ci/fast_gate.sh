@@ -66,11 +66,22 @@ if [[ "${1:-}" == --worker ]]; then
   worker "$@"
   exit
 fi
-cd "$(git rev-parse --show-toplevel)"
+tree=$(git rev-parse --show-toplevel)
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_PREFIX
+cd "$tree"
 start=$SECONDS
 failed=0
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+snapshot_repo() {
+  local target=$1
+  git config --local --get-all core.bare > "$target.bare" || :
+  git config --local --get-regexp '^user\.' > "$target.user" || :
+  git for-each-ref --format='%(refname)' refs/heads > "$target.branches"
+  git worktree list --porcelain | sed -n 's/^worktree //p' > "$target.worktrees"
+}
+snapshot_repo "$work/before"
 branch=$(git symbolic-ref --quiet --short HEAD || true)
 base=${1:-}
 if [[ -z "$base" ]]; then
@@ -151,6 +162,14 @@ fi
 if [[ -s "$work/priority" || -s "$work/queue" ]]; then
   cat "$work/priority" "$work/queue" | xargs -0 -n 3 -P "$jobs" /bin/bash scripts/ci/fast_gate.sh --worker "$work" || failed=1
 fi
+snapshot_repo "$work/after"
+for part in bare user branches worktrees; do
+  if ! cmp -s "$work/before.$part" "$work/after.$part"; then
+    printf 'FAIL repository %s changed during fast gate\n' "$part"
+    diff -u "$work/before.$part" "$work/after.$part" || :
+    failed=1
+  fi
+done
 slowest=-1
 slowest_label="none"
 for (( i=1; i<=index; i++ )); do

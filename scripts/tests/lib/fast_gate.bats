@@ -178,3 +178,59 @@ BATS
   [ "$status" -eq 0 ]
   [[ "$output" == *'PASS scripts/tests/bin/ask_bash_scope.bats'* && "$output" == *'PASS scripts/tests/bin/machine_setup_acceptance.bats'* ]]
 }
+
+@test "fast gate: linked worktree push isolates fixture git and guard detects repository changes" {
+  mkdir -p "$fixture/.githooks"
+  cp "$root/.githooks/pre-push" "$fixture/.githooks/pre-push"
+  git init --bare -q "$BATS_TEST_TMPDIR/remote.git"
+  git -C "$fixture" remote add origin "$BATS_TEST_TMPDIR/remote.git"
+  git -C "$fixture" config core.bare false
+  cat > "$fixture/scripts/tests/lib/static.bats" <<'BATS'
+#!/usr/bin/env bats
+@test "fixture git environment" {
+  [ -z "${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_INDEX_FILE+x}${GIT_COMMON_DIR+x}${GIT_OBJECT_DIRECTORY+x}${GIT_ALTERNATE_OBJECT_DIRECTORIES+x}${GIT_NAMESPACE+x}${GIT_PREFIX+x}" ]
+  mkdir "$BATS_TEST_TMPDIR/probe"
+  git -C "$BATS_TEST_TMPDIR/probe" init -q
+  (cd "$BATS_TEST_TMPDIR/probe" && git config core.bare true)
+  [ "$(git -C "$BATS_TEST_TMPDIR/probe" config core.bare)" = true ]
+}
+BATS
+  git -C "$fixture" add .
+  git -C "$fixture" commit -qm probe
+  git -C "$fixture" -c core.hooksPath=/dev/null push -q origin HEAD:refs/heads/topic
+  git -C "$fixture" config core.hooksPath .githooks
+  git -C "$fixture" worktree add -qb linked "$BATS_TEST_TMPDIR/linked"
+  [ "$(cd "$(git -C "$BATS_TEST_TMPDIR/linked" rev-parse --git-common-dir)" && pwd -P)" = "$(cd "$fixture/.git" && pwd -P)" ]
+  git -C "$fixture" config --local --list > "$BATS_TEST_TMPDIR/config.before"
+  git -C "$fixture" branch --list > "$BATS_TEST_TMPDIR/branches.before"
+  git -C "$fixture" worktree list --porcelain > "$BATS_TEST_TMPDIR/worktrees.before"
+  printf 'change\n' >> "$BATS_TEST_TMPDIR/linked/thing.txt"
+  git -C "$BATS_TEST_TMPDIR/linked" commit -qam change
+  # The commit advances the linked branch; capture the state immediately before push.
+  git -C "$fixture" branch --list > "$BATS_TEST_TMPDIR/branches.before"
+  git -C "$fixture" worktree list --porcelain > "$BATS_TEST_TMPDIR/worktrees.before"
+  run git -C "$BATS_TEST_TMPDIR/linked" push origin HEAD:refs/heads/topic
+  [ "$status" -eq 0 ]; [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
+  [ "$(git -C "$fixture" config core.bare)" = false ]
+  git -C "$fixture" config --local --list > "$BATS_TEST_TMPDIR/config.after"
+  git -C "$fixture" branch --list > "$BATS_TEST_TMPDIR/branches.after"
+  git -C "$fixture" worktree list --porcelain > "$BATS_TEST_TMPDIR/worktrees.after"
+  cmp "$BATS_TEST_TMPDIR/config.before" "$BATS_TEST_TMPDIR/config.after"
+  cmp "$BATS_TEST_TMPDIR/branches.before" "$BATS_TEST_TMPDIR/branches.after"
+  cmp "$BATS_TEST_TMPDIR/worktrees.before" "$BATS_TEST_TMPDIR/worktrees.after"
+  # Control: the hook's inherited worktree gitdir redirects an unqualified write.
+  mkdir "$BATS_TEST_TMPDIR/control"
+  git -C "$BATS_TEST_TMPDIR/control" init -q
+  local gitdir
+  gitdir=$(git -C "$BATS_TEST_TMPDIR/linked" rev-parse --absolute-git-dir)
+  (cd "$BATS_TEST_TMPDIR/control" && GIT_DIR="$gitdir" git config core.bare true)
+  [ "$(git --git-dir="$fixture/.git" config core.bare)" = true ]
+  git --git-dir="$fixture/.git" config core.bare false
+  # A suite that explicitly targets the pushed repository must trip the guard.
+  cat > "$BATS_TEST_TMPDIR/linked/scripts/tests/lib/static.bats" <<BATS
+#!/usr/bin/env bats
+@test "mutate repository" { git -C "$fixture" config user.name Intruder; }
+BATS
+  run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$BATS_TEST_TMPDIR/linked" "$base"
+  [ "$status" -ne 0 ]; [[ "$output" == *'FAIL repository user changed'* ]]
+}
