@@ -87,3 +87,20 @@ interface:
   - $XDG_CONFIG_HOME/k3d-manager/machine-role
   - env K3DM_ALLOW_LOCAL_HUB
 ```
+
+## Recurrence — 2026-11-01 10:18 PST (hub release targets from the M4)
+
+The operator ran the release steps (`make restart-webhook`, `make appsets-reapply`, `make appsets-check`,
+`make platform-ops`) in an M4 shell (`cliang@m4-air`, checkout `k3d-manager-v1.43.13`, context `k3d-k3d-cluster`).
+Every step went to the retired hub and failed harmlessly because it is stopped:
+
+- `appsets-reapply`: `Preparing ApplicationSets (branch k3d-manager-v1.43.13 ...)`, then `0/5 hub ApplicationSet(s)`,
+  `dial tcp 127.0.0.1:55730: connect: connection refused`.
+- `appsets-check`: `Could not read Applications from k3d-k3d-cluster/cicd`.
+- `platform-ops`: same refused connection on the namespace apply.
+- `restart-webhook`: `Could not find service "com.k3d-manager.cloud-bridge"` (cloud-bridge is not loaded on the M4).
+
+The root cause is the same: nothing records which machine is the hub, so hub-mutating targets run anywhere. If the
+retired hub had been running, `appsets-reapply` would have pinned every values ref to `k3d-manager-v1.43.13` on a
+second ArgoCD. Proposed scope extension, pending the operator's decision: the same `machine-role` gate also guards
+`appsets-reapply`, `platform-ops` and `restart-webhook`. The Acceptance block above is unchanged until it is approved.

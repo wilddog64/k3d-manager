@@ -11,7 +11,7 @@
 ## 2026-11-01 v1.43.14 opened
 
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
-- [ ] M5 appsets-reapply + appsets-check on v1.43.14. The earlier "done" report was wrong: the operator's appsets-check (pasted 2026-11-01) failed, with all Applications still on `k3d-manager-v1.43.13`. Rerun the reapply, then the check.
+- [ ] M5 appsets-reapply + appsets-check on v1.43.14. The earlier "done" report was wrong: the operator's appsets-check (pasted 2026-11-01) failed, with all Applications still on `k3d-manager-v1.43.13`. Rerun the reapply, then the check. The 10:18 PST rerun went to the M4 by mistake (retired hub, all refused, no change). It has to run on the M5.
 
 ## 2026-10-23 API status channel bug filed
 
