@@ -40,6 +40,8 @@ window.
 
 The **Agent Dispatch** dashboard covers dispatch throughput, active runs, per-spec delivery and verification, plus run outcomes. Its **Window** selector includes time windows and ledger releases from v1.43.0 onward. Use the **Agents** link to move between the three agent dashboards while keeping the selected time range and window.
 
+**Run outcomes** gives each Codex run one of nine labels: `accepted` (landed with a matching tree and passing tests), `progress` (a progress verdict), `rework` (tests refused before a later run), `failed` (tests refused, nonzero exit, or abandoned), `unrecorded` (the land lacks a tree or test result), `superseded` (a later run followed this exit), `open` (no land or abandon, last event newer than seven days), `stale` (the same, seven days or older) and `unknown` (nothing else applies). **Run outcome coverage** is the share of runs with an evidenced verdict; `unrecorded`, `superseded`, `open`, `stale` and `unknown` are not covered.
+
 In a release window, **Release span** measures calendar time from the release's first dispatch to its PR merge, or to its latest land while the release is unmerged; its `end` label is `merge` or `last_land` accordingly. **Active time** unions each landed spec's first-start-to-last-land interval, so overlapping work counts once. Both panels show no data for time windows, and **Time to land** is the mean per spec.
 
 Agent-neutral task token totals include Codex's cumulative `codex_exit.tokens` and the sum of agy's per-run `agent_exit.usage.total_tokens`; agent runtime and run counts include exits from both agents.

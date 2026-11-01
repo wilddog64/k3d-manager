@@ -1,6 +1,7 @@
 # Bug: "Run outcomes" labels 199 runs `unknown` although the ledger says why each has no verdict
 
-**Status:** OPEN
+**Status:** FIXED — `9146f9f7` (Codex; Claude review, independent verify); E2 (live) pending
+**Fix commit:** 9146f9f7
 **Priority:** P3
 **Severity:** low — the bar gauge and the 35.8% coverage read as "two thirds of runs went nowhere"; the counts are right but one label hides three different reasons
 **Approval:** operator, 2026-11-01 ("it possible a good idea not to label everything as unknown")
@@ -94,3 +95,10 @@ interface:
   - ledger.jsonl under K3DM_WORKTREE_ROOT
   - Grafana /d/k3dm-agent-dispatch
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `9146f9f7` through `make codex-land`; the ledger records `land` and `verify` events for slug `2026-11-01-dispatch-run-outcome-unknown-lumps-missing-evidence`.
+- Offline evidence: `/opt/homebrew/bin/python3 -m pytest -q scripts/tests/bin/test_dispatch_metrics.py && bats scripts/tests/plugins/agent_dispatch_dashboard.bats`: rc 0; fast gate passed. Independent black-box verifier (Sonnet, tests written from the Acceptance block only): PASS; M1-M4 red on pre-fix code, M5/N4 layout ok, N3 61 metric signatures identical.
+- Errors seen: a CHANGELOG rebase conflict, resolved by keeping both entries.
+- E2 (live) pending: after `make platform-ops` and an exporter run, Run outcomes shows the nine labels.

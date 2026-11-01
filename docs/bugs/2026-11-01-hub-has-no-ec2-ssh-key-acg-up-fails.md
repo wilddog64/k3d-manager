@@ -1,6 +1,6 @@
 # Bug: acg-up on the new hub fails at once because no EC2 SSH key exists, and machine-setup never creates one
 
-**Status:** OPEN
+**Status:** OPEN — machine-setup half `08c94b0f` + `15549a06` landed and verified (Codex task `hub-machine-setup-ec2-ssh-key`); `acg_provision` half waits for lib-foundation PR #73, tag v0.5.5 and the subtree pull; E3 (live) pending
 **Priority:** P2
 **Severity:** medium — `/cluster-up aws` on the M5 hub fails before provisioning; workaround: create the key by hand on the M5
 **Approval:** operator, 2026-11-01 ("should each node has its own ssh key intead of copying over?" — yes, one key per node; hub-migration gaps are filed as found); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")

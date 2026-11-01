@@ -1,6 +1,7 @@
 # Bug: acg-up skips app-cluster Vault auth when `KUBECONFIG` lists several files
 
-**Status:** OPEN
+**Status:** FIXED — `10381790` (Codex; Claude review, independent verify); E2 (live) pending
+**Fix commit:** 10381790
 **Priority:** P3
 **Severity:** low — `configure_vault_app_auth_for_context` warns and returns 0, so the app cluster gets no Vault Kubernetes auth role; ESO still syncs through the vault-token ClusterSecretStore (all 10 ExternalSecrets `True` after job `cdff3cea`)
 **Approval:** operator, 2026-11-01 ("let's get the reminding items complete so we can create-pr"; found in the session's acg-up live run)
@@ -65,3 +66,10 @@ interface:
   - configure_vault_app_auth_for_context <context> [kubeconfig]
   - env KUBECONFIG, APP_VAULT_AUTH_REQUIRED
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `10381790` through `make codex-land`; the ledger records `land` and `verify` events for slug `2026-11-01-vault-app-auth-skipped-when-kubeconfig-is-a-list`.
+- Offline evidence: worker bats (ok 27-29) and the land test passed (rc 0); fast gate passed. Independent black-box verifier (Sonnet, tests written from the Acceptance block only): PASS; M1/N1 red on pre-fix code.
+- Errors seen: the worker's version failed the pre-commit `_agent_audit` if-count threshold; Claude rewrote the selection as a `case` and both test sets still passed.
+- E2 (live) pending: the next acg-up shows `configure_vault_app_auth_for_context` create the app-cluster role.

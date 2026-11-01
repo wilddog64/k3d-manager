@@ -17,6 +17,9 @@ Password rotation is automatically deployed when LDAP is enabled with Vault:
 ./scripts/k3d-manager deploy_ldap --enable-vault
 ```
 
+`make platform-ops` also reapplies the rotator on the hub when the `identity` namespace exists, unless
+`LDAP_ROTATOR_ENABLED=0`; see [Rotate a service credential](rotate-service-credentials.md).
+
 ## Configuration
 
 ### Environment Variables

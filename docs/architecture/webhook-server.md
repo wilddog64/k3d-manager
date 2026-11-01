@@ -277,7 +277,9 @@ authoritative target list is `MAKE_TARGETS`; `/k3dm help` renders the role-filte
 Top-level jobs, cleanup, status, diagnostics, and agent replies preserve the source Slack
 thread and channel when one is supplied. The renderer records thread timestamps in the job
 directory, fetches bounded thread context for agent questions, and falls back to the
-response URL when a bot thread cannot be used. Relayed slash commands are still subject to
+response URL when a bot thread cannot be used. A job that has a channel but no thread starts
+one: its first update is a bot post to the channel, and the returned `ts` becomes the job's
+`thread_ts`. Relayed slash commands are still subject to
 the mapped caller role, including commands stamped by the Worker.
 
 The `cloud-runner` credential is a capability set for remote e2e and the AWS-bound cluster

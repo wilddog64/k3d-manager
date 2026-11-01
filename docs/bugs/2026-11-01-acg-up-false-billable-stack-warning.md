@@ -1,6 +1,7 @@
 # Bug: acg-up warns a CloudFormation stack is "still running — billable" when the run failed before creating it
 
-**Status:** OPEN
+**Status:** VERIFIED — `45c0f97e` (Codex; Claude review, independent verify)
+**Fix commit:** 45c0f97e
 **Priority:** P3
 **Severity:** low — a false alarm that tells the operator to run `make down`; no stack exists
 **Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; found in job `87c78389`); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
@@ -61,3 +62,9 @@ interface:
   - ${_ACG_STATE_DIR}/run/cf-stack-created
   - aws cloudformation describe-stacks
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `45c0f97e` through `make codex-land`; the ledger records `land` and `verify` events for slug `2026-11-01-acg-up-false-billable-stack-warning`.
+- Offline evidence: land test `bats scripts/tests/bin/cluster_up.bats` passed, 70/70 (rc 0), and the fast gate passed. Independent black-box verifier (Sonnet, tests written from the Acceptance block only): PASS, 7/7 on the fix; N1 red on pre-fix code.
+- Errors seen: an out-of-scope `docs/issues/` note from the worker (sandbox limits only) was dropped before landing; a CHANGELOG rebase conflict was resolved by keeping both entries.

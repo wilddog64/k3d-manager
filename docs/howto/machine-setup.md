@@ -36,7 +36,7 @@ If SSH is unavailable, an item needs GUI approval, or you prefer a file, run `ma
 
 iCloud does not sync these credentials: `security add-generic-password` writes to each Mac's local file-based login Keychain. When setup later prompts to create missing secrets, answer **N** for secrets being copied; the transfer command copies existing values without rotating tokens or changing their live consumers.
 
-The script checks Keychain **presence only**; it never reads values. Missing credentials are re-entered or rotated on the new Mac, never copied from another Mac. Without a TTY, prompts are skipped and the report remains missing. Sign in to Claude (`/login`), Codex (`codex login`), Gemini/agy, and GitHub (`gh auth login`) at the terminal.
+The script checks Keychain **presence only**; it never reads values. It reports `keychain:login` as missing when the login Keychain is locked in the current session (for example over SSH), because later reads would fail; run setup from a local Terminal. Missing credentials are re-entered or rotated on the new Mac, never copied from another Mac. Without a TTY, prompts are skipped and the report remains missing. Sign in to Claude (`/login`), Codex (`codex login`), agy (Gemini is an optional fallback), and GitHub (`gh auth login`) at the terminal.
 
 SSH and cosign private keys are not copied or read by machine setup. Transfer/recreate them using the operator's approved secure process, then verify their file names and permissions manually. Keep the Bitbucket SSH key available before setting up Bitbucket repositories. Existing checkouts are left untouched; unavailable branches and inaccessible remotes are reported as skipped.
 

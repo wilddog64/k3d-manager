@@ -1,6 +1,7 @@
 # Bug: `k3dm_cleanup.bats` port-marker test fails under `codex-dispatch land` because it inherits `K3DM_PORT_CACHE_DIR`
 
-**Status:** OPEN
+**Status:** VERIFIED — `fcfa5623` (Codex; Claude review, independent verify)
+**Fix commit:** fcfa5623
 **Priority:** P3
 **Severity:** low — test-only; it refuses any land whose fast gate selects `k3dm_cleanup.bats`, with no defect in the task under land
 **Approval:** operator, 2026-11-01 ("go ahead to dispatch them according (parallel if possible)"; found while landing)
@@ -56,3 +57,9 @@ interface:
   - bin/k3dm-cleanup (env HOME, K3DM_PORT_CACHE_DIR, K3DM_PORT_RETENTION_DAYS)
   - scripts/tests/bin/k3dm_cleanup.bats
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `fcfa5623` through `make codex-land`; the ledger records `land` and `verify` events for slug `2026-11-01-cleanup-test-inherits-port-cache-dir`.
+- Offline evidence: `bats scripts/tests/bin/k3dm_cleanup.bats`: rc 0, 12/12 with `K3DM_PORT_CACHE_DIR` exported to an unrelated dir (whose old marker survived) and 12/12 with it unset; the pre-fix test is `not ok` with the variable set. `bin/` unchanged. Claude verified from the Acceptance block.
+- Errors seen: none.

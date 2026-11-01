@@ -478,6 +478,8 @@ On 2026-11-01 Claude split the release (operator: "we can split the plans out"):
 
 Plans moved from v1.43.13 on 2026-11-01. Branch `k3d-manager-v1.43.14`, cut from `main` after v1.43.13 merges.
 
+Bug work carried from v1.43.13 (Claude, 2026-11-01, to ship v1.43.13 the same day; bugs do not count toward the plan cap): the P2 [resume reason](bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md), the P3 [machine-setup ACG node deps](bugs/2026-11-01-machine-setup-skips-acg-node-deps-and-chromium.md), and the lib-foundation half of the [new-hub EC2 key and extend profile](bugs/2026-11-01-acg-new-hub-ec2-key-import-and-extend-profile.md) fix (`6706f64`, lib-foundation PR #73: merge, tag v0.5.5, subtree pull).
+
 **v1.43.14 plan 1:** [`control-node-role`](plans/v1.43.14-control-node-role.md) (operator, 2026-10-30): a `control`
 machine role for a Mac that develops k3d-manager and runs hub work over ssh, with no OrbStack or hub agents. The M2 moves
 to it so the operator can travel with it. Open decisions D1 (reaching the hub away from home) and D2 (the M2 e2e runner while away).
@@ -506,6 +508,10 @@ Split from v1.43.13 on 2026-10-31 by Claude; moved to v1.43.15 on 2026-11-01 (be
 **v1.43.15 plan 4:** [`cost-attribution-coverage`](plans/v1.43.15-cost-attribution-coverage.md) (operator, 2026-11-01): the agent-cost dashboard's "Ledger coverage 36.3%" counts sessions, so 200 guardian approval reviews drag it down, and "Outside ledger $76.77" lumps the operator's own interactive Codex (60% of 30d cost) with real ledger gaps ($0.48). Every Codex session gets one category from `session_meta`, guardian reviews are charged to their parent via `parent_thread_id`, unpriced `codex-auto-review` tokens are shown instead of $0, and coverage becomes dispatch cost / agent-run cost (~65% 30d, ~99.8% 7d).
 
 **v1.43.15 plan 5:** [`claude-cost-task-attribution`](plans/v1.43.15-claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`.
+
+### Patch release — v1.43.16 (queued, no specs yet)
+
+**Candidate plan:** `claude-quota-grace-window` (operator, 2026-11-01: "usually we may still be able to run 10 ~ 30 mins even reach 100% weekly quota base on the last couple releases. if you can capture that metrics in grafana dashboard that would be very helpful"). Record when the weekly Claude quota reached 100% and when the session was actually cut off, and show the grace window per release on a Grafana dashboard, so release-day planning can count on a measured margin rather than a guess. Placed here because v1.43.14 and v1.43.15 are both at the 5-plan cap. The spec still needs a source for the quota-reached and cut-off timestamps.
 
 ### Candidate milestone — v1.44.0
 

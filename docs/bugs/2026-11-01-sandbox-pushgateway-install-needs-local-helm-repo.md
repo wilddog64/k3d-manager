@@ -1,6 +1,7 @@
 # Bug: acg-up cannot install the sandbox Pushgateway on a hub without the `prometheus-community` Helm repo
 
-**Status:** OPEN
+**Status:** FIXED — `2a2a43c9` (Codex; Claude review, independent verify); E2 (live) pending
+**Fix commit:** 2a2a43c9
 **Priority:** P3
 **Severity:** low — deployment metrics from the sandbox are disabled; the run completes
 **Approval:** operator, 2026-11-01 (hub-migration gaps are filed as found)
@@ -61,3 +62,10 @@ interface:
   - _deploy_pushgateway_acg [context]
   - helm on PATH
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `2a2a43c9` through `make codex-land`; the ledger records `land` and `verify` events for slug `2026-11-01-sandbox-pushgateway-install-needs-local-helm-repo`.
+- Offline evidence: land test on `scripts/tests/plugins/observability_k3dm_tests_rules.bats` passed (rc 0), landed with `--allow-out-of-scope` (that suite is the one the spec names as covering the install). Independent black-box verifier (Sonnet, tests written from the Acceptance block only): PASS; M1/M2 red on pre-fix code, N1 invariant.
+- Errors seen: none.
+- E2 (live) pending: the next sandbox `make up` shows the Pushgateway install succeed on the M5 hub.

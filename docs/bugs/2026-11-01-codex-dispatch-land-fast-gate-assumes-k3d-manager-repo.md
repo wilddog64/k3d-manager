@@ -1,6 +1,6 @@
 # Bug: `codex-dispatch land` fast gate runs `scripts/ci/fast_gate.sh`, which a cross-repo task (lib-foundation) does not have
 
-**Status:** OPEN
+**Status:** VERIFIED — fixed in `ce0f3f25`
 **Priority:** P3
 **Severity:** low — a lib-foundation land always fails after its tests pass; workaround `K3DM_SKIP_FAST_GATE=1`
 **Approval:** operator, 2026-11-01 ("go ahead to dispatch them according (parallel if possible)"; found while landing)
@@ -57,3 +57,9 @@ interface:
   - bin/k3dm-codex-dispatch land --slug S --test CMD
   - ledger.jsonl under K3DM_WORKTREE_ROOT
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Landed as `ce0f3f25`; land test `bats scripts/tests/bin/codex_dispatch.bats` passed (rc 0).
+- Independent black-box verifier (Sonnet, tests from the Acceptance block only): PASS. M1 and N1 red on the pre-fix tree (`env: 'scripts/ci/fast_gate.sh': No such file or directory`), green on the fix; M2 and N2 green on both (invariants).
+- Errors seen: the verifier's `cd` failed under the zsh smartcd hook and briefly created an untracked `post/` directory in the repo, which it removed (`git status` clean, confirmed by Claude). It also viewed the dispatcher diff once while debugging a path, after writing its tests.

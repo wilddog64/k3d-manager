@@ -1,7 +1,7 @@
 # Bug: Slack relay drops `channel_id` for `/cluster-up` and `/cluster-down`, so job updates are never threaded and the 6th is lost
 
-**Status:** OPEN — relay half `63be0e33` live-confirmed (job `87c78389` has `channel_id`); webhook half missing, see "Second cause"
-**Fix commit:** 63be0e33
+**Status:** FIXED — relay half `63be0e33` live-confirmed (job `87c78389` has `channel_id`); webhook half `75d987ca` (Codex task `webhook-slash-command-starts-bot-thread`; Claude review, independent verify); E4 (live) pending after `make restart-webhook`
+**Fix commit:** 63be0e33, 75d987ca
 **Priority:** P2
 **Severity:** medium — every `/cluster-up` / `/cluster-down` update goes to `response_url` instead of a bot thread; Slack accepts at most five posts per `response_url`, so a long job's later updates (the failure analysis or the final result) are rejected and never shown
 **Approval:** operator, 2026-11-01 ("the cluster-up does not post result in a thread"); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
@@ -157,3 +157,10 @@ interface:
 `1793551009.895759`; updates 7-8 `bot_thread` in that thread. The operator saw "two out of thread, the third one
 replied in a thread" (screenshot 521). This is the pre-fix behavior the webhook half fixes: the thread should start
 at update 1, not at update 6. Not a regression.
+
+## Verification, webhook half (2026-11-01, Claude)
+
+- Landed as `75d987ca` through `make codex-land`; the ledger records `land` and `verify` events for slug `webhook-slash-command-starts-bot-thread`.
+- Offline evidence: webhook half landed as `75d987ca` (slug `webhook-slash-command-starts-bot-thread`, `--superseding` this spec): `/opt/homebrew/bin/python3 -m pytest -q scripts/tests/bin/test_slack_bot_post_logging.py scripts/tests/bin/test_webhook_stale_cleanup.py` rc 0; fast gate passed. Independent black-box verifier (Sonnet, tests written from the Acceptance block only): PASS, 6 pass on the fix, 4 fail on pre-fix code.
+- Errors seen: first land used the direnv `python3` without pytest (`No module named pytest`, recorded `land_refused` reason tests; environment, not code); a fast-gate failure in `k3dm_cleanup.bats` was a test-isolation bug, filed and fixed as `docs/bugs/2026-11-01-cleanup-test-inherits-port-cache-dir.md`.
+- E4 (live) pending: after `make restart-webhook` on the M5, a channel `/cluster-up` job records `route: bot_thread` for every post.

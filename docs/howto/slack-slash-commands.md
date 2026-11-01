@@ -28,7 +28,8 @@ sequenceDiagram
     H->>H: Bearer token auth + spawn job thread
     H-->>W: 202 {job_id}
     W-->>S: 200 ⏳ Acknowledged
-    H-->>S: POST response_url ✅/❌ when done
+    H-->>S: chat.postMessage starts a bot thread<br/>(response_url if no channel or bot post fails)
+    H-->>S: thread replies ✅/❌ when done
 
     note over U,H: Path B — Thread reply (Events API)
     U->>S: ask claude why is basket crashing?
@@ -410,8 +411,11 @@ commands; they are ignored, so a nearby asynchronous report is not attributed to
 
 `e2e-replay` republishes only `publication_pending` files left by a failed original publish. After a hub rebuild, use `make e2e-republish RUNNER=m2` to select and republish the newest retained summary for each service and tier from the runner. It is not a slash command: run it from a terminal on the M4.
 
-All commands respond immediately with an acknowledgement, then post results back to the
-channel via `response_url` when the job completes.
+All commands respond immediately with an acknowledgement. When the relay supplies the channel and
+the webhook has a bot token, the first job update starts a bot thread in that channel and later
+updates reply in it. Otherwise, or when the bot post fails, updates go to `response_url`, which
+Slack limits to five posts. A rejected `chat.postMessage` is logged in `~/Library/Logs/k3dm-webhook.log`
+with the Slack error code and channel.
 
 `smoke` runs the same gate as `make smoke`: the offline sweep always, and the cluster sweep
 when the cluster is reachable. `SMOKE_ONLY` narrows it to one half — `SMOKE_ONLY=offline` skips
