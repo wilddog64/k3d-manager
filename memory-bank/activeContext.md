@@ -1892,3 +1892,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Slack /cluster-up refused (role reader): M5 lacks Keychain k3dm-slack-role-map (M4 has it, acct k3dm); hub secrets manifest omits it. Filed P2 docs/bugs/2026-11-01-hub-secrets-manifest-omits-slack-role-map.md. Operator to add the item on the M5 + restart webhook, then retry /cluster-up.
 - Role map added on M5 by operator; /cluster-up accepted as admin (job ec9ce66c, 15:23:38Z), job running.
 - https-remotes E5 LIVE-VERIFIED; zshdotfiles 98759b2 removed truncated _gemini (M5 pulled; M2 needs operator pull).
+- acg-up job ec9ce66c failed: M5 lacks k3dm-acg-pluralsight; M4/M5 keychain diff: 27 items missing on M5, none in secrets.hub.list (app-cluster-secrets, cloudflared, signing, cloud-runner token…). Broadened P2 hub-secrets-manifest bug. acg-up live check blocked on copying secrets to M5.

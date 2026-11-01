@@ -2188,3 +2188,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: filed P2 hub-secrets-manifest-omits-slack-role-map (/cluster-up forbidden on the M5).
 - 2026-11-01: Slack role map workaround applied on M5; /cluster-up job ec9ce66c accepted (admin).
 - 2026-11-01: https-remotes bug LIVE-VERIFIED (E5); my_func.zsh parse error fixed in zshdotfiles 98759b2.
+- 2026-11-01: /cluster-up ec9ce66c failed (no ACG creds on M5); P2 broadened to all hub-read Keychain items missing from secrets.hub.list.
