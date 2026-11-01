@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.43.14] - Unreleased
+
+- Require captured verifier evidence for dispatch passes and show legacy claims separately.
+
 ## [1.43.13] - 2026-11-01
 
 Machine-setup and bug-fix release for the M5 hub. The five plans first planned for v1.43.13 moved to v1.43.14, and v1.43.14's plans moved to v1.43.15; no plan work ships here.

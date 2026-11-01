@@ -157,6 +157,27 @@ reported. Use `bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail`; i
 was itself a Codex task. A verifier run outside Codex has no token value. The command requires an
 existing `land` event and refuses invalid values without appending a ledger event.
 
+A passing result requires `--evidence FILE`; failures may also provide it. Ask the independent
+verifier to write this file itself using its own captured command output, including the red runs
+for every `must_not`; do not construct it from a summary. For example:
+
+```text
+verifier: codex
+tests_from: acceptance
+fix_sha: abc1234
+command: bats scripts/tests/example.bats
+rc: 0
+pre_fix_sha: def5678
+pre_fix_command: bats scripts/tests/example.bats
+pre_fix_rc: 1
+---
+Raw captured test output goes here.
+```
+
+Each SHA must resolve to a commit, and each pre-fix triple must appear in order. The dispatcher
+copies valid evidence into the task run directory and records its path and SHA-256. A legacy pass
+without an evidence hash is claimed and remains awaiting verification.
+
 A spec is **delivered** when its latest independent verification passed and, if its Acceptance
 requires live evidence, its document is `LIVE-VERIFIED` with well-formed `Live evidence`. Delivered
 cost is Codex tokens for implementation plus any recorded Codex verifier tokens. It excludes

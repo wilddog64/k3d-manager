@@ -898,7 +898,7 @@ def _task_metrics(task_events, land_event, prices=None):
 
 def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
     states = _task_states(events)
-    known = delivered = awaiting = unknown = codex_delivered = 0
+    known = delivered = awaiting = unknown = claimed = codex_delivered = 0
     delivered_tokens = []
     review = 0
     for land in landed:
@@ -908,6 +908,9 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
                           key=lambda event: event.get("ts", 0))
         if any(event.get("result") == "fail" for event in verifies):
             review += 1
+        latest = verifies[-1] if verifies else None
+        if latest and latest.get("result") == "pass" and not latest.get("evidence_sha256"):
+            claimed += 1
         starts = [event for event in task_events if event.get("event") == "start"]
         start = max(starts, key=lambda event: event.get("ts", 0)) if starts else {}
         spec = start.get("spec")
@@ -923,10 +926,9 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
         known += 1
         acceptance = re.search(r"(?ms)^## Acceptance\s*\n(.*?)(?=^## |\Z)", text)
         requires_live = bool(acceptance and re.search(r"(?m)^\s*(?:-\s*)?kind:\s*live\s*$", acceptance.group(1)))
-        latest = verifies[-1] if verifies else None
         if requires_live:
             is_live = doc_verification(text) == "live" and bool(doc_live_evidence(text))
-            if latest is None or latest.get("result") != "pass" or not is_live:
+            if latest is None or latest.get("result") != "pass" or not latest.get("evidence_sha256") or not is_live:
                 awaiting += 1
                 continue
             live_commit_ts = _live_status_commit_timestamp(repo_root, spec)
@@ -935,7 +937,7 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
                 continue
             delivered_at = max(int(latest.get("ts", 0)), live_commit_ts)
         else:
-            if latest is None or latest.get("result") != "pass":
+            if latest is None or latest.get("result") != "pass" or not latest.get("evidence_sha256"):
                 awaiting += 1
                 continue
             delivered_at = int(latest.get("ts", 0))
@@ -958,6 +960,7 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
         "delivered": delivered,
         "delivered_tokens": token_mean,
         "awaiting": awaiting,
+        "claimed": claimed,
         "unknown": unknown,
         "review": review,
     }
@@ -1148,8 +1151,8 @@ def _direct_bug_costs(states, repo_root, release=None, cutoff=None):
                               and event.get("result") in {"pass", "fail"}]
         verifications[spec].extend(task_verifications)
         if (any(event.get("event") == "land" and event.get("test_result") == "passed" for event in task_events)
-                and any(event.get("result") == "pass" for event in task_verifications)):
-            closure_ts = max([event.get("ts", 0) for event in task_verifications if event.get("result") == "pass"])
+                and any(event.get("result") == "pass" and event.get("evidence_sha256") for event in task_verifications)):
+            closure_ts = max([event.get("ts", 0) for event in task_verifications if event.get("result") == "pass" and event.get("evidence_sha256")])
             closures[spec] = max(closures.get(spec, 0), closure_ts)
     costs = []
     first_pass = {"pass": 0, "fail": 0}
@@ -1350,6 +1353,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if verification["delivered_tokens"] is not None:
         lines.append(f'k3dm_dispatch_codex_tokens_per_delivered{{window="{window}"}} {verification["delivered_tokens"]}')
     lines.append(f'k3dm_dispatch_awaiting_verification{{window="{window}"}} {verification["awaiting"]}')
+    lines.append(f'k3dm_dispatch_verification_claimed{{window="{window}"}} {verification["claimed"]}')
     lines.append(f'k3dm_dispatch_verification_unknown{{window="{window}"}} {verification["unknown"]}')
     run_metrics = metrics["run_outcomes"]
     for outcome, count in run_metrics["outcomes"].items():

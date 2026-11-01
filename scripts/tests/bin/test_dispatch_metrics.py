@@ -432,7 +432,7 @@ def test_verified_delivery_cost_and_review_rework(tmp_path):
         event(now - 10, "codex_exit", "one", tokens=100),
         event(now - 5, "land", "one"),
         event(now - 4, "verify", "one", result="fail"),
-        event(now - 3, "verify", "one", result="pass", tokens=50),
+        event(now - 3, "verify", "one", result="pass", evidence_sha256="abc", tokens=50),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
     assert 'k3dm_dispatch_delivered{window="30d"} 1' in output  # agent-audit: allow assert-removed same 19 asserts, f prefix dropped for ruff F541
@@ -450,11 +450,11 @@ def test_delivered_agy_spec_counts_but_stays_out_of_codex_token_mean(tmp_path):
         event(now - 20, "start", "codex", spec="docs/plans/v9.9.9-demo.md"),
         event(now - 10, "codex_exit", "codex", tokens=100),
         event(now - 5, "land", "codex"),
-        event(now - 3, "verify", "codex", result="pass"),
+        event(now - 3, "verify", "codex", result="pass", evidence_sha256="abc"),
         event(now - 20, "start", "agy", spec="docs/plans/v9.9.9-demo.md", agent="agy"),
         event(now - 10, "agent_exit", "agy", usage={"total_tokens": 900}),
         event(now - 5, "land", "agy"),
-        event(now - 3, "verify", "agy", result="pass"),
+        event(now - 3, "verify", "agy", result="pass", evidence_sha256="abc"),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
     assert 'k3dm_dispatch_delivered{window="30d"} 2' in output
@@ -469,10 +469,10 @@ def test_live_delivery_waiting_and_unknown_spec_are_distinct(tmp_path):
     rows = [
         event(now - 20, "start", "waiting", spec="docs/plans/v9.9.9-live.md"),
         event(now - 10, "land", "waiting"),
-        event(now - 8, "verify", "waiting", result="pass"),
+        event(now - 8, "verify", "waiting", result="pass", evidence_sha256="abc"),
         event(now - 20, "start", "unknown"),
         event(now - 10, "land", "unknown"),
-        event(now - 8, "verify", "unknown", result="pass"),
+        event(now - 8, "verify", "unknown", result="pass", evidence_sha256="abc"),
     ]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
     assert 'k3dm_dispatch_delivered{window="30d"} 0' in output
@@ -504,7 +504,7 @@ def test_live_delivery_requires_status_and_well_formed_evidence(tmp_path):
     now = int(time.time())
     rows = [event(now - 20, "start", "live", spec="docs/plans/v9.9.9-live.md"),
             event(now - 15, "codex_exit", "live", tokens=100), event(now - 10, "land", "live"),
-            event(now - 5, "verify", "live", result="pass", tokens=7)]
+            event(now - 5, "verify", "live", result="pass", evidence_sha256="abc", tokens=7)]
     output = dispatch_metrics.render(rows, 0, now, repo_root=repo)
     assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
     assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 107.0' in output
@@ -801,7 +801,7 @@ def test_directly_linked_live_verified_bug_has_known_run_cost(tmp_path):
     rows = [event(now - 20, "start", "bug", run=1, spec="docs/bugs/2026-10-24-dispatch-cost.md"),
             event(now - 15, "codex_exit", "bug", run=1, exit=0, tokens=100, tree="tree"),
             event(now - 10, "land", "bug", tree="tree", test_result="passed"),
-            event(now - 5, "verify", "bug", result="pass")]
+            event(now - 5, "verify", "bug", result="pass", evidence_sha256="abc")]
     output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
     assert 'k3dm_dispatch_codex_tokens_per_live_verified_bug{window="30d"} 100.0' in output
     assert 'k3dm_dispatch_live_verified_bug_first_pass{window="30d",result="pass"} 1' in output
@@ -1008,7 +1008,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 85  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec; observed compaction point panel; repo bar gauges add an other series each
+    assert sum("$window" in expr for expr in expressions) == 86  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec; observed compaction point panel; repo bar gauges add an other series each
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1902,7 +1902,7 @@ def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_pa
     events = [
         event(now - 300, "start", version="v9.9.9", slug="quota", spec="docs/plans/v9.9.9-demo.md", agent="codex"),
         event(now - 250, "land", version="v9.9.9", slug="quota"),
-        event(now - 150, "verify", version="v9.9.9", slug="quota", result="pass"),
+        event(now - 150, "verify", version="v9.9.9", slug="quota", result="pass", evidence_sha256="abc"),
     ]
     lines = []
     dispatch_metrics._quota_efficiency(lines, events, (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now - 600)), {"secondary": {"used_percent": 20, "resets_at": 200}}), 100)
@@ -2412,3 +2412,18 @@ def test_claude_result_hash_rejects_errors_and_truncation():
     assert digest({"content": "same"}) == digest({"content": "same"})
     assert digest({"content": "same", "is_error": True}) is None
     assert digest({"content": "Output truncated: secret"}) is None
+
+
+def test_claimed_verification_is_not_delivered(tmp_path):
+    spec = tmp_path / "docs/plans/v9.9.9-demo.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("## Acceptance\n\n```yaml\nevidence:\n  - kind: offline\n```\n")
+    now = int(time.time())
+    rows = []
+    for slug in ("backed", "claimed"):
+        rows.extend([event(now - 3, "start", slug, spec="docs/plans/v9.9.9-demo.md"), event(now - 2, "land", slug)])
+    rows.extend([event(now - 1, "verify", "backed", result="pass", evidence_sha256="abc"), event(now - 1, "verify", "claimed", result="pass")])
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
+    assert 'k3dm_dispatch_awaiting_verification{window="30d"} 1' in output
+    assert 'k3dm_dispatch_verification_claimed{window="30d"} 1' in output

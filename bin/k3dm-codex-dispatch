@@ -296,7 +296,7 @@ Usage:
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope]
   bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
-  bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--tokens N] [--verifier NAME]
+  bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
   bin/k3dm-codex-dispatch abandon --slug SLUG --yes
   bin/k3dm-codex-dispatch prune [--yes]
@@ -331,13 +331,54 @@ _dispatch_release_merged() {
   echo "recorded release merge: $version PR #$pr"
 }
 
+_dispatch_validate_evidence() {
+  python3 -I - "$1" "$2" "${3:-$_dispatch_repo_root}" <<'PYVALIDATE'
+import re, subprocess, sys
+from pathlib import Path
+try:
+    text = Path(sys.argv[1]).read_text(encoding="utf-8")
+    headers, output = text.split("\n---\n", 1)
+    assert output and output.splitlines()
+    fields = {}
+    triples = []
+    for line in headers.splitlines():
+        match = re.fullmatch(r"([a-z_]+): (.+)", line)
+        assert match
+        key, value = match.groups()
+        assert value.strip()
+        if key.startswith("pre_fix_"):
+            triples.append((key, value))
+        else:
+            assert key not in fields
+            fields[key] = value
+    assert re.fullmatch(r"[A-Za-z0-9._-]{1,80}", fields["verifier"])
+    assert not sys.argv[2] or fields["verifier"] == sys.argv[2]
+    assert fields["tests_from"] == "acceptance" and fields["rc"] == "0"
+    assert fields["command"].strip()
+    assert triples and len(triples) % 3 == 0
+    shas = [fields["fix_sha"]]
+    for i in range(0, len(triples), 3):
+        sha, command, rc = triples[i:i+3]
+        assert [sha[0], command[0], rc[0]] == ["pre_fix_sha", "pre_fix_command", "pre_fix_rc"]
+        assert command[1].strip() and re.fullmatch(r"-?[0-9]+", rc[1]) and int(rc[1]) != 0
+        shas.append(sha[1])
+    for sha in shas:
+        assert re.fullmatch(r"[0-9a-fA-F]{7,40}", sha)
+        assert subprocess.run(["git", "-C", sys.argv[3], "cat-file", "-e", sha + "^{commit}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    print(fields["verifier"])
+except (OSError, UnicodeError, ValueError, KeyError, AssertionError):
+    sys.exit(1)
+PYVALIDATE
+}
+
 _dispatch_verify() {
-  local slug="" result="" tokens="" verifier="" rel version tokens_set=0
+  local slug="" result="" tokens="" verifier="" evidence="" evidence_path="" evidence_sha256="" rel version tokens_set=0 run_dir count
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --result) (($# >= 2)) || _dispatch_error "--result requires a value"; result="$2"; shift 2 ;;
       --tokens) (($# >= 2)) || _dispatch_error "--tokens requires a value"; tokens="$2"; tokens_set=1; shift 2 ;;
+      --evidence) (($# >= 2)) || _dispatch_error "--evidence requires a value"; evidence="$2"; shift 2 ;;
       --verifier) (($# >= 2)) || _dispatch_error "--verifier requires a value"; verifier="$2"; shift 2 ;;
       *) _dispatch_error "unknown verify option: $1" ;;
     esac
@@ -350,13 +391,24 @@ _dispatch_verify() {
   jq -se --arg version "$version" --arg slug "$slug" \
     'any(.[]; .event == "land" and .version == $version and .slug == $slug)' \
     "$_dispatch_worktree_root/ledger.jsonl" >/dev/null 2>&1 || _dispatch_error "no landed task for $slug in $version"
+  [[ "$result" != pass || -n "$evidence" ]] || _dispatch_error "pass requires --evidence"
+  if [[ -n "$evidence" ]]; then
+    run_dir="$_dispatch_worktree_root/$version/$slug.run"
+    verifier="$(_dispatch_validate_evidence "$evidence" "$verifier" "$(cat "$run_dir/repo" 2>/dev/null)")" || _dispatch_error "invalid verification evidence"
+    mkdir -p "$run_dir" || _dispatch_error "could not create run directory"
+    count="$(find "$run_dir" -maxdepth 1 -name 'verify-evidence.*.log' -type f | wc -l | tr -d ' ')"
+    evidence_path="$version/$slug.run/verify-evidence.$((count + 1)).log"
+    [[ ! -e "$_dispatch_worktree_root/$evidence_path" ]] || _dispatch_error "evidence destination already exists"
+    cp "$evidence" "$_dispatch_worktree_root/$evidence_path" || _dispatch_error "could not copy evidence"
+    evidence_sha256="$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$_dispatch_worktree_root/$evidence_path")" || _dispatch_error "could not hash evidence"
+  fi
   _dispatch_event_repo="$(cat "$_dispatch_worktree_root/$version/$slug.run/repo-name" 2>/dev/null || echo k3d-manager)"
   if (( tokens_set )); then
-    _dispatch_ledger_event verify "$version" "$slug" --arg result "$result" --arg verifier "$verifier" --argjson tokens "$tokens" \
-      '.result=$result|.tokens=$tokens|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
+    _dispatch_ledger_event verify "$version" "$slug" --arg evidence_path "$evidence_path" --arg evidence_sha256 "$evidence_sha256" --arg result "$result" --arg verifier "$verifier" --argjson tokens "$tokens" \
+      '.result=$result|if $evidence_path != "" then .evidence_path=$evidence_path|.evidence_sha256=$evidence_sha256 else . end|.tokens=$tokens|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
   else
-    _dispatch_ledger_event verify "$version" "$slug" --arg result "$result" --arg verifier "$verifier" \
-      '.result=$result|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
+    _dispatch_ledger_event verify "$version" "$slug" --arg evidence_path "$evidence_path" --arg evidence_sha256 "$evidence_sha256" --arg result "$result" --arg verifier "$verifier" \
+      '.result=$result|if $evidence_path != "" then .evidence_path=$evidence_path|.evidence_sha256=$evidence_sha256 else . end|if $verifier != "" then .verifier=$verifier else . end' || _dispatch_error "could not record verification"
   fi
   _dispatch_schedule_metrics
   echo "verification recorded: $slug ($result)"

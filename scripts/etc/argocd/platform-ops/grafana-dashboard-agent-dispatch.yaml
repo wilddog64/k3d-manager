@@ -1186,7 +1186,7 @@ data:
           "description": "Mean implementation Codex tokens plus any Codex-run verifier tokens for delivered specs in the selected window or release. Claude verification tokens are excluded. No data means no delivered spec has a token total.",
           "gridPos": {
             "h": 6,
-            "w": 12,
+            "w": 8,
             "x": 0,
             "y": 26
           },
@@ -1232,8 +1232,8 @@ data:
           "description": "Landed specs with a missing or failed latest independent verification, or with required live evidence still missing. Specs whose source document is absent are shown separately as unknown.",
           "gridPos": {
             "h": 6,
-            "w": 12,
-            "x": 12,
+            "w": 8,
+            "x": 8,
             "y": 26
           },
           "datasource": {
@@ -1243,6 +1243,52 @@ data:
           "targets": [
             {
               "expr": "k3dm_dispatch_awaiting_verification{window=\"$window\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 101,
+          "type": "stat",
+          "options": {
+            "text": {
+              "valueSize": 32
+            }
+          },
+          "title": "Claimed, no evidence",
+          "description": "A claimed pass has no verifier output on file.",
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 26
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_dispatch_verification_claimed{window=\"$window\"}",
               "instant": true
             }
           ],

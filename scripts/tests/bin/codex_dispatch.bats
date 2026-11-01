@@ -1086,12 +1086,19 @@ EOF
 
 @test "codex dispatch: verify records pass tokens only for a landed task" {
   printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"verified"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
-  run dispatch verify --slug verified --result pass --tokens 456 --verifier codex
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: bats test\nrc: 0\npre_fix_sha: %s\npre_fix_command: bats test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$BATS_TEST_TMPDIR/evidence"
+  run dispatch verify --slug verified --result pass --tokens 456 --verifier codex --evidence "$BATS_TEST_TMPDIR/evidence"
   [ "$status" -eq 0 ]
   [ "$(jq -r -s '.[-1].event' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = verify ]
   [ "$(jq -r -s '.[-1].result' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = pass ]
   [ "$(jq -r -s '.[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 456 ]
   [ "$(jq -r -s '.[-1].verifier' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = codex ]
+  copy="$K3DM_WORKTREE_ROOT/$(jq -r -s '.[-1].evidence_path' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ -f "$copy" ]
+  [ "$(shasum -a 256 "$copy" | cut -d' ' -f1)" = "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
 }
 
 @test "codex dispatch: verify refusals do not append ledger events" {
@@ -1336,4 +1343,60 @@ EOF
   [ "$status" -eq 0 ]
   [ "$(cat "$run_dir/land-fast-gate.log")" = "$(printf '%s\n%s' "$run_dir/state/jobs" "$run_dir/state/tmp")" ]
   [[ "$output" == *"$run_dir/state/jobs"* && "$output" == *"$run_dir/state/tmp"* ]]
+}
+
+@test "codex dispatch: evidence refusals and failure without evidence" {
+  printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"sample"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  file="$BATS_TEST_TMPDIR/evidence"
+  for variant in missing missing_file empty separator verifier tests_from fix_missing command rc_missing pre_missing pre_command pre_rc_missing rc pre_rc fix_sha pre_sha; do
+    printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: test\nrc: 0\npre_fix_sha: %s\npre_fix_command: test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$file"
+    case "$variant" in
+      empty) : >"$file" ;;
+      separator) sed -i.bak '/^---$/d' "$file" ;;
+      verifier) sed -i.bak '/^verifier:/d' "$file" ;;
+      tests_from) sed -i.bak '/^tests_from:/d' "$file" ;;
+      fix_missing) sed -i.bak '/^fix_sha:/d' "$file" ;;
+      command) sed -i.bak '/^command:/d' "$file" ;;
+      rc_missing) sed -i.bak '/^rc:/d' "$file" ;;
+      pre_missing) sed -i.bak '/^pre_fix_sha:/d' "$file" ;;
+      pre_command) sed -i.bak '/^pre_fix_command:/d' "$file" ;;
+      pre_rc_missing) sed -i.bak '/^pre_fix_rc:/d' "$file" ;;
+      rc) sed -i.bak 's/^rc: 0/rc: 1/' "$file" ;;
+      pre_rc) sed -i.bak 's/^pre_fix_rc: 1/pre_fix_rc: 0/' "$file" ;;
+      fix_sha) sed -i.bak 's/^fix_sha:.*/fix_sha: deadbeef/' "$file" ;;
+      pre_sha) sed -i.bak 's/^pre_fix_sha:.*/pre_fix_sha: deadbeef/' "$file" ;;
+    esac
+    if [ "$variant" = missing ]; then run dispatch verify --slug sample --result pass
+    elif [ "$variant" = missing_file ]; then run dispatch verify --slug sample --result pass --evidence "$file.absent"
+    else run dispatch verify --slug sample --result pass --evidence "$file"; fi
+    [ "$status" -ne 0 ]
+    [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+    [ ! -d "$K3DM_WORKTREE_ROOT/v9.9.9/sample.run" ]
+  done
+  run dispatch verify --slug sample --result fail
+  [ "$status" -eq 0 ]
+  [ "$(jq -r -s '.[-1].result' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = fail ]
+}
+
+@test "codex dispatch: evidence SHAs resolve in the task's work repository" {
+  printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"other"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  other="$BATS_TEST_TMPDIR/other-repo"
+  git init -q "$other"
+  git -C "$other" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m other
+  sha="$(git -C "$other" rev-parse HEAD)"
+  [ "$other" != "$(git rev-parse --show-toplevel)" ]
+  run git -C "$FIXTURE" cat-file -e "$sha^{commit}"
+  [ "$status" -ne 0 ]
+  printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: test\nrc: 0\npre_fix_sha: %s\npre_fix_command: test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$BATS_TEST_TMPDIR/evidence"
+  run dispatch verify --slug other --result pass --evidence "$BATS_TEST_TMPDIR/evidence"
+  [ "$status" -ne 0 ]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/other.run"
+  printf '%s\n' "$other" >"$K3DM_WORKTREE_ROOT/v9.9.9/other.run/repo"
+  run dispatch verify --slug other --result pass --evidence "$BATS_TEST_TMPDIR/evidence"
+  [ "$status" -eq 0 ]
+  [ -n "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
 }
