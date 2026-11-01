@@ -36,6 +36,16 @@ favour of `antigravity-cli` (agy), which the manifests already install.
    changed, so an installed gemini stays a fallback.
 4. `docs/howto/m5-hub-migration.md`: agy is the required AI CLI; gemini is optional and no longer installed.
 
+## Files
+
+- `scripts/etc/machine/brew.hub.list`
+- `scripts/etc/machine/brew.worker.list`
+- `bin/k3dm-machine-setup`
+- `scripts/tests/bin/machine_setup.bats`
+- `scripts/tests/bin/machine_setup_acceptance.bats`
+- `docs/howto/m5-hub-migration.md`
+- `CHANGELOG.md`
+
 ## What NOT to do
 
 - Do not change `scripts/lib/webhook/agent.py` or the AI CLI order.

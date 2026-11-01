@@ -45,6 +45,15 @@ On the M5 hub, `make machine-setup ROLE=hub` reported `secret:k3dm-platform-ops-
    of "not in Keychain". Keep the existing skip behaviour.
 3. No value is ever read by machine setup, and no value is printed by either tool.
 
+## Files
+
+- `bin/k3dm-machine-setup`
+- `scripts/plugins/argocd.sh`
+- `scripts/tests/bin/machine_setup.bats`
+- `scripts/tests/bin/machine_setup_acceptance.bats`
+- `scripts/tests/plugins/argocd_keychain_unreadable.bats`
+- `CHANGELOG.md`
+
 ## What NOT to do
 
 - Do not add `-w` or `-g` to any `security` call in `bin/k3dm-machine-setup` (its acceptance suite forbids it).
@@ -70,7 +79,7 @@ evidence:
       unlocked capture, each with host and date in a comment. The locked case prints keychain:login locked and exits 1;
       the unlocked case prints ok. For platform-ops, the stub returns an empty value with the item present, then absent,
       and the two messages differ. A call log shows no -w or -g from machine setup and no unlock-keychain call.
-    what: bats scripts/tests/bin/machine_setup.bats scripts/tests/bin/machine_setup_acceptance.bats and the platform-ops suite that covers argocd_sync_git_writer_secret
+    what: bats scripts/tests/bin/machine_setup.bats scripts/tests/bin/machine_setup_acceptance.bats scripts/tests/plugins/argocd_keychain_unreadable.bats
   E2:
     proves: [M1]
     kind: live

@@ -44,6 +44,14 @@ Prometheus or LDAP rotators, and `make observability` is a full stack redeploy t
 4. `make platform-ops` prints one summary line per rotator: applied, skipped (namespace absent) or failed.
 5. Do not run a rotation. Applying a CronJob must not create a Job.
 
+## Files
+
+- `scripts/plugins/argocd.sh`
+- `scripts/plugins/observability.sh`
+- `scripts/plugins/ldap.sh`
+- `scripts/tests/plugins/argocd_platform_ops_rotators.bats`
+- `CHANGELOG.md`
+
 ## What NOT to do
 
 - Do not redeploy the Grafana or Prometheus Helm releases, or the LDAP server, from `platform-ops`.
@@ -73,7 +81,7 @@ evidence:
       makes the run log an ERROR. The call log has no "create job", no helm install or upgrade, and no delete cronjob.
       Stub kubectl output for "get namespace" comes from a real read-only capture on the M5 hub, with host and date in
       a comment.
-    what: bats scripts/tests/plugins/<new or existing platform-ops suite>.bats
+    what: bats scripts/tests/plugins/argocd_platform_ops_rotators.bats
   E2:
     proves: [M1]
     kind: live
