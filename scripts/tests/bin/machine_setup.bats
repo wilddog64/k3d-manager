@@ -437,6 +437,35 @@ SH
   run ! grep -q '^secrets pull ' "$CALL_LOG"
 }
 
+tty_limited() {
+  perl -MPOSIX -e '
+    my $limit = shift;
+    $limit =~ /^[1-9][0-9]*$/ or die "timeout must be a positive integer\n";
+    my $pid = fork(); defined $pid or die "fork: $!\n";
+    if (!$pid) { POSIX::setsid() >= 0 or die "setsid: $!\n"; exec @ARGV; die "exec: $!\n"; }
+    my $expired = 0;
+    $SIG{ALRM} = sub { $expired = 1; die "timeout\n"; };
+    alarm $limit;
+    my $waited;
+    eval { $waited = waitpid($pid, 0); };
+    if ($expired) {
+      my %children;
+      open my $ps, "-|", "ps", "-axo", "pid=,ppid=" or die "ps: $!\n";
+      while (<$ps>) { if (/^\s*(\d+)\s+(\d+)/) { push @{$children{$2}}, $1; } }
+      close $ps;
+      my @pending = ($pid); my @descendants;
+      while (@pending) { my $p = shift @pending; push @descendants, $p; push @pending, @{$children{$p} || []}; }
+      kill "KILL", reverse @descendants;
+      kill "KILL", -$pid;
+      waitpid($pid, 0) unless defined $waited;
+      print STDERR "timed out after ${limit}s\n";
+      exit 124;
+    }
+    alarm 0;
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$@"
+}
+
 tty_machine() {
   command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
   local wrapper="$BATS_TEST_TMPDIR/tty-machine"
@@ -445,10 +474,11 @@ tty_machine() {
   printf '\n' >> "$wrapper"
   chmod +x "$wrapper"
   if [[ "$(uname -s)" == Darwin ]]; then
-    run bash -c "/bin/sleep 3 | script -q /dev/null '$wrapper'"
+    run tty_limited "${TTY_MACHINE_TIMEOUT:-60}" bash -c "/bin/sleep 3 | script -q /dev/null '$wrapper'"
   else
-    run bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
+    run tty_limited "${TTY_MACHINE_TIMEOUT:-60}" bash -c "/bin/sleep 3 | script -qec '$wrapper' /dev/null"
   fi
+  if [[ "$status" -eq 124 ]]; then printf 'tty_machine %s\n' "$output"; return 1; fi
   [[ "$output" != *'Operation not permitted'* ]] || skip 'sandbox pseudo-terminal does not permit terminal reads'
 }
 
@@ -1034,4 +1064,25 @@ SH
     [[ "$output" == *"shell:$name"*"skipped (linked elsewhere: ~/elsewhere)"* ]]
     [ "$(readlink "$FIXHOME/$name")" = "$FIXHOME/elsewhere" ]
   done
+}
+
+@test "tty_machine: timeout kills the fixture and a short command completes" {
+  local TTY_MACHINE_TIMEOUT=5
+  setup_machine_fixture
+  [[ "$FIXROOT" == "$BATS_TEST_TMPDIR"/* && "$FIXROOT/bin/k3dm-machine-setup" != "$SCRIPT_SOURCE" ]]
+  cat > "$FIXROOT/bin/k3dm-machine-setup" <<'SH'
+#!/bin/sh
+printf '%s\n' "$$" > "$CALL_LOG.pid"
+exec sleep 300
+SH
+  chmod +x "$FIXROOT/bin/k3dm-machine-setup"
+  run tty_machine --role console
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"timed out after ${TTY_MACHINE_TIMEOUT:-60}s"* ]]
+  run kill -0 "$(cat "$CALL_LOG.pid")"
+  [ "$status" -ne 0 ]
+  printf '#!/bin/sh\nsleep 1\necho fixture-complete\n' > "$FIXROOT/bin/k3dm-machine-setup"
+  tty_machine --role console
+  [ "$status" -eq 0 ]
+  [[ "$output" == *fixture-complete* ]]
 }

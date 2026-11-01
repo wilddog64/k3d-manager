@@ -1,5 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
+run_limited() {
+  perl -MPOSIX -e '
+    my $limit = shift;
+    $limit =~ /^[1-9][0-9]*$/ or die "timeout must be a positive integer\n";
+    my $pid = fork(); defined $pid or die "fork: $!\n";
+    if (!$pid) { POSIX::setsid() >= 0 or die "setsid: $!\n"; exec @ARGV; die "exec: $!\n"; }
+    my $expired = 0;
+    $SIG{ALRM} = sub { $expired = 1; die "timeout\n"; };
+    alarm $limit;
+    my $waited;
+    eval { $waited = waitpid($pid, 0); };
+    if ($expired) {
+      my %children;
+      open my $ps, "-|", "ps", "-axo", "pid=,ppid=" or die "ps: $!\n";
+      while (<$ps>) { if (/^\s*(\d+)\s+(\d+)/) { push @{$children{$2}}, $1; } }
+      close $ps;
+      my @pending = ($pid); my @descendants;
+      while (@pending) { my $p = shift @pending; push @descendants, $p; push @pending, @{$children{$p} || []}; }
+      kill "KILL", reverse @descendants;
+      kill "KILL", -$pid;
+      waitpid($pid, 0) unless defined $waited;
+      print STDERR "timed out after ${limit}s\n";
+      exit 124;
+    }
+    alarm 0;
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "${FAST_GATE_SUITE_TIMEOUT:-900}" "$@"
+}
 worker() {
   local work=$1 index=$2 kind=$3 file=$4 label="" begin=$SECONDS rc=0 no_tests=0
   local -a command=() pytest_cmd=() docs=()
@@ -20,7 +48,7 @@ worker() {
       case "$file" in
         scripts/tests/bin/test_dispatch_metrics.py|scripts/tests/bin/test_dashboard_queries.py|scripts/tests/bin/test_orbstack_metrics.py|scripts/tests/observability/test_cve_fix_available_alert.py)
           if ! command -v promtool >/dev/null 2>&1; then
-            scripts/tests/tripwire.sh "${pytest_cmd[@]}" --collect-only -q -m external "$file" > "$work/collect.$index" 2>&1 || rc=$?
+            run_limited scripts/tests/tripwire.sh "${pytest_cmd[@]}" --collect-only -q -m external "$file" > "$work/collect.$index" 2>&1 || rc=$?
             if (( rc != 0 && rc != 5 )); then
               printf 'FAIL %s 0s (pytest collection)\n' "$file" > "$work/result.$index"
               tail -n 20 "$work/collect.$index" >> "$work/result.$index"
@@ -42,7 +70,7 @@ worker() {
     return
   fi
   rc=0
-  "${command[@]}" > "$work/output.$index" 2>&1 || rc=$?
+  run_limited "${command[@]}" > "$work/output.$index" 2>&1 || rc=$?
   if [[ "$kind" == pytest && -f "$work/collect.$index" && "$rc" == 5 ]] && grep -Eq '[0-9]+ deselected' "$work/output.$index"; then rc=0; no_tests=1; fi
   local elapsed=$((SECONDS - begin))
   if (( no_tests )); then

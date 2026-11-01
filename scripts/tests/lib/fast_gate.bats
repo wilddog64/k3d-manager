@@ -234,3 +234,19 @@ BATS
   run bash -c 'cd "$1" && scripts/ci/fast_gate.sh "$2"' _ "$BATS_TEST_TMPDIR/linked" "$base"
   [ "$status" -ne 0 ]; [[ "$output" == *'FAIL repository user changed'* ]]
 }
+
+@test "fast gate: timeout kills a hung suite and permits a short suite" {
+  cat > "$fixture/scripts/tests/lib/static.bats" <<BATS
+#!/usr/bin/env bats
+@test "hung probe" { echo \$\$ > "$BATS_TEST_TMPDIR/probe.pid"; exec sleep 300; }
+BATS
+  run bash -c 'cd "$1" && FAST_GATE_SUITE_TIMEOUT=5 scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'FAIL scripts/tests/lib/static.bats'*'timed out after 5s'* ]]
+  run kill -0 "$(cat "$BATS_TEST_TMPDIR/probe.pid")"
+  [ "$status" -ne 0 ]
+  printf '#!/usr/bin/env bats\n@test "short probe" { sleep 1; }\n' > "$fixture/scripts/tests/lib/static.bats"
+  run bash -c 'cd "$1" && FAST_GATE_SUITE_TIMEOUT=5 scripts/ci/fast_gate.sh "$2"' _ "$fixture" "$base"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'PASS scripts/tests/lib/static.bats'* ]]
+}
