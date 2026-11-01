@@ -2169,3 +2169,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: rotator release-deploy P2 landed (3cc9abcf, e388c471); E1 7/7, all red pre-fix; E2 pending (operator make platform-ops on M5). Compaction: 400K trial found inert (200K window; 212 auto-compactions all 166K-213K); autoCompactWindow back to 200000, experiment log + CLAUDE.md corrected. Dashboard panel shows configured value, not effective; P3 offered.
 - 2026-11-01: gemini-cli P3 landed (955b979e); E1 121/121, pre-fix red 3/3, N1 mutant red. E2 pending (machine-check on M5).
 - 2026-11-01: rotator P2 LIVE-VERIFIED (platform-ops 12:47Z on M5; Grafana CronJob + LDAP ConfigMap carry WARN lines, no Jobs). gemini-cli P3 LIVE-VERIFIED (M5 check: ai:agy ok, no brew:gemini-cli).
+- 2026-11-01: find-similar-docs K P2 LIVE-VERIFIED (Slack job 04bccbb3). Keychain P3: operator's unlocked capture recorded; dispatched to Luna.

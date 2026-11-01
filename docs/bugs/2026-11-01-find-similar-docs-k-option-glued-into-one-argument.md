@@ -1,6 +1,8 @@
 # Bug: `make find-similar-docs K=<n>` fails with "unrecognized arguments: --k10--"
 
-**Status:** FIXED
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run webhook-job-04bccbb3 · env m5-air · scenario slack-find-similar-docs-k10 · commit f2369dbb · proves E2
+**Fix commit:** bdfe2b8e
 **Priority:** P2
 **Severity:** low — any `K=` value breaks the target from Slack and from the shell; workaround is to drop `K` (default 5)
 **Approval:** operator, 2026-11-01 (posted the failing Slack job; Claude fixed it directly as a one-line change)
@@ -65,3 +67,9 @@ interface:
   `['--k5--', "what's recent e2e issues"]`) and passes 3/3 after the fix. `test_find_similar_docs.py`,
   `webhook_make_targets.py` and `test_webhook_thread_dispatch.py` stay green (104 passed, 1 skipped).
 - `make find-similar-docs Q=... K=3` on the M4 now gets past argument parsing.
+
+## Live verification (E2), 2026-11-01
+
+- Slack `/k3dm find-similar-docs K=10 Q="rotator not deployed by release"` on the M5 (webhook job `04bccbb3`) succeeded
+  and returned 10 ranked docs, the first being `docs/bugs/2026-11-01-rotators-outside-platform-ops-miss-release-deploy.md`.
+  The earlier job `87e69e3f` had failed with `unrecognized arguments: --k10--`.

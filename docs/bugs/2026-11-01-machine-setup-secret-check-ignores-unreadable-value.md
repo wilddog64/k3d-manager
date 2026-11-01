@@ -31,8 +31,13 @@ On the M5 hub, `make machine-setup ROLE=hub` reported `secret:k3dm-platform-ops-
       security: SecKeychainCopySettings /Users/cliang/Library/Keychains/login.keychain-db: User interaction is not allowed.
       rc=36
 
-  The unlocked case (rc 0, from a local Terminal) is to be captured by the operator before the stub is written. Do not
-  invent its text.
+  Unlocked case, captured by the operator on m5-air.local in a local Terminal, 2026-11-01:
+
+      $ security show-keychain-info ~/Library/Keychains/login.keychain-db
+      Keychain "/Users/cliang/Library/Keychains/login.keychain-db" no-timeout
+
+  The stub prints this line for the unlocked case and exits 0. The `no-timeout` word reflects this Keychain's
+  lock setting, so the code must key on the exit code, not on that text.
 
 ## Fix
 
