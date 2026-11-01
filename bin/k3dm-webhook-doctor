@@ -232,6 +232,20 @@ def _slack_bot_status(path):
         return 'missing_token'
 
 
+def _slack_role_map_status():
+    raw = os.environ.get("K3DM_SLACK_ROLE_MAP")
+    if not raw:
+        result = _run(["security", "find-generic-password", "-s", "k3dm-slack-role-map", "-a", "k3dm", "-w"])
+        if _command_status(result) != "complete" or result.get("returncode") != 0:
+            return "missing"
+        raw = result.get("stdout", "")
+    for pair in raw.split(","):
+        uid, separator, role = pair.strip().partition(":")
+        if separator and uid.strip() and role.strip().lower() in ("reader", "operator", "admin"):
+            return "present"
+    return "missing"
+
+
 def diagnose(check=False):
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     if not check:
@@ -254,7 +268,7 @@ def diagnose(check=False):
     reliable_unhealthy = job["status"] == "missing" or (
         job["status"] == "loaded" and listener["status"] == "no_listener"
         and probe["http_responsive"] is False)
-    return {"timestamp_utc": now, "mode": "check", "slack_bot": _slack_bot_status(home / 'Library/LaunchAgents' / f'{LABEL}.plist'), "launchd": job, "process": process, "listener": listener,
+    return {"timestamp_utc": now, "mode": "check", "slack_role_map": _slack_role_map_status(), "slack_bot": _slack_bot_status(home / 'Library/LaunchAgents' / f'{LABEL}.plist'), "launchd": job, "process": process, "listener": listener,
             "log": log, "health": probe, "health_timeout_seconds": HEALTH_TIMEOUT, "classification": classification,
             "credential": credential, "credential_action": _credential_action(credential),
             "recovery_recommended": reliable_unhealthy,

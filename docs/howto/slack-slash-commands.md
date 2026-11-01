@@ -70,7 +70,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 | `operator` | `/cluster-refresh`, `/k3dm smoke` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade`, `/cleanup-stale-sandbox` plus everything in `operator` |
 
-`/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token.
+`/k3dm <target>` runs an allowlisted Makefile target (`scripts/lib/webhook/make_targets.py`). The relay stamps it `admin`; the webhook caps that at the caller's `K3DM_SLACK_ROLE_MAP` role (unmapped users are `reader`), then applies the target's own minimum role. Destructive targets also require the `confirm` token. The webhook reads `K3DM_SLACK_ROLE_MAP` or the Keychain item `k3dm-slack-role-map` (account `k3dm`) at startup; restart the webhook after changing the map.
 
 ### Confirming a mutating command
 

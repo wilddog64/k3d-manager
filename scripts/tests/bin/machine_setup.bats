@@ -1192,3 +1192,42 @@ SH
   run grep -q '^launchctl ' "$CALL_LOG"
   [ "$status" -eq 1 ]
 }
+
+@test "machine setup: hub credentials are checked and missing role map triggers FROM pull" {
+  setup_machine_fixture
+  cp "$MACHINE_DIR/secrets.hub.list" "$FIXROOT/scripts/etc/machine/secrets.hub.list"
+  # macOS security find-generic-password exits 44 for a missing item (m4-air.local, 2026-11-01; spec observation).
+  cat > "$STUBS/security" <<'SH'
+#!/bin/sh
+printf 'security %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = show-keychain-info ] && exit 0
+[ -e "$CALL_LOG.present" ] && exit 0
+exit 44
+SH
+  chmod +x "$STUBS/security"
+  run_machine --role hub --check
+  [ "$status" -ne 0 ]
+  while IFS='|' read -r service account _; do
+    [[ -n "$service" && "$service" != \#* ]] || continue
+    [[ "$output" == *"secret:$service"* ]]
+  done < "$MACHINE_DIR/secrets.hub.list"
+  [[ "$output" == *'secret:k3dm-slack-role-map'*'missing'* ]]
+  tty_machine --role hub --from old-mac.local --secrets skip
+  grep -q '^secrets pull --from old-mac.local --role hub$' "$CALL_LOG"
+  touch "$CALL_LOG.present"
+  run_machine --role hub --check
+  [[ "$output" == *'secret:k3dm-slack-role-map:k3dm'*'ok'* ]]
+}
+
+@test "machine setup: hub manifest includes each hub-read service and account" {
+  for entry in \
+    'k3dm-slack-role-map|k3dm' 'k3dm-acg-pluralsight|username' 'k3dm-acg-pluralsight|password' \
+    'k3d-manager-cloudflared-cert|cloudflared' 'k3d-manager-cloudflared-credentials|cloudflared' \
+    'k3d-manager-signing|k3dm-cosign-key' 'k3d-manager-signing|k3dm-cosign-password' \
+    'k3dm-webhook-token-cloud-runner|k3dm' 'gemini-cli-api-key|default-api-key' 'k3d-manager-slack-bot-token|cliang'; do
+    grep -Fq "$entry|" "$MACHINE_DIR/secrets.hub.list"
+  done
+  for account in redis/cart redis/orders-cache postgres/orders postgres/products postgres/payment payment/encryption payment/stripe payment/paypal rabbitmq/default minio/credentials ldap/admin keycloak/admin keycloak/clients github/pat; do
+    grep -Fq "k3d-manager-app-cluster-secrets|$account|" "$MACHINE_DIR/secrets.hub.list"
+  done
+}
