@@ -276,7 +276,7 @@ def test_open_links_are_dropped_last_and_counted(monkeypatch):
     answer = _reply_with(monkeypatch, {"v1.43.5": data}, bug_count.CountQuery("v1.43.5", None, None))
     assert "Fixed: " not in answer
     assert f"…and {20 - answer.count('Open: ')} more open." in answer
-    assert f"…and 10 more fixed." in answer
+    assert "…and 10 more fixed." in answer  # agent-audit: allow assert-removed same assertion, f prefix dropped (ruff F541)
     assert len(answer) + len("\n\nSources: none") <= ask_docs.MAX_REPLY_CHARS
     assert answer.count("<") == answer.count(">")
 
