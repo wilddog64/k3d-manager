@@ -509,6 +509,64 @@ def test_live_delivery_requires_status_and_well_formed_evidence(tmp_path):
     assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
     assert 'k3dm_dispatch_codex_tokens_per_delivered{window="30d"} 107.0' in output
 
+def test_run_outcome_missing_evidence_classes_and_coverage(tmp_path, monkeypatch):
+    now = int(time.time())
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    root.mkdir(parents=True)
+    # Event shapes copied from the M4 ledger, 2026-11-01.
+    rows = [
+        event(now - 100, "start", "unrecorded", run=1),
+        event(now - 90, "codex_exit", "unrecorded", run=1, exit=0),
+        event(now - 80, "land", "unrecorded"),
+        event(now - 100, "start", "superseded", run=1),
+        event(now - 90, "codex_exit", "superseded", run=1, exit=0),
+        event(now - 80, "resume", "superseded", n=2),
+        event(now - 100, "start", "open", run=1),
+        event(now - 90, "codex_exit", "open", run=1, exit=0),
+        event(now - 7 * 86400 - 10, "start", "stale", run=1),
+        event(now - 7 * 86400, "codex_exit", "stale", run=1, exit=0),
+        event(now - 100, "start", "accepted", run=1),
+        event(now - 90, "codex_exit", "accepted", run=1, exit=0, tree="a"),
+        event(now - 80, "land", "accepted", tree="a", test_result="passed"),
+        event(now - 100, "start", "rework", run=1),
+        event(now - 90, "codex_exit", "rework", run=1, exit=0),
+        event(now - 80, "land_refused", "rework", reason="tests"),
+        event(now - 70, "resume", "rework", n=2),
+        event(now - 100, "start", "failed", run=1),
+        event(now - 90, "codex_exit", "failed", run=1, exit=1),
+        event(now - 80, "land", "failed"),
+    ]
+    ledger = root / "ledger.jsonl"
+    ledger.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+    result = dispatch_metrics._run_outcome_metrics(rows, tmp_path, now=now)
+    assert result["outcomes"] == {"accepted": 1, "progress": 0, "rework": 1, "failed": 1,
+                                  "unrecorded": 1, "superseded": 1, "open": 1, "stale": 1, "unknown": 0}
+    assert sum(result["outcomes"].values()) == 7
+    assert result["coverage"] == 3 / 7
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    original = dispatch_metrics._run_outcome_metrics
+
+    def old_fallback(*args, **kwargs):
+        metrics = original(*args, **kwargs)
+        for label in ("unrecorded", "superseded", "open", "stale"):
+            metrics["outcomes"]["unknown"] += metrics["outcomes"].pop(label)
+        for _, _, _, task_rows in metrics["rows"]:
+            for row in task_rows:
+                if row["outcome"] in {"unrecorded", "superseded", "open", "stale"}:
+                    row["outcome"] = "unknown"
+        return metrics
+
+    monkeypatch.setattr(dispatch_metrics, "_run_outcome_metrics", old_fallback)
+    baseline = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    def unaffected(text):
+        return [line for line in text.splitlines() if not line.startswith((
+            "k3dm_dispatch_run_outcomes{", "k3dm_dispatch_task_run_outcome{"))]
+    assert unaffected(output) == unaffected(baseline)
+    assert 'k3dm_dispatch_run_outcome_coverage{window="30d"} 0.42857142857142855' in output
+
+
 def test_run_outcomes_use_evidence_and_cumulative_token_increments(tmp_path):
     now = int(time.time())
     rows = [

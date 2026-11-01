@@ -1028,7 +1028,7 @@ data:
           "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
           "title": "Lines changed total",
           "description": "Code + test + documentation lines added and deleted across every measured landed task in scope.",
-          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 49},
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 52},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "sum(k3dm_dispatch_change_lines_total{window=\"$window\"})", "legendFormat": "Lines changed", "refId": "A"}],
           "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
@@ -1039,7 +1039,7 @@ data:
           "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
           "title": "Median lines / spec",
           "description": "Median code + test + documentation lines added and deleted per measured landed task.",
-          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 49},
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 52},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_change_lines_median{window=\"$window\"}", "legendFormat": "Median lines / spec", "refId": "A"}],
           "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
@@ -1050,7 +1050,7 @@ data:
           "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
           "title": "Acceptance items total",
           "description": "Must + must_not items for landed specs whose acceptance counts were measured at dispatch.",
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 49},
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 52},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_spec_acceptance_items_total{window=\"$window\"}", "legendFormat": "Acceptance items", "refId": "A"}],
           "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
@@ -1061,7 +1061,7 @@ data:
           "fieldConfig": {"defaults": {"unit": "short", "noValue": "not measured", "color": {"mode": "fixed", "fixedColor": "blue"}}, "overrides": []},
           "title": "Measured",
           "description": "First value is landed specs with recorded change size; second value is all landed specs in scope.",
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 49},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 52},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {"expr": "k3dm_dispatch_complexity_measured_tasks{window=\"$window\",measure=\"change\"}", "legendFormat": "Measured", "refId": "A"},
@@ -1154,7 +1154,7 @@ data:
           "type": "stat",
           "title": "Final worker exit → land",
           "description": "Mean wall-clock gap from the final qualifying Codex exit to land. Missing exit timestamps are excluded. This is not proven human waiting or active review; live verification occurs after landing.",
-          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 54},
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 57},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [{"expr": "k3dm_dispatch_post_exit_land_minutes_per_landed{window=\"$window\"}", "instant": true}],
           "fieldConfig": {"defaults": {"unit": "m", "color": {"mode": "fixed", "fixedColor": "orange"}}, "overrides": []},
@@ -1165,7 +1165,7 @@ data:
           "type": "bargauge",
           "title": "Human continuation prompts",
           "description": "Explicitly recorded operator events by reason. The tracked tasks bar is the coverage denominator. No historical prompts are inferred; zero means none recorded since tracking began, not proof of no human effort.",
-          "gridPos": {"h": 8, "w": 18, "x": 6, "y": 54},
+          "gridPos": {"h": 8, "w": 18, "x": 6, "y": 57},
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {"expr": "k3dm_dispatch_human_continuation_prompts{window=\"$window\"}", "legendFormat": "{{reason}}", "instant": true, "refId": "A"},
@@ -1284,9 +1284,9 @@ data:
           "id": 43,
           "type": "bargauge",
           "title": "Run outcomes",
-          "description": "Bounded counts for accepted, rework, failed, progress and unknown attempts. Unknown attempts remain visible and are not counted as rejected work.",
+          "description": "Accepted: landed with matching tree and passing tests.\nProgress: progress verdict.\nRework: tests refused before a later run.\nFailed: tests refused, nonzero exit, or abandoned.\nUnrecorded: land lacks tree or test result.\nSuperseded: a later run followed this exit.\nOpen: no land or abandon; last event is newer than seven days.\nStale: no land or abandon; last event is at least seven days old.\nUnknown: no other classification applies.",
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 6,
             "x": 0,
             "y": 33
@@ -1325,7 +1325,8 @@ data:
           "options": {
             "displayMode": "basic",
             "orientation": "horizontal",
-            "namePlacement": "left"
+            "namePlacement": "left",
+            "minVizHeight": 20
           }
         },
         {
@@ -1339,7 +1340,7 @@ data:
           "title": "Rejected-attempt Codex tokens",
           "description": "Tokens on objectively rejected runs with a known cumulative-counter increment. No data means the rejected-token total is unavailable, not zero.",
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 6,
             "x": 6,
             "y": 33
@@ -1383,9 +1384,9 @@ data:
             }
           },
           "title": "Run outcome coverage",
-          "description": "Share of runs with independently evidenced accepted, rework or failed outcomes. Progress and unknown are not evidence of acceptance or failure.",
+          "description": "Share of runs with evidenced verdicts; unrecorded, superseded, open, stale and unknown are not covered.\nAccepted: landed with matching tree and passing tests.\nProgress: progress verdict.\nRework: tests refused before a later run.\nFailed: tests refused, nonzero exit, or abandoned.\nUnrecorded: land lacks tree or test result.\nSuperseded: a later run followed this exit.\nOpen: no land or abandon; last event is newer than seven days.\nStale: no land or abandon; last event is at least seven days old.\nUnknown: no other classification applies.",
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 6,
             "x": 12,
             "y": 33
@@ -1431,7 +1432,7 @@ data:
           "title": "Codex tokens per live-verified bug",
           "description": "Mean Codex tokens for tasks whose explicit spec is a live-verified bug document. Tasks linked only through a plan remain unmatched and are excluded; no data means no attributable bug total.",
           "gridPos": {
-            "h": 6,
+            "h": 9,
             "w": 6,
             "x": 18,
             "y": 33
@@ -1475,7 +1476,7 @@ data:
             "h": 10,
             "w": 18,
             "x": 6,
-            "y": 39
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",
@@ -1679,7 +1680,7 @@ data:
             "h": 10,
             "w": 6,
             "x": 0,
-            "y": 39
+            "y": 42
           },
           "datasource": {
             "type": "prometheus",

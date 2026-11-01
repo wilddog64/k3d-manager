@@ -813,3 +813,34 @@ for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_
 PYTEST
   [ "$status" -eq 0 ]
 }
+
+@test "agent dispatch: outcome row accommodates nine labels and preserves subsequent layout" {
+  run python3 - "$BASE" <<'PY'
+import json,sys
+from pathlib import Path
+text=(Path(sys.argv[1])/"grafana-dashboard-agent-dispatch.yaml").read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-dispatch.json: |\n",1)[1].splitlines()))
+panels={p["title"]:p for p in d["panels"]}
+row=("Run outcomes", "Rejected-attempt Codex tokens", "Run outcome coverage", "Codex tokens per live-verified bug")
+for x,title in enumerate(row):
+    assert panels[title]["gridPos"]=={"h":9,"w":6,"x":6*x,"y":33}, (title,panels[title]["gridPos"])
+options=panels["Run outcomes"]["options"]
+assert options["orientation"]=="horizontal" and options["namePlacement"]=="left" and options["minVizHeight"]==20
+# Original positions before expanding the outcome row; all other dimensions stay fixed.
+later={"Per run evidence":(10,18,6,39), "First-pass live verification":(10,6,0,39),
+       "Lines changed total":(4,6,0,49), "Median lines / spec":(4,6,6,49),
+       "Acceptance items total":(4,6,12,49), "Measured":(4,6,18,49),
+       "Final worker exit → land":(8,6,0,54), "Human continuation prompts":(8,18,6,54)}
+assert {p["title"] for p in d["panels"] if p["gridPos"]["y"]>=42}==set(later)
+for title,(h,w,x,y) in later.items():
+    assert panels[title]["gridPos"]=={"h":h,"w":w,"x":x,"y":y+3},title
+# The expanded row and the immediately following row tile the whole width without gaps or overlaps.
+for y in range(33,52):
+    cells=[x for p in d["panels"] for x in range(p["gridPos"]["x"],p["gridPos"]["x"]+p["gridPos"]["w"])
+           if p["gridPos"]["y"]<=y<p["gridPos"]["y"]+p["gridPos"]["h"]]
+    assert sorted(cells)==list(range(24)),y
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}

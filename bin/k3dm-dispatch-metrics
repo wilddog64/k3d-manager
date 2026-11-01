@@ -994,9 +994,10 @@ def _run_spec_url(version, launches, launch):
     return f"{base}/tree/{branch}"
 
 
-def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
+def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None):
+    now = time.time() if now is None else now
     states = _task_states(events)
-    outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unknown")}
+    outcomes = {name: 0 for name in ("accepted", "progress", "rework", "failed", "unrecorded", "superseded", "open", "stale", "unknown")}
     rows = []
     rejected_tokens = 0
     rejected_known = False
@@ -1064,6 +1065,13 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
                 outcome, evidence = "failed", "codex_exit.exit"
             elif abandon and land is None:
                 outcome, evidence = "failed", "abandon.event"
+            elif land and (not land.get("tree") or not land.get("test_result")):
+                outcome, evidence = "unrecorded", "none"
+            elif next_launch is not None:
+                outcome, evidence = "superseded", "none"
+            elif land is None and not abandon:
+                outcome = "open" if ordered[-1][1].get("ts", 0) > now - 7 * 86400 else "stale"
+                evidence = "none"
             else:
                 outcome, evidence = "unknown", "none"
             if matching_launch not in launches:
@@ -1093,7 +1101,7 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None):
     run_total = sum(outcomes.values())
     return {
         "outcomes": outcomes,
-        "coverage": sum(count for name, count in outcomes.items() if name != "unknown") / run_total if run_total else None,
+        "coverage": sum(count for name, count in outcomes.items() if name in {"accepted", "progress", "rework", "failed"}) / run_total if run_total else None,
         "rejected_tokens": (rejected_tokens if rejected_known else 0 if run_total and not rejected_seen else None),
         "bug_cost": bug_cost,
         "bug_first_pass": bug_first_pass,
@@ -1163,7 +1171,7 @@ def _direct_bug_costs(states, repo_root, release=None, cutoff=None):
 
 
 def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, release=None,
-                   verification_landed=None, repo_root=None):
+                   verification_landed=None, repo_root=None, now=None):
     attempts = {result: 0 for result in RESULTS}
     for event in selected:
         if event.get("event") == "land":
@@ -1185,7 +1193,7 @@ def _scope_metrics(events, selected, landed_selected, prices=None, cutoff=None, 
     post_exit_land_values = []
     verification = _verification_metrics(events, verification_landed if verification_landed is not None else landed_selected,
                                          repo_root or _repo_root(), cutoff, release)
-    run_outcomes = _run_outcome_metrics(events, repo_root or _repo_root(), cutoff, release)
+    run_outcomes = _run_outcome_metrics(events, repo_root or _repo_root(), cutoff, release, now)
     rework = {cause: 0 for cause in REWORK_CAUSES}
     tasks = []
     for key, event in landed.items():
@@ -1257,7 +1265,7 @@ def _window_metrics(events, now, seconds, prices=None, repo_root=None):
             latest_lands[key] = event
     landed_selected = [event for event in latest_lands.values() if event["ts"] >= cutoff]
     return _scope_metrics(events, selected, landed_selected, prices, cutoff=cutoff,
-                          verification_landed=list(latest_lands.values()), repo_root=repo_root)
+                          verification_landed=list(latest_lands.values()), repo_root=repo_root, now=now)
 
 
 def _normalize_version(value):
@@ -1273,7 +1281,7 @@ def _releases(events):
     return sorted(releases, key=lambda version: tuple(int(part) for part in version[1:].split(".")))
 
 
-def _release_metrics(events, release, prices=None, repo_root=None):
+def _release_metrics(events, release, prices=None, repo_root=None, now=None):
     selected = [event for event in events
                 if _normalize_version(event.get("version")) == release
                 and event.get("event") in {"land", "land_refused"}]
@@ -1285,7 +1293,7 @@ def _release_metrics(events, release, prices=None, repo_root=None):
         if key not in latest_lands or event["ts"] >= latest_lands[key]["ts"]:
             latest_lands[key] = event
     return _scope_metrics(events, selected, list(latest_lands.values()), prices, release=release,
-                          repo_root=repo_root)
+                          repo_root=repo_root, now=now)
 
 
 def _render_release_duration(lines, window, events):
@@ -1890,7 +1898,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         _render_scope(lines, window, _window_metrics(events, now, seconds, prices, doc_root), events,
                       prices, coverage, True, now, claude_records, claude_prices, now-seconds)
     for release in _releases(events):
-        _render_scope(lines, release, _release_metrics(events, release, prices, doc_root), events, prices,
+        _render_scope(lines, release, _release_metrics(events, release, prices, doc_root, now), events, prices,
                       now=now, claude_records=claude_records, claude_prices=claude_prices)
     if claude_records is not None:
         if claude_records:
