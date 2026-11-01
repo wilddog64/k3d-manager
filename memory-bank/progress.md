@@ -10,6 +10,9 @@
 
 ## 2026-11-01 v1.43.14 opened
 
+- [ ] P1 verify-evidence DISPATCHED to Luna (spec corrected 90380e17). Then verify with an evidence-backed independent verifier and land.
+- [x] Dev-node P2 scope widened to hub release targets (operator approval recorded 90380e17).
+
 - Cut from `abcde772`. Carried: P1 verify-evidence bug, four open P2 docs retargeted (resume reason, extend guard, hub EC2 key, dev-node acg-up), lib-foundation #73 → v0.5.5 + brace-expansion bump + subtree pull.
 - [x] M5 appsets-reapply (hub 5/5, app-cluster 8/8) + appsets-check PASS on v1.43.14, from the operator's pasted output (2026-11-01). The first rerun went to the M4/retired hub by mistake (no change).
 - [x] `make platform-ops` on the M5 for v1.43.14 (operator paste 2026-11-01). The Keychain was locked, so the 4 DR secret syncs were skipped; the existing Secrets are intact. Rerun it before the PR if v1.43.14 changes platform-ops.
