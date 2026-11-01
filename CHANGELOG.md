@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Count Bash file reads and distinguish unchanged re-reads after compaction in the agent activity dashboard.
+
 - Show the observed automatic compaction point beside the configured setting on the agent activity dashboard.
 
 - Report an unloaded optional heartbeat without failing the hub machine check; candidate rendering failures remain errors.

@@ -18,6 +18,12 @@
 | 2026-10-22 | 400000 | Raised to 400K as a trial (`autoCompactWindow` in `.claude/settings.json`); the 200K baseline ran 4 days, not 2 weeks |
 | 2026-11-01 | 200000 | Correction, not a new trial: the 400K setting never applied. Sessions run in a 200K context window; the 140 auto-compactions from 2026-10-22 to 2026-11-01 ran at 166K–213K (median 168K), the same as the 72 before (166K–180K). `autoCompactWindow` set back to 200000. A real 400K trial needs a session with a larger context window |
 
+## Metric changes
+
+| date | change |
+|---|---|
+| 2026-11-01 | Re-read share now includes Bash reads and counts the first re-read per file per segment; earlier values are not comparable. |
+
 ## Incidents
 
 | date | kind | spec | note |

@@ -202,7 +202,7 @@ data:
             }
           },
           "title": "Re-read share after compaction",
-          "description": "Share of Read tool calls in the selected time window that re-read a file already read before the latest compaction boundary in the same session.",
+          "description": "Share of file reads in the selected window that first re-read a file after a compaction boundary in the same session.",
           "gridPos": {
             "h": 6,
             "w": 6,
@@ -366,6 +366,20 @@ data:
           "options": {"text": {"valueSize": 32}}
         },
         {
+          "id": 100,
+          "type": "stat",
+          "title": "Wasted re-read share",
+          "description": "Share of reads that re-read content identical to the pre-compaction read.",
+          "gridPos": {"h": 6, "w": 24, "x": 0, "y": 13},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"expr": "k3dm_claude_reads{window=\"$window\",kind=\"reread_unchanged\"} / ignoring(kind) (k3dm_claude_reads{window=\"$window\",kind=\"all\"} > 0)", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "fixed", "fixedColor": "blue"}, "noValue": "No reads in window", "mappings": [
+            {"type": "special", "options": {"match": "nan", "result": {"text": "No reads in window"}}},
+            {"type": "special", "options": {"match": "null", "result": {"text": "No reads in window"}}}
+          ]}, "overrides": []},
+          "options": {"text": {"valueSize": 32}}
+        },
+        {
           "id": 49,
           "type": "row",
           "title": "All Codex activity (including outside the dispatcher)",
@@ -374,7 +388,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 13
+            "y": 19
           }
         },
         {
@@ -391,7 +405,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -445,7 +459,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -499,7 +513,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -545,7 +559,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 14
+            "y": 20
           },
           "datasource": {
             "type": "prometheus",
@@ -590,7 +604,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -641,7 +655,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -692,7 +706,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -748,7 +762,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 20
+            "y": 26
           },
           "datasource": {
             "type": "prometheus",
@@ -794,7 +808,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 28
+            "y": 34
           },
           "datasource": {
             "type": "prometheus",
@@ -835,7 +849,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 40
           }
         },
         {
@@ -852,7 +866,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -898,7 +912,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -944,7 +958,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -990,7 +1004,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 35
+            "y": 41
           },
           "datasource": {
             "type": "prometheus",
@@ -1031,7 +1045,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 41
+            "y": 47
           }
         },
         {
@@ -1048,7 +1062,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1094,7 +1108,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1140,7 +1154,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1181,7 +1195,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 42
+            "y": 48
           },
           "datasource": {
             "type": "prometheus",
@@ -1232,7 +1246,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 50
+            "y": 56
           },
           "datasource": {
             "type": "prometheus",
@@ -1288,7 +1302,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 50
+            "y": 56
           },
           "datasource": {
             "type": "prometheus",
@@ -1329,7 +1343,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 28
+            "y": 34
           },
           "datasource": {
             "type": "prometheus",

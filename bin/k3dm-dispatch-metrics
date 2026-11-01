@@ -3,6 +3,8 @@
 
 import argparse
 import glob
+import hashlib
+import shlex
 import json
 import math
 import os
@@ -79,6 +81,68 @@ def _spec_stats(path):
     return result
 
 
+def _bash_reads(command, cwd):
+    """Conservatively identify file operands in a read-only first pipeline stage."""
+    if not isinstance(command, str):
+        return []
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="|&;<>")
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except (ValueError, TypeError):
+        return []
+    if not tokens or any(any(c in token for c in ";&<>") or ("|" in token and token != "|") for token in tokens):
+        return []
+    if any(token == "tee" or token.startswith("-i") for token in tokens):
+        return []
+    stage = tokens[:tokens.index("|")] if "|" in tokens else tokens
+    if not stage or stage[0] not in ("cat", "head", "tail", "sed", "awk", "grep", "rg"):
+        return []
+    program = stage[0]
+    options, operands = [], []
+    skip = False
+    has_pattern = program not in ("sed", "awk", "grep", "rg")
+    for token in stage[1:]:
+        if skip:
+            options.append(token)
+            skip = False
+        elif token.startswith("-"):
+            options.append(token)
+            skip = token in ("-e", "--regexp", "-f", "--file") or (program in ("head", "tail") and token in ("-n", "--lines", "-c", "--bytes"))
+            if token in ("-e", "--regexp", "-f", "--file"):
+                has_pattern = True
+        elif not has_pattern:
+            options.append(token)
+            has_pattern = True
+        else:
+            operands.append(token)
+    if program == "sed" and "-n" not in options:
+        return []
+    if not operands or len(operands) > 5:
+        return []
+    repo = _repo_root().resolve()
+    result = []
+    for operand in operands:
+        path = Path(operand)
+        if not path.is_absolute():
+            path = Path(cwd or repo) / path
+            path = path.resolve()
+            if not path.is_relative_to(repo):
+                return []
+        result.append((str(path), (program, *options)))
+    return result
+
+
+def _result_hash(block):
+    content = block.get("content")
+    if block.get("is_error") or content is None:
+        return None
+    body = content if isinstance(content, str) else json.dumps(content, sort_keys=True, ensure_ascii=False)
+    if re.search(r"(?:<persisted-output>|output truncated|truncated output|exceeded.*(?:limit|characters))", body, re.I):
+        return None
+    return hashlib.sha256(body.encode()).digest()
+
+
 def _claude_rollup(projects_dir, cache_path, context_out=None):
     cache = {"offsets": {}, "records": {}}
     try:
@@ -99,9 +163,11 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                 if size < offset:
                     offset = 0
                 start_offset = 0 if context_out is not None else offset
-                seen_paths = set()
-                pre_boundary_paths = set()
-                has_compacted = False
+                latest = {}
+                before = {}
+                edited = defaultdict(int)
+                segment_seen = set()
+                pending = {}
                 seen_read_calls = set()
                 pos = start_offset
                 with path.open("rb") as stream:
@@ -112,7 +178,7 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                         stripped = raw.replace(b" ", b"")
                         is_assistant = b'"type":"assistant"' in stripped
                         is_boundary = context_out is not None and b'"subtype":"compact_boundary"' in stripped
-                        if not is_assistant and not is_boundary:
+                        if not is_assistant and not is_boundary and not (context_out is not None and b'"type":"user"' in stripped):
                             continue
                         try:
                             item = json.loads(raw)
@@ -128,8 +194,19 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
-                            has_compacted = True
-                            pre_boundary_paths = set(seen_paths)
+                            before = {name: dict(ranges) for name, ranges in latest.items()}
+                            segment_seen.clear()
+                            continue
+                        if item.get("type") == "user" and context_out is not None:
+                            content = (item.get("message") or {}).get("content")
+                            for block in content if isinstance(content, list) else []:
+                                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                                    continue
+                                digest = _result_hash(block)
+                                for fpath, read_range, record, generation, previous in pending.pop(block.get("tool_use_id"), []):
+                                    if record["reread"] and digest is not None and previous == (digest, generation):
+                                        record["classification"] = "unchanged"
+                                    latest.setdefault(fpath, {})[read_range] = (digest, generation)
                             continue
                         if item.get("type") != "assistant":
                             continue
@@ -141,17 +218,35 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                     for idx, block in enumerate(content):
                                         if not isinstance(block, dict):
                                             continue
-                                        if block.get("type") == "tool_use" and block.get("name") == "Read":
-                                            call_id = block.get("id") or (message.get("id"), idx)
-                                            if call_id in seen_read_calls:
-                                                continue
-                                            seen_read_calls.add(call_id)
-                                            inp = block.get("input")
-                                            fpath = inp.get("file_path") if isinstance(inp, dict) else None
-                                            if isinstance(fpath, str) and fpath:
-                                                is_reread = has_compacted and fpath in pre_boundary_paths
-                                                reads.append({"ts": item.get("timestamp"), "reread": is_reread})
-                                                seen_paths.add(fpath)
+                                        if block.get("type") != "tool_use":
+                                            continue
+                                        call_id = block.get("id") or (message.get("id"), idx)
+                                        if call_id in seen_read_calls:
+                                            continue
+                                        seen_read_calls.add(call_id)
+                                        inp = block.get("input") or {}
+                                        if not isinstance(inp, dict):
+                                            continue
+                                        name = block.get("name")
+                                        fpath = inp.get("file_path") or inp.get("notebook_path")
+                                        if name in ("Edit", "Write", "NotebookEdit") and isinstance(fpath, str):
+                                            edited[fpath] += 1
+                                        candidates = []
+                                        if name == "Read" and isinstance(fpath, str) and fpath:
+                                            candidates = [(fpath, (inp.get("offset"), inp.get("limit"), inp.get("pages")))]
+                                        elif name == "Bash":
+                                            candidates = _bash_reads(inp.get("command"), item.get("cwd"))
+                                        for fpath, read_range in candidates:
+                                            reread = fpath in before and fpath not in segment_seen
+                                            record = {"ts": item.get("timestamp"), "reread": reread,
+                                                      "classification": "changed" if reread else None,
+                                                      "tool": name.lower()}
+                                            reads.append(record)
+                                            segment_seen.add(fpath)
+                                            previous = before.get(fpath, {}).get(read_range)
+                                            generation = edited[fpath]
+                                            pending.setdefault(call_id, []).append((fpath, read_range, record, generation, previous))
+                                            latest.setdefault(fpath, {})[read_range] = (None, generation)
                             if line_pos < offset:
                                 continue
                             mid, model = message.get("id"), message.get("model")
@@ -1769,6 +1864,12 @@ def _render_claude_context(lines, now, claude_context, repo_root):
                         rereads += 1
             lines.append(f'k3dm_claude_reads{{window="{window}",kind="all"}} {all_reads}')
             lines.append(f'k3dm_claude_reads{{window="{window}",kind="reread_after_compaction"}} {rereads}')
+            for kind in ("unchanged", "changed"):
+                count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("classification") == kind)
+                lines.append(f'k3dm_claude_reads{{window="{window}",kind="reread_{kind}"}} {count}')
+            for tool in ("read", "bash"):
+                count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("tool") == tool)
+                lines.append(f'k3dm_claude_reads_by_tool{{window="{window}",tool="{tool}"}} {count}')
         for level in ("live", "verified", "unverified"):
             lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
         for kind in INCIDENT_KINDS:
