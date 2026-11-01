@@ -92,3 +92,31 @@ setup() {
   run grep -Fq 'vault.vault.svc' "${REPO_ROOT}/plugins/ldap.sh"
   [ "$status" -ne 0 ]
 }
+
+@test "LDAP rotator notice reports failures, skips and success safely" {
+  block="$BATS_TEST_TMPDIR/notice.sh"
+  awk '/if \[ -n "\$slack_url" \]; then/ { print "set -eu"; capture=1 } capture { sub(/^ +/, ""); print; if ($0 == "fi") exit }' "$ROTATE" > "$block"
+  mkdir -p "$BATS_TEST_TMPDIR/stubs"
+  cat > "$BATS_TEST_TMPDIR/stubs/curl" <<'STUB'
+#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = -o ]; then shift; printf '%s' "${REPLY_BODY:-no_service}" > "$1"; fi
+  shift
+done
+printf '%s' "$HTTP_STATUS"
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/stubs/curl"
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=404 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'WARN slack notice not delivered: HTTP 404 no_service'* ]]
+  [[ "$output" != *'secret-webhook-marker'* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=200 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *WARN* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='' HTTP_STATUS=200 /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'WARN slack notice skipped'* ]]
+  run env PATH="$BATS_TEST_TMPDIR/stubs:$PATH" slack_url='https://secret-webhook-marker' HTTP_STATUS=404 REPLY_BODY='https://secret-webhook-marker' /bin/sh "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'secret-webhook-marker'* ]]
+}
