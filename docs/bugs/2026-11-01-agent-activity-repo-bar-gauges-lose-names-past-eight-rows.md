@@ -1,6 +1,7 @@
 # Bug: Agent Activity "Untracked by repo" and "Tokens by repo" lose every bar name once the window holds ~20 repos
 
-**Status:** OPEN — dispatched to Luna 2026-11-01 (after the re-read share fix landed at 65cb87cc)
+**Status:** VERIFIED — `badbb970` (Luna; Claude review, independent verify); E2 live screenshot pending
+**Fix commit:** badbb970
 **Priority:** P3
 **Severity:** low — the bar values are correct; the operator cannot tell which repo a bar belongs to; no runtime impact
 **Approval:** operator, 2026-11-01 ("file two P3 bug then all to Luna")
@@ -75,3 +76,13 @@ interface:
   - Prometheus metrics k3dm_codex_untracked_sessions{window,repo,mode}, k3dm_codex_tokens{window,repo}
   - Grafana /d/k3dm-agent-activity
 ```
+
+## Verification (2026-11-01, Claude)
+
+- Review: the diff touches only panels 54 and 56 targets (`topk(8, <sum>)` + `(sum(<sum>) - sum(topk(8, <sum>))) > 0` legend `other`); `h` stays 8 (>= 5 for 9 rows), `namePlacement: top` kept.
+- Pre-fix red: Luna's new bats test `repo gauges cap named series and preserve the remainder` fails against the pre-fix dashboard (`not ok 1`).
+- Independent verifier (Acceptance block only, scratchpad `verify_bars.py`): PASS on the fix; on the pre-fix file it reports M1/M2 for both panels. Checks N1 (every other panel byte-identical, count unchanged), N2 (no rectangle overlap), N3 (metric, `$window`, `by` labels).
+- Gates: `agent_dispatch_dashboard.bats` 36/36; `test_dashboard_queries.py` pass; `make validate-manifests` 85 valid; `git diff --check` ok.
+- Land: first refused by the land fast gate — `test_dispatch_metrics.py::test_dispatch_dashboard_window_variable_and_release_link` `assert 85 == 83` (the pinned `$window` expression count; the two new `other` targets add two). Claude raised the pin to 85 with its reason and landed with `--allow-out-of-scope` (that test file is not in the spec's Files). Landed `badbb970`, pushed; `verify --result pass --verifier claude` recorded.
+- Errors seen: the refused land above (explained, fixed). None other.
+- Pending: E2 — operator screenshot of `/d/k3dm-agent-activity`, Window 30d, after the hub syncs (`make platform-ops` / reapply).

@@ -142,3 +142,16 @@ interface:
 ```
 
 **Intent approved:** operator, 2026-10-31 ("as well as those two bugs")
+
+## Live E4 (2026-11-01, Claude, M4)
+
+- `make fast-gate BASE=bd68d6ff53cfbec771f3c6b8c253edf44a2ae4db` (v1.43.12 merge base): rc 2. Timing met (TOTAL 202 s vs
+  SLOWEST 199 s `codex_dispatch.bats`), but `agent_dispatch_dashboard.bats` FAIL, all 35 `not ok`. Cause: make exports
+  `BASE` and the suite reads `BASE` as its dashboard directory — filed P3
+  `docs/bugs/2026-11-01-make-fast-gate-base-leaks-into-dashboard-suite.md`.
+- `scripts/ci/fast_gate.sh bd68d6ff…` (positional, nothing else touching the repo): rc 0, 66 PASS, TOTAL 201 s vs SLOWEST
+  199 s. Skips all labelled: promtool tests in `test_dispatch_metrics.py` and `test_dashboard_queries.py` ("promtool not
+  installed"), `test_dashboard_queries.py` "no tests remain". Also printed "43 more tests name touched files — run make test".
+- Errors seen: the make-form red above (explained, filed); an earlier positional run printed `FAIL repository branches/
+  worktrees changed during fast gate` because Claude ran a `land` concurrently — the snapshot guard working, not a defect.
+- Verdict: E4 timing and per-check table PASS through the script; the `make fast-gate BASE=` form passes once the P3 lands.
