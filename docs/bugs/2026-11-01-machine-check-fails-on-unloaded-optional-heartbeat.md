@@ -1,6 +1,8 @@
 # Bug: `make machine-check ROLE=hub` can never pass, because the never-loaded heartbeat agent counts as missing
 
-**Status:** FIXED — `59b5fde6`, `4b47e7d7`, `78800eb7` (Luna; Claude review); live check E2 pending
+**Status:** LIVE-VERIFIED
+**Live evidence:** 2026-11-01 · run machine-check-m5-hub · env m5-air · scenario machine-check-role-hub · commit 28ba803a · proves E2
+**Fix commit:** 59b5fde6
 **Priority:** P3
 **Severity:** low — the hub check exits 1 on every run even when every real item is ok, so a real failure is hidden behind a permanent red; no runtime impact
 **Approval:** operator, 2026-11-01 ("then file a P3 and dispatch to Luna")
@@ -104,3 +106,10 @@ interface:
   matched `gc` inside the bats temp dir `bats-run-7gccFg`, so every `git -C <path>` call counted as a mutation. The
   subcommands now match as whole words (a real `git gc` still matches).
 - Land tests: `machine_setup.bats` + `machine_setup_acceptance.bats` 125/125; fast gate green.
+
+## Live verification (E2), 2026-11-01
+
+- M5 at `28ba803a`, operator ran `make machine-check ROLE=hub` in a local Terminal; Claude read `/tmp/machine-check.log`
+  over SSH (read-only): `agent:bin/k3dm-heartbeat-setup   not loaded (optional; review candidates: docs/howto/independent-heartbeats.md)`,
+  `agent:bin/k3dm-hermes-setup ok`, and no `missing`, `failed` or `Error` line. This also closes E4 of
+  `docs/plans/v1.43.12-one-command-machine-setup.md`.
