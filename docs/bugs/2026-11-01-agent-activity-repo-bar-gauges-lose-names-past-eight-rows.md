@@ -8,7 +8,7 @@
 **Detected by:** operator (screenshot 514, agent-activity, Window 30d), root cause by Claude
 **Affected:** `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml` (panels 54 "Untracked by repo", 56 "Tokens by repo")
 **Branch:** `k3d-manager-v1.43.13`
-**Related:** `docs/bugs/2026-10-24-agent-activity-titles-and-bar-labels-truncated.md` (Recurrence 2026-11-01 records the symptom; this file is the dispatchable fix); `docs/plans/v1.43.14-cost-attribution-coverage.md` (changes the same panels' data later)
+**Related:** `docs/bugs/2026-10-24-agent-activity-titles-and-bar-labels-truncated.md` (Recurrence 2026-11-01 records the symptom; this file is the dispatchable fix); `docs/plans/v1.43.15-cost-attribution-coverage.md` (changes the same panels' data later)
 
 ## Observed failure
 

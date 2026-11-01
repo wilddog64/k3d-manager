@@ -89,7 +89,7 @@ Grafana has no height left for the names.
 
 Proposed fix (not yet dispatched): show at most 8 rows (`topk(8, ...)`, the remainder summed as `other`) and keep h so
 each row has its name line; a dashboard test asserts the row cap and fails on the current file. Normalising clone
-names to their repo is out of scope here; `docs/plans/v1.43.14-cost-attribution-coverage.md` changes the same panels'
+names to their repo is out of scope here; `docs/plans/v1.43.15-cost-attribution-coverage.md` changes the same panels'
 data, so do this fix first or fold it into that plan's dashboard step.
 
 Dispatchable fix filed as `docs/bugs/2026-11-01-agent-activity-repo-bar-gauges-lose-names-past-eight-rows.md` (P3, 2026-11-01).

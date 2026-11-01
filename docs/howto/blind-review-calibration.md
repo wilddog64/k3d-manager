@@ -1,7 +1,7 @@
 # Blind review calibration
 
 Step 2 of the review-improvement sequence the operator adopted on 2026-10-31 (recorded in
-`docs/plans/v1.43.13-agent-instruction-files-refresh.md`, "Not in this plan"). The goal is to measure
+`docs/plans/v1.43.14-agent-instruction-files-refresh.md`, "Not in this plan"). The goal is to measure
 where Claude's PR review differs from the operator's before anyone changes the review instructions.
 This step changes no review instruction, skill or prompt.
 
