@@ -5,6 +5,7 @@
 - Fix the LDAP password rotator's Slack URL decoding for BusyBox so it can send rotation notices.
 - Log failed or skipped rotator Slack notices without failing a successful password rotation.
 - Bound pseudo-terminal machine setup tests and fast-gate checks with timeouts that terminate hung processes and report the limit.
+- Count ask-docs bugs at the fetched upstream ref by default, and identify a fallback to local HEAD when no upstream is available.
 - Isolate fast-gate test Git commands from linked-worktree hook variables and detect changes to repository configuration, branches, and worktrees.
 - Preserve each land test attempt’s log and show test counts and the first failure for refused runs.
 - Preserve diagnostic prose when the AI reply filter withholds an inline command, and stop treating tool names in ordinary sentences as commands. Commands after short labels and stacked list, blockquote, shell prompt, or run markers are still withheld when disallowed.

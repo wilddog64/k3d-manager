@@ -115,8 +115,15 @@ def _select(releases, release, ref, root):
 
 
 def reply(query):
-    ref = os.environ.get("K3DM_INDEX_REF", "HEAD")
     root = Path(__file__).resolve().parents[2].parent
+    ref = os.environ.get("K3DM_INDEX_REF")
+    no_upstream = False
+    if not ref:
+        rc, output, timed_out = proc._spawn_capture_text(
+            ["git", "rev-parse", "--abbrev-ref", "@{upstream}"], cwd=root, timeout=10)
+        ref = output.strip() if rc == 0 and not timed_out else ""
+        if not ref:
+            ref, no_upstream = "HEAD", True
     cmd = [sys.executable, str(Path(__file__).resolve().parents[2] / "bug-tally.py"),
            "--json", "--counts-only", "--ref", ref]
     rc, output, timed_out = proc._spawn_capture_text(cmd, cwd=root, timeout=30)
@@ -132,9 +139,10 @@ def reply(query):
     names, header = _select(releases, query.release, ref, root)
     selected = {name: releases[name] for name in names if releases.get(name) is not None}
     if not selected:
+        fallback = "\nCounted at local HEAD (no upstream)." if no_upstream else ""
         if header:
-            return header + "\nNo bug docs in those releases."
-        return f"No bug tally found for {query.release}."
+            return header + "\nNo bug docs in those releases." + fallback
+        return f"No bug tally found for {query.release}." + fallback
 
     def counts_of(data):
         return data.get("by_priority", {}).get(query.priority, {}) if query.priority else data
@@ -196,6 +204,8 @@ def reply(query):
             omissions[release]["fixed"] = max(0, len(closed_items) - 10)
     if unset_total:
         lines.append(f"{unset_total} docs in these releases have no Priority line, so they are not counted here.")
+    if no_upstream:
+        lines.append("Counted at local HEAD (no upstream).")
     lines.append(f"_Counted from docs/bugs/ at {ref}; release = Branch: line, else the release the doc was added in._")
     # Reserve the ask-docs source wrapper and omission notices before returning.
     from webhook.ask_docs import MAX_REPLY_CHARS
