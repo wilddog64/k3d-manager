@@ -105,7 +105,6 @@ that are missing on the M5, and none of them is in `secrets.hub.list`. Items tha
 | `k3d-manager-cloudflared-cert`, `k3d-manager-cloudflared-credentials` (`cloudflared`) | `bin/cluster-up:657`, `:1922` |
 | `k3d-manager-signing` (`k3dm-cosign-key`, `k3dm-cosign-password`) | `scripts/plugins/signing.sh`, `scripts/lib/hermes/repairs.py` |
 | `k3dm-webhook-token-cloud-runner` (`k3dm`) | `scripts/lib/webhook/auth.py` |
-| `gemini-cli-api-key` (`default-api-key`) | `scripts/lib/hermes/prior_art.py` (optional) |
 | `k3d-manager-slack-bot-token` (`cliang`) | `bin/hub-new` (the manifest lists a different service, `k3d-manager-slack-bot-token-bot`) |
 
 Missing items with no hub code reader: `copilot-cli`, `GitHub - https://api.github.com`, `github-packages-token`,
@@ -130,3 +129,16 @@ values, so real external credentials (`payment/stripe`, `payment/paypal`, `githu
   pre-fix doctor lacks (expected); the rebase conflict above. None other.
 - Pending live: on the M5 run `make machine-setup ROLE=hub FROM=m4-air.local`; `--check` reports no hub item missing;
   then `/cluster-up aws` gets past the ACG login.
+
+## Live run on the M5 (2026-11-01, operator; read by Claude from the M5 tmux pane)
+
+`make machine-setup ROLE=hub FROM=m4-air.local` after fast-forwarding the M5 checkout to `9f323f34`: every new line
+`ok` — `k3dm-slack-role-map:k3dm`, `k3dm-acg-pluralsight:username`/`password`, all 14
+`k3d-manager-app-cluster-secrets` accounts, both cloudflared items, both signing accounts,
+`k3dm-webhook-token-cloud-runner:k3dm`, `k3d-manager-slack-bot-token:cliang`. The one failure:
+`secret:gemini-cli-api-key missing`, then `make: *** [machine-setup] Error 1`. The M4 item exists
+(`default-api-key`), but its ACL belongs to the Gemini CLI, so the non-GUI stream export cannot read it
+(memory `reference_gemini_cli_keychain_item_prompts_security`). The hub reads it only as an optional input to
+`prior_art.py`, and the worker manifest already carries it, so Claude removed the line from `secrets.hub.list`
+rather than leave a permanent `--check` failure on the hub. An earlier run the same morning used the pre-fix checkout
+(`⇣20`), so it checked the old list and pulled nothing.
