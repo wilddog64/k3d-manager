@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P2
 **Severity:** medium — the hub's Slack AI analysis is unavailable ("agy: not-installed; gemini: not-installed"); workaround is a manual install and login on the hub
-**Approval:** pending
+**Approval:** operator, 2026-10-31 ("go ahead" to dispatch, after choosing the make machine-setup route over a manual install)
 **Filed:** 2026-10-31
 **Detected by:** operator (Slack ask-docs reply on the M5 hub), root cause by Claude
 **Affected:** `scripts/etc/machine/brew.hub.list`, `scripts/etc/machine/brew.worker.list`, `bin/k3dm-machine-setup`, `docs/howto/m5-hub-migration.md`
