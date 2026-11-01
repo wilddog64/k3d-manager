@@ -2259,3 +2259,31 @@ def test_run_spec_link_accepts_recorded_doc_kinds(tmp_path, directory):
     ], 0, 100, repo_root=tmp_path)
     line = next(line for line in output.splitlines() if line.startswith("k3dm_dispatch_task_run_outcome{"))
     assert f'spec_url="https://github.com/wilddog64/k3d-manager/blob/k3d-manager-v1.43.9/{spec}"' in line
+
+
+def test_attempt_evidence_uses_ledger_paths_and_redacts(tmp_path, monkeypatch):
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path))
+    run = tmp_path / "9.9.9" / "attempt.run"
+    run.mkdir(parents=True)
+    secret = "ghp_" + "a" * 36
+    (run / "land-test.1.log").write_text("".join(f"ok {i} - pass\n" for i in range(100)) + f"not ok 101 - {Path.home()}/private {secret}\n")
+    (run / "land-test.2.log").write_text("1 passed in 0.1s\n")
+    now = int(time.time())
+    rows = [event(now-6, "start", "attempt", run=1), event(now-5, "codex_exit", "attempt", run=1, tree="a"),
+            event(now-4, "land_refused", "attempt", reason="tests", validation=str(run / "land-test.1.log")),
+            event(now-3, "resume", "attempt", run=2), event(now-2, "codex_exit", "attempt", run=2, tree="b"),
+            event(now-1, "land", "attempt", tree="b", test_result="passed", validation=str(run / "land-test.2.log"))]
+    output = dispatch_metrics.render(rows, 0, now, repo_root=tmp_path)
+    assert '100/101 ok; first fail: 101 - ~/private <redacted>' in output
+    assert 'attempt.run/land-test.1.log' in output and 'attempt.run/land-test.2.log' in output
+    assert secret not in output and str(Path.home()) not in output
+
+
+def test_refused_pytest_summary(tmp_path, monkeypatch):
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path))
+    run = tmp_path / "v1.2.3" / "sample.run"
+    run.mkdir(parents=True)
+    (run / "land-test.1.log").write_text("FAILED tests/test_a.py::test_bad - error\n1 failed, 2 passed in 1.0s\n")
+    summary, path = dispatch_metrics._evidence_details("v1.2.3", "sample", "land_refused.tests", {"validation": "land-test.1.log"})
+    assert summary == "1 failed, 2 passed; first fail: tests/test_a.py::test_bad"
+    assert path.endswith("land-test.1.log")

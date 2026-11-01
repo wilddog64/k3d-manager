@@ -169,20 +169,22 @@ def test_metrics_calls_shipper_only_after_successful_non_dry_push(monkeypatch, t
     assert calls == []
 
 
-def test_ships_only_the_latest_run_of_a_slug(setup_run, loki):
+def test_ships_each_attempt_once(setup_run, loki):
     root, run_dir = setup_run
-    (run_dir / "land-test.log").write_text("second attempt\n")
-    rows = [json.loads(line) for line in (root / "ledger.jsonl").read_text().splitlines()]
-    rows[1]["tree"] = "old"
+    (run_dir / "land-test.1.log").write_text("failed attempt\n")
+    (run_dir / "land-test.2.log").write_text("passing attempt\n")
+    rows = [json.loads(line) for line in (root / "ledger.jsonl").read_text().splitlines()][:2]
     rows += [
-        {"ts": 4, "event": "land_refused", "version": "v1.43.7", "slug": "sample", "reason": "tests"},
+        {"ts": 4, "event": "land_refused", "version": "v1.43.7", "slug": "sample", "reason": "tests", "validation": str(run_dir / "land-test.1.log")},
         {"ts": 5, "event": "resume", "version": "v1.43.7", "slug": "sample", "run": 2},
         {"ts": 6, "event": "codex_exit", "version": "v1.43.7", "slug": "sample", "run": 2, "exit": 0, "tree": "new"},
-        {"ts": 7, "event": "land", "version": "v1.43.7", "slug": "sample", "test_result": "passed", "tree": "new"},
+        {"ts": 7, "event": "land", "version": "v1.43.7", "slug": "sample", "test_result": "passed", "tree": "new", "validation": str(run_dir / "land-test.2.log")},
     ]
     (root / "ledger.jsonl").write_text("\n".join(json.dumps(row) for row in rows) + "\n")
     assert dispatch_logs.main([]) == 0
-    assert [request["streams"][0]["stream"]["run"] for request in loki.requests] == ["2"]
+    assert dispatch_logs.main([]) == 0
+    assert [request["streams"][0]["stream"]["run"] for request in loki.requests] == ["1", "2"]  # agent-audit: allow assert-removed latest-only expectation replaced by every-attempt-once
+    assert "failed attempt" in str(loki.requests[0]) and "passing attempt" in str(loki.requests[1])
 
 
 def test_run_log_panel_reads_every_shipped_line():

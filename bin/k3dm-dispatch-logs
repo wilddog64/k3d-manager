@@ -46,44 +46,35 @@ def _rows(ledger):
         except (ValueError, TypeError):
             continue
     rows = []
+    seen = set()
     for (version, slug), events in grouped.items():
         if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
             continue
         if not isinstance(slug, str) or not SLUG_RE.fullmatch(slug):
             continue
-        launches = sorted((e for e in events if e.get("event") in {"start", "resume"}), key=lambda e: e["ts"])
-        exits = sorted((e for e in events if e.get("event") in {"codex_exit", "agent_exit"}), key=lambda e: e["ts"])
-        seen = set()
-        for index, exit_event in enumerate(exits, 1):
+        events.sort(key=lambda e: e["ts"])
+        exits = [e for e in events if e.get("event") in {"codex_exit", "agent_exit"}]
+        for event in events:
+            if not (event.get("event") == "land" and event.get("test_result") == "passed" or
+                    event.get("event") == "land_refused" and event.get("reason") == "tests"):
+                continue
+            previous = [e for e in exits if e["ts"] < event["ts"]]
+            if not previous:
+                continue
+            exit_event = previous[-1]
             run = exit_event.get("run")
             if type(run) is not int or run < 1:
-                run = index
-            if run in seen:
+                run = len(previous)
+            validation = event.get("validation")
+            name = Path(validation).name if isinstance(validation, str) and validation else "land-test.log"
+            if not re.fullmatch(r"land-test(?:\.\d+)?\.log", name):
                 continue
-            seen.add(run)
-            matching_launch = next((e for e in launches if e.get("run", e.get("n")) == run), None)
-            if matching_launch is None and index <= len(launches):
-                matching_launch = launches[index - 1]
-            if matching_launch is None:
+            key = (version, slug, name)
+            if key in seen:
                 continue
-            next_launch = next((e["ts"] for e in launches if e["ts"] > exit_event["ts"]), None)
-            refusals = [e for e in events if e.get("event") == "land_refused" and e.get("reason") == "tests"
-                        and e["ts"] > exit_event["ts"] and (next_launch is None or e["ts"] < next_launch)]
-            land = next((e for e in reversed(events) if e.get("event") == "land"), None)
-            if land and land.get("test_result") == "passed" and land.get("tree") and land.get("tree") == exit_event.get("tree"):
-                evidence = "land-test.log"
-            elif refusals:
-                evidence = "land_refused.tests"
-            elif exit_event.get("exit") not in (None, 0):
-                evidence = "codex_exit.exit"
-            else:
-                evidence = "none"
-            if evidence in EVIDENCE:
-                rows.append((version, slug, run))
-    latest = {}
-    for version, slug, run in rows:
-        latest[(version, slug)] = max(run, latest.get((version, slug), run))
-    return [(version, slug, str(run)) for (version, slug), run in latest.items()]
+            seen.add(key)
+            rows.append((version, slug, str(run), name))
+    return rows
 
 
 def _clean_line(line):
@@ -118,9 +109,9 @@ def _state(path):
         return {}
 
 
-def _ship(row, lines, digest, state, state_path, base, dry_run):
+def _ship(row, lines, digest, state, state_path, base, dry_run, state_key=None):
     version, slug, run = row
-    key = "/".join(row)
+    key = state_key or "/".join(row)
     labels = {"job": "k3dm-dispatch-run", "version": version, "slug": slug, "run": run}
     if dry_run:
         print(f"would push labels={json.dumps(labels, sort_keys=True)} lines={len(lines)}")
@@ -158,19 +149,20 @@ def main(argv=None):
     state = _state(state_path)
     base = os.environ.get("K3DM_DISPATCH_LOKI_URL", "http://localhost:19100").rstrip("/")
     failures = 0
-    for version, slug, run in _rows(root / "ledger.jsonl"):
-        log_path = root / version / f"{slug}.run" / "land-test.log"
+    for version, slug, run, name in _rows(root / "ledger.jsonl"):
+        log_path = root / version / f"{slug}.run" / name
         try:
             raw = log_path.read_bytes()
         except OSError:
             continue
         digest = hashlib.sha256(raw).hexdigest()
-        if state.get("/".join((version, slug, run))) == digest:
+        state_key = "/".join((version, slug, run, name))
+        if state.get(state_key) == digest:
             continue
         lines = _lines(log_path, digest)
         if lines is None:
             continue
-        if not _ship((version, slug, run), lines, digest, state, state_path, base, args.dry_run):
+        if not _ship((version, slug, run), lines, digest, state, state_path, base, args.dry_run, state_key):
             failures += 1
     return 1 if args.strict and failures else 0
 

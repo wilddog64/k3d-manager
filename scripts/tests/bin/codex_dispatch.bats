@@ -756,9 +756,11 @@ EOF
   [ "$(<"$FIXTURE/a.txt")" = original ]
   [ -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/land-test.log" ]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock" ]
-  run dispatch land --slug one --test false
+  run dispatch land --slug one --test 'printf "not ok 1 - failure\n"; false'
   [ "$status" -eq 2 ]; [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$before" ]
-  run dispatch land --slug one --test true
+  run dispatch land --slug one --test 'printf "ok 1 - success\n"'
+  [ "$(cat "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/land-test.2.log")" = 'not ok 1 - failure' ]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/land-test.3.log")" = 'ok 1 - success' ]
   [ "$status" -eq 0 ]; [[ "$output" == *"tests: passed"* ]]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/.land.lock" ]
 }

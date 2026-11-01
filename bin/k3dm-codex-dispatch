@@ -802,13 +802,29 @@ _dispatch_land() {
     "K3DM_STATE_DIR=$run/state/state" "K3DM_LOG_DIR=$run/state/logs" "K3DM_TMP_ROOT=$run/state/tmp"
     "K3DM_PORT_CACHE_DIR=$run/state/port-cache" "TMPDIR=$run/state/tmp"
   )
+  local validation="$run/land-test.log" attempt=0 existing
   if (( no_test )); then
     echo "tests: skipped (--no-test)"
-  elif ! (cd "$task" && env "${land_env[@]}" bash -c "$test_cmd" >"$run/land-test.log" 2>&1); then
-    tail -n 20 "$run/land-test.log"
-    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason tests '.["reason"]=$reason'
+  else
+    for existing in "$run"/land-test.*.log; do
+      [[ -f "$existing" ]] && ((attempt+=1))
+    done
+    ((attempt+=1))
+    validation="$run/land-test.$attempt.log"
+    # Avoid overwriting an existing attempt even if the sequence has gaps.
+    while [[ -e "$validation" ]]; do
+      ((attempt+=1))
+      validation="$run/land-test.$attempt.log"
+    done
+    ln -sfn "${validation##*/}" "$run/land-test.log"
+  fi
+  if (( no_test )); then
+    :
+  elif ! (cd "$task" && env "${land_env[@]}" bash -c "$test_cmd" >"$validation" 2>&1); then
+    tail -n 20 "$validation"
+    _dispatch_ledger_event_best_effort land_refused "$version" "$slug" --arg reason tests --arg validation "$validation" '.["reason"]=$reason|.validation=$validation'
     _dispatch_schedule_metrics
-    _dispatch_error "tests failed after rebase onto $target; see $run/land-test.log"
+    _dispatch_error "tests failed after rebase onto $target; see $validation"
   else
     echo "tests: passed"
   fi
@@ -839,7 +855,7 @@ _dispatch_land() {
   (( no_test )) && test_result=skipped
   _dispatch_ledger_event_best_effort land "$version" "$slug" --argjson verifier_lines "$verifier_lines" \
     --argjson wait_seconds "$wait_seconds" --arg tree "$(cat "$run/codex-tree" 2>/dev/null || true)" \
-    --arg validation "$run/land-test.log" --arg test_result "$test_result" \
+    --arg validation "$validation" --arg test_result "$test_result" \
     --argjson target_moved_commits "$target_count" --arg commit "$land_commit" --argjson change "$change_json" \
     --arg actor "$landing_actor" --arg vendor "$landing_vendor" --arg model "$landing_model" --argjson review_pending "$review_pending" \
     '.verifier_lines=$verifier_lines|.wait_seconds=$wait_seconds|.tree=$tree|.validation=$validation|.test_result=$test_result|.target_moved_commits=$target_moved_commits|.landing_actor={actor:$actor,vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:(if $actor=="unknown" then "unknown" else "declared" end)}|.review_status=(if $review_pending then "pending" else "unknown" end)|if $commit!="" then .commit=$commit else . end|if ($change|type)=="object" then .change=$change else . end|.chosen=true'

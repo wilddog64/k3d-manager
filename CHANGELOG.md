@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Isolate fast-gate test Git commands from linked-worktree hook variables and detect changes to repository configuration, branches, and worktrees.
+- Preserve each land test attempt’s log and show test counts and the first failure for refused runs.
 - Machine setup reported `brew:azure-cli missing` on the M5 and failed every run, because Homebrew now installs azure-cli as a cask while the check only asked `brew list --formula`; `brew install` could not repair it. A manifest entry with no `cask:` or `formula:` prefix now counts as present when either kind is installed, so the M5 (cask) and the M4 (older formula) both pass. Prefixed entries stay strict.
 - Run a fast local gate on pushes and task landings to catch relevant lint and test failures early.
 - On the M5, direnv waited for an HTTPS credential prompt because setup had left managed GitHub remotes on HTTPS. Setup now switches those remotes to SSH when authentication works and restores HTTPS if verification fails. The M5 also had 10,585 group- or world-writable entries under `~/.zplug`, stopping compinit; setup repairs home completion permissions and reports insecure Homebrew paths. It preserves linked SSH configuration. The new interactive login-shell check catches these problems, which did not appear in the existing setup checks.
