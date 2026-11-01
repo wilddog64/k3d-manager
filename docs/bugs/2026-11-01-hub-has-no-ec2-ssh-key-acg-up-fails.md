@@ -96,3 +96,22 @@ interface:
   - acg_provision (via make up CLUSTER_PROVIDER=k3s-aws)
   - aws ec2 import-key-pair / describe-key-pairs
 ```
+
+## Recurrence: an empty `.pub` from the failed run poisons the next one (job `e7a0ecfb`, 2026-11-01)
+
+After the operator created the key, job `e7a0ecfb` reached `create-stack`, which then failed: every instance got
+`The key pair 'k3d-manager-key' does not exist`, and the stack went to `ROLLBACK_COMPLETE`. The first failed run
+(`87c78389`) ran `ssh-keygen -y -f <missing pem> > k3d-manager-key.pub`. The redirect created a 0-byte `.pub`
+before `ssh-keygen` failed. On the next run the `.pub` existed, so derivation was skipped. The import of empty key
+material then failed with its error hidden. A dry-run import of the real key succeeds (`DryRunOperation`).
+
+Added to the fix: `acg_provision` derives the `.pub` into a temp file and moves it into place only on success. It
+treats an empty `.pub` as missing. It confirms the key pair exists (`describe-key-pairs`) before `create-stack`.
+
+```yaml
+must:
+  M5: a 0-byte k3d-manager-key.pub next to a valid pem is re-derived, not imported empty
+must_not:
+  N4: a failed ssh-keygen derivation never leaves a k3d-manager-key.pub behind
+  N5: create-stack is never called when the key pair is absent from the sandbox after import
+```
