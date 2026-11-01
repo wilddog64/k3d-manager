@@ -105,6 +105,7 @@ SH
   cat > "$STUBS/security" <<'SH'
 #!/bin/sh
 printf 'security %s\n' "$*" >> "$CALL_LOG"
+[ "$1" = show-keychain-info ] && exit 0
 exit 1
 SH
   cat > "$STUBS/git" <<'SH'
@@ -1126,4 +1127,35 @@ SH
   grep -q "^brew " "$CALL_LOG"
   run grep -Eq '^(brew uninstall|agy |gemini |security find-generic-password)' "$CALL_LOG"
   [ "$status" -eq 1 ]
+}
+
+@test "machine setup: login Keychain status uses exit code without reading values" {
+  setup_machine_fixture
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  printf 'fixture|k3dm|test|operator:test\n' > "$FIXROOT/scripts/etc/machine/secrets.hub.list"
+  cat > "$STUBS/security" <<'SH'
+#!/bin/sh
+printf 'security %s\n' "$*" >> "$CALL_LOG"
+case "$1" in
+  # m5-air.local, 2026-11-01: operator's unlocked local Terminal capture.
+  show-keychain-info) if [ -e "$CALL_LOG.locked" ]; then
+    # m4-air.local and m5-air.local, 2026-11-01: SSH capture, rc 36.
+    echo 'security: SecKeychainCopySettings: User interaction is not allowed.' >&2; exit 36
+  fi; echo 'Keychain "login.keychain-db" no-timeout'; exit 0 ;;
+  find-generic-password) exit 0 ;;
+esac
+exit 1
+SH
+  chmod +x "$STUBS/security"
+  run_machine --role hub --check
+  [[ "$output" == *'keychain:login'*'ok'* ]]
+  touch "$CALL_LOG.locked"
+  for mode in check setup; do
+    if [[ "$mode" == check ]]; then run_machine --role hub --check
+    else run_machine --role hub; fi
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
+  done
+  ! grep -E 'security .* -(w|g)( |$)|security unlock-keychain' "$CALL_LOG"
+  [[ "$output" != *SECRETVALUE_LEAK* ]]
 }

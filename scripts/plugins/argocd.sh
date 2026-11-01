@@ -1775,6 +1775,13 @@ function _argocd_keychain_value() {
    _no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "${_service}" "${_account}" 2>/dev/null || true
 }
 
+function _argocd_keychain_unreadable() {
+   local _service="${1:?service required}" _account="${2:?account required}"
+   [[ "$(uname -s)" == "Darwin" ]] || return 1
+   security find-generic-password -s "${_service}" -a "${_account}" >/dev/null 2>&1 || return 1
+   _warn "[argocd] ${_service} present in Keychain but unreadable (login Keychain locked?)"
+}
+
 function argocd_sync_webhook_token_secret() {
    local _ns="${1:-cicd}"
    local _service="k3dm-webhook-token"
@@ -1784,6 +1791,7 @@ function argocd_sync_webhook_token_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _warn "[argocd] ${_service} not found in Keychain (${_service}/${_account}) — run bin/k3dm-webhook-setup to create it, then re-run; skipping cluster Secret sync"
       return 0
    fi
@@ -1802,6 +1810,7 @@ function argocd_sync_app_rebuild_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       if _kubectl --no-exit get secret "${_name}" -n "${_ns}" >/dev/null 2>&1; then
          _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — Secret already present in ${_ns}; leaving as-is"
       elif _kubectl --no-exit get cronjob app-cve-scan -n "${_ns}" >/dev/null 2>&1; then
@@ -1826,6 +1835,7 @@ function argocd_sync_git_writer_secret() {
    _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional CVE git-writer PAT; skipping (store a dedicated fine-grained PAT scoped to wilddog64/k3d-manager contents:write ONLY — do NOT reuse a broad gh CLI token)"
       return 0
    fi
@@ -1843,6 +1853,7 @@ function _argocd_sync_notifications_slack_secret_untraced() {
 
    _value=$(_argocd_keychain_value "${_service}" "${_account}")
    if [[ -z "${_value}" ]]; then
+      if _argocd_keychain_unreadable "${_service}" "${_account}"; then return 0; fi
       _info "[argocd] ${_service} not in Keychain"
       return 0
    fi

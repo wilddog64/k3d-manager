@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Report a locked login Keychain during machine setup and distinguish unreadable Keychain items in Argo CD secret sync.
+
 - Reapply the Grafana and enabled LDAP credential rotators during platform-ops deployment, reporting each rotator's outcome.
 
 - Install Antigravity CLI for hub and worker setup and require `agy` on the webhook PATH. Gemini is an optional fallback and is no longer installed by setup because its Homebrew formula is deprecated.

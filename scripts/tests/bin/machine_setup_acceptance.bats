@@ -605,3 +605,17 @@ STUB
     [ "$status" -eq 1 ]
   done
 }
+
+@test "keychain: locked login makes an otherwise complete hub check fail" {
+  [[ "$HOME_FX" == "$BATS_TEST_TMPDIR/"* && "$STUBS" == "$BATS_TEST_TMPDIR/"* ]]
+  complete_machine hub
+  ms --role hub --check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'keychain:login'*'ok'* ]]
+  miss "security show-keychain-info $HOME_FX/Library/Keychains/login.keychain-db"
+  ms --role hub --check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'keychain:login'*'locked (reads will fail'* ]]
+  ! grep -E '^security (unlock-keychain|.* -(w|g)( |$))' "$CALLS"
+  [[ "$output" != *SECRETVALUE_LEAK* ]]
+}

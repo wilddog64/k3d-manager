@@ -361,7 +361,7 @@ secret_present() {
 }
 
 check_secrets() {
-  local service account purpose command missing_hint=0 has_missing=0
+  local service account purpose command missing_hint=0 has_missing=0 keychain_checked=0
   if [[ "$mode" == dry-run && -n "$from_host" ]]; then report secrets "would pull secrets from $from_host"; fi
   if [[ "$mode" == setup && -n "$from_host" && -t 0 ]]; then
     while IFS='|' read -r service account purpose command <&3; do
@@ -377,6 +377,11 @@ check_secrets() {
   fi
   while IFS='|' read -r service account purpose command <&3; do
     [[ -n "$service" && "$service" != \#* ]] || continue
+    if (( ! keychain_checked )); then
+      keychain_checked=1
+      if security show-keychain-info "$HOME/Library/Keychains/login.keychain-db" >/dev/null 2>&1; then report keychain:login ok
+      else record_failure keychain:login "locked (reads will fail in this session; run from a local Terminal)"; fi
+    fi
     local lookup_account="$account"
     if [[ "$account" == USER ]]; then lookup_account="$(id -un)"; fi
     if secret_present "$service" "$lookup_account"; then report "secret:${service}:${account}" ok
