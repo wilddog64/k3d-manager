@@ -589,3 +589,80 @@ EOF
   [ "$status" -eq 0 ]
   [ ! -e "${MANAGER_LOG}" ]
 }
+
+macmon_fixture() {
+  export MACMON_BIN="${BATS_TEST_TMPDIR}/macmon-bin"
+  export MACMON_LOG="${BATS_TEST_TMPDIR}/macmon.log"
+  mkdir -p "${MACMON_BIN}"
+  : > "${MACMON_LOG}"
+  cat > "${MACMON_BIN}/uname" <<'STUB'
+#!/bin/bash
+# uname -m captured on m4-air, 2026-11-01: arm64
+printf '%s\n' "${MACMON_ARCH:-arm64}"
+STUB
+  cat > "${MACMON_BIN}/brew" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "${MACMON_LOG}"
+exit "${MACMON_BREW_STATUS:-0}"
+STUB
+  cat > "${MACMON_BIN}/sudo" <<'STUB'
+#!/bin/bash
+printf 'sudo %s\n' "$*" >> "${MACMON_LOG}"
+exit 1
+STUB
+  chmod +x "${MACMON_BIN}/uname" "${MACMON_BIN}/brew" "${MACMON_BIN}/sudo"
+  export PATH="${MACMON_BIN}:/usr/bin:/bin"
+  [ "$(command -v brew)" = "${MACMON_BIN}/brew" ]
+  _is_mac() { return 0; }
+}
+
+@test "_install_macmon installs on Apple Silicon" {
+  macmon_fixture
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ "$(cat "${MACMON_LOG}")" = "install macmon" ]
+  [[ "$output" == *"macmon installed"* ]]
+}
+
+@test "_install_macmon skips an existing binary" {
+  macmon_fixture
+  printf '#!/bin/bash\nexit 0\n' > "${MACMON_BIN}/macmon"
+  chmod +x "${MACMON_BIN}/macmon"
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon returns install failure" {
+  macmon_fixture
+  export MACMON_BREW_STATUS=1
+  run _install_macmon
+  [ "$status" -ne 0 ]
+  [ "$(cat "${MACMON_LOG}")" = "install macmon" ]
+}
+
+@test "_install_macmon skips Linux" {
+  macmon_fixture
+  _is_mac() { return 1; }
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon skips Intel Macs" {
+  macmon_fixture
+  export MACMON_ARCH=x86_64
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon requires Homebrew without sudo" {
+  macmon_fixture
+  rm "${MACMON_BIN}/brew"
+  run _install_macmon
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Homebrew is required to install macmon"* ]]
+  [ ! -s "${MACMON_LOG}" ]
+}

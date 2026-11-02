@@ -207,6 +207,42 @@ _acg_discover_agent_ips() {
     | cut -f2)
 }
 
+_acg_import_key() {
+  local _pub="${_ACG_KEY_PEM%.pem}.pub" _temp _error _remote _local
+  if [[ ! -s "${_pub}" ]]; then
+    rm -f -- "${_pub}"
+    _temp=$(mktemp "${_pub}.XXXXXX") || return 1
+    if ! _run_command --soft -- ssh-keygen -y -f "${_ACG_KEY_PEM}" > "${_temp}" || [[ ! -s "${_temp}" ]]; then
+      rm -f -- "${_temp}"
+      printf 'ERROR: [acg] Failed to derive public key from %s\n' "${_ACG_KEY_PEM}" >&2
+      return 1
+    fi
+    mv -f -- "${_temp}" "${_pub}" || { rm -f -- "${_temp}"; return 1; }
+  fi
+  if _error=$(_run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
+    --public-key-material "fileb://${_pub}" 2>&1); then
+    :
+  else
+    printf '%s\n' "${_error}" >&2
+    case "${_error}" in
+      *InvalidKeyPair.Duplicate*)
+        _remote=$(_run_command --soft -- aws ec2 describe-key-pairs --region "${ACG_REGION}" --key-names "${_ACG_KEY_NAME}" --query 'KeyPairs[0].KeyFingerprint' --output text) || return 1
+        _local=$(_run_command --soft -- ssh-keygen -E md5 -lf "${_pub}" | awk '{sub(/^MD5:/, "", $2); print $2}') || return 1
+        if [[ -z "${_local}" || "${_local}" != "${_remote}" ]]; then
+          printf 'ERROR: [acg] Key fingerprint mismatch: local %s, AWS %s\n' "${_local}" "${_remote}" >&2
+          return 1
+        fi
+        ;;
+      *) return 1 ;;
+    esac
+  fi
+  _remote=$(_run_command --soft -- aws ec2 describe-key-pairs --region "${ACG_REGION}" --key-names "${_ACG_KEY_NAME}" --query 'KeyPairs[0].KeyFingerprint' --output text) || return 1
+  if [[ -z "${_remote}" || "${_remote}" == "None" || "${_remote}" == "null" ]]; then
+    printf 'ERROR: [acg] Key pair %s not found in %s\n' "${_ACG_KEY_NAME}" "${ACG_REGION}" >&2
+    return 1
+  fi
+}
+
 _acg_cf_deploy() {
   _acg_validate_agent_count || return 1
 
@@ -223,12 +259,7 @@ _acg_cf_deploy() {
     --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
   _info "[acg] AMI: ${ami_id}"
 
-  if [[ ! -f "${_ACG_KEY_PEM%.pem}.pub" ]]; then
-    _info "[acg] Deriving public key from ${_ACG_KEY_PEM}"
-    _run_command -- ssh-keygen -y -f "${_ACG_KEY_PEM}" > "${_ACG_KEY_PEM%.pem}.pub"
-  fi
-  _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
-    --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
+  _acg_import_key || return 1
 
   local _rendered_template
   _rendered_template="$(mktemp -t acg-cluster.XXXXXX)" || return 1
@@ -497,6 +528,10 @@ HELP
   fi
 
   _acg_validate_agent_count || return 1
+  if [[ ! -f "${_ACG_KEY_PEM}" ]]; then
+    printf 'ERROR: [acg] Missing private key %s. Run make machine-setup ROLE=hub.\n' "${_ACG_KEY_PEM}" >&2
+    return 1
+  fi
   _acg_check_credentials || return 1
 
   if [[ $_recreate -eq 1 ]]; then

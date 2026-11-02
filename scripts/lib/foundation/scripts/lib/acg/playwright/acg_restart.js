@@ -26,7 +26,7 @@ const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
  * Usage: node acg_restart.js <sandbox-url>
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
+const AUTH_DIR = process.env.PLAYWRIGHT_AUTH_DIR || path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'pw-profile');
 
 async function _dismissExtendYourSessionDialog(page) {
   const visible = await page.evaluate(() =>

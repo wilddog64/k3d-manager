@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- `_install_macmon` installs the macmon sensor reader with Homebrew on Apple Silicon macOS.
+
+### Fixed
+- ACG provisioning validates the hub SSH key and its AWS fingerprint before deployment; sandbox extend and restart use the active Playwright profile.
+
 ## [v0.5.4] — 2026-10-17
 
 ### Fixed

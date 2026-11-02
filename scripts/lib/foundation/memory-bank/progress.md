@@ -1,6 +1,6 @@
 # Progress — lib-foundation
 
-- [x] **Copilot PR #72 finding addressed (2026-10-21):** Removed the unreachable `|| return 1` after hard `_run_command`; failures already terminate via `_err`/`exit`. Copilot's equivalent fix is `b2b769a`; local branch merged it with local verification commit and pushed `14532f6`. Clean-env `acg.bats` passed 28/28, shellcheck and agent-rigor passed, review thread replied to and resolved. GitHub checks are rerunning after the update.
+- [x] **PR #72 post-merge (2026-10-21/22):** Removed the unreachable `|| return 1` after hard `_run_command`. Merged to lib-foundation `main` at `c307df2`; Copilot thread resolved; clean-env ACG BATS 28/28, shellcheck and agent-rigor passed; GitHub `acg (node)`, `bats`, and `shellcheck` all passed. Pulled upstream main into k3d-manager `k3d-manager-v1.43.5` as subtree squash `18f7c8cc` + merge `205d4272`; downstream ACG BATS 28/28, ShellCheck, and audit passed. Operator live verification remains pending; no live AWS operation or release tag was performed.
 
 - [x] **v1.26.0 fleet lifecycle Phase A (2026-08-20):** commit `8148e33` (`feat(acg): make
   CloudFormation agent fleet count-agnostic`) pushed to `origin/feat/v0.4.12`. The ACG module now

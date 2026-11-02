@@ -518,3 +518,94 @@ EOF
   [[ "${output}" == *"FUNCTION_RETURNED"* ]]
   run ! grep -F 'kubectl config delete-context' "${calls}"
 }
+
+_acg_key_fixture() {
+  [ "${HOME}" = "${BATS_TEST_TMPDIR}/home" ]
+  mkdir -p "${HOME}/.ssh" "${BATS_TEST_TMPDIR}/key-bin"
+  export ACG_CALLS_FILE="${BATS_TEST_TMPDIR}/key-calls" ACG_KEY_SCENARIO="${1}"
+  cat >"${BATS_TEST_TMPDIR}/key-bin/aws" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *import-key-pair*)
+    # k3d-manager M5 read-only capture, 2026-11-01: DryRunOperation.
+    case "${ACG_KEY_SCENARIO}" in denied) echo 'An error occurred (DryRunOperation)' >&2; exit 1;; duplicate|mismatch) echo 'An error occurred (InvalidKeyPair.Duplicate)' >&2; exit 1;; esac ;;
+  *describe-key-pairs*)
+    case "${ACG_KEY_SCENARIO}" in missing) echo 'not found' >&2; exit 1;; mismatch) echo 'bb:bb';; *) echo 'aa:aa';; esac ;;
+  *describe-images*) echo ami-test ;;
+esac
+STUB
+  cat >"${BATS_TEST_TMPDIR}/key-bin/ssh-keygen" <<'STUB'
+#!/usr/bin/env bash
+printf 'ssh-keygen %s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$1" in
+  -y) [[ "${ACG_KEY_SCENARIO}" != derive-fails ]] || exit 1; echo 'test-public-material' ;;
+  -E) echo '2048 MD5:aa:aa comment (RSA)' ;;
+esac
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/key-bin/"{aws,ssh-keygen}
+  export PATH="${BATS_TEST_TMPDIR}/key-bin:${PATH}"
+  _acg_check_credentials() { :; }
+  _run_command() { while [[ "$1" == --* ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }
+}
+
+@test "acg provisioning rejects missing private key before AWS" {
+  _acg_key_fixture success
+  run acg_provision --confirm --recreate
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"${_ACG_KEY_PEM}"* && "$output" == *'make machine-setup ROLE=hub'* ]]
+  [ ! -e "${ACG_CALLS_FILE}" ]
+}
+
+@test "acg provisioning derives empty public key and imports it" {
+  _acg_key_fixture success
+  touch "${_ACG_KEY_PEM}" "${_ACG_KEY_PEM%.pem}.pub"
+  run acg_provision --confirm
+  [ "$status" -eq 0 ]
+  grep -q 'ssh-keygen -y' "${ACG_CALLS_FILE}"
+  grep -q 'import-key-pair' "${ACG_CALLS_FILE}"
+  grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+  [[ "$output" != *test-public-material* ]]
+}
+
+@test "acg provisioning removes failed public key derivation" {
+  _acg_key_fixture derive-fails
+  touch "${_ACG_KEY_PEM}" "${_ACG_KEY_PEM%.pem}.pub"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [ ! -e "${_ACG_KEY_PEM%.pem}.pub" ]
+  run ! grep -q 'import-key-pair' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning accepts matching duplicate and rejects mismatched fingerprint" {
+  _acg_key_fixture duplicate
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -eq 0 ]
+  grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+  : >"${ACG_CALLS_FILE}"
+  export ACG_KEY_SCENARIO=mismatch
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'aa:aa'* && "$output" == *'bb:bb'* ]]
+  [[ "$output" != *test-public-material* ]]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning stops when imported pair cannot be found" {
+  _acg_key_fixture missing
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning shows import errors and stops" {
+  _acg_key_fixture denied
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [[ "$output" == *DryRunOperation* ]]
+  [[ "$output" != *test-public-material* ]]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}

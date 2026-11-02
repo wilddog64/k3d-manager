@@ -1,0 +1,2 @@
+# Legacy AWK-function parser false positive; see docs/issues/2026-11-01-agent-audit-acg-awk-if-count.md.
+scripts/lib/acg/acg.sh:emit_output
