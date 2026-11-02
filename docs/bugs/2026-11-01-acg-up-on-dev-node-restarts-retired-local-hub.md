@@ -3,7 +3,7 @@
 **Status:** OPEN
 **Priority:** P2
 **Severity:** medium — running `bin/acg-up` / `make up` from the M4 (where Claude and dispatches run) would start a second hub: a second ArgoCD that registers the sandbox, port-forward plists and CronJobs that push to the same Pushgateway names; the workaround is to run it on the M5
-**Approval:** operator, 2026-11-01 (asked "does it matter from m4 or m5?" while scheduling acg-up; hub-migration gaps are filed as found); scope widened to the hub release targets: operator, 2026-11-01 ("we should widen machine-role check to those three")
+**Approval:** operator, 2026-11-01 (asked "does it matter from m4 or m5?" while scheduling acg-up; hub-migration gaps are filed as found); scope widened to the hub release targets: operator, 2026-11-01 ("we should widen machine-role check to those three"); dispatch go: operator, 2026-11-01 ("go as you recommended")
 **Filed:** 2026-11-01
 **Detected by:** Claude, reading `bin/cluster-up` before the session's acg-up
 **Affected:** `bin/cluster-up` (hub bootstrap, lines ~528-545: `k3d cluster list` → `deploy_cluster --provider k3d` or `k3d cluster start`)
