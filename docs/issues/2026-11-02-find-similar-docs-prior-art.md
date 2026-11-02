@@ -16,3 +16,23 @@ ssh: Could not resolve hostname m5-air.local: nodename nor servname provided, or
 ```
 
 M4 lacked the embedding credentials available to this process and the sandbox prevented the attempted local Vault connection; the later restricted SSH environment could not resolve M5. Follow up by restoring an appropriate credential source and testing retrieval against a representative set of known documents and a keyword-search baseline. A zero exit status alone does not prove vector retrieval took place.
+
+The restricted sandbox also produced a misleading initial dispatch status:
+
+```text
+task: 2026-11-02-acg-up-stalls-at-system-keychain-trust
+state: terminated unexpectedly (see /Users/cliang/.local/share/k3d-manager/worktrees/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust.run/supervisor.log)
+repo: k3d-manager
+scope: in-scope
+```
+
+The sandbox denied `ps` with `zsh:1: operation not permitted: ps`. Checking outside the sandbox returned:
+
+```text
+task: 2026-11-02-acg-up-stalls-at-system-keychain-trust
+state: running
+repo: k3d-manager
+scope: in-scope
+```
+
+The process supervisor was also present. Use an environment permitted to inspect the worker process when checking dispatch status.

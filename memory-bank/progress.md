@@ -1,6 +1,6 @@
 # Progress — compressed operational log
 
-- 2026-11-02: Operator requested Luna dispatch for the P2 headless CA trust stall. M5 vector search found relevant trust and cleanup prior art; M4 retrieval unavailable. Bug acceptance and file scope prepared, no live retry. See docs/issues/2026-11-02-find-similar-docs-prior-art.md.
+- 2026-11-02: P2 headless CA trust stall DISPATCHED to gpt-6-luna (slug `2026-11-02-acg-up-stalls-at-system-keychain-trust`, spec commit `204d8e81`); running when checked outside sandbox. M5 vector search found relevant trust and cleanup prior art; M4 retrieval unavailable. No live retry. See docs/issues/2026-11-02-find-similar-docs-prior-art.md.
 
 - 2026-11-02: M5 Slack /cluster-up job c38c3855 failed after 3300s, last output System Keychain CA trust; CloudFormation had succeeded, cleanup removed connections only. Operator clarified run was before today's pull. M5 now at remote release head 8d9f5f0f, default hub-role file absent; sudoers existed before the job and current noninteractive CA-trust policy check succeeded, CA verify fails, exact blocking process unknown (unified log shows three sudo true password-required checks, no add-trusted-cert entry). AWS DescribeStacks returned InvalidClientTokenId, so current stack status unknown. Filed docs/bugs/2026-11-02-acg-up-stalls-at-system-keychain-trust.md and docs/issues/2026-11-02-acg-up-job-c38c3855.md. No retry or live mutation.
 
