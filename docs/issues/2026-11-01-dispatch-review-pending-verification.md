@@ -113,3 +113,7 @@ SLOWEST scripts/tests/bin/codex_dispatch.bats 206s
 TOTAL 206s
 
 ```
+
+## Approved follow-up
+
+The operator approved the hub-data fixture and issue-document scope exception. The resume task landed as `2c7fc95c` and `22110d0c`: focused dispatcher BATS 94/94, metrics pytest 169 passed, and dashboard BATS 38/38; the landing fast gate passed. It skipped the promtool-dependent model query and dashboard query because promtool was not installed. Independent verification evidence and the operator live check remain pending. The instruction refresh remains unlanded.
