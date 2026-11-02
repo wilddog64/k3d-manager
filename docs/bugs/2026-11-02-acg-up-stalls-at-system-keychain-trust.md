@@ -6,7 +6,7 @@
 **Filed:** 2026-11-02
 **Detected by:** operator screenshot and read-only investigation of job `c38c3855`
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** Operator requested dispatch to Luna on 2026-11-02 and subsequently authorized a narrowly scoped privileged supervisor and new sudoers permission to preserve automatic headless trust. Offline verification is sufficient for landing; live verification is deferred.
+**Approval:** Operator requested dispatch to Luna on 2026-11-02 and subsequently authorized a narrowly scoped privileged supervisor and new sudoers permission to preserve automatic headless trust. Operator explicitly expanded scope to harden existing sudoers rules and dependent listener flows. Offline verification is sufficient for landing; live verification is deferred.
 **Related:** `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`, `docs/bugs/v1.5.3-bugfix-acg-up-vault-ca-trust-no-soft.md`
 
 ## Evidence
@@ -39,6 +39,10 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 - `bin/k3dm-vault-ca-trust-supervisor` (new, if needed)
 - `scripts/tests/bin/install_sudoers.bats`
 - `scripts/tests/bin/vault_ca_trust_supervisor.bats` (new, if needed)
+- `scripts/plugins/argocd.sh`
+- `bin/cluster-refresh`
+- `scripts/lib/providers/k3s-hostinger.sh`
+- Corresponding listener templates and BATS suites, limited to files directly needed for securing and preserving those flows; identify precise paths in the implementation report.
 - `CHANGELOG.md`
 
 ## Fix scope
@@ -46,6 +50,8 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 Bound the headless System Keychain CA-trust operation so a hung authorization or `security` process cannot consume the cluster-up job deadline. Implement a narrowly scoped privileged supervisor and sudoers rule as needed, with a short deadline (at most 30 seconds plus a short termination grace), without relying on GNU `timeout` being installed on macOS. The existing privileged sudo monitor may serve as supervisor if a command-specific timeout can be enforced and missing policy fails closed. Terminate and reap controlled processes on timeout. Warn and continue along the existing failure path; do not claim trust succeeded. Do not assume a particular cause of the observed stall. Investigate whether macOS service work may complete after client cancellation and document what offline tests can and cannot prove; do not make unsupported guarantees about macOS service internals.
 
 Preserve the documented automatic trust behavior: already-trusted certificates skip the add operation, interactive use retains its existing prompt and warning behavior, and failed trust remains a warning. Match the existing runner's headless definition (stdin or stdout is not a TTY). Preserve certificate verification and non-Darwin behavior. The supervisor must be installed securely as a root-owned, non-user-writable executable and allow only the intended Keychain trust operation; reject arbitrary commands, unsafe paths, options, symlinks and mutable executable substitution. Add only a narrowly scoped rule for that fixed helper, with no shell or arbitrary command permission. Existing permissive installation rules may be tightened where necessary to secure the helper, with compatibility tests for legitimate installation flows. Existing hosts must receive clear instructions to install the new helper and sudoers rule; if unavailable, warn and continue without falling back to an unbounded privileged command. Do not weaken trust, modify AWS cleanup, automatically destroy infrastructure, or access real Keychains, AWS, Kubernetes or remote hosts in tests. No live installation or live cluster-up is authorized by this dispatch. The live environment and stack state require separate operator investigation.
+
+The operator explicitly authorized expanding scope to close existing passwordless sudoers self-update, binary path traversal, and caller-controlled root LaunchDaemon routes that would defeat the supervisor's security boundary. Preserve legitimate listener configuration and lifecycle using validated, root-controlled executables and narrowly scoped policy. Investigate and test all applicable sudoers paths to helper or policy replacement. Avoid unrelated redesign. Provide clear upgrade instructions and do not modify live host configuration.
 
 ## Acceptance
 

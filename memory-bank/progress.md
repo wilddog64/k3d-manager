@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-02: Operator approved expanding CA trust fix scope to harden pre-existing sudoers rules and dependent listener flows. Proceed to implement and verify offline; live verification deferred.
+
 - 2026-11-02: CA trust supervisor review found existing policy routes that defeat a protected helper (sudoers self-update, install traversal, user-controlled system LaunchDaemon). Built-in sudo timeout misses pre-command setup and does not guarantee detached process termination. Focused worker suite 81 passed, 4 failed; asked operator about expanding scope to harden affected policy and listener flows. Fix not landed; live verification deferred.
 
 - 2026-11-02: Operator approved preserving automatic headless trust using a narrowly scoped privileged supervisor and new sudoers permission. Continue until implemented, offline verified and landed; live verification deferred. P2 bug scope updated; no host configuration changes authorized.

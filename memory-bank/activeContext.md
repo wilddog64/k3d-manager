@@ -1,5 +1,9 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 operator approved expanded security scope
+
+Operator explicitly chose “Expand scope and harden” to secure the CA trust supervisor against pre-existing sudoers self-update, install traversal and caller-controlled root LaunchDaemon routes. Preserve legitimate listener flows, continue until fix is offline verified and landed, and defer live verification. Updated bug spec includes authorized scope. Do not perform live sudoers, Keychain, AWS or cluster changes. After completion, record a handoff for `/clear`.
+
 ## Handoff — 2026-11-02 CA trust supervisor scope decision
 
 Operator authorized privileged supervision and asked to continue until fixed, offline verified and landed; live verification deferred. Luna discovered pre-existing passwordless sudoers self-update, install path traversal and user-controlled system LaunchDaemon routes that can replace or bypass a root helper. The built-in sudo timeout does not fully resolve this: Apple's non-PTY code targets the command PID and starts its timer after policy session initialization. No helper implemented or landed; focused suite 81 passed, 4 failed in isolated regressions. See `docs/issues/2026-11-02-find-similar-docs-prior-art.md` and dispatch `.run/codex-6.log` / `codex-7.log`.
