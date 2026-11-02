@@ -94,3 +94,22 @@ not ok 85 arbitrary scratch plist matched both install and system-bootstrap rule
 ```
 
 The other 81 cases passed. No real sudo or daemon action was used in the policy tests. The macOS sudo monitor alternative was also investigated: scratch `visudo` accepted a command-specific `user_command_timeouts` policy, but Apple sudo's documented non-PTY implementation targets the command PID rather than its process group, and starts its timeout after policy session initialization. Consequently it cannot establish the original deadline and controlled-descendant guarantees alone. User direction is pending on expanding the task to harden the existing policy and dependent listener flows. No live host changes were made.
+
+The operator subsequently approved expanding that scope. The worker partially hardened policy and drafted an uninstalled supervisor, but hit its usage limit:
+
+```text
+ERROR: You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at 9:07 AM.
+```
+
+An independent run of its prototype supervisor suite produced:
+
+```text
+1..5
+ok 1 supervisor accepts a safe caller-owned certificate and rejects unsafe paths
+ok 2 supervisor entry rejects extra arguments and dispatches only a scratch certificate
+ok 3 supervisor preserves quick security success and failure status
+ok 4 supervisor bounds a TERM-resistant controlled security process group
+ok 5 supervisor interruption terminates its controlled security process group
+```
+
+The supervisor remains unwired and uninstalled; old timeout and arbitrary root LaunchDaemon authorization remain unresolved. The partial work remains in the dispatch worktree. No verification pass or landing has been recorded.

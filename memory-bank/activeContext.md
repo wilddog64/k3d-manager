@@ -1,5 +1,13 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 expanded CA trust hardening in progress
+
+Operator requires this task to continue until fixed, offline verified and landed; live verification is deferred. The operator explicitly approved hardening existing sudoers rules and dependent listener flows. The release branch contains the expanded specification through `4d5821f2`.
+
+Luna's resumed worker hit its usage limit and exited nonzero; its partial changes remain uncommitted in `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust`. The `.run/codex-9.log` contains its output. A copy was inspected on the main worktree and removed again; the task worktree is the preserved source of the draft. The root-owned supervisor is a prototype, not installed or connected. Independent `bats scripts/tests/bin/vault_ca_trust_supervisor.bats` on that draft returned 5/5; ShellCheck on changed shell files and `git diff --check` were clean. Prior focused checks still failed on the old unprivileged timeout and arbitrary root LaunchDaemon authorization; broad suites had not completed before the worker hit its limit. No fix has been verified or landed.
+
+**Next, in order:** Continue implementation and review; secure existing listener installation/bootstrap against arbitrary root execution while preserving actual listener behavior, and protect the supervisor and its sudoers authorization against all existing privileged rules. Wire automatic headless trust to the supervisor with safe handling of missing installation; test all affected flows in isolation. Independently run relevant BATS, lint, staged audit and required gates, resolve failures, then land and push. Report the unresolved limitation that offline tests cannot prove cancellation of work already handed to macOS services. Do not perform live Keychain, sudoers, AWS or cluster operations. Record a completed handoff only after the fix is landed; operator plans `/clear` thereafter.
+
 ## Handoff — 2026-11-02 operator approved expanded security scope
 
 Operator explicitly chose “Expand scope and harden” to secure the CA trust supervisor against pre-existing sudoers self-update, install traversal and caller-controlled root LaunchDaemon routes. Preserve legitimate listener flows, continue until fix is offline verified and landed, and defer live verification. Updated bug spec includes authorized scope. Do not perform live sudoers, Keychain, AWS or cluster changes. After completion, record a handoff for `/clear`.

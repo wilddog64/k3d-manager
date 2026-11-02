@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-02: Expanded CA trust hardening remains in progress. Luna hit a usage limit; partial draft preserved in task worktree. Independently ran supervisor BATS 5/5 and ShellCheck/diff check clean, but old timeout and arbitrary root LaunchDaemon authorization remain unresolved; no verified fix or landing. See latest activeContext handoff and docs/issues/2026-11-02-find-similar-docs-prior-art.md.
+
 - 2026-11-02: Operator approved expanding CA trust fix scope to harden pre-existing sudoers rules and dependent listener flows. Proceed to implement and verify offline; live verification deferred.
 
 - 2026-11-02: CA trust supervisor review found existing policy routes that defeat a protected helper (sudoers self-update, install traversal, user-controlled system LaunchDaemon). Built-in sudo timeout misses pre-command setup and does not guarantee detached process termination. Focused worker suite 81 passed, 4 failed; asked operator about expanding scope to harden affected policy and listener flows. Fix not landed; live verification deferred.
