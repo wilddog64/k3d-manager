@@ -42,6 +42,8 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 - `scripts/plugins/argocd.sh`
 - `bin/cluster-refresh`
 - `scripts/lib/providers/k3s-hostinger.sh`
+- `scripts/lib/core.sh` and directly corresponding tests, for preserving k3s installation after hardening generic installation rules.
+- `bin/cluster-down` and directly corresponding tests, for preserving safe listener cleanup after hardening plist removal.
 - Corresponding listener templates and BATS suites, limited to files directly needed for securing and preserving those flows; identify precise paths in the implementation report.
 - `CHANGELOG.md`
 
