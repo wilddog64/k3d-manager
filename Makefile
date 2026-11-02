@@ -81,7 +81,7 @@ install-test-metrics:
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3d) bin/hub-up ;; \
+	  k3d) bin/k3dm-require-role hub && bin/hub-up ;; \
 	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
 	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
@@ -422,6 +422,7 @@ sync-main:
 
 ## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
 appsets-reapply:
+	@bin/k3dm-require-role hub
 	@_b='$(BRANCH)'; \
 	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
@@ -531,6 +532,7 @@ cloudflare-preflight:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
+	@bin/k3dm-require-role hub
 	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
 		if _bootstrap_output=$$(launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>&1); then \
@@ -1263,6 +1265,7 @@ observability:
 
 ## Reconcile Hub platform-ops resources (CVE scanner, retry limits, and dashboards)
 platform-ops:
+	@bin/k3dm-require-role hub
 	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
 
 ## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy

@@ -270,3 +270,5 @@ curl -s -o /dev/null -w '%{http_code}\n' -I -H "Authorization: Bearer $T" \
 As of 2026-09-25 both `quay.io/minio/minio` and `quay.io/minio/mc` answer `401` for every tag,
 including `latest`, while `quay.io/prometheus/busybox:latest` returns `200` — so MinIO's images
 are no longer anonymously pullable and need a mirror or a pull secret.
+
+Run `acg-up` on the hub machine. The recorded machine role must be `hub` (or set `K3DM_ALLOW_LOCAL_HUB=1` explicitly).

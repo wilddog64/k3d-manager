@@ -164,7 +164,7 @@ SH
 }
 
 run_machine() {
-  run env HOME="$FIXHOME" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
 }
 
 @test "N1: agents option rejects unsupported values" {
@@ -483,7 +483,7 @@ tty_machine() {
   command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
   local wrapper="$BATS_TEST_TMPDIR/tty-machine"
   printf '#!/usr/bin/env bash\nexec' > "$wrapper"
-  printf ' %q' env HOME="$FIXHOME" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" SECRETS_STUB_RC="${SECRETS_STUB_RC:-0}" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://example.test/existing.git "$FIXROOT/bin/k3dm-machine-setup" "$@" >> "$wrapper"
+  printf ' %q' env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" SECRETS_STUB_RC="${SECRETS_STUB_RC:-0}" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://example.test/existing.git "$FIXROOT/bin/k3dm-machine-setup" "$@" >> "$wrapper"
   printf '\n' >> "$wrapper"
   chmod +x "$wrapper"
   if [[ "$(uname -s)" == Darwin ]]; then
@@ -1278,4 +1278,14 @@ SH
   [ ! "$BATS_TEST_TMPDIR/original" -ot "$FIXHOME/.ssh/k3d-manager-key.pem" ]
   [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
   run ! grep -q '^ssh-keygen called' "$CALL_LOG"
+}
+
+@test "machine setup: records each setup role in scratch XDG config" {
+  setup_machine_fixture
+  for role in hub worker console; do
+    run_machine --role "$role" --agents skip --secrets skip
+    [ "$(cat "$FIXHOME/.config/k3d-manager/machine-role")" = "$role" ]
+  done
+  run_machine --role worker --check
+  [ "$(cat "$FIXHOME/.config/k3d-manager/machine-role")" = console ]
 }

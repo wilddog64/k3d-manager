@@ -65,3 +65,5 @@ After GitHub SSH authentication is available, setup switches managed wilddog64 H
 ## Last step: check the login shell
 
 As the last new-Mac setup step, run `make machine-check-shell HOST=<new-Mac-hostname>` from the connecting Mac. This read-only check opens an SSH login shell, exits immediately, and fails on credential prompts, command errors, insecure completion directories, a nonzero exit or a 60-second timeout. Matched output is redacted.
+
+Machine setup records the selected role in `${XDG_CONFIG_HOME:-$HOME/.config}/k3d-manager/machine-role`. Hub operations require `hub`; on the hub, run `make machine-setup ROLE=hub` to record it. `K3DM_ALLOW_LOCAL_HUB=1` overrides the check.

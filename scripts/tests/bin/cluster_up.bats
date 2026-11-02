@@ -303,6 +303,9 @@ exit 1
 STUB
   chmod +x "${stub_bin}"/*
 
+  mkdir -p "${HOME}/.config/k3d-manager"
+  printf 'hub\n' > "${HOME}/.config/k3d-manager/machine-role"
+  export XDG_CONFIG_HOME="${HOME}/.config"
   export HOME STUB_LOG="${stub_log}"
   export PATH="${stub_bin}:$PATH"
   run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bin/cluster-up

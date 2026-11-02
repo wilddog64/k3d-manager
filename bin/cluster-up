@@ -29,6 +29,7 @@ fi
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+"${REPO_ROOT}/bin/k3dm-require-role" hub
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/ssh_config_guard.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
