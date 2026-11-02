@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-02: Operator approved preserving automatic headless trust using a narrowly scoped privileged supervisor and new sudoers permission. Continue until implemented, offline verified and landed; live verification deferred. P2 bug scope updated; no host configuration changes authorized.
+
 - 2026-11-02: Operator requests the CA trust task continue until landed. Luna resumed and confirmed detached-child regression remains failing (75 pass, 1 fail). Asked operator to choose headless skip with warning versus privileged-supervisor investigation; response pending at time of note. No landing. See latest activeContext handoff.
 
 - 2026-11-02: CA-trust Luna dispatch worker exited successfully but reported a blocker: isolated detached-child regression left a delayed scratch side effect after timeout (focused BATS 75 pass, 1 fail); privileged descendant termination also unproven. Unstaged patch is not verified or landed. Latest handoff in activeContext; details in docs/issues/2026-11-02-find-similar-docs-prior-art.md.

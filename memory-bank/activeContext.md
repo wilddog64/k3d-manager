@@ -1,5 +1,9 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 operator approved privileged CA trust supervisor
+
+The operator selected preserving automatic headless trust with a narrowly scoped privileged supervisor and new sudoers permission. Continue this session until the P2 fix is implemented, independently verified offline and landed; live verification is explicitly deferred. Investigate macOS Keychain cancellation and report offline proof limits honestly. Do not modify live sudoers, Keychains, AWS or cluster state. The updated P2 bug contains expanded file scope and security acceptance. Write a final handoff when complete, per operator `/clear` preference.
+
 ## Handoff — 2026-11-02 CA trust fix design decision pending
 
 The operator explicitly says this session is not complete until the P2 fix is landed and requested Luna be resumed. The latest continuation confirmed the process-group timeout cannot meet the existing no-orphan guarantee for a synthetic detached child (focused BATS 75 passed, 1 failed). The test does not prove that the actual macOS `security` command creates such a child; cancellation of an in-flight Keychain service request also remains unproven. Sudo's user timeout requires policy changes; a privileged supervisor would require a new narrowly scoped sudoers rule and further service-cancellation evidence. Details: `.run/codex-4.log` for dispatch slug `2026-11-02-acg-up-stalls-at-system-keychain-trust` and `docs/issues/2026-11-02-find-similar-docs-prior-art.md`.

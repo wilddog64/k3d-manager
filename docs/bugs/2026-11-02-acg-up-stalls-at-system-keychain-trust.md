@@ -6,7 +6,7 @@
 **Filed:** 2026-11-02
 **Detected by:** operator screenshot and read-only investigation of job `c38c3855`
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** Operator requested dispatch to Luna on 2026-11-02.
+**Approval:** Operator requested dispatch to Luna on 2026-11-02 and subsequently authorized a narrowly scoped privileged supervisor and new sudoers permission to preserve automatic headless trust. Offline verification is sufficient for landing; live verification is deferred.
 **Related:** `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`, `docs/bugs/v1.5.3-bugfix-acg-up-vault-ca-trust-no-soft.md`
 
 ## Evidence
@@ -35,16 +35,20 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 
 - `bin/cluster-up`
 - `scripts/tests/bin/cluster_up.bats`
+- `bin/install-sudoers.sh`
+- `bin/k3dm-vault-ca-trust-supervisor` (new, if needed)
+- `scripts/tests/bin/install_sudoers.bats`
+- `scripts/tests/bin/vault_ca_trust_supervisor.bats` (new, if needed)
 - `CHANGELOG.md`
 
 ## Fix scope
 
-Bound the headless System Keychain CA-trust operation so a hung authorization or `security` process cannot consume the cluster-up job deadline. Investigate the existing command path and implement a short deadline (at most 30 seconds plus a short termination grace) without relying on GNU `timeout` being installed on macOS. Terminate and reap the operation and its descendants on timeout. Warn and continue along the existing failure path; do not claim trust succeeded. Do not assume a particular cause of the observed stall.
+Bound the headless System Keychain CA-trust operation so a hung authorization or `security` process cannot consume the cluster-up job deadline. Implement a narrowly scoped privileged supervisor and sudoers rule as needed, with a short deadline (at most 30 seconds plus a short termination grace), without relying on GNU `timeout` being installed on macOS. Terminate and reap controlled processes on timeout. Warn and continue along the existing failure path; do not claim trust succeeded. Do not assume a particular cause of the observed stall. Investigate whether macOS service work may complete after client cancellation and document what offline tests can and cannot prove; do not make unsupported guarantees about macOS service internals.
 
-Preserve the documented automatic trust behavior: already-trusted certificates skip the add operation, interactive use retains its existing prompt and warning behavior, and failed trust remains a warning. Match the existing runner's headless definition (stdin or stdout is not a TTY). Preserve certificate verification and non-Darwin behavior. Do not change sudoers, use bare sudo, weaken trust, modify cleanup, automatically destroy infrastructure, or access real Keychains, AWS, Kubernetes or remote hosts in tests. The live environment and stack state require separate operator investigation.
+Preserve the documented automatic trust behavior: already-trusted certificates skip the add operation, interactive use retains its existing prompt and warning behavior, and failed trust remains a warning. Match the existing runner's headless definition (stdin or stdout is not a TTY). Preserve certificate verification and non-Darwin behavior. The supervisor must be installed securely as a root-owned, non-user-writable executable and allow only the intended Keychain trust operation; reject arbitrary commands, unsafe paths, options, symlinks and mutable executable substitution. Add only a narrowly scoped rule for that fixed helper, with no shell or arbitrary command permission. Existing hosts must receive clear instructions to install the new helper and sudoers rule; if unavailable, warn and continue without falling back to an unbounded privileged command. Do not weaken trust, modify AWS cleanup, automatically destroy infrastructure, or access real Keychains, AWS, Kubernetes or remote hosts in tests. No live installation or live cluster-up is authorized by this dispatch. The live environment and stack state require separate operator investigation.
 
 ## Acceptance
 
-- A headless trust operation that hangs is terminated within the deadline, including its descendants, and produces a warning before execution continues. Test with a real controlled subprocess and confirm no child remains; provide a short test-only deadline without adding a public option.
+- A headless trust operation that hangs is terminated within the deadline, including controlled descendants, and produces a warning before execution continues. Test with real controlled subprocesses including a TERM-resistant child; provide a short test-only deadline without adding a public option. Investigate and accurately document macOS service cancellation limits; offline tests alone cannot prove cancellation of requests already handed to system services.
 - A quick successful headless trust attempt executes once, an already-trusted CA skips it, and an immediate trust failure warns and continues. Preserve interactive and non-Darwin behavior. Tests must isolate command stubs and assert they cannot touch real system state.
-- Run the focused cluster-up BATS suite, ShellCheck on `bin/cluster-up`, `git diff --check`, and `_agent_audit`; report actual results. Do not run a live cluster-up.
+- Test the supervisor's argument/path validation, trusted installation and exact sudoers rule, missing helper/permission behavior, and all above paths with isolated stubs. Run the focused BATS suites, ShellCheck on touched shell scripts, `git diff --check`, and a meaningful staged `_agent_audit`; report actual results. Do not run a live cluster-up or install the helper on the host.
