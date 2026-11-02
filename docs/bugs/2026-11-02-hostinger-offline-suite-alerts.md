@@ -31,3 +31,7 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 - [ ] Record human intervention and link any related bug or plan.
 
 **Note:** Initial triage; not a confirmed diagnosis or a claim that remediation has occurred.
+
+## Prior-art / duplication check (2026-11-02)
+
+Related: `docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md` (LIVE-VERIFIED, introduced `OfflineSuiteRunIncomplete`), `docs/bugs/2026-10-15-offline-suite-failing-no-email-after-40m.md` (OPEN, alert delivery failure rather than test failure), `docs/bugs/2026-10-05-offline-tests-rotted-on-v1-41-0.md` (FIXED) and Oct 28 offline-suite verification documents. These explain alert semantics and earlier incidents but **do not yet identify the Nov 1 failing test cases**. Correlate run IDs, latest test output and metrics; if this is a repeat of an existing failing test, update that bug rather than creating parallel remediation work.
