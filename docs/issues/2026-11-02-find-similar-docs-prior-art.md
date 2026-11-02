@@ -45,3 +45,5 @@ Luna's first run exited successfully, but reported these broader-suite results:
 ```
 
 These are the worker's reported results; independently diagnose the failures before claiming broad verification. Review also found missing explicit tests of interactive and non-Darwin paths and elapsed timeout. The worker was resumed to address those gaps.
+
+The continuation reported 75 focused BATS cases passed and added those tests. Its audit was run while the proposed changes were unstaged. It also identified that its process tree fixture runs under the test user's ownership and cannot prove cleanup of a privileged `security` descendant. The production runner may invoke `sudo -n /usr/bin/security`; the unprivileged process-group timeout must not be assumed to kill a root-owned descendant. Luna was resumed again to investigate without live privileged tests. Independent verification and staged audit remain pending.

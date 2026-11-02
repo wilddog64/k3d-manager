@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-02: Operator requests a handoff in `activeContext.md` after each completed, verified task before they `/clear`. CA-trust Luna continuation reported 75 focused tests passed; staged audit and independent verification remain pending. Review identified that same-user process tests do not prove a sudo-owned descendant can be stopped; Luna resumed again (resume 3). No landing or live cluster-up.
+
 - 2026-11-02: CA-trust Luna first run focused BATS 73 passed; broad suites reported tripwire-related failures. Review found missing explicit interactive/non-Darwin and elapsed timeout tests; Luna resumed (resume 2). Not landed or verified. See docs/issues/2026-11-02-find-similar-docs-prior-art.md.
 
 - 2026-11-02: P2 headless CA trust stall DISPATCHED to gpt-6-luna (slug `2026-11-02-acg-up-stalls-at-system-keychain-trust`, spec commit `204d8e81`); running when checked outside sandbox. M5 vector search found relevant trust and cleanup prior art; M4 retrieval unavailable. No live retry. See docs/issues/2026-11-02-find-similar-docs-prior-art.md.
