@@ -114,7 +114,7 @@ teardown() {
 @test "Makefile routes k3d and preserves k3s-aws routing" {
   run grep -A8 '^up:' Makefile
   [ "$status" -eq 0 ]
-  [[ "$output" == *"k3d) bin/hub-up"* ]]
+  [[ "$output" == *"k3d) bin/k3dm-require-role hub && bin/hub-up"* ]]
   [[ "$output" == *"bin/cluster-up"* ]]
 }
 

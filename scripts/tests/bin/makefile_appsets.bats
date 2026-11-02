@@ -5,7 +5,11 @@ MAKEFILE="${MAKEFILE:-${BATS_TEST_DIRNAME}/../../../Makefile}"
 setup() {
   WORK="${BATS_TEST_TMPDIR}/work"
   CALL_LOG="${BATS_TEST_TMPDIR}/calls.log"
-  mkdir -p "${WORK}/scripts"
+  mkdir -p "${WORK}/scripts" "${WORK}/bin" "${BATS_TEST_TMPDIR}/config/k3d-manager"
+  export XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+  [[ "${XDG_CONFIG_HOME}" == "${BATS_TEST_TMPDIR}/"* ]]
+  printf 'hub\n' > "${XDG_CONFIG_HOME}/k3d-manager/machine-role"
+  cp "${BATS_TEST_DIRNAME}/../../../bin/k3dm-require-role" "${WORK}/bin/"
   cp "${MAKEFILE}" "${WORK}/Makefile"
   : > "${CALL_LOG}"
   cat > "${WORK}/scripts/k3d-manager" <<'EOF'
