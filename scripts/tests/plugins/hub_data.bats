@@ -313,6 +313,9 @@ freeze_clock() {
 }
 
 @test "hub data export: streams each claim from its own node and path" {
+  export TMPDIR="$BATS_TEST_TMPDIR/export-tmp"
+  [[ "$TMPDIR" == "$BATS_TEST_TMPDIR/"* ]]
+  mkdir -p "$TMPDIR"
   make_fixture; source_plugin; printf recipient > "$TEST_ROOT/recipient"; export K3DM_HUB_DATA_AGE_RECIPIENT="$TEST_ROOT/recipient" K3DM_HUB_DATA_TIMESTAMP=20261009T120000Z
   _hub_data_inventory() { printf '%s\n' '{"vault_paths":["secret/app"],"keycloak_realm_user_count":3,"ldap_entry_count":2}' > "$1/inventory.json"; }
   run hub_data_export; [ "$status" -eq 0 ]; [ "$(find "${TMPDIR:-/tmp}" -name '*.tar' -print | wc -l)" -eq 0 ]; [ "$(grep -Ec '\.tar$' "$TEST_ROOT/age-stage.log" || true)" -eq 0 ]
