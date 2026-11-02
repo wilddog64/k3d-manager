@@ -113,3 +113,15 @@ The root cause is the same: nothing records which machine is the hub, so hub-mut
 retired hub had been running, `appsets-reapply` would have pinned every values ref to `k3d-manager-v1.43.13` on a
 second ArgoCD. Scope extension APPROVED (operator, 2026-11-01): the same `machine-role` gate guards `appsets-reapply`,
 `platform-ops` and `restart-webhook`. See Fix step 5 and Acceptance M4/N3.
+
+## Recurrence — 2026-11-02 11:02 PST (Slack job `3f1591d3`)
+
+Operator observed `/cluster-up aws` fail immediately in the Slack thread. Failure analysis classified it `CLUSTER_FAILURE / PERMANENT`; `make up CLUSTER_PROVIDER=k3s-aws` exited 2 before provisioning. The error reported:
+
+```text
+ERROR: /Users/cliang/.config/k3d-manager/machine-role: role missing; run acg-up on the hub machine. Run make machine-setup ROLE=hub on the hub, or set K3DM_ALLOW_LOCAL_HUB=1.
+```
+
+The traceback terminates at `scripts/lib/webhook/lifecycle.py:411` after the subprocess exits; this is propagation, not evidence of a lifecycle.py defect. The 2026-11-02 CA-trust incident bug independently records that the M5's default `machine-role` file is missing after checkout at release head `8d9f5f0f`. These observations strongly suggest the new fail-closed role gate is working as designed while the M5 migration/setup left its persistent machine-role state uninitialized. Verify the job's actual execution host before declaring this definitely an M5 failure.
+
+**Follow-up / acceptance gap:** Confirm on M5 (read-only) that `machine-role` is absent and whether machine-setup was run after the role-writing change landed; identify whether setup migration omitted the post-upgrade role-state initialization. On the authorized hub, run the approved role-initialization path only after reviewing machine-setup side effects, then repeat `cluster-up aws` to prove the role gate clears without `K3DM_ALLOW_LOCAL_HUB=1`. Add a regression acceptance check for an existing migrated hub whose machine-setup previously ran before role persistence existed, with no AWS/k3d side effects. Do not loosen the role guard or assume a successful cluster provision until verified. No host commands or live retry were executed for this report.
