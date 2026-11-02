@@ -31,3 +31,7 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 - [ ] Record human intervention and link any related bug or plan.
 
 **Note:** Initial triage; not a confirmed diagnosis or a claim that remediation has occurred.
+
+## Prior-art / duplication check (2026-11-02)
+
+Related: `docs/bugs/2026-10-08-cleanup-stale-sandbox-kills-hostinger-pushgateway-forward.md` (FIXED, concerns Hostinger Pushgateway port-forward), plus `docs/bugs/2026-10-15-acg-up-prometheus-forward-missing-after-success.md`. Screenshot's target is `ubuntu-k3s` with `job=pushgateway`, **not explicitly Hostinger**. Do not assume an identical regression. Verify actual target endpoint, expected sandbox lifecycle and service ownership; consolidate with older bug only if matching cause is proven.
