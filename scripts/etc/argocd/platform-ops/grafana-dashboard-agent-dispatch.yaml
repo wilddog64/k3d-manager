@@ -1330,7 +1330,7 @@ data:
           "id": 43,
           "type": "bargauge",
           "title": "Run outcomes",
-          "description": "Accepted: landed with matching tree and passing tests.\nProgress: progress verdict.\nRework: tests refused before a later run.\nFailed: tests refused, nonzero exit, or abandoned.\nUnrecorded: land lacks tree or test result.\nSuperseded: a later run followed this exit.\nOpen: no land or abandon; last event is newer than seven days.\nStale: no land or abandon; last event is at least seven days old.\nUnknown: no other classification applies.",
+          "description": "Accepted: landed with matching tree and passing tests.\nProgress: coordinator resumed with a continuation or clarification.\nRework: tests refused before a later run or coordinator recorded a correction.\nFailed: tests refused, nonzero exit, or abandoned.\nUnrecorded: land lacks tree or test result.\nSuperseded: a later run followed this exit.\nOpen: no land or abandon; last event is newer than seven days.\nStale: no land or abandon; last event is at least seven days old.\nUnknown: no other classification applies.",
           "gridPos": {
             "h": 9,
             "w": 6,

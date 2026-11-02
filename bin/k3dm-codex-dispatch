@@ -293,8 +293,9 @@ _dispatch_usage() {
 Usage:
   bin/k3dm-codex-dispatch start --spec PATH [--slug SLUG] [--agent codex|agy] [--model ID] [--coordinator VENDOR/MODEL] [--primary-coordinator VENDOR/MODEL] [--network] [--repo PATH --branch NAME]
   bin/k3dm-codex-dispatch status [SLUG]
+  bin/k3dm-codex-dispatch open [--version vX.Y.Z]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope]
-  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH [--coordinator VENDOR/MODEL]
+  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
@@ -955,16 +956,55 @@ _dispatch_release_land_lock() {
   rmdir "$lock" 2>/dev/null || true
 }
 
+_dispatch_open() {
+  local version="" ledger="$_dispatch_worktree_root/ledger.jsonl"
+  while (($#)); do
+    case "$1" in
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; version="$2"; shift 2 ;;
+      *) _dispatch_error "unknown open option: $1" ;;
+    esac
+  done
+  [[ -z "$version" || "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version"
+  [[ -f "$ledger" ]] || return 0
+  python3 - "$ledger" "$version" <<'PYOPEN'
+import json, sys, time
+from collections import defaultdict
+
+tasks = defaultdict(list)
+with open(sys.argv[1]) as ledger:
+    for line in ledger:
+        try:
+            event = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(event, dict) and event.get("version") and event.get("slug"):
+            tasks[(event["version"], event["slug"])].append(event)
+found = False
+for (version, slug), events in sorted(tasks.items()):
+    if sys.argv[2] and version != sys.argv[2]:
+        continue
+    starts = [e for e in events if e.get("event") == "start"]
+    if not starts or any(e.get("event") in ("land", "abandon") for e in events):
+        continue
+    age = max(0, int((time.time() - starts[0].get("ts", 0)) // 86400))
+    print(f"{version} {slug} {age}d {events[-1].get('event', 'unknown')}")
+    found = True
+sys.exit(1 if found else 0)
+PYOPEN
+}
+
 _dispatch_resume() {
-  local slug="" prompt_file="" rel version task run session_id n network_slug agent model coordinator="" coordinator_vendor="" coordinator_model=""
+  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model coordinator="" coordinator_vendor="" coordinator_model=""
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --prompt-file) (($# >= 2)) || _dispatch_error "--prompt-file requires a path"; prompt_file="$2"; shift 2 ;;
+      --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
       --coordinator) (($# >= 2)) || _dispatch_error "invalid coordinator"; coordinator="$2"; shift 2 ;;
       *) _dispatch_error "unknown resume option: $1" ;;
     esac
   done
+  case "$reason" in continue_prompt|clarification|correction|other) ;; *) _dispatch_error "invalid or missing resume reason" ;; esac
   [[ -n "$slug" ]] || _dispatch_error "resume requires --slug SLUG"
   if [[ -n "$coordinator" ]]; then
     [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
@@ -997,9 +1037,10 @@ _dispatch_resume() {
   fi
   cp "$prompt_file" "$run/prompt-$n.md"
   rm -f "$run/exit" "$run/start"
+  _dispatch_intervention --slug "$slug" --reason "$reason" >/dev/null
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --arg reason "$reason" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.reason=$reason|.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
 }
@@ -1090,6 +1131,7 @@ main() {
   case "$1" in
     _worker) shift; _dispatch_worker "$@" ;;
     start) shift; _dispatch_start "$@" ;;
+    open) shift; _dispatch_open "$@" ;;
     status) shift; (($# <= 1)) || _dispatch_error "status accepts at most one slug"; _dispatch_status "${1:-}" ;;
     land) shift; _dispatch_land "$@" ;;
     resume) shift; _dispatch_resume "$@" ;;

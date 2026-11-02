@@ -2427,3 +2427,41 @@ def test_claimed_verification_is_not_delivered(tmp_path):
     assert 'k3dm_dispatch_delivered{window="30d"} 1' in output
     assert 'k3dm_dispatch_awaiting_verification{window="30d"} 1' in output
     assert 'k3dm_dispatch_verification_claimed{window="30d"} 1' in output
+
+
+@pytest.mark.parametrize("reason,intervention,expected,evidence", [
+    ("correction", None, "rework", "resume.correction"),
+    ("continue_prompt", None, "progress", "resume.continue_prompt"),
+    ("clarification", None, "progress", "resume.clarification"),
+    (None, "correction", "rework", "intervention.correction"),
+    ("other", "correction", "superseded", "none"),
+    (None, None, "superseded", "none"),
+])
+def test_resume_reason_outcomes(tmp_path, reason, intervention, expected, evidence):
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    root.mkdir(parents=True)
+    # Event shapes copied from the M4 ledger, 2026-11-01.
+    rows = [event(100, "start", "task", run=1), event(110, "codex_exit", "task", run=1, exit=0)]
+    if intervention:
+        rows.append(event(115, "intervention", "task", reason=intervention))
+    rows.append(event(120, "resume", "task", n=2, **({"reason": reason} if reason else {})))
+    ledger = root / "ledger.jsonl"
+    ledger.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    result = dispatch_metrics._run_outcome_metrics([json.loads(line) for line in ledger.read_text().splitlines()], tmp_path, now=130)
+    assert result["outcomes"][expected] == 1
+    assert result["rows"][0][3][0]["evidence"] == evidence
+    assert result["coverage"] == (0 if expected == "superseded" else 1)
+
+
+@pytest.mark.parametrize("extra,exit_code,expected", [
+    ([event(130, "land", "task", tree="a", test_result="passed")], 0, "accepted"),
+    ([event(115, "land_refused", "task", reason="tests")], 0, "rework"),
+    ([], 1, "failed"),
+    ([event(130, "abandon", "task")], 0, "failed"),
+])
+def test_resume_reason_preserves_precedence(tmp_path, extra, exit_code, expected):
+    rows = [event(100, "start", "task", run=1), event(110, "codex_exit", "task", run=1, exit=exit_code, tree="a"),
+            *extra, event(120, "resume", "task", n=2, reason="clarification")]
+    result = dispatch_metrics._run_outcome_metrics(rows, tmp_path, now=140)
+    assert result["outcomes"][expected] == 1

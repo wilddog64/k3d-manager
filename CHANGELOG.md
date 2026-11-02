@@ -5,6 +5,7 @@
 ## [1.43.14] - Unreleased
 
 - Require the recorded hub machine role before starting the local hub or running hub release operations.
+- Record resume reasons, classify reviewed runs, and list open dispatch tasks.
 
 - Require captured verifier evidence for dispatch passes and show legacy claims separately.
 

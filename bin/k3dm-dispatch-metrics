@@ -1051,10 +1051,18 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None)
             else:
                 increment = token_count - previous_tokens
                 previous_tokens = token_count
-            exit_ts = exit_event.get("ts", 0)
-            next_launch = next((event.get("ts", 0) for event in all_launches if event.get("ts", 0) > exit_ts), None)
-            refusal = next ( (event for event in refusals if event.get("ts", 0) > exit_ts and
-                               (next_launch is None or event.get("ts", 0) < next_launch)), None)
+            ordered_events = [event for _, event in ordered]
+            exit_index = next(i for i, event in enumerate(ordered_events) if event is exit_event)
+            following = ordered_events[exit_index + 1:]
+            next_event = next((event for event in following if event.get("event") in {"start", "resume"}), None)
+            next_launch = next_event.get("ts", 0) if next_event else None
+            between = following[:next(i for i, event in enumerate(following) if event is next_event)] if next_event else following
+            intervention = next((event for event in reversed(between) if event.get("event") == "intervention"), None)
+            reason = next_event.get("reason") if next_event else None
+            source = "resume"
+            if not reason and intervention:
+                reason, source = intervention.get("reason"), "intervention"
+            refusal = next((event for event in between if event in refusals), None)
             test_refusal = refusal is not None
             accepted = bool(land and land.get("test_result") == "passed" and land.get("tree")
                             and land.get("tree") == exit_event.get("tree"))
@@ -1071,7 +1079,12 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None)
             elif land and (not land.get("tree") or not land.get("test_result")):
                 outcome, evidence = "unrecorded", "none"
             elif next_launch is not None:
-                outcome, evidence = "superseded", "none"
+                if exit_event.get("exit") == 0 and reason == "correction":
+                    outcome, evidence = "rework", f"{source}.correction"
+                elif exit_event.get("exit") == 0 and reason in {"continue_prompt", "clarification"}:
+                    outcome, evidence = "progress", f"{source}.{reason}"
+                else:
+                    outcome, evidence = "superseded", "none"
             elif land is None and not abandon:
                 outcome = "open" if ordered[-1][1].get("ts", 0) > now - 7 * 86400 else "stale"
                 evidence = "none"

@@ -303,7 +303,7 @@ GIT
   [ "$(jq -r 'select(.event=="identity")|.worker_identity.model+":"+.worker_identity.source+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1:runtime:reported" ]
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/runtime-prompt.md"
   export STUB_MODEL_LINE='model: gpt-test-2'
-  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --coordinator anthropic/claude-test >/dev/null
+  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --reason continue_prompt --coordinator anthropic/claude-test >/dev/null
   sleep 1
   [ "$(jq -r -s '[.[]|select(.event=="identity")|.worker_identity.model]|join(",")' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1,gpt-test-2" ]
   [ "$(jq -r 'select(.event=="resume" and .slug=="runtime")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
@@ -334,10 +334,10 @@ GIT
   sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   rm "$K3DM_WORKTREE_ROOT/v9.9.9/resume.run/session"
-  run dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"agy run returned no conversation id; start a new task"* ]]
   printf 'agy-conversation-1\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/resume.run/session"
-  dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null
+  dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null
   sleep 1
   grep -q -- '--conversation agy-conversation-1' "$BATS_TEST_TMPDIR/agy.argv"
   run ! grep -q -- '--continue' "$BATS_TEST_TMPDIR/agy.argv"
@@ -994,7 +994,7 @@ EOF
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 0 ]; sleep 1
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-2.log" ]
@@ -1007,8 +1007,8 @@ EOF
   [ "$(jq -r -s 'map(select(.slug=="one" and .event=="resume"))[0] | (.run|tostring)+":"+.worker_identity.vendor+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "2:openai:unknown" ]
   [ "$(jq -r -s '[.[]|select(.slug=="one" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
   export STUB_SLEEP=5
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"Codex is still running"* ]]
   sleep 6
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
@@ -1022,7 +1022,7 @@ EOF
   rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit"
   sed -i.bak 's/^process_start=.*/process_start=not-the-worker/' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 0 ]
   sleep 1
   [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
@@ -1033,7 +1033,7 @@ EOF
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null; sleep 1
   resume_argv="$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv")"
   [[ "$resume_argv" == *"writable_roots=[\"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/state\"]"* ]]
   [[ "$resume_argv" != *"network_access=true"* ]]
@@ -1045,15 +1045,15 @@ EOF
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   sed -i.bak '/^session id: /d' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex.log"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"no valid session id"* ]]
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/empty.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/empty.md" --reason continue_prompt
   [ "$status" -eq 2 ]
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug two >/dev/null; sleep 1
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" commit -m edit >/dev/null
   dispatch land --slug two --no-test >/dev/null
-  run dispatch resume --slug two --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug two --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]
 }
 
@@ -1062,7 +1062,7 @@ EOF
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one --network >/dev/null; sleep 1
   STUB_SLEEP=5 dispatch start --spec docs/plans/v9.9.9-demo.md --slug two --network >/dev/null
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"network task two is still running"* ]]
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
@@ -1148,7 +1148,7 @@ EOF
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   export STUB_TOKENS=20000
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null; sleep 1
   [ "$(jq -r -s 'map(select(.event == "resume"))[0].n' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 2 ]
   [ "$(jq -r -s 'map(select(.event == "codex_exit"))[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 20000 ]
 }
@@ -1282,8 +1282,8 @@ EOF
   [ "$status" -eq 0 ] && [[ "$output" == *"--landing-actor 'codex' --landing-model 'openai/gpt-6-luna'"* ]]
   run make -s -n -C "$root" codex-land-pending SLUG=x TEST=true LANDING_ACTOR=human
   [ "$status" -eq 0 ] && [[ "$output" == *"codex-land-pending --slug 'x' --test 'true' --landing-actor 'human'"* ]]
-  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
-  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
+  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md REASON=correction COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--reason 'correction'"* ]] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }
 
 @test "codex dispatch: release-merged records one merge timestamp idempotently" {
@@ -1399,4 +1399,43 @@ EOF
   run dispatch verify --slug other --result pass --evidence "$BATS_TEST_TMPDIR/evidence"
   [ "$status" -eq 0 ]
   [ -n "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
+}
+
+@test "codex dispatch: resume requires a reason and records both events" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug reason >/dev/null
+  sleep 1
+  printf 'continue\n' >"$BATS_TEST_TMPDIR/p.md"
+  cp "$K3DM_WORKTREE_ROOT/ledger.jsonl" "$BATS_TEST_TMPDIR/before"
+  cp "$STUB_ARGV" "$BATS_TEST_TMPDIR/argv-before"
+  run dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]
+  run dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason invalid
+  [ "$status" -eq 2 ]
+  cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  cmp "$BATS_TEST_TMPDIR/argv-before" "$STUB_ARGV"
+  dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null
+  [ "$(jq -s '[.[] | select(.event == "resume" and .reason == "correction")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention" and .reason == "correction")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
+@test "codex dispatch: open lists only unfinished tasks without writes" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  # Event shapes copied from the M4 ledger, 2026-11-01.
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'LEDGER'
+{"ts":1,"event":"start","version":"v9.9.9","slug":"pending","repo":"k3d-manager"}
+{"ts":2,"event":"codex_exit","version":"v9.9.9","slug":"pending","repo":"k3d-manager"}
+{"ts":1,"event":"start","version":"v9.9.9","slug":"done","repo":"k3d-manager"}
+{"ts":2,"event":"land","version":"v9.9.9","slug":"done","repo":"k3d-manager"}
+{"ts":1,"event":"start","version":"v8.0.0","slug":"other","repo":"k3d-manager"}
+LEDGER
+  cp "$K3DM_WORKTREE_ROOT/ledger.jsonl" "$BATS_TEST_TMPDIR/before"
+  run dispatch open --version v9.9.9
+  [ "$status" -eq 1 ]; [[ "$output" == *"v9.9.9 pending "*" codex_exit"* ]]
+  [[ "$output" != *done* && "$output" != *other* ]]
+  run dispatch open --version v7.0.0
+  [ "$status" -eq 0 ]; [ -z "$output" ]
+  cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$(find "$K3DM_WORKTREE_ROOT" -mindepth 1 | wc -l | tr -d ' ')" -eq 1 ]
 }

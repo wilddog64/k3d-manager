@@ -455,9 +455,9 @@ codex-land:
 codex-land-pending:
 	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)' $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',)
 
-## Resume a Codex task (SLUG=slug, PROMPT=path)
+## Resume a Codex task (SLUG=slug, PROMPT=path, REASON=continue_prompt|clarification|correction|other)
 codex-resume:
-	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' --reason '$(REASON)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
 
 ## Record an explicit coordinator handoff (SLUG=slug, ACTING_COORDINATOR=vendor/model)
 codex-handoff:
