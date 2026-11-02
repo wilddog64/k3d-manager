@@ -31,3 +31,7 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 - [ ] Record human intervention and link any related bug or plan.
 
 **Note:** Initial triage; not a confirmed diagnosis or a claim that remediation has occurred.
+
+## Prior-art / duplication check (2026-11-02)
+
+Related existing bug: `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md` — marked FIXED with live proof on M4 (export success and rule deployed). The current screenshot shows `HubDataExportNeverRan` on hub after the M5 migration. Treat this as a **possible recurrence or metric migration gap**, not a confirmed new export implementation defect. Compare Pushgateway series identity, export artifacts and launchd schedule on current hub. If the same Oct 11 defect is confirmed, consolidate this report into the older bug and close/remove this duplicate.
