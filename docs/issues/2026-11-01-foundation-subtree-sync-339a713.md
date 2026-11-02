@@ -24,7 +24,13 @@ staged files 173 upstream files 173 differences 0
 
 The initial staged audit failed with the existing embedded-AWK false positive; its exact output, root cause, narrow path-specific allowlist and follow-up are in `2026-11-01-foundation-subtree-audit-awk.md`. The staged audit passed after the documented exception.
 
-Verification: clean-environment BATS through the tripwire returned 179/179, with no live command reached; full output is `/private/tmp/k3dm-foundation-sync-bats.log`. ACG Jest returned:
+Verification: clean-environment BATS through the tripwire returned 178 passed and 1 skipped (179 cases), with no live command reached; full output is `/private/tmp/k3dm-foundation-sync-bats.log`. The skip was:
+
+```text
+ok 107 _acg_sync_known_hosts prunes stale managed AWS IPs and records current ones # skip Feature not yet implemented: see docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md
+```
+
+ACG Jest returned:
 
 ```text
 Test Suites: 8 passed, 8 total
