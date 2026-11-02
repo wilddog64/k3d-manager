@@ -71,3 +71,26 @@ not ok 6 headless Vault CA timeout prevents a detached descendant's delayed side
 ```
 
 This controlled fixture demonstrates a process-group limitation; it does not establish that real `security` forks such a child. The operator was asked to choose between skipping headless trust with a warning and pursuing privileged supervision, since each changes the approved constraints or requires further evidence.
+
+The operator selected privileged supervision and authorized offline verification without a live test. Review identified that the existing generic passwordless install rule matches a path-traversal destination in a scratch-only `fnmatch` regression:
+
+```text
+1..1
+not ok 1 binary install sudoers rule cannot replace a privileged helper through path traversal
+# legitimate install matches: True
+# traversal matches existing rule: True
+# AssertionError: existing rule permits a traversal destination
+```
+
+The next continuation was directed to tighten existing rules as needed while preserving and testing legitimate installation flows. No live sudoers or host installation was performed.
+
+The subsequent isolated policy review also found passwordless installation of a caller-controlled sudoers file and installation plus bootstrap of a caller-controlled system LaunchDaemon. Existing browser listener plists execute wrappers from user-writable state directories. The worker reported these focused results:
+
+```text
+not ok 6  detached descendant produced a delayed scratch effect
+not ok 83 traversal destination matched the existing binary-install rule
+not ok 84 caller-controlled sudoers source matched the self-update rule
+not ok 85 arbitrary scratch plist matched both install and system-bootstrap rules
+```
+
+The other 81 cases passed. No real sudo or daemon action was used in the policy tests. The macOS sudo monitor alternative was also investigated: scratch `visudo` accepted a command-specific `user_command_timeouts` policy, but Apple sudo's documented non-PTY implementation targets the command PID rather than its process group, and starts its timeout after policy session initialization. Consequently it cannot establish the original deadline and controlled-descendant guarantees alone. User direction is pending on expanding the task to harden the existing policy and dependent listener flows. No live host changes were made.

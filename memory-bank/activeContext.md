@@ -1,5 +1,11 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 CA trust supervisor scope decision
+
+Operator authorized privileged supervision and asked to continue until fixed, offline verified and landed; live verification deferred. Luna discovered pre-existing passwordless sudoers self-update, install path traversal and user-controlled system LaunchDaemon routes that can replace or bypass a root helper. The built-in sudo timeout does not fully resolve this: Apple's non-PTY code targets the command PID and starts its timer after policy session initialization. No helper implemented or landed; focused suite 81 passed, 4 failed in isolated regressions. See `docs/issues/2026-11-02-find-similar-docs-prior-art.md` and dispatch `.run/codex-6.log` / `codex-7.log`.
+
+Asked the operator whether to expand the task to harden these existing sudoers rules and dependent listener flows. **Decision pending when written; inspect subsequent messages.** Continue the authorized task, update scope and tests if approved, and do not claim offline verification proves macOS service cancellation. User expressly wants a handoff after completed and verified tasks, before `/clear`.
+
 ## Handoff — 2026-11-02 operator approved privileged CA trust supervisor
 
 The operator selected preserving automatic headless trust with a narrowly scoped privileged supervisor and new sudoers permission. Continue this session until the P2 fix is implemented, independently verified offline and landed; live verification is explicitly deferred. Investigate macOS Keychain cancellation and report offline proof limits honestly. Do not modify live sudoers, Keychains, AWS or cluster state. The updated P2 bug contains expanded file scope and security acceptance. Write a final handoff when complete, per operator `/clear` preference.
