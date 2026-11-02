@@ -1,5 +1,13 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 CA trust dispatch blocked by descendant cleanup
+
+**Operator preference:** Write a handoff after each completed and verified task before reporting completion; the operator plans to `/clear` and start the next session from the newest handoff. Record incomplete work honestly.
+
+**Status:** P2 `2026-11-02-acg-up-stalls-at-system-keychain-trust` worker exited successfully, but its fix is **not complete, verified, or landed**. Luna's latest report is in `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust.run/codex-3.log`; its in-scope unstaged work remains in the corresponding worktree. The worker's scratch-only detached-child regression produced a delayed side effect after timeout: focused BATS 75 passed, 1 failed. A root-owned or detached security process may also survive unprivileged group signals; the exact privileged behavior is not proven. The patch does not meet the no-orphan/no-delayed-side-effect acceptance criterion. See `docs/issues/2026-11-02-find-similar-docs-prior-art.md`.
+
+**Next, in order (planning queue):** Decide a design that preserves automatic trust and can enforce and verify termination of privileged work without inappropriate sudoers changes; investigate macOS authorization and a narrowly authorized supervisor if appropriate. A headless skip conflicts with the current approved spec. Do not land or record verify pass until the regression and other required checks pass; run a meaningful staged audit. Earlier broad suite failures under the tripwire remain unverified. No live cluster-up: sandbox credentials may be expired, AWS stack state unknown, M5 role file was missing. Create no PR. The operator will decide the next task after `/clear`.
+
 ## Handoff — 2026-11-02 CA trust dispatch review and session preference
 
 **Operator preference:** After each task is complete and verified, write a handoff here for the next session before reporting completion. The operator plans to run `/clear` after each task; the next session should read the newest handoff. Record actual status and evidence, including incomplete or blocked work; never imply an unfinished task is complete.
