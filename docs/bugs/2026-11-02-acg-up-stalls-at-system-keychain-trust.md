@@ -6,6 +6,7 @@
 **Filed:** 2026-11-02
 **Detected by:** operator screenshot and read-only investigation of job `c38c3855`
 **Branch:** `k3d-manager-v1.43.14`
+**Approval:** Operator requested dispatch to Luna on 2026-11-02.
 **Related:** `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`, `docs/bugs/v1.5.3-bugfix-acg-up-vault-ca-trust-no-soft.md`
 
 ## Evidence
@@ -25,3 +26,25 @@ The operator states the failed run was before today's pull. Read-only checks on 
 ## Next investigation
 
 Capture the real process tree and TTY/authorization state if this recurs; distinguish `sudo` waiting from `security` waiting, and confirm the deployed webhook and job environment. Establish a bounded, safe failure mode for headless CA trust, preserving certificate verification and not assuming that a pull alone fixes the stall. Verify stack state after sandbox credentials are restored before deciding whether to reuse or clean up infrastructure. See `docs/issues/2026-11-02-acg-up-job-c38c3855.md` for exact diagnostic output.
+
+## Prior-art search
+
+`make find-similar-docs` on M5 surfaced `docs/plans/v1.4.6-auto-trust-vault-ca.md` (score 0.806) and the two related CA-trust bugs above among the top results for the incident query. A timeout/cleanup query found `docs/bugs/2026-08-15-cluster-up-failure-orphans-cloudformation-stack.md` (0.793). M4 retrieval was unavailable; see `docs/issues/2026-11-02-find-similar-docs-prior-art.md`. These examples are useful retrieval evidence, not a comparative evaluation.
+
+## Files
+
+- `bin/cluster-up`
+- `scripts/tests/bin/cluster_up.bats`
+- `CHANGELOG.md`
+
+## Fix scope
+
+Bound the headless System Keychain CA-trust operation so a hung authorization or `security` process cannot consume the cluster-up job deadline. Investigate the existing command path and implement a short deadline (at most 30 seconds plus a short termination grace) without relying on GNU `timeout` being installed on macOS. Terminate and reap the operation and its descendants on timeout. Warn and continue along the existing failure path; do not claim trust succeeded. Do not assume a particular cause of the observed stall.
+
+Preserve the documented automatic trust behavior: already-trusted certificates skip the add operation, interactive use retains its existing prompt and warning behavior, and failed trust remains a warning. Match the existing runner's headless definition (stdin or stdout is not a TTY). Preserve certificate verification and non-Darwin behavior. Do not change sudoers, use bare sudo, weaken trust, modify cleanup, automatically destroy infrastructure, or access real Keychains, AWS, Kubernetes or remote hosts in tests. The live environment and stack state require separate operator investigation.
+
+## Acceptance
+
+- A headless trust operation that hangs is terminated within the deadline, including its descendants, and produces a warning before execution continues. Test with a real controlled subprocess and confirm no child remains; provide a short test-only deadline without adding a public option.
+- A quick successful headless trust attempt executes once, an already-trusted CA skips it, and an immediate trust failure warns and continues. Preserve interactive and non-Darwin behavior. Tests must isolate command stubs and assert they cannot touch real system state.
+- Run the focused cluster-up BATS suite, ShellCheck on `bin/cluster-up`, `git diff --check`, and `_agent_audit`; report actual results. Do not run a live cluster-up.
