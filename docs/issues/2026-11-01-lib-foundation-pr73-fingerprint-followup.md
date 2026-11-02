@@ -30,4 +30,4 @@ A non-force merge `25678b7` retained both changelog entries and was pushed to `f
 WARN: Agent audit: scripts/lib/acg/acg.sh exceeds if-count threshold in: emit_output:10
 ```
 
-The precise legacy entry was allowlisted with a follow-up issue in lib-foundation, keeping the threshold at 8; the staged audit then passed. PR #74 does not contain the fingerprint fix. GitHub CI and Copilot review of the updated PR remain to be checked.
+The precise legacy entry was allowlisted with a follow-up issue in lib-foundation, keeping the threshold at 8; the staged audit then passed. PR #74 does not contain the fingerprint fix. GitHub CI on `25678b7` passed (shellcheck, bats, acg node); the existing Copilot review predates the update.
