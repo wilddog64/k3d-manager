@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-02: Operator requests the CA trust task continue until landed. Luna resumed and confirmed detached-child regression remains failing (75 pass, 1 fail). Asked operator to choose headless skip with warning versus privileged-supervisor investigation; response pending at time of note. No landing. See latest activeContext handoff.
+
 - 2026-11-02: CA-trust Luna dispatch worker exited successfully but reported a blocker: isolated detached-child regression left a delayed scratch side effect after timeout (focused BATS 75 pass, 1 fail); privileged descendant termination also unproven. Unstaged patch is not verified or landed. Latest handoff in activeContext; details in docs/issues/2026-11-02-find-similar-docs-prior-art.md.
 
 - 2026-11-02: Operator requests a handoff in `activeContext.md` after each completed, verified task before they `/clear`. CA-trust Luna continuation reported 75 focused tests passed; staged audit and independent verification remain pending. Review identified that same-user process tests do not prove a sudo-owned descendant can be stopped; Luna resumed again (resume 3). No landing or live cluster-up.

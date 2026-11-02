@@ -1,5 +1,11 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-02 CA trust fix design decision pending
+
+The operator explicitly says this session is not complete until the P2 fix is landed and requested Luna be resumed. The latest continuation confirmed the process-group timeout cannot meet the existing no-orphan guarantee for a synthetic detached child (focused BATS 75 passed, 1 failed). The test does not prove that the actual macOS `security` command creates such a child; cancellation of an in-flight Keychain service request also remains unproven. Sudo's user timeout requires policy changes; a privileged supervisor would require a new narrowly scoped sudoers rule and further service-cancellation evidence. Details: `.run/codex-4.log` for dispatch slug `2026-11-02-acg-up-stalls-at-system-keychain-trust` and `docs/issues/2026-11-02-find-similar-docs-prior-art.md`.
+
+Asked operator to choose between skipping untrusted CA trust in headless runs with a warning (interactive automatic trust preserved) and investigating a privileged supervisor. The former changes the existing automatic-headless-trust requirement and needs explicit direction. **The decision was pending when this handoff was written; check the conversation for an answer.** The Luna patch remains unstaged and must not be landed as-is. Continue through implementation, independent verification, landing and updated handoff once the decision is resolved; do not run live cluster-up or modify system sudoers without authorization.
+
 ## Handoff — 2026-11-02 CA trust dispatch blocked by descendant cleanup
 
 **Operator preference:** Write a handoff after each completed and verified task before reporting completion; the operator plans to `/clear` and start the next session from the newest handoff. Record incomplete work honestly.

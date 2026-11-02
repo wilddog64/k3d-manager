@@ -59,3 +59,15 @@ not ok 6 headless Vault CA timeout prevents a detached descendant's delayed side
 ```
 
 The worker reported 75 passed, 1 failed, 0 skipped for the focused suite. Its proposed design requires investigation of a narrowly authorized privileged supervisor; whether it can guarantee termination and prevent further macOS authorization or Keychain service work remains unproven. Do not land the patch or record a verification pass until the acceptance criteria are met.
+
+The next continuation tested a sudo-like monitor forwarding TERM and still reproduced the detached-child side effect:
+
+```text
+1..76
+not ok 6 headless Vault CA timeout prevents a detached descendant's delayed side effect
+# monitor forwarded TERM to controlled child
+# delayed scratch effect observed: True
+# AssertionError: detached child survived timeout and produced a delayed effect
+```
+
+This controlled fixture demonstrates a process-group limitation; it does not establish that real `security` forks such a child. The operator was asked to choose between skipping headless trust with a warning and pursuing privileged supervision, since each changes the approved constraints or requires further evidence.
