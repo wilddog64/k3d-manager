@@ -1,5 +1,7 @@
 # Active context — k3d-manager-v1.43.10
 
+- 2026-11-01 Codex dispatch review PARTIAL: role guard landed/pushed `bd3002db`, focused BATS 157/157 and landing/pre-push fast gates passed; pre-fix and live checks pending. Resume task focused BATS 94/94, metrics pytest 169 and dashboard BATS 38/38 passed, but fast gate exposed a hub-data shared TMPDIR collision; isolated fix `8614ebb4` remains on task branch pending scope approval. Agent instruction refresh remains unlanded: broad tests and agy loading unverified. See docs/issues/2026-11-01-dispatch-review-pending-verification.md.
+
 This file was compressed on 2026-10-19 because the active memory-bank exceeded 700 KB and was approaching the repository's 200K-token context-compaction boundary. Older detail is summarized in `memory-bank/archive/2026-10-07-to-2026-10-16-compressed.md`; the pre-compression files remain recoverable from git history.
 
 ## Current branch and operating rules
