@@ -1,5 +1,9 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-03 CA trust Phase B outcome
+
+The operator authorized Phase B only and requested its results before Phase C. Luna added an isolated end-to-end caller/timeout/warning/continuation test in task-branch commit `f08a3775` (parent implementation `6491d5d2`). Independent Python 3.13 BATS passed 89/89 with no skips. The hung fixture used a one-second monotonic deadline and short grace, a TERM-resistant controlled child retaining stdout/stderr, returned failure 124, warned, reached the next sentinel, and verified controlled processes exited. Prior automatic-trust, already-trusted skip, interactive behavior and nonfatal failure decisions were reviewed. Exact output and limitations: `docs/issues/2026-11-03-ca-trust-phase-b-containment.md`. This does not prove real root signal behavior or macOS service cancellation; live verification deferred. **Do not start Phase C until operator reviews the outcome.**
+
 ## Handoff — 2026-11-03 CA trust Phase A diagnosis
 
 The operator approved Phase A only and requested its results before moving to Phase B. Phase A found the actual blocking process inconclusive: existing job logs stop at CA trust, and post-incident sudo policy/log checks cannot identify the culprit. Isolated fake-command fixtures exercised blocked sudo, blocked security, and an inherited pipe held after both commands exited; all behaved as designed. The current webhook writes output to a file and waits on the job PID, so the pipe fixture is a general diagnostic, not proof of this incident. Exact output and future live-capture guidance are in `docs/issues/2026-11-03-ca-trust-phase-a-diagnosis.md`. No live cluster or host trust changes were performed. **Stop for operator review before Phase B.**

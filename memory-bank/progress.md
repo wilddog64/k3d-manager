@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-03: CA trust Phase B offline containment suite independently passed 89/89, including the actual caller warning and continuation after a controlled hung process held stdout/stderr. Phase B test committed to task branch `f08a3775`; see `docs/issues/2026-11-03-ca-trust-phase-b-containment.md`. Await operator review before Phase C; no live verification or landing.
+
 - 2026-11-03: CA trust Phase A completed with inconclusive live root cause. Fake sudo/security and inherited-pipe fixtures produced the expected distinct process states; the current webhook writes output to a file rather than capturing a pipe. Full output and live-capture guidance: `docs/issues/2026-11-03-ca-trust-phase-a-diagnosis.md`. Await operator review before Phase B.
 
 - 2026-11-02: Expanded CA trust hardening remains in progress. Luna hit a usage limit; partial draft preserved in task worktree. Independently ran supervisor BATS 5/5 and ShellCheck/diff check clean, but old timeout and arbitrary root LaunchDaemon authorization remain unresolved; no verified fix or landing. See latest activeContext handoff and docs/issues/2026-11-02-find-similar-docs-prior-art.md.
