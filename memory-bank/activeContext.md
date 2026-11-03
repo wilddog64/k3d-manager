@@ -1,5 +1,11 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-03 CA trust Phase A diagnosis
+
+The operator approved Phase A only and requested its results before moving to Phase B. Phase A found the actual blocking process inconclusive: existing job logs stop at CA trust, and post-incident sudo policy/log checks cannot identify the culprit. Isolated fake-command fixtures exercised blocked sudo, blocked security, and an inherited pipe held after both commands exited; all behaved as designed. The current webhook writes output to a file and waits on the job PID, so the pipe fixture is a general diagnostic, not proof of this incident. Exact output and future live-capture guidance are in `docs/issues/2026-11-03-ca-trust-phase-a-diagnosis.md`. No live cluster or host trust changes were performed. **Stop for operator review before Phase B.**
+
+The release worktree contains a temporary review copy previously made by the coordinator; automatic approval rejected removing it as potentially destructive. The committed Luna task branch/worktree is separate. Do not discard or overwrite either copy; obtain operator approval for any cleanup before landing. The earlier task-branch push was interrupted and its remote state is not confirmed.
+
 ## Handoff — 2026-11-02 expanded CA trust hardening in progress
 
 Operator requires this task to continue until fixed, offline verified and landed; live verification is deferred. The operator explicitly approved hardening existing sudoers rules and dependent listener flows. The release branch contains the expanded specification through `4d5821f2`.
