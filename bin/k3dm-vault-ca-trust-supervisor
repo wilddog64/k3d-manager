@@ -1,0 +1,204 @@
+#!/usr/bin/python3 -I
+"""Prototype: not installed or invoked until the sudoers boundary is hardened."""
+
+import os
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import math
+
+SECURITY = "/usr/bin/security"
+KEYCHAIN = "/Library/Keychains/System.keychain"
+DEADLINE = 30
+GRACE = 1
+MAX_CERT_BYTES = 1024 * 1024
+
+
+class _StopRequested(Exception):
+    def __init__(self, signum):
+        self.signum = signum
+
+
+class _DeadlineExpired(Exception):
+    pass
+
+
+def _stop_requested(signum, _frame):
+    raise _StopRequested(signum)
+
+
+def _deadline_requested(_signum, _frame):
+    raise _DeadlineExpired()
+
+
+def _validate_installation():
+    expected = "/Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor"
+    path = os.path.realpath(__file__)
+    if path != expected:
+        raise ValueError("supervisor is not running from its fixed installation path")
+    for directory in ("/", "/usr", "/usr/bin", "/Library", "/Library/PrivilegedHelperTools"):
+        info = os.stat(directory, follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("supervisor and system executable parent directories must be root-owned and not group/world writable")
+    info = os.stat(path, follow_symlinks=False)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or not info.st_mode & 0o111:
+        raise ValueError("supervisor must be a root-owned, non-writable executable")
+    for executable in ("/usr/bin/python3", SECURITY):
+        info = os.stat(executable, follow_symlinks=False)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or not info.st_mode & 0o111:
+            raise ValueError("required system executable is not trusted")
+
+
+def _open_certificate(path, owner):
+    """Open an absolute, non-symlink path without following swapped components."""
+    if (not path.startswith("/") or path == "/" or
+            any(ord(character) < 32 or ord(character) == 127 for character in path)):
+        raise ValueError("certificate path must be absolute")
+    components = path.split("/")[1:]
+    if any(not part or part in (".", "..") or part.startswith("-") for part in components):
+        raise ValueError("unsafe certificate path")
+    directory = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for component in components[:-1]:
+            child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        fd = os.open(components[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+    finally:
+        os.close(directory)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != owner or info.st_mode & 0o022:
+            raise ValueError("certificate must be a non-writable regular file owned by the invoking user")
+        if info.st_size == 0 or info.st_size > MAX_CERT_BYTES:
+            raise ValueError("certificate size is invalid")
+        with os.fdopen(fd, "rb") as stream:
+            fd = -1
+            data = stream.read(MAX_CERT_BYTES + 1)
+        if not data or len(data) > MAX_CERT_BYTES:
+            raise ValueError("certificate size is invalid")
+        return data
+    finally:
+        if fd != -1:
+            os.close(fd)
+
+
+def _run_security(cert_path, command=SECURITY, deadline=DEADLINE, grace=GRACE,
+                  environment=None, absolute_deadline=None):
+    """Terminate the controlled process group and reap its leader on timeout."""
+    if environment is None:
+        environment = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": "/var/root"}
+    signals = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+    managed_signals = signals + (signal.SIGALRM,)
+    previous = {signum: signal.signal(signum, _stop_requested) for signum in signals}
+    previous[signal.SIGALRM] = signal.getsignal(signal.SIGALRM)
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, managed_signals)
+    try:
+        remaining = deadline
+        if absolute_deadline is not None:
+            remaining = min(remaining, absolute_deadline - time.monotonic())
+        if remaining <= 0:
+            print("Vault CA trust timed out before Keychain operation", file=sys.stderr)
+            return 124
+
+        def _child_setup():
+            if absolute_deadline is not None and time.monotonic() >= absolute_deadline:
+                os._exit(124)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
+        proc = subprocess.Popen([command, "add-trusted-cert", "-d", "-r", "trustRoot",
+                                 "-k", KEYCHAIN, cert_path], start_new_session=True,
+                                env=environment,
+                                preexec_fn=_child_setup)
+        try:
+            # Unmask only after the process handle exists and inside the cleanup
+            # guard, so a pending signal always terminates and reaps the child.
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            previous_mask = None
+            remaining = deadline
+            if absolute_deadline is not None:
+                remaining = min(remaining, absolute_deadline - time.monotonic())
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, 0)
+            return proc.wait(timeout=remaining)
+        except (subprocess.TimeoutExpired, _StopRequested, _DeadlineExpired) as exc:
+            cleanup_mask = signal.pthread_sigmask(signal.SIG_BLOCK, managed_signals)
+            for signum in managed_signals:
+                signal.signal(signum, signal.SIG_IGN)
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            try:
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                # Keep the leader unreaped through the grace period; then
+                # SIGKILL the group regardless of whether that leader exited.
+                time.sleep(grace)
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                proc.wait()
+            finally:
+                for signum, handler in previous.items():
+                    signal.signal(signum, handler)
+                signal.pthread_sigmask(signal.SIG_SETMASK, cleanup_mask)
+            if isinstance(exc, _StopRequested):
+                print("Vault CA trust interrupted", file=sys.stderr)
+                return 128 + exc.signum
+            print("Vault CA trust timed out", file=sys.stderr)
+            return 124
+    finally:
+        if previous_mask is not None:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
+
+
+def main(argv):
+    if len(argv) != 3 or os.geteuid() != 0:
+        print("usage: k3dm-vault-ca-trust-supervisor /absolute/ca.crt MONOTONIC_DEADLINE", file=sys.stderr)
+        return 2
+    alarm = None
+    previous_alarm_handler = None
+    try:
+        try:
+            absolute_deadline = float(argv[2])
+        except ValueError as exc:
+            raise ValueError("invalid monotonic deadline") from exc
+        if not math.isfinite(absolute_deadline):
+            raise ValueError("invalid monotonic deadline")
+        remaining = absolute_deadline - time.monotonic()
+        if remaining <= 0 or remaining > DEADLINE:
+            raise ValueError("monotonic deadline is expired or exceeds the allowed window")
+        previous_alarm_handler = signal.signal(signal.SIGALRM, _deadline_requested)
+        alarm = signal.setitimer(signal.ITIMER_REAL, remaining)
+        _validate_installation()
+        uid_text = os.environ.get("SUDO_UID", "")
+        if not uid_text.isascii() or not uid_text.isdecimal() or int(uid_text) <= 0:
+            raise ValueError("invoking sudo user is unavailable")
+        data = _open_certificate(argv[1], int(uid_text))
+        with tempfile.TemporaryDirectory(prefix="k3dm-vault-ca-", dir="/private/tmp") as tmp:
+            cert = os.path.join(tmp, "ca.crt")
+            fd = os.open(cert, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+            return _run_security(cert, absolute_deadline=absolute_deadline)
+    except _DeadlineExpired:
+        print("Vault CA trust timed out before Keychain operation", file=sys.stderr)
+        return 124
+    except (OSError, ValueError) as exc:
+        print(f"Vault CA trust refused: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        if alarm is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+        if previous_alarm_handler is not None:
+            signal.signal(signal.SIGALRM, previous_alarm_handler)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

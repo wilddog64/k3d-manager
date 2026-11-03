@@ -213,7 +213,7 @@ function _hostinger_deregister_cluster() {
 function _hostinger_restart_launchd() {
   local label="$1" plist="$2" domain="${3:-user}"
 
-  [[ -f "${plist}" ]] || return 0
+  [[ -f "${plist}" || "${domain}" == "system" ]] || return 0
 
   _hostinger_wait_for_port_free() {
     local port="$1" timeout="${2:-30}" attempt=0
@@ -231,14 +231,32 @@ function _hostinger_restart_launchd() {
   }
 
   if [[ "${domain}" == "system" ]]; then
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" >/dev/null 2>&1 || true
-    if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
-      _hostinger_wait_for_port_free 8080 30
-    fi
-    _run_command --interactive-sudo --quiet --soft -- launchctl enable "system/${label}" >/dev/null 2>&1 || true
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" >/dev/null 2>&1 \
-      && _info "[k3s-hostinger] launchd ${label}: restarted" \
-      || _warn "[k3s-hostinger] launchd ${label}: restart failed"
+    _acg_validate_browser_listener_config "${_ACG_STATE_DIR}" || return 1
+    local helper="/Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor"
+    case "${label}" in
+      com.k3d-manager.argocd-browser-https)
+        local tls_dir="${ARGOCD_BROWSER_TLS_DIR:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls}"
+        _run_command --interactive-sudo --quiet --soft -- "${helper}" write argocd-https \
+          "${ARGOCD_BROWSER_TLS_CERT_FILE:-${tls_dir}/fullchain.crt}" \
+          "${ARGOCD_BROWSER_TLS_KEY_FILE:-${tls_dir}/tls.key}" "${ARGOCD_BROWSER_PORT:-443}" \
+          && _info "[k3s-hostinger] secure launchd ${label}: restarted" \
+          || _warn "[k3s-hostinger] secure launchd ${label} helper or permission unavailable"
+        ;;
+      com.k3d-manager.keycloak-browser-http)
+        _run_command --interactive-sudo --quiet --soft -- "${helper}" write keycloak-http \
+          && _info "[k3s-hostinger] secure launchd ${label}: restarted" \
+          || _warn "[k3s-hostinger] secure launchd ${label} helper or permission unavailable"
+        ;;
+      com.k3d-manager.frontend-browser-http)
+        _run_command --interactive-sudo --quiet --soft -- "${helper}" write hostinger-frontend-http \
+          && _info "[k3s-hostinger] secure launchd ${label}: restarted" \
+          || _warn "[k3s-hostinger] secure launchd ${label} helper or permission unavailable"
+        ;;
+      *)
+        _warn "[k3s-hostinger] refusing generic system LaunchDaemon restart for ${label}"
+        return 1
+        ;;
+    esac
   else
     launchctl bootout "gui/$(id -u)" "${plist}" >/dev/null 2>&1 || true
     if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
@@ -402,9 +420,9 @@ set -euo pipefail
 export KUBECONFIG="${HOME}/.kube/config"
 _log="${log_file}"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
-  ${kubectl_bin} --context "${_HOSTINGER_KUBE_CONTEXT}" port-forward --address=127.0.0.2 \
-    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.1:18082" >> "\${_log}"
+  ${kubectl_bin} --context "${_HOSTINGER_KUBE_CONTEXT}" port-forward --address=127.0.0.1 \
+    svc/frontend 18082:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
@@ -592,11 +610,44 @@ function _hostinger_clear_matching_processes() {
   fi
 }
 
+function _hostinger_prepare_access_layer_dependencies() {
+  if ! declare -F _acg_write_user_listener_agent >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/lib/acg_browser_listeners.sh"
+  fi
+  if ! declare -F _argocd_write_port_forward_wrapper >/dev/null 2>&1; then
+    _hostinger_load_argocd_plugin || return 1
+  fi
+}
+
+function _hostinger_install_fixed_browser_listeners() {
+  local helper="/Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor"
+  local tls_dir="${ARGOCD_BROWSER_TLS_DIR:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls}"
+  _acg_validate_browser_listener_config "${_ACG_STATE_DIR}" || return 1
+  if ! _run_command --interactive-sudo --quiet --soft -- "${helper}" write argocd-https \
+      "${ARGOCD_BROWSER_TLS_CERT_FILE:-${tls_dir}/fullchain.crt}" \
+      "${ARGOCD_BROWSER_TLS_KEY_FILE:-${tls_dir}/tls.key}" "${ARGOCD_BROWSER_PORT:-443}"; then
+    _warn "[k3s-hostinger] secure ArgoCD browser listener helper or permission unavailable"
+    return 1
+  fi
+  _hostinger_install_one_fixed_listener keycloak-http || return 1
+  _acg_install_loopback_frontend_listener hostinger-loopback-alias hostinger-frontend-http \
+    _hostinger_install_one_fixed_listener _hostinger_install_one_fixed_listener
+}
+
+function _hostinger_install_one_fixed_listener() {
+  local service="$1" helper="/Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor"
+  _run_command --interactive-sudo --quiet --soft -- "${helper}" write "${service}" || {
+    _warn "[k3s-hostinger] secure ${service} listener helper or permission unavailable"
+    return 1
+  }
+}
+
 function _hostinger_refresh_access_layer() {
   if [[ "$(uname)" != "Darwin" ]]; then
     return 0
   fi
 
+  _hostinger_prepare_access_layer_dependencies || return 1
   _info "[k3s-hostinger] Refreshing local access layer listeners..."
   local _argocd_pf_label="com.k3d-manager.argocd-port-forward"
   local _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
@@ -606,6 +657,8 @@ function _hostinger_refresh_access_layer() {
   local _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
   local _kc_pf_log="${_ACG_STATE_DIR}/logs/keycloak-pf.log"
   local _kc_pf_wrapper="${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  local _keycloak_browser_wrapper="${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  local _keycloak_browser_log="${_ACG_STATE_DIR}/logs/keycloak-browser-http.log"
   local _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
   local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
@@ -618,6 +671,7 @@ function _hostinger_refresh_access_layer() {
   local _pushgateway_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   local _pushgateway_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
   local _pushgateway_svc="prometheus-pushgateway"
+  _hostinger_install_fixed_browser_listeners || return 1
   if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
     _info "[k3s-hostinger] ArgoCD port-forward plist missing — regenerating from wrapper..."
     mkdir -p "$(dirname "${_argocd_pf_log}")"
@@ -647,6 +701,14 @@ PLIST
   fi
   _hostinger_write_argocd_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"
   _hostinger_write_keycloak_port_forward_wrapper "${_kc_pf_wrapper}" "${_kc_pf_log}"
+  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" \
+    "$(command -v kubectl)" "$(command -v curl)" "istio-system" "${_HOSTINGER_KUBE_CONTEXT}" \
+    "svc/istio-ingressgateway" "18081" "80" "http://127.0.0.1:18081/health/ready" \
+    "${HOME}/.kube/config" "127.0.0.1" "keycloak-browser-forward"
+  _acg_write_user_listener_agent com.k3d-manager.keycloak-browser-forward \
+    "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" \
+    && _acg_start_user_listener_agent com.k3d-manager.keycloak-browser-forward \
+    || _warn "[k3s-hostinger] Keycloak browser port-forward LaunchAgent could not start"
   if [[ ! -f "${_kc_pf_plist}" && -f "${_kc_pf_wrapper}" ]]; then
     _info "[k3s-hostinger] Keycloak port-forward plist missing — regenerating from wrapper..."
     mkdir -p "$(dirname "${_kc_pf_log}")"
@@ -674,9 +736,6 @@ PLIST
 </plist>
 PLIST
   fi
-  _hostinger_write_argocd_browser_https_wrapper \
-    "${_argocd_browser_wrapper}" \
-    "${_argocd_browser_log}"
   _hostinger_write_frontend_browser_wrapper \
     "${_frontend_browser_wrapper}" \
     "${_frontend_browser_log}"
@@ -711,32 +770,13 @@ PLIST
     "${_kc_pf_plist}" \
     user
   _hostinger_restart_cloudflared
-  _hostinger_restart_launchd \
-    "com.k3d-manager.argocd-browser-https" \
-    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
-    system
-  _hostinger_restart_launchd \
-    "com.k3d-manager.keycloak-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
-    system
-  local _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
-  _hostinger_write_frontend_browser_plist \
-    "${_frontend_browser_plist_tmp}" \
+  _hostinger_write_frontend_browser_wrapper \
     "${_frontend_browser_wrapper}" \
     "${_frontend_browser_log}"
-  if [[ ! -f "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" ]] || \
-      ! diff -q "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" >/dev/null 2>&1; then
-    _run_command --interactive-sudo --quiet --soft -- install -m 644 \
-        "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-      || _warn "[k3s-hostinger] could not install frontend-browser-http plist — public frontend may still point at another provider"
-  fi
-  rm -f "${_frontend_browser_plist_tmp}"
-  _hostinger_restart_launchd \
-    "com.k3d-manager.frontend-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-    system
+  _acg_write_user_listener_agent com.k3d-manager.frontend-browser-forward \
+    "${_frontend_browser_wrapper}" "${_frontend_browser_log}" \
+    && _acg_start_user_listener_agent com.k3d-manager.frontend-browser-forward \
+    || _warn "[k3s-hostinger] frontend browser port-forward LaunchAgent could not start"
   if [[ ! -f "${_vault_pf_plist}" && -f "${_vault_pf_tmpl}" ]]; then
     _info "[k3s-hostinger] Vault port-forward plist missing — installing from template..."
     local _vault_pf_kubectl

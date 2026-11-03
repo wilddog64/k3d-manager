@@ -1,0 +1,191 @@
+#!/usr/bin/python3 -I
+"""Install only the fixed, user-context browser listener LaunchDaemons."""
+
+import os
+import pathlib
+import plistlib
+import pwd
+import secrets
+import stat
+import subprocess
+import sys
+
+ROOT = "/Library/LaunchDaemons"
+SUPERVISOR = "/Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor"
+RELAY = "/Library/PrivilegedHelperTools/k3dm-browser-listener-relay"
+PYTHON = "/usr/bin/python3"
+LAUNCHCTL = "/bin/launchctl"
+IFCONFIG = "/sbin/ifconfig"
+SERVICES = {
+    "argocd-https": ("com.k3d-manager.argocd-browser-https", "127.0.0.1", "443", "tls", "8080"),
+    "keycloak-http": ("com.k3d-manager.keycloak-browser-http", "127.0.0.1", "80", "tcp", "18081"),
+    "frontend-http": ("com.k3d-manager.sandbox.frontend-browser-http", "127.0.0.3", "80", "tcp", "18082"),
+    "hostinger-frontend-http": ("com.k3d-manager.frontend-browser-http", "127.0.0.2", "80", "tcp", "18082"),
+    "sandbox-loopback-alias": ("com.k3d-manager.sandbox.loopback-alias", "", "", "alias", "127.0.0.3"),
+    "hostinger-loopback-alias": ("com.k3d-manager.loopback-alias", "", "", "alias", "127.0.0.2"),
+}
+
+
+def _safe_root_path(path):
+    expected = ("/", "/usr", "/usr/bin", "/Library", "/Library/PrivilegedHelperTools", ROOT)
+    for item in expected:
+        info = os.stat(item, follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("listener helper directories must be root-owned and not group/world writable; fix /Library/PrivilegedHelperTools before retrying make install-sudoers")
+    info = os.stat(path, follow_symlinks=False)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or not info.st_mode & 0o111:
+        raise ValueError("listener executable is not root-controlled")
+
+
+def _requesting_user():
+    uid_text = os.environ.get("SUDO_UID", "")
+    if not uid_text.isascii() or not uid_text.isdecimal() or int(uid_text) <= 0:
+        raise ValueError("sudo invoking user is unavailable")
+    user = pwd.getpwuid(int(uid_text))
+    if user.pw_uid == 0 or not user.pw_name or "/" in user.pw_name:
+        raise ValueError("invalid invoking user")
+    return user
+
+
+def _argocd_port(value):
+    if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
+        raise ValueError("Argo CD listener port must be an ASCII decimal port")
+    port = int(value)
+    if str(port) != value or not 1 <= port <= 65535:
+        raise ValueError("Argo CD listener port must be between 1 and 65535")
+    return str(port)
+
+
+def _ensure_loopback_alias(address):
+    """Ensure a fixed loopback address exists before launchd binds a socket."""
+    if address not in ("127.0.0.2", "127.0.0.3"):
+        raise ValueError("unsupported loopback alias")
+
+    def present():
+        result = subprocess.run([IFCONFIG, "lo0"], check=True, capture_output=True,
+                                text=True, timeout=5)
+        return any(len(fields) >= 2 and fields[0] == "inet" and fields[1] == address
+                   for fields in (line.split() for line in result.stdout.splitlines()))
+
+    if not present():
+        subprocess.run([IFCONFIG, "lo0", "alias", address], check=True, timeout=5)
+    if not present():
+        raise ValueError(f"loopback alias {address} was not configured")
+
+
+def _plist(service, user, cert=None, key=None, listener_port=None):
+    label, host, port, kind, backend = SERVICES[service]
+    if service == "argocd-https":
+        port = _argocd_port("443" if listener_port is None else listener_port)
+    elif listener_port is not None:
+        raise ValueError("custom ports are supported only for the Argo CD listener")
+    if kind == "alias":
+        if cert is not None or key is not None:
+            raise ValueError("loopback alias does not accept extra arguments")
+        return {
+            "Label": label,
+            "ProgramArguments": ["/sbin/ifconfig", "lo0", "alias", backend],
+            "RunAtLoad": True,
+            "StandardOutPath": "/dev/null",
+            "StandardErrorPath": "/dev/null",
+        }
+    if kind == "tls":
+        if not cert or not key or not os.path.isabs(cert) or not os.path.isabs(key):
+            raise ValueError("Argo CD TLS listener requires absolute certificate and key paths")
+        arguments = [PYTHON, "-I", RELAY, "tls", backend, cert, key]
+    else:
+        if cert is not None or key is not None:
+            raise ValueError("HTTP listener does not accept certificate arguments")
+        arguments = [PYTHON, "-I", RELAY, "tcp", backend]
+    return {
+        "Label": label,
+        "ProgramArguments": arguments,
+        "UserName": user.pw_name,
+        "inetdCompatibility": {"Wait": False},
+        "Sockets": {"Listener": {
+            "SockFamily": "IPv4",
+            "SockType": "stream",
+            "SockProtocol": "TCP",
+            "SockNodeName": host,
+            "SockServiceName": port,
+            "SockPassive": True,
+        }},
+        "StandardOutPath": "/dev/null",
+        "StandardErrorPath": "/dev/null",
+    }
+
+
+def _install_plist(path, payload):
+    os.makedirs(ROOT, mode=0o755, exist_ok=True)
+    directory = os.open(ROOT, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(directory)
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("LaunchDaemons directory is not root-controlled")
+        target = pathlib.Path(path)
+        if target.parent.as_posix() != ROOT:
+            raise ValueError("unexpected LaunchDaemon path")
+        try:
+            old = os.stat(path, follow_symlinks=False)
+        except FileNotFoundError:
+            old = None
+        if old and (not stat.S_ISREG(old.st_mode) or old.st_uid != 0):
+            raise ValueError("existing LaunchDaemon is not a root-owned regular file")
+        temp_name = f".k3dm-listener-{secrets.token_hex(8)}.plist"
+        temp_path = os.path.join(ROOT, temp_name)
+        fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                plistlib.dump(payload, stream, fmt=plistlib.FMT_XML, sort_keys=True)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chown(temp_path, 0, 0, follow_symlinks=False)
+            os.chmod(temp_path, 0o644, follow_symlinks=False)
+            os.replace(temp_path, path)
+        finally:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+    finally:
+        os.close(directory)
+
+
+def write_listener(service, cert=None, key=None, listener_port=None):
+    if service not in SERVICES:
+        raise ValueError("unsupported listener")
+    _safe_root_path(RELAY)
+    _safe_root_path(PYTHON)
+    user = None if SERVICES[service][3] == "alias" else _requesting_user()
+    label = SERVICES[service][0]
+    plist_path = f"{ROOT}/{label}.plist"
+    payload = _plist(service, user, cert, key, listener_port)
+    if SERVICES[service][3] == "alias":
+        _ensure_loopback_alias(SERVICES[service][4])
+    elif service in ("frontend-http", "hostinger-frontend-http"):
+        _ensure_loopback_alias(SERVICES[service][1])
+    subprocess.run([LAUNCHCTL, "bootout", "system", plist_path], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _install_plist(plist_path, payload)
+    subprocess.run([LAUNCHCTL, "bootstrap", "system", plist_path], check=True)
+    subprocess.run([LAUNCHCTL, "enable", f"system/{label}"], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main(argv):
+    if os.geteuid() != 0 or len(argv) not in (3, 5, 6) or argv[1] != "write":
+        print("usage: k3dm-browser-listener-supervisor write SERVICE [CERT KEY [ARGOCD_PORT]]", file=sys.stderr)
+        return 2
+    try:
+        if os.path.realpath(__file__) != SUPERVISOR:
+            raise ValueError("listener supervisor is not at its fixed installation path")
+        _safe_root_path(SUPERVISOR)
+        write_listener(argv[2], *(argv[3:] if len(argv) > 3 else ()))
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        print(f"browser listener refused: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

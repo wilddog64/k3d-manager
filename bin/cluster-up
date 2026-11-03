@@ -31,6 +31,7 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "${REPO_ROOT}/bin/k3dm-require-role" hub
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/acg_browser_listeners.sh"
 source "${REPO_ROOT}/scripts/lib/ssh_config_guard.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/system_overrides.sh"
@@ -42,12 +43,6 @@ source "${REPO_ROOT}/scripts/lib/cloudflared_render.sh"
 source "${REPO_ROOT}/scripts/lib/cloudflare_tunnel.sh"
 if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   export DRY_RUN=1
-fi
-_ACG_DIR="${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg"
-if ! _dry_run_active && ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
-  printf 'INFO: [acg-up] Bootstrapping ACG Playwright dependencies in %s...\n' "${_ACG_DIR}" >&2
-  npm --prefix "${_ACG_DIR}" ci 2>&1
-  npm --prefix "${_ACG_DIR}" exec -- playwright install chromium 2>&1
 fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
@@ -84,6 +79,19 @@ source "${REPO_ROOT}/scripts/plugins/hub_recovery.sh"
 : "${_ldap_admin_pass:=}"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
+_acg_state_provider="$(_acg_normalize_provider "${_cluster_provider}")"
+_ACG_STATE_DIR="$(_acg_provider_state_dir "${_acg_state_provider}")"
+if _is_mac; then
+  _acg_validate_browser_listener_config "${_ACG_STATE_DIR}" || exit 1
+fi
+
+_ACG_DIR="${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg"
+if ! _dry_run_active && ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
+  printf 'INFO: [acg-up] Bootstrapping ACG Playwright dependencies in %s...\n' "${_ACG_DIR}" >&2
+  npm --prefix "${_ACG_DIR}" ci 2>&1
+  npm --prefix "${_ACG_DIR}" exec -- playwright install chromium 2>&1
+fi
+
 case "${_cluster_provider}" in
   k3s-aws)
     source "${REPO_ROOT}/scripts/plugins/aws.sh"
@@ -101,8 +109,6 @@ case "${_cluster_provider}" in
     ;;
 esac
 
-_acg_state_provider="$(_acg_normalize_provider "${_cluster_provider}")"
-_ACG_STATE_DIR="$(_acg_provider_state_dir "${_acg_state_provider}")"
 _dry_guard "migrate flat state dir to a per-provider dir" _acg_migrate_flat_state "${_ACG_STATE_BASE}" "${_acg_state_provider}"
 _dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 _acg_state_root="${_ACG_STATE_BASE:-${HOME}/.local/share/k3d-manager}"
@@ -184,6 +190,86 @@ function _acg_keycloak_reverse_tunnel_up() {
   local code
   code=$(ssh -o ConnectTimeout=10 ubuntu "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:18080/" 2>/dev/null || true)
   [[ -n "${code}" && "${code}" != "000" ]]
+}
+
+function _acg_ca_trust_helper_path() {
+  printf '%s\n' "/Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor"
+}
+
+function _acg_install_browser_listener() {
+  local service="$1" cert="${2:-}" key="${3:-}" port="${4:-${ARGOCD_BROWSER_PORT:-443}}"
+  local helper="/Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor"
+  if [[ -n "${cert}" && -n "${key}" ]]; then
+    if [[ "${service}" == "argocd-https" ]]; then
+      _run_command --interactive-sudo --quiet --soft -- "${helper}" write "${service}" "${cert}" "${key}" "${port}" || {
+        _warn "[acg-up] secure browser listener helper failed or permission is missing; run 'make install-sudoers' interactively and verify /Library/PrivilegedHelperTools is root-owned and not group-writable"
+        return 1
+      }
+    else
+      _run_command --interactive-sudo --quiet --soft -- "${helper}" write "${service}" "${cert}" "${key}" || {
+        _warn "[acg-up] secure browser listener helper failed or permission is missing; run 'make install-sudoers' interactively and verify /Library/PrivilegedHelperTools is root-owned and not group-writable"
+        return 1
+      }
+    fi
+  else
+    _run_command --interactive-sudo --quiet --soft -- "${helper}" write "${service}" || {
+      _warn "[acg-up] secure browser listener helper failed or permission is missing; run 'make install-sudoers' interactively and verify /Library/PrivilegedHelperTools is root-owned and not group-writable"
+      return 1
+    }
+  fi
+}
+
+function _acg_install_supervised_listener() {
+  _run_command --interactive-sudo --quiet --soft -- \
+    /Library/PrivilegedHelperTools/k3dm-browser-listener-supervisor write "$1"
+}
+
+function _acg_install_frontend_http_listener() {
+  _acg_install_browser_listener "$1"
+}
+
+function _acg_run_ca_trust() {
+  local helper client system_library
+  helper="$(_acg_ca_trust_helper_path)"
+  if [[ "$#" -ne 8 || "$1 $2 $3 $4 $5 $6 $7" != "security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain" ]]; then
+    _warn "[acg-up] Refusing unexpected Vault CA trust command"
+    return 1
+  fi
+  # Preserve the direct interactive path: a human at a TTY can authenticate
+  # with sudo even when the managed headless helper has not been installed.
+  if [[ -t 0 && -t 1 ]]; then
+    _run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot \
+      -k /Library/Keychains/System.keychain "$8" || {
+      _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
+      return 1
+    }
+    return 0
+  fi
+  if [[ ! -x "${helper}" ]]; then
+    _warn "[acg-up] Headless Vault CA trust helper is missing; run 'make install-sudoers' interactively after updating k3d-manager. Browser may show TLS warning for ArgoCD HTTPS"
+    return 1
+  fi
+  client="${REPO_ROOT}/bin/k3dm-bounded-sudo"
+  system_library="${REPO_ROOT}/scripts/lib/system.sh"
+  if [[ ! -f "${client}" || ! -f "${system_library}" ]]; then
+    _warn "[acg-up] Bounded Vault CA trust runner is missing; refusing an unbounded sudo operation"
+    return 1
+  fi
+  _run_command --soft -- /usr/bin/python3 -I "${client}" "${system_library}" "${helper}" "$8" || {
+    _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
+    return 1
+  }
+}
+
+function _acg_trust_vault_ca_if_needed() {
+  local cert="$1"
+  if security verify-cert -c "${cert}" >/dev/null 2>&1; then
+    _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
+    return 0
+  fi
+  _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
+  _acg_run_ca_trust security add-trusted-cert -d -r trustRoot \
+    -k /Library/Keychains/System.keychain "${cert}" || true
 }
 
 function _acg_ldap_bind_pass() {
@@ -731,7 +817,7 @@ _info "[acg-up] Updating /etc/hosts entries before starting the ArgoCD browser H
 _argocd_host_ip="127.0.0.1"
 _kc_browser_ip="127.0.0.1"
 _HOSTS_LIST=(
-  "argocd.shopping-cart.local|${_argocd_host_ip}"
+  "${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
   "frontend.shopping-cart.local|127.0.0.3"
 )
@@ -746,13 +832,8 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
   if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
     _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --prefer-sudo --soft -- \
-        sh -c "set -e
-tmp=\$(mktemp)
-grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
-printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
-cat \"\$tmp\" > /etc/hosts
-rm -f \"\$tmp\""; then
+    if _run_command --interactive-sudo --quiet --soft -- \
+        /Library/PrivilegedHelperTools/k3dm-update-hosts-entry "${_h}" "${_desired_ip}"; then
       _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
     else
       _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
@@ -762,8 +843,8 @@ done
 
 if _is_mac; then
   _info "[acg-up] Step 4c/12 — Installing ArgoCD browser HTTPS listener (${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}, Vault PKI, auto-restart)..."
-  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
-  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
+  _argocd_browser_label="com.k3d-manager.argocd-browser-https"
+  _argocd_browser_plist="/Library/LaunchDaemons/${_argocd_browser_label}.plist"
   _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
   _argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https-launchctl.log}"
   _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
@@ -780,84 +861,12 @@ if _is_mac; then
     _argocd_browser_ready=0
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
     if [[ "$(uname)" == "Darwin" ]]; then
-      if ! security verify-cert -c "${_argocd_browser_tls_dir}/ca.crt" >/dev/null 2>&1; then
-        _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
-        _run_command --interactive-sudo --soft -- \
-          security add-trusted-cert -d -r trustRoot \
-            -k /Library/Keychains/System.keychain \
-            "${_argocd_browser_tls_dir}/ca.crt" || \
-          _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
-      else
-        _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
-      fi
+      _acg_trust_vault_ca_if_needed "${_argocd_browser_tls_dir}/ca.crt"
     fi
-    _argocd_browser_wrapper_before=""
-    if [[ -f "${_argocd_browser_wrapper}" ]]; then
-      _argocd_browser_wrapper_before="$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')"
-    fi
-    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
-    _argocd_browser_wrapper_changed=0
-    if [[ "$(shasum -a 256 "${_argocd_browser_wrapper}" | awk '{print $1}')" != "${_argocd_browser_wrapper_before}" ]]; then
-      _argocd_browser_wrapper_changed=1
-      _info "[acg-up] ArgoCD browser HTTPS wrapper changed — forcing a listener restart so the new paths take effect"
-    fi
-    cat > "${_argocd_browser_plist_tmp}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_argocd_browser_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>${_argocd_browser_wrapper}</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_argocd_browser_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_argocd_browser_log}</string>
-  </dict>
-</plist>
-PLIST
     _argocd_browser_install_skipped=0
-    if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
-      rm -f "${_argocd_browser_plist_tmp}"
-      _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
-    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-      rm -f "${_argocd_browser_plist_tmp}"
-      _warn "[acg-up] no sudo in headless context — skipping argocd-browser-https LaunchDaemon install (run interactively or install /etc/sudoers.d/k3d-manager)"
+    rm -f -- "${_argocd_browser_wrapper}"
+    if ! _acg_install_browser_listener argocd-https "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${ARGOCD_BROWSER_PORT:-443}"; then
       _argocd_browser_install_skipped=1
-    else
-      : > "${_argocd_browser_launchctl_log}"
-      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
-          >"${_argocd_browser_launchctl_log}" 2>&1; then
-        _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
-      elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-        _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
-      fi
-      : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
-          >"${_argocd_browser_launchctl_log}" 2>&1; then
-        if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-          tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-        fi
-        _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
-      fi
-      rm -f "${_argocd_browser_plist_tmp}"
-      : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_argocd_browser_plist}" \
-          >"${_argocd_browser_launchctl_log}" 2>&1; then
-        if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-          tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-        fi
-        _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
-      fi
     fi
     if [[ "${_argocd_browser_install_skipped}" -eq 1 ]]; then
       _warn "[acg-up] ArgoCD browser HTTPS listener not installed in headless context — skipping wait (Cloudflare tunnel path unaffected)"
@@ -1459,75 +1468,27 @@ fi
 if _is_mac; then
   _info "[acg-up] Step 10e/14 — Installing Istio ingress HTTP listener (keycloak + frontend → 127.0.0.1:80, auto-restart)..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
-  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
+  _keycloak_browser_plist="/Library/LaunchDaemons/${_keycloak_browser_label}.plist"
   _keycloak_browser_log="${_ACG_STATE_DIR}/logs/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${_ACG_STATE_DIR}/logs/keycloak-browser-http-launchctl.log"
   _keycloak_browser_wrapper="${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
   _keycloak_browser_plist_tmp="${_ACG_STATE_DIR}/run/keycloak-browser-http.plist"
   _keycloak_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_keycloak_browser_log}")"
-  _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "80" "80" "http://keycloak.shopping-cart.local/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-http"
-  if curl -sf --max-time 1 http://keycloak.shopping-cart.local/health/ready >/dev/null 2>&1; then
-    _info "[acg-up] Istio ingress HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
+  _keycloak_listener_ready=0
+  if _acg_install_browser_listener keycloak-http; then
+    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "18081" "80" "http://127.0.0.1:18081/health/ready" "${_keycloak_browser_kubeconfig}" "127.0.0.1" "keycloak-browser-forward"
+    _keycloak_listener_ready=1
   else
-    cat > "${_keycloak_browser_plist_tmp}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_keycloak_browser_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>${_keycloak_browser_wrapper}</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_keycloak_browser_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_keycloak_browser_log}</string>
-</dict>
-</plist>
-PLIST
-    if [[ -f "${_keycloak_browser_plist}" ]] && diff -q "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" >/dev/null 2>&1; then
-      rm -f "${_keycloak_browser_plist_tmp}"
-      _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
-    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-      rm -f "${_keycloak_browser_plist_tmp}"
-      _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
-    else
-      : > "${_keycloak_browser_launchctl_log}"
-      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
-          >"${_keycloak_browser_launchctl_log}" 2>&1; then
-        _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
-      elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-        _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
-      fi
-      : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
-          >"${_keycloak_browser_launchctl_log}" 2>&1; then
-        if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-          tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-        fi
-        _err "[acg-up] failed to install Keycloak browser HTTP listener plist; see ${_keycloak_browser_launchctl_log}"
-      fi
-      rm -f "${_keycloak_browser_plist_tmp}"
-      : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_keycloak_browser_plist}" \
-          >"${_keycloak_browser_launchctl_log}" 2>&1; then
-        if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-          tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-        fi
-        _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
-      fi
-    fi
-    _info "[acg-up] Istio ingress HTTP listener reachable at http://keycloak.shopping-cart.local and http://frontend.shopping-cart.local (launchd: ${_keycloak_browser_label})"
+    _warn "[acg-up] secure Keycloak listener could not be installed; user forwarding agent was left untouched"
   fi
+  if (( _keycloak_listener_ready )) && _acg_write_user_listener_agent com.k3d-manager.keycloak-browser-forward "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}"; then
+    _acg_start_user_listener_agent com.k3d-manager.keycloak-browser-forward || \
+      _warn "[acg-up] could not start the Keycloak browser port-forward LaunchAgent"
+  else
+    _warn "[acg-up] could not write the Keycloak browser port-forward LaunchAgent"
+  fi
+  _info "[acg-up] Istio ingress HTTP listener routed through an unprivileged port-forward at http://keycloak.shopping-cart.local"
 fi
 
 _info "[acg-up] Step 10f/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
@@ -1635,138 +1596,43 @@ _info "[acg-up] ArgoCD SSO wired: login at ${_argocd_public_url} → Keycloak re
 if _is_mac; then
   _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.3:80 → ubuntu-k3s, auto-restart)..."
   _frontend_browser_label="com.k3d-manager.sandbox.frontend-browser-http"
-  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_frontend_browser_label}.plist}"
+  _frontend_browser_plist="/Library/LaunchDaemons/${_frontend_browser_label}.plist"
   _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
   _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
-  # Ensure 127.0.0.3 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! /sbin/ifconfig lo0 | grep '127\.0\.0\.3' >/dev/null; then
-    _run_command --interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3 || \
-      _warn "[acg-up] failed to add 127.0.0.3 loopback alias — frontend port-forward will fail to bind"
-  fi
-
-  # Install persistent loopback alias launchd agent (survives reboots)
-  _loopback_label="com.k3d-manager.sandbox.loopback-alias"
-  _loopback_plist="/Library/LaunchDaemons/${_loopback_label}.plist"
-  _loopback_plist_tmp="${_ACG_STATE_DIR}/run/sandbox-loopback-alias.plist"
-  _loopback_launchctl_log="${_ACG_STATE_DIR}/logs/loopback-alias-launchctl.log"
-  cat > "${_loopback_plist_tmp}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_loopback_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/sbin/ifconfig</string>
-    <string>lo0</string>
-    <string>alias</string>
-    <string>127.0.0.3</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/dev/null</string>
-  <key>StandardErrorPath</key>
-  <string>/dev/null</string>
-</dict>
-</plist>
-PLIST
-  if [[ -f "${_loopback_plist}" ]] && diff -q "${_loopback_plist_tmp}" "${_loopback_plist}" >/dev/null 2>&1; then
-    rm -f "${_loopback_plist_tmp}"
-    _info "[acg-up] Loopback alias LaunchDaemon unchanged — skipping reinstall"
-  else
-    : > "${_loopback_launchctl_log}"
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
-      >"${_loopback_launchctl_log}" 2>&1 || true
-    : > "${_loopback_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
-        >"${_loopback_launchctl_log}" 2>&1; then
-      _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
-    else
-      rm -f "${_loopback_plist_tmp}"
-      : > "${_loopback_launchctl_log}"
-      _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_loopback_plist}" \
-        >"${_loopback_launchctl_log}" 2>&1 || \
-        _warn "[acg-up] failed to bootstrap loopback alias agent"
-    fi
-  fi
-  # Write self-contained wrapper script; paths are baked in at write-time.
   _kubectl_bin="$(command -v kubectl)"
+  _frontend_listener_ready=0
+  if _acg_install_loopback_frontend_listener sandbox-loopback-alias frontend-http \
+      _acg_install_supervised_listener _acg_install_frontend_http_listener; then
+    _frontend_listener_ready=1
+  else
+    _warn "[acg-up] secure frontend listener or loopback alias could not be installed; user forwarding agent was left untouched"
+  fi
+  if (( _frontend_listener_ready )); then
   cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
 #!/usr/bin/env bash
 set -euo pipefail
 export KUBECONFIG="${_frontend_browser_kubeconfig}"
 _log="${_frontend_browser_log}"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.3:80" >> "\${_log}"
-  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.3 \
-    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.1:18082" >> "\${_log}"
+  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.1 \
+    svc/frontend 18082:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
-  chmod +x "${_frontend_browser_wrapper}"
-  cat > "${_frontend_browser_plist_tmp}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_frontend_browser_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>${_frontend_browser_wrapper}</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_frontend_browser_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_frontend_browser_log}</string>
-</dict>
-</plist>
-PLIST
-  if [[ -f "${_frontend_browser_plist}" ]] && diff -q "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" >/dev/null 2>&1; then
-    rm -f "${_frontend_browser_plist_tmp}"
-    _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
-  elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-    rm -f "${_frontend_browser_plist_tmp}"
-    _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
+  chmod 700 "${_frontend_browser_wrapper}"
+  if _acg_write_user_listener_agent com.k3d-manager.sandbox.frontend-browser-forward "${_frontend_browser_wrapper}" "${_frontend_browser_log}"; then
+    _acg_start_user_listener_agent com.k3d-manager.sandbox.frontend-browser-forward || \
+      _warn "[acg-up] could not start the frontend browser port-forward LaunchAgent"
   else
-    : > "${_frontend_browser_launchctl_log}"
-    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
-        >"${_frontend_browser_launchctl_log}" 2>&1; then
-      _info "[acg-up] Stopped existing frontend browser HTTP listener"
-    elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
-      _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
-    fi
-    : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
-        >"${_frontend_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
-      fi
-      _err "[acg-up] failed to install frontend browser HTTP listener plist"
-    fi
-    rm -f "${_frontend_browser_plist_tmp}"
-    : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_frontend_browser_plist}" \
-        >"${_frontend_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
-      fi
-      _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
-    fi
+    _warn "[acg-up] could not write the frontend browser port-forward LaunchAgent"
   fi
-  _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.3 (launchd: ${_frontend_browser_label})"
+  fi
+  _info "[acg-up] Frontend HTTP listener routes through an unprivileged port-forward at http://frontend.shopping-cart.local"
 fi
 
 if _is_mac; then

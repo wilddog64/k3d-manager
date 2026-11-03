@@ -124,7 +124,7 @@ function _argocd_wait_for_local_port_forward() {
 }
 
 function _argocd_wait_for_browser_https() {
-   local log_file="$1"
+   local _legacy_log_file="$1"
    local timeout="${2:-$ARGOCD_PORT_FORWARD_WAIT_TIMEOUT}"
    local url="${3:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
 
@@ -135,10 +135,7 @@ function _argocd_wait_for_browser_https() {
       sleep 1
    done
 
-   printf 'ERROR: %s\n' "[argocd] Argo CD did not become reachable on ${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT} within ${timeout}s — check ${log_file}" >&2
-   {
-      tail -n 20 "$log_file" 2>/dev/null || true
-   } >&2
+   printf 'ERROR: %s\n' "[argocd] Argo CD did not become reachable on ${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT} within ${timeout}s — fixed listener output is not logged; inspect its launchd service and TLS files" >&2
    return 1
 }
 

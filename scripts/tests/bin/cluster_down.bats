@@ -2,6 +2,34 @@
 
 bats_require_minimum_version 1.5.0
 
+@test "listener cleanup separates privileged plist removal from user wrapper removal" {
+  local helper="${BATS_TEST_TMPDIR}/listener-cleanup.sh" root="${BATS_TEST_TMPDIR}/fake-root"
+  mkdir -p "${root}" "${BATS_TEST_TMPDIR}/home"
+  sed -n '/^function _acg_remove_listener_artifacts()/,/^}$/p' "${CLUSTER_DOWN_SCRIPT:-bin/cluster-down}" > "${helper}"
+  [ -s "${helper}" ]
+  run env HOME="${BATS_TEST_TMPDIR}/home" CA_FAKE_ROOT="${root}" bash -c '
+    set -euo pipefail
+    [[ "$HOME" == "${CA_FAKE_ROOT%/fake-root}/home" && -d "$CA_FAKE_ROOT" ]]
+    plist="$CA_FAKE_ROOT/listener.plist"
+    wrapper="$CA_FAKE_ROOT/wrapper.sh"
+    : > "$plist"; : > "$wrapper"
+    _run_command() {
+      case "$1" in
+        --prefer-sudo) [[ "$2 $3 $4 $5" == "--soft -- rm -f" && "$6" == "$plist" && $# -eq 6 ]]; command rm -f "$plist" ;;
+        --) [[ "$2 $3 $4" == "rm -f --" && "$5" == "$wrapper" && $# -eq 5 ]]; command rm -f -- "$wrapper" ;;
+        *) return 1 ;;
+      esac
+    }
+    _dry_guard() { shift; if [[ "$DRY_RUN" == 0 ]]; then "$@"; fi; }
+    source "$1"
+    DRY_RUN=1 _acg_remove_listener_artifacts "$plist" "$wrapper"
+    [[ -f "$plist" && -f "$wrapper" ]]
+    DRY_RUN=0 _acg_remove_listener_artifacts "$plist" "$wrapper"
+    [[ ! -e "$plist" && ! -e "$wrapper" ]]
+  ' bash "${helper}"
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-down sources dry-run overrides and has itemized launchd plans" {
   run grep -nF 'source "${REPO_ROOT}/scripts/lib/system_overrides.sh"' bin/cluster-down
   [ "$status" -eq 0 ]
@@ -54,6 +82,37 @@ bats_require_minimum_version 1.5.0
   [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
 }
 
+@test "acg-down rejects unsupported listener overrides before teardown mutations" {
+  _stub_uname_darwin
+  local custom_plist="${BATS_TEST_TMPDIR}/keycloak-browser.plist"
+  : > "${custom_plist}"
+
+  run env DRY_RUN=0 CLUSTER_PROVIDER=k3s-aws \
+    KEYCLOAK_BROWSER_LISTENER_PLIST="${custom_plist}" \
+    EXPECTED_HOME="${HOME}" \
+    bash -c '[[ "$HOME" == "$EXPECTED_HOME" && -d "$HOME/Library/LaunchAgents" ]] || exit 90; bin/cluster-down --confirm --keep-hub 2>&1'
+
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"KEYCLOAK_BROWSER_LISTENER_PLIST"*"unsupported"* ]]
+  [[ "$output" != *"Tearing down CloudFormation stack"* ]]
+  [ ! -s "${BATS_TEST_TMPDIR}/aws.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
+  [ -e "${custom_plist}" ]
+}
+
+@test "acg-down default listener dry-run retains itemized safe preview" {
+  _stub_uname_darwin
+  run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws \
+    EXPECTED_HOME="${HOME}" \
+    bash -c '[[ "$HOME" == "$EXPECTED_HOME" && -d "$HOME/Library/LaunchAgents" ]] || exit 90; bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"DRY_RUN: would unload Pushgateway port-forward LaunchAgent"* ]]
+  [[ "$output" == *"DRY_RUN: would unload Keycloak port-forward LaunchAgent"* ]]
+  [ ! -s "${BATS_TEST_TMPDIR}/aws.log" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/launchctl-mutation-called" ]
+}
+
 @test "acg-down dry-run *) path previews _run_command rm -f without executing it" {
     cat > "${BATS_TEST_TMPDIR}/bin/uname" <<'STUB'
 #!/usr/bin/env bash
@@ -61,15 +120,11 @@ if [[ "${1:-}" == "-s" ]]; then printf 'Darwin\n'; else /usr/bin/uname "$@"; fi
 STUB
     chmod +x "${BATS_TEST_TMPDIR}/bin/uname"
 
-    _sentinel="${BATS_TEST_TMPDIR}/keycloak-browser.plist"
-    : > "${_sentinel}"
-
     run env DRY_RUN=1 CLUSTER_PROVIDER=orbstack \
-      KEYCLOAK_BROWSER_LISTENER_PLIST="${_sentinel}" \
       bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
 
     [ "$status" -eq 0 ]
-    [ -e "${_sentinel}" ]
+    [[ "$output" == *"Stopping Vault port-forward"* ]]
 }
 
 _stub_uname_darwin() {
@@ -223,6 +278,7 @@ STUB
 #!/usr/bin/env bash
 set -euo pipefail
 echo "rm $*" >> "${BATS_TEST_TMPDIR}/rm.log"
+if [[ "${STUB_RM_PROTECTED:-0}" == "1" && " $* " == *" /Library/LaunchDaemons/"* ]]; then exit 0; fi
 exec /bin/rm "$@"
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/rm"
@@ -537,7 +593,7 @@ _make_down_flag() {
   run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
-  run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down
+  run grep -F '_keycloak_browser_plist="/Library/LaunchDaemons/${_keycloak_browser_label}.plist"' bin/cluster-down
   [ "$status" -eq 0 ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
@@ -560,13 +616,13 @@ _make_down_flag() {
 
 @test "M1/N1: keep-hub removes sandbox Pushgateway and frontend agents exactly once" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_plist="/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
   frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
   pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
   mkdir -p "$(dirname "${frontend_wrapper}")"
-  touch "${frontend_plist}" "${frontend_wrapper}" "${pgw_plist}"
+  touch "${frontend_wrapper}" "${pgw_plist}"
 
-  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+  run env DRY_RUN=0 STUB_RM_PROTECTED=1 \
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
 
   [ "$status" -eq 0 ]
@@ -574,20 +630,23 @@ _make_down_flag() {
   [ "$status" -eq 0 ]
   run grep -F "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 0 ]
-  run grep -F "${frontend_plist} ${frontend_wrapper}" "${BATS_TEST_TMPDIR}/rm.log"
+  run grep -F "${frontend_plist}" "${BATS_TEST_TMPDIR}/rm.log"
+  [ "$status" -eq 0 ]
+  run grep -F "${frontend_wrapper}" "${BATS_TEST_TMPDIR}/rm.log"
   [ "$status" -eq 0 ]
   run grep -F "${pgw_plist}" "${BATS_TEST_TMPDIR}/rm.log"
   [ "$status" -eq 0 ]
   [ "$(grep -F -c "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
   [ "$(grep -F -c "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  [ "$(grep -F -c "${frontend_plist}" "${BATS_TEST_TMPDIR}/rm.log")" -eq 1 ]
+  [ "$(grep -F -c "${frontend_wrapper}" "${BATS_TEST_TMPDIR}/rm.log")" -eq 1 ]
 }
 
 @test "M2: headless keep-hub warns and skips sandbox frontend bootout without sudo" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
-  touch "${frontend_plist}"
+  frontend_plist="/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
 
-  run env DRY_RUN=0 STUB_SUDO_FAIL=1 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+  run env DRY_RUN=0 STUB_SUDO_FAIL=1 \
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
 
   [ "$status" -eq 0 ]
@@ -598,13 +657,13 @@ _make_down_flag() {
 
 @test "M3: delete-hub removes sandbox agents once without changing hub cleanup" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_plist="/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
   frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
   pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
   mkdir -p "$(dirname "${frontend_wrapper}")"
-  touch "${frontend_plist}" "${frontend_wrapper}" "${pgw_plist}"
+  touch "${frontend_wrapper}" "${pgw_plist}"
 
-  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+  run env DRY_RUN=0 STUB_RM_PROTECTED=1 \
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --delete-hub --discard-hub-data 2>&1'
 
   [ "$status" -eq 0 ]
@@ -616,10 +675,9 @@ _make_down_flag() {
 
 @test "N2: keep-hub leaves hub and Hostinger agents untouched" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
-  touch "${frontend_plist}"
+  frontend_plist="/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist"
 
-  run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+  run env DRY_RUN=0 STUB_RM_PROTECTED=1 \
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
 
   [ "$status" -eq 0 ]

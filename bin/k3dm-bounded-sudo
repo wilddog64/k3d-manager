@@ -1,0 +1,92 @@
+#!/usr/bin/python3 -I
+"""Run the fixed Vault trust sudo command under a caller-side deadline."""
+
+import os
+import signal
+import subprocess
+import sys
+import time
+
+LIMIT = 30
+GRACE = 1
+ROOT_HELPER = "/Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor"
+
+
+class _StopRequested(Exception):
+    def __init__(self, signum):
+        self.signum = signum
+
+
+def _stop_requested(signum, _frame):
+    raise _StopRequested(signum)
+
+
+def _terminate_group(process):
+    group_signal_denied = False
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        pass
+    # Keep the group leader unreaped until after SIGKILL so its PID cannot be
+    # reused while it is still the identity used for process-group cleanup.
+    time.sleep(GRACE)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        group_signal_denied = True
+    if group_signal_denied:
+        print("Vault CA trust watchdog could not signal the full sudo process group; the root helper deadline remains active", file=sys.stderr)
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            pass
+        try:
+            process.wait(timeout=GRACE)
+        except subprocess.TimeoutExpired:
+            print("Vault CA trust sudo process remains outside caller signal permissions", file=sys.stderr)
+        return
+    process.wait()
+
+
+def main(argv):
+    if len(argv) != 3 or argv[1] != ROOT_HELPER or not os.path.isabs(argv[2]):
+        print("refusing unexpected bounded sudo request", file=sys.stderr)
+        return 2
+    system_library, helper, certificate = argv
+    deadline = time.monotonic() + LIMIT
+    shell_code = 'source "$1"; _run_command --interactive-sudo --quiet --soft -- "$2" "$3" "$4"'
+    signals = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+    previous_handlers = {signum: signal.signal(signum, _stop_requested) for signum in signals}
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+    try:
+        process = subprocess.Popen(
+            ["/bin/bash", "-c", shell_code, "k3dm-bounded-sudo", system_library,
+             helper, certificate, str(deadline)],
+            start_new_session=True,
+            preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask),
+        )
+        try:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            previous_mask = None
+            return process.wait(timeout=max(0, deadline - time.monotonic()))
+        except (subprocess.TimeoutExpired, _StopRequested) as exc:
+            _terminate_group(process)
+            if isinstance(exc, _StopRequested):
+                return 128 + exc.signum
+            print("Vault CA trust timed out waiting for sudo or the root helper", file=sys.stderr)
+            return 124
+    finally:
+        if previous_mask is not None:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

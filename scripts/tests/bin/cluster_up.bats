@@ -63,6 +63,187 @@ function _run_sandbox_ttl_helper() {
   [ "${output}" -eq 1 ]
 }
 
+@test "headless Vault CA trust runs quick success once and warns on quick failure" {
+  local helper="${BATS_TEST_TMPDIR}/ca-trust.sh" calls="${BATS_TEST_TMPDIR}/calls" exe="${BATS_TEST_TMPDIR}/supervisor"
+  local repo_root
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  sed -n '/^function _acg_ca_trust_helper_path()/,/^}/p; /^function _acg_run_ca_trust()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  [ -s "${helper}" ]
+  printf '#!/bin/sh\nexit 0\n' > "${exe}"
+  chmod 755 "${exe}"
+  run env REPO_ROOT="${repo_root}" CA_TRUST_SCRATCH="${BATS_TEST_TMPDIR}" CA_TRUST_CALLS="${calls}" CA_TRUST_EXE="${exe}" bash -c '
+    [[ "$CA_TRUST_CALLS" == "$CA_TRUST_SCRATCH/calls" && "$CA_TRUST_EXE" == "$CA_TRUST_SCRATCH/supervisor" ]]
+    _run_command() {
+      [[ "$1 $2 $3 $4 $5" == "--soft -- /usr/bin/python3 -I $REPO_ROOT/bin/k3dm-bounded-sudo" && \
+        "$6" == "$REPO_ROOT/scripts/lib/system.sh" && "$7" == "$CA_TRUST_EXE" && "$8" == "$CA_TRUST_CERT" ]] || return 31
+      printf "%s\\n" "$CA_TRUST_MODE" >> "$CA_TRUST_CALLS"
+      [[ "$CA_TRUST_MODE" == success ]]
+    }
+    _warn() { printf "WARN:%s\n" "$*"; }
+    source "$1"
+    _acg_ca_trust_helper_path() { printf "%s\\n" "$CA_TRUST_EXE"; }
+    CA_TRUST_CERT="$CA_TRUST_CALLS.cert"
+    : > "$CA_TRUST_CERT"
+    CA_TRUST_MODE=success _acg_run_ca_trust security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CA_TRUST_CERT" || exit 11
+    CA_TRUST_MODE=failure _acg_run_ca_trust security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CA_TRUST_CERT" || true
+    [[ $(wc -l < "$CA_TRUST_CALLS") -eq 2 ]]
+  ' bash "${helper}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Could not add Vault CA"* ]]
+}
+
+@test "headless Vault CA trust fails closed when the fixed supervisor is missing" {
+  local helper="${BATS_TEST_TMPDIR}/ca-trust.sh" cert="${BATS_TEST_TMPDIR}/ca.crt" calls="${BATS_TEST_TMPDIR}/calls"
+  sed -n '/^function _acg_ca_trust_helper_path()/,/^}/p; /^function _acg_run_ca_trust()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  : > "${cert}"
+  run env CA_TRUST_SCRATCH="${BATS_TEST_TMPDIR}" CA_TRUST_CERT="${cert}" CA_TRUST_CALLS="${calls}" bash -c '
+    [[ "$CA_TRUST_CERT" == "$CA_TRUST_SCRATCH/ca.crt" && ! -e "$CA_TRUST_CALLS" ]]
+    _run_command() { echo "must not execute" >> "$CA_TRUST_CALLS"; return 0; }
+    _warn() { printf "WARN:%s\\n" "$*"; }
+    source "$1"
+    _acg_ca_trust_helper_path() { printf "%s\\n" "$CA_TRUST_SCRATCH/missing-helper"; }
+    _acg_run_ca_trust security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$CA_TRUST_CERT" && exit 9
+    [[ ! -e "$CA_TRUST_CALLS" ]]
+  ' bash "${helper}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"helper is missing"* ]]
+}
+
+@test "interactive Vault CA trust preserves direct TTY runner when helper is missing" {
+  local helper="${BATS_TEST_TMPDIR}/ca-trust.sh" driver="${BATS_TEST_TMPDIR}/tty-driver.sh"
+  local repo_root
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  mkdir -p "${BATS_TEST_TMPDIR}/home"
+  : > "${BATS_TEST_TMPDIR}/ca.crt"
+  sed -n '/^function _acg_ca_trust_helper_path()/,/^}/p; /^function _acg_run_ca_trust()/,/^}/p; /^function _acg_trust_vault_ca_if_needed()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  [ -s "${helper}" ]
+  cat > "${driver}" <<'SH'
+set -euo pipefail
+[[ "$HOME" == "$CA_TRUST_SCRATCH/home" && "$CA_TRUST_CERT" == "$CA_TRUST_SCRATCH/ca.crt" ]]
+security() { [[ "$*" == "verify-cert -c $CA_TRUST_CERT" ]] || exit 31; return 1; }
+_info() { :; }
+_warn() { printf 'WARN:%s\n' "$*"; }
+_run_command() {
+  [[ -t 0 && -t 1 ]] || exit 32
+  [[ "$*" == "--interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CA_TRUST_CERT" ]] || exit 33
+  printf '%s\n' "$CA_TRUST_MODE" >> "$CA_TRUST_CALLS"
+  if [[ "$CA_TRUST_MODE" == success ]]; then return 0; fi
+  return 1
+}
+source "$CA_TRUST_HELPER"
+_acg_ca_trust_helper_path() { printf '%s\n' "$CA_TRUST_EXE"; }
+_ACG_CA_TRUST_TIMEOUT_SECONDS=1
+_acg_trust_vault_ca_if_needed "$CA_TRUST_CERT"
+printf 'continued under set -e\n'
+SH
+  run env HOME="${BATS_TEST_TMPDIR}/home" REPO_ROOT="${repo_root}" CA_TRUST_SCRATCH="${BATS_TEST_TMPDIR}" \
+    CA_TRUST_CERT="${BATS_TEST_TMPDIR}/ca.crt" CA_TRUST_CALLS="${BATS_TEST_TMPDIR}/tty-calls" \
+    CA_TRUST_EXE="${BATS_TEST_TMPDIR}/missing-supervisor" \
+    CA_TRUST_HELPER="${helper}" python3 - "${driver}" <<'PY'
+import os, pty, select, subprocess, sys, time
+for mode in ('success', 'failure'):
+    master, slave = pty.openpty()
+    env = dict(os.environ, CA_TRUST_MODE=mode)
+    proc = subprocess.Popen(['bash', sys.argv[1]], stdin=slave, stdout=slave, stderr=slave, env=env)
+    try:
+        output = b''
+        deadline = time.monotonic() + 6
+        while True:
+            assert time.monotonic() < deadline, 'TTY runner hung'
+            ready, _, _ = select.select([master], [], [], .1)
+            if ready:
+                output += os.read(master, 4096)
+            elif proc.poll() is not None:
+                break
+        rc = proc.wait()
+        text = output.decode()
+        print(mode + ': ' + text.strip())
+        assert rc == 0, rc
+        assert 'continued under set -e' in text
+        assert 'timed out' not in text
+        assert ('Could not add Vault CA' in text) == (mode == 'failure')
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        os.close(slave)
+        os.close(master)
+with open(os.environ['CA_TRUST_CALLS']) as calls:
+    assert calls.read().splitlines() == ['success', 'failure']
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "non-Darwin browser setup skips Keychain trust while Darwin invokes it" {
+  local guard="${BATS_TEST_TMPDIR}/darwin-guard.sh" calls="${BATS_TEST_TMPDIR}/guard-calls"
+  sed -n '/^    if \[\[ "$(uname)" == "Darwin" \]\]; then/,/^    fi$/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${guard}"
+  [ -s "${guard}" ]
+  run env CA_TRUST_SCRATCH="${BATS_TEST_TMPDIR}" CA_TRUST_CALLS="${calls}" bash -c '
+    set -euo pipefail
+    _argocd_browser_tls_dir="$CA_TRUST_SCRATCH"
+    uname() { printf "%s\n" "$CA_TRUST_OS"; }
+    _acg_trust_vault_ca_if_needed() {
+      [[ "$1" == "$CA_TRUST_SCRATCH/ca.crt" ]] || exit 31
+      printf "%s\n" "$1" >> "$CA_TRUST_CALLS"
+    }
+    CA_TRUST_OS=Linux
+    source "$1"
+    [[ ! -e "$CA_TRUST_CALLS" ]]
+    CA_TRUST_OS=Darwin
+    source "$1"
+    [[ $(wc -l < "$CA_TRUST_CALLS") -eq 1 ]]
+  ' bash "${guard}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "already trusted Vault CA skips the add command and stubs stay in scratch" {
+  local helper="${BATS_TEST_TMPDIR}/ca-trust.sh" calls="${BATS_TEST_TMPDIR}/calls" cert="${BATS_TEST_TMPDIR}/ca.crt" exe="${BATS_TEST_TMPDIR}/supervisor" repo="${BATS_TEST_TMPDIR}/repo"
+  sed -n '/^function _acg_ca_trust_helper_path()/,/^}/p; /^function _acg_run_ca_trust()/,/^}/p; /^function _acg_trust_vault_ca_if_needed()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  [ -s "${helper}" ]
+  printf '#!/bin/sh\nexit 0\n' > "${exe}"
+  chmod 755 "${exe}"
+  mkdir -p "${repo}/bin" "${repo}/scripts/lib"
+  : > "${repo}/bin/k3dm-bounded-sudo"
+  : > "${repo}/scripts/lib/system.sh"
+  : > "${cert}"
+  run env REPO_ROOT="${repo}" CA_TRUST_CALLS="${calls}" CA_TRUST_CERT="${cert}" CA_TRUST_EXE="${exe}" bash -c '
+    _info() { :; }
+    security() { [[ "$1 $2 $3" == "verify-cert -c $CA_TRUST_CERT" && "${CA_TRUSTED:-1}" == 1 ]]; }
+    _run_command() {
+      [[ "$1 $2 $3 $4" == "--soft -- /usr/bin/python3 -I" && "$5" == "$REPO_ROOT/bin/k3dm-bounded-sudo" && \
+        "$6" == "$REPO_ROOT/scripts/lib/system.sh" && "$7" == "$CA_TRUST_EXE" && "$8" == "$CA_TRUST_CERT" ]] || return 31
+      printf "%s\n" "$*" >> "$CA_TRUST_CALLS"
+      return 0
+    }
+    _warn() { printf "WARN:%s\n" "$*"; }
+    source "$1"
+    _acg_ca_trust_helper_path() { printf "%s\\n" "$CA_TRUST_EXE"; }
+    _acg_trust_vault_ca_if_needed "$CA_TRUST_CERT"
+    [[ ! -e "$CA_TRUST_CALLS" ]]
+    CA_TRUSTED=0 _acg_trust_vault_ca_if_needed "$CA_TRUST_CERT"
+    [[ $(wc -l < "$CA_TRUST_CALLS") -eq 1 ]]
+  ' bash "${helper}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up forwards default and configured ArgoCD ports to the fixed listener helper" {
+  local function_file="${BATS_TEST_TMPDIR}/listener-function.sh"
+  sed -n '/^function _acg_install_browser_listener()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${function_file}"
+  [ -s "${function_file}" ]
+  run env LISTENER_FUNCTION_FILE="${function_file}" LISTENER_CALLS="${BATS_TEST_TMPDIR}/calls" bash -c '
+    set -euo pipefail
+    _warn() { printf "WARN:%s\n" "$*"; }
+    _run_command() { printf "%s\n" "$*" >> "$LISTENER_CALLS"; }
+    source "$LISTENER_FUNCTION_FILE"
+    _acg_install_browser_listener argocd-https /scratch/cert /scratch/key
+    ARGOCD_BROWSER_PORT=8443 _acg_install_browser_listener argocd-https /scratch/cert /scratch/key
+    [[ $(wc -l < "$LISTENER_CALLS") -eq 2 ]]
+    grep -q "write argocd-https /scratch/cert /scratch/key 443" "$LISTENER_CALLS"
+    grep -q "write argocd-https /scratch/cert /scratch/key 8443" "$LISTENER_CALLS"
+  '
+  [ "${status}" -eq 0 ]
+}
+
 @test "acg-up TTL N2 does not restart after a successful or unnecessary extension" {
   _run_sandbox_ttl_helper 30 20 0 1
   [ "${status}" -eq 0 ]
@@ -364,9 +545,9 @@ STUB
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
 
-  run grep -nF '_argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}"' bin/cluster-up
+  run grep -nF '_acg_install_browser_listener argocd-https "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${ARGOCD_BROWSER_PORT:-443}"' bin/cluster-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"_argocd_write_browser_https_wrapper"* ]]
+  [[ "$output" == *"_acg_install_browser_listener argocd-https"* ]]
 
   run grep -nF '_argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}"' bin/cluster-up
   [ "$status" -eq 0 ]
@@ -388,10 +569,10 @@ STUB
   run grep -nF 'Step 10e/14 — Installing Istio ingress HTTP listener' bin/cluster-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"Istio ingress HTTP listener"* ]]
-  run grep -nF 'Istio ingress HTTP listener already healthy' bin/cluster-up
+  run grep -nF '_acg_install_browser_listener keycloak-http' bin/cluster-up
   [ "$status" -eq 0 ]
-  local health_line="${output%%:*}"
-  [ "$wrapper_line" -lt "$health_line" ]
+  local listener_line="${output%%:*}"
+  [ "$listener_line" -lt "$wrapper_line" ]
 
   run grep -nF 'Step 10f/14 — Wiring ArgoCD SSO' bin/cluster-up
   [ "$status" -eq 0 ]
@@ -562,18 +743,13 @@ STUB
   [ "${status}" -eq 0 ]
 }
 
-@test "acg-up restarts the argocd browser listener when only the wrapper changed" {
-  run grep -nF 'if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q' bin/cluster-up
+@test "acg-up and refresh regenerate the fixed ArgoCD browser listener" {
+  run grep -nF '_acg_install_browser_listener argocd-https' bin/cluster-up
   [ "$status" -eq 0 ]
-
-  run grep -cF '_argocd_browser_wrapper_changed=1' bin/cluster-up
+  [[ "$output" == *"_acg_install_browser_listener argocd-https"* ]]
+  run grep -nF '_acg_refresh_install_listener argocd-https' bin/cluster-refresh
   [ "$status" -eq 0 ]
-  [ "$output" -eq 1 ]
-
-  run bash -c "awk '/_argocd_browser_wrapper_before=\"\"/{print NR} /_argocd_write_browser_https_wrapper \"/{print NR} /_argocd_browser_wrapper_changed=0/{print NR}' bin/cluster-up"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | sed -n '1p')" -lt "$(printf '%s\n' "$output" | sed -n '2p')" ]
-  [ "$(printf '%s\n' "$output" | sed -n '2p')" -lt "$(printf '%s\n' "$output" | sed -n '3p')" ]
+  [[ "$output" == *"_acg_refresh_install_listener argocd-https"* ]]
 }
 
 @test "acg-up registers the app cluster with a real provider and the shopping-cart label" {

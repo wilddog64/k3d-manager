@@ -16,6 +16,41 @@ setup() {
   unset K3S_NO_SYSTEMD_LOG
 }
 
+@test "macOS k3s binary installation uses the interactive privileged runner" {
+  local source_file="${BATS_TEST_TMPDIR}/k3s-source" destination="${BATS_TEST_TMPDIR}/k3s-target"
+  printf 'fixture\n' > "${source_file}"
+  _k3s_mac_install_target_writable() { [[ "$1" == "$destination" ]] && return 1; return 2; }
+  _run_command() {
+    [[ "$1 $2" == "--interactive-sudo --" ]] || return 1
+    shift 2
+    case "$1" in
+      mv) [[ "$2" == "$source_file" && "$3" == "$destination" ]] || return 1; command mv "$2" "$3" ;;
+      chmod) [[ "$2" == 0755 && "$3" == "$destination" ]] || return 1; command chmod "$2" "$3" ;;
+      *) return 1 ;;
+    esac
+  }
+  _k3s_install_mac_binary "${source_file}" "${destination}"
+  [ ! -e "${source_file}" ]
+  [ -x "${destination}" ]
+}
+
+@test "macOS k3s binary installation works without sudo in a writable directory" {
+  local source_file="${BATS_TEST_TMPDIR}/k3s-source" destination="${BATS_TEST_TMPDIR}/k3s-target"
+  printf 'fixture\n' > "${source_file}"
+  _run_command() {
+    [[ "$1" == -- ]] || return 1
+    shift
+    case "$1" in
+      mv) [[ "$2" == "$source_file" && "$3" == "$destination" ]] || return 1; command mv "$2" "$3" ;;
+      chmod) [[ "$2" == 0755 && "$3" == "$destination" ]] || return 1; command chmod "$2" "$3" ;;
+      *) return 1 ;;
+    esac
+  }
+  _k3s_install_mac_binary "${source_file}" "${destination}"
+  [ ! -e "${source_file}" ]
+  [ -x "${destination}" ]
+}
+
 @test "_start_k3s_service falls back to manual start without systemd" {
   unset -f _systemd_available
   _systemd_available() { return 1; }

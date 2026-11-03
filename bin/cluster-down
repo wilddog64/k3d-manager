@@ -28,6 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/acg_browser_listeners.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
@@ -35,7 +36,6 @@ if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
   export DRY_RUN=1
 fi
 _ACG_STATE_DIR="$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-aws}")"
-_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 
 : "${SCRIPT_DIR}"
 
@@ -75,6 +75,21 @@ if [[ "${_confirm}" -eq 0 ]]; then
   echo "  --discard-hub-data  Explicitly delete Hub data without a verified snapshot."
   exit 1
 fi
+
+# Validate the fixed privileged listener configuration before any teardown
+# mutation. cluster-down uses canonical labels and plist paths, so custom
+# overrides could otherwise leave caller-managed legacy listeners behind.
+if _is_mac && ! _acg_validate_browser_listener_config "${_ACG_STATE_DIR}"; then
+  exit 2
+fi
+
+_dry_guard "create local state directories" mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+
+function _acg_remove_listener_artifacts() {
+  local plist="$1" wrapper="$2"
+  _dry_guard "remove listener plist" _run_command --prefer-sudo --soft -- rm -f "${plist}" >/dev/null 2>&1 || true
+  _dry_guard "remove listener wrapper" _run_command -- rm -f -- "${wrapper}" >/dev/null 2>&1 || true
+}
 
 function _k3dm_down_metrics_exit() {
   local _exit_code=$?
@@ -208,7 +223,14 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
 fi
 if _is_mac; then
   _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
-  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist}"
+  if [[ "$(_acg_normalize_provider "${CLUSTER_PROVIDER:-k3s-aws}")" == "k3s-hostinger" ]]; then
+    _frontend_browser_label="com.k3d-manager.frontend-browser-http"
+    _frontend_browser_agent_label="com.k3d-manager.frontend-browser-forward"
+  else
+    _frontend_browser_label="com.k3d-manager.sandbox.frontend-browser-http"
+    _frontend_browser_agent_label="com.k3d-manager.sandbox.frontend-browser-forward"
+  fi
+  _frontend_browser_plist="/Library/LaunchDaemons/${_frontend_browser_label}.plist"
   _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
   _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
@@ -222,7 +244,8 @@ if _is_mac; then
       _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
     fi
   fi
-  _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
+  _acg_remove_listener_artifacts "${_frontend_browser_plist}" "${_frontend_browser_wrapper}"
+  _acg_remove_user_listener_agent "${_frontend_browser_agent_label}"
   if ! _dry_run_active && [[ -e "${_frontend_browser_plist}" ]]; then
     _warn "[acg-down] com.k3d-manager.sandbox.frontend-browser-http is still installed (see ${_frontend_browser_launchctl_log}); remove it with: sudo launchctl bootout system ${_frontend_browser_plist}; sudo rm -f ${_frontend_browser_plist}"
   fi
@@ -319,7 +342,7 @@ fi
 if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
-  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
+  _keycloak_browser_plist="/Library/LaunchDaemons/${_keycloak_browser_label}.plist"
   _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
@@ -334,12 +357,13 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
       _warn "[acg-down] existing Keycloak browser HTTP listener was not loaded; continuing"
     fi
   fi
-  _run_command --prefer-sudo --soft -- rm -f "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" >/dev/null 2>&1 || true
+  _acg_remove_listener_artifacts "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}"
+  _acg_remove_user_listener_agent com.k3d-manager.keycloak-browser-forward
 
   _info "[acg-down] Stopping ArgoCD browser HTTPS listener launchd daemon..."
-  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
-  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
-  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  _argocd_browser_label="com.k3d-manager.argocd-browser-https"
+  _argocd_browser_plist="/Library/LaunchDaemons/${_argocd_browser_label}.plist"
+  _argocd_browser_wrapper="${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
   _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${_ACG_STATE_DIR}/argocd-browser-https-tls}"
   _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
@@ -359,7 +383,7 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
       _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
     fi
   fi
-  _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
+  _acg_remove_listener_artifacts "${_argocd_browser_plist}" "${_argocd_browser_wrapper}"
   _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
   _argocd_browser_tls_dir_legacy="${HOME}/.local/share/k3d-manager/argocd-browser-https-tls"
   if [[ "${_argocd_browser_tls_dir_legacy}" != "${_argocd_browser_tls_dir}" ]]; then

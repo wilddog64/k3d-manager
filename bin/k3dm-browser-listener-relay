@@ -1,0 +1,164 @@
+#!/usr/bin/python3 -I
+"""Prototype unprivileged, single-connection loopback relay for launchd."""
+
+import os
+import select
+import socket
+import ssl
+import sys
+import threading
+
+TLS_HANDSHAKE_TIMEOUT = 10
+
+
+def _pump(source, destination, shutdown_write=True, send_lock=None):
+    try:
+        while True:
+            data = source.recv(65536)
+            if not data:
+                break
+            if send_lock is None:
+                destination.sendall(data)
+            else:
+                with send_lock:
+                    destination.sendall(data)
+    except OSError:
+        pass
+    finally:
+        if shutdown_write:
+            try:
+                destination.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+
+
+def _pump_tls_request(client, upstream, response_complete, ssl_io_lock):
+    def try_recv():
+        original_timeout = client.gettimeout()
+        try:
+            with ssl_io_lock:
+                client.setblocking(False)
+                try:
+                    return client.recv(65536), None
+                except ssl.SSLWantReadError:
+                    return None, "read"
+                except ssl.SSLWantWriteError:
+                    return None, "write"
+                except BlockingIOError:
+                    return None, "read"
+                finally:
+                    client.settimeout(original_timeout)
+        except OSError:
+            return None, "closed"
+
+    try:
+        while not response_complete.is_set():
+            with ssl_io_lock:
+                has_pending = client.pending() > 0
+            if not has_pending:
+                readable, _, _ = select.select([client], [], [], 0.25)
+                if not readable:
+                    continue
+            data, wait_for = try_recv()
+            if wait_for == "closed":
+                break
+            if wait_for:
+                readable, writable, _ = select.select(
+                    [client] if wait_for == "read" else [],
+                    [client] if wait_for == "write" else [],
+                    [], 0.25,
+                )
+                continue
+            if not data:
+                break
+            upstream.sendall(data)
+    except OSError:
+        pass
+    finally:
+        try:
+            upstream.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+
+
+def _relay(client, backend, tls_context=None, handshake_timeout=TLS_HANDSHAKE_TIMEOUT):
+    if tls_context is not None:
+        original_timeout = client.gettimeout()
+        client.settimeout(handshake_timeout)
+        try:
+            client = tls_context.wrap_socket(client, server_side=True)
+        except (OSError, ssl.SSLError):
+            client.close()
+            raise
+        client.settimeout(original_timeout)
+    upstream = socket.create_connection(("127.0.0.1", backend), timeout=10)
+    upstream.settimeout(None)
+    try:
+        response_complete = threading.Event()
+        request_stopped = threading.Event()
+        ssl_io_lock = threading.Lock()
+
+        def pump_response():
+            _pump(upstream, client, shutdown_write=tls_context is None,
+                  send_lock=ssl_io_lock if tls_context is not None else None)
+            if tls_context is not None:
+                response_complete.set()
+                request_stopped.wait()
+                # Stop racing SSL reads before sending close_notify. Waiting
+                # for the peer's close_notify is bounded for one-shot clients.
+                client.settimeout(1)
+                try:
+                    raw_client = client.unwrap()
+                except (OSError, ssl.SSLError):
+                    client.close()
+                else:
+                    raw_client.close()
+            else:
+                client.close()
+
+        response = threading.Thread(target=pump_response)
+        response.start()
+        if tls_context is None:
+            _pump(client, upstream)
+        else:
+            try:
+                _pump_tls_request(client, upstream, response_complete, ssl_io_lock)
+            finally:
+                request_stopped.set()
+        response.join()
+    finally:
+        upstream.close()
+        client.close()
+
+
+def main(argv):
+    if os.geteuid() == 0:
+        print("listener relay refuses to run as root", file=sys.stderr)
+        return 2
+    if len(argv) not in (3, 5) or argv[1] not in ("tcp", "tls"):
+        print("usage: k3dm-browser-listener-relay tcp PORT | tls PORT CERT KEY", file=sys.stderr)
+        return 2
+    if (argv[1] == "tcp" and len(argv) != 3) or (argv[1] == "tls" and len(argv) != 5):
+        return 2
+    try:
+        if not argv[2].isascii() or not argv[2].isdecimal():
+            raise ValueError("invalid backend port")
+        port = int(argv[2])
+        if not 1 <= port <= 65535:
+            raise ValueError("invalid backend port")
+        context = None
+        if argv[1] == "tls":
+            if not all(os.path.isabs(path) and not any(ord(ch) < 32 for ch in path) for path in argv[3:]):
+                raise ValueError("certificate and key paths must be absolute")
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(argv[3], argv[4])
+        client = socket.socket(fileno=os.dup(0))
+        _relay(client, port, context)
+        return 0
+    except (OSError, ValueError, ssl.SSLError) as exc:
+        print(f"listener relay failed: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

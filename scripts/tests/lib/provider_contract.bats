@@ -846,6 +846,9 @@ JSON
   : > "${SCRIPT_DIR}/plugins/shopping_cart.sh"
   : > "${SCRIPT_DIR}/etc/hostinger/vars.sh"
   cp "${REPO_ROOT}/scripts/lib/provider.sh" "${SCRIPT_DIR}/lib/provider.sh"
+  cp "${REPO_ROOT}/scripts/lib/acg_browser_listeners.sh" "${SCRIPT_DIR}/lib/acg_browser_listeners.sh"
+  cp "${REPO_ROOT}/scripts/lib/port_forward_wrapper.sh" "${SCRIPT_DIR}/lib/port_forward_wrapper.sh"
+  cp "${REPO_ROOT}/scripts/plugins/argocd.sh" "${SCRIPT_DIR}/plugins/argocd.sh"
   cp "${REPO_ROOT}/scripts/etc/argocd/port-forward-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
   cp "${REPO_ROOT}/scripts/etc/argocd/browser-https-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
@@ -945,7 +948,7 @@ EOF
 
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
   _run_command() {
-    :
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/restart.log"
   }
   _hostinger_restart_launchd() {
     printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/restart.log"
@@ -954,7 +957,7 @@ EOF
 
   run grep -Fq -- 'still in use — clearing stale listener' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
-  run test -x "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
+  run grep -Fq -- 'write argocd-https' "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
@@ -984,7 +987,16 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
-  run grep -Eq -- '--context "ubuntu-hostinger" .*--address=127\.0\.0\.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  run grep -nF -- 'write argocd-https' "${BATS_TEST_TMPDIR}/restart.log"
+  [ "$status" -eq 0 ]
+  local argocd_listener_line="${output%%:*}"
+  run grep -nF -- 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
+  [ "$status" -eq 0 ]
+  local cloudflared_stop_line="${output%%:*}"
+  [ "$argocd_listener_line" -lt "$cloudflared_stop_line" ]
+  run grep -Fq -- 'port-forward --address=127.0.0.1' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -Fq -- 'write hostinger-frontend-http' "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
   run grep -F -- 'com.k3d-manager.grafana-port-forward.sh' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]
@@ -1022,7 +1034,7 @@ EOF
   [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
-  [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
+  [[ "${output}" == *"write argocd-https"* ]]
   [[ "${output}" == *"com.k3d-manager.vault-port-forward"* ]]
 }
 

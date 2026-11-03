@@ -194,6 +194,23 @@ function _vault_app_auth_mount() {
   printf '%s' "kubernetes-${seg}"
 }
 
+function _k3s_mac_install_target_writable() {
+   local directory="${1%/*}"
+   [[ "$directory" == "$1" ]] && directory=.
+   [[ -w "$directory" ]]
+}
+
+function _k3s_install_mac_binary() {
+   local source_file="$1" destination="$2"
+   if _k3s_mac_install_target_writable "$destination"; then
+      _run_command -- mv "$source_file" "$destination" || return $?
+      _run_command -- chmod 0755 "$destination"
+   else
+      _run_command --interactive-sudo -- mv "$source_file" "$destination" || return $?
+      _run_command --interactive-sudo -- chmod 0755 "$destination"
+   fi
+}
+
 function _install_k3s() {
    local cluster_name="${1:-${CLUSTER_NAME:-k3s-cluster}}"
 
@@ -227,8 +244,7 @@ function _install_k3s() {
 
       _ensure_path_exists "$K3S_INSTALL_DIR"
 
-      _run_command --prefer-sudo -- mv "$tmpfile" "$dest"
-      _run_command --prefer-sudo -- chmod 0755 "$dest"
+      _k3s_install_mac_binary "$tmpfile" "$dest" || return $?
 
       _info "Installed k3s binary at $dest"
       return 0

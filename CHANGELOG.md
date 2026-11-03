@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Route headless Vault CA trust through a fixed, root-controlled supervisor that terminates its controlled process group and reaps its child after a 30-second deadline plus a one-second grace period. Existing hosts must run `make install-sudoers` interactively to install the helper and scoped permission; a missing helper or permission warns and skips trust.
+- Replace caller-controlled root LaunchDaemon plists with fixed root-generated socket listeners that run the root-owned relay as the invoking user. Existing hosts must run `make install-sudoers` interactively to install the helpers and scoped policy.
+- Preserve `ARGOCD_BROWSER_PORT` for the fixed ArgoCD HTTPS listener; the root helper accepts only canonical decimal ports from 1 through 65535 and keeps the bind address, listener service, and relay backend fixed.
+- Require the fixed browser listener labels, plist paths, wrapper paths and log paths. The fixed relay sends output to `/dev/null`; readiness failures now report that listener output is unavailable instead of pointing at stale logs. Existing custom `ARGOCD_BROWSER_LISTENER_*` path/label values, `KEYCLOAK_BROWSER_LISTENER_*` paths/labels and `FRONTEND_BROWSER_LISTENER_PLIST` must be unset or restored to their documented defaults before `make up`, `make refresh` or Hostinger access-layer refresh; unsupported values now fail with the expected path in the warning. `ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT` is obsolete and only its default value (`30`) is accepted; health readiness still honors `ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT`. Custom ArgoCD host, port, TLS material and readiness timeouts remain configurable.
+- Offline tests exercise termination of the controlled process group and reaping of its leader; they cannot prove whether macOS already accepted a Keychain authorization request before client cancellation or how launchd socket activation behaves on a live host.
+- The installer retires known legacy root listeners, but an already-compromised host may have other privileged persistence from the old broad policy; assess or rebuild such a host before relying on the new boundary. The removed broad Linux sudo rules may require authenticated sudo for affected workflows.
+
 ## [1.43.14] - Unreleased
 
 - Require the recorded hub machine role before starting the local hub or running hub release operations.
