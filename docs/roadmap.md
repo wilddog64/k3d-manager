@@ -899,7 +899,17 @@ when v1.48.0 took the operational-quality bundle. It depends on nothing in that 
 
 Also here (triage 2026-10-15): [`v1.48.1-e2e-current-release-head-sync.md`](plans/v1.48.1-e2e-current-release-head-sync.md),
 which makes the E2E preflight test the current release-branch HEAD (renamed from the unversioned
-proposal). With the semantic approval gate, v1.48.1 holds 3 of 5 plans.
+proposal). With the semantic approval gate, v1.48.1 previously held 3 of 5 plans.
+
+**Plan 4 of 5 — provider-independent application deployment** (operator, 2026-11-02):
+[`v1.48.1-provider-independent-app-deployment.md`](plans/v1.48.1-provider-independent-app-deployment.md)
+separates cluster/platform provisioning from application reconciliation. An optional `APP`
+selects a declared profile (initially shopping-cart, then a second test app); omitting it
+provisions infrastructure only. Add independent app-deploy/app-down operations while
+preserving the provider lifecycle, cluster registration, GitOps, data retention and security
+gates. The existing [shopping-cart tight-coupling issue](issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md)
+is the historical basis. **Required before v1.49.0 unfamiliar-app onboarding and v1.50.0
+workload transition.** v1.48.1 now holds **4 of 5 plans**.
 
 **Unscheduled P3 backlog** (triage 2026-10-15):
 [`argocd-image-updater-dashboard-kpi-alignment`](bugs/2026-10-13-argocd-image-updater-dashboard-kpi-alignment.md),
