@@ -1,6 +1,6 @@
 # Bug: headless ACG cluster-up stalls at Vault CA trust until timeout
 
-**Status:** IN PROGRESS — Option A narrow fix approved for dispatch (2026-11-03)
+**Status:** LANDED — `8d57ff9e`; offline-verified by Argon (`verify-evidence.1.log`); independent reviewer assessment and live M5 verification pending
 **Priority:** P2
 **Severity:** medium — Slack-driven ACG bring-up failed; an interactive CA trust path may be a workaround but has not been verified for this incident
 **Filed:** 2026-11-02
@@ -210,3 +210,28 @@ Run one **read-only** unified log query on `m5-air.local` covering `2026-11-01 2
 #### 5. Test-Environment Limits & Cost
 - **Test-environment limits:** All Phase B/C BATS suites (`vault_ca_trust_e2e.bats`, `vault_ca_trust_supervisor.bats`, `install_sudoers.bats`) use same-user stub processes and `fnmatch` models; offline tests cannot exercise macOS `authd` / `SecurityAgent` right evaluation or `sudo` policy evaluation.
 - **Tokens / Cost:** Single bounded read-only pass on `m4-air.local`; no paid external API calls or subagents invoked.
+
+### Evidence comparison and Option A implementation outcome (2026-11-03)
+
+- **Decision & Muse Status:**
+  - **Chosen path:** `narrow_patch` (Option A), authorized by the operator on `2026-11-03`.
+  - **Muse Wonder / Muse Code status:** `OPTIONAL_NOT_COMMISSIONED` (no subscription or paid usage activated).
+  - **Original Phase B/C worktree:** `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust` (`f08a3775`, 24 runs) retained untouched in place.
+- **Dispatched Implementation (`2026-11-02-acg-up-stalls-at-system-keychain-trust-fix`):**
+  - **Worker / Coordinator:** OpenAI `gpt-6-luna` via `bin/k3dm-codex-dispatch` (session `01a1a424-3817-7220-a589-c31971e525cd`), coordinated by `google/gemini-4-argon-medium`.
+  - **Run count:** **1 run** (`start` only, 0 resumes; well within the 3-run cap), `state: exited successfully (rc=0)`, `scope: in-scope`.
+  - **Landed commit:** `8d57ff9e9451d2154bc36f9a1edf53ed817bd27c` (`8d57ff9e`), rebased onto `12b617026b5edbabf376f373acf1ac80beca410a` (`12b61702`).
+  - **Scoped changes (5 files, +115 / -17 lines; `code: 44, tests: 87, docs: 1`):**
+    1. `bin/cluster-up` (lines 150–174, 808): Extracted `_acg_trust_vault_ca()`. Non-Darwin returns `0`; already-trusted CA (`security verify-cert -c`) logs and returns `0`; headless Darwin (`! [[ -t 0 && -t 1 ]]`) skips `security add-trusted-cert` and emits `_warn` naming `SecurityAgent` and the manual `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <ca_cert>` command; interactive TTY Darwin (`[[ -t 0 && -t 1 ]]`) preserves `_run_command --interactive-sudo --soft -- security add-trusted-cert ...` with warning fallback.
+    2. `bin/install-sudoers.sh` (lines 30–35, 130): Removed the ineffective `%admin ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *` rule and updated the `sudo -l` verification hint.
+    3. `scripts/tests/bin/cluster_up.bats` (lines 3–73): Added isolated stub tests for `M1` (interactive TTY positive control + warning on add failure), `M2` (already-trusted CA skipped in headless mode), `M3` (non-Darwin no-op), and `N1` (headless Darwin skip + remediation warning, no `security add-trusted-cert` or `_run_command` call).
+    4. `scripts/tests/bin/install_sudoers.bats` (lines 5, 34–45): Added `N2` test verifying `bin/install-sudoers.sh` and `--dry-run` output never grant `NOPASSWD` to `/usr/bin/security` or `security add-trusted-cert`.
+    5. `CHANGELOG.md` (line 7): Added `1.43.14` entry.
+- **Offline Verification & Evidence (`verify-evidence.1.log`):**
+  - **Pre-fix red (`12b61702`):** `N1` and `N2` failed (`pre_fix_rc: 1`) against pre-fix `bin/cluster-up` and `bin/install-sudoers.sh` while `M1`–`M3` passed.
+  - **Post-fix green (`8d57ff9e`):** `env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/install_sudoers.bats` passed all **81/81** tests (`rc: 0`); `shellcheck -x -S warning bin/cluster-up bin/install-sudoers.sh` exited `0`; `scripts/ci/fast_gate.sh` passed all 24 suites in 24s; `_agent_audit` exited `0`.
+  - **Ledger verification artifact:** `v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust-fix.run/verify-evidence.1.log` (SHA-256 `381631e7d81c972abc861d55a1ac380041bd161a103ec10048438fd444d24a8f`, verifier `gemini-4-argon-medium`).
+- **Token / Cost Coverage (from `ledger.jsonl`):**
+  - `codex_usage` (run 1, `gpt-6-luna`): `input: 2,463,898` (`cached_input: 2,376,832`, uncached input: `87,066`), `output: 14,007` (`codex_exit` billed tokens: `101,073`).
+- **Remaining Limits & Next Steps:**
+  - Offline verification does not substitute for a live headless `cluster-up` run on `m5-air.local` (once `machine-role` is initialized and ACG credentials are refreshed) or the optional historical M5 `log show --info` query for `2026-11-01 20:03:50–20:53:00 PST`. Independent reviewer sign-off and live M5 verification remain separate gates before marking `LIVE-VERIFIED`.
