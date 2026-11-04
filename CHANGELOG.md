@@ -10,6 +10,7 @@
 - Require the recorded hub machine role before starting the local hub or running hub release operations.
 - Record resume reasons, classify reviewed runs, and list open dispatch tasks.
 - Retry observability LaunchAgent bootstraps across `bootout` teardown and avoid ephemeral `direnv` Python paths in auth-proxy plists.
+- Report an actionable M2 SSH key-authentication error when publishing DR drill results.
 
 - Require captured verifier evidence for dispatch passes and show legacy claims separately.
 
