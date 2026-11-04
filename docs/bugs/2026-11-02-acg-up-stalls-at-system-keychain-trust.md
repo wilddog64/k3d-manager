@@ -41,18 +41,18 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 
 ## Fix scope
 
-Implement **Option A (`narrow_patch`)**:
+Implement **Option A (`narrow_patch`) + M5 Live Verification Follow-Up (2026-11-03)**:
 
-1. **`bin/cluster-up` (Step 4c System Keychain CA trust):**
+1. **`bin/cluster-up` (Step 4c System Keychain CA trust — `_acg_trust_vault_ca`):**
    - Extract a helper function `function _acg_trust_vault_ca()` and call `_acg_trust_vault_ca "${_argocd_browser_tls_dir}/ca.crt"` at Step 4c in place of the inline `if [[ "$(uname)" == "Darwin" ]]; then ... fi` block.
    - Inside `function _acg_trust_vault_ca()`:
      - Take `local _ca_cert="$1"`.
      - If `[[ "$(uname)" != "Darwin" ]]`, return `0` without calling `security`.
      - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` succeeds, log `_info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"` and return `0`.
-     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails and stdin or stdout is not a TTY (`! [[ -t 0 && -t 1 ]]`), **do not** invoke `security add-trusted-cert` (because macOS right `com.apple.trust-settings.admin` requires interactive `SecurityAgent` GUI approval even when `/usr/bin/security` runs as `root` via `sudo -n`, causing unattended jobs to hang). Instead, emit:
+     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails and either stdin/stdout is not a TTY (`! [[ -t 0 && -t 1 ]]`) **or** the shell is an SSH session (`[[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]`, which lacks macOS Aqua GUI `SecurityAgent` access and fails with `SecTrustSettingsSetTrustSettings: The authorization was denied since no user interaction was possible`), **do not** invoke `security add-trusted-cert`. Instead, emit:
        `_warn "[acg-up] Skipping System Keychain Vault CA trust in headless session (macOS SecurityAgent requires interactive approval) — to trust manually, run: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${_ca_cert}"`
        and return `0`.
-     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails and both stdin and stdout are TTYs (`[[ -t 0 && -t 1 ]]`), preserve the existing interactive path:
+     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails, both stdin and stdout are TTYs (`[[ -t 0 && -t 1 ]]`), and `[[ -z "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]`, preserve the interactive path:
        - Log `_info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."`
        - Run:
          ```bash
@@ -63,34 +63,54 @@ Implement **Option A (`narrow_patch`)**:
            _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
          ```
        - Return `0`.
-2. **`bin/install-sudoers.sh`:**
-   - Remove the ineffective `# macOS System Keychain — trust Vault PKI CA certificate` comment and `%admin  ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *` rule from `_SUDOERS_CONTENT`, and update the verify hint on line 133 from `'launchctl|security|k3d-manager'` to `'launchctl|k3d-manager'`. Leave all other sudoers rules untouched.
-3. **`scripts/tests/bin/cluster_up.bats` & `scripts/tests/bin/install_sudoers.bats`:**
-   - Add isolated offline BATS tests covering `M1`, `M2`, `M3`, `N1`, and `N2` below. Never touch the real `/Library/Keychains/System.keychain` or invoke real `sudo`; use PATH/function stubs in `${BATS_TEST_TMPDIR}` and assert the stub log target is inside `${BATS_TEST_TMPDIR}`.
-4. **`CHANGELOG.md`:**
-   - Add one bullet under `## [1.43.14] - Unreleased` summarizing the headless System Keychain CA-trust skip/remediation warning and removal of the ineffective `security add-trusted-cert` sudoers rule.
+2. **`bin/cluster-up` (Step 4b/4c `/etc/hosts` helper wiring — `_acg_update_hosts_entry`):**
+   - On M5 live verification (2026-11-03), the `/etc/hosts` loop immediately before Step 4c failed with `sh: line 4: /etc/hosts: Permission denied` because `bin/cluster-up` called `_run_command --prefer-sudo --soft -- sh -c "... > /etc/hosts"` instead of the scoped sudoers helper `/usr/local/bin/k3d-manager-update-hosts` installed by `bin/install-sudoers.sh`.
+   - Extract `function _acg_update_hosts_entry()` in `bin/cluster-up` and call `_acg_update_hosts_entry "${_h}" "${_desired_ip}"` inside the `_HOSTS_LIST` loop in place of the inline `grep`/`_run_command --prefer-sudo --soft -- sh -c ...` block:
+     - Take `local _h="$1" _desired_ip="$2"`.
+     - Use `local _hosts_file="${K3DM_HOSTS_FILE:-/etc/hosts}"` and `local _update_hosts_bin="${K3DM_UPDATE_HOSTS_BIN:-/usr/local/bin/k3d-manager-update-hosts}"`.
+     - Set `local _desired_host_entry="${_desired_ip} ${_h}"` and `local _current_host_entry`.
+     - Read `_current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" "${_hosts_file}" 2>/dev/null | tail -n 1 || true)`.
+     - If `[[ "${_current_host_entry}" == "${_desired_host_entry}" ]]`, return `0` without calling `_run_command`.
+     - Log `_info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."`.
+     - Decide the helper executable: if `[[ -x "${_update_hosts_bin}" ]]`, use `"${_update_hosts_bin}"`; otherwise use `"${REPO_ROOT}/bin/update-hosts-entry.sh"`.
+     - Invoke `if _run_command --interactive-sudo --soft -- "${_helper}" "${_h}" "${_desired_ip}"; then _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"; else _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"; fi` and return `0`.
+     - Never invoke `sh -c` or `--prefer-sudo` for `/etc/hosts` updates.
+3. **`bin/install-sudoers.sh`:**
+   - Keep the ineffective `%admin ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert ...` rule removed and `/usr/local/bin/k3d-manager-update-hosts *` preserved.
+4. **`scripts/tests/bin/cluster_up.bats` & `scripts/tests/bin/install_sudoers.bats`:**
+   - Add isolated offline BATS tests covering `M1`–`M5` and `N1`–`N4` below. In `_run_vault_ca_trust_test`, explicitly clear `SSH_CONNECTION` and `SSH_TTY` by default unless the test passes an SSH simulation variable so tests running inside an SSH tmux session are hermetic.
+5. **`CHANGELOG.md`:**
+   - Update the `## [1.43.14] - Unreleased` bullet to mention skipping System Keychain Vault CA trust in headless/SSH sessions and updating `/etc/hosts` through `/usr/local/bin/k3d-manager-update-hosts`.
 
 ## Acceptance
 
 ```yaml
 must:
   - id: M1
-    req: when uname is Darwin, security verify-cert returns non-zero, and both stdin and stdout are TTYs, _acg_trust_vault_ca invokes _run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <ca_cert> once (paired positive control for N1), and logs the TLS warning while returning 0 if that command exits non-zero
+    req: when uname is Darwin, security verify-cert returns non-zero, stdin and stdout are TTYs, and SSH_CONNECTION/SSH_TTY are unset, _acg_trust_vault_ca invokes _run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <ca_cert> once (paired positive control for N1/N3), and logs the TLS warning while returning 0 if that command exits non-zero
   - id: M2
-    req: when uname is Darwin and security verify-cert returns 0, _acg_trust_vault_ca logs that the Vault CA cert is already trusted and never invokes security add-trusted-cert (even in a headless session)
+    req: when uname is Darwin and security verify-cert returns 0, _acg_trust_vault_ca logs that the Vault CA cert is already trusted and never invokes security add-trusted-cert (even in a headless or SSH session)
   - id: M3
     req: when uname is not Darwin (e.g. Linux), _acg_trust_vault_ca returns 0 without invoking security
+  - id: M4
+    req: when the desired host entry is missing or stale in K3DM_HOSTS_FILE and K3DM_UPDATE_HOSTS_BIN is executable, _acg_update_hosts_entry invokes _run_command --interactive-sudo --soft -- "$K3DM_UPDATE_HOSTS_BIN" <host> <ip> and logs "[acg-up] /etc/hosts: <host> → <ip>" on success or warns with the manual entry on failure
+  - id: M5
+    req: when the desired host entry is already present in K3DM_HOSTS_FILE, _acg_update_hosts_entry returns 0 without invoking _run_command
 must_not:
   - id: N1
     req: when uname is Darwin, security verify-cert returns non-zero, and stdin or stdout is not a TTY (headless), _acg_trust_vault_ca never invokes security add-trusted-cert or _run_command, returns 0, and emits a warning naming SecurityAgent and the manual "sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain" command
   - id: N2
     req: bin/install-sudoers.sh (and bin/install-sudoers.sh --dry-run output) never grants NOPASSWD for /usr/bin/security or security add-trusted-cert
+  - id: N3
+    req: when uname is Darwin, security verify-cert returns non-zero, stdin and stdout are TTYs, and SSH_CONNECTION or SSH_TTY is non-empty, _acg_trust_vault_ca never invokes security add-trusted-cert or _run_command and emits the headless/SecurityAgent remediation warning
+  - id: N4
+    req: bin/cluster-up never uses "--prefer-sudo" or "sh -c" to write /etc/hosts directly
 evidence:
   - id: E1
-    proves: [M1, M2, M3, N1, N2]
+    proves: [M1, M2, M3, M4, M5, N1, N2, N3, N4]
     kind: offline
     intent: >-
-      Isolated BATS tests in scripts/tests/bin/cluster_up.bats and scripts/tests/bin/install_sudoers.bats prove N1 and N2 fail (red) on pre-fix code and M1-M3 + N1-N2 pass (green) on fixed code without touching the real System Keychain.
+      Isolated BATS tests in scripts/tests/bin/cluster_up.bats and scripts/tests/bin/install_sudoers.bats prove N3 and N4 fail (red) on pre-followup code (8d57ff9e) and M1-M5 + N1-N4 pass (green) on fixed code without touching real /etc/hosts or System Keychain.
     what: env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/install_sudoers.bats
 ```
 

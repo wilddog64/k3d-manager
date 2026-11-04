@@ -47,12 +47,10 @@ a message, and the instances get a key this node cannot use.
 
 ## Files
 
-- `bin/k3dm-machine-setup`
-- `scripts/tests/bin/machine_setup.bats`
-- `scripts/lib/foundation/scripts/lib/acg/acg.sh` (upstream lib-foundation first, then subtree-pull)
-- lib-foundation BATS for `acg_provision`
-- `docs/howto/machine-setup.md`
-- `CHANGELOG.md`
+- `scripts/lib/acg/acg.sh`
+- `scripts/tests/lib/acg.bats`
+- `docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md`
+- `CHANGE.md`
 
 ## What NOT to do
 
@@ -66,36 +64,37 @@ a message, and the instances get a key this node cannot use.
 
 ```yaml
 must:
-  M1: machine-setup --role hub creates ~/.ssh/k3d-manager-key.pem (mode 600) and its .pub when missing
-  M2: machine-setup --check --role hub reports the key present or missing, without key contents
-  M3: acg_provision with a missing key exits non-zero before any aws call, naming the path and make machine-setup ROLE=hub
-  M4: an import-key-pair duplicate whose fingerprint matches the local key proceeds to create-stack (paired positive control for N2)
+  - id: M1
+    req: for an imported ssh-ed25519 public key, _acg_imported_key_fingerprint strips the leading "SHA256:" prefix from ssh-keygen -E sha256 -lf output and returns the 43-character base64 SHA-256 digest
+  - id: M2
+    req: when import-key-pair returns InvalidKeyPair.Duplicate for an Ed25519 key and describe-key-pairs returns the real AWS EC2 KeyFingerprint format (bare 43-character base64 SHA-256 digest with trailing "=" and no "SHA256:" prefix, as captured on m5-air on 2026-11-03: "DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A="), _acg_import_key succeeds (returns 0) and acg_provision proceeds to cloudformation deploy (paired positive control for N1)
+  - id: M3
+    req: when import-key-pair returns InvalidKeyPair.Duplicate for an RSA key and describe-key-pairs returns the matching PKCS8 DER MD5 colon-hex fingerprint, _acg_import_key succeeds (returns 0)
 must_not:
-  N1: machine-setup never modifies an existing key (same bytes and mtime after a run)
-  N2: an existing sandbox key pair with a different fingerprint never reaches create-stack; the error names both fingerprints
-  N3: no private key material appears in any output or log
+  - id: N1
+    req: when describe-key-pairs returns the real AWS EC2 unprefixed base64 SHA-256 fingerprint with trailing "=" for a matching Ed25519 key, _acg_import_key never fails with "Key fingerprint mismatch"
+  - id: N2
+    req: when describe-key-pairs returns a mismatched fingerprint or trailing non-padding characters (e.g. "=junk"), _acg_import_key exits non-zero with "Key fingerprint mismatch" before cloudformation deploy
+  - id: N3
+    req: no private key material appears in any output or log
 evidence:
-  E1:
-    proves: [M1, M2, N1, N3]
+  - id: E1
+    proves: [M1, M2, M3, N1, N2, N3]
     kind: offline
-    intent: You will see machine_setup.bats in a scratch HOME create the key when it is missing, leave a pre-placed key byte-identical, and print no key material (M1 red on the pre-fix script).
-    what: bats scripts/tests/bin/machine_setup.bats
-  E2:
-    proves: [M3, M4, N2]
-    kind: offline
-    intent: You will see lib-foundation BATS with a stub aws log no aws call for a missing key, reach create-stack on a matching duplicate, and stop before create-stack on a mismatched one (M3/N2 red on the pre-fix acg.sh).
-    what: lib-foundation bats for acg_provision
-  E3:
-    proves: [M1, M3]
-    kind: live
-    intent: You will see make machine-setup ROLE=hub on the M5 create the key, then /cluster-up aws get past "Deriving public key" and create the stack.
-    what: operator on the M5; Claude reads the job output
-interface:
-  - make machine-setup ROLE=hub / bin/k3dm-machine-setup --role hub [--check]
-  - ~/.ssh/k3d-manager-key.pem, ~/.ssh/k3d-manager-key.pub
-  - acg_provision (via make up CLUSTER_PROVIDER=k3s-aws)
-  - aws ec2 import-key-pair / describe-key-pairs
+    intent: >-
+      Isolated BATS tests in scripts/tests/lib/acg.bats prove N1 fails (red) on pre-fix fix/acg-key-fingerprint (eb2a136, where _acg_imported_key_fingerprint kept the SHA256: prefix while real AWS returns bare base64 with trailing "=") and M1-M3 + N1-N3 pass (green) on fixed code.
+    what: env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/acg.bats
 ```
+
+## Rules
+
+- Touch only the files listed under `## Files` inside this `lib-foundation` worktree (`scripts/lib/acg/acg.sh`, `scripts/tests/lib/acg.bats`, `docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md`, `CHANGE.md`). Do not touch `memory-bank/`.
+- Do not run `git add`, `git commit`, or `git push`. Leave changes in the working tree.
+- Do not unset or override task-provided `K3DM_*` and `TMPDIR` environment variables.
+- Run and paste the output of:
+  - `bats scripts/tests/lib/acg.bats`
+  - `shellcheck -x -S warning scripts/lib/acg/acg.sh`
+  - `git --no-pager diff --check`
 
 ## Recurrence: an empty `.pub` from the failed run poisons the next one (job `e7a0ecfb`, 2026-11-01)
 
@@ -108,19 +107,29 @@ material then failed with its error hidden. A dry-run import of the real key suc
 Added to the fix: `acg_provision` derives the `.pub` into a temp file and moves it into place only on success. It
 treats an empty `.pub` as missing. It confirms the key pair exists (`describe-key-pairs`) before `create-stack`.
 
-```yaml
-must:
-  M5: a 0-byte k3d-manager-key.pub next to a valid pem is re-derived, not imported empty
-must_not:
-  N4: a failed ssh-keygen derivation never leaves a k3d-manager-key.pub behind
-  N5: create-stack is never called when the key pair is absent from the sandbox after import
+## Recurrence: live M5 Ed25519 duplicate-key fingerprint format has no `SHA256:` prefix (2026-11-03)
+
+On `2026-11-03` during live `make up CLUSTER_PROVIDER=k3s-aws` verification on `m5-air`, the second run (reusing the `CREATE_COMPLETE` CloudFormation stack) failed in `_acg_import_key` with:
+
+```text
+aws: [ERROR]: An error occurred (InvalidKeyPair.Duplicate) when calling the ImportKeyPair operation: The keypair already exists
+aws command failed (254): aws ec2 import-key-pair --region us-west-2 --key-name k3d-manager-key --public-key-material fileb:///Users/cliang/.ssh/k3d-manager-key.pub
+ERROR: [acg] Key fingerprint mismatch: local 83:66:fc:52:97:a2:55:42:54:27:8a:47:de:1d:f9:1f, AWS DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=
 ```
 
-## Dispatch split (2026-11-01)
+This live capture establishes two facts:
+1. `k3d-manager-v1.43.14` still had the `bb7f1f28` subtree (which used `ssh-keygen -E md5 -lf` -> `83:66:fc:...`).
+2. Even on `lib-foundation` branch `fix/acg-key-fingerprint` (`eb2a136`), `_acg_imported_key_fingerprint` returned `awk '{print $2}'` from `ssh-keygen -E sha256 -lf`, which includes the `SHA256:` prefix (`SHA256:DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A`), and `_acg_import_key` only stripped `=` when `_remote` matched `SHA256:*`. However, real AWS EC2 `describe-key-pairs --query 'KeyPairs[0].KeyFingerprint' --output text` returns **bare Base64 SHA-256 with `=` padding and NO `SHA256:` prefix** (`DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=`).
 
-- **This k3d-manager dispatch:** Fix step 1 and step 3 only (`bin/k3dm-machine-setup` key creation and
-  `--check`, `docs/howto/machine-setup.md`), proving M1, M2, N1 and N3 with E1. Do not edit
-  `scripts/lib/foundation/` — it is a subtree.
-- **lib-foundation:** Fix step 2, the recurrence additions, M3-M5, N2, N4 and N5. Dispatched upstream as
-  lib-foundation `docs/bugs/2026-11-01-acg-new-hub-ec2-key-import-and-extend-profile.md` (branch
-  `fix/acg-hub-ec2-key-and-extend-profile`), then subtree-pulled.
+**Required fix in `lib-foundation` (`fix/acg-key-fingerprint`):**
+1. In `scripts/lib/acg/acg.sh`:
+   - In `_acg_imported_key_fingerprint()`, strip `^SHA256:` for `ssh-ed25519`:
+     `printf '%s\n' "${_fingerprint}" | awk '{sub(/^SHA256:/, "", $2); print $2}'`
+   - In `_acg_import_key()`, under `*InvalidKeyPair.Duplicate*`, normalize `_remote` before comparing with `_local`:
+     - Strip an optional `SHA256:` prefix: `_remote="${_remote#SHA256:}"`
+     - When `_local` is a 43-char Base64 SHA-256 digest (`[[ "${_local}" =~ ^[A-Za-z0-9+/]{43}$ ]]`), strip at most one trailing `=` padding character (`_remote="${_remote%=}"`) so real AWS output (`DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=`), unpadded Base64 (`DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A`), and `SHA256:`-prefixed stubs all match `_local`, while double `==` or `=junk` or wrong digests still fail closed (`Key fingerprint mismatch`).
+2. In `scripts/tests/lib/acg.bats`:
+   - In `_acg_real_duplicate_key` for `ed25519`, set `ACG_REMOTE_FP` to the real AWS EC2 format: bare Base64 SHA-256 with trailing `=` and **no** `SHA256:` prefix (`"$("$real_ssh" -E sha256 -lf "${_ACG_KEY_PEM%.pem}.pub" | awk '{sub(/^SHA256:/, "", $2); print $2"="}')"`, noting the `m5-air` `2026-11-03` live capture in a comment).
+   - Test that `_acg_import_key` succeeds on the real unprefixed `...=` format, on unprefixed unpadded `...`, and on `SHA256:...=`, and fails closed on `...=junk` and mismatched digests.
+3. In `docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md`:
+   - Record the `2026-11-03` `m5-air` live AWS EC2 capture (`DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=`, unprefixed Base64 SHA-256 with trailing `=`).
