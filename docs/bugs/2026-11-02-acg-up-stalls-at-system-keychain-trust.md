@@ -1,12 +1,12 @@
 # Bug: headless ACG cluster-up stalls at Vault CA trust until timeout
 
-**Status:** OPEN — investigating; exact blocking process and cause unconfirmed
+**Status:** IN PROGRESS — Option A narrow fix approved for dispatch (2026-11-03)
 **Priority:** P2
 **Severity:** medium — Slack-driven ACG bring-up failed; an interactive CA trust path may be a workaround but has not been verified for this incident
 **Filed:** 2026-11-02
 **Detected by:** operator screenshot and read-only investigation of job `c38c3855`
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** Operator requested dispatch to Luna on 2026-11-02 and subsequently authorized a narrowly scoped privileged supervisor and new sudoers permission to preserve automatic headless trust. Operator explicitly expanded scope to harden existing sudoers rules and dependent listener flows. Offline verification is sufficient for landing; live verification is deferred.
+**Approval:** Operator requested dispatch to Luna on 2026-11-02; on 2026-11-03, after reviewing the Gemini Argon independent root-cause report (`com.apple.trust-settings.admin` requires interactive `SecurityAgent` approval even for `root`), operator approved proceeding with Option A (`narrow_patch`) first before deciding on any broader sudoers/listener rework. Offline verification is sufficient for landing; live verification is deferred.
 **Related:** `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`, `docs/bugs/v1.5.3-bugfix-acg-up-vault-ca-trust-no-soft.md`
 
 ## Evidence
@@ -36,35 +36,77 @@ Capture the real process tree and TTY/authorization state if this recurs; distin
 - `bin/cluster-up`
 - `scripts/tests/bin/cluster_up.bats`
 - `bin/install-sudoers.sh`
-- `bin/k3dm-vault-ca-trust-supervisor` (new, if needed)
 - `scripts/tests/bin/install_sudoers.bats`
-- `scripts/tests/bin/vault_ca_trust_supervisor.bats` (new, if needed)
-- `scripts/plugins/argocd.sh`
-- `bin/cluster-refresh`
-- `scripts/lib/providers/k3s-hostinger.sh`
-- `scripts/lib/core.sh` and directly corresponding tests, for preserving k3s installation after hardening generic installation rules.
-- `bin/cluster-down` and directly corresponding tests, for preserving safe listener cleanup after hardening plist removal.
-- Corresponding listener templates and BATS suites, limited to files directly needed for securing and preserving those flows; identify precise paths in the implementation report.
 - `CHANGELOG.md`
 
 ## Fix scope
 
-Bound the headless System Keychain CA-trust operation so a hung authorization or `security` process cannot consume the cluster-up job deadline. Implement a narrowly scoped privileged supervisor and sudoers rule as needed, with a short deadline (at most 30 seconds plus a short termination grace), without relying on GNU `timeout` being installed on macOS. The existing privileged sudo monitor may serve as supervisor if a command-specific timeout can be enforced and missing policy fails closed. Terminate and reap controlled processes on timeout. Warn and continue along the existing failure path; do not claim trust succeeded. Do not assume a particular cause of the observed stall. Investigate whether macOS service work may complete after client cancellation and document what offline tests can and cannot prove; do not make unsupported guarantees about macOS service internals.
+Implement **Option A (`narrow_patch`)**:
 
-Preserve the documented automatic trust behavior: already-trusted certificates skip the add operation, interactive use retains its existing prompt and warning behavior, and failed trust remains a warning. Match the existing runner's headless definition (stdin or stdout is not a TTY). Preserve certificate verification and non-Darwin behavior. The supervisor must be installed securely as a root-owned, non-user-writable executable and allow only the intended Keychain trust operation; reject arbitrary commands, unsafe paths, options, symlinks and mutable executable substitution. Add only a narrowly scoped rule for that fixed helper, with no shell or arbitrary command permission. Existing permissive installation rules may be tightened where necessary to secure the helper, with compatibility tests for legitimate installation flows. Existing hosts must receive clear instructions to install the new helper and sudoers rule; if unavailable, warn and continue without falling back to an unbounded privileged command. Do not weaken trust, modify AWS cleanup, automatically destroy infrastructure, or access real Keychains, AWS, Kubernetes or remote hosts in tests. No live installation or live cluster-up is authorized by this dispatch. The live environment and stack state require separate operator investigation.
-
-The operator explicitly authorized expanding scope to close existing passwordless sudoers self-update, binary path traversal, and caller-controlled root LaunchDaemon routes that would defeat the supervisor's security boundary. Preserve legitimate listener configuration and lifecycle using validated, root-controlled executables and narrowly scoped policy. Investigate and test all applicable sudoers paths to helper or policy replacement. Avoid unrelated redesign. Provide clear upgrade instructions and do not modify live host configuration.
+1. **`bin/cluster-up` (Step 4c System Keychain CA trust):**
+   - Extract a helper function `function _acg_trust_vault_ca()` and call `_acg_trust_vault_ca "${_argocd_browser_tls_dir}/ca.crt"` at Step 4c in place of the inline `if [[ "$(uname)" == "Darwin" ]]; then ... fi` block.
+   - Inside `function _acg_trust_vault_ca()`:
+     - Take `local _ca_cert="$1"`.
+     - If `[[ "$(uname)" != "Darwin" ]]`, return `0` without calling `security`.
+     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` succeeds, log `_info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"` and return `0`.
+     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails and stdin or stdout is not a TTY (`! [[ -t 0 && -t 1 ]]`), **do not** invoke `security add-trusted-cert` (because macOS right `com.apple.trust-settings.admin` requires interactive `SecurityAgent` GUI approval even when `/usr/bin/security` runs as `root` via `sudo -n`, causing unattended jobs to hang). Instead, emit:
+       `_warn "[acg-up] Skipping System Keychain Vault CA trust in headless session (macOS SecurityAgent requires interactive approval) — to trust manually, run: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${_ca_cert}"`
+       and return `0`.
+     - If `security verify-cert -c "${_ca_cert}" >/dev/null 2>&1` fails and both stdin and stdout are TTYs (`[[ -t 0 && -t 1 ]]`), preserve the existing interactive path:
+       - Log `_info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."`
+       - Run:
+         ```bash
+         _run_command --interactive-sudo --soft -- \
+           security add-trusted-cert -d -r trustRoot \
+             -k /Library/Keychains/System.keychain \
+             "${_ca_cert}" || \
+           _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
+         ```
+       - Return `0`.
+2. **`bin/install-sudoers.sh`:**
+   - Remove the ineffective `# macOS System Keychain — trust Vault PKI CA certificate` comment and `%admin  ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *` rule from `_SUDOERS_CONTENT`, and update the verify hint on line 133 from `'launchctl|security|k3d-manager'` to `'launchctl|k3d-manager'`. Leave all other sudoers rules untouched.
+3. **`scripts/tests/bin/cluster_up.bats` & `scripts/tests/bin/install_sudoers.bats`:**
+   - Add isolated offline BATS tests covering `M1`, `M2`, `M3`, `N1`, and `N2` below. Never touch the real `/Library/Keychains/System.keychain` or invoke real `sudo`; use PATH/function stubs in `${BATS_TEST_TMPDIR}` and assert the stub log target is inside `${BATS_TEST_TMPDIR}`.
+4. **`CHANGELOG.md`:**
+   - Add one bullet under `## [1.43.14] - Unreleased` summarizing the headless System Keychain CA-trust skip/remediation warning and removal of the ineffective `security add-trusted-cert` sudoers rule.
 
 ## Acceptance
 
-- A headless trust operation that hangs is terminated within the deadline, including controlled descendants, and produces a warning before execution continues. Test with real controlled subprocesses including a TERM-resistant child; provide a short test-only deadline without adding a public option. Investigate and accurately document macOS service cancellation limits; offline tests alone cannot prove cancellation of requests already handed to system services.
-- A quick successful headless trust attempt executes once, an already-trusted CA skips it, and an immediate trust failure warns and continues. Preserve interactive and non-Darwin behavior. Tests must isolate command stubs and assert they cannot touch real system state.
-- Test the supervisor's argument/path validation, trusted installation and exact sudoers rule, missing helper/permission behavior, and all above paths with isolated stubs. Run the focused BATS suites, ShellCheck on touched shell scripts, `git diff --check`, and a meaningful staged `_agent_audit`; report actual results. Do not run a live cluster-up or install the helper on the host.
+```yaml
+must:
+  - id: M1
+    req: when uname is Darwin, security verify-cert returns non-zero, and both stdin and stdout are TTYs, _acg_trust_vault_ca invokes _run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <ca_cert> once (paired positive control for N1), and logs the TLS warning while returning 0 if that command exits non-zero
+  - id: M2
+    req: when uname is Darwin and security verify-cert returns 0, _acg_trust_vault_ca logs that the Vault CA cert is already trusted and never invokes security add-trusted-cert (even in a headless session)
+  - id: M3
+    req: when uname is not Darwin (e.g. Linux), _acg_trust_vault_ca returns 0 without invoking security
+must_not:
+  - id: N1
+    req: when uname is Darwin, security verify-cert returns non-zero, and stdin or stdout is not a TTY (headless), _acg_trust_vault_ca never invokes security add-trusted-cert or _run_command, returns 0, and emits a warning naming SecurityAgent and the manual "sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain" command
+  - id: N2
+    req: bin/install-sudoers.sh (and bin/install-sudoers.sh --dry-run output) never grants NOPASSWD for /usr/bin/security or security add-trusted-cert
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, N1, N2]
+    kind: offline
+    intent: >-
+      Isolated BATS tests in scripts/tests/bin/cluster_up.bats and scripts/tests/bin/install_sudoers.bats prove N1 and N2 fail (red) on pre-fix code and M1-M3 + N1-N2 pass (green) on fixed code without touching the real System Keychain.
+    what: env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/install_sudoers.bats
+```
 
+## Rules
+
+- Touch only the 5 files listed under `## Files`. Do not create or modify any other files, and do not touch `memory-bank/`.
+- Do not run `git add`, `git commit`, or `git push`. Leave changes in the working tree.
+- Do not unset or override task-provided `K3DM_*` and `TMPDIR` environment variables.
+- Run and paste the output of:
+  - `bats scripts/tests/bin/cluster_up.bats scripts/tests/bin/install_sudoers.bats`
+  - `shellcheck -x -S warning bin/cluster-up bin/install-sudoers.sh`
+  - `git --no-pager diff --check`
 
 ## Independent cross-vendor diagnosis before replanning (2026-11-03)
 
-**Status:** IN PROGRESS — Gemini Argon read-only report attached (2026-11-03); Muse Wonder/Muse Code report and synthesis pending; not approved for code changes. This section records the operator's proposal to have Muse Wonder/Muse Code and Gemini Argon independently update **this existing bug** before choosing a revised fix plan. Do not describe either vendor as having inspected the incident until an actual dated, attributable report is attached. This is not approval to install tools, pay API charges, modify live hosts, or land changes.
+**Status:** APPROVED FOR OPTION A (`narrow_patch`, 2026-11-03) — Gemini Argon read-only report attached below; operator reviewed findings on 2026-11-03 and authorized proceeding with Option A (`narrow_patch`) first before deciding whether to pursue broader sudoers/listener rework.
 
 ### Shared read-only investigation contract
 
@@ -82,7 +124,7 @@ Give each investigator the same frozen evidence bundle and file SHAs: incident j
 - Update this bug with a dated **cross-vendor evidence comparison**: verified facts, conflicting conclusions, cost/effort coverage, chosen experiment, rejection reasons, and a clear decision: `diagnose_first`, `narrow_patch`, `revise_existing_plan`, or `operator_decision_required`.
 - Do **not** replace Terra's Phase A/B/C record or silently mark acceptance/live verification complete. A new implementation plan is warranted only when the evidence changes the approach or acceptance contract; first amend the existing plan/bug if the correction is narrow, preserving release-slot rules.
 - Treat the 2026-11-03 multi-run rework and repeated corrections as a P0 dispatch-stall historical regression case (see `docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md`), while keeping causal diagnosis separate from model/token efficiency. Do not promote `resume.clarification` to independently verified progress.
-- Until synthesis and separate authorization, **implementation remains on hold for this proposed cross-vendor review**, without reversing any previously completed commits or claiming the active worker has been automatically paused.
+- **2026-11-03 Operator Decision (`narrow_patch`):** Operator authorized dispatching Option A (`narrow_patch`) to Luna (`gpt-6-luna`) with a 3-run cap to land the narrow fix first before evaluating any broader sudoers/listener work.
 
 ### Gemini Argon independent report (2026-11-03)
 
