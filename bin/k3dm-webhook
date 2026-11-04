@@ -201,6 +201,27 @@ def _provider_context(provider=None):
     }.get(provider, "ubuntu-k3s")
 
 
+def _tunnel_port_for_provider(provider=None):
+    """Return the local tunnel port used by this provider's app cluster."""
+    app_context = _provider_context(provider)
+    if app_context == "ubuntu-k3s":
+        return int(os.environ.get("TUNNEL_SANDBOX_LOCAL_PORT", "16443"))
+    return int(os.environ.get("TUNNEL_LOCAL_PORT", "6443"))
+
+
+_APP_CLUSTER_PREFIXES = (
+    "ubuntu-k3s-", "ubuntu-hostinger-", "ubuntu-gcp-", "ubuntu-azure-",
+)
+
+
+def _app_matches_provider_context(app_name, app_context):
+    """Keep shared Hub apps and apps belonging to the selected app cluster."""
+    for prefix in _APP_CLUSTER_PREFIXES:
+        if app_name.startswith(prefix):
+            return prefix == f"{app_context}-"
+    return True
+
+
 def _acg_stack_probe(provider):
     provider = _resolve_provider(provider)
     if provider != "k3s-aws":
@@ -1841,14 +1862,17 @@ def _run_post_provision_check(job_id, provider):
 
     lines = []
 
+    app_context = _provider_context(provider)
+    tunnel_port = _tunnel_port_for_provider(provider)
+
     # SSH tunnel — Python socket, no subprocess
     import socket as _socket
     try:
-        with _socket.create_connection(("localhost", 6443), timeout=3):
+        with _socket.create_connection(("localhost", tunnel_port), timeout=3):
             tunnel_ok = True
     except OSError:
         tunnel_ok = False
-    lines.append(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
+    lines.append(f"*SSH tunnel ({tunnel_port}):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
     if not tunnel_ok:
         lines.append("⚠️ SSH tunnel down — ACG cluster API unreachable. Service endpoints may still be accessible via port-forwards.")
@@ -1864,7 +1888,8 @@ def _run_post_provision_check(job_id, provider):
         lines.append("_ArgoCD app status unavailable_")
         degraded = []
     else:
-        app_lines = [l for l in apps_out.strip().splitlines() if l]
+        app_lines = [l for l in apps_out.strip().splitlines()
+                     if l and _app_matches_provider_context(l.split()[0], app_context)]
         degraded = [l.split()[0] for l in app_lines
                     if len(l.split()) >= 2 and l.split()[1] == "Degraded"]
         healthy_count = len(app_lines) - len(degraded)
@@ -1896,7 +1921,6 @@ def _run_post_provision_check(job_id, provider):
             if not desc_timeout and desc_out.strip():
                 diag_parts.append(f"ArgoCD Application:\n{desc_out[-2000:]}")
 
-            app_context = _provider_context(provider)
             pods_out, pods_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-A", "--context", app_context,
                  "--no-headers", "--request-timeout=8s",

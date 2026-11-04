@@ -2,6 +2,7 @@
 """Read-only cluster status collection and Slack formatting for k3dm-webhook."""
 
 import datetime
+import os
 
 from webhook.config import JOB_DIR
 from webhook.proc import _spawn_capture_text
@@ -27,6 +28,26 @@ _ARCH_CONTEXT = ""
 _slack_bot_token = lambda: ""
 _slack_channel_id = lambda: ""
 _status_channel_id = lambda: ""
+
+
+def _tunnel_port_for_context(app_context):
+    """Return the local SSH tunnel port for an app-cluster context."""
+    if app_context == "ubuntu-k3s":
+        return int(os.environ.get("TUNNEL_SANDBOX_LOCAL_PORT", "16443"))
+    return int(os.environ.get("TUNNEL_LOCAL_PORT", "6443"))
+
+
+_APP_CLUSTER_PREFIXES = (
+    "ubuntu-k3s-", "ubuntu-hostinger-", "ubuntu-gcp-", "ubuntu-azure-",
+)
+
+
+def _app_matches_provider_context(app_name, app_context):
+    """Keep shared Hub apps and apps belonging to the selected app cluster."""
+    for prefix in _APP_CLUSTER_PREFIXES:
+        if app_name.startswith(prefix):
+            return prefix == f"{app_context}-"
+    return True
 
 
 def _post_slack_message(output, thread_ts, channel_id):
@@ -179,12 +200,13 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, cha
 
         # SSH tunnel — Python socket, no subprocess
         import socket as _socket
+        tunnel_port = _tunnel_port_for_context(app_context)
         try:
-            with _socket.create_connection(("localhost", 6443), timeout=3):
+            with _socket.create_connection(("localhost", tunnel_port), timeout=3):
                 tunnel_ok = True
         except OSError:
             tunnel_ok = False
-        _write_log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
+        _write_log(f"*SSH tunnel ({tunnel_port}):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
         if acg_probe:
             _write_log(acg_probe["status_line"])
 
@@ -265,7 +287,9 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None, cha
                     _write_log("_(cached — ACG cluster was unreachable)_")
                 _write_log(f"```{chr(10).join(acg_apps)}```")
             all_apps = apps_out.strip().splitlines()
-            unhealthy = [l for l in all_apps
+            scoped_apps = [l for l in all_apps
+                           if l.split() and _app_matches_provider_context(l.split()[0], app_context)]
+            unhealthy = [l for l in scoped_apps
                          if "Degraded" in l or "Missing" in l or "OutOfSync" in l]
             if unhealthy:
                 _write_log("\n⚠️ *Unhealthy/OutOfSync apps:*")
