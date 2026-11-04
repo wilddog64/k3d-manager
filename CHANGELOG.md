@@ -7,6 +7,7 @@
 - Skip System Keychain Vault CA trust in headless or SSH sessions with a manual remediation warning, update `/etc/hosts` through `/usr/local/bin/k3d-manager-update-hosts`, and remove the ineffective `security add-trusted-cert` sudoers rule.
 - Require the recorded hub machine role before starting the local hub or running hub release operations.
 - Record resume reasons, classify reviewed runs, and list open dispatch tasks.
+- Retry observability LaunchAgent bootstraps across `bootout` teardown and avoid ephemeral `direnv` Python paths in auth-proxy plists.
 
 - Require captured verifier evidence for dispatch passes and show legacy claims separately.
 

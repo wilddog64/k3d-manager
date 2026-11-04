@@ -723,15 +723,13 @@ uninstall-alertmanager-port-forward:
 
 install-alertmanager-auth-proxy:
 	sed \
-	  -e "s|{{PYTHON3_PATH}}|$$(command -v python3)|g" \
+	  -e "s|{{PYTHON3_PATH}}|$(K3DM_PYTHON3_PATH)|g" \
 	  -e "s|{{ALERTMANAGER_PROXY_BIN}}|$(CURDIR)/bin/alertmanager-auth-proxy|g" \
 	  -e "s|{{ALERTMANAGER_AUTH_FILE}}|$(HOME)/.local/share/k3d-manager/alertmanager-basic-auth.env|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+	bin/launchd-reload com.k3d-manager.alertmanager-auth-proxy "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy installed — localhost:9093 now requires basic auth"
 
 uninstall-alertmanager-auth-proxy:

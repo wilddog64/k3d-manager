@@ -207,6 +207,46 @@ function observability_install_prometheus_rotator() {
   _observability_install_prometheus_rotator "$@"
 }
 
+function _observability_python3_path() {
+  if [[ -n "${K3DM_PYTHON3_PATH:-}" && -x "${K3DM_PYTHON3_PATH}" ]]; then
+    printf '%s\n' "${K3DM_PYTHON3_PATH}"
+    return 0
+  fi
+  local _candidate
+  for _candidate in \
+    /opt/homebrew/opt/python@3.14/bin/python3.14 \
+    /opt/homebrew/bin/python3 \
+    /usr/local/bin/python3 \
+    /usr/bin/python3; do
+    if [[ -x "${_candidate}" ]]; then
+      printf '%s\n' "${_candidate}"
+      return 0
+    fi
+  done
+  command -v python3
+}
+
+function _observability_launchd_reload() {
+  local _label="$1" _plist="$2"
+  local _domain _tries _wait
+  _domain="gui/$(id -u)"
+  _tries="${K3DM_LAUNCHD_BOOTSTRAP_TRIES:-10}"
+  _wait="${K3DM_LAUNCHD_BOOTSTRAP_WAIT:-0.5}"
+  local _attempt _rc=0
+  launchctl bootout "${_domain}/${_label}" 2>/dev/null || true
+  for (( _attempt = 1; _attempt <= _tries; _attempt++ )); do
+    if launchctl bootstrap "${_domain}" "${_plist}"; then
+      return 0
+    else
+      _rc=$?
+    fi
+    if (( _attempt < _tries )); then
+      sleep "${_wait}"
+    fi
+  done
+  _err "[observability] Failed to bootstrap ${_label} after ${_tries} attempts (exit ${_rc})"
+}
+
 function _observability_install_prometheus_rotator() {
   if ! _is_mac; then
     return 0
@@ -224,8 +264,7 @@ function _observability_install_prometheus_rotator() {
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
   if [[ "${K3DM_AGENT_LOAD:-1}" != 0 ]]; then
-    launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-credential-rotator" 2>/dev/null || true
-    launchctl bootstrap "gui/$(id -u)" "${_plist}"
+    _observability_launchd_reload "com.k3d-manager.prometheus-credential-rotator" "${_plist}"
   fi
   _info "[observability] Prometheus credential rotator installed"
 }
@@ -252,8 +291,7 @@ function _observability_install_alertmanager_port_forward() {
     -e "s|{{KUBECTL_PATH}}|$(command -v kubectl)|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
-  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _observability_launchd_reload "com.k3d-manager.alertmanager-port-forward" "${_plist}"
   _info "[observability] Alertmanager port-forward agent installed — raw backend stays open on port 19093"
 }
 
@@ -498,13 +536,12 @@ function _observability_install_alertmanager_auth_proxy() {
 
   mkdir -p "$(dirname "${_plist}")"
   sed \
-    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{PYTHON3_PATH}}|$(_observability_python3_path)|g" \
     -e "s|{{ALERTMANAGER_PROXY_BIN}}|${SCRIPT_DIR}/../bin/alertmanager-auth-proxy|g" \
     -e "s|{{ALERTMANAGER_AUTH_FILE}}|${_auth_file}|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
-  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _observability_launchd_reload "com.k3d-manager.alertmanager-auth-proxy" "${_plist}"
   _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
 }
 
@@ -532,13 +569,12 @@ function _observability_install_prometheus_auth_proxy() {
 
   mkdir -p "$(dirname "${_plist}")"
   sed \
-    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{PYTHON3_PATH}}|$(_observability_python3_path)|g" \
     -e "s|{{PROMETHEUS_PROXY_BIN}}|${SCRIPT_DIR}/../bin/prometheus-auth-proxy|g" \
     -e "s|{{PROMETHEUS_AUTH_FILE}}|${_auth_file}|g" \
     -e "s|{{HOME}}|${HOME}|g" \
     "${_plist_template}" > "${_plist}"
-  launchctl bootout "gui/$(id -u)/com.k3d-manager.prometheus-auth-proxy" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _observability_launchd_reload "com.k3d-manager.prometheus-auth-proxy" "${_plist}"
   _info "[observability] Prometheus auth proxy installed — localhost:19090 now requires login"
 }
 

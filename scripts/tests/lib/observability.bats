@@ -813,3 +813,91 @@ EOF
   [[ "$output" == *"no Slack incoming webhook — rotation notice not sent"* ]]
   [[ "$output" != *"${secret_url}"* ]]
 }
+
+@test "observability LaunchAgent reload retries teardown races for all four installers" {
+  local auth_file prom_auth_file
+  auth_file="${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  prom_auth_file="${HOME}/.local/share/k3d-manager/prometheus-basic-auth.env"
+  mkdir -p "$(dirname "${auth_file}")"
+  printf '%s\n' 'ALERTMANAGER_BASIC_AUTH_USER=admin' 'ALERTMANAGER_BASIC_AUTH_PASSWORD=test' > "${auth_file}"
+  printf '%s\n' 'PROMETHEUS_BASIC_AUTH_USER=admin' 'PROMETHEUS_BASIC_AUTH_PASSWORD=test' > "${prom_auth_file}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"; SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    export K3DM_LAUNCHD_BOOTSTRAP_WAIT=0 K3DM_LAUNCHD_BOOTSTRAP_TRIES=3
+    _is_mac() { return 0; }
+    kubectl() { :; }
+    _observability_ensure_alertmanager_login() { :; }
+    launchctl() {
+      printf "%s\n" "$*" >> "${BATS_TEST_TMPDIR}/reload.log"
+      if [[ "$1" == bootstrap ]]; then
+        local n
+        # Captured incident behavior: m5-air.local, 2026-11-03; first bootstrap exits 5 during teardown, next succeeds.
+        n=$(grep -c "^bootstrap" "${BATS_TEST_TMPDIR}/reload.log" || true)
+        if (( n % 2 == 1 )); then return 5; fi
+      fi
+      return 0
+    }
+    export -f _is_mac kubectl launchctl
+    _observability_install_prometheus_rotator
+    _observability_install_alertmanager_port_forward
+    _observability_install_alertmanager_auth_proxy
+    _observability_install_prometheus_auth_proxy
+  '
+  [ "$status" -eq 0 ]
+  run grep -c '^bootstrap' "${BATS_TEST_TMPDIR}/reload.log"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 8 ]
+}
+
+@test "observability port-forward install fails after exhausted launchd retries" {
+  run bash -c '
+    REPO_ROOT="$(pwd)"; SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _is_mac() { return 0; }; kubectl() { :; }; launchctl() { [[ "$1" == bootout ]] && return 0; return 5; }
+    export -f _is_mac kubectl launchctl
+    export K3DM_LAUNCHD_BOOTSTRAP_TRIES=2 K3DM_LAUNCHD_BOOTSTRAP_WAIT=0
+    _observability_install_alertmanager_port_forward
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Failed to bootstrap com.k3d-manager.alertmanager-port-forward after 2 attempts (exit 5)"* ]]
+  [[ "$output" != *"Alertmanager port-forward agent installed"* ]]
+}
+
+@test "auth proxy installers ignore direnv python and use configured stable python" {
+  local direnv_bin python_path auth_file prom_auth_file
+  direnv_bin="${BATS_TEST_TMPDIR}/.cache/direnv/layouts/test/bin"
+  python_path="${BATS_TEST_TMPDIR}/stable-python"
+  mkdir -p "${direnv_bin}" "${HOME}/.local/share/k3d-manager"
+  printf '#!/bin/sh\nexit 0\n' > "${direnv_bin}/python3"
+  chmod +x "${direnv_bin}/python3"
+  printf '#!/bin/sh\nexit 0\n' > "${python_path}"
+  chmod +x "${python_path}"
+  auth_file="${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  prom_auth_file="${HOME}/.local/share/k3d-manager/prometheus-basic-auth.env"
+  printf '%s\n' 'ALERTMANAGER_BASIC_AUTH_USER=admin' 'ALERTMANAGER_BASIC_AUTH_PASSWORD=test' > "${auth_file}"
+  printf '%s\n' 'PROMETHEUS_BASIC_AUTH_USER=admin' 'PROMETHEUS_BASIC_AUTH_PASSWORD=test' > "${prom_auth_file}"
+  run env PATH="${direnv_bin}:${PATH}" K3DM_PYTHON3_PATH="${python_path}" bash -c '
+    REPO_ROOT="$(pwd)"; SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _is_mac() { return 0; }; launchctl() { :; }
+    export -f _is_mac launchctl
+    _observability_install_alertmanager_auth_proxy
+    _observability_install_prometheus_auth_proxy
+    cat "${HOME}/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+    cat "${HOME}/Library/LaunchAgents/com.k3d-manager.prometheus-auth-proxy.plist"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'.cache/direnv/'* ]]
+  [[ "$output" == *"${python_path}"* ]]
+}
+
+@test "make auth proxy target uses configured stable python and launchd-reload" {
+  run make -n install-alertmanager-auth-proxy K3DM_PYTHON3_PATH=/stable/python3
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'s|{{PYTHON3_PATH}}|/stable/python3|g'* ]]
+  [[ "$output" == *'bin/launchd-reload com.k3d-manager.alertmanager-auth-proxy'* ]]
+}
