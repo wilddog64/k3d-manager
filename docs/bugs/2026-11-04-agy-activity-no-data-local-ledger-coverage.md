@@ -74,3 +74,12 @@ wc -l ~/.local/share/k3d-manager/agent-sessions/agy.jsonl 2>/dev/null
 ```
 
 Repeat `type -a agy`, ledger count, and `bin/k3dm-dispatch-metrics --dry-run | grep '^k3dm_agy_'` **on M5**, and determine which machine actually publishes `k3dm-dispatch` metrics. Avoid running `agy` merely to synthesize metrics; do not expose raw session ledger or authentication data. Do not run the wrapper installer until the real binary path is confirmed: the historical installer collision is documented separately.
+
+
+## Operator follow-up — 2026-11-04, 06:10 PST
+
+Operator reports **"m5 has nothing"** in response to requested M5 Agy telemetry checks. Treat this as reported absence of Agy telemetry on M5; precise file existence, wrapper PATH and exporter heartbeat on M5 are not independently captured yet. Do not infer zero actual Agy usage from this observation.
+
+Combined evidence: M4 `type -a agy` does not list the dedicated wrapper path and its exporter dry-run emitted no `k3dm_agy_*` series; M5 reportedly has no Agy data; Grafana shows all six Agy panels as `No data`. Prioritize tracing the host running the scheduled metrics exporter, then safely enabling wrapper collection on each active worker host and defining host-tagged multi-host aggregation. Avoid pretending that installing a wrapper on M5 alone recovers M4 activity or retroactively reconstructs historical sessions. Preserve existing real `agy` binaries.
+
+**Remaining evidence for exact root cause:** `ls -l` or `readlink` of M4 executable paths; source ledger presence/count on M4/M5; scheduled metrics exporter location and output on M5; Prometheus target freshness. No production modifications or synthetic telemetry are authorized by this note.
