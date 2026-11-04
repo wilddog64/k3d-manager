@@ -2,7 +2,7 @@
 
 setup() {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
-  SCRIPT="${REPO_ROOT}/bin/install-sudoers.sh"
+  SCRIPT="${INSTALL_SUDOERS_FILE:-${REPO_ROOT}/bin/install-sudoers.sh}"
 }
 
 @test "install-sudoers.sh is executable" {
@@ -29,6 +29,19 @@ setup() {
 @test "sudoers content includes k3d-manager-update-hosts NOPASSWD rule" {
   run grep -F 'NOPASSWD: /usr/local/bin/k3d-manager-update-hosts' bin/install-sudoers.sh
   [ "$status" -eq 0 ]
+}
+
+@test "install-sudoers N2 never grants passwordless System Keychain trust" {
+  local stub_log="${BATS_TEST_TMPDIR}/sudoers-check.log"
+  : > "${stub_log}"
+  [[ "${stub_log}" == "${BATS_TEST_TMPDIR}"/* ]]
+  run grep -E 'NOPASSWD:.*(/usr/bin/security|security add-trusted-cert)' "${SCRIPT}"
+  [ "${status}" -ne 0 ]
+  run "${SCRIPT}" --dry-run
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Syntax OK"* ]]
+  [[ "${output}" != *"/usr/bin/security"* ]]
+  [[ "${output}" != *"security add-trusted-cert"* ]]
 }
 
 @test "install-sudoers.sh rejects unknown arguments" {

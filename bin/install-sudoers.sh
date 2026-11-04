@@ -30,9 +30,6 @@ _SUDOERS_CONTENT='# k3d-manager passwordless '"${_SUDO}"' rules
 # 60-minute credential cache — '"${_SUDO}"' -v prewarm at session start covers a full make up/down run
 Defaults:%admin  timestamp_timeout=60
 
-# macOS System Keychain — trust Vault PKI CA certificate
-%admin  ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *
-
 # macOS loopback alias — 127.0.0.2 for frontend port-forward
 %admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *
 %admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 -alias *
@@ -130,6 +127,6 @@ case "$_mode" in
     rm -f "$_tmpfile"
     echo "[install-sudoers] Installed $_SUDOERS_FILE"
     echo "[install-sudoers] Installed /usr/local/bin/k3d-manager-update-hosts"
-    echo "[install-sudoers] Verify: ${_SUDO} -l | grep -E 'launchctl|security|k3d-manager'"
+    echo "[install-sudoers] Verify: ${_SUDO} -l | grep -E 'launchctl|k3d-manager'"
     ;;
 esac

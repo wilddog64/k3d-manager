@@ -1,5 +1,77 @@
 #!/usr/bin/env bats
 
+function _run_vault_ca_trust_test() {
+  local os_name="$1" verify_rc="$2" add_rc="${3:-0}" tty_mode="${4:-headless}"
+  local helper="${BATS_TEST_TMPDIR}/acg-trust-helper.sh"
+  local runner="${BATS_TEST_TMPDIR}/acg-trust-runner.sh"
+  local stub_log="${BATS_TEST_TMPDIR}/trust-stub.log"
+  local output_log="${BATS_TEST_TMPDIR}/trust-output.log"
+  sed -n '/^function _acg_trust_vault_ca()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  if [[ ! -s "${helper}" ]]; then
+    printf 'function _acg_trust_vault_ca() {\n  local _argocd_browser_tls_dir="${1%%/ca.crt}"\n' > "${helper}"
+    sed -n '/if \[\[ "\$(uname)" == "Darwin" \]\]; then/,/^    fi$/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" >> "${helper}"
+    printf '}\n' >> "${helper}"
+  fi
+  : > "${stub_log}"
+  cat > "${runner}" <<'RUNNER'
+uname() { printf '%s\n' "${TRUST_UNAME}" > "${TRUST_LOG}.target"; printf '%s\n' "${TRUST_UNAME}"; }
+security() { printf 'security %s\n' "$*" >> "${TRUST_LOG}"; [[ "$1" == verify-cert ]] && return "${VERIFY_RC}"; return "${ADD_RC}"; }
+_info() { printf 'INFO %s\n' "$*" >> "${OUTPUT_LOG}"; }
+_warn() { printf 'WARN %s\n' "$*" >> "${OUTPUT_LOG}"; }
+_run_command() { printf '_run_command %s\n' "$*" >> "${TRUST_LOG}"; return "${ADD_RC}"; }
+source "${TRUST_HELPER}"
+_acg_trust_vault_ca '/scratch/ca.crt'
+RUNNER
+  if [[ "${tty_mode}" == "tty" ]]; then
+    run /usr/bin/env TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /usr/bin/python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' "${runner}"
+  else
+    run /usr/bin/env TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /bin/bash "${runner}"
+  fi
+  [ -f "${stub_log}.target" ]
+  [[ "${stub_log}.target" == "${BATS_TEST_TMPDIR}"/* ]]
+  [[ "${stub_log}" == "${BATS_TEST_TMPDIR}"/* ]]
+  TRUST_STUB_LOG="${stub_log}"
+  TRUST_OUTPUT_LOG="${output_log}"
+}
+
+@test "acg-up Vault CA M1 keeps interactive trust and warns on add failure" {
+  _run_vault_ca_trust_test Darwin 1 7 tty
+  [ "${status}" -eq 0 ]
+  run grep -Fc '_run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /scratch/ca.crt' "${TRUST_STUB_LOG}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+  run grep -F 'Could not add Vault CA to System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up Vault CA M2 skips an already trusted certificate in headless mode" {
+  _run_vault_ca_trust_test Darwin 0
+  [ "${status}" -eq 0 ]
+  run grep -F 'already trusted in System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Vault CA M3 does not call security off macOS" {
+  _run_vault_ca_trust_test Linux 1
+  [ "${status}" -eq 0 ]
+  [ ! -s "${TRUST_STUB_LOG}" ]
+}
+
+@test "acg-up Vault CA N1 skips trust in a headless Darwin session" {
+  _run_vault_ca_trust_test Darwin 1
+  [ "${status}" -eq 0 ]
+  run grep -F 'SecurityAgent requires interactive approval' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /scratch/ca.crt' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  run grep -F '_run_command' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
 function _run_sandbox_ttl_helper() {
   local first_ttl="$1" reread_ttl="$2" extend_rc="$3" restart_rc="$4" provision_floor="${5:-}"
   local helper="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.sh"
