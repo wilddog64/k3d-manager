@@ -207,6 +207,28 @@ _acg_discover_agent_ips() {
     | cut -f2)
 }
 
+# Match EC2's documented fingerprint format for imported key pairs.
+_acg_imported_key_fingerprint() {
+  local _type _rest _fingerprint
+  read -r _type _rest < "$1" || return 1
+  case "${_type}" in
+    ssh-ed25519)
+      _fingerprint=$(_run_command --soft -- ssh-keygen -E sha256 -lf "$1") || return 1
+      _fingerprint=$(printf '%s\n' "${_fingerprint}" | awk '{sub(/^SHA256:/, "", $2); print $2}')
+      ;;
+    ssh-rsa)
+      command -v openssl >/dev/null 2>&1 || { printf 'ERROR: [acg] openssl is required to verify RSA key fingerprint\n' >&2; return 1; }
+      _fingerprint=$(set -o pipefail; _run_command --soft -- ssh-keygen -f "$1" -e -m PKCS8 \
+        | _run_command --soft -- openssl pkey -pubin -outform DER \
+        | _run_command --soft -- openssl md5 -c) || return 1
+      _fingerprint=$(printf '%s\n' "${_fingerprint}" | awk '{print $NF}')
+      ;;
+    *) printf 'ERROR: [acg] Unsupported public key type: %s\n' "${_type}" >&2; return 1 ;;
+  esac
+  [[ -n "${_fingerprint}" ]] || { printf 'ERROR: [acg] Failed to parse public key fingerprint from %s\n' "$1" >&2; return 1; }
+  printf '%s\n' "${_fingerprint}"
+}
+
 _acg_import_key() {
   local _pub="${_ACG_KEY_PEM%.pem}.pub" _temp _error _remote _local
   if [[ ! -s "${_pub}" ]]; then
@@ -227,7 +249,11 @@ _acg_import_key() {
     case "${_error}" in
       *InvalidKeyPair.Duplicate*)
         _remote=$(_run_command --soft -- aws ec2 describe-key-pairs --region "${ACG_REGION}" --key-names "${_ACG_KEY_NAME}" --query 'KeyPairs[0].KeyFingerprint' --output text) || return 1
-        _local=$(_run_command --soft -- ssh-keygen -E md5 -lf "${_pub}" | awk '{sub(/^MD5:/, "", $2); print $2}') || return 1
+        _local=$(_acg_imported_key_fingerprint "${_pub}") || return 1
+        _remote="${_remote#SHA256:}"
+        if [[ "${_local}" =~ ^[A-Za-z0-9+/]{43}$ ]]; then
+          _remote="${_remote%=}"
+        fi
         if [[ -z "${_local}" || "${_local}" != "${_remote}" ]]; then
           printf 'ERROR: [acg] Key fingerprint mismatch: local %s, AWS %s\n' "${_local}" "${_remote}" >&2
           return 1
