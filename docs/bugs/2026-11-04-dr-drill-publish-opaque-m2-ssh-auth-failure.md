@@ -1,6 +1,6 @@
 # Bug: `make dr-drill-publish` fails with an opaque `Permission denied` / exit 255 when the M2 peer no longer authorizes this Mac's SSH key
 
-**Status:** OPEN (operator workaround applied 2026-11-04; code fix pending)
+**Status:** Fixed (`65156ec3`, `ade1b7e4`; offline-verified, live `make dr-drill-publish` on M5 pending operator run)
 **Priority:** P2
 **Severity:** medium — DR drill results cannot be published from a Mac whose key was regenerated, and the error gives no hint about the cause or the remedy
 **Filed:** 2026-11-04
