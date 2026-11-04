@@ -275,7 +275,7 @@ def _run_upgrade(job_id, chart_version, stage):
     except Exception as exc:
         _write_log(f"ERROR: {exc}")
         _finish("failed")
-def _run_cluster(job_id, action, provider="aws", dry_run=False):
+def _run_cluster(job_id, action, provider="aws", dry_run=False, trust_vault_ca=False):
     running = _helpers["running_cluster_job"]()
     if running and running[0] != job_id:
         _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
@@ -358,7 +358,9 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
             _push_metrics(action, provider, status, elapsed_secs, job_id)
 
     try:
-        if action == "up":
+        if action == "up" and trust_vault_ca:
+            cmd = ["./bin/cluster-up", "--trust-vault-ca"]
+        elif action == "up":
             cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}"]
         elif _cluster_provider == "k3s-hostinger":
             cmd = ["make", "down", f"CLUSTER_PROVIDER={_cluster_provider}"]
@@ -368,13 +370,15 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         _spawn_env = dict(os.environ)
         if dry_run:
             _spawn_env["DRY_RUN"] = "1"
+        if trust_vault_ca:
+            _spawn_env["K3DM_ALLOW_GUI_SECURITY_AGENT"] = "1"
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
         pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT, env=_spawn_env)
         with _running_procs_lock:
             _running_procs[job_id] = pid
-        timeout = _cluster_job_timeout(action)
+        timeout = 120 if trust_vault_ca else _cluster_job_timeout(action)
         deadline = time.monotonic() + timeout
         timed_out = False
         while time.monotonic() < deadline:
@@ -410,7 +414,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         if _rc != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _write_log(f"{action} complete")
-        if action == "up" and not dry_run:
+        if action == "up" and not dry_run and not trust_vault_ca:
             _record_acg_state(provider)
             threading.Thread(
                 target=_run_post_provision_check,
@@ -431,7 +435,7 @@ def _run_cluster(job_id, action, provider="aws", dry_run=False):
         except Exception as analysis_exc:
             _write_log(f"WARN: failure analysis skipped: {analysis_exc}")
         _finish("failed")
-        if action == "up":
+        if action == "up" and not trust_vault_ca:
             threading.Thread(
                 target=_run_cleanup,
                 args=(job_id, provider),

@@ -22,6 +22,46 @@ SPEC.loader.exec_module(lifecycle)
 
 
 class WebhookLifecycleTests(unittest.TestCase):
+    def test_trust_vault_ca_spawns_bounded_standalone_command(self):
+        job_id = "a1b2c3f1"
+        (lifecycle.JOB_DIR / job_id).mkdir()
+        original_waitpid = lifecycle.os.waitpid
+        original_wifexited = lifecycle.os.WIFEXITED
+        original_wexitstatus = lifecycle.os.WEXITSTATUS
+        original_killpg = lifecycle.os.killpg
+        recorded = []
+        checked = []
+        cleaned = []
+        old_record = lifecycle._helpers["record_acg_state"]
+        old_check = lifecycle._run_post_provision_check
+        old_cleanup = lifecycle._run_cleanup
+        old_global_record = lifecycle._record_acg_state
+        try:
+            lifecycle._helpers["record_acg_state"] = lambda provider: recorded.append(provider)
+            lifecycle._record_acg_state = lifecycle._helpers["record_acg_state"]
+            lifecycle._run_post_provision_check = lambda *args: checked.append(args)
+            lifecycle._run_cleanup = lambda *args: cleaned.append(args)
+            lifecycle.os.waitpid = lambda pid, options: (pid, 0)
+            lifecycle.os.WIFEXITED = lambda status: True
+            lifecycle.os.WEXITSTATUS = lambda status: 0
+            lifecycle.os.killpg = lambda pid, sig: None
+            lifecycle._run_cluster(job_id, "up", "aws", trust_vault_ca=True)
+            cmd, _, _, env = self.spawned[0]
+            self.assertEqual(cmd, ["./bin/cluster-up", "--trust-vault-ca"])
+            self.assertEqual(env["K3DM_ALLOW_GUI_SECURITY_AGENT"], "1")
+            self.assertEqual(recorded, [])
+            self.assertEqual(checked, [])
+            self.assertEqual(cleaned, [])
+        finally:
+            lifecycle.os.waitpid = original_waitpid
+            lifecycle.os.WIFEXITED = original_wifexited
+            lifecycle.os.WEXITSTATUS = original_wexitstatus
+            lifecycle.os.killpg = original_killpg
+            lifecycle._helpers["record_acg_state"] = old_record
+            lifecycle._run_post_provision_check = old_check
+            lifecycle._run_cleanup = old_cleanup
+            lifecycle._record_acg_state = old_global_record
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         lifecycle.JOB_DIR = Path(self.temp_dir.name)

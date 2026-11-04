@@ -28,6 +28,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+
+function _acg_has_launchdaemon_sudo() {
+  sudo -n true >/dev/null 2>&1 || sudo -n -l /bin/launchctl bootout system "${1:-/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist}" >/dev/null 2>&1
+}
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
@@ -214,7 +218,7 @@ if _is_mac; then
   _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
   _dry_run_active && _frontend_browser_log_target=/dev/null
   _dry_guard "truncate frontend browser launchctl log" sh -c ': > "$1"' sh "${_frontend_browser_launchctl_log}"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+  if ! _acg_has_launchdaemon_sudo "${_frontend_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
     _warn "[acg-down] no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"
   else
     if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
@@ -323,7 +327,7 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+  if ! _acg_has_launchdaemon_sudo "${_keycloak_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
     _warn "[acg-down] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon bootout"
   else
     if _run_command --prefer-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
@@ -348,7 +352,7 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _argocd_browser_log_target="${_argocd_browser_launchctl_log}"
   _dry_run_active && _argocd_browser_log_target=/dev/null
   _dry_guard "truncate ArgoCD browser launchctl log" sh -c ': > "$1"' sh "${_argocd_browser_launchctl_log}"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+  if ! _acg_has_launchdaemon_sudo "${_argocd_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
     _warn "[acg-down] no sudo in headless context — skipping argocd-browser-https LaunchDaemon bootout"
   else
     if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \

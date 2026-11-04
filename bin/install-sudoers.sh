@@ -29,6 +29,7 @@ _SUDOERS_CONTENT='# k3d-manager passwordless '"${_SUDO}"' rules
 
 # 60-minute credential cache — '"${_SUDO}"' -v prewarm at session start covers a full make up/down run
 Defaults:%admin  timestamp_timeout=60
+%admin  ALL=(root) NOPASSWD: /usr/bin/true
 
 # macOS loopback alias — 127.0.0.2 for frontend port-forward
 %admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *

@@ -29,6 +29,15 @@ bats_require_minimum_version 1.5.0
   [ "$status" -eq 0 ]
 }
 
+@test "cluster-down LaunchDaemon guards probe command authorization after timestamp expiry" {
+  run grep -F '_acg_has_launchdaemon_sudo "${_frontend_browser_plist}"' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -F 'sudo -n -l /bin/launchctl bootout system "${1:-/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist}"' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -F 'no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout' bin/cluster-down
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-down k3s-aws deregister block has real and dry-run paths" {
   run grep -nF '_k3s_aws_deregister_cluster || _warn' bin/cluster-down
   [ "$status" -eq 0 ]
@@ -197,6 +206,10 @@ STUB
 #!/usr/bin/env bash
 set -euo pipefail
 echo "sudo $*" >> "${BATS_TEST_TMPDIR}/sudo.log"
+if [[ "${STUB_SUDO_EXPIRED_FALLBACK:-0}" == "1" && "${1:-}" == "-n" ]]; then
+  if [[ "${2:-}" == "true" ]]; then exit 1; fi
+  if [[ "${2:-}" == "-l" ]]; then exit 0; fi
+fi
 if [[ "${STUB_SUDO_FAIL:-0}" == "1" ]]; then
   exit 1
 fi
@@ -594,6 +607,20 @@ _make_down_flag() {
   [[ "$output" == *"no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"* ]]
   run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 1 ]
+}
+
+@test "cluster-down uses authorized launchctl after sudo timestamp expires" {
+  _stub_uname_darwin
+  local frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  touch "${frontend_plist}"
+  run env DRY_RUN=0 STUB_SUDO_EXPIRED_FALLBACK=1 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  run grep -F "sudo -n -l /bin/launchctl bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/sudo.log"
+  [ "$status" -eq 0 ]
+  run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"no sudo in headless context"* ]]
 }
 
 @test "M3: delete-hub removes sandbox agents once without changing hub cleanup" {

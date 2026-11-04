@@ -143,6 +143,54 @@ HELPER
   [ "${status}" -ne 0 ]
 }
 
+@test "standalone Vault CA trust requires GUI approval when untrusted and headless" {
+  local helper="${BATS_TEST_TMPDIR}/standalone-ca.sh"
+  sed -n '/^function _acg_export_and_trust_vault_ca()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  [ -s "${helper}" ]
+  [[ "${helper}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${BATS_TEST_TMPDIR}/runner.sh" <<'RUNNER'
+uname() { printf 'Darwin\n'; }
+security() { printf 'security %s\n' "$*" >> "${CALLS}"; [[ "$1" == verify-cert ]] && return "${VERIFY_RC:-1}"; }
+kubectl() { printf 'kubectl %s\n' "$*" >> "${CALLS}"; printf 'test certificate\n'; }
+_info() { :; }
+_run_command() { printf '%s\n' "$*" >> "${CALLS}"; }
+_err() { printf '%s\n' "$*" > "${MESSAGE}"; exit 81; }
+source "${HELPER}"
+_acg_export_and_trust_vault_ca "${CA_CERT}"
+RUNNER
+  local cert="${BATS_TEST_TMPDIR}/ca.crt" calls="${BATS_TEST_TMPDIR}/calls" message="${BATS_TEST_TMPDIR}/message"
+  rm -f "${cert}"
+  : > "${calls}"
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 81 ]
+  run grep -F 'make trust-vault-ca' "${message}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'kubectl exec -n secrets vault-0 --context k3d-k3d-cluster -- vault read -field=certificate pki/cert/ca' "${calls}"
+  [ "${status}" -eq 0 ]
+  run grep -F "security verify-cert -c ${cert}" "${calls}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'security add-trusted-cert' "${calls}"
+  [ "${status}" -ne 0 ]
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 K3DM_ALLOW_GUI_SECURITY_AGENT=1 /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '--interactive-sudo -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain' "${calls}"
+  [ "${status}" -eq 0 ]
+  : > "${calls}"
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 \
+    python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' \
+    "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '--interactive-sudo -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain' "${calls}"
+  [ "${status}" -eq 0 ]
+  : > "${calls}"
+  run env SSH_CONNECTION='127.0.0.1 22' SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 K3DM_ALLOW_GUI_SECURITY_AGENT=1 /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 81 ]
+  run grep -F 'make trust-vault-ca' "${message}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'security add-trusted-cert' "${calls}"
+  [ "${status}" -ne 0 ]
+}
+
 function _run_sandbox_ttl_helper() {
   local first_ttl="$1" reread_ttl="$2" extend_rc="$3" restart_rc="$4" provision_floor="${5:-}"
   local helper="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.sh"

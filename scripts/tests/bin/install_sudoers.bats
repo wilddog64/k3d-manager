@@ -26,6 +26,15 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "sudoers grants the noninteractive true readiness probe" {
+  run grep -F '%admin  ALL=(root) NOPASSWD: /usr/bin/true' bin/install-sudoers.sh
+  [ "$status" -eq 0 ]
+  run "$SCRIPT" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Syntax OK"* ]]
+  [[ "$output" == *"%admin  ALL=(root) NOPASSWD: /usr/bin/true"* ]]
+}
+
 @test "sudoers content includes k3d-manager-update-hosts NOPASSWD rule" {
   run grep -F 'NOPASSWD: /usr/local/bin/k3d-manager-update-hosts' bin/install-sudoers.sh
   [ "$status" -eq 0 ]

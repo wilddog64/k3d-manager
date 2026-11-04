@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Regression tests for allowlisted Slack /k3dm Makefile targets."""
 import importlib.util
+import io
+import json
 from importlib.machinery import SourceFileLoader
 import re
+import subprocess
+import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 _WEBHOOK = Path(__file__).resolve().parents[3] / "bin" / "k3dm-webhook"
@@ -20,6 +25,53 @@ wh.CLUSTER_COMMANDS = CLUSTER_COMMANDS
 
 
 class MakeTargetTests(unittest.TestCase):
+    def test_trust_vault_ca_target_is_admin_only_and_dispatchable(self):
+        self.assertEqual(wh.MAKE_TARGETS["trust-vault-ca"]["min_role"], "admin")
+        self.assertEqual(wh.MAKE_TARGETS["trust-vault-ca"]["timeout"], 120)
+        self.assertTrue(wh._has_trust_vault_ca_flag("cluster-up aws --trust-vault-ca"))
+        self.assertFalse(wh._has_trust_vault_ca_flag("cluster-up aws"))
+        self.assertEqual(wh.parse_make_request("trust-vault-ca", {}, None), (["trust-vault-ca"], None))
+        self.assertIn("./bin/cluster-up --trust-vault-ca", subprocess.check_output(
+            ["make", "-n", "trust-vault-ca"], cwd=Path(__file__).resolve().parents[3], text=True
+        ))
+
+    def test_cluster_post_forwards_trust_vault_ca(self):
+        for body in ({"action": "up", "trust_vault_ca": True}, {"action": "trust-vault-ca"}):
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as temp_dir:
+                encoded = json.dumps(body).encode()
+                handler = object.__new__(wh._Handler)
+                handler.path = "/api/v1/cluster"
+                handler.headers = {"Content-Length": str(len(encoded))}
+                handler.rfile = io.BytesIO(encoded)
+                response = []
+                handler._auth = lambda: True
+                handler._json = lambda status, payload: response.append((status, payload))
+                threads = []
+
+                class ThreadStub:
+                    def __init__(self, **kwargs):
+                        self.kwargs = kwargs
+                        threads.append(kwargs)
+
+                    def start(self):
+                        pass
+
+                with patch.object(wh, "JOB_DIR", Path(temp_dir)), \
+                     patch.object(wh, "_request_source_command", return_value=""), \
+                     patch.object(wh, "_effective_make_role", return_value="admin"), \
+                     patch.object(wh, "_request_actor", return_value="test"), \
+                     patch.object(wh, "effective_policy", return_value={"name": "cluster", "min_role": "admin"}), \
+                     patch.object(wh, "_policy_allows", return_value=True), \
+                     patch.object(wh, "_audit_remote_action"), \
+                     patch.object(wh, "_running_cluster_job", return_value=None), \
+                     patch.object(wh, "_persist_notification_context"), \
+                     patch.object(wh.threading, "Thread", ThreadStub):
+                    handler.do_POST()
+
+                self.assertEqual(response[0][0], 202)
+                self.assertEqual(threads[0]["target"], wh._run_cluster)
+                self.assertEqual(threads[0]["kwargs"], {"trust_vault_ca": True})
+
     def test_e2e_help_summaries_change_without_changing_target_contracts(self):
         expected = {
             "e2e-remote": {

@@ -615,6 +615,13 @@ def _parse_cluster_args(command):
     return provider, dry_run
 
 
+_TRUST_VAULT_CA_TOKENS = {"--trust-vault-ca", "trust-vault-ca"}
+
+
+def _has_trust_vault_ca_flag(command):
+    return any(p.lower() in _TRUST_VAULT_CA_TOKENS for p in command.strip().split()[1:])
+
+
 
 
 _MAX_JOB_AGE_SECS = 10800  # 3 hours — any older "running" job is stale
@@ -1103,7 +1110,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
-            kwargs={"dry_run": _up_dry},
+            kwargs={"dry_run": _up_dry, "trust_vault_ca": _has_trust_vault_ca_flag(command)},
             daemon=True,
         ).start()
         _up_tag = " — DRY_RUN preview" if _up_dry else ""
@@ -2462,6 +2469,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         if route["handler"] == "cluster":
             action = body.get("action", "")
+            trust_vault_ca = bool(body.get("trust_vault_ca"))
+            if action == "trust-vault-ca":
+                action = "up"
+                trust_vault_ca = True
             if action == "kill":
                 job_id = body.get("job_id", "")
                 if not job_id or not _JOB_ID_RE.match(job_id):
@@ -2505,6 +2516,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             threading.Thread(
                 target=_run_cluster,
                 args=(job_id, action, provider),
+                **({"kwargs": {"trust_vault_ca": True}} if trust_vault_ca else {}),
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

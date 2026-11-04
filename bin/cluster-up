@@ -147,6 +147,36 @@ function _acg_fail() {
   exit 1
 }
 
+function _acg_has_launchdaemon_sudo() {
+  local _plist="${1:-/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist}"
+  sudo -n true >/dev/null 2>&1 || sudo -n -l /bin/launchctl bootout system "${_plist}" >/dev/null 2>&1
+}
+
+function _acg_export_and_trust_vault_ca() {
+  local _ca_cert="${1:-${ARGOCD_BROWSER_TLS_CA_FILE:-${HOME}/.local/share/k3d-manager/acg/argocd-browser-https-tls/ca.crt}}"
+  if [[ "$(uname)" != "Darwin" ]]; then
+    _info "[acg-up] System Keychain trust is only supported on macOS — skipping"
+    return 0
+  fi
+  if [[ ! -s "${_ca_cert}" ]]; then
+    mkdir -p "$(dirname "${_ca_cert}")"
+    kubectl exec -n "${VAULT_NS_DEFAULT:-secrets}" "${VAULT_POD_0:-vault-0}" --context "${KUBE_CONTEXT_HUB:-k3d-k3d-cluster}" -- vault read -field=certificate "${VAULT_PKI_PATH:-pki}/cert/ca" > "${_ca_cert}" 2>/dev/null || true
+    if [[ ! -s "${_ca_cert}" ]]; then
+      rm -f "${_ca_cert}"
+      _err "[acg-up] Vault CA cert not found at ${_ca_cert} and could not be read from Hub Vault (${KUBE_CONTEXT_HUB:-k3d-k3d-cluster})"
+    fi
+  fi
+  if security verify-cert -c "${_ca_cert}" >/dev/null 2>&1; then
+    _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
+    return 0
+  fi
+  if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]] || { ! [[ -t 0 && -t 1 ]] && [[ "${K3DM_ALLOW_GUI_SECURITY_AGENT:-0}" != "1" ]]; }; then
+    _err "[acg-up] System Keychain Vault CA trust requires a local macOS GUI session (SecurityAgent prompt) — run 'make trust-vault-ca' from a local terminal on the Mac"
+  fi
+  _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
+  _run_command --interactive-sudo -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${_ca_cert}"
+}
+
 function _acg_trust_vault_ca() {
   local _ca_cert="$1"
 
@@ -160,7 +190,7 @@ function _acg_trust_vault_ca() {
   fi
 
   if ! [[ -t 0 && -t 1 ]] || [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
-    _warn "[acg-up] Skipping System Keychain Vault CA trust in headless session (macOS SecurityAgent requires interactive approval) — to trust manually, run: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${_ca_cert}"
+    _warn "[acg-up] Skipping System Keychain Vault CA trust in headless session (macOS SecurityAgent requires interactive approval) — to trust manually, run 'make trust-vault-ca' or: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${_ca_cert}"
     return 0
   fi
 
@@ -430,9 +460,14 @@ for arg in "$@"; do
   case "$arg" in
     --login-prompt)    login_prompt=1 ;;
     --no-login-prompt) login_prompt=0 ;;
+    --trust-vault-ca) trust_vault_ca_only=1 ;;
     *)                 sandbox_url="$arg" ;;
   esac
 done
+if [[ "${trust_vault_ca_only:-0}" -eq 1 ]]; then
+  _acg_export_and_trust_vault_ca
+  exit $?
+fi
 sandbox_url="${sandbox_url:-${ACG_SANDBOX_URL:-}}"
 
 if [[ "$login_prompt" -eq 1 ]]; then
@@ -854,7 +889,7 @@ PLIST
     if [[ -f "${_argocd_browser_plist}" ]] && [[ "${_argocd_browser_wrapper_changed}" -eq 0 ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
-    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    elif ! _acg_has_launchdaemon_sudo "${_argocd_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
       rm -f "${_argocd_browser_plist_tmp}"
       _warn "[acg-up] no sudo in headless context — skipping argocd-browser-https LaunchDaemon install (run interactively or install /etc/sudoers.d/k3d-manager)"
       _argocd_browser_install_skipped=1
@@ -1522,7 +1557,7 @@ PLIST
     if [[ -f "${_keycloak_browser_plist}" ]] && diff -q "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_keycloak_browser_plist_tmp}"
       _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
-    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    elif ! _acg_has_launchdaemon_sudo "${_keycloak_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
       rm -f "${_keycloak_browser_plist_tmp}"
       _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
     else
@@ -1762,7 +1797,7 @@ PLIST
   if [[ -f "${_frontend_browser_plist}" ]] && diff -q "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" >/dev/null 2>&1; then
     rm -f "${_frontend_browser_plist_tmp}"
     _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
-  elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+  elif ! _acg_has_launchdaemon_sudo "${_frontend_browser_plist}" && ! [[ -t 0 && -t 1 ]]; then
     rm -f "${_frontend_browser_plist_tmp}"
     _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
   else
