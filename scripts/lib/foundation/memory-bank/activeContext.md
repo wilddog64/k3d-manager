@@ -1,5 +1,7 @@
 # Active Context — lib-foundation
 
+- 2026-11-01: PR #73 follow-up on branch `fix/acg-key-fingerprint`: `bac3238` uses EC2 user-guide RSA DER/MD5 and Ed25519 SHA-256 for imported duplicate keys; `f79f45c` accepts optional trailing SHA-256 padding and rejects malformed fingerprints. Clean-env system/core/agent-rigor/ACG BATS 154/154; final ACG BATS 37/37; shellcheck and staged `_agent_audit` passed. Real AWS verification is pending; AWS API and user-guide RSA descriptions differ. See docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md and docs/issues/2026-11-01-agent-audit-acg-awk-if-count.md.
+
 **2026-10-21/22 PR #72 merged:** `_run_command` hard-fails through `_err`/`exit` unless called with `--soft`/`--no-exit`, so its trailing `|| return 1` was unreachable. Removed the dead guard while preserving fail-fast behavior. PR [#72](https://github.com/wilddog64/lib-foundation/pull/72) merged to `main` at `c307df2`; Copilot's review thread is resolved. Clean-env ACG BATS passed 28/28, shellcheck and agent-rigor passed, and GitHub `acg (node)`, `bats`, and `shellcheck` checks are all green. Local `main` is synced. The merged subtree was pulled into k3d-manager `k3d-manager-v1.43.5` (squash `18f7c8cc`, merge `205d4272`); downstream focused BATS passed 28/28. No live ACG bring-up was run; operator verification remains pending. No new release tag was created for this non-versioned PR.
 
 **2026-08-20 fleet lifecycle Phase A COMPLETE (Codex, `8148e33`):** on `feat/v0.4.12`,

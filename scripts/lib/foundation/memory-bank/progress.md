@@ -1,5 +1,7 @@
 # Progress — lib-foundation
 
+- 2026-11-01: PR #73 follow-up on branch `fix/acg-key-fingerprint`: `bac3238` uses EC2 user-guide RSA DER/MD5 and Ed25519 SHA-256 for imported duplicate keys; `f79f45c` accepts optional trailing SHA-256 padding and rejects malformed fingerprints. Clean-env system/core/agent-rigor/ACG BATS 154/154; final ACG BATS 37/37; shellcheck and staged `_agent_audit` passed. Real AWS verification is pending; AWS API and user-guide RSA descriptions differ. See docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md and docs/issues/2026-11-01-agent-audit-acg-awk-if-count.md.
+
 - [x] **PR #72 post-merge (2026-10-21/22):** Removed the unreachable `|| return 1` after hard `_run_command`. Merged to lib-foundation `main` at `c307df2`; Copilot thread resolved; clean-env ACG BATS 28/28, shellcheck and agent-rigor passed; GitHub `acg (node)`, `bats`, and `shellcheck` all passed. Pulled upstream main into k3d-manager `k3d-manager-v1.43.5` as subtree squash `18f7c8cc` + merge `205d4272`; downstream ACG BATS 28/28, ShellCheck, and audit passed. Operator live verification remains pending; no live AWS operation or release tag was performed.
 
 - [x] **v1.26.0 fleet lifecycle Phase A (2026-08-20):** commit `8148e33` (`feat(acg): make

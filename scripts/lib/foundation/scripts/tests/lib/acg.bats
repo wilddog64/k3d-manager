@@ -531,7 +531,8 @@ case "$*" in
     # k3d-manager M5 read-only capture, 2026-11-01: DryRunOperation.
     case "${ACG_KEY_SCENARIO}" in denied) echo 'An error occurred (DryRunOperation)' >&2; exit 1;; duplicate|mismatch) echo 'An error occurred (InvalidKeyPair.Duplicate)' >&2; exit 1;; esac ;;
   *describe-key-pairs*)
-    case "${ACG_KEY_SCENARIO}" in missing) echo 'not found' >&2; exit 1;; mismatch) echo 'bb:bb';; *) echo 'aa:aa';; esac ;;
+    if [[ -n "${ACG_REMOTE_FP:-}" ]]; then printf '%s\n' "${ACG_REMOTE_FP}"; exit 0; fi
+    case "${ACG_KEY_SCENARIO}" in missing) echo 'not found' >&2; exit 1;; mismatch) echo 'SHA256:bb:bb';; *) echo 'SHA256:aa:aa';; esac ;;
   *describe-images*) echo ami-test ;;
 esac
 STUB
@@ -539,8 +540,8 @@ STUB
 #!/usr/bin/env bash
 printf 'ssh-keygen %s\n' "$*" >>"${ACG_CALLS_FILE}"
 case "$1" in
-  -y) [[ "${ACG_KEY_SCENARIO}" != derive-fails ]] || exit 1; echo 'test-public-material' ;;
-  -E) echo '2048 MD5:aa:aa comment (RSA)' ;;
+  -y) [[ "${ACG_KEY_SCENARIO}" != derive-fails ]] || exit 1; echo 'ssh-ed25519 test-public-material' ;;
+  -E) echo '256 SHA256:aa:aa comment (ED25519)' ;;
 esac
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/key-bin/"{aws,ssh-keygen}
@@ -608,4 +609,79 @@ STUB
   [[ "$output" == *DryRunOperation* ]]
   [[ "$output" != *test-public-material* ]]
   run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+# Fingerprint commands follow AWS EC2 "Verify the fingerprint of your key pair"
+# and DescribeKeyPairs documentation, retrieved 2026-11-01. Keys are ephemeral.
+_acg_real_duplicate_key() {
+  local kind="$1"
+  local real_ssh real_openssl
+  real_ssh="$(command -v ssh-keygen)"
+  [[ "$HOME" == "$BATS_TEST_TMPDIR/"* ]]
+  _acg_key_fixture duplicate
+  "$real_ssh" -q -t "$kind" -N '' -f "$_ACG_KEY_PEM"
+  mv "$_ACG_KEY_PEM.pub" "${_ACG_KEY_PEM%.pem}.pub"
+  cat >"${BATS_TEST_TMPDIR}/key-bin/ssh-keygen" <<'STUB'
+#!/usr/bin/env bash
+exec "$REAL_SSH_KEYGEN" "$@"
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/key-bin/ssh-keygen"
+  export REAL_SSH_KEYGEN="$real_ssh"
+  if [[ "$kind" == ed25519 ]]; then
+    # Captured on m5-air, 2026-11-03: AWS returns bare SHA-256 Base64 with padding.
+    ACG_REMOTE_FP="$("$real_ssh" -E sha256 -lf "${_ACG_KEY_PEM%.pem}.pub" | awk '{sub(/^SHA256:/, "", $2); print $2"="}')"
+  else
+    real_openssl="$(command -v openssl)"
+    ACG_REMOTE_FP="$("$real_ssh" -f "${_ACG_KEY_PEM%.pem}.pub" -e -m PKCS8 | "$real_openssl" pkey -pubin -outform DER | "$real_openssl" md5 -c | awk '{print $NF}')"
+  fi
+  export ACG_REMOTE_FP
+}
+
+@test "acg provisioning accepts matching imported Ed25519 fingerprint and rejects mismatch" {
+  local local_fp
+  _acg_real_duplicate_key ed25519
+  local_fp="${ACG_REMOTE_FP%=}"
+  run _acg_imported_key_fingerprint "${_ACG_KEY_PEM%.pem}.pub"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$local_fp" ]
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="$local_fp"
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="SHA256:${local_fp}="
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="${local_fp}=junk"
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  export ACG_REMOTE_FP="${local_fp}=="
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  export ACG_REMOTE_FP='wrong'
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'fingerprint mismatch'* ]]
+}
+
+@test "acg provisioning accepts matching imported RSA fingerprint and rejects mismatch" {
+  _acg_real_duplicate_key rsa
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP='00:00:00:00'
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'fingerprint mismatch'* ]]
+}
+
+@test "acg imported key fingerprint refuses unsupported and malformed keys" {
+  local public="${BATS_TEST_TMPDIR}/invalid.pub"
+  [[ "$public" == "$BATS_TEST_TMPDIR/"* ]]
+  printf 'ssh-dss fake\n' > "$public"
+  run _acg_imported_key_fingerprint "$public"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Unsupported public key type'* ]]
+  printf 'ssh-rsa invalid\n' > "$public"
+  run _acg_imported_key_fingerprint "$public"
+  [ "$status" -ne 0 ]
 }
