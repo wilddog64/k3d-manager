@@ -159,7 +159,7 @@ function _acg_trust_vault_ca() {
     return 0
   fi
 
-  if ! [[ -t 0 && -t 1 ]]; then
+  if ! [[ -t 0 && -t 1 ]] || [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
     _warn "[acg-up] Skipping System Keychain Vault CA trust in headless session (macOS SecurityAgent requires interactive approval) — to trust manually, run: sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${_ca_cert}"
     return 0
   fi
@@ -170,6 +170,32 @@ function _acg_trust_vault_ca() {
       -k /Library/Keychains/System.keychain \
       "${_ca_cert}" || \
     _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
+  return 0
+}
+
+function _acg_update_hosts_entry() {
+  local _h="$1" _desired_ip="$2"
+  local _hosts_file="${K3DM_HOSTS_FILE:-/etc/hosts}"
+  local _update_hosts_bin="${K3DM_UPDATE_HOSTS_BIN:-/usr/local/bin/k3d-manager-update-hosts}"
+  local _desired_host_entry="${_desired_ip} ${_h}" _current_host_entry
+  local _helper
+
+  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" "${_hosts_file}" 2>/dev/null | tail -n 1 || true)
+  if [[ "${_current_host_entry}" == "${_desired_host_entry}" ]]; then
+    return 0
+  fi
+
+  _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
+  if [[ -x "${_update_hosts_bin}" ]]; then
+    _helper="${_update_hosts_bin}"
+  else
+    _helper="${REPO_ROOT}/bin/update-hosts-entry.sh"
+  fi
+  if _run_command --interactive-sudo --soft -- "${_helper}" "${_h}" "${_desired_ip}"; then
+    _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
+  else
+    _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
+  fi
   return 0
 }
 
@@ -768,22 +794,7 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
     _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
     continue
   fi
-  _desired_host_entry="${_desired_ip} ${_h}"
-  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
-  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
-    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --prefer-sudo --soft -- \
-        sh -c "set -e
-tmp=\$(mktemp)
-grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
-printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
-cat \"\$tmp\" > /etc/hosts
-rm -f \"\$tmp\""; then
-      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
-    else
-      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
-    fi
-  fi
+  _acg_update_hosts_entry "${_h}" "${_desired_ip}"
 done
 
 if _is_mac; then

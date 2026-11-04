@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 function _run_vault_ca_trust_test() {
-  local os_name="$1" verify_rc="$2" add_rc="${3:-0}" tty_mode="${4:-headless}"
+  local os_name="$1" verify_rc="$2" add_rc="${3:-0}" tty_mode="${4:-headless}" ssh_sim="${5:-}"
   local helper="${BATS_TEST_TMPDIR}/acg-trust-helper.sh"
   local runner="${BATS_TEST_TMPDIR}/acg-trust-runner.sh"
   local stub_log="${BATS_TEST_TMPDIR}/trust-stub.log"
@@ -23,15 +23,80 @@ source "${TRUST_HELPER}"
 _acg_trust_vault_ca '/scratch/ca.crt'
 RUNNER
   if [[ "${tty_mode}" == "tty" ]]; then
-    run /usr/bin/env TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /usr/bin/python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' "${runner}"
+    run /usr/bin/env SSH_CONNECTION="${ssh_sim}" SSH_TTY= TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /usr/bin/python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' "${runner}"
   else
-    run /usr/bin/env TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /bin/bash "${runner}"
+    run /usr/bin/env SSH_CONNECTION="${ssh_sim}" SSH_TTY= TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /bin/bash "${runner}"
   fi
   [ -f "${stub_log}.target" ]
   [[ "${stub_log}.target" == "${BATS_TEST_TMPDIR}"/* ]]
   [[ "${stub_log}" == "${BATS_TEST_TMPDIR}"/* ]]
   TRUST_STUB_LOG="${stub_log}"
   TRUST_OUTPUT_LOG="${output_log}"
+}
+
+function _run_hosts_entry_test() {
+  local hosts_file="${BATS_TEST_TMPDIR}/hosts" helper_bin="${BATS_TEST_TMPDIR}/update-hosts" helper="${BATS_TEST_TMPDIR}/hosts-helper.sh"
+  local calls="${BATS_TEST_TMPDIR}/hosts-calls" output_log="${BATS_TEST_TMPDIR}/hosts-output"
+  sed -n '/^function _acg_update_hosts_entry()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  : > "${calls}"
+  : > "${output_log}"
+  printf '%s\n' "${1:-127.0.0.2 demo.shopping-cart.local}" > "${hosts_file}"
+  [[ "${hosts_file}" == "${BATS_TEST_TMPDIR}"/* ]]
+  [[ "${helper_bin}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${helper_bin}" <<'HELPER'
+#!/usr/bin/env bash
+printf 'helper %s %s\n' "$1" "$2" >> "${HOSTS_CALLS}"
+exit "${HELPER_RC:-0}"
+HELPER
+  chmod +x "${helper_bin}"
+  run env K3DM_HOSTS_FILE="${hosts_file}" K3DM_UPDATE_HOSTS_BIN="${helper_bin}" HOSTS_CALLS="${calls}" HOSTS_OUTPUT="${output_log}" HELPER_RC="${HELPER_RC:-0}" bash -c '
+    _info() { printf "INFO %s\n" "$*" >> "${HOSTS_OUTPUT}"; }
+    _warn() { printf "WARN %s\n" "$*" >> "${HOSTS_OUTPUT}"; }
+    _run_command() { printf "run %s\n" "$*" >> "${HOSTS_CALLS}"; "${K3DM_UPDATE_HOSTS_BIN}" "${@: -2}"; }
+    source "$1"
+    _acg_update_hosts_entry demo.shopping-cart.local 127.0.0.2
+  ' bash "${helper}"
+  HOSTS_TEST_CALLS="${calls}"
+  HOSTS_TEST_OUTPUT="${output_log}"
+}
+
+@test "acg-up Vault CA N3 skips trust over SSH even with a TTY" {
+  _run_vault_ca_trust_test Darwin 1 0 tty "10.0.0.1 22"
+  [ "${status}" -eq 0 ]
+  run grep -F 'SecurityAgent requires interactive approval' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  run grep -F '_run_command' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up hosts M4 uses the scoped helper and reports success or failure" {
+  HELPER_RC=0 _run_hosts_entry_test '127.0.0.1 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  run grep -F 'run --interactive-sudo --soft --' "${HOSTS_TEST_CALLS}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'helper demo.shopping-cart.local 127.0.0.2' "${HOSTS_TEST_CALLS}"
+  [ "${status}" -eq 0 ]
+  run grep -F '/etc/hosts: demo.shopping-cart.local → 127.0.0.2' "${HOSTS_TEST_OUTPUT}"
+  [ "${status}" -eq 0 ]
+  HELPER_RC=1 _run_hosts_entry_test '127.0.0.1 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  run grep -F 'please add manually: 127.0.0.2 demo.shopping-cart.local' "${HOSTS_TEST_OUTPUT}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up hosts M5 leaves an existing desired entry alone" {
+  _run_hosts_entry_test '127.0.0.2 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  [ ! -s "${HOSTS_TEST_CALLS}" ]
+}
+
+@test "acg-up N4 never writes hosts through shell or preferred sudo" {
+  run grep -nE -- '--prefer-sudo|sh -c' "${CLUSTER_UP_FILE:-bin/cluster-up}"
+  [ "${status}" -ne 0 ] || [[ "${output}" != *'/etc/hosts'* ]]
+  run grep -F '_acg_update_hosts_entry "${_h}" "${_desired_ip}"' "${CLUSTER_UP_FILE:-bin/cluster-up}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "acg-up Vault CA M1 keeps interactive trust and warns on add failure" {
@@ -44,8 +109,14 @@ RUNNER
   [ "${status}" -eq 0 ]
 }
 
-@test "acg-up Vault CA M2 skips an already trusted certificate in headless mode" {
+@test "acg-up Vault CA M2 skips an already trusted certificate in headless and SSH sessions" {
   _run_vault_ca_trust_test Darwin 0
+  [ "${status}" -eq 0 ]
+  run grep -F 'already trusted in System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  _run_vault_ca_trust_test Darwin 0 0 tty "10.0.0.1 22"
   [ "${status}" -eq 0 ]
   run grep -F 'already trusted in System Keychain' "${TRUST_OUTPUT_LOG}"
   [ "${status}" -eq 0 ]
