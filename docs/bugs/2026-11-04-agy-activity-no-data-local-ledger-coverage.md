@@ -57,3 +57,20 @@ Do **not** paste raw ledger contents, as they may contain local activity identif
 2. Recent eligible wrapped agy runs appear under the correct 1d/7d/30d window, with explicit coverage limitations.
 3. Metrics exporter health still reports correctly when `agy.jsonl` is missing; no fabricated usage values.
 4. M5 post-migration validation protects against recurrence.
+
+
+## M4 live evidence — 2026-11-04, 06:09 PST
+
+The operator ran `type -a agy` on M4. Shell resolution showed an `agy` executable under `~/.local/bin/agy` first, and `/opt/homebrew/bin/agy` second; the dedicated wrapper default path `~/.local/share/k3d-manager/bin/agy` was **not** listed. This suggests the safe wrapper is not installed/on PATH, but `type -a` alone does **not** prove whether either visible executable is itself a symlink to `bin/k3dm-agy`; resolve/readlink before concluding bypass.
+
+On the same M4 checkout, `bin/k3dm-dispatch-metrics --dry-run | grep '^k3dm_agy_' | head -30` produced zero matching lines. This independently demonstrates **no agy metrics emitted by that M4 local dry-run**; it does not establish whether M4 is the production Pushgateway exporter or whether M5 has ledger records.
+
+Next minimal, read-only discriminators:
+
+```bash
+ls -l ~/.local/bin/agy /opt/homebrew/bin/agy ~/.local/share/k3d-manager/bin/agy 2>/dev/null
+ls -l ~/.local/share/k3d-manager/agent-sessions/agy.jsonl 2>/dev/null
+wc -l ~/.local/share/k3d-manager/agent-sessions/agy.jsonl 2>/dev/null
+```
+
+Repeat `type -a agy`, ledger count, and `bin/k3dm-dispatch-metrics --dry-run | grep '^k3dm_agy_'` **on M5**, and determine which machine actually publishes `k3dm-dispatch` metrics. Avoid running `agy` merely to synthesize metrics; do not expose raw session ledger or authentication data. Do not run the wrapper installer until the real binary path is confirmed: the historical installer collision is documented separately.
