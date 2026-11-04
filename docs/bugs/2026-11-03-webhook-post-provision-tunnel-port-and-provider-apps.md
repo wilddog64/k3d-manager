@@ -1,6 +1,6 @@
 # Bug: webhook post-provision check and cluster status hardcode Hostinger tunnel port 6443 and report other-provider ArgoCD apps as degraded
 
-**Status:** OPEN
+**Status:** Fixed & Verified (`4a76ee3e`; live-verified on `m5-air.local` via Slack job `0d15432a` on `2026-11-03`)
 **Priority:** P2
 **Severity:** medium — Slack post-provision check after `/k3dm acg-up` (`provider="k3s-aws"`) falsely reports `SSH tunnel (6443): DOWN ❌ — ACG cluster API unreachable` when the ACG tunnel on `:16443` is up, and flags/triages `ubuntu-hostinger-*` apps against `ubuntu-k3s` pods
 **Filed:** 2026-11-03
