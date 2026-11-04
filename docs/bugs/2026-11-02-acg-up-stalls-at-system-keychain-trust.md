@@ -64,7 +64,7 @@ The operator explicitly authorized expanding scope to close existing passwordles
 
 ## Independent cross-vendor diagnosis before replanning (2026-11-03)
 
-**Status:** REVIEW REQUESTED — not assigned, dispatched, performed, independently verified, or approved for code changes. This section records the operator's proposal to have Muse Wonder/Muse Code and Gemini Argon independently update **this existing bug** before choosing a revised fix plan. Do not describe either vendor as having inspected the incident until an actual dated, attributable report is attached. This is not approval to install tools, pay API charges, modify live hosts, or land changes.
+**Status:** IN PROGRESS — Gemini Argon read-only report attached (2026-11-03); Muse Wonder/Muse Code report and synthesis pending; not approved for code changes. This section records the operator's proposal to have Muse Wonder/Muse Code and Gemini Argon independently update **this existing bug** before choosing a revised fix plan. Do not describe either vendor as having inspected the incident until an actual dated, attributable report is attached. This is not approval to install tools, pay API charges, modify live hosts, or land changes.
 
 ### Shared read-only investigation contract
 
@@ -83,3 +83,81 @@ Give each investigator the same frozen evidence bundle and file SHAs: incident j
 - Do **not** replace Terra's Phase A/B/C record or silently mark acceptance/live verification complete. A new implementation plan is warranted only when the evidence changes the approach or acceptance contract; first amend the existing plan/bug if the correction is narrow, preserving release-slot rules.
 - Treat the 2026-11-03 multi-run rework and repeated corrections as a P0 dispatch-stall historical regression case (see `docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md`), while keeping causal diagnosis separate from model/token efficiency. Do not promote `resume.clarification` to independently verified progress.
 - Until synthesis and separate authorization, **implementation remains on hold for this proposed cross-vendor review**, without reversing any previously completed commits or claiming the active worker has been automatically paused.
+
+### Gemini Argon independent report (2026-11-03)
+
+- **Model / Tool / Host / Date:** Gemini 4 Argon (Medium) via Antigravity CLI (`agy`), executed on `m4-air.local` (`hostname && uname -n`), `2026-11-03`.
+- **Input Evidence & Source SHAs Inspected (Read-Only):**
+  - Release branch `k3d-manager-v1.43.14` HEAD: `094e90b7d15f781926fd3482b54b823de0472893` (incident post-pull ref: `8d9f5f0f`).
+  - Task worktree `/Users/cliang/.local/share/k3d-manager/worktrees/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust` (`task/v1.43.14/2026-11-02-acg-up-stalls-at-system-keychain-trust`): committed HEAD `f08a37751854707f72d4e5ca6ea8fe6b42dde138` (parent `6491d5d2`, spec base `204d8e81`: 28 files, +4,300 / -603 lines) plus uncommitted Phase C working-tree changes (10 tracked modified + 8 untracked files, +1,352 / -112 lines).
+  - Incident & prior-art docs: `docs/issues/2026-11-02-acg-up-job-c38c3855.md`, `docs/issues/2026-11-02-find-similar-docs-prior-art.md`, `docs/issues/2026-11-03-ca-trust-phase-a-diagnosis.md`, `docs/issues/2026-11-03-ca-trust-phase-b-containment.md`, `docs/plans/v1.4.6-auto-trust-vault-ca.md`, `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`, `docs/bugs/v1.5.3-bugfix-acg-up-vault-ca-trust-no-soft.md`.
+  - macOS system policy & binaries inspected read-only on `m4-air.local`: `/System/Library/Security/authorization.plist`, `/usr/bin/security` entitlements (`codesign -d --entitlements :- /usr/bin/security`) and symbols (`nm -u /usr/bin/security`), `/etc/pam.d/sudo`, `/usr/share/man/man5/sudoers.5`.
+- **Root-Cause Verdict for Job `c38c3855`:** **`INCONCLUSIVE` from preserved post-incident artifacts** (no live process tree or `authd` log was captured during the stall), with **two new verified forensic findings** that explain the M5 unified log timestamps, strongly support **H1** (`security add-trusted-cert -d` blocking in `AuthorizationCopyRights("com.apple.trust-settings.admin")` waiting for a GUI `SecurityAgent` prompt even when run as `root`), and show that a root helper cannot make headless System Keychain trust succeed unattended.
+
+#### 1. Verified Facts vs. Inferences
+
+**Verified Facts:**
+1. **Exact Source of the Three `sudo true` Entries at `20:03:52.637–20:03:52.675 PST`:**
+   - Immediately before Step 4c (`bin/cluster-up:763`), `bin/cluster-up:733-761` iterates over the **3-element** `_HOSTS_LIST` (`argocd.shopping-cart.local`, `keycloak.shopping-cart.local`, `frontend.shopping-cart.local`) and invokes `_run_command --prefer-sudo --soft -- sh -c ...`.
+   - In `scripts/lib/foundation/scripts/lib/system.sh:108-109`, `--prefer-sudo` probes `sudo -n true >/dev/null 2>&1`. Because `/etc/sudoers.d/k3d-manager` (`bin/install-sudoers.sh:25-74`) does not grant `NOPASSWD: /usr/bin/true` and no sudo timestamp cache was active, those three loop iterations produced the exact three `a password is required ; ... COMMAND=/usr/bin/true` unified log entries on M5 within 38 ms (`20:03:52.637`, `20:03:52.658`, `20:03:52.675 PST`).
+   - This pins the exact wall-clock entry into Step 4c to **`~20:03:53 PST`** (~6.5 minutes into the 3,300s job started around `19:57:22 PST` / Slack thread `p1793591842897049`), meaning the job stalled at Step 4c for **~48.5 minutes** until killed at `~20:52:22 PST`.
+2. **Why Default `log show` Missed Allowed `sudo` Commands (`syslog_goodpri` vs `syslog_badpri`):**
+   - Per `/usr/share/man/man5/sudoers.5` (`syslog_goodpri`, lines 5748–5760), `sudo` logs rejected/password-required commands at `syslog_badpri` (`alert` -> Unified Log `Default`/`Df`, shown by default in `log show`), whereas allowed commands (including `NOPASSWD` matches) log at `syslog_goodpri` (`notice` -> Unified Log `Info`/`I`, omitted by `log show` unless `--info` is passed). Thus, the absence of `add-trusted-cert` in a default `log show` query does not prove `sudo -n /usr/bin/security` was not executed.
+3. **macOS `com.apple.trust-settings.admin` Authorization Policy Does Not Exempt `root`:**
+   - Verified on `m4-air.local` via `plutil -extract 'rights.com\.apple\.trust-settings\.admin' xml1 -o - /System/Library/Security/authorization.plist` and `codesign -d --entitlements :- /usr/bin/security`:
+     - Modifying Admin Trust Settings (`security add-trusted-cert -d`) calls `SecTrustSettingsSetTrustSettings` -> `AuthorizationCopyRights` for right `com.apple.trust-settings.admin`.
+     - `com.apple.trust-settings.admin` evaluates `k-of-n: 1` of `[entitled, authenticate-admin]` and **does not set `allow-root: true`**.
+     - `rules.entitled` requires `builtin:entitled,privileged` (`com.apple.private.AuthorizationServices`), which `/usr/bin/security` **does not possess** (its entitlements are only `com.apple.authorization.smartcard.override`, `com.apple.keystore.keybag.create`, `com.apple.private.CoreAuthentication.SPI`, and `com.apple.private.platformsso.security`).
+     - Consequently, **even when `sudo -n /usr/bin/security add-trusted-cert -d ...` executes as `root` (`euid=0`)**, `authd` falls through to `rules.authenticate-admin` (`class: user`, `group: admin`, `shared: true`, `timeout: 0`), spawning a **GUI `SecurityAgent` / `CoreAuthUI` modal dialog** in the user's GUI session requiring interactive Touch ID or admin password entry on every call (`timeout: 0`).
+4. **Webhook Subprocess Execution Model:**
+   - `bin/k3dm-webhook:550-568` (`_posix_spawn_job`) launches `make up` via `os.posix_spawn(..., setsid=True)` with `fd 1` and `fd 2` redirected to the regular file `job_dir / "output"`, and `scripts/lib/webhook/lifecycle.py:380-386` polls `os.waitpid(pid, os.WNOHANG)` on the top-level job PID (not a pipe EOF).
+   - `scripts/lib/foundation/scripts/lib/system.sh:60-76` (`_run_command_resolve_sudo`) checks `[[ ! -t 0 || ! -t 1 ]]`, sets `sudo_flags=(-n)`, and resolves `security` to `/usr/bin/security`.
+
+**Inferences & Remaining Unknowns:**
+- It is strongly inferred (but unconfirmed without M5 `authd`/`SecurityAgent` logs from `20:03:53–20:52:22 PST`) that `sudo -n` succeeded via `/etc/sudoers.d/k3d-manager` and `/usr/bin/security` blocked inside `AuthorizationCopyRights("com.apple.trust-settings.admin")` waiting for an unattended GUI `SecurityAgent` prompt on M5.
+- Unknowns: exact M5 working-tree SHA prior to the 2026-11-02 pull; M5 screen-lock / GUI session state at `20:03:53 PST`; current AWS CloudFormation stack state (blocked by expired ACG credentials).
+
+#### 2. Ranked Root-Cause Hypotheses & Counterevidence
+
+1. **H1 (Most Strongly Supported): `sudo -n /usr/bin/security add-trusted-cert -d ...` succeeded via `NOPASSWD`, and `/usr/bin/security` (running as `root`) blocked in `AuthorizationCopyRights("com.apple.trust-settings.admin")` waiting on an unattended GUI `SecurityAgent` prompt.**
+   - *Supporting evidence:* `/etc/sudoers.d/k3d-manager` predated the run (`2026-11-01 09:41:43 PST`); `sudo -n -l` for the exact command returned `0`; `com.apple.trust-settings.admin` requires `authenticate-admin` (`timeout: 0`) even for `root`; post-timeout `security verify-cert` returned `1` (CA untrusted).
+   - *Missing confirmation:* Historical M5 `authd` / `SecurityAgent` unified log entries during `20:03:53–20:52:22 PST`.
+2. **H2 (Weakly Supported / Unlikely): `sudo` itself blocked waiting for a password prompt.**
+   - *Counterevidence:* `_posix_spawn_job` runs with `setsid=True` and file-redirected stdout/stderr (`! -t 1`), causing `_run_command_resolve_sudo` to pass `sudo -n`. `sudo -n` fails in ~20 ms when a password is required, as proved by the three `sudo -n true` calls at `20:03:52.637–.675 PST`. H2 would require M5 to have been running pre-v1.41.0 code without `-n` and with an accessible controlling TTY.
+3. **H3 (Contradicted by Code & Logs): `sudo` and `security` exited, and an inherited stdout/stderr pipe held the job open.**
+   - *Counterevidence:* `_posix_spawn_job` redirects stdout/stderr to a regular file (`job_dir / "output"`) and `_run_cluster` waits on `os.waitpid(pid, os.WNOHANG)`. In `bin/cluster-up:785-798`, `_run_command` runs synchronously; if `security` had exited `0` or non-zero, `bin/cluster-up` would have written the `_warn` line or the subsequent listener log lines to `output`.
+
+#### 3. Review of Root-Helper Trust Boundaries, Certificate Provenance, Sudoers & Listener Migration
+
+1. **Unattended Failure Semantics & Root-Helper Futility (`bin/k3dm-vault-ca-trust-supervisor` & `bin/k3dm-bounded-sudo`):**
+   - Because `com.apple.trust-settings.admin` requires interactive `SecurityAgent` approval (`authenticate-admin`, `timeout: 0`) even when `/usr/bin/security` runs as `root`, executing `/usr/bin/security add-trusted-cert -d` inside `/Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor` **cannot make headless CA trust succeed unattended**. Instead, every headless run with a newly issued Vault CA will still pop up a GUI `SecurityAgent` modal on the Mac, hang for 30 seconds, get killed by `SIGKILL`, and potentially leave an orphaned `SecurityAgent` dialog in the GUI session before logging a warning.
+2. **Certificate Identity & Provenance Gap (`bin/k3dm-vault-ca-trust-supervisor:55-86, 117`):**
+   - Draft sudoers grants `%admin ALL=(root) NOPASSWD: /Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor *`.
+   - `_open_certificate(path, owner)` in `bin/k3dm-vault-ca-trust-supervisor:55-86` only checks that `path` is an absolute non-symlink regular file owned by `SUDO_UID` with mode `0600`/`0644` and size `<= 1 MiB`. It neither restricts `path` to `${_ACG_STATE_DIR}/argocd-browser-https-tls/ca.crt` nor verifies X.509 CA attributes or Vault provenance—any process running as the user can pass an arbitrary self-generated CA file to `/Library/PrivilegedHelperTools/k3dm-vault-ca-trust-supervisor` (though on macOS `authd` will still prompt `SecurityAgent`).
+3. **Listener Migration & Sudoers Over-Expansion (`bin/k3dm-browser-listener-supervisor`, `bin/k3dm-browser-listener-relay`, `bin/install-sudoers.sh`, `bin/cluster-down`):**
+   - **Blast radius:** Phase B/C spans 38 files (+5,652 / -715 lines), replacing `socat` LaunchDaemons with a custom 164-line Python socket-activated TLS/TCP proxy (`bin/k3dm-browser-listener-relay` with `inetdCompatibility: {Wait: False}`), which spawns a new Python interpreter per TCP connection and discards all listener logs to `/dev/null`.
+   - **Fragile `launchctl print` parsing:** `bin/install-sudoers.sh:20-22` and `bin/cluster-down:102-125` gate plist removal on `launchctl print` returning exit `113` and exact substring `"Could not find service \"${label}\" in domain for system"`. `launchctl(1)` explicitly warns `print` output is not a stable API.
+   - **Destructive upgrade ordering:** `bin/install-sudoers.sh:211-220` deletes `/etc/sudoers.d/k3d-manager` before retiring legacy listeners and staging helpers; any mid-script failure leaves the host without sudoers policy.
+   - **Unscoped Linux/k3s collateral changes:** Uncommitted Phase C modifies `scripts/lib/core.sh` and `scripts/lib/providers/k3s.sh` and exposes an unresolved `/bin/bash` 3.2 `set -u` (`probe_args[@]: unbound variable`) bug in `scripts/lib/foundation/scripts/lib/system.sh`.
+4. **Recommended Narrow Alternative:**
+   - In `bin/cluster-up:783-792`, if `security verify-cert -c "${_argocd_browser_tls_dir}/ca.crt"` fails and the run is headless (`! [[ -t 0 && -t 1 ]]`), **skip `security add-trusted-cert` immediately with `_warn`** (and print the exact one-line command for the operator to run interactively if browser trust is needed), while preserving automatic trust when `[[ -t 0 && -t 1 ]]` (optionally bounded by a caller timeout). Remove `NOPASSWD: /usr/bin/security add-trusted-cert ...` from `bin/install-sudoers.sh`, and decouple any broader sudoers/LaunchDaemon hardening into a dedicated security plan.
+
+#### 4. Smallest Discriminating Experiment
+
+Run one **read-only** unified log query on `m5-air.local` covering `2026-11-01 20:03:50` to `20:53:00 PST` with `--info` enabled (to capture `sudo`'s `LOG_NOTICE` entries) and including `authd`, `SecurityAgent`, `security`, and `trustd`:
+
+```bash
+/usr/bin/log show --info \
+  --start '2026-11-01 20:03:50' \
+  --end   '2026-11-01 20:53:00' \
+  --predicate 'process IN {"sudo", "security", "authd", "SecurityAgent", "trustd"}' \
+  --style compact
+```
+
+- **Predicted outcome under H1 (`security` blocked in `authd` / `SecurityAgent` for `com.apple.trust-settings.admin`):** Within ~1–3s after `20:03:52.675`, `sudo` logs an `I` (`Info`) entry for `COMMAND=/usr/bin/security add-trusted-cert ...`, immediately followed by `authd` / `SecurityAgent` evaluating `com.apple.trust-settings.admin`, which stays pending until `~20:52:22` when `SIGTERM` invalidates the client connection.
+- **Predicted outcome under H2 (`sudo` blocked on password):** No `authd` evaluation for `com.apple.trust-settings.admin` appears at `20:03:53`; `sudo` blocks in PAM without spawning `security`.
+- **Predicted outcome under H3 (post-`security` descriptor hang):** Both `sudo` and `authd` (`com.apple.trust-settings.admin`) complete within seconds of `20:03:53`.
+
+#### 5. Test-Environment Limits & Cost
+- **Test-environment limits:** All Phase B/C BATS suites (`vault_ca_trust_e2e.bats`, `vault_ca_trust_supervisor.bats`, `install_sudoers.bats`) use same-user stub processes and `fnmatch` models; offline tests cannot exercise macOS `authd` / `SecurityAgent` right evaluation or `sudo` policy evaluation.
+- **Tokens / Cost:** Single bounded read-only pass on `m4-air.local`; no paid external API calls or subagents invoked.
