@@ -80,3 +80,14 @@ evidence:
   - `bats scripts/tests/bin/dr_drill_publish.bats`
   - `shellcheck bin/dr-drill-publish`
   - `git --no-pager diff --check`
+
+## Live verification (2026-11-04, `m5-air.local` at `9a542a52`)
+
+1. Success path: `make dr-drill-publish` published `results/20261104T141556Z.json` to k3dm-hub-data (`f19fea8..320d5ef`) and the `k3dm_dr_drill_*` metrics were present on the `:19094` Pushgateway.
+2. Failure path (no keys changed, nothing published): `env -u SSH_AUTH_SOCK bin/dr-drill-publish` on M5 was refused by the real M2 (`Permission denied (publickey,...)`) and exited 1 with:
+   - `[dr-drill-publish] cannot authenticate to m2jump: its authorized_keys does not accept this host's key`
+   - `SHA256:ASp9NdzijFI3Z3wuZm7m/a6UJHx6+HkrpEA9ROrlEIk cliang@m5-air.local (ED25519)` (fallback to `ssh-keygen -lf` because no agent was reachable)
+   - the `ssh-copy-id -i ~/.ssh/id_ed25519.pub m2jump` remedy
+   - no `git clone`, `git push` or `curl` ran.
+
+Observation (not fixed here): the wording blames `authorized_keys` even when the cause is only an unloaded/locked key (no agent identities). A follow-up could mention `ssh-add` as the first thing to try.
