@@ -143,3 +143,6 @@ This live capture establishes two facts:
   - **Pre-fix red (`eb2a136`):** `env -i HOME="$HOME" PATH="$PATH" bats -f "Ed25519" scripts/tests/lib/acg.bats` failed (`pre_fix_rc: 1`).
   - **Post-fix green (`0f64b74`):** `env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/acg.bats` passed **37/37** (`rc: 0`); `shellcheck -x -S warning scripts/lib/acg/acg.sh` and `git --no-pager diff --check` exited `0`.
   - **Ledger verification artifact:** `v1.43.14/2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails-fp.run/verify-evidence.1.log` (SHA-256 `f6ee9cdb58e5c5969b69d7f74bab9b70e7799221f2cbf6e18d95a1c313648796`, verifier `gemini-4-argon-medium`).
+- **Subtree Sync & Live M5 Verification (`2026-11-03`):**
+  - Merged `lib-foundation` PR [#75](https://github.com/wilddog64/lib-foundation/pull/75) (`dea3d02`) after addressing Copilot review (`8447ae1`) and synced into `k3d-manager-v1.43.14` via `git subtree pull` (`2d2ec4ce` / `73c14ac6`).
+  - Verified live on `m5-air.local` (`73c14ac6`) both from the terminal and via Slack webhook job `4a9b212c` (`~/.local/share/k3d-manager/webhook-jobs/4a9b212c/output`, `status: success`, `up complete`): Step 2 hit `InvalidKeyPair.Duplicate`, matched the local Ed25519 SHA-256 fingerprint against AWS's unprefixed `DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=`, and proceeded through full cluster and observability deployment.
