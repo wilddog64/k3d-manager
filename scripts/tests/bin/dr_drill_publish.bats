@@ -124,6 +124,13 @@ STUB
 }
 
 @test "dr drill publish: SSH options do not weaken authentication or write authorized_keys" {
-  ! grep -Eq 'StrictHostKeyChecking=no|PasswordAuthentication' bin/dr-drill-publish
-  ! grep -Eq '(^|[[:space:]])(>>?|tee)[[:space:]].*authorized_keys|authorized_keys[[:space:]]+(>>?|tee)' bin/dr-drill-publish
+  run grep -Eq 'StrictHostKeyChecking=no|PasswordAuthentication' bin/dr-drill-publish
+  [ "$status" -ne 0 ]
+  run grep -Eq '(^|[[:space:]])(>>?|tee)[[:space:]].*authorized_keys|authorized_keys[[:space:]]+(>>?|tee)' bin/dr-drill-publish
+  [ "$status" -ne 0 ]
+
+  cp bin/dr-drill-publish "$BATS_TEST_TMPDIR/dr-drill-publish"
+  printf '\n%s\n' 'StrictHostKeyChecking=no' >> "$BATS_TEST_TMPDIR/dr-drill-publish"
+  run grep -Eq 'StrictHostKeyChecking=no|PasswordAuthentication' "$BATS_TEST_TMPDIR/dr-drill-publish"
+  [ "$status" -eq 0 ]
 }
