@@ -1,0 +1,1 @@
+{"action": "diagnose-pods", "body": {"job_id": "e2d3ef86", "status": "queued"}, "completed_at": "2026-11-04T16:35:35.492724Z", "http_status": 202, "id": "20261104T163519Z-diagnose-pods-e2e", "schema": 1, "status": "ok"}
