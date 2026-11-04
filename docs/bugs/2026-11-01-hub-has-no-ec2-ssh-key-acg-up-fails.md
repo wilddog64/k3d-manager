@@ -133,3 +133,13 @@ This live capture establishes two facts:
    - Test that `_acg_import_key` succeeds on the real unprefixed `...=` format, on unprefixed unpadded `...`, and on `SHA256:...=`, and fails closed on `...=junk` and mismatched digests.
 3. In `docs/issues/2026-11-01-acg-imported-key-fingerprint-formats.md`:
    - Record the `2026-11-03` `m5-air` live AWS EC2 capture (`DWj8LMmMqaZ9O3vJ8oG6xflnl5I/W5HmeoHVYWcR83A=`, unprefixed Base64 SHA-256 with trailing `=`).
+
+### Dispatched implementation outcome (`2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails-fp`, 2026-11-03)
+
+- **Worker / Coordinator:** OpenAI `gpt-6-luna` via `bin/k3dm-codex-dispatch` (session `01a1a450-8d84-7f90-8975-a55ea1a36644`), coordinated by `google/gemini-4-argon-medium`.
+- **Run count & tokens:** **1 run** (`start` only, 0 resumes; `exit: 0`, `scope: in-scope`), `input: 705,260` (`cached_input: 662,272`, uncached input: `42,988`), `output: 4,401` (`codex_exit` billed tokens: `47,389`).
+- **Landed commit in `lib-foundation` (`fix/acg-key-fingerprint`):** `0f64b742f71d13ffee939deb639f0ce71f0e40da` (`0f64b74`, pushed to `origin/fix/acg-key-fingerprint`), 4 files changed (+24 / -6 lines).
+- **Verification & Evidence:**
+  - **Pre-fix red (`eb2a136`):** `env -i HOME="$HOME" PATH="$PATH" bats -f "Ed25519" scripts/tests/lib/acg.bats` failed (`pre_fix_rc: 1`).
+  - **Post-fix green (`0f64b74`):** `env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/acg.bats` passed **37/37** (`rc: 0`); `shellcheck -x -S warning scripts/lib/acg/acg.sh` and `git --no-pager diff --check` exited `0`.
+  - **Ledger verification artifact:** `v1.43.14/2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails-fp.run/verify-evidence.1.log` (SHA-256 `f6ee9cdb58e5c5969b69d7f74bab9b70e7799221f2cbf6e18d95a1c313648796`, verifier `gemini-4-argon-medium`).
