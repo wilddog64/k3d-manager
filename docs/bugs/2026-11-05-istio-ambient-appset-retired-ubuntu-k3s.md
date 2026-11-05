@@ -30,3 +30,13 @@ A reapply during hub migration/rebuild or another deployment path may have subst
 - Regression tests cover absent APP_CLUSTER_NAME, missing registration, hub migration, and existing destination preservation.
 - Live verify ApplicationSet healthy, expected children and destination, Hostinger Istio healthy, no unintended pruning.
 - Do not re-register retired clusters, force-delete finalizers, or prune applications without confirming intended lifecycle.
+
+## Cloud-bridge live evidence — 2026-11-05 07:45–07:46 PST
+Read-only requests filed on the orphan `cloud-requests` branch and acknowledged by the live hub bridge:
+- `diagnose-appsets` job `cb0d79a0`: SUCCESS; `istio-ambient` exists among 13 ApplicationSets, age ~5d18h.
+- `diagnose-app istiod-ubuntu-k3s` job `5fb6a393`: returned Kubernetes NotFound (that legacy child Application is absent).
+- `diagnose-apps` job `5fd7977c`: SUCCESS; returned output tail includes multiple `ubuntu-hostinger-*` Applications `Synced Healthy`. This response is truncated to an output tail and **does not prove the absence of Istio children**.
+- Operator suspects ACG sandbox up/down lifecycle leaves stale resources. Investigate ACG teardown and stale registration cleanup, but do not assume ACG owns the persistent Istio ApplicationSet or delete any Hostinger resources.
+
+### Next check
+Compare live `istio-ambient` ApplicationSet spec/template destination and all status conditions to the registered clusters and current ACG lifecycle state. The bridge's `diagnose-appsets` action only lists names/ages, so the exact live spec, second error, and causal operation remain unverified.
