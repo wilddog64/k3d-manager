@@ -28,6 +28,8 @@ Reproduced by Claude on the M4, 2026-11-05, against `k3d-manager-v1.43.14` (`c97
 - `_run_command` expands `"${probe_args[@]}"` at `system.sh:181` and `:185` with no `--probe`. That is every `_run_command` call without a probe, including the two `--interactive-sudo` installs in `bin/install-sudoers.sh`.
 - `scripts/k3d-manager:16` already refuses bash below 4. `bin/install-sudoers.sh` (`#!/usr/bin/env bash`) has no such guard.
 
+Recurrence: the operator reran it on the M2 on `k3d-manager-v1.43.14` and got the same error at line 183. So the bug is not specific to the stale branch.
+
 ## Fix (proposal; the operator picks)
 
 - **A. Fail fast (recommended, smallest).** `bin/install-sudoers.sh` checks `BASH_VERSINFO` the same way `scripts/k3d-manager:16` does. On bash below 4 it exits 2 with a message naming `brew install bash` and the `PATH` workaround, before writing the temp file.

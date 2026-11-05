@@ -1,6 +1,6 @@
 # Bug: passwordless sudoers rules let any same-user process gain root (self-update and /usr/local/bin wildcards)
 
-**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify PASS (Sonnet, recorded in the ledger 2026-11-05); live E4 pending the operator rerunning `make install-sudoers`.
+**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify PASS (Sonnet, recorded in the ledger 2026-11-05); live E4 PASS on the M4 (2026-11-05). The M5 reinstall succeeded; the M2 is blocked by `docs/bugs/2026-11-05-install-sudoers-crashes-under-macos-bash-3-2.md`.
 **Priority:** P1
 **Severity:** high — local privilege escalation. Any process running as an `%admin` user (a dispatched Codex/agy agent, a compromised npm/pip postinstall, a malicious repo script) can become root with no password, on every Mac that ran `make install-sudoers`.
 **Filed:** 2026-11-05
@@ -121,3 +121,13 @@ A Sonnet verifier wrote 15 BATS tests from the Acceptance block only. Claude rer
 - M1–M4 pass on both versions, as the positive controls.
 
 The evidence is recorded with `k3dm-codex-dispatch verify`. Its verifier header was normalised to `claude-sonnet-independent`, because the validator rejects spaces and parentheses.
+
+## Live verification E4 (Claude, M4, 2026-11-05)
+
+The operator ran `make install-sudoers` on the M4 and the M5; both succeeded. `/etc/sudoers.d/k3d-manager` on the M4 is dated Nov 5 15:54, 1823 bytes.
+
+**Correction to E4 as written.** `sudo -n -l <cmd>` is not a valid check. It returned rc 0 for the removed commands and for `/usr/bin/true` alike, even after `sudo -k`. With the default `listpw=any`, it reports a command as permitted when any rule allows it, including the admin group's password-required `(ALL) ALL`. The check that does tell them apart is the full `sudo -n -l` listing, which shows each rule's `NOPASSWD` tag.
+
+Result on the M4: the listing has `(ALL) ALL` plus exactly the 16 expected `NOPASSWD` rules, the same lines as the M2 dry-run test. None of the six removed rules appears: no `/etc/sudoers.d` target, and no install/cp/chmod rule under `/usr/local/bin`. **N1 and N2 PASS live.**
+
+The M2 is pending until the bash 3.2 crash is fixed, or until it is installed with Homebrew bash (`/opt/homebrew/bin/bash bin/install-sudoers.sh`).
