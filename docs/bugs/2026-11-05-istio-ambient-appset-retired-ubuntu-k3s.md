@@ -59,3 +59,8 @@ Assess whether the sandbox reaper was installed/running and whether it skipped t
 2. the still-live `istio-ambient` ApplicationSet's `destination.name: ubuntu-k3s` (which may require a separate safe retarget after cleanup).
 
 Acceptance addition: expiration without operator-initiated down must eventually converge to clean hub state, with observable/audited decisions, without touching persistent Hostinger Applications.
+
+## Operator live cleanup verification — 2026-11-05 ~07:55 PST
+The operator ran Slack `cleanup-stale-sandbox confirm`. Slack reported success, explicitly listing removal of `ubuntu-k3s` local kube context and local frontend/sandbox launchd agents, ending `Cleanup complete: stale sandbox local state removed or already absent.` **No Argo CD cluster registration or ApplicationSet deletion appears in this output.**
+A subsequent Argo CD UI screenshot still shows `istio-ambient` **Degraded** with **0 Applications** (other ApplicationSets Healthy). This validates a cleanup scope mismatch: the Slack command is local-only, while the remaining object is a persistent `cicd/istio-ambient` ApplicationSet on the hub.
+Do not treat 0 generated Applications as proof that the persistent ApplicationSet is safe to delete. Check whether intended target is `ubuntu-hostinger`; obtain full ApplicationSet conditions and registration inventory before deciding between safe retarget/reapply and obsolete-object removal.
