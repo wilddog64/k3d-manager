@@ -36,7 +36,7 @@
 
 ## 2026-11-05 security + telemetry filings
 
-- [ ] P1 sudoers passwordless root escalation: LANDED `4c4f7dd1`. Independent verify PASS (recorded); live E4 after the operator runs `make install-sudoers` on M4/M5/M2.
+- [ ] P1 sudoers passwordless root escalation: LANDED `4c4f7dd1`. Independent verify PASS (recorded). install-sudoers: M4 and M5 OK; M2 blocked by bash 3.2 (P2 filed). E4 `sudo -n -l` check pending.
 - [ ] P1 sudoers LaunchDaemon/exec wildcards: design pending.
 - [ ] P2 dispatch resume ignores task model: Acceptance pending.
 - [ ] P2 agy no-data: root cause recorded; Fix direction is to read agy transcripts.
@@ -2265,3 +2265,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: acg-up live on M5 OK (cdff3cea); 2 P3 gaps dispatched.
 - 2026-11-01: gap P2 bug filed (held behind labels P3); v1.43.15 plan 5 claude cost attribution filed.
 - 2026-11-01: 6 fixes landed + verified (2a2a43c9..75d987ca); lib-foundation 6706f64 pushed; 2 P3s filed (cleanup env pin landed, cross-repo fast gate dispatched); hubkey in correction.
+
+- [ ] P2 `install-sudoers` crashes under macOS /bin/bash 3.2 (M2). Filed 2026-11-05; approval pending; recommended fix A (bash 4 guard).
