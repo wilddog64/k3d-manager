@@ -50,3 +50,12 @@ Compare live `istio-ambient` ApplicationSet spec/template destination and all st
 
 ### Scope refinement
 Test and document lifecycle-aware **preflight** on ACG up: read-only inventory and identification of stale prior sandbox registrations, then safe cleanup *only* after confirming exact sandbox identity and expiration/teardown, with operator approval for unmanaged registrations. Do not blindly call `cleanup-stale-resources CONFIRM=1` at startup. Validate that any fix also preserves the persistent `ubuntu-hostinger` Istio target and does not conflate ACG cleanup with `istio-ambient` destination overwrite.
+
+## Operator reproduction hypothesis — 2026-11-05
+The operator reports an earlier `make up` of an ACG sandbox, followed by natural sandbox expiration without running `make down` or manual cleanup. This can leave Argo CD state that requires lifecycle reconciliation. Treat this as a **likely event sequence, not verified root cause**.
+
+Assess whether the sandbox reaper was installed/running and whether it skipped this cluster because `k3d-manager/managed=false`, missing expiration metadata, or another eligibility/health check. Distinguish:
+1. expired sandbox registration and stale generated Applications;
+2. the still-live `istio-ambient` ApplicationSet's `destination.name: ubuntu-k3s` (which may require a separate safe retarget after cleanup).
+
+Acceptance addition: expiration without operator-initiated down must eventually converge to clean hub state, with observable/audited decisions, without touching persistent Hostinger Applications.
