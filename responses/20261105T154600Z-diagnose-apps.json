@@ -1,0 +1,1 @@
+{"action": "diagnose-apps", "body": {"job_id": "5fd7977c", "status": "queued"}, "completed_at": "2026-11-05T15:46:21.966162Z", "http_status": 202, "id": "20261105T154600Z-diagnose-apps", "schema": 1, "status": "ok"}
