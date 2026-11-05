@@ -1,0 +1,32 @@
+# P2: istio-ambient ApplicationSet targets retired ubuntu-k3s
+
+**Date:** 2026-11-05
+**Status:** OPEN — live verification pending
+**Priority:** P2
+**Branch:** bug/2026-11-05-istio-ambient-retired-cluster (based on main)
+
+## Observed
+Argo CD ApplicationSet `cicd/istio-ambient` is Degraded, reporting 2 Errors and 1 Info. Screenshot last updated 2026-11-04 09:45:25 PST. Visible error: `application destination spec is invalid: there are no clusters with this name: ubuntu-k3s`.
+
+## Repository evidence
+- `scripts/etc/argocd/applicationsets/istio-ambient.yaml` uses `destination.name: ${APP_CLUSTER_NAME}` and names generated children with this variable.
+- `scripts/plugins/istio_ambient.sh` silently defaults `APP_CLUSTER_NAME` to `ARGOCD_APP_CLUSTER_NAME` or `ubuntu-k3s`.
+- `docs/issues/2026-08-13-stale-istio-ubuntu-k3s-applications.md` documents retired ubuntu-k3s applications and confirms `ubuntu-hostinger` was the intended active target.
+- CHANGELOG documents a previous `deploy_argocd_applicationsets` fix to preserve live destinations and provider-specific CNI paths when re-pinning. Check whether a different reconciliation/rebuild path bypasses that fix.
+
+## Hypothesis (not yet proven)
+A reapply during hub migration/rebuild or another deployment path may have substituted the legacy default. Screenshot does not establish which operation triggered the change, or the second error.
+
+## Investigation
+1. Read full ApplicationSet status.conditions, generated child Applications, and registered Argo CD cluster names; do not expose secrets.
+2. Check `ubuntu-hostinger` registration and Istio workloads before any mutation.
+3. Trace hub migration/rebuild and `deploy_argocd_applicationsets` / `deploy_istio_ambient` activity around Nov 4 09:45 PST.
+4. Compare with August 13 incident; determine whether this is a recurrence or a new failure mode.
+5. Investigate the second ApplicationSet error independently.
+
+## Acceptance criteria
+- Fail closed when no valid target is selected; do not silently fall back to retired `ubuntu-k3s`.
+- Reconciliation and one-command hub rebuild preserve intended registered cluster destination and provider-specific CNI configuration.
+- Regression tests cover absent APP_CLUSTER_NAME, missing registration, hub migration, and existing destination preservation.
+- Live verify ApplicationSet healthy, expected children and destination, Hostinger Istio healthy, no unintended pruning.
+- Do not re-register retired clusters, force-delete finalizers, or prune applications without confirming intended lifecycle.
