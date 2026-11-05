@@ -40,3 +40,13 @@ Read-only requests filed on the orphan `cloud-requests` branch and acknowledged 
 
 ### Next check
 Compare live `istio-ambient` ApplicationSet spec/template destination and all status conditions to the registered clusters and current ACG lifecycle state. The bridge's `diagnose-appsets` action only lists names/ages, so the exact live spec, second error, and causal operation remain unverified.
+
+## Lifecycle wiring confirmed from current main Makefile
+- `CLEANUP_STALE ?= 0`; the `down` target invokes `cleanup-stale-resources CONFIRM=1` **only** with `CLEANUP_STALE=1`.
+- The `up` target has no `cleanup-stale-resources` invocation. Thus `make up` can run with prior stale Argo CD registrations unless another background reconciler handles them.
+- Existing targets: `cleanup-stale-sandbox` (local state), `cleanup-stale-clusters` (expired managed registrations), `cleanup-stale-registration CLUSTER=...` (exact-name legacy/unmanaged), and `cleanup-stale-resources` (both guarded paths).
+- A separate `install-sandbox-reaper` launchd target exists and periodically cleans eligible expired sandbox registrations, but its installation/live state has not been verified.
+- `docs/bugs/2026-09-29-stale-unmanaged-argocd-registration.md` previously fixed the missing explicit exact-name cleanup pathway for `managed=false` registrations. The managed-only cleanup intentionally excludes these.
+
+### Scope refinement
+Test and document lifecycle-aware **preflight** on ACG up: read-only inventory and identification of stale prior sandbox registrations, then safe cleanup *only* after confirming exact sandbox identity and expiration/teardown, with operator approval for unmanaged registrations. Do not blindly call `cleanup-stale-resources CONFIRM=1` at startup. Validate that any fix also preserves the persistent `ubuntu-hostinger` Istio target and does not conflate ACG cleanup with `istio-ambient` destination overwrite.
