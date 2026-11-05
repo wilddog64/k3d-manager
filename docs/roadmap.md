@@ -512,7 +512,9 @@ Split from v1.43.13 on 2026-10-31 by Claude; moved to v1.43.15 on 2026-11-01 (be
 
 **v1.43.15 plan 5:** [`claude-cost-task-attribution`](plans/v1.43.15-claude-cost-task-attribution.md) (operator, 2026-11-01): Claude is 97.5% of 30d model spend ($1,097 vs $28.54 Codex dispatch), but its per-task cost is split evenly across every dispatch open at that moment, and spec writing and verification fall outside those intervals. This plan charges each Claude turn to the tasks its tool calls name, and reports attribution coverage by cost. It lands after plan 4. **v1.43.15 is at the 5-plan cap.** The outcome half of the same gap is a P2 bug carried in v1.43.13: `docs/bugs/2026-11-01-dispatch-resume-reason-unrecorded-runs-never-rework-or-progress.md`.
 
-### Patch release — v1.43.16 (queued, no specs yet)
+### Patch release — v1.43.16
+
+**v1.43.16 plan 1:** [`lead-model-activity-dashboard`](plans/v1.43.16-lead-model-activity-dashboard.md) (operator, 2026-11-05): a `k3dm Lead Model Activity` dashboard that shows, per lead (coordinator) model, the tasks led, first-run land rate, corrections per landed task, stalled tasks, tokens and cost, together with a lead timeline. It reads agy's own transcripts, so interactive Argon lead sessions are counted: the 2026-11-03 5 h Argon session recorded nothing. It depends on bugs `2026-10-29-non-claude-coordinator-work-unattributed`, `2026-11-04-agy-activity-no-data-local-ledger-coverage` and `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`.
 
 **Candidate plan:** `claude-quota-grace-window` (operator, 2026-11-01: "usually we may still be able to run 10 ~ 30 mins even reach 100% weekly quota base on the last couple releases. if you can capture that metrics in grafana dashboard that would be very helpful"). Record when the weekly Claude quota reached 100% and when the session was actually cut off, and show the grace window per release on a Grafana dashboard, so release-day planning can count on a measured margin rather than a guess. Placed here because v1.43.14 and v1.43.15 are both at the 5-plan cap. The spec still needs a source for the quota-reached and cut-off timestamps.
 

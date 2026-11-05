@@ -1,5 +1,15 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-05 sudoers P1 dispatched; lead-model dashboard planned
+
+- **P1 dispatched to Luna:** `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`. It removes the passwordless self-update and `/usr/local/bin` wildcard rules and validates `update-hosts-entry` input. Claude reviews it, runs the independent verifier, and then lands it. Operator remediation after merge: rerun `make install-sudoers` on M4, M5 and M2.
+- **Filed, not dispatched:**
+  - P1 `2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent`: a design is needed; recommendation is options B+C.
+  - P2 `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`: `codex exec resume` has no `-m`, so the 23 keychain resumes ran Terra while the ledger said Luna.
+- **agy no-data bug, root cause appended:** the wrapper is not installed on the M4, and agy self-updates overwrite both PATH entries. agy's own `transcript_full.jsonl` carries tokens. The Argon session `59d11804` totals 3.49M input, 87.0M cache-read and 322K output tokens.
+- **New plan `v1.43.16-lead-model-activity-dashboard`:** PROPOSED. v1.43.14 is at 6 plans and v1.43.15 at 5.
+- **Abandoning the original keychain worktree** `2026-11-02-acg-up-stalls-at-system-keychain-trust` still needs the operator's OK.
+
 ## Handoff — 2026-11-03 CA trust Phase B outcome
 
 The operator authorized Phase B only and requested its results before Phase C. Luna added an isolated end-to-end caller/timeout/warning/continuation test in task-branch commit `f08a3775` (parent implementation `6491d5d2`). Independent Python 3.13 BATS passed 89/89 with no skips. The hung fixture used a one-second monotonic deadline and short grace, a TERM-resistant controlled child retaining stdout/stderr, returned failure 124, warned, reached the next sentinel, and verified controlled processes exited. Prior automatic-trust, already-trusted skip, interactive behavior and nonfatal failure decisions were reviewed. Exact output and limitations: `docs/issues/2026-11-03-ca-trust-phase-b-containment.md`. This does not prove real root signal behavior or macOS service cancellation; live verification deferred. **Do not start Phase C until operator reviews the outcome.**

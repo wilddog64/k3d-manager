@@ -34,6 +34,14 @@
 
 - 2026-11-01 Codex dispatch review PARTIAL: role guard landed/pushed `bd3002db`, focused BATS 157/157 and landing/pre-push fast gates passed; pre-fix and live checks pending. Resume task focused BATS 94/94, metrics pytest 169 and dashboard BATS 38/38 passed, but fast gate exposed a hub-data shared TMPDIR collision; isolated fix `8614ebb4` remains on task branch pending scope approval. Agent instruction refresh remains unlanded: broad tests and agy loading unverified. See docs/issues/2026-11-01-dispatch-review-pending-verification.md.
 
+## 2026-11-05 security + telemetry filings
+
+- [ ] P1 sudoers passwordless root escalation: dispatched to Luna. Next: review, independent verify, land; live E4 after `make install-sudoers`.
+- [ ] P1 sudoers LaunchDaemon/exec wildcards: design pending.
+- [ ] P2 dispatch resume ignores task model: Acceptance pending.
+- [ ] P2 agy no-data: root cause recorded; Fix direction is to read agy transcripts.
+- [ ] Plan v1.43.16 lead-model-activity-dashboard: PROPOSED.
+
 ## 2026-11-01 v1.43.13 release prep
 
 - Landed: pushgateway, vault list-kubeconfig, billable warning, run-outcome labels, cleanup env pin, webhook bot thread, machine-setup EC2 key, fast-gate skip `ce0f3f25`.

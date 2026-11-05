@@ -83,3 +83,24 @@ Operator reports **"m5 has nothing"** in response to requested M5 Agy telemetry 
 Combined evidence: M4 `type -a agy` does not list the dedicated wrapper path and its exporter dry-run emitted no `k3dm_agy_*` series; M5 reportedly has no Agy data; Grafana shows all six Agy panels as `No data`. Prioritize tracing the host running the scheduled metrics exporter, then safely enabling wrapper collection on each active worker host and defining host-tagged multi-host aggregation. Avoid pretending that installing a wrapper on M5 alone recovers M4 activity or retroactively reconstructs historical sessions. Preserve existing real `agy` binaries.
 
 **Remaining evidence for exact root cause:** `ls -l` or `readlink` of M4 executable paths; source ledger presence/count on M4/M5; scheduled metrics exporter location and output on M5; Prometheus target freshness. No production modifications or synthetic telemetry are authorized by this note.
+
+## Recurrence and root cause — Argon's 5-hour lead session left no metrics (2026-11-05, Claude, M4)
+
+The operator reported that Gemini Argon's run on the keychain-stall bug (2026-11-03, about 5 h of active work) shows nothing on Agent Activity. Read-only findings on `m4-air.local`:
+
+1. **The wrapper is not installed on the M4.**
+   - `type -a agy` resolves `~/.local/bin/agy`, then `/opt/homebrew/bin/agy`. Both are Mach-O binaries of about 200 MB (the real CLI). `~/.local/bin/agy` is dated 2026-11-04 06:18 and `/opt/homebrew/bin/agy` 2026-11-05 04:31, so agy's own updater writes both paths.
+   - The `make` wrapper install (`Makefile:498-502`) needs `$(AGY_WRAPPER_DIR)/agy` to be a symlink to `bin/k3dm-agy`, and refuses to replace a real binary.
+   - `~/.local/share/k3d-manager/agent-sessions/agy.jsonl` does not exist, so `bin/k3dm-agy` has never recorded a run on this machine.
+2. **Argon worked as the lead (coordinator), not as a dispatched worker.**
+   - The dispatch ledger records it only as `coordinator_identity` on the six Luna dispatches it started (11-03 17:19–19:59 PST).
+   - Its own turns, tokens and time sit outside every collector.
+3. **agy already records everything we need, locally.**
+   - Each session writes `~/.gemini/antigravity-cli/brain/<session>/.system_generated/logs/transcript_full.jsonl`, with `created_at`, `type`, `status` and `tool_calls` on every step, plus `input_tokens`, `cache_read_tokens` and `output_tokens` on model steps. 493 sessions have one.
+   - The Argon session `59d11804-5224-4816-a1d8-d1360fecbf99`: 1,439 steps from 2026-11-04T00:35:05Z to 2026-11-05T13:20:19Z. Its token fields sum to input 3,488,941, cache read 86,963,859 and output 322,136.
+
+**Fix direction (changes the Fix of this bug):**
+- Read the agy transcripts directly, the same way the Claude collector reads `~/.claude/projects/*.jsonl`, instead of relying on the wrapper ledger. This survives agy self-updates and covers interactive lead sessions.
+- Keep the wrapper only for dispatch linkage.
+- Treat the absent wrapper as a `machine-check` warning, not as the data source.
+- Stub fixtures copy step shapes from a real `transcript_full.jsonl` (host, date and session id in a comment). Never copy message content: it can hold repo text and secrets.
