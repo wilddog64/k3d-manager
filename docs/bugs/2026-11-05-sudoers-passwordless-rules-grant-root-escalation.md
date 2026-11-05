@@ -54,6 +54,14 @@ Tests: extend `scripts/tests/bin/install_sudoers.bats` (dry-run output) and add 
 
 Live remediation (operator, after merge): rerun `make install-sudoers` on M4, M5 and M2. It prompts for a password once and overwrites the old file.
 
+## Files
+
+- `bin/install-sudoers.sh`
+- `bin/update-hosts-entry.sh`
+- `scripts/tests/bin/install_sudoers.bats`
+- `scripts/tests/bin/update_hosts_entry.bats`
+- `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`
+
 ## Acceptance
 
 ```yaml
