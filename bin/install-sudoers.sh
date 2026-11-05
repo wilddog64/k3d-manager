@@ -43,18 +43,8 @@ Defaults:%admin  timestamp_timeout=60
 %admin  ALL=(root) NOPASSWD: /usr/bin/install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist
 %admin  ALL=(root) NOPASSWD: /bin/rm -f /Library/LaunchDaemons/com.k3d-manager.*.plist *
 
-# Self-update — allow passwordless re-run of make install-sudoers after first install
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 0755 * /usr/local/bin/k3d-manager-update-hosts
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 0440 /tmp/k3d-manager-sudoers.* /etc/sudoers.d/k3d-manager
-%admin  ALL=(root) NOPASSWD: /bin/rm -f /usr/local/bin/k3d-manager-update-hosts
-
 # /etc/hosts management — scoped helper only (no bare sh -c wildcard)
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3d-manager-update-hosts *
-
-# Binary install to /usr/local/bin (k3s, kubectl, istioctl, vcluster, etc.)
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m [0-9][0-9][0-9] * /usr/local/bin/*
-%admin  ALL=(root) NOPASSWD: /bin/cp * /usr/local/bin/*
-%admin  ALL=(root) NOPASSWD: /bin/chmod [0-9][0-9][0-9] /usr/local/bin/*
 
 # k3s lifecycle (local k3s node)
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s *
