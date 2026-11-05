@@ -2,7 +2,7 @@
 
 ## Handoff — 2026-11-05 sudoers P1 dispatched; lead-model dashboard planned
 
-- **P1 dispatched to Luna:** `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`. It removes the passwordless self-update and `/usr/local/bin` wildcard rules and validates `update-hosts-entry` input. Claude reviews it, runs the independent verifier, and then lands it. Operator remediation after merge: rerun `make install-sudoers` on M4, M5 and M2.
+- **P1 LANDED `4c4f7dd1`** (Luna + Claude hardening), with the independent Sonnet verify running: `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`. It removes the passwordless self-update and `/usr/local/bin` wildcard rules and validates `update-hosts-entry` input. Claude reviews it, runs the independent verifier, and then lands it. Operator remediation after merge: rerun `make install-sudoers` on M4, M5 and M2.
 - **Filed, not dispatched:**
   - P1 `2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent`: a design is needed; recommendation is options B+C.
   - P2 `2026-11-05-dispatch-resume-ignores-task-model-and-records-wrong-worker`: `codex exec resume` has no `-m`, so the 23 keychain resumes ran Terra while the ledger said Luna.

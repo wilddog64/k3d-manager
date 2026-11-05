@@ -36,7 +36,7 @@
 
 ## 2026-11-05 security + telemetry filings
 
-- [ ] P1 sudoers passwordless root escalation: dispatched to Luna. Next: review, independent verify, land; live E4 after `make install-sudoers`.
+- [ ] P1 sudoers passwordless root escalation: LANDED `4c4f7dd1`. Independent verify running; live E4 after the operator runs `make install-sudoers` on M4/M5/M2.
 - [ ] P1 sudoers LaunchDaemon/exec wildcards: design pending.
 - [ ] P2 dispatch resume ignores task model: Acceptance pending.
 - [ ] P2 agy no-data: root cause recorded; Fix direction is to read agy transcripts.

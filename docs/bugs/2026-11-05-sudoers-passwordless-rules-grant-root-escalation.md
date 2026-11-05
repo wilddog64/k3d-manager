@@ -1,6 +1,6 @@
 # Bug: passwordless sudoers rules let any same-user process gain root (self-update and /usr/local/bin wildcards)
 
-**Status:** OPEN — dispatched to Luna (`gpt-6-luna`) 2026-11-05
+**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify pending; live E4 pending the operator rerunning `make install-sudoers`.
 **Priority:** P1
 **Severity:** high — local privilege escalation. Any process running as an `%admin` user (a dispatched Codex/agy agent, a compromised npm/pip postinstall, a malicious repo script) can become root with no password, on every Mac that ran `make install-sudoers`.
 **Filed:** 2026-11-05
@@ -102,3 +102,13 @@ interface:
   - "bin/install-sudoers.sh --dry-run"
   - "bin/update-hosts-entry.sh <hostname> <ip>  (env K3DM_HOSTS_FILE overrides /etc/hosts)"
 ```
+
+## Review notes (Claude, 2026-11-05)
+
+- Luna's diff removes exactly the six rules. Every other rule is unchanged: the dry-run comparison test checks this.
+- **Claude hardening 1.** `update-hosts-entry` now ignores `K3DM_HOSTS_FILE` when `EUID` is 0. The helper runs as root under sudo, and env_reset strips the variable today, but a future `env_keep` or `SETENV` would otherwise turn it into an arbitrary root file write.
+- **Claude hardening 2.** IPv4 octets are limited to `[0-9]{1,3}`. `18446744073709551616.1.1.1` wrapped to 0 in Bash arithmetic and passed the `> 255` check. A mutation check showed the new test fails on Luna's regex.
+- **Pre-fix red.**
+  - N1 and N2: the dry-run tests fail on `7c9927e9`.
+  - N3: 7 of 8 cases fail on `7c9927e9` once the pre-fix helper's `/etc/hosts` is replaced by the test seam. The argument-count case was already guarded by `${1:?}`.
+  - M4 passes on the pre-fix seam copy, as the positive control.
