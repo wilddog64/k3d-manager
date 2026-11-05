@@ -1,6 +1,6 @@
 # Bug: passwordless sudoers rules let any same-user process gain root (self-update and /usr/local/bin wildcards)
 
-**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify pending; live E4 pending the operator rerunning `make install-sudoers`.
+**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify PASS (Sonnet, recorded in the ledger 2026-11-05); live E4 pending the operator rerunning `make install-sudoers`.
 **Priority:** P1
 **Severity:** high — local privilege escalation. Any process running as an `%admin` user (a dispatched Codex/agy agent, a compromised npm/pip postinstall, a malicious repo script) can become root with no password, on every Mac that ran `make install-sudoers`.
 **Filed:** 2026-11-05
@@ -112,3 +112,12 @@ interface:
   - N1 and N2: the dry-run tests fail on `7c9927e9`.
   - N3: 7 of 8 cases fail on `7c9927e9` once the pre-fix helper's `/etc/hosts` is replaced by the test seam. The argument-count case was already guarded by `${1:?}`.
   - M4 passes on the pre-fix seam copy, as the positive control.
+
+## Independent verification (2026-11-05)
+
+A Sonnet verifier wrote 15 BATS tests from the Acceptance block only. Claude reran them:
+- Fix `4c4f7dd1`: rc 0, 15 of 15 pass.
+- Pre-fix `7c9927e9`: rc 1, with 11 red (N1, N2, N2b, N3a–N3h).
+- M1–M4 pass on both versions, as the positive controls.
+
+The evidence is recorded with `k3dm-codex-dispatch verify`. Its verifier header was normalised to `claude-sonnet-independent`, because the validator rejects spaces and parentheses.
