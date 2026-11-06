@@ -196,7 +196,7 @@ YAML
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq "$(wc -l < "$config" | tr -d ' ')" ]
   [[ "$output" == *"service: http://127.0.0.1:8000"* ]]
-  [[ "$output" != *"frontend.3ai-talk.org"$'\n'"    service: http://127.0.0.2:80"* ]]
+  [[ "$output" != *"frontend.3ai-talk.org"$'\n'"    service: http://127.0.0.2:18082"* ]]
 }
 
 @test "_hub_recovery_render_cloudflared_config: hostinger and unknown providers preserve config" {
@@ -218,7 +218,7 @@ YAML
   export -f _kubectl _info
   run _hub_recovery_install_cloudflared_config hub-context app-context
   [ "$status" -eq 0 ]
-  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+  grep -Fq 'service: http://127.0.0.2:18082' "$HOME/.cloudflared/config.yml"
 }
 
 @test "_hub_recovery_install_cloudflared_config: only hub frontend uses k3d" {
@@ -237,7 +237,7 @@ YAML
   run _hub_recovery_install_cloudflared_config hub-context app-context
   [ "$status" -eq 0 ]
   [[ "$output" == *"no frontend deployment found"* ]]
-  grep -Fq 'service: http://127.0.0.2:80' "$HOME/.cloudflared/config.yml"
+  grep -Fq 'service: http://127.0.0.2:18082' "$HOME/.cloudflared/config.yml"
 }
 
 @test "_hub_recovery_install_cloudflared_config: explicit provider override wins" {

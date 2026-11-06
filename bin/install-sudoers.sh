@@ -38,18 +38,6 @@ _SUDOERS_CONTENT='# k3d-manager passwordless '"${_SUDO}"' rules
 Defaults:%admin  timestamp_timeout=60
 %admin  ALL=(root) NOPASSWD: /usr/bin/true
 
-# macOS loopback alias — 127.0.0.2 for frontend port-forward
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 -alias *
-
-# macOS launchd — system-scope daemon lifecycle for k3d-manager plists only
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.*.plist
-
-# macOS LaunchDaemons — install and remove k3d-manager plists only
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/rm -f /Library/LaunchDaemons/com.k3d-manager.*.plist *
-
 # /etc/hosts management — scoped helper only (no bare sh -c wildcard)
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3d-manager-update-hosts *
 
@@ -58,15 +46,19 @@ Defaults:%admin  timestamp_timeout=60
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-killall.sh
 
-# systemd service management (Linux / Ubuntu EC2 — harmless on macOS where paths do not exist)
+'
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  _SUDOERS_CONTENT+='# systemd service management (Linux / Ubuntu EC2)
 %admin  ALL=(root) NOPASSWD: /usr/bin/systemctl *
 
-# Package managers (Linux only — paths do not resolve on macOS)
+# Package managers (Linux only)
 %admin  ALL=(root) NOPASSWD: /usr/bin/apt-get *
 %admin  ALL=(root) NOPASSWD: /usr/bin/dnf *
 %admin  ALL=(root) NOPASSWD: /usr/bin/yum *
 %admin  ALL=(root) NOPASSWD: /usr/bin/microdnf *
 '
+fi
 
 _mode="install"
 for _arg in "$@"; do

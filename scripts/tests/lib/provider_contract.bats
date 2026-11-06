@@ -948,7 +948,7 @@ EOF
     :
   }
   _hostinger_restart_launchd() {
-    printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/restart.log"
+    printf '%s %s %s\n' "$1" "$2" "$3" >> "${BATS_TEST_TMPDIR}/restart.log"
   }
   _hostinger_refresh_access_layer
 
@@ -1022,7 +1022,11 @@ EOF
   [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
-  [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
+  [[ "${output}" == *"com.k3d-manager.browser.argocd-https ${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist user"* ]]
+  local browser_line cloudflare_line
+  browser_line="$(grep -nF "com.k3d-manager.browser.argocd-https " "${BATS_TEST_TMPDIR}/restart.log" | cut -d: -f1)"
+  cloudflare_line="$(grep -nF "com.k3d-manager.cloudflare-tunnel " "${BATS_TEST_TMPDIR}/restart.log" | cut -d: -f1)"
+  [ "${browser_line}" -lt "${cloudflare_line}" ]
   [[ "${output}" == *"com.k3d-manager.vault-port-forward"* ]]
 }
 

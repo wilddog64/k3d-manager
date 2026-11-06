@@ -87,9 +87,13 @@ STUB
   [ "$(grep -Fc '_run_command --interactive-sudo -- /usr/bin/install' "$SCRIPT")" -eq 2 ]
 }
 
-@test "sudoers content includes launchctl NOPASSWD rule" {
-  run grep -F 'NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist' bin/install-sudoers.sh
+@test "sudoers dry-run removes browser LaunchDaemon and alias rules" {
+  run "$SCRIPT" --dry-run
   [ "$status" -eq 0 ]
+  [[ "$output" != *"/Library/LaunchDaemons"* ]]
+  [[ "$output" != *"ifconfig lo0"* ]]
+  [[ "$output" != *"launchctl bootstrap system"* ]]
+  [[ "$output" != *"launchctl bootout system"* ]]
 }
 
 @test "sudoers grants the noninteractive true readiness probe" {
@@ -130,27 +134,37 @@ STUB
   expected=$(cat <<'RULES'
 Defaults:%admin  timestamp_timeout=60
 %admin  ALL=(root) NOPASSWD: /usr/bin/true
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 -alias *
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/rm -f /Library/LaunchDaemons/com.k3d-manager.*.plist *
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3d-manager-update-hosts *
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s *
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-killall.sh
-%admin  ALL=(root) NOPASSWD: /usr/bin/systemctl *
-%admin  ALL=(root) NOPASSWD: /usr/bin/apt-get *
-%admin  ALL=(root) NOPASSWD: /usr/bin/dnf *
-%admin  ALL=(root) NOPASSWD: /usr/bin/yum *
-%admin  ALL=(root) NOPASSWD: /usr/bin/microdnf *
 RULES
 )
+  if [[ "$(uname -s)" == Linux ]]; then
+    expected+=$'\n%admin  ALL=(root) NOPASSWD: /usr/bin/systemctl *\n%admin  ALL=(root) NOPASSWD: /usr/bin/apt-get *\n%admin  ALL=(root) NOPASSWD: /usr/bin/dnf *\n%admin  ALL=(root) NOPASSWD: /usr/bin/yum *\n%admin  ALL=(root) NOPASSWD: /usr/bin/microdnf *'
+  fi
   run "$SCRIPT" --dry-run
   [ "$status" -eq 0 ]
   actual=$(printf '%s\n' "$output" | grep -E '^(Defaults:|%admin  ALL=)')
   [ "$actual" = "$expected" ]
+}
+
+@test "dry-run scopes Linux package rules to Linux uname" {
+  local stub_bin="${BATS_TEST_TMPDIR}/uname-bin"
+  mkdir -p "${stub_bin}"
+  cat > "${stub_bin}/uname" <<'STUB'
+#!/bin/sh
+printf '%s\n' "${FAKE_UNAME:-Darwin}"
+STUB
+  chmod +x "${stub_bin}/uname"
+  run env PATH="${stub_bin}:${PATH}" FAKE_UNAME=Darwin "$SCRIPT" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"/usr/bin/systemctl"* ]]
+  run env PATH="${stub_bin}:${PATH}" FAKE_UNAME=Linux "$SCRIPT" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/usr/bin/systemctl *"* ]]
+  [[ "$output" == *"/usr/bin/apt-get *"* ]]
+  [[ "$output" == *"/usr/bin/microdnf *"* ]]
 }
 
 @test "install-sudoers N2 never grants passwordless System Keychain trust" {

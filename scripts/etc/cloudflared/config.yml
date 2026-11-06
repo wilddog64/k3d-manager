@@ -5,7 +5,7 @@ ingress:
   - hostname: argocd.3ai-talk.org
     service: http://127.0.0.1:8080
   - hostname: frontend.3ai-talk.org
-    service: http://127.0.0.2:80
+    service: http://127.0.0.2:18082
   - hostname: keycloak.3ai-talk.org
     service: http://127.0.0.1:8880
   - hostname: prometheus.3ai-talk.org

@@ -378,12 +378,12 @@ function _hostinger_write_argocd_browser_https_wrapper() {
   CURL_BIN="${curl_bin}" \
   LOG_FILE="${log_file}" \
   LOCAL_HOST="127.0.0.1" \
-  LOCAL_PORT="${ARGOCD_BROWSER_PORT:-443}" \
+  LOCAL_PORT="18443" \
   UPSTREAM_HOST="127.0.0.1" \
   UPSTREAM_PORT="8080" \
   CERT_FILE="${ARGOCD_BROWSER_TLS_CERT_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/fullchain.crt}" \
   KEY_FILE="${ARGOCD_BROWSER_TLS_KEY_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/tls.key}" \
-  HEALTHZ_URL="https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz" \
+  HEALTHZ_URL="https://127.0.0.1:18443/healthz" \
   STARTUP_TIMEOUT="${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}" \
     envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $CERT_FILE $KEY_FILE $HEALTHZ_URL $STARTUP_TIMEOUT' \
       < "${template_path}" > "${wrapper_path}"
@@ -402,9 +402,9 @@ set -euo pipefail
 export KUBECONFIG="${HOME}/.kube/config"
 _log="${log_file}"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:18082" >> "\${_log}"
   ${kubectl_bin} --context "${_HOSTINGER_KUBE_CONTEXT}" port-forward --address=127.0.0.2 \
-    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+    svc/frontend 18082:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
@@ -420,7 +420,7 @@ function _hostinger_write_frontend_browser_plist() {
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.k3d-manager.frontend-browser-http</string>
+  <string>com.k3d-manager.browser.hostinger-frontend-http</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
@@ -710,33 +710,18 @@ PLIST
     "${_kc_pf_label}" \
     "${_kc_pf_plist}" \
     user
+  _hostinger_restart_launchd \
+    "com.k3d-manager.browser.argocd-https" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist" \
+    user
   _hostinger_restart_cloudflared
   _hostinger_restart_launchd \
-    "com.k3d-manager.argocd-browser-https" \
-    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
-    system
-  _hostinger_restart_launchd \
-    "com.k3d-manager.keycloak-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
-    system
-  local _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
-  _hostinger_write_frontend_browser_plist \
-    "${_frontend_browser_plist_tmp}" \
-    "${_frontend_browser_wrapper}" \
-    "${_frontend_browser_log}"
-  if [[ ! -f "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" ]] || \
-      ! diff -q "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" >/dev/null 2>&1; then
-    _run_command --interactive-sudo --quiet --soft -- install -m 644 \
-        "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-      || _warn "[k3s-hostinger] could not install frontend-browser-http plist — public frontend may still point at another provider"
-  fi
-  rm -f "${_frontend_browser_plist_tmp}"
-  _hostinger_restart_launchd \
-    "com.k3d-manager.frontend-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-    system
+    "com.k3d-manager.browser.keycloak-http" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist" \
+    user
+  local _frontend_browser_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist"
+  _hostinger_write_frontend_browser_plist "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" "${_frontend_browser_log}"
+  _hostinger_restart_launchd "com.k3d-manager.browser.hostinger-frontend-http" "${_frontend_browser_plist}" user
   if [[ ! -f "${_vault_pf_plist}" && -f "${_vault_pf_tmpl}" ]]; then
     _info "[k3s-hostinger] Vault port-forward plist missing — installing from template..."
     local _vault_pf_kubectl
