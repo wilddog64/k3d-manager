@@ -1,6 +1,6 @@
 # Bug: HubDataExportNeverRan on hub
 
-**Status:** OPEN — investigation required; screenshot evidence only
+**Status:** OPEN — alert cleared 2026-11-05 and exports run; the earlier gap is unexplained and a restore is untested
 **Priority:** P2
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
@@ -35,3 +35,10 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 ## Prior-art / duplication check (2026-11-02)
 
 Related existing bug: `docs/bugs/2026-10-11-hub-data-export-fails-under-launchd-and-dr-alerts-never-deployed.md` — marked FIXED with live proof on M4 (export success and rule deployed). The current screenshot shows `HubDataExportNeverRan` on hub after the M5 migration. Treat this as a **possible recurrence or metric migration gap**, not a confirmed new export implementation defect. Compare Pushgateway series identity, export artifacts and launchd schedule on current hub. If the same Oct 11 defect is confirmed, consolidate this report into the older bug and close/remove this duplicate.
+
+## Read-only M5 check, 2026-11-06 about 17:40Z
+
+- `HubDataExportNeverRan` last fired 2026-11-05 11:33Z. The history available starts 2026-11-03 12:03Z and it fired from then on.
+- The export metric first appears 2026-11-05 11:39Z. The latest success is 2026-11-06 11:39Z, with 3 exports kept, 243931174 bytes, and launchd reports exit 0.
+- The Pushgateway pod has not restarted since 2026-10-30, so a wiped metric does not explain the gap: the run due about 2026-11-04 11:30Z did not leave a metric. Why is not established.
+- Whether an export can be restored was not tested; this check was read-only.

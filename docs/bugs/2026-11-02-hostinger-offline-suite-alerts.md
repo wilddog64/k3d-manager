@@ -1,6 +1,6 @@
 # Bug: OfflineSuiteRunIncomplete and OfflineSuiteFailing on ubuntu-hostinger
 
-**Status:** OPEN — investigation required; screenshot evidence only
+**Status:** ROOT CAUSE FOUND 2026-11-06 — still firing; fix spec `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md`
 **Priority:** P2
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
@@ -35,3 +35,10 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 ## Prior-art / duplication check (2026-11-02)
 
 Related: `docs/bugs/2026-10-10-offline-suite-count-floor-stale-and-partial-runs.md` (LIVE-VERIFIED, introduced `OfflineSuiteRunIncomplete`), `docs/bugs/2026-10-15-offline-suite-failing-no-email-after-40m.md` (OPEN, alert delivery failure rather than test failure), `docs/bugs/2026-10-05-offline-tests-rotted-on-v1-41-0.md` (FIXED) and Oct 28 offline-suite verification documents. These explain alert semantics and earlier incidents but **do not yet identify the Nov 1 failing test cases**. Correlate run IDs, latest test output and metrics; if this is a repeat of an existing failing test, update that bug rather than creating parallel remediation work.
+
+## Read-only M5 check, 2026-11-06 about 17:40Z
+
+- The rules run on the Hostinger Prometheus, not the hub's, and route to `platform-warning` on its own Alertmanager. The hub's Alertmanager never lists them.
+- `OfflineSuiteFailing` and `OfflineSuiteRunIncomplete` are active from 2026-10-29 12:44Z and `OfflineSuiteStale` from 2026-11-04 23:42Z. They are one failure, not three: the nightly `make test-all` on the M5.
+- Last run 2026-11-06 about 12:36Z: 29 of 1995 failed, exit 2, run incomplete. Last pass 2026-10-28 22:42Z.
+- The agent's log has 125 `No module named 'yaml'` lines. Not every one of the 29 is proven to be this cause; whatever remains after the fix gets its own bug.

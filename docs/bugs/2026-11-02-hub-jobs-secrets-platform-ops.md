@@ -1,6 +1,6 @@
 # Bug: KubeJobFailed in secrets and platform-ops
 
-**Status:** OPEN — investigation required; screenshot evidence only
+**Status:** OPEN — narrowed 2026-11-06: one stale Job still fires, and `acg-expiry-check` failure bursts have no logs left
 **Priority:** P2
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
@@ -35,3 +35,9 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 ## Prior-art / duplication check (2026-11-02)
 
 Earlier `KubeJobFailed` bugs include `docs/bugs/2026-10-02-ldap-password-rotator-never-succeeds.md` (identity namespace), `docs/bugs/2026-10-05-argocd-cve-scan-exits-nonzero-when-no-newer-chart.md` (platform-ops), and `docs/bugs/2026-10-21-hermes-minio-upload-status-not-visible.md` (notification visibility). **Same alert name does not establish same Job/root cause**. Screenshot provides namespaces `secrets` and `platform-ops` but not Job names. Compare owning Jobs to these records and Hermes R10 superseded-job handling before implementing any fix; merge back to prior bug if matched.
+
+## Read-only M5 check, 2026-11-06 about 17:40Z
+
+- Only `secrets/vault-unseal-watchdog-29889925` still fires, from 2026-10-30. It is a retained Job object; its fix is `dd248543`. Deleting it needs the operator's approval.
+- `platform-ops/acg-expiry-check` failed in bursts, its Job names decoding to about 2026-11-01 23:00Z to 2026-11-02 00:00Z and 2026-11-04 08:30Z to 12:30Z. It is not firing now and the latest three runs complete in 3s.
+- Those Jobs and their logs are gone, so the cause of the bursts is not established. Check the next burst while its pods exist.

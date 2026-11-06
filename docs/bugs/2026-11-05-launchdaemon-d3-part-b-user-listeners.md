@@ -1,6 +1,6 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** FIX INCOMPLETE on the Hostinger path (Correction 4, found 2026-11-06, open). Landed so far: `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 PARTIAL on the M4 2026-11-06 (see below); agents, URLs, `make up` and the M5 pass are not proven.
+**Status:** Correction 4 LANDED `632ac235`, verify PASS (`docs/bugs/2026-11-06-hostinger-refresh-skips-argocd-keycloak-browser-agents.md`). Landed earlier: `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 PARTIAL on the M4 2026-11-06 (see below); agents, URLs, `make up` and the M5 pass are not proven.
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05
@@ -174,7 +174,7 @@ launchd's override database still lists `com.k3d-manager.frontend-browser-http` 
 
 The reboot also exposed a separate outage, not caused by Part B: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md`.
 
-## Correction 4 (Claude review, 2026-11-06): the Hostinger path never writes two of the agents (OPEN)
+## Correction 4 (Claude review, 2026-11-06): the Hostinger path never writes two of the agents (LANDED `632ac235`)
 
 Fix spec: `docs/bugs/2026-11-06-hostinger-refresh-skips-argocd-keycloak-browser-agents.md`.
 

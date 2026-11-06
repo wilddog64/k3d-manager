@@ -1,6 +1,6 @@
 # Bug: TargetDown for ubuntu-k3s pushgateway
 
-**Status:** OPEN — investigation required; screenshot evidence only
+**Status:** CLOSED 2026-11-06 — not recurring in the history available; the Nov 1-2 cause cannot be recovered
 **Priority:** P2
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
@@ -35,3 +35,9 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 ## Prior-art / duplication check (2026-11-02)
 
 Related: `docs/bugs/2026-10-08-cleanup-stale-sandbox-kills-hostinger-pushgateway-forward.md` (FIXED, concerns Hostinger Pushgateway port-forward), plus `docs/bugs/2026-10-15-acg-up-prometheus-forward-missing-after-success.md`. Screenshot's target is `ubuntu-k3s` with `job=pushgateway`, **not explicitly Hostinger**. Do not assume an identical regression. Verify actual target endpoint, expected sandbox lifecycle and service ownership; consolidate with older bug only if matching cause is proven.
+
+## Read-only M5 check, 2026-11-06 about 17:40Z
+
+- The hub Prometheus keeps 3 days, so its history starts 2026-11-03 12:00Z and does not reach the screenshot.
+- Since then `TargetDown` has fired only for `job=federate-acg cluster=acg`, not for a pushgateway. Both pushgateway targets report `up 1`.
+- The `federate-acg` alert is a separate matter: `host.internal:19190` refuses connections, active since 2026-11-04 10:00Z, and nothing listens on 19190 on the M5. Whether a sandbox should be up then was not checked.
