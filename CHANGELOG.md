@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Derive 30-day open-bug history from git commits on the release ref independent of Prometheus retention, publishing to Pushgateway group `k3dm-bug-open-history`, and add the "Open by priority, last 30 days (from git)" stacked bar chart to the Bugs dashboard.
+
 ## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.

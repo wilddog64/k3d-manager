@@ -1381,10 +1381,12 @@ def test_lib_foundation_series_carry_repo_and_push_to_their_own_instance(metrics
     assert {job: method for job, (method, _body) in pushes.items()} == {
         "k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST",
         "k3dm-plan-docs": "PUT",
+        "k3dm-bug-open-history/instance/k3d-manager": "PUT",
         "k3dm-bug-docs/instance/lib-foundation": "POST",
         "k3dm-bug-open/instance/lib-foundation": "PUT",
         "k3dm-bug-releases/instance/lib-foundation": "POST",
-    }
+        "k3dm-bug-open-history/instance/lib-foundation": "PUT",
+    }  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-bug-open-history
     for job, (_method, body) in pushes.items():
         if job == "k3dm-plan-docs":
             assert 'k3dm_plan_info_skipped{repo="k3d-manager"}' in body
@@ -1428,10 +1430,10 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
     lf_jobs = {job for job in pushes if job.endswith("/instance/lib-foundation")}
     assert lf_jobs == {
         "missing_dir": set(), "no_origin_main": set(),
-        "tally_fails": {"k3dm-bug-docs/instance/lib-foundation"},
+        "tally_fails": {"k3dm-bug-docs/instance/lib-foundation", "k3dm-bug-open-history/instance/lib-foundation"},
         "fetch_fails": {"k3dm-bug-docs/instance/lib-foundation", "k3dm-bug-open/instance/lib-foundation",
-                        "k3dm-bug-releases/instance/lib-foundation"},
-    }[breakage]
+                        "k3dm-bug-releases/instance/lib-foundation", "k3dm-bug-open-history/instance/lib-foundation"},
+    }[breakage]  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-bug-open-history
     assert "lib-foundation" in capsys.readouterr().err
 
 
@@ -1460,3 +1462,133 @@ def test_not_before_floor_is_midnight_in_the_operator_time_zone(metrics, monkeyp
     pacific = ZoneInfo("America/Los_Angeles")
     for bound in ("low", "mid", "high"):
         assert datetime.fromtimestamp(row[bound], pacific).strftime("%Y-%m-%d %H:%M") == "2026-11-03 00:00"
+
+
+def test_bug_open_history_across_dates_and_commits_e1(metrics, tmp_path):
+    # E1 proves [M1, M2, M3, N1, N2]
+    # Fixture asserts scratch repo is not the real repository tree
+    assert tmp_path.resolve() != ROOT.resolve()
+    assert not (tmp_path / ".git").exists() or (tmp_path / ".git").resolve() != (ROOT / ".git").resolve()
+
+    repo = tmp_path / "repo"
+    bugs = repo / "docs/bugs"
+    bugs.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    # Day 1: 2026-11-01T10:00:00Z
+    (bugs / "bug1.md").write_text("# bug1\n**Priority:** P1\n**Status:** Open\n", encoding="utf-8")
+    (bugs / "bug2.md").write_text("# bug2\n**Priority:** P2\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 1 commit", "2026-11-01T10:00:00Z")
+
+    # Day 2: 2026-11-02T15:00:00Z
+    (bugs / "bug3.md").write_text("# bug3\n**Priority:** P0\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 2 commit", "2026-11-02T15:00:00Z")
+
+    # Day 3: doc closed on day 3, plus positive control commit at 23:59:58Z
+    (bugs / "bug1.md").write_text("# bug1\n**Priority:** P1\n**Status:** FIXED\n", encoding="utf-8")
+    _commit(repo, "day 3 close bug1", "2026-11-03T12:00:00Z")
+    (bugs / "bug4.md").write_text("# bug4\n**Priority:** P3\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 3 late commit 23:59:58Z", "2026-11-03T23:59:58Z")
+
+    # Day 4: commit at 00:00:01Z on day 4
+    (bugs / "bug5.md").write_text("# bug5\n**Priority:** P1\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 4 early commit 00:00:01Z", "2026-11-04T00:00:01Z")
+
+    now = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc)
+    output = metrics._bug_open_history(repo, "main", days=5, now=now)
+
+    # N1: a date before the ref's first commit emits no sample (no zero rows invented for pre-history)
+    assert 'date="2026-10-31"' not in output
+    # N1 positive control: a date on or after the first commit does emit samples
+    assert 'date="2026-11-01"' in output
+
+    # M3: every emitted date carries all five priorities (P0 P1 P2 P3 unset), zeros included
+    for date_str in ("2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04"):
+        for priority in ("P0", "P1", "P2", "P3", "unset"):
+            pattern = f'k3dm_bug_open_history{{repo="k3d-manager",priority="{priority}",date="{date_str}"}} '
+            assert pattern in output
+
+    # N2: a commit made after a date's 23:59:59Z never changes that date's counts
+    # bug5 committed on 2026-11-04T00:00:01Z must NOT be counted on 2026-11-03
+    # on Day 3: bug1 is fixed, bug5 not added -> P1 is 0
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P1",date="2026-11-03"} 0' in output
+    # N2 positive control: commit at 23:59:58Z (bug4) does change day 3
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P3",date="2026-11-03"} 1' in output
+    # Day 4 includes bug5 -> P1 is 1
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P1",date="2026-11-04"} 1' in output
+
+    # M1 & M2: for today's date the history equals the current k3dm_bug_docs{state="open"} counts on the same ref
+    current_inventory = metrics._bug_metrics(repo, "main")
+    for priority in ("P0", "P1", "P2", "P3", "unset"):
+        history_val = re.search(rf'k3dm_bug_open_history\{{repo="k3d-manager",priority="{priority}",date="2026-11-04"\}} (\d+)', output).group(1)
+        current_val = re.search(rf'k3dm_bug_docs\{{repo="k3d-manager",priority="{priority}",state="open"\}} (\d+)', current_inventory).group(1)
+        assert history_val == current_val
+
+
+def test_bug_open_history_push_and_failure_isolation_e2(metrics, monkeypatch, tmp_path, capsys):
+    # E2 proves [M4, N3, N4, N5]
+    # N5: tests never push to the live hub Pushgateway (assert URL points to stub/127.0.0.1:9 first)
+    monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://127.0.0.1:9/stub")
+    push_url = metrics._pushgateway_url()
+    assert push_url.startswith("http://127.0.0.1:9") or "stub" in push_url
+
+    pushed = []
+    monkeypatch.setitem(
+        metrics.publish_bug_metrics.__globals__,
+        "_push_bug_group",
+        lambda job, payload, method="POST", instance=None: pushed.append((job, method, instance, payload)) or True
+    )
+
+    km = tmp_path / "km"
+    _git_repo(km, {"km-open.md": "# km open\n**Priority:** P1\n**Status:** OPEN\n"})
+    lf = _lib_foundation(tmp_path)
+    monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(lf))
+    km_tally = {"releases": {"v1.43.0": _bucket()}, "fixed_in": {}}
+    monkeypatch.setitem(
+        metrics.publish_bug_metrics.__globals__,
+        "_tally",
+        lambda root, ref=None, full=False, repo="k3d-manager", repo_dir=None: km_tally if full else km_tally["releases"]
+    )
+
+    # 1. Normal run (no failure):
+    assert metrics.publish_bug_metrics(km) is True
+
+    # M4: k3dm-bug-open-history pushed with PUT once for k3d-manager and once for lib-foundation (instance = repo)
+    calls = [(job, method, instance) for job, method, instance, _payload in pushed]
+    assert ("k3dm-bug-open-history", "PUT", "k3d-manager") in calls
+    assert ("k3dm-bug-open-history", "PUT", "lib-foundation") in calls
+
+    # N3 positive control: run with no failure pushes dates
+    km_history_body = next(payload for job, _method, inst, payload in pushed if job == "k3dm-bug-open-history" and inst == "k3d-manager")
+    assert 'k3dm_bug_open_history{repo="k3d-manager"' in km_history_body
+
+    # N4: existing groups and series keep their names, labels and values on the same fixture
+    assert ("k3dm-bug-docs", "POST", None) in calls
+    assert ("k3dm-bug-open", "PUT", None) in calls
+    assert ("k3dm-bug-releases", "POST", None) in calls
+    assert ("k3dm-plan-docs", "PUT", None) in calls
+
+    # 2. Failure run: cat-file call fails for one date
+    pushed.clear()
+    real_bug_texts = metrics.publish_bug_metrics.__globals__["_bug_texts"]
+
+    def failing_bug_texts(root, ref=None, repo="k3d-manager"):
+        # Fail during history scan when called on specific commit ref
+        if ref and len(ref) == 40:
+            raise subprocess.CalledProcessError(1, ["git", "cat-file", "--batch"], stderr="simulated cat-file failure")
+        return real_bug_texts(root, ref, repo=repo)
+
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_bug_texts", failing_bug_texts)
+    assert metrics.publish_bug_metrics(km) is True
+
+    failure_calls = [(job, method, instance) for job, method, instance, _payload in pushed]
+    # N3: failure while computing any date pushes nothing for k3dm-bug-open-history
+    assert not any(job == "k3dm-bug-open-history" and inst == "k3d-manager" for job, _m, inst in failure_calls)
+    # N3: does not stop other bug groups from publishing
+    assert any(job == "k3dm-bug-docs" and inst is None for job, _m, inst in failure_calls)
+    assert any(job == "k3dm-bug-open" and inst is None for job, _m, inst in failure_calls)
+    assert any(job == "k3dm-bug-releases" and inst is None for job, _m, inst in failure_calls)
+    err = capsys.readouterr().err
+    assert "bug open history skipped (non-fatal):" in err

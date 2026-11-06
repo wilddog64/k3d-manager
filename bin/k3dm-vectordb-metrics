@@ -10,7 +10,7 @@ import tempfile
 import time
 import urllib.request
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -181,6 +181,49 @@ def _bug_metrics(root, ref=None, texts=None, repo="k3d-manager"):
     lines = [f'k3dm_bug_docs{{repo="{repo}",priority="{priority}",state="{state}"}} {counts[(priority, state)]}'
              for priority, state in counts]
     lines.append(f'k3dm_bug_docs_scan_timestamp_seconds{{repo="{repo}"}} {time.time()}')
+    return "\n".join(lines) + "\n"
+
+
+def _bug_open_history(root, ref=None, days=30, repo="k3d-manager", now=None):
+    root = Path(root)
+    target_ref = ref or "HEAD"
+    now_dt = now or datetime.now(timezone.utc)
+    if isinstance(now_dt, (int, float)):
+        now_dt = datetime.fromtimestamp(now_dt, timezone.utc)
+    elif now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=timezone.utc)
+
+    today = now_dt.date()
+    dates = [today - timedelta(days=i) for i in reversed(range(days))]
+
+    date_commits = {}
+    for d in dates:
+        date_str = d.strftime("%Y-%m-%d")
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-list", "-1", f"--before={date_str}T23:59:59Z", target_ref],
+            capture_output=True, text=True, check=True, timeout=60
+        )
+        commit = result.stdout.strip()
+        if commit:
+            date_commits[date_str] = commit
+
+    commit_counts = {}
+    for commit in set(date_commits.values()):
+        texts = _bug_texts(root, commit, repo=repo)
+        counts = {priority: 0 for priority in PRIORITIES}
+        for text in texts.values():
+            priority, state = doc_meta(text)
+            if state == "open":
+                counts[priority] += 1
+        commit_counts[commit] = counts
+
+    lines = []
+    for date_str, commit in date_commits.items():
+        counts = commit_counts[commit]
+        for priority in PRIORITIES:
+            lines.append(f'k3dm_bug_open_history{{repo="{repo}",priority="{priority}",date="{date_str}"}} {counts[priority]}')
+    scan_ts = time.time() if now is None else (now if isinstance(now, (int, float)) else now_dt.timestamp())
+    lines.append(f'k3dm_bug_open_history_scan_timestamp_seconds{{repo="{repo}"}} {scan_ts}')
     return "\n".join(lines) + "\n"
 
 
@@ -938,6 +981,11 @@ def publish_bug_metrics(root, ref=None):
         _push_bug_group("k3dm-bug-open", open_bugs, method="PUT")
     except Exception as exc:
         print(f"open bug metrics skipped (non-fatal): {exc}", file=sys.stderr)
+    try:
+        history = _bug_open_history(root, ref, repo="k3d-manager")
+        _push_bug_group("k3dm-bug-open-history", history, method="PUT", instance="k3d-manager")
+    except Exception as exc:
+        print(f"bug open history skipped (non-fatal): {exc}", file=sys.stderr)
     if tally is None:
         print("bug release metrics skipped (non-fatal): no tally", file=sys.stderr)
         _publish_lib_foundation_bugs()
@@ -975,6 +1023,11 @@ def _publish_lib_foundation_bugs():
     except Exception as exc:
         print(f"lib-foundation bug inventory skipped (non-fatal): {exc}", file=sys.stderr)
         return
+    try:
+        history = _bug_open_history(root, "origin/main", repo="lib-foundation")
+        _push_bug_group("k3dm-bug-open-history", history, method="PUT", instance="lib-foundation")
+    except Exception as exc:
+        print(f"lib-foundation bug open history skipped (non-fatal): {exc}", file=sys.stderr)
     try:
         payload = _tally(ROOT, "origin/main", full=True, repo="lib-foundation", repo_dir=root)
         tally = payload["releases"]

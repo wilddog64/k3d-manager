@@ -27,7 +27,22 @@ open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Eac
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
 where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
-scan age, a **Bugs** table, and open-by-priority over time (pinned to the last 3 days, the hub Prometheus retention). Each document is classified by status:
+scan age, a **Bugs** table, and two open-by-priority trend panels side by side: **Open by priority over time**
+(pinned to the last 3 days, the hub Prometheus retention) and **Open by priority, last 30 days (from git)**.
+
+The 30-day panel derives historical inventory directly from git rather than Prometheus metric retention.
+For each of the last 30 UTC dates D (today included), the scanner picks the last commit on the release ref
+at or before `D 23:59:59Z` (`git rev-list -1 --before=<D>T23:59:59Z <ref>`). Dates before the ref's first
+commit are skipped. Each distinct commit is evaluated once with `_bug_texts` and `doc_meta`, and its open
+bug counts by priority are reused for every date mapping to it. The entire 30-day history is published
+with `PUT` to the Pushgateway group `k3dm-bug-open-history` (instance = repo), emitting
+`k3dm_bug_open_history{repo,priority,date}` with all five priorities (P0, P1, P2, P3, unset; zeros included)
+so the stacked bars line up. The dashboard panel reads this with an instant query of
+`sum by (date, priority) (k3dm_bug_open_history{repo="$repo"})`, keeping the standard priority colours.
+Unlike the 3-day panel, which queries Prometheus timeseries `k3dm_bug_docs{state="open"}` and is limited
+to Prometheus's 3-day retention (`retention: 3d`), the 30-day panel's data is retained across Prometheus
+restarts or new hub cutovers. Like the 3-day panel, this is an inventory snapshot, not opened/fixed
+events: a falling count does not prove a fix. Each document is classified by status:
 
 | Status | Doc `**Status:**` value begins with |
 |---|---|

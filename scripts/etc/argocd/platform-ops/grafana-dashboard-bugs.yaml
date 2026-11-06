@@ -1516,7 +1516,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 62,
-            "w": 24,
+            "w": 12,
             "h": 8
           },
           "description": "This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted. Hub Prometheus keeps 3 days (retention: 3d), so this panel always shows the last 3 days, whatever range the dashboard is set to. A new hub starts empty and fills to 3 days.",
@@ -1630,6 +1630,173 @@ data:
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
+          }
+        },
+        {
+          "id": 18,
+          "type": "barchart",
+          "title": "Open by priority, last 30 days (from git)",
+          "description": "Counts are open docs per day, read from the last commit of each UTC day on the release ref. This is an inventory snapshot, not opened/fixed events: a falling count does not prove a fix. Not limited by Prometheus retention.",
+          "gridPos": {
+            "x": 12,
+            "y": 62,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (date, priority) (k3dm_bug_open_history{repo=\"$repo\"})",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "date"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "rowField": "date",
+                "columnField": "priority",
+                "valueField": "Value",
+                "emptyValue": "null"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "date\\\\priority",
+                "renamePattern": "date"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "date": 0,
+                  "P0": 1,
+                  "P1": 2,
+                  "P2": 3,
+                  "P3": 4,
+                  "unset": 5
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P0"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "dark-red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P1"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P2"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P3"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "yellow"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "unset"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#8e8e8e"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "xField": "date",
+            "stacking": "normal",
+            "showValue": "never",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "xTickLabelRotation": 0,
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           }
         },
         {

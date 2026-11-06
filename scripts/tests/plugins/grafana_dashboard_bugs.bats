@@ -459,9 +459,10 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 3
+assert len(bars) == 4
 for panel in bars:
-    assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
+    if panel["id"] in (7, 8, 25):
+        assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
     matrix = next(x for x in panel["transformations"] if x["id"] == "groupingToMatrix")
     assert matrix["options"]["emptyValue"] == "null", panel["title"]
     assert not panel["fieldConfig"]["defaults"].get("mappings"), panel["title"]
@@ -478,10 +479,10 @@ def colours(panel):
     return {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
             for o in panel["fieldConfig"]["overrides"] if o["properties"][0]["id"] == "color"}
 panels = {panel["id"]: panel for panel in data["panels"]}
-by_priority = [panels[index] for index in (7, 25)]
+by_priority = [panels[index] for index in (7, 18, 25)]
 by_state = [p for p in data["panels"] if p["type"] == "barchart"
             and "state)" in " ".join(t["expr"] for t in p["targets"])]
-assert len(by_priority) == 2 and len(by_state) == 1
+assert len(by_priority) == 3 and len(by_state) == 1
 first = colours(by_priority[0])
 assert set(first) == {"P0", "P1", "P2", "P3", "unset"}
 assert all(colours(p) == first for p in by_priority)
@@ -496,7 +497,7 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 3
+assert len(bars) == 4
 for panel in bars:
     assert panel["options"]["showValue"] == "never", panel["title"]
     assert panel["options"]["tooltip"]["mode"] == "multi", panel["title"]
@@ -827,6 +828,50 @@ data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1
 panel = next(p for p in data["panels"] if p["title"] == "Open by priority over time")
 assert panel.get("timeFrom") == "3d", panel.get("timeFrom")
 assert "retention: 3d" in panel["description"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard has 30-day open-by-priority history panel next to 3-day panel" {
+  run python3 - "${dashboard}" "${metrics}" <<'PY'
+import json, sys
+from pathlib import Path
+dashboard, metrics_path = sys.argv[1:]
+data = json.loads(Path(dashboard).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {p["id"]: p for p in data["panels"]}
+
+# New panel exists with instant query and $repo scope
+new_panel = next((p for p in data["panels"] if p.get("title") == "Open by priority, last 30 days (from git)"), None)
+assert new_panel is not None, "new panel missing"
+assert new_panel["type"] == "barchart"
+target = new_panel["targets"][0]
+assert target["expr"] == 'sum by (date, priority) (k3dm_bug_open_history{repo="$repo"})'
+assert target.get("instant") is True
+
+# Metric is emitted by exporter
+source = Path(metrics_path).read_text()
+assert "k3dm_bug_open_history" in source
+
+# 3-day panel is unchanged
+p15 = panels[15]
+assert p15["title"] == "Open by priority over time"
+assert p15["targets"][0]["expr"] == 'sum by (priority) (k3dm_bug_docs{repo="$repo",state="open"})'
+assert p15.get("timeFrom") == "3d"
+
+# Positions do not overlap
+cells = set()
+for panel in data["panels"]:
+    pos = panel["gridPos"]
+    assert pos["x"] + pos["w"] <= 24, panel["title"]
+    for x in range(pos["x"], pos["x"] + pos["w"]):
+        for y in range(pos["y"], pos["y"] + pos["h"]):
+            assert (x, y) not in cells, f"collision at ({x}, {y}) for {panel['title']}"
+            cells.add((x, y))
+
+# Next to 3-day panel at y=62
+assert p15["gridPos"]["y"] == 62
+assert new_panel["gridPos"]["y"] == 62
+assert p15["gridPos"]["h"] == new_panel["gridPos"]["h"]
 PY
   [ "${status}" -eq 0 ]
 }
