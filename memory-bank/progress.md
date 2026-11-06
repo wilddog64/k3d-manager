@@ -2276,3 +2276,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] bug-open-history (agy Flash): landed 71dd01e7 + test fix 0f518142; verify PASS 2026-11-05; live E4 pending platform-ops.
 - [ ] P0 dispatch gates: S1 (v1.43.14, Luna + agy in parallel) after current three tasks verified; S2–S5 moved to v1.43.16 (2026-11-05).
 - 2026-11-05: D3 Part B landed (`7e6d9324` + `b122ffb1`). First land refused by the fast gate: `makefile_cloudflared_config.bats` fixture still edited the old `127.0.0.2:80` origin; fixed to 18082. Second refusal: two hub_restore `_run_with_tty` tests red whenever stdin is inherited (reproduced on the base branch, pass with `</dev/null`); Recurrence appended to the 2026-10-06 hub-restore bug. Third land with `</dev/null`: 400/400.
+- 2026-11-06: payment PR #100: CI all green, Copilot no comments, E3 green (CI runtime base digest is alpine 3.24.4, plus apk upgrade). Waiting on operator merge; then E1 Trivy compare.

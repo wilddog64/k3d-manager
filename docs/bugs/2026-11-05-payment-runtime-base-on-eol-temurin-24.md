@@ -1,6 +1,6 @@
 # Bug: payment's runtime base moved to eclipse-temurin:24-jre-alpine, a frozen non-LTS tag on alpine 3.22.1, so each new build has more CRITICAL CVEs than the deployed one
 
-**Status:** IN REVIEW. Fix `0b8c2df` on `fix/runtime-lts-base` (Luna, reviewed by Claude); E2 green, branch CI green (run 42151157909). PR wilddog64/shopping-cart-payment#100 opened 2026-11-05 on the operator go ("go ahead for P2 bug"). E3 in PR CI, E1 after merge.
+**Status:** IN REVIEW. Fix `0b8c2df` on `fix/runtime-lts-base` (Luna, reviewed by Claude); E2 green. PR wilddog64/shopping-cart-payment#100 opened 2026-11-05 on the operator go ("go ahead for P2 bug"): all CI checks pass, Copilot left no comments. E3 green (see below). Waiting on the operator merge; E1 after merge.
 **Priority:** P2
 **Severity:** medium. If the newest payment image were promoted, it would replace one CRITICAL OS finding with five. Today the CVE loop cannot promote it (see the tag-pagination bug), so nothing bad has shipped yet. Once that bug is fixed, the loop would promote this image.
 **Filed:** 2026-11-05
@@ -53,3 +53,9 @@ evidence:
 interface:
   - "wilddog64/shopping-cart-payment Dockerfile and .github/dependabot.yml"
 ```
+
+## PR #100 checks (Claude, 2026-11-06)
+
+- `gh pr checks 100`: every check passes, including Image Build Check (run 42154175281, job 127685008246). Build, Scan & Push is skipped on a PR, as expected.
+- Copilot: one COMMENTED review, "No open issues", no inline comments. Its note says it could not run at the selected tier, so this is a light review.
+- **E3:** the job built the image with runtime `FROM eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c…` and ran `RUN apk upgrade --no-cache && addgroup …`. On the M4, `docker run --rm --entrypoint cat <that digest> /etc/alpine-release` gives `3.24.4`. The built image is that base plus `apk upgrade`, so it is 3.24 or newer. The PR job does not push an image, so this checks the base digest, not the built image's own file.
