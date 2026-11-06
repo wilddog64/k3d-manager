@@ -253,7 +253,8 @@ else:
     if not os.path.exists(backup):
         with open(path, 'rb') as source, open(backup, 'xb') as target:
             shutil.copyfileobj(source, target)
-    original['ProgramArguments'] = ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o',
+    identity = os.path.abspath(os.path.expanduser('~/.ssh/k3dm_hub_forward'))
+    original['ProgramArguments'] = ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-i', identity, '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none', '-o', 'BatchMode=yes', '-o',
         'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o',
         'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, host]
     original.pop('Program', None)
@@ -261,6 +262,54 @@ else:
     with open(path, 'wb') as target:
         plistlib.dump(original, target)
     reload()
+PYCODE
+}
+
+install_forward_key() {
+  local public_key
+  # shellcheck disable=SC2016 # Expand HOME on the remote old host, not on this hub.
+  public_key="$(old_ssh 'mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh" && { test -f "$HOME/.ssh/k3dm_hub_forward" || ssh-keygen -q -t ed25519 -N "" -C k3dm-hub-forward -f "$HOME/.ssh/k3dm_hub_forward"; } && chmod 600 "$HOME/.ssh/k3dm_hub_forward" && cat "$HOME/.ssh/k3dm_hub_forward.pub"')" || {
+    echo "hub-cutover: cannot create or read ~/.ssh/k3dm_hub_forward on $OLD_HOST" >&2; return 1;
+  }
+  [[ "$public_key" =~ ^ssh-ed25519[[:space:]]+[A-Za-z0-9+/]+=*[[:space:]]+k3dm-hub-forward$ ]] || {
+    echo "hub-cutover: invalid public key in ~/.ssh/k3dm_hub_forward.pub on $OLD_HOST" >&2; return 1;
+  }
+  python3 - "$HOME/.ssh/authorized_keys" "$public_key" "$FORWARDS" <<'PYCODE'
+import os, re, sys, tempfile
+path, public, forwards = sys.argv[1:]
+match = re.fullmatch(r'ssh-ed25519 ([A-Za-z0-9+/]+=*) k3dm-hub-forward', public)
+if not match:
+    raise SystemExit('hub-cutover: invalid forward public key')
+ports = []
+with open(forwards) as source:
+    for line in source:
+        if line.strip() and not line.lstrip().startswith('#'):
+            fields = line.rstrip('\n').split('|')
+            if len(fields) < 2 or not fields[1].isdigit(): raise SystemExit('hub-cutover: invalid forward manifest')
+            ports.append(fields[1])
+if not ports: raise SystemExit('hub-cutover: empty hub forwards manifest')
+directory = os.path.dirname(path)
+os.makedirs(directory, mode=0o700, exist_ok=True)
+os.chmod(directory, 0o700)
+try:
+    with open(path, 'rb') as source: contents = source.read()
+except FileNotFoundError: contents = b''
+body = match.group(1).encode('ascii')
+if not any(re.search(rb'\bssh-ed25519\s+' + re.escape(body) + rb'(?:\s|$)', line) for line in contents.splitlines()):
+    options = ['command="/usr/bin/false"', 'restrict', 'port-forwarding']
+    options += ['permitopen="127.0.0.1:' + port + '"' for port in ports]
+    options += ['permitlisten="127.0.0.1:1"']
+    entry = (','.join(options) + ' ' + public + '\n').encode('ascii')
+    separator = b'\n' if contents and not contents.endswith(b'\n') else b''
+    fd, temporary = tempfile.mkstemp(prefix='.authorized_keys.', dir=directory)
+    try:
+        with os.fdopen(fd, 'wb') as target:
+            os.fchmod(target.fileno(), 0o600)
+            target.write(contents + separator + entry)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+os.chmod(path, 0o600)
 PYCODE
 }
 
@@ -287,16 +336,25 @@ forwards_ready() {
 
 repoint_forwards() {
   [[ "$NEW_HOST" =~ ^[a-zA-Z0-9._-]+$ ]] || { echo 'hub-cutover: invalid new host' >&2; return 1; }
-  if ! old_ssh "ssh -o BatchMode=yes -o ConnectTimeout=10 '$NEW_HOST' true"; then
-    echo "hub-cutover: cutover passed, but old host cannot ssh to $NEW_HOST; set up key login on $OLD_HOST (ssh-copy-id $NEW_HOST) and rerun make hub-cutover-forwards" >&2
+  install_forward_key || return 1
+  local check_rc
+  old_ssh "env -u SSH_AUTH_SOCK ssh -F /dev/null -i ~/.ssh/k3dm_hub_forward -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes -o ConnectTimeout=10 '$NEW_HOST' true" || check_rc=$?
+  check_rc="${check_rc:-0}"
+  if [[ "$check_rc" -eq 255 ]]; then
+    echo "hub-cutover: tunnel key ~/.ssh/k3dm_hub_forward on $OLD_HOST cannot authenticate to $NEW_HOST without an agent" >&2
     append_report forwards-skipped; return 1
   fi
-  if for_each_forward install && forwards_ready; then
-    append_report forwards-pass; return 0
+  if ! for_each_forward install; then
+    append_report forwards-failed
+    echo 'hub-cutover: cutover itself passed, but forwarding failed; rerun make hub-cutover-forwards' >&2
+    return 1
   fi
-  append_report forwards-failed
-  echo 'hub-cutover: cutover itself passed, but forwarding failed; rerun make hub-cutover-forwards' >&2
-  return 1
+  if ! forwards_ready; then
+    append_report forwards-failed
+    echo 'hub-cutover: cutover itself passed, but forwarding failed; rerun make hub-cutover-forwards' >&2
+    return 1
+  fi
+  append_report forwards-pass; return 0
 }
 
 rollback() {

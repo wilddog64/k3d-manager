@@ -12,6 +12,9 @@ setup() {
   export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
   export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local HUB_NEW_HOST=m5-air.local
   [[ "$HOME" == "$WORK/home" && "$HUB_CUTOVER_STATE_DIR" == "$WORK/state" ]]
+  # Real read-only public-key format capture: ssh-keygen on cliang's workstation, 2026-11-06.
+  ssh-keygen -q -t ed25519 -N '' -C k3dm-hub-forward -f "$WORK/captured-forward-key"
+  export STUB_FORWARD_PUBLIC_KEY="$(cat "$WORK/captured-forward-key.pub")"
   export OLD_HOME="$WORK/old-home"
   mkdir -p "$OLD_HOME/Library/LaunchAgents"
   python3 - "$OLD_HOME" <<'PYCODE'
@@ -89,7 +92,13 @@ while [[ "$1" == -o ]]; do opts+="$2 "; shift 2; done
 [[ "$opts" == *BatchMode=yes* && "$opts" == *ClearAllForwardings=yes* ]] || { echo "ssh without BatchMode/ClearAllForwardings" >&2; exit 97; }
 [[ "${STUB_SSH_DENIED:-0}" == 0 ]] || exit 255
 printf 'ssh host=%s command=%s\n' "$1" "$2" >> "$CALLS"
-if [[ "$2" == ssh\ -o* ]]; then exit "${STUB_FORWARD_SSH_DENIED:-0}"; fi
+if [[ "$2" == *'cat "$HOME/.ssh/k3dm_hub_forward.pub"'* ]]; then
+  mkdir -p "$OLD_HOME/.ssh"
+  if [[ ! -f "$OLD_HOME/.ssh/k3dm_hub_forward" ]]; then printf 'private-key-placeholder\n' > "$OLD_HOME/.ssh/k3dm_hub_forward"; fi
+  if [[ "${STUB_INVALID_FORWARD_KEY:-0}" == 1 ]]; then printf 'ssh-rsa invalid\n'; else printf '%s\n' "$STUB_FORWARD_PUBLIC_KEY"; fi
+  exit 0
+fi
+if [[ "$2" == *'ssh -F /dev/null'* ]]; then exit "${STUB_FORWARD_SSH_DENIED:-1}"; fi
 if [[ "$2" == python3\ -* ]]; then HOME="$OLD_HOME" bash -c "$2"; exit $?; fi
 if [[ "$2" == curl\ -* ]]; then
   if [[ -n "${STUB_FORWARD_FAIL_FIRST:-}" ]]; then
@@ -627,16 +636,134 @@ for label, port in (("hub-pushgateway-port-forward", "19094"), ("hub-loki-port-f
     with open(path, 'rb') as f: current = plistlib.load(f)
     with open(path + '.pre-cutover', 'rb') as f: original = plistlib.load(f)
     assert original['ProgramArguments'] == ['kubectl']
-    assert current['ProgramArguments'] == ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    args = current['ProgramArguments']
+    assert args[:14] == ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-i', os.path.join(sys.argv[1], '.ssh/k3dm_hub_forward'), '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes']
+    assert args[14:] == ['-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    assert args[5].startswith('/') and os.environ['STUB_FORWARD_PUBLIC_KEY'].split()[1] not in ' '.join(args)
+    assert 'private-key-placeholder' not in open(path, 'rb').read().decode('latin1')
     assert current['KeepAlive'] and current['StandardOutPath'] == '/tmp/forward.log'
 PYCODE
   grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
 }
 
+@test "forwards: dedicated key is authorized once with forward-only restrictions" {
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  local authorized="$HOME/.ssh/authorized_keys"
+  [ "$(grep -c 'k3dm-hub-forward' "$authorized")" -eq 1 ]
+  grep -Fq 'command="/usr/bin/false",restrict,port-forwarding,permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100",permitlisten="127.0.0.1:1"' "$authorized"
+  grep -Fq 'env -u SSH_AUTH_SOCK ssh -F /dev/null -i ~/.ssh/k3dm_hub_forward -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes' "$CALLS"
+  run grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$status" -eq 1 ]
+  run grep -Fq private-key-placeholder "$CALLS"
+  [ "$status" -eq 1 ]
+  [ "$(stat -f '%Lp' "$HOME/.ssh")" = 700 ]
+  [ "$(stat -f '%Lp' "$authorized")" = 600 ]
+  local original_inode
+  original_inode="$(stat -f '%i' "$authorized")"
+  cp "$authorized" "$WORK/authorized-before"
+  printf '[{"verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'k3dm-hub-forward' "$authorized")" -eq 1 ]
+  [ "$(stat -f '%i' "$authorized")" = "$original_inode" ]
+  cmp "$WORK/authorized-before" "$authorized"
+  [ "$(cat "$OLD_HOME/.ssh/k3dm_hub_forward")" = private-key-placeholder ]
+}
+
+@test "forwards: existing authorized keys retain their bytes and an unterminated last line is separated" {
+  [[ "$HOME" == "$WORK/home" ]]
+  mkdir -p "$HOME/.ssh"
+  printf 'first existing line\nlast existing line' > "$HOME/.ssh/authorized_keys"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  python3 - "$HOME/.ssh/authorized_keys" <<'PYCODE'
+import os, sys
+contents = open(sys.argv[1], 'rb').read()
+prefix = b'first existing line\nlast existing line\n'
+assert contents.startswith(prefix)
+assert contents[len(prefix):].endswith(os.environ['STUB_FORWARD_PUBLIC_KEY'].encode() + b'\n')
+assert contents.count(b'k3dm-hub-forward') == 1
+PYCODE
+}
+
+@test "forwards: failed atomic replacement preserves authorized keys and a retry succeeds" {
+  [[ "$HOME" == "$WORK/home" ]]
+  mkdir -p "$HOME/.ssh" "$WORK/injection"
+  printf 'existing key without newline' > "$HOME/.ssh/authorized_keys"
+  cp "$HOME/.ssh/authorized_keys" "$WORK/authorized-before"
+  local original_inode
+  original_inode="$(stat -f '%i' "$HOME/.ssh/authorized_keys")"
+  cat > "$WORK/injection/sitecustomize.py" <<'PYCODE'
+import os
+original_replace = os.replace
+def fail_authorized_replace(source, destination, *args, **kwargs):
+    if destination == os.path.join(os.environ['HOME'], '.ssh', 'authorized_keys'):
+        with open(source, 'wb') as target:
+            target.write(b'partial temporary write')
+        raise OSError('injected replacement failure')
+    return original_replace(source, destination, *args, **kwargs)
+os.replace = fail_authorized_replace
+PYCODE
+  run env PYTHONPATH="$WORK/injection${PYTHONPATH:+:$PYTHONPATH}" "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'injected replacement failure'* ]]
+  [ "$(stat -f '%i' "$HOME/.ssh/authorized_keys")" = "$original_inode" ]
+  cmp "$WORK/authorized-before" "$HOME/.ssh/authorized_keys"
+  [ "$(find "$HOME/.ssh" -name '.authorized_keys.*' | wc -l | tr -d ' ')" -eq 0 ]
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$HOME/.ssh/authorized_keys"
+}
+
+@test "forwards: each manifest port is authorized, including a third forward" {
+  printf 'extra-forward|19101|fixture\n' >> "$ROOT/scripts/etc/machine/hub-push-forwards.list"
+  python3 - "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.extra-forward.plist" <<'PYCODE'
+import plistlib, sys
+with open(sys.argv[1], 'wb') as target:
+    plistlib.dump({'ProgramArguments': ['kubectl']}, target)
+PYCODE
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -Fq 'permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100",permitopen="127.0.0.1:19101"' "$HOME/.ssh/authorized_keys"
+}
+
+@test "forwards: an empty manifest is refused before authorization" {
+  [[ "$HOME" == "$WORK/home" && "$ROOT" == "$WORK/repo" ]]
+  printf '# no forwards\n' > "$ROOT/scripts/etc/machine/hub-push-forwards.list"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'empty hub forwards manifest'* ]]
+  [ ! -e "$HOME/.ssh/authorized_keys" ]
+}
+
+@test "forwards: failed plist install reports how to retry" {
+  rm "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'rerun make hub-cutover-forwards'* ]]
+  grep -q '"verify": "forwards-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+}
+
+@test "forwards: invalid tunnel public key fails before authorization" {
+  export STUB_INVALID_FORWARD_KEY=1
+  # Fixture proves both destinations are isolated before running the program.
+  [[ "$HOME" == "$WORK/home" && "$OLD_HOME" == "$WORK/old-home" ]]
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'invalid public key'* ]]
+  [ ! -e "$HOME/.ssh/authorized_keys" ]
+}
+
 @test "forwards: failed batch login skips changes after a passing cutover" {
-  export STUB_FORWARD_SSH_DENIED=1
+  export STUB_FORWARD_SSH_DENIED=255
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
+  [[ "$output" == *'tunnel key ~/.ssh/k3dm_hub_forward on m4-air.local cannot authenticate to m5-air.local without an agent'* ]]
   grep -q '"verify": "forwards-skipped"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
   [ ! -e "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ]
   run grep -q 'command=python3 -' "$CALLS"
