@@ -601,7 +601,7 @@ data:
           "title": "Untracked by repo",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 0,
             "y": 26
@@ -644,7 +644,7 @@ data:
           "options": {
             "orientation": "horizontal",
             "namePlacement": "top",
-            "minVizHeight": 8,
+            "minVizHeight": 36,
             "text": {
               "titleSize": 12,
               "valueSize": 16
@@ -657,7 +657,7 @@ data:
           "title": "Sessions by mode",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 6,
             "y": 26
@@ -708,7 +708,7 @@ data:
           "title": "Tokens by repo",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 12,
             "y": 26
@@ -751,7 +751,7 @@ data:
           "options": {
             "orientation": "horizontal",
             "namePlacement": "top",
-            "minVizHeight": 8,
+            "minVizHeight": 36,
             "text": {
               "titleSize": 12,
               "valueSize": 16
@@ -769,7 +769,7 @@ data:
           "title": "Codex active hours",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 18,
             "y": 26
@@ -818,7 +818,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 34
+            "y": 38
           },
           "datasource": {
             "type": "prometheus",
@@ -859,7 +859,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 40
+            "y": 44
           }
         },
         {
@@ -876,7 +876,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -922,7 +922,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -968,7 +968,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -1014,7 +1014,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -1055,7 +1055,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 47
+            "y": 51
           }
         },
         {
@@ -1072,7 +1072,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1118,7 +1118,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1164,7 +1164,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1205,7 +1205,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1256,7 +1256,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 56
+            "y": 60
           },
           "datasource": {
             "type": "prometheus",
@@ -1312,7 +1312,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 56
+            "y": 60
           },
           "datasource": {
             "type": "prometheus",
@@ -1353,7 +1353,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 34
+            "y": 38
           },
           "datasource": {
             "type": "prometheus",

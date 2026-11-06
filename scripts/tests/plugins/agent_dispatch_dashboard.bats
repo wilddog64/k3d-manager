@@ -266,6 +266,38 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent activity: repo gauge height, row layout, and protected panel data" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json,sys
+from pathlib import Path
+text=Path(sys.argv[1]).read_text()
+d=json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n",1)[1].splitlines()))
+panels=d["panels"]; by_id={p["id"]:p for p in panels}
+for panel_id in (54,56):
+    p=by_id[panel_id]
+    assert p["gridPos"]["h"]>=12 and (p["gridPos"]["h"]*38-8-52)/9>=36,p["gridPos"]
+    assert p["options"]["minVizHeight"]>=36,p["options"]
+    assert p["options"]["namePlacement"]=="top"
+    expected={54:[
+      'topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window="$window"}))',
+      '(sum(sum by (repo, mode) (k3dm_codex_untracked_sessions{window="$window"})) - sum(topk(8, sum by (repo, mode) (k3dm_codex_untracked_sessions{window="$window"})))) > 0'],
+      56:[
+      'topk(8, sum by (repo) (k3dm_codex_tokens{window="$window"}))',
+      '(sum(sum by (repo) (k3dm_codex_tokens{window="$window"})) - sum(topk(8, sum by (repo) (k3dm_codex_tokens{window="$window"})))) > 0']}[panel_id]
+    assert [t["expr"] for t in p["targets"]]==expected
+    assert p["targets"][1]["legendFormat"]=="other"
+row=[by_id[i] for i in (54,55,56,57)]
+assert len({p["gridPos"]["y"] for p in row})==len({p["gridPos"]["h"] for p in row})==1
+assert all(p["gridPos"]["h"]==12 for p in row)
+# Only the two repo gauges get the taller minimum.
+assert by_id[55]["options"]["minVizHeight"]==8
+assert "minVizHeight" not in by_id[57]["options"]
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "agent dashboards: each dashboard has unique panel ids and no overlapping rectangles" {
   run python3 - "$BASE" <<'PY'
 import json,sys
