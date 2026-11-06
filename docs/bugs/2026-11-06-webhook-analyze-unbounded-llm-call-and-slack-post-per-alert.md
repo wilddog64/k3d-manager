@@ -1,6 +1,6 @@
 # Bug: the analyzer makes one LLM call and one Slack post for every firing alert, with no cap
 
-**Status:** OPEN — filed and dispatched to Luna 2026-11-06
+**Status:** LANDED `62742959`, independent verify PASS 2026-11-06 (M1 to M4, N1, N2 over all four delivery routes; 6 mutants red). The HTTP route was not exercised offline. Live E2 open, after the M5 webhook restart
 **Priority:** P2
 **Severity:** medium. A large batch spends LLM quota and floods `#grafana-notification`. Nothing is lost.
 **Approval:** not required: non-critical, Claude files and dispatches. Operator told 2026-11-06.

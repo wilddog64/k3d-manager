@@ -2330,4 +2330,6 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-06: P3 Python 3.15 test LANDED `2ee593e3`, verify PASS on the landed commit.
 - 2026-11-06: hub-cutover token-dead LANDED `5b436578`, verify PASS on the landed commit, live E2 open.
 - 2026-11-06: 30-day panel label LANDED `555ac6fa`, verify PASS on the landed commit, live E2 open.
+- 2026-11-06: fan-out cap LANDED `62742959`, verify PASS on the landed commit, live E2 open.
+- 2026-11-06: filed P3 `agent-activity-repo-gauges-clip-values-at-nine-rows`; the 2026-11-01 fix's live E2 failed on the operator's screenshot.
 - 2026-11-06: operator go for the next queue after this batch: D3 Correction 4, resume-model bug, read-only alert check, ACG pair, agy panels.

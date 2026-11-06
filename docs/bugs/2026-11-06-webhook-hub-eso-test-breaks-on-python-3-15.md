@@ -1,6 +1,6 @@
 # Bug: webhook_hub_eso.bats fails on Python 3.15, so no Python on the M4 passes the land gate
 
-**Status:** FIXED `2ee593e3`, independent verify PASS 2026-11-06 under Python 3.15.2 and 3.13.6; offline only, no live evidence required. Not confirmed under Homebrew Python: the shell's `python3` on the M4 is the direnv 3.13 with no PyYAML, which fails `ci_workflow_no_stage2.bats` at the land gate for an unrelated reason (2026-11-06), so lands here still put a PyYAML venv on PATH
+**Status:** FIXED `2ee593e3`, independent verify PASS 2026-11-06 under Python 3.15.2 and 3.13.6; offline only, no live evidence required. Confirmed under Homebrew 3.15.2 on the M4: `webhook_hub_eso.bats` passed in the land gate of `62742959`. The land only needs `/opt/homebrew/bin` first on PATH, because the direnv 3.13 that comes first by default has no PyYAML (unrelated to this fix).
 **Priority:** P3
 **Severity:** low. Test-only; the webhook itself is not affected.
 **Approval:** not required: non-critical, Claude files and dispatches. Operator told 2026-11-06.
