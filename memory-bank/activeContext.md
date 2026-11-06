@@ -8,6 +8,9 @@
 - **P0 S1:** spec committed (`4c6dcd5a`), Claude's spec review done, agy review not run, not dispatched. Gate: D3 Part B and the two alert P2s verified.
 - **Operator decisions 2026-11-06:** tunnel fix is option 1, forward-only key; its spec needs key install steps and a `## Files` section, and it dispatches after the P1 lands (both edit `bin/hub-cutover`). `chrome-cdp` removed from the M4. P1 hub-cutover dispatched to Luna, scope extended to unloaded singletons and the rollback path on the new hub.
 - **P1 hub-cutover landed** `76f34498`, verify PASS; live E3 open. Tunnel fix dispatched to Luna; after landing the operator runs `make hub-cutover-forwards` on the M5. A rollback to the M4 still needs the undo steps in the bug doc.
+- **Frontend 502 on the M5 (P1, filed, dispatch pending):** root-owned `frontend-browser-http.log` stops the agent with exit 78. Operator recovery: chown + kickstart. Blocks the M5 reboot.
+- **Tunnel fix:** Luna's first attempt reviewed; Correction 1 (trailing newline, atomic write, port count, lost message). Then independent verifier, land, operator `make hub-cutover-forwards`, live E3, E4.
+- **diruse:** scoped only, `docs/plans/v2.0.0-diruse-windows-disk-usage-tool.md`. Operator chose VirtualBox if possible, ACG AWS multi-node, C#/.NET, private. Plan proposes the M4 for the VM, not the M5.
 - **Filed, not dispatched:** `docs/bugs/2026-11-06-bug-dashboard-undeclared-overlaps-panel-out-of-sight.md` (P3); the operator picks the time. If the 30-day open-history panel is still empty after `make platform-ops`, file that too.
 - **With the operator on the M5:** `make platform-ops` then relays, sudoers, `refresh-edge`. These read the M5's own tree from origin, so Luna's M4 worktree does not affect them. Reboot last, after Claude checks.
 - **Done this session:** M4 `hub-vault-profile` reset; payment E1 recorded.

@@ -65,6 +65,13 @@ Rollback restores the `.pre-cutover` plist as it does today. It leaves the key a
 
 **Rollout, after landing.** The operator runs `make hub-cutover-forwards` on the M5 from the release branch. The M4 keeps its login key for all other SSH.
 
+## Correction 1 (Claude review of Luna's first attempt, 2026-11-06)
+
+- If `authorized_keys` has no trailing newline, the new entry is appended to the last line, which breaks both keys and can lock out the existing login.
+- The file is rewritten in place even when nothing changes, so an interruption can truncate it. Write a temp file in the same directory with mode 600, then replace; do not write when the key is present.
+- `len(ports) != 2` hard-codes the count. Build the entries from the list and refuse only an empty one.
+- A failed `for_each_forward install` lost its message. Print the same "rerun make hub-cutover-forwards" message on both failure paths.
+
 ## Files
 
 - `bin/hub-cutover`
@@ -83,6 +90,8 @@ must:
     text: "The cut-over pre-check fails, and names the problem, when the tunnel's own command cannot authenticate without an agent (paired positive control: it passes when it can)."
   - id: M4
     text: "After make hub-cutover-forwards, the new hub's authorized_keys holds the key with the forced command, restrict, a permitopen for each port in hub-push-forwards.list and the permitlisten option."
+  - id: M5
+    text: "Every line already in authorized_keys is unchanged after the run, including a last line with no trailing newline, and the new entry is on its own line."
 must_not:
   - id: N1
     text: "No private key, passphrase or token appears in plist values, process arguments, logs or metrics."
@@ -92,10 +101,12 @@ must_not:
     text: "A re-run does not add a second authorized_keys line for the same key and does not replace an existing key pair."
   - id: N4
     text: "A public key that fails validation is not written to authorized_keys, and the run fails."
+  - id: N5
+    text: "A re-run with the key present does not rewrite authorized_keys, and the file is never replaced by a partial write."
 evidence:
   - {id: E1, proves: [M3], kind: offline, text: "BATS on bin/hub-cutover with an ssh stub that fails only when no agent socket is set; plist and pre-check arguments asserted. Red on the pre-fix commit."}
   - {id: E2, proves: [N1], kind: offline, text: "BATS parses the generated plist with plistlib and asserts the identity is a path only and no key material is present."}
-  - {id: E5, proves: [M4, N3, N4], kind: offline, text: "BATS with HOME in BATS_TEST_TMPDIR (asserted first) and the ssh stub returning a captured-format public key: options asserted, a second run leaves one line, an invalid key leaves the file unchanged and rc non-zero."}
+  - {id: E5, proves: [M4, M5, N3, N4, N5], kind: offline, text: "BATS with HOME in BATS_TEST_TMPDIR (asserted first) and the ssh stub returning a captured-format public key: options asserted, a second run leaves one line, an invalid key leaves the file unchanged and rc non-zero."}
   - {id: E3, proves: [M1, N2], kind: live, text: "Claude, on the M4: env -u SSH_AUTH_SOCK with the plist's exact arguments succeeds; ssh with the key and a remote command runs only the forced command (rc 1, no output from the command asked for); -L to a third port is refused; -R is refused."}
   - {id: E4, proves: [M2], kind: live, text: "Operator reboots the M4; Claude checks both ports answer and a dispatch metrics push reaches the M5."}
 interface:

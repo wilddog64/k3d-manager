@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-06: diruse scoped (`docs/plans/v2.0.0-diruse-windows-disk-usage-tool.md`, roadmap candidate; not scheduled).
+- 2026-11-06: filed P1 `docs/bugs/2026-11-06-browser-agent-exits-78-on-root-owned-log-after-relay-install.md`; M5 frontend 502 until the operator runs chown + kickstart. Tunnel fix: Luna exited, Correction 1 sent after review.
 - 2026-11-06: tunnel fix dispatched to Luna (forward-only key). Operator reports the M5 commands ran; live checks next.
 - 2026-11-06: P1 hub-cutover LANDED 76f34498, verify PASS (13 tests from Acceptance; 11 red pre-fix; 6 mutants red). Live E3 open. Tunnel fix (P2) now unblocked.
 - 2026-11-06: P1 hub-cutover first attempt reviewed; Correction 1 (re-run records, disabled+loaded, rollback on new hub, plan text) and M6-M10 added; resumed Luna.
