@@ -2014,3 +2014,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: dispatched to Luna: 2026-11-05-app-cve-scan-ghcr-tag-pagination (k3d-manager) and 2026-11-05-payment-runtime-lts-base (payment repo, base fix/runtime-lts-base). Both running. Part B finished; reviewing.
 - 2026-11-05: operator asked to dispatch one v1.43.14 plan via agy Gemini 3.8 Flash; Claude picked v1.43.14-bug-open-history-from-git (offline only). Dispatched.
 - 2026-11-05: operator approved the P0 delivery split ("go with your suggestion"): S1 in v1.43.14 (Luna dispatcher half + agy metrics half, fixed event schema), S2–S5 in v1.43.16; agy reviews specs and writes independent tests for S2–S4. Recorded in docs/roadmap.md. Starts after D3 Part B + the two P2s are verified.
+- 2026-11-05: operator approved adding split-work recording to S1 (--parent/--role, combine event, Split work panel).
