@@ -186,15 +186,16 @@ install_tools() {
 
 ensure_python_tools() {
   local venv_dir="${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv" python_bin
-  if command -v ruff >/dev/null 2>&1 && command -v pytest >/dev/null 2>&1; then report python-tools ok; return; fi
-  if [[ -x "$venv_dir/bin/ruff" && -x "$venv_dir/bin/pytest" ]]; then report python-tools ok; return; fi
+  if [[ -x "$venv_dir/bin/python" ]] && "$venv_dir/bin/python" -c 'import pytest, ruff, yaml' >/dev/null 2>&1; then report python-tools ok; return; fi
   if [[ "$mode" != setup ]]; then record_failure python-tools missing; return; fi
   python_bin="$(command -v python3 || true)"
   if [[ -z "$python_bin" ]]; then record_failure python-tools missing; return; fi
-  if ! "$python_bin" -m venv "$venv_dir" || ! "$venv_dir/bin/python" -m pip install 'pytest==9.1.1' 'ruff==0.15.8' >/dev/null; then
+  if [[ ! -x "$venv_dir/bin/python" ]] && ! "$python_bin" -m venv "$venv_dir"; then
     record_failure python-tools missing; return
   fi
-  if [[ ! -x "$venv_dir/bin/ruff" || ! -x "$venv_dir/bin/pytest" ]]; then record_failure python-tools missing; return; fi
+  if ! "$venv_dir/bin/python" -m pip install 'pytest==9.1.1' 'ruff==0.15.8' 'PyYAML==6.0.3' >/dev/null || ! "$venv_dir/bin/python" -c 'import pytest, ruff, yaml' >/dev/null 2>&1; then
+    record_failure python-tools missing; return
+  fi
   report python-tools 'installed (add ~/.local/share/k3d-manager/venv/bin to PATH)'
 
 }
