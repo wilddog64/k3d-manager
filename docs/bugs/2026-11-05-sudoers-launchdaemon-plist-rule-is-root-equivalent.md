@@ -1,6 +1,6 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN: design D1 chosen 2026-11-05. Waiting on pf test S1 (operator-run), then Part 1 goes to Luna.
+**Status:** OPEN. D1 failed its pf test on 2026-11-05 (`lo0` is skipped). D3 (launchd socket relay) is proposed and awaits the operator's go plus its own spike. Nothing has been dispatched.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
@@ -42,7 +42,30 @@ The fix must therefore stop root from executing anything user-writable, not only
 - **D2. Root-owned runtime.** A one-time, password-gated install puts static wrappers, plus pinned copies of `socat` and `curl`, in a root-owned directory (`/usr/local/libexec/k3d-manager`, `root:wheel` 0755). Per-sandbox values (ports, cert paths) come from a data file that the wrapper validates strictly and never sources. Headless runs only `bootout`/`bootstrap`. This keeps a root process that parses user data.
 - C (split sudoers per OS) applies to either.
 
-## Design D1 (chosen)
+## Finding: D1 is not viable (pf tests S1 and S2, M4, 2026-11-05)
+
+- **S1.** The rule loaded into `com.apple/k3dm-pf-spike`, but `curl 127.0.0.3:81` returned nothing.
+- **S2 (diagnostic).**
+  - The main ruleset does reference `rdr-anchor "com.apple/*"`, and the anchor rules are listed.
+  - The `127.0.0.1:81` rule shows `Evaluations: 14  Packets: 0`.
+  - `pfctl -s Interfaces -i lo0` shows **`lo0 (skip)`**, with `References: Rules: 1`.
+  - pf has been enabled for 11 days by another owner (the system), and its main ruleset carries `set skip on lo0`.
+- **Conclusion.** pf never filters or translates loopback traffic on this Mac. `set skip` is a main-ruleset option and cannot be set or cleared from an anchor.
+- D1 would therefore mean replacing Apple's main ruleset, which Part 1's N3 forbids. Apple or another tool could also reload that ruleset at any time.
+- D1 is dropped.
+
+## Proposed D3: launchd socket relay (pending operator go + relay spike)
+
+- launchd itself, which is already root, binds the low port from a static plist `Sockets` entry.
+- For each connection it starts `/usr/bin/nc 127.0.0.1 <high>` as **`UserName nobody`**, through `inetdCompatibility`.
+- `/usr/bin/nc` is a SIP-protected system binary, and every argument is a literal.
+- The real listeners move to user LaunchAgents on high ports, as in D1 Part 2.
+- So no root process runs any user-writable code, and the only root-run binary is launchd.
+- Homebrew `socat` as root was rejected, because it links `/opt/homebrew/opt/openssl@3` dylibs, which are user-writable.
+- **Relay spike** (operator-run, M4): a temporary system job on `127.0.0.1:81` and `127.0.0.3:81` relays to a user listener on 18081. It is removed on exit.
+- **Open check:** binding `127.0.0.2/.3` needs the loopback aliases to exist first. The spike shows whether launchd tolerates that ordering.
+
+## Design D1 (superseded)
 
 Static redirect map. These are the current binds, read from the live wrappers on the M4 on 2026-11-05:
 
