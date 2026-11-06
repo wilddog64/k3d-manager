@@ -1,6 +1,6 @@
 # Bug: the webhook access log cannot tell the operator's own probes from an outsider
 
-**Status:** OPEN
+**Status:** LANDED `b124fb83`, independent verify PASS 2026-11-06 (M1 to M3, N1 to N3 pass; M1 and M2 red on the parent; 7 mutants red). The evidence run removes Luna's test file from the landed export, because the verifier's tree guard refuses a tree containing it. Live E2 open: needs the M5 webhook restart.
 **Priority:** P3
 **Severity:** low. Every request described here was refused; there is no sign of a breach. The gap is that a suspicious request cannot be attributed from this log.
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"; "go ahead to investigate webhook GET / 401 traffic. file bug if necessary and dispatch to Luna"
