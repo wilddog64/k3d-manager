@@ -1,6 +1,6 @@
 # Bug: webhook_hub_eso.bats fails on Python 3.15, so no Python on the M4 passes the land gate
 
-**Status:** OPEN — filed and dispatched to Luna 2026-11-06
+**Status:** FIXED `2ee593e3`, independent verify PASS 2026-11-06 under Python 3.15.2 and 3.13.6; offline only, no live evidence required. The full land gate under Homebrew Python is confirmed at the next land
 **Priority:** P3
 **Severity:** low. Test-only; the webhook itself is not affected.
 **Approval:** not required: non-critical, Claude files and dispatches. Operator told 2026-11-06.
