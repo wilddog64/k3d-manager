@@ -70,6 +70,8 @@ Out of scope:
 
 - `bin/cluster-up`
 - `bin/cluster-down`
+- `bin/cluster-refresh` (added 2026-11-05, correction 3)
+- `scripts/tests/bin/cluster_refresh.bats`
 - `scripts/lib/providers/k3s-hostinger.sh`
 - `bin/install-sudoers.sh`
 - `scripts/etc/cloudflared-config.yml.tmpl`
@@ -100,9 +102,11 @@ must:
     text: "Cloudflare origins served by the Hostinger frontend listener point at http://127.0.0.2:18082."
   - id: M7
     text: "install-sudoers --dry-run on Linux still contains the systemctl/apt-get/dnf/yum/microdnf rules; every rule not named in the Fix is unchanged."
+  - id: M8
+    text: "cluster-refresh regenerates the argocd, keycloak and sandbox-frontend wrappers on their high ports and ensures the three browser.* user agents in gui/<uid> (added 2026-11-05, correction 3)."
 must_not:
   - id: N1
-    text: "No code path in cluster-up, cluster-down or k3s-hostinger.sh writes under /Library/LaunchDaemons, calls launchctl in the system domain, or runs ifconfig, for any of the five legacy labels or the four new ones."
+    text: "No code path in cluster-up, cluster-down, cluster-refresh or k3s-hostinger.sh writes under /Library/LaunchDaemons, calls launchctl in the system domain, or runs ifconfig, for any of the five legacy labels or the four new ones."
   - id: N2
     text: "cluster-up never invokes sudo (directly or via _run_command) for browser listeners, including when relays are missing and stdin is not a TTY."
   - id: N3
@@ -118,7 +122,27 @@ evidence:
 interface:
   - "bin/cluster-up (ACG and Hostinger browser listener steps)"
   - "bin/cluster-down"
+  - "bin/cluster-refresh (section 5, launchd browser listeners)"
   - "scripts/lib/providers/k3s-hostinger.sh refresh path (_hostinger_restart_launchd callers)"
   - "bin/install-sudoers.sh --dry-run"
   - "env: HOME, PATH (stubs), K3DM_LAUNCHD_DIR (relay plist dir lookup, test only, ignored as root)"
 ```
+
+## Correction 3 (Claude review, 2026-11-05): `bin/cluster-refresh` was missed
+
+The spec's writer table left out `bin/cluster-refresh`. Its section 5 ("launchd daemons (system-domain)", ~506–571) still does the following for `argocd-browser-https`, `keycloak-browser-http` and `sandbox.frontend-browser-http`:
+- writes the wrapper on the old ports (443; 127.0.0.3:80);
+- writes each plist to `/Library/LaunchDaemons` through `_system_daemon_install_if_missing`;
+- bootstraps it into the system domain with `_launchd_ensure … system`.
+
+After `make install-browser-relays` removes the legacy daemons, the next `make refresh` would put them back as root daemons running wrappers under `$HOME`. Those daemons bind the same ports as the relays. This breaks N1 and E5.
+
+Fix:
+- Section 5 regenerates the three wrappers exactly the way `cluster-up` now does: same helper functions, high ports 18443, 18080 and 18083, health probes on those ports.
+- It writes and ensures the three `com.k3d-manager.browser.*` plists in `$HOME/Library/LaunchAgents`, using `_launchd_ensure … user`. Reuse `cluster-up`'s plist writer if one can be shared; otherwise write the same plist content.
+- It never calls sudo, `/Library/LaunchDaemons` or `launchctl … system` for these labels.
+- Delete `_system_daemon_install_if_missing` if nothing calls it any more.
+- The Cloudflare tunnel restart (section 6) stays as it is.
+- Tests in `scripts/tests/bin/cluster_refresh.bats`:
+  - M8;
+  - N1 for `cluster-refresh`, using the block-extraction style already in that file, with `HOME` in `BATS_TEST_TMPDIR`, and the stubs asserted on PATH and logging their arguments. Show N1 red on the current worktree version of `cluster-refresh` (which still has the system-daemon code) before fixing it.

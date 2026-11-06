@@ -2021,3 +2021,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: pagination independent verify PASS (Sonnet 15 tests; fix 15/15, pre-fix 6 red), recorded via dispatch verify.
 - 2026-11-05: agy (Flash 3.8 high) bug-open-history landed 71dd01e7; review clean except test_dashboard_queries fixture missing _bug_open_history (Claude fixed, mutation-checked). Claude slip: land --test ended "; true" (masked) — reran unmasked, which caught it. Pending: independent verifier; live E4 after platform-ops.
 - 2026-11-05: bug-open-history independent verify PASS (Sonnet 16 tests; fix 16/16, pre-fix 11 red), recorded.
+- 2026-11-05: Part B review: 14 affected suites green outside the sandbox. Gap found: bin/cluster-refresh still writes 3 legacy root LaunchDaemons. Spec correction 3 added (M8, N1 widened); Luna resumed.
