@@ -1,6 +1,10 @@
 # Progress — compressed operational log
 
-- 2026-11-06: diruse scoped (`docs/plans/v2.0.0-diruse-windows-disk-usage-tool.md`, roadmap candidate; not scheduled).
+- 2026-11-06: tunnel fix LANDED `8e5f8831`, verify PASS (independent suite 25/25, 20 red on pre-fix, 13 mutants red; N4c strict excluded as beyond the spec). Live E3, E4 open.
+- 2026-11-06: M5 frontend back: log owner `cliang`, agent running, listener on 127.0.0.2:18082, public URL 200. P1 log bug dispatched; correction 1 sent (GNU stat abort, double glob, unreachable message, false capture comment, missing tests).
+- 2026-11-06: `_install_virtualbox` / `_install_vagrant` specced for lib-foundation (`docs/plans/lib-foundation-v0.5.5-install-vagrant-virtualbox.md`, branch `feat/install-vagrant-virtualbox`) and dispatched.
+- 2026-11-06: diruse renamed `docs/plans/diruse-windows-disk-usage-tool.md`: own repo, M1 in a gap, main work after v1.46.1, VM on the M4; operator holds a Windows 11 Pro licence.
+- 2026-11-06: diruse scoped (`docs/plans/diruse-windows-disk-usage-tool.md`, roadmap candidate; not scheduled).
 - 2026-11-06: filed P1 `docs/bugs/2026-11-06-browser-agent-exits-78-on-root-owned-log-after-relay-install.md`; M5 frontend 502 until the operator runs chown + kickstart. Tunnel fix: Luna exited, Correction 1 sent after review.
 - 2026-11-06: tunnel fix dispatched to Luna (forward-only key). Operator reports the M5 commands ran; live checks next.
 - 2026-11-06: P1 hub-cutover LANDED 76f34498, verify PASS (13 tests from Acceptance; 11 red pre-fix; 6 mutants red). Live E3 open. Tunnel fix (P2) now unblocked.

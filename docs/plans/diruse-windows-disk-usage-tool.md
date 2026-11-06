@@ -1,7 +1,6 @@
-# v2.0.0 (scoping) — diruse: a Windows disk usage and purge tool
+# diruse: a Windows disk usage and purge tool
 
-**Status:** SCOPING ONLY — not scheduled. No implementation until the open decisions below are
-answered and each milestone has its own spec with an Acceptance block.
+**Status:** SCOPED; sequenced, not started. Own repo, so it takes no k3d-manager version and does not count toward any release's plan cap. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses while v1.47.0's e2e and gate work is active (operator, 2026-11-06). Dates are re-estimated after the move to the $100 plan. No implementation until the open decisions below are answered and each milestone has its own spec with an Acceptance block.
 **Approval:** Scoping: operator, 2026-11-06 ("modify plan accordingly base on your analysis"). Implementation: pending.
 **Filed:** 2026-11-06
 **Branch (when scheduled):** none here; it gets its own repo.
@@ -84,19 +83,14 @@ command line part:
 | Daily development | Vagrant + Windows 11 ARM VM, on the M4 | GUI by eye, local paths, `\\localhost\c$` |
 | Multi-node | Windows Server x64 on an ACG AWS sandbox: one central node, two or more targets | UNC, admin shares, unreachable nodes, fleet purge, real x64 |
 
-- **Vagrant on the M4, not the M5.** The M5 has the room (32 GiB, 50% free, 800 GB disk; read
-  2026-11-06), but it is the hub, and a Windows VM takes memory from its monitoring and public edge.
-  The M4 has 24 GiB, 89% free, 161 GB disk and Vagrant already installed, and it is where agents run.
-  The VM stays halted when not in use. The operator suggested the M5 as a maybe, so this can be reversed.
+- **Vagrant on the M4 (operator, 2026-11-06: "go ahead to use M4").** The M4 has 24 GiB and 161 GB free disk, and it is where agents run; v1.47.0 dedicates the M2 to its own run. The M5 is the hub, so nothing runs there, and the operator is uninstalling its copies. The VM stays halted when not in use.
 - **Vagrant provider: VirtualBox (operator, 2026-11-06).** VirtualBox 7.2 added Windows 11/Arm guests.
   The M4 has VirtualBox 7.2.22, which lists OS type `Windows11_arm64`, and Vagrant 2.4.9, reported to
-  support 7.2 (read 2026-11-06). The M5 has neither. Two things
+  support 7.2 (read 2026-11-06). Three things
   are unproven:
-  - Nothing found confirms Vagrant, VirtualBox and a Windows ARM guest working together end to end,
-    and VirtualBox arm64 boxes are scarce. So expect to build a private box from Microsoft's Windows
-    11 ARM64 ISO; that also avoids trusting a third-party image. M1 proves this first: boot, WinRM,
-    a shared folder and `\\localhost\c$`.
-  - The Windows licence for the VM is not settled.
+  - A Windows ARM guest under this stack is not proven on the M4. `stromweld/windows-11` publishes a VirtualBox arm64 build (read from Vagrant Cloud 2026-11-06), the M2 holds a copy and Windows 11 Arm VMs, and the operator's Ansible repo uses it, but none were booted for this check. M1 proves it first: boot, WinRM, a shared folder and `\\localhost\c$`.
+  - The box is a third-party image. Using it for development is a start; anything nearer company use should come from a box built from Microsoft's Windows 11 ARM64 ISO.
+  - Licence fit. The operator holds a Windows 11 Pro retail licence (2026-11-06; the key is never recorded in a repo, plan or command). A Pro key activates only Pro, the box's edition is unread, and the terms for a VirtualBox Arm guest are unread. It does not settle company use.
   If VirtualBox fails that check, the fallback is `vagrant_utm`, already installed on the M4, then
   VMware Fusion with `apter-tech/vagrant-windows-11-arm64`.
 - **ARM versus x64.** Apple Silicon runs Windows on ARM, where an x64 build runs under emulation.
@@ -262,7 +256,7 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 
 ## Decided (operator, 2026-11-06)
 
-- **Dev environment:** Vagrant with VirtualBox if it works and a Windows image, on the M5 as a maybe; this plan proposes the M4.
+- **Dev environment:** Vagrant with VirtualBox if it works and a Windows image, on the M4.
 - **Multi-node testing:** ACG AWS sandboxes.
 - **Audience:** private, possibly used at the operator's company; no public release.
 - **Name:** stays `diruse`. Where a server still has Microsoft's old `diruse.exe`, run this one by full path.

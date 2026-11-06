@@ -1002,11 +1002,11 @@ of those only if a platform feature still needs it to prove itself.
 
 ### Candidate tool — diruse: Windows disk usage and purge, from one node across many machines
 
-**Proposed 2026-11-06 (operator; scoping only, not scheduled).** A private C#/.NET tool in its own
-repo, in the same window as v2.0.0 and independent of it. It is also the pilot for the intent workflow:
+**Proposed 2026-11-06 (operator).** A private C#/.NET tool in its own
+repo, independent of v2.0.0 and of k3d-manager's version numbers. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses during v1.47.0's e2e and gate work. It is also the pilot for the intent workflow:
 a real request from draft to verified software. Reads ship before deletes; `/autopurge` ships last on
 its own go. Development on Vagrant with VirtualBox, multi-node tests on ACG AWS; both are proven first.
-Scope: [`v2.0.0-diruse-windows-disk-usage-tool.md`](plans/v2.0.0-diruse-windows-disk-usage-tool.md).
+Scope: [`diruse-windows-disk-usage-tool.md`](plans/diruse-windows-disk-usage-tool.md).
 
 ### Candidate theme — v2.x: AI diagnostics and healing gateway
 

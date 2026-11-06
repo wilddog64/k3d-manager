@@ -38,6 +38,15 @@ In `bin/install-browser-relays.sh`, install mode only, after the legacy daemons 
 
 Dry-run and uninstall modes change no ownership. No new sudoers rule: this runs under the operator's interactive `make`.
 
+## Correction 1 (Claude review of Luna's first attempt, 2026-11-06)
+
+- `stat -f '%Su'` fails under GNU stat, which the M4's PATH resolves first (captured 2026-11-06), so the install would abort on any matching log. Use the repo's idiom: `stat -c '%U' -- FILE 2>/dev/null || stat -f '%Su' -- FILE`.
+- `*-browser-http*.log` also matches `*-browser-https*.log`, so an https log is visited twice. One pattern covers both.
+- `_run_command` without `--soft` exits inside itself, so the message naming the file never prints.
+- `$EUID` cannot be stubbed, so N4 was untestable. Read `id -u` in the repair function.
+- The stub's capture comment cited a command that had failed in her sandbox. Replaced with Claude's real capture.
+- M3, N3 and N4 had no tests, and the new test failed.
+
 ## Files
 
 - `bin/install-browser-relays.sh`
