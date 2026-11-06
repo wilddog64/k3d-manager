@@ -1752,7 +1752,7 @@ def _clear_stale_jobs():
                     f"❌ *cluster-{action}* orphaned — webhook restarted mid-job; "
                     f"check cluster state manually (job `{entry.name}`)",
                 )
-            elif status in {"success", "failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
+            elif status in {"success", "failed", "delivery_failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
                 shutil.rmtree(entry, ignore_errors=True)
                 _LOG.info("purged old job %s (status=%s)", entry.name, status)
         except Exception:
@@ -2060,6 +2060,8 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
 
+    delivery_failed = False
+
     try:
         (job_dir / "status").write_text("running")
         alerts = alert_payload.get("alerts", [])
@@ -2113,16 +2115,28 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             _log(analysis + "\n")
 
             message = f"🔍 *{alert_name}* — `{display_name}`\n{analysis}"
+            route = "none"
+            posted = False
+            reason = "no_route_configured"
             if response_url:
-                _slack_post(response_url, message)
+                route = "response_url"
+                posted = bool(_slack_post(response_url, message))
+                reason = "post_failed"
             else:
-                posted = ""
                 if SLACK_BOT_TOKEN and STATUS_CHANNEL_ID:
-                    posted = _post_slack_bot(message, channel_id=STATUS_CHANNEL_ID)
+                    route = "bot"
+                    posted = bool(_post_slack_bot(message, channel_id=STATUS_CHANNEL_ID))
+                    reason = "bot_post_failed"
                 if not posted and SLACK_WEBHOOK_URL:
-                    _slack_post(SLACK_WEBHOOK_URL, message)
+                    route = "webhook_fallback" if route == "bot" else "webhook"
+                    posted = bool(_slack_post(SLACK_WEBHOOK_URL, message))
+                    reason = "webhook_post_failed"
+            if not posted:
+                delivery_failed = True
+                _LOG.warning("slack notification failed job=%s route=%s reason=%s",
+                             job_id, route, reason)
 
-        _finish("success")
+        _finish("delivery_failed" if delivery_failed else "success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
         _finish("failed")
@@ -2799,7 +2813,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         status = (job_dir / "status").read_text().strip()
         output = read_job_output(job_dir, redact=_redact_secrets)
-        classification = {"success": "passed", "failed": "failed_untriaged"}.get(
+        classification = {"success": "passed", "failed": "failed_untriaged",
+                          "delivery_failed": "failed_untriaged"}.get(
             status, "in_progress")
         payload = {
             "job_id": job_id,

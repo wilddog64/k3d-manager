@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import logging
+from http.server import BaseHTTPRequestHandler
 import os
 import sys
 import threading
@@ -13,6 +15,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import webhook.render as render
 
 _WEBHOOK = Path(os.environ.get("K3DM_TEST_WEBHOOK_FILE", ROOT / "bin" / "k3dm-webhook"))
 _spec = importlib.util.spec_from_file_location(
@@ -57,18 +60,91 @@ def test_posts_to_status_channel_when_bot_is_available(monkeypatch, analyze_env,
     assert bot_calls[0][1] == {"channel_id": "C-STATUS"}
     assert "🔍 *DiskFull* — `api`\ntest analysis" == bot_calls[0][0]
     assert webhook_calls == []
+    assert (tmp_path / "job" / "status").read_text() == "success"
 
 
 def test_failed_bot_post_falls_back_to_incoming_webhook(monkeypatch, analyze_env, tmp_path):
     bot_calls = []
     webhook_calls = []
     monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: bot_calls.append((text, kwargs)) or "")
-    monkeypatch.setattr(wh, "_slack_post", lambda *args: webhook_calls.append(args))
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: webhook_calls.append(args) or True)
 
     _run(monkeypatch, tmp_path, [_alert()])
 
     assert len(bot_calls) == 1
     assert webhook_calls == [("https://hooks.invalid/test", bot_calls[0][0])]
+    assert (tmp_path / "job" / "status").read_text() == "success"
+
+
+def test_failed_routes_record_delivery_failed_keep_analysis_and_redact_secrets(
+    monkeypatch, analyze_env, tmp_path, caplog
+):
+    monkeypatch.setattr(wh, "STATUS_CHANNEL_ID", "")
+    monkeypatch.setattr(wh, "SLACK_WEBHOOK_URL", "https://hooks.invalid/secret-url")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: False)
+    with caplog.at_level(logging.WARNING, logger="webhook"):
+        _run(monkeypatch, tmp_path, [_alert()])
+
+    assert (tmp_path / "job" / "status").read_text() == "delivery_failed"
+    assert "test analysis" in (tmp_path / "job" / "output").read_text()
+    assert "route=webhook" in caplog.text
+    assert "reason=webhook_post_failed" in caplog.text
+    assert "secret-url" not in caplog.text
+    assert "test-token" not in caplog.text
+
+
+def test_no_configured_route_records_delivery_failed(monkeypatch, analyze_env, tmp_path, caplog):
+    monkeypatch.setattr(wh, "STATUS_CHANNEL_ID", "")
+    monkeypatch.setattr(wh, "SLACK_WEBHOOK_URL", "")
+    monkeypatch.setattr(wh, "SLACK_BOT_TOKEN", "")
+    with caplog.at_level(logging.WARNING, logger="webhook"):
+        _run(monkeypatch, tmp_path, [_alert()])
+
+    assert (tmp_path / "job" / "status").read_text() == "delivery_failed"
+    assert "route=none" in caplog.text
+    assert "reason=no_route_configured" in caplog.text
+
+
+def test_response_url_failure_records_delivery_failed(monkeypatch, analyze_env, tmp_path, caplog):
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: False)
+    with caplog.at_level(logging.WARNING, logger="webhook"):
+        _run(monkeypatch, tmp_path, [_alert()], response_url="https://hooks.invalid/response")
+
+    assert (tmp_path / "job" / "status").read_text() == "delivery_failed"
+    assert "route=response_url" in caplog.text
+
+
+@pytest.mark.parametrize(("response_code", "expected_status"), [(200, "success"), (500, "delivery_failed")])
+def test_local_response_endpoint_result_controls_job_status(
+    monkeypatch, analyze_env, tmp_path, caplog, response_code, expected_status
+):
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            self.send_response(response_code)
+            self.end_headers()
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        assert server.server_address[0] == "127.0.0.1"
+        local_url = f"http://127.0.0.1:{server.server_address[1]}/slack"
+        monkeypatch.setattr(render, "_is_allowed_slack_url", lambda url: url == local_url)
+        monkeypatch.setattr(wh, "_slack_post", render._slack_post)
+        with caplog.at_level(logging.WARNING, logger="webhook"):
+            _run(monkeypatch, tmp_path, [_alert()], response_url=local_url)
+        assert (tmp_path / "job" / "status").read_text() == expected_status
+        if response_code == 500:
+            assert "route=response_url" in caplog.text
+            assert "reason=post_failed" in caplog.text
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_response_url_takes_precedence(monkeypatch, analyze_env, tmp_path):
