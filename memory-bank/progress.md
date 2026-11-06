@@ -2273,3 +2273,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] D1 pf test: S1 FAIL; S2 diagnostic pending (operator).
 - [ ] LaunchDaemon P1: D3 Part A landed + verified 2026-11-05; Part B dispatched to Luna 2026-11-05 (operator go).
 - [ ] P2 app-cve-scan GHCR tag pagination: dispatched to Luna 2026-11-05. [ ] P2 payment runtime on EOL temurin 24: dispatched to Luna 2026-11-05 (payment repo; ships before pagination deploy). [x] operator replaced revoked Slack webhook 2026-11-06 (live probe 400, not 404).
+- [ ] P0 dispatch gates: S1 (v1.43.14, Luna + agy in parallel) after current three tasks verified; S2–S5 moved to v1.43.16 (2026-11-05).
