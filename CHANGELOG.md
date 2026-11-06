@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Remove the unused `scripts/playwright/acg_extend.js`, which still read the old login profile directory; `acg.sh` uses the lib-foundation copy.
+
 - Add validated Cloudflare client IP and sanitized User-Agent fields to webhook request access logs.
 
 - Require `K3DM_STATUS_CHANNEL_ID` during hub preparation, report its plist presence in `webhook-doctor --check`, and document analyzer delivery verification during M5 migration.

@@ -2,7 +2,8 @@
 
 **Filed:** 2026-11-04
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — static source investigation complete; live M5/M2 collector and wrapper inspection pending
+**Status:** OPEN — dispatched to Luna 2026-11-06; the Fix section below replaces "Proposed fix / acceptance"
+**Approval:** operator, 2026-11-06: "go with your suggestion". The exporter and dashboard change only; it starts no hub workload change beyond the ArgoCD-synced dashboard.
 **Priority:** P2 — loss of AI activity observability across machine migration / worker execution
 **Severity:** Moderate — missing telemetry and misleading visibility, not evidence that agy itself stopped working
 **Component:** `bin/k3dm-agy`, `bin/k3dm-dispatch-metrics`, `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml`, machine-setup / hub cutover, `docs/guides/grafana-dashboards/k3dm-agent-activity.md`
@@ -104,3 +105,76 @@ The operator reported that Gemini Argon's run on the keychain-stall bug (2026-11
 - Keep the wrapper only for dispatch linkage.
 - Treat the absent wrapper as a `machine-check` warning, not as the data source.
 - Stub fixtures copy step shapes from a real `transcript_full.jsonl` (host, date and session id in a comment). Never copy message content: it can hold repo text and secrets.
+
+## Read-only check, 2026-11-06 (Claude, `m4-air` and `m5-air`)
+
+- `m4-air`: 493 transcripts, newest about 16 h old. `m5-air`: 30 transcripts, newest about 6 h old. Neither host has `agent-sessions/agy.jsonl`.
+- Step keys seen in the newest 40 transcripts on both hosts: `step_index`, `source`, `type`, `status`, `created_at`, `content`, `input_tokens`, `cache_read_tokens`, `output_tokens`, `thinking`, `tool_calls`, `error`. Types: `USER_INPUT`, `PLANNER_RESPONSE`, `GENERIC`, `SYSTEM_MESSAGE`, `CHECKPOINT`. Statuses: `DONE`, `ERROR`, `RUNNING`. `created_at` looks like `2026-11-06T02:45:59Z`; token fields are integers and appear only on `PLANNER_RESPONSE`. Neither a working directory nor a mode is present.
+- The exporter runs from dispatch events and pushes one shared `k3dm-dispatch` group, so today it reports the M4. No launchd agent runs it on either host.
+
+## Fix
+
+Scope: the host running the exporter. Combining hosts is out of scope and needs its own decision, so the panel states which host it reports.
+
+1. Add a transcript collector to `bin/k3dm-dispatch-metrics`. It reads `~/.gemini/antigravity-cli/brain/*/.system_generated/logs/transcript_full.jsonl`, skipping files not modified inside the longest window. `K3DM_AGY_BRAIN_DIR` overrides the root. The session id is the directory name.
+2. It reads only `created_at` and the three token fields. It must never read `content`, `thinking`, `tool_calls` or `error` into any output. Malformed lines and non-integer or boolean tokens are skipped, and skipped lines are counted in `k3dm_agy_transcript_skipped_lines`.
+3. For each window: a session counts in `k3dm_agy_sessions` if any step falls inside the window. Tokens sum the steps inside the window, as `kind` values `input_tokens`, `cache_read_tokens` and `output_tokens`. `k3dm_agy_active_seconds` sums the gaps between consecutive in-window steps, with each gap capped at 300 s, so a session left idle for hours does not count as work.
+4. Labels are `mode="unknown"` and `repo="unknown"`, because the transcript holds neither. A session is untracked unless its id equals a `session` on an `exit` event in the dispatch ledger with `agent` agy.
+5. When the brain directory exists, it is the only source of these series, so a wrapper-recorded run is not counted twice. When it does not exist, today's `agy.jsonl` path runs unchanged. The wrapper stays for dispatch linkage.
+6. Emit `k3dm_agy_source_present{host="<short hostname>",source="transcripts|ledger|none"} 1` on every render, and `k3dm_agy_latest_step_timestamp` when a step was seen. Absence never emits a zero session count.
+7. Add one stat panel, `agy data source`, at x 12, y 60, w 6, h 8, showing the host and source, with `none` shown as a warning. Its description says what the row covers: the host named, interactive and print sessions, no combining across hosts.
+8. `make machine-check` (or `--check` in `bin/k3dm-machine-setup`) reports `agy wrapper: absent` as a warning that does not fail, never as the data source.
+
+## Files
+
+- `bin/k3dm-dispatch-metrics`
+- `bin/k3dm-machine-setup`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml`
+- `docs/guides/grafana-dashboards/k3dm-agent-activity.md`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats`
+- `CHANGELOG.md`
+
+## What NOT to do
+
+- Do not copy `~/.gemini/antigravity` or `antigravity-cli` content, credentials or message text anywhere, including test fixtures.
+- Do not run `agy` to create data. Do not install the wrapper.
+- Do not push from tests: `K3DM_DISPATCH_PUSHGATEWAY_URL` is `http://127.0.0.1:9`, and the test asserts it.
+- Fixtures use the step shape recorded above, with host and date in a comment and invented, content-free values.
+
+## Acceptance
+
+```yaml
+must:
+  - id: M1
+    text: "With a brain directory holding a transcript whose steps fall inside a window, the render reports that session in k3dm_agy_sessions, the in-window token sum by kind in k3dm_agy_tokens, and active seconds with each gap capped at 300."
+  - id: M2
+    text: "A step outside a window adds nothing to that window, and a session spanning the boundary counts only its in-window tokens and active time."
+  - id: M3
+    text: "A session whose id appears on an agy exit event in the dispatch ledger is not counted in k3dm_agy_untracked_sessions; any other session is."
+  - id: M4
+    text: "k3dm_agy_source_present reports the host and source: transcripts when the brain directory exists, ledger when only agy.jsonl exists, none when neither does."
+  - id: M5
+    text: "The dashboard has an `agy data source` panel reading k3dm_agy_source_present, overlapping no other panel."
+  - id: M6
+    text: "With no brain directory, the existing agy.jsonl metrics are the same as before the fix."
+must_not:
+  - id: N1
+    text: "A marker placed in content, thinking, tool_calls or error never appears in the rendered metrics (paired control: M1 shows the same transcript's tokens do appear)."
+  - id: N2
+    text: "With neither source, no k3dm_agy_sessions or k3dm_agy_tokens series is emitted as zero, and the render still succeeds (paired control: M1)."
+  - id: N3
+    text: "With both a transcript and an agy.jsonl row for the same run, the session is counted once."
+  - id: N4
+    text: "Malformed lines, booleans or strings in token fields, and an unreadable transcript do not abort the render and add nothing to the token totals; skipped lines are counted."
+evidence:
+  - {id: E1, proves: [M1, M2, M3, M4, M6, N1, N2, N3, N4], kind: offline, text: "bin/k3dm-dispatch-metrics --dry-run with scratch HOME, K3DM_AGY_BRAIN_DIR, K3DM_AGENT_LEDGER_DIR and K3DM_WORKTREE_ROOT, asserted first. M1 to M4 red on the pre-fix commit; N1 to N4 red by mutants."}
+  - {id: E2, proves: [M5], kind: offline, text: "The dashboard JSON parsed from the YAML: panel present with that query, and no two panels overlap."}
+  - {id: E3, proves: [M1, M4], kind: live, text: "Claude runs the dry-run on the M4 with no push and compares session and token totals with an independent read of the transcripts, printing counts only. The operator confirms the row on Grafana after the next push."}
+interface:
+  - "bin/k3dm-dispatch-metrics --dry-run"
+  - "env: HOME, K3DM_AGY_BRAIN_DIR, K3DM_AGENT_LEDGER_DIR, K3DM_WORKTREE_ROOT, K3DM_DISPATCH_PUSHGATEWAY_URL"
+  - "transcript path: <brain>/<session id>/.system_generated/logs/transcript_full.jsonl"
+  - "metrics: k3dm_agy_sessions, k3dm_agy_untracked_sessions, k3dm_agy_active_seconds, k3dm_agy_tokens, k3dm_agy_source_present, k3dm_agy_latest_step_timestamp, k3dm_agy_transcript_skipped_lines"
+  - "dashboard: scripts/etc/argocd/platform-ops/grafana-dashboard-agent-activity.yaml"
+```
