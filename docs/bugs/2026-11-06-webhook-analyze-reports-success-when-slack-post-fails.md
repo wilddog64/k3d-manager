@@ -1,6 +1,6 @@
 # Bug: webhook analyze reports success when its Slack post fails
 
-**Status:** OPEN — silent-result path confirmed in the code; whether these posts fail or go to another channel is unconfirmed
+**Status:** OPEN — cause of the missing posts found 2026-11-06: the M5 plist has no route; the silent success is still in the code
 **Priority:** P2
 **Approval:** pending
 **Branch:** `k3d-manager-v1.43.14`
@@ -24,7 +24,7 @@ In `_run_analyze` (`bin/k3dm-webhook`), neither failure is seen:
 
 `_slack_post` returns False on any exception (`scripts/lib/webhook/render.py`), the return is discarded, and nothing handles neither path being configured. So a job can be `success` with no delivery.
 
-Open question for the investigation: the webhook LaunchAgent's Slack settings point to one route; find where these posts go. They may be reaching a different channel.
+On the M5 the case is exactly that one: the webhook plist has neither `K3DM_STATUS_CHANNEL_ID` nor `K3DM_SLACK_WEBHOOK_URL`, so no post was attempted, which is why no failure line appears. The missing setting is tracked in `docs/bugs/2026-10-31-hub-migration-drops-webhook-slack-bot-config.md`. This bug keeps the part that hid it.
 
 ## Files
 
@@ -41,7 +41,7 @@ Record delivery in the job: a job whose analysis could not be posted logs `slack
 ```yaml
 must:
   - id: M1
-    text: "When the Slack post fails on every configured route, the analyze job does not end with status success, and the webhook log records the failure with route and reason."
+    text: "When no route is configured, or the Slack post fails on every configured route, the analyze job does not end with status success, and the webhook log records the failure with route and reason."
   - id: M2
     text: "When the post succeeds, the job ends with status success."
 must_not:

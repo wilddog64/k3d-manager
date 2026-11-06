@@ -83,3 +83,7 @@ interface:
   - bin/k3dm-webhook-doctor --check
   - docs/howto/m5-hub-migration.md
 ```
+
+## Recurrence 2026-11-06: the status channel was not restored
+
+The M5 `com.k3d-manager.webhook.plist` has `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` but no `K3DM_STATUS_CHANNEL_ID`. The M4 plist has `K3DM_STATUS_CHANNEL_ID=C4CAEH8HX`. Neither has `K3DM_SLACK_WEBHOOK_URL`. So on the M5 `_run_analyze` has no route: the bot branch needs the status channel, and the fallback needs the URL. Every alert analysis since the migration was written and never posted, with status `success`; see `docs/bugs/2026-11-06-webhook-analyze-reports-success-when-slack-post-fails.md`. `bin/k3dm-webhook-setup` preserves the key only from a plist already on the host, so a new hub cannot inherit it. The fix should make hub setup and `hub-new` require the status channel.

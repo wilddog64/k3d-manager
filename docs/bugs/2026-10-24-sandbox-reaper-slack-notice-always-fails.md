@@ -94,3 +94,7 @@ interface:
 - Do NOT read or print the webhook URL or the Keychain item, and do not post to Slack, in tests or by hand.
 - Do NOT change the reap logic or its timings.
 - Do NOT edit `scripts/lib/foundation/`.
+
+## Note 2026-11-06
+
+The item this notifier reads holds a revoked URL on the M5 (`no_service http=404`), filed as `docs/bugs/2026-11-06-hermes-slack-webhook-item-still-holds-revoked-url.md`. That is a later cause than the Oct 24 failures, so it does not settle this bug.
