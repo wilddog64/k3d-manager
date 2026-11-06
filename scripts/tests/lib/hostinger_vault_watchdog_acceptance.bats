@@ -208,3 +208,31 @@ section() {
   [[ "$output" != *"on a stale values branch"* ]] || false
   [[ "$output" == *"app-degraded"* ]] || false
 }
+
+@test "M1: watchdog finished Jobs expire after the configured TTL" {
+  manifest="$REPO/scripts/etc/vault/unseal-watchdog.yaml.tmpl"
+  [ -f "$manifest" ]
+  [[ "$(cat "$manifest")" == *$'namespace: ${VAULT_NS}'* ]]
+  [[ "$(cat "$manifest")" == *$'name: vault-unseal-watchdog'* ]]
+  # Keep TTL in jobTemplate.spec, so it applies to both failed and successful Jobs.
+  awk '
+    /^  jobTemplate:$/ { in_job = 1; next }
+    in_job && /^  [^ ]/ { in_job = 0 }
+    in_job && /^      ttlSecondsAfterFinished: 3600$/ { found = 1 }
+    END { exit !found }
+  ' "$manifest"
+}
+
+@test "N1: repeated watchdog failures remain routed as KubeJobFailed alerts" {
+  manifest="$REPO/scripts/etc/vault/unseal-watchdog.yaml.tmpl"
+  alert_config="$REPO/scripts/etc/prometheus/alertmanager.yaml.tmpl"
+  [ -f "$manifest" ]
+  [ -f "$alert_config" ]
+  [[ "$(cat "$manifest")" == *$'name: vault-unseal-watchdog'* ]]
+  # The schedule keeps producing Jobs; retaining the failed history gives
+  # KubeJobFailed an active failure to observe while failures continue.
+  grep -Fq 'schedule: "*/5 * * * *"' "$manifest"
+  grep -Fq 'failedJobsHistoryLimit: 3' "$manifest"
+  # Positive control: the existing warning route still explicitly matches it.
+  grep -Fq 'KubeJobFailed' "$alert_config"
+}
