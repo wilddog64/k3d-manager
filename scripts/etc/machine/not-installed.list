@@ -25,3 +25,8 @@ sandbox.prometheus-port-forward|managed by the ACG sandbox lifecycle (make up)
 sandbox.pushgateway-port-forward|managed by the ACG sandbox lifecycle (make up)
 heartbeat|not loaded by hub-new or cutover: bin/k3dm-heartbeat-setup renders a review candidate only
 install-browser-relays|not installed by setup: operator-run once with a password, and only after D3 Part B moves the listeners to user agents (docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
+relay.argocd-https|system LaunchDaemon installed once by make install-browser-relays (D3, docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
+relay.keycloak-http|system LaunchDaemon installed once by make install-browser-relays (D3, docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
+relay.hostinger-frontend-http|system LaunchDaemon installed once by make install-browser-relays (D3, docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
+relay.sandbox-frontend-http|system LaunchDaemon installed once by make install-browser-relays (D3, docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
+loopback-aliases|system LaunchDaemon installed once by make install-browser-relays (D3, docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
