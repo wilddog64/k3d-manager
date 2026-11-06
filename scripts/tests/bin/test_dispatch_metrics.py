@@ -31,6 +31,7 @@ def _pin_pushgateway_target(monkeypatch):
 def _isolate_state_dirs(monkeypatch, tmp_path):
     monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(tmp_path / "worktrees"))
     monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(tmp_path / "agent-sessions"))
+    monkeypatch.setenv("K3DM_AGY_BRAIN_DIR", str(tmp_path / "agy-brain"))
 
 
 def load_dashboard(path, key):
@@ -1976,14 +1977,180 @@ def test_eleven_dispatch_worktrees_fold_into_manager_not_other(tmp_path, monkeyp
     assert not any('repo="other"' in line for line in output.splitlines() if line.startswith("k3dm_codex_tokens{"))
 
 
-def test_agy_ledger_missing_or_corrupt_is_nonfatal(tmp_path):
+def test_agy_ledger_missing_or_corrupt_is_nonfatal(tmp_path, monkeypatch):
+    # agent-audit: allow assert-removed every render now emits exactly one source line; the replacements assert that line and nothing else
+    brain = tmp_path / "brain"
+    ledger = tmp_path / "agent-sessions/agy.jsonl"
+    assert not brain.exists()
+    assert not ledger.exists() and tmp_path in ledger.parents
+    monkeypatch.setenv("K3DM_AGY_BRAIN_DIR", str(brain))
     output = []
-    dispatch_metrics._agy_metrics(output, tmp_path / "missing.jsonl", 100)
-    assert output == []
+    dispatch_metrics._agy_metrics(output, ledger, 100)
+    assert len(output) == 1 and 'source="none"' in output[0]
+    output.clear()
     path = tmp_path / "agy.jsonl"
     path.write_text("{bad}\n")
     dispatch_metrics._agy_metrics(output, path, 100)
-    assert output == []
+    assert len(output) == 1 and 'source="ledger"' in output[0]
+
+
+# Step keys mirror read-only output from m4-air on 2026-11-06; values and session ids below are invented.
+def write_agy_transcript(brain, session, rows, now):
+    path = brain / session / ".system_generated/logs/transcript_full.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text("".join(row if isinstance(row, str) else json.dumps(row) + "\n" for row in rows))
+    os.utime(path, (now, now))
+    return path
+
+
+def agy_scratch(monkeypatch, tmp_path, now):
+    home = tmp_path / "home"
+    brain = home / ".gemini/antigravity-cli/brain"
+    ledger_dir = home / ".local/share/k3d-manager/agent-sessions"
+    worktree_root = tmp_path / "repo"
+    home.mkdir()
+    brain.mkdir(parents=True)
+    ledger_dir.mkdir(parents=True)
+    worktree_root.mkdir()
+    assert home != Path.home() and brain.is_dir() and ledger_dir.is_dir() and worktree_root.is_dir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("K3DM_AGY_BRAIN_DIR", str(brain))
+    monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(ledger_dir))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(worktree_root))
+    monkeypatch.setenv("K3DM_DISPATCH_PUSHGATEWAY_URL", "http://127.0.0.1:9")
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    return home, brain, ledger_dir, worktree_root
+
+
+def test_agy_transcripts_report_in_window_tokens_active_time_and_source(monkeypatch, tmp_path):
+    now = 1_800_000_600
+    _, brain, _, _ = agy_scratch(monkeypatch, tmp_path, now)
+    write_agy_transcript(brain, "session-a", [
+        {"created_at": "2027-01-14T07:59:30Z", "input_tokens": 2, "content": "PRIVATE_MARKER"},
+        {"created_at": "2027-01-15T08:00:00Z", "input_tokens": 3, "cache_read_tokens": 5,
+         "thinking": "PRIVATE_MARKER", "tool_calls": [{"marker": "PRIVATE_MARKER"}], "error": "PRIVATE_MARKER"},
+        {"created_at": "2027-01-15T08:06:40Z", "output_tokens": 7},
+    ], now)
+    output = dispatch_metrics.render([], 0, now, repo_root=tmp_path / "repo")
+    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 3' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="cache_read_tokens"} 5' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="output_tokens"} 7' in output
+    assert 'k3dm_agy_active_seconds{window="1d",mode="unknown"} 300' in output
+    assert 'source="transcripts"} 1' in output
+    assert "PRIVATE_MARKER" not in output
+
+
+def test_agy_transcript_window_boundary_and_dispatch_tracking(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    _, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    write_agy_transcript(brain, "tracked", [
+        {"created_at": "2027-01-14T07:59:59Z", "input_tokens": 99},
+        {"created_at": "2027-01-14T08:00:01Z", "input_tokens": 4},
+    ], now)
+    write_agy_transcript(brain, "untracked", [{"created_at": "2027-01-15T07:59:00Z"}], now)
+    events = [event(now, "agent_exit", exit=0, session="tracked")]
+    output = dispatch_metrics.render(events, 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 2' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 4' in output
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_active_seconds{window="1d",mode="unknown"} 0' in output
+    assert 'k3dm_agy_sessions{window="30d",mode="unknown",repo="unknown"} 2' in output
+    assert 'k3dm_agy_tokens{window="30d",mode="unknown",kind="input_tokens"} 103' in output
+    codex_only = dispatch_metrics.render([event(now, "codex_exit", exit=0, session="tracked")], 0, now, repo_root=repo)
+    assert 'k3dm_agy_untracked_sessions{window="1d",mode="unknown",repo="unknown"} 2' in codex_only
+
+
+def test_agy_missing_sources_emit_source_but_no_usage_zero(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home = tmp_path / "home"
+    brain = home / ".gemini/antigravity-cli/brain"
+    ledger = home / ".local/share/k3d-manager/agent-sessions"
+    root = tmp_path / "repo"
+    home.mkdir(); root.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("K3DM_AGY_BRAIN_DIR", str(brain))
+    monkeypatch.setenv("K3DM_AGENT_LEDGER_DIR", str(ledger))
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(root))
+    assert not brain.exists() and not (ledger / "agy.jsonl").exists() and root.is_dir()
+    output = dispatch_metrics.render([], 0, now, repo_root=root)
+    assert 'source="none"} 1' in output
+    assert "k3dm_agy_sessions{" not in output and "k3dm_agy_tokens{" not in output
+
+
+def test_agy_transcript_skips_malformed_bad_tokens_and_unreadable_file(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    _, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    write_agy_transcript(brain, "bad", [
+        "{malformed}\n",
+        {"created_at": "2027-01-15T08:00:00Z", "input_tokens": True},
+        {"created_at": "2027-01-15T08:00:01Z", "output_tokens": "8"},
+    ], now)
+    unreadable = brain / "unreadable/.system_generated/logs/transcript_full.jsonl"
+    unreadable.parent.mkdir(parents=True)
+    unreadable.mkdir()
+    os.utime(unreadable, (now, now))
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_transcript_skipped_lines 4' in output
+    assert "k3dm_agy_tokens{" not in output
+    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+
+
+def test_agy_transcript_invalid_utf8_line_is_skipped_without_losing_valid_steps(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    _, brain, _, repo = agy_scratch(monkeypatch, tmp_path, now)
+    path = brain / "utf8-session/.system_generated/logs/transcript_full.jsonl"
+    path.parent.mkdir(parents=True)
+    assert path.parent.is_dir() and path.is_relative_to(brain) and repo.is_dir()
+    path.write_bytes(
+        b'{"created_at":"2027-01-15T07:59:00Z","input_tokens":4}\n'
+        b'\xff\n'
+        b'{"created_at":"2027-01-15T07:59:30Z","output_tokens":6}\n'
+    )
+    os.utime(path, (now, now))
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="input_tokens"} 4' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="unknown",kind="output_tokens"} 6' in output
+    assert "k3dm_agy_transcript_skipped_lines 1" in output
+
+
+def test_agy_transcripts_prefer_brain_over_duplicate_ledger(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    _, brain, ledger_dir, repo = agy_scratch(monkeypatch, tmp_path, now)
+    write_agy_transcript(brain, "same-run", [{"created_at": "2027-01-15T08:00:00Z", "input_tokens": 5}], now)
+    (ledger_dir / "agy.jsonl").write_text(json.dumps({"start": now, "mode": "print", "usage": {"input_tokens": 5}}) + "\n")
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'source="transcripts"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="unknown",repo="unknown"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="other"}' not in output
+
+
+def test_agy_ledger_fallback_preserves_existing_metrics(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, ledger_dir, repo = agy_scratch(monkeypatch, tmp_path, now)
+    shutil.rmtree(brain)
+    assert not brain.exists()
+    ledger = ledger_dir / "agy.jsonl"
+    ledger.write_text(json.dumps({"start": now - 10, "mode": "print", "repo": "repo-a",
+                                  "duration_s": 9, "usage": {"input_tokens": 11}}) + "\n")
+    output = dispatch_metrics.render([], 0, now, repo_root=repo)
+    assert 'k3dm_agy_source_present{host="' in output and 'source="ledger"} 1' in output
+    assert 'k3dm_agy_sessions{window="1d",mode="print",repo="repo-a"} 1' in output
+    assert 'k3dm_agy_active_seconds{window="1d",mode="print"} 9' in output
+    assert 'k3dm_agy_tokens{window="1d",mode="print",kind="input_tokens"} 11' in output
+
+
+def test_agy_dry_run_with_no_sources_succeeds_without_zero_usage(monkeypatch, tmp_path):
+    now = 1_800_000_000
+    home, brain, ledger, repo = agy_scratch(monkeypatch, tmp_path, now)
+    shutil.rmtree(brain)
+    assert not brain.exists() and not (ledger / "agy.jsonl").exists() and repo.is_dir()
+    completed = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                               env=os.environ.copy(), check=False)
+    assert completed.returncode == 0, completed.stderr
+    assert 'source="none"} 1' in completed.stdout
+    assert "k3dm_agy_sessions{" not in completed.stdout and "k3dm_agy_tokens{" not in completed.stdout
 
 
 def test_quota_efficiency_requires_same_reset_and_positive_observed_delta(tmp_path, monkeypatch):
