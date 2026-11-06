@@ -1,6 +1,6 @@
 # Bug: one failed vault-unseal-watchdog Job has kept KubeJobFailed firing since the cutover
 
-**Status:** OPEN — observed 2026-11-06 on the M5
+**Status:** FIXED offline `dd248543`, independent verify PASS 2026-11-06; live E2 pending (deploy, then deleting the stale Job needs operator approval)
 **Priority:** P3
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
