@@ -2023,3 +2023,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: bug-open-history independent verify PASS (Sonnet 16 tests; fix 16/16, pre-fix 11 red), recorded.
 - 2026-11-05: Part B review: 14 affected suites green outside the sandbox. Gap found: bin/cluster-refresh still writes 3 legacy root LaunchDaemons. Spec correction 3 added (M8, N1 widened); Luna resumed.
 - 2026-11-05: payment PR #100 opened (operator go); Copilot requested; E3 pending in PR CI, E1 after merge.
+- 2026-11-05: Part B correction 3: Luna asked about a frontend probe; answered match cluster-up (no probe); resumed (clarification).
