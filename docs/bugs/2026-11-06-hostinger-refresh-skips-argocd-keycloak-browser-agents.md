@@ -45,6 +45,11 @@ Keep the current restart order, with cloudflared between argocd and keycloak.
 
 Not in scope: `bin/cluster-up`, `bin/cluster-refresh`, relays, sudoers, the k3s-aws wrappers.
 
+## Files
+
+- `scripts/lib/providers/k3s-hostinger.sh`
+- `scripts/tests/lib/provider_contract.bats`
+
 ## Acceptance
 
 ```yaml
