@@ -1,12 +1,12 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Dispatching Part A to Luna needs the operator's go.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A is dispatched to Luna.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
 **Detected by:** `docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md` (Terra Phase C worktree), confirmed by Claude against `bin/install-sudoers.sh` at `7c9927e9`.
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** operator, 2026-11-05: "go with your recommendation" (B plus C). Claude has since found that B is insufficient (see the finding below). Operator, 2026-11-05: "let dispatch D1". Part 1 dispatches after the pf test (S1) passes on the M4.
+**Approval:** operator, 2026-11-05: "go with your recommendation" (B plus C). Claude has since found that B is insufficient (see the finding below). Operator, 2026-11-05: "let dispatch D1". Part 1 dispatches after the pf test (S1) passes on the M4. Then D3, operator 2026-11-05: "let's get D3 a shot".
 **Related:** `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md` (narrow fix, dispatched first)
 
 ## Evidence
