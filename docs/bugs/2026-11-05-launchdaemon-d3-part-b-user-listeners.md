@@ -1,6 +1,6 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 pending (operator).
+**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 PARTIAL on the M4 2026-11-06 (see below); agents, URLs, `make up` and the M5 pass are not proven.
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05
@@ -155,3 +155,21 @@ A Sonnet verifier wrote 25 BATS tests from the Acceptance block (plus the Fix ta
 - cluster-up and cluster-refresh were run as fragments, because the whole scripts start Chrome/Playwright. E5 is live and not covered.
 - Two notes from the verifier, both not defects: `cluster-refresh` `_launchd_ensure` uses `launchctl load` on the `~/Library/LaunchAgents` plist (it loads into `gui/<uid>`); `cluster-down` does not stop the Hostinger frontend agent, whose lifecycle the Fix table puts in `k3s-hostinger.sh` only.
 - Repo `git status` was clean afterwards. Recorded with `k3dm-codex-dispatch verify`.
+
+## Live E5 on the M4 (2026-11-06, partial)
+
+Read-only checks after the operator's reboot:
+
+| Check | Result |
+|---|---|
+| `sudo -n -l` | PASS: no LaunchDaemon, `ifconfig` or Linux-only NOPASSWD rules; the `k3s` rules are a known separate item |
+| `/Library/LaunchDaemons` | PASS: only the 4 relays and `loopback-aliases`, all loaded |
+| Aliases `127.0.0.2`, `127.0.0.3` | PASS: present after the reboot |
+| Relay sockets `127.0.0.1:443`, `127.0.0.1:80`, `127.0.0.2:80`, `127.0.0.3:80` | PASS: `nc` rc 0 |
+| Four `browser.*` agents and their high ports | NOT PROVEN: no plists, because no `cluster-up` or refresh has run on the M4 since the fix, and its cluster is stopped |
+| Local browser URLs | NOT PROVEN: argocd rc 35, keycloak rc 56, frontend rc 56, because the relays have no backend |
+| `make up` without a password prompt | NOT RUN |
+
+launchd's override database still lists `com.k3d-manager.frontend-browser-http` as enabled; the plist is gone.
+
+The reboot also exposed a separate outage, not caused by Part B: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md`.

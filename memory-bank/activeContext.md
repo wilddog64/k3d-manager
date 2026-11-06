@@ -1,5 +1,14 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-06 M4 reboot caused a public outage; ended; P1 filed
+
+- **Outage ended.** The M4 reboot restarted its old `cloudflare-tunnel` agent, so a second connector with no origins took frontend, Keycloak, Grafana and ArgoCD to 502. The operator ran `launchctl bootout` + `disable`; one connector left, routes answer. New P1: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md` (Approval pending, not dispatched).
+- **Decision waiting on the operator:** disable the 14 singletons still loaded on the M4 and reset its `hub-vault-profile`. M4 `vault-failover` ran a real failover at 03:56:01Z: Hostinger Vault was not written and the store was not repointed, but the M4 profile now reads `hostinger`.
+- **Do not reboot the M5 for E5** until the M4 is cleaned up and the M5 reboot behaviour is thought through.
+- **Part B E5 on the M4 is partial:** sudoers, relays, aliases and removal of the old LaunchDaemons pass. The `browser.*` agents, URLs and `make up` are not proven, because nothing has written the agents since the fix and the M4 cluster is stopped.
+- **Payment:** main CI run 42157751676 succeeded, with `build-push` success. E1 Trivy compare is the next step; then independent verify, then `make platform-ops` from a shell that can read the login Keychain.
+- SSH to the M5 works as `m5-air.local`, not `m5-air`.
+
 ## Handoff — 2026-11-06 D3 Part B verified; operator E5 next
 
 - Part B landed: `7e6d9324` (Luna + Claude corrections) and `b122ffb1` (cloudflared drift fixture to 18082). Land gate 400/400, with stdin `</dev/null` (hub_restore stdin recurrence, recorded in the 2026-10-06 bug).
