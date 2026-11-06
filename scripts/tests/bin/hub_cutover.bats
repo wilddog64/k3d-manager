@@ -4,12 +4,13 @@ setup() {
   REPO="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   WORK="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-cutover.XXXXXX")"
   ROOT="$WORK/repo"
-  mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$ROOT/bin" "$ROOT/scripts/etc/machine"
+  mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$WORK/home/Library/Logs" "$ROOT/bin" "$ROOT/scripts/etc/machine"
   cp "${HUB_CUTOVER_SOURCE:-$REPO/bin/hub-cutover}" "$ROOT/bin/hub-cutover"
   chmod +x "$ROOT/bin/hub-cutover"
   cp "$REPO/scripts/etc/machine/hub-push-forwards.list" "$ROOT/scripts/etc/machine/"
   cp "$REPO/scripts/etc/machine/hub-singletons.list" "$ROOT/scripts/etc/machine/"
   export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
+  printf '%s\n' '{"records":[{"sensor":"argocd","status":"healthy","evidence":"29 applications healthy"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
   export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local HUB_NEW_HOST=m5-air.local
   [[ "$HOME" == "$WORK/home" && "$HUB_CUTOVER_STATE_DIR" == "$WORK/state" ]]
   # Real read-only public-key format capture: ssh-keygen on cliang's workstation, 2026-11-06.
@@ -232,6 +233,43 @@ STUB
     [[ -n "$label" && "$label" != \#* ]] || continue
     : > "$HOME/Library/LaunchAgents/com.k3d-manager.$label.plist"
   done < "$ROOT/scripts/etc/machine/hub-singletons.list"
+}
+
+@test "verify fails on rejected Hermes ArgoCD credential without minting or exposing a token" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  printf '%s\n' '{"records":[{"sensor":"argocd","status":"unknown","evidence":"ArgoCD status source unavailable: credential rejected; re-mint k3dm-hermes-argocd-token"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
+  run env STUB_HERMES_REPORT='{"data":{"checks":[],"counts":{},"failed_ids":[],"warned_ids":[]},"evidence":"cluster status source unavailable","sampled_at":"2026-11-06T15:50:35Z","sensor":"status_checks","status":"unknown"}' "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Hermes ArgoCD credential was rejected; run make argocd-hermes-token'* ]]
+  [[ "$output" != *'token='* ]]
+  run grep -E 'security (add|find)-generic-password|argocd-hermes-token' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "verify accepts healthy and degraded Hermes ArgoCD sensor records" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  for sensor_status in healthy degraded; do
+    printf '{"records":[{"sensor":"argocd","status":"%s","evidence":"credential accepted"}]}\n' "$sensor_status" > "$HOME/Library/Logs/k3dm-hermes.log"
+    run "$ROOT/bin/hub-cutover" --verify
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "verify treats a missing Hermes argocd record as not verified" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  printf '%s\n' '{"records":[{"sensor":"status_checks","status":"healthy"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'argocd status not verified'* ]]
 }
 
 teardown() { rm -rf "$WORK"; }

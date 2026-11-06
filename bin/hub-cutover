@@ -198,7 +198,7 @@ handoff() {
 }
 
 verify_cutover() {
-  local label output count frontend_code webhook_code webhook_report webhook_classification hermes_report hermes_status hermes_evidence
+  local label output count frontend_code webhook_code webhook_report webhook_classification hermes_report hermes_status hermes_evidence hermes_log hermes_line status_checks_status status_checks_evidence
   output="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret -l k3d-manager/role=app-cluster -o name)" || return 1
   grep -Fxq secret/cluster-ubuntu-hostinger <<<"$output" || return 1
   kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
@@ -226,9 +226,35 @@ verify_cutover() {
   done
   hermes_report="$(bin/k3dm-hermes status)" || return 1
   hermes_status="$(jq -r '.status // empty' <<<"$hermes_report")" || return 1
-  if [[ "$hermes_status" == unknown ]]; then
-    hermes_evidence="$(jq -r '.evidence // "no evidence supplied"' <<<"$hermes_report")" || return 1
-    echo "hub-cutover: Hermes status is unknown: $hermes_evidence" >&2
+  status_checks_status="$hermes_status"
+  status_checks_evidence="$(jq -r '.evidence // "no evidence supplied"' <<<"$hermes_report")" || return 1
+  hermes_log="$HOME/Library/Logs/k3dm-hermes.log"
+  if [[ ! -r "$hermes_log" ]]; then
+    echo "hub-cutover: Hermes argocd status not verified; log unavailable: $hermes_log" >&2
+    return 1
+  fi
+  hermes_line="$(awk '/^\{"records"/ { line=$0 } END { if (line != "") print line }' "$hermes_log")"
+  if [[ -z "$hermes_line" ]]; then
+    echo "hub-cutover: Hermes argocd status not verified; no records line in $hermes_log" >&2
+    return 1
+  fi
+  hermes_report="$(jq -c '[.records[]? | select(.sensor == "argocd")][-1] // empty' <<<"$hermes_line")" || return 1
+  if [[ -z "$hermes_report" ]]; then
+    echo 'hub-cutover: Hermes argocd status not verified; no argocd sensor record in latest log entry' >&2
+    return 1
+  fi
+  hermes_status="$(jq -r '.status // empty' <<<"$hermes_report")" || return 1
+  hermes_evidence="$(jq -r '.evidence // "no evidence supplied"' <<<"$hermes_report")" || return 1
+  if [[ "$hermes_evidence" == *'credential rejected'* ]]; then
+    echo 'hub-cutover: Hermes ArgoCD credential was rejected; run make argocd-hermes-token' >&2
+    return 1
+  fi
+  if [[ "$hermes_status" != healthy && "$hermes_status" != degraded ]]; then
+    echo "hub-cutover: Hermes argocd status not verified: ${hermes_status:-missing status}: $hermes_evidence" >&2
+    return 1
+  fi
+  if [[ "$status_checks_status" == unknown ]]; then
+    echo "hub-cutover: Hermes status is unknown: $status_checks_evidence" >&2
     return 1
   fi
   echo 'hub-cutover: Slack delivery was not tested.'

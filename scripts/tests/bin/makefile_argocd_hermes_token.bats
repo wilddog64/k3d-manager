@@ -31,12 +31,29 @@ setup() {
   [[ "${RECIPE}" == *'ARGOCD_ADMIN_PW="$$_pw" python3'* ]]
   [[ "${RECIPE}" == *'ARGOCD_TOKEN="$$_stored" python3'* ]]
 
+  [[ "${RECIPE}" == *'os.environ["ARGOCD_ADMIN_PW"]'* ]]
+  [[ "${RECIPE}" != *'"password":"$$_pw"'* ]]
+}
+
+@test "admin password sources prefer env, then Vault, then the initial secret" {
+  local env_line vault_line initial_line
+  env_line="$(printf '%s\n' "${RECIPE}" | grep -nF '_pw="$${ARGOCD_ADMIN_PASSWORD:-}"' | cut -d: -f1)"
+  vault_line="$(printf '%s\n' "${RECIPE}" | grep -nF 'v1/secret/data/argocd/admin' | cut -d: -f1)"
+  initial_line="$(printf '%s\n' "${RECIPE}" | grep -nF 'argocd-initial-admin-secret' | tail -1 | cut -d: -f1)"
+  [ -n "${env_line}" ] && [ -n "${vault_line}" ] && [ -n "${initial_line}" ]
+  [ "${env_line}" -lt "${vault_line}" ]
+  [ "${vault_line}" -lt "${initial_line}" ]
+  [[ "${RECIPE}" == *"vault-root"* ]]
+}
+
+@test "Vault token and password are not printed or interpolated into command arguments" {
   case "${RECIPE}" in
-    *'python3 -c '*'$$_pw'*)
-      printf 'The admin password is interpolated into the python argument.\n' >&2
-      printf 'Script arguments are visible in ps and in shell history.\n' >&2
+    *'echo "$$_vault_tok"'*|*'echo $$_vault_tok'*|*'echo "$$_pw"'*|*'echo $$_pw'*)
+      printf 'A Vault token or admin password is echoed.\n' >&2
       return 1 ;;
   esac
+  [[ "${RECIPE}" == *'"$$_vault_tok" >"$$_vault_hdr"'* ]]
+  [[ "${RECIPE}" == *'ARGOCD_ADMIN_PW="$$_pw" python3'* ]]
 }
 
 @test "the stored value is read back before the target reports success" {

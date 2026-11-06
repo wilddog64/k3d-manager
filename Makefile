@@ -1159,8 +1159,9 @@ signing-restore:
 ## Required after ANY ArgoCD rebuild: a rebuild regenerates server.secretkey, which permanently
 ## invalidates every token minted before it — the CLI reports "token signature is invalid", which
 ## is neither an expiry nor a revocation, and retrying can never succeed.
-## The admin password resolves from ARGOCD_ADMIN_PASSWORD, else the argocd-initial-admin-secret
-## Secret. Override the endpoint with ARGOCD_HOST. Never prints the token.
+## The admin password resolves from ARGOCD_ADMIN_PASSWORD, Vault secret/argocd/admin,
+## then the argocd-initial-admin-secret Secret. Override the endpoint with ARGOCD_HOST.
+## Never prints the token or either password.
 argocd-hermes-token:
 	@[ -t 0 ] || { \
 	  echo "[argocd-hermes-token] ERROR: refusing to run without a terminal." >&2; \
@@ -1170,11 +1171,22 @@ argocd-hermes-token:
 	_host="$${ARGOCD_HOST:-argocd.3ai-talk.org}"; \
 	_ns="$${ARGOCD_NAMESPACE:-cicd}"; \
 	_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; \
+	if [ -z "$$_pw" ]; then \
+	  _vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+	  if [ -n "$$_vault_tok" ]; then \
+	    _vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; \
+	    printf 'X-Vault-Token: %s\n' "$$_vault_tok" >"$$_vault_hdr"; \
+	    _pw=$$(curl -sf -H "@$$_vault_hdr" http://127.0.0.1:18200/v1/secret/data/argocd/admin 2>/dev/null | \
+	      python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); \
+	    rm -f "$$_vault_hdr"; trap - EXIT; \
+	  fi; \
+	fi; \
 	[ -n "$$_pw" ] || _pw=$$(kubectl get secret argocd-initial-admin-secret -n "$$_ns" \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null); \
 	[ -n "$$_pw" ] || { \
-	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, or check" >&2; \
-	  echo "[argocd-hermes-token]        that argocd-initial-admin-secret still exists in $$_ns." >&2; \
+	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, check Vault" >&2; \
+	  echo "[argocd-hermes-token]        secret/argocd/admin, or check argocd-initial-admin-secret in $$_ns." >&2; \
 	  exit 1; \
 	}; \
 	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; UA="k3d-manager/argocd-hermes-token"; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json","User-Agent":UA}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":0}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
