@@ -957,3 +957,68 @@ PY
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 2 ]; [[ "$output" == *differs* ]]; [ ! -s "$CALLS" ]
 }
+
+@test "recovery modes use last cutover report host when old-host is absent" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"stale.example","verify":"pass"},{"old_host":"recorded.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    printf '[{"old_host":"stale.example","verify":"pass"},{"old_host":"recorded.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    grep -q '^ssh host=recorded.example ' "$CALLS"
+    if grep -q '^ssh host=stale.example ' "$CALLS"; then false; fi
+  done
+  [ ! -e "$HUB_CUTOVER_STATE_DIR/old-host" ]
+}
+
+@test "recovery modes reject invalid report host before ssh" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"bad host;touch /tmp/pwned","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
+}
+
+@test "recovery modes with no old host source refuse before ssh" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
+}
+
+@test "recovery host precedence is environment then old-host then report" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"report.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  printf 'file.example\n' > "$HUB_CUTOVER_STATE_DIR/old-host"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  run "$ROOT/bin/hub-cutover" --rollback
+  grep -q '^ssh host=m4-air.local ' "$CALLS"
+  [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-host")" = file.example ]
+  rm -f "$HUB_CUTOVER_STATE_DIR/old-host"
+  : > "$CALLS"
+  unset HUB_OLD_HOST
+  run "$ROOT/bin/hub-cutover" --rollback
+  grep -q '^ssh host=report.example ' "$CALLS"
+}
+
+@test "recovery modes refuse a report that is valid JSON but not a list" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '{}\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
+}

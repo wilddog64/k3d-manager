@@ -424,6 +424,21 @@ rollback() {
 
 if [[ "${1:-}" == --rollback || "${1:-}" == --verify || "${1:-}" == --forwards ]]; then
   if [[ -z "$OLD_HOST" && -f "$STATE_DIR/old-host" ]]; then OLD_HOST="$(cat "$STATE_DIR/old-host")"; fi
+  if [[ -z "$OLD_HOST" && ! -f "$STATE_DIR/old-host" ]]; then
+    OLD_HOST="$(python3 - "$STATE_DIR/hub-cutover-report.json" <<'PYCODE'
+import json, sys
+try:
+    rows = json.load(open(sys.argv[1]))
+    print(rows[-1].get("old_host") or "")
+except (OSError, ValueError, LookupError, AttributeError, TypeError):
+    print("")
+PYCODE
+)"
+  fi
+  if [[ -n "$OLD_HOST" && ! "$OLD_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2
+    exit 2
+  fi
 else
   if [[ -z "$OLD_HOST" && ! -f "$REPORT" ]]; then
     echo 'hub-cutover: set HUB_OLD_HOST to the old hub (e.g. HUB_OLD_HOST=old-hub.local)' >&2; exit 2
