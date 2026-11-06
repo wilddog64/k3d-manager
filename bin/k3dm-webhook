@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
+    ANALYZE_MAX_BODY,
     SLACK_EVENT_MAX_BODY,
     _JOB_ID_RE,
     JOB_DIR,
@@ -2362,7 +2363,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if length is None:
             self._json(400, {"error": "invalid content-length"})
             return
-        if length > MAX_BODY:
+        max_body = ANALYZE_MAX_BODY if self.path in (
+            "/api/v1/analyze", "/api/v1/cve-remediate",
+        ) else MAX_BODY
+        if length > max_body:
             self._json(413, {"error": "request too large"})
             return
         try:
