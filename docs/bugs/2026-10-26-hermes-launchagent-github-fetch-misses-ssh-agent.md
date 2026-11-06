@@ -171,3 +171,7 @@ grep-alias error are in `docs/issues/2026-10-27-live-verification-hermes-and-pla
 No restart, sync, credential change, or live test was initiated by the assistant
 during this evidence check. Prior SSH failures retained in the log are historical;
 the fresh post-start success above establishes this verification.
+
+## Note 2026-11-06
+
+On the M5, the Hermes log has 11 `vectordb index refresh skipped: git fetch failed: ... Permission denied (publickey)` lines on 2026-11-04, last after 11:14Z, and 2 on 2026-10-31, none since. The index is current (`rows=2491, corpus=2491`, indexed 0.0d ago). Not active; recorded in case it recurs. The cause of the Nov 4 window was not established.

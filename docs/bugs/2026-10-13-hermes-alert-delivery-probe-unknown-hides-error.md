@@ -68,3 +68,13 @@ this one. Their extra evidence and scope carry over here:
   persistent cluster, a missing Secret, invalid JSON, no clusters, partial success, and a real
   null-route blackout.
 
+## Recurrence 2026-11-06: root cause on the M5
+
+`alert_delivery unknown / alert delivery probe unavailable` in every Hermes record since 2026-10-31T01:49:11Z. Run by hand on the M5:
+
+    bin/k3dm-alert-delivery-status --json
+    rc 1
+    {"available":false}
+    ModuleNotFoundError: No module named 'yaml'
+
+The script's route-shape step (`bin/k3dm-alert-delivery-status:50`) does `import yaml` under `python3`, Homebrew 3.15 on the M5, which has no PyYAML. Machine setup does not provide it, and the sensor's bare `except` hides the reason, as this bug said. Fix should drop the dependency or provide it through machine setup, and surface the stderr line. Live check: the Hermes record shows `alert_delivery healthy`.

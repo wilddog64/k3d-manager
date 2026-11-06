@@ -140,3 +140,7 @@ out of scope for this fix (see What NOT to do). Track it as a `hub-new` checklis
 4. Live acceptance: E2E runner reports reachable, and Grafana status metrics actually return series; keep these as separate requirements.
 
 No cluster changes or recovery actions were performed. This evidence is on branch `k3d-manager-v1.43.14`; P2 priority is retained.
+
+## Recurrence note 2026-11-06: metrics frozen since Oct 31
+
+`HostDiskMetricsStale` has fired since 2026-10-31T15:14Z. On the M5 Pushgateway, `push_time_seconds{job="k3dm-disk"}` is 2026-10-31T14:13:42Z, about six days old, while the `m5`, `m4`, `m2` and `hostinger` `k3dm_disk_probe_success` series still read 1. Those 1s are frozen values, not live probes, so the Oct 31 live verification is the last known good and cannot speak for today. Hermes runs `bin/k3dm-disk-metrics` with `check=False` and captured output (`_publish_disk_metrics`), so a failure leaves no trace in its log. Cause not established.

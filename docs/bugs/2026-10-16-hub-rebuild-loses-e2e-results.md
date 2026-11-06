@@ -195,3 +195,7 @@ The last one must fail a fixture where a target has only failing runs.
 - Do NOT add `e2e-republish` to the webhook make-target allowlist.
 - Do NOT create a PR, commit, switch branches, or use `--no-verify`.
 - Do NOT modify files outside the Files table, including `memory-bank/`.
+
+## Recurrence note 2026-11-06
+
+`E2EResultsMissing` (`absent(e2e_last_run_pass)`) has fired on the M5 since 2026-10-31T03:29Z, so the live proof this bug awaits has not happened on the current hub. The series is not on the Pushgateway either (0 matches). The E2E runner regression is tracked in `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md`; a passing E2E run that exports the metric is the check.
