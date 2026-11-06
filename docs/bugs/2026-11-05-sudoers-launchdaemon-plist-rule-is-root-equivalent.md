@@ -1,6 +1,6 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A is dispatched to Luna.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify pending. Part B not yet specified. Do not run `make install-browser-relays` until Part B lands.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
@@ -118,7 +118,7 @@ must:
   - id: M2
     text: "Each relay plist has Sockets.Listeners with exactly the SockNodeName/SockServiceName from the D3 table, inetdCompatibility Wait=false, UserName=nobody, and ProgramArguments exactly [/usr/bin/nc, <ip>, <high port>] from the table."
   - id: M3
-    text: "The alias plist adds 127.0.0.2 and 127.0.0.3 to lo0 and kickstarts the two alias-bound relays, using only /sbin/ifconfig and /bin/launchctl with literal arguments."
+    text: "The alias plist adds 127.0.0.2 and 127.0.0.3 to lo0, then boots out and re-bootstraps the two alias-bound relays from their literal /Library/LaunchDaemons paths, using only /sbin/ifconfig and /bin/launchctl with literal arguments. It is RunAtLoad only, with no KeepAlive (a one-shot job)."
   - id: M4
     text: "Install mode removes the six legacy daemons and bootstraps the five new jobs, every privileged call via `_run_command --interactive-sudo`; `--uninstall` removes the five."
 must_not:
@@ -137,6 +137,18 @@ interface:
   - "make install-browser-relays"
   - "env: K3DM_LAUNCHD_DIR (test only, ignored as root)"
 ```
+
+## Part A review notes (Claude, 2026-11-05)
+
+Luna's diff: the `Makefile` target, `bin/install-browser-relays.sh`, and 4 BATS tests. Claude fixed four defects before landing:
+- **KeepAlive on the alias job.** Its `sh -c` exits, so `KeepAlive true` respawned it about every 10 s, and each run `kickstart -k` killed the relays. Now it is RunAtLoad only. A test asserts there is no KeepAlive; a mutation check (KeepAlive put back) makes it fail.
+- **kickstart cannot rebind a socket.** launchd binds `Sockets` when the job loads, so a relay loaded before its alias exists stays unbound. The alias job now boots out and re-bootstraps the two alias-bound relays from their literal plist paths. M3 is reworded to match.
+- **Listeners** pin `SockType stream` and `SockFamily IPv4`, as in the spike.
+- **Reinstall** soft-boots out each new job before bootstrap, so `make install-browser-relays` can be run twice.
+
+At land, the fast gate also needed the new names classified. `install-browser-relays` and the five labels are now in `scripts/etc/machine/not-installed.list` (machine setup never installs them). The land used `--allow-out-of-scope` because the dispatch slug's scope file predates the spec's Part A file list. Both new files and the list are named in this doc.
+
+Fast gate at land: all suites PASS, including `install_browser_relays.bats`, `agent_classification.bats`, both `machine_setup` suites and shellcheck.
 
 ## Design D1 (superseded)
 
