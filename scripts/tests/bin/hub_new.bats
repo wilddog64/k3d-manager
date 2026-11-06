@@ -18,7 +18,7 @@ setup() {
   mkdir -p "$WORK/home/.cloudflared"
   echo fixture > "$WORK/home/.cloudflared/$TUNNEL_CREDS"
   echo fixture > "$WORK/home/.cloudflared/cert.pem"
-  export HOME="$WORK/home" HUB_NEW_STATE_DIR="$WORK/state" CALLS="$WORK/calls" AGENTS_DIR="$WORK/home/Library/LaunchAgents"
+  export HOME="$WORK/home" EXPECTED_HOME="$WORK/home" HUB_NEW_STATE_DIR="$WORK/state" CALLS="$WORK/calls" AGENTS_DIR="$WORK/home/Library/LaunchAgents"
   [[ "$HOME" == "$WORK/home" ]]
   mkdir -p "$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra/argocd/config"
   : > "$HOME/src/gitrepo/personal/shopping-carts/shopping-cart-infra/argocd/config/argocd-secret.yaml"
@@ -46,7 +46,7 @@ case "$(basename "$0")" in
   pmset) printf ' SleepDisabled\t\t%s\n' "${STUB_SLEEP_DISABLED:-1}" ;;
   gh) exit 0 ;;
   k3d) [[ -z "${STUB_EXISTING_CLUSTER:-}" ]] || echo k3d-cluster ;;
-  security) exit 0 ;;
+  security) [[ "$HOME" == "$EXPECTED_HOME" ]] || exit 97; exit 0 ;;
   id) echo 501 ;;
   docker)
     case "$1" in
@@ -105,6 +105,7 @@ exit 0
 STUB
     chmod +x "$WORK/stub/$cmd"
   done
+  [[ "$(command -v security)" == "$WORK/stub/security" ]]
 
   for script in bin/hub-up bin/hub-restore bin/k3dm-webhook-setup bin/k3dm-hermes-setup scripts/k3d-manager; do
     cat > "$ROOT/$script" <<STUB
@@ -120,6 +121,7 @@ case "$(basename "$0") ${1:-}" in
 import plistlib, sys
 env = {'SLACK_BOT_TOKEN': 'xoxb-QZ7K-fixture-secret-token'} if sys.argv[2] != 'no_token' else {}
 if sys.argv[2] != 'no_channel': env['SLACK_CHANNEL_ID'] = 'C123'
+if sys.argv[2] != 'no_status': env['K3DM_STATUS_CHANNEL_ID'] = 'C456'
 with open(sys.argv[1], 'wb') as f: plistlib.dump({'EnvironmentVariables': env}, f)
 PYPLIST
     else plist webhook; fi ;;
@@ -447,13 +449,17 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
 }
 
-@test "Slack bot: missing token or channel fails without revealing the secret" {
+@test "M1/N1/N2: missing token, channel, or status channel fails without revealing the secret" {
   export STUB_BOT=1
-  for STUB_SLACK_ENV in no_token no_channel; do
+  [[ "$HOME" == "$WORK/home" && "$(command -v security)" == "$WORK/stub/security" ]]
+  for STUB_SLACK_ENV in no_token no_channel no_status; do
     export STUB_SLACK_ENV
     run bash -c '"$1" 2>&1' _ "$HUB_NEW_BIN"
     [ "$status" -ne 0 ]
     [[ "$output" == *'make update-webhook-slack'* ]]
+    if [[ "$STUB_SLACK_ENV" == no_status ]]; then
+      [[ "$output" == *'K3DM_STATUS_CHANNEL_ID'* ]]
+    fi
     [[ "$output" != *xoxb-QZ7K-fixture-secret-token* ]]
     [[ "$output" != *xoxb-QZ7* ]]
     [[ "$output" != *QZ7K* ]]
@@ -461,7 +467,8 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   done
 }
 
-@test "Slack bot: configured plist passes without revealing the secret" {
+@test "M2/N1/N2: configured plist passes without revealing the secret" {
+  [[ "$HOME" == "$WORK/home" && "$(command -v security)" == "$WORK/stub/security" ]]
   export STUB_BOT=1 STUB_SLACK_ENV=configured
   run bash -c '"$1" 2>&1' _ "$HUB_NEW_BIN"
   [ "$status" -eq 0 ]
@@ -469,4 +476,9 @@ singleton_labels() { grep -v '^#' "$ROOT/scripts/etc/machine/hub-singletons.list
   [[ "$output" != *xoxb-QZ7* ]]
   [[ "$output" != *QZ7K* ]]
   grep -q '^prepare-singletons=pass ' "$HUB_NEW_STATE_DIR/state"
+}
+
+@test "N3: hub tools contain no literal Slack channel IDs" {
+  run grep -Eo 'C[A-Z0-9]{8,}' "$HUB_NEW_BIN" "$REPO/bin/k3dm-webhook-doctor"
+  [ "$status" -eq 1 ]
 }

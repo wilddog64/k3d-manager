@@ -3,6 +3,7 @@ import importlib.util
 import io
 from importlib.machinery import SourceFileLoader
 import json
+import os
 import pytest
 import subprocess
 import sys
@@ -488,6 +489,7 @@ def test_health_header_and_body_share_one_deadline(monkeypatch):
 def test_slack_bot_plist_presence_and_redaction(monkeypatch, tmp_path, capsys):
     import plistlib
     monkeypatch.setenv("HOME", str(tmp_path))
+    assert Path(os.environ["HOME"]) == tmp_path
     monkeypatch.setenv("K3DM_WEBHOOK_TOKEN_READER", "reader")
     monkeypatch.setattr(doctor, "_launchd_facts", lambda *_a: {"status": "missing", "port": None})
     monkeypatch.setattr(doctor, "_process_facts", lambda: {"status": "available", "pids": []})
@@ -495,13 +497,15 @@ def test_slack_bot_plist_presence_and_redaction(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(doctor, "_health_probe", lambda *_a, **_k: {"status": "local_timeout", "http_responsive": False})
     path = tmp_path / "Library/LaunchAgents" / (doctor.LABEL + ".plist")
     path.parent.mkdir(parents=True)
-    for env, expected in [({}, "missing_token"), ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token"}, "missing_channel"),
-                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123"}, "configured")]:
+    for env, expected, status_expected in [({}, "missing_token", "missing"), ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token"}, "missing_channel", "missing"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123"}, "configured", "missing"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123", "K3DM_STATUS_CHANNEL_ID": "C456"}, "configured", "configured")]:
         path.write_bytes(plistlib.dumps({"EnvironmentVariables": env}))
         assert doctor.main(["--check"]) == 0
         captured = capsys.readouterr()
         output = captured.out + captured.err
         assert json.loads(captured.out)["slack_bot"] == expected
+        assert json.loads(captured.out)["status_channel"] == status_expected
         assert "xoxb-QZ7K-fixture-secret-token" not in output
         assert "xoxb-QZ7" not in output
         assert "QZ7K" not in output

@@ -232,6 +232,15 @@ def _slack_bot_status(path):
         return 'missing_token'
 
 
+def _status_channel_status(path):
+    try:
+        with path.open('rb') as handle:
+            env = plistlib.load(handle).get('EnvironmentVariables', {})
+        return 'configured' if 'K3DM_STATUS_CHANNEL_ID' in env else 'missing'
+    except (OSError, ValueError, TypeError):
+        return 'missing'
+
+
 def _slack_role_map_status():
     raw = os.environ.get("K3DM_SLACK_ROLE_MAP")
     if not raw:
@@ -268,7 +277,8 @@ def diagnose(check=False):
     reliable_unhealthy = job["status"] == "missing" or (
         job["status"] == "loaded" and listener["status"] == "no_listener"
         and probe["http_responsive"] is False)
-    return {"timestamp_utc": now, "mode": "check", "slack_role_map": _slack_role_map_status(), "slack_bot": _slack_bot_status(home / 'Library/LaunchAgents' / f'{LABEL}.plist'), "launchd": job, "process": process, "listener": listener,
+    webhook_plist = home / 'Library/LaunchAgents' / f'{LABEL}.plist'
+    return {"timestamp_utc": now, "mode": "check", "slack_role_map": _slack_role_map_status(), "slack_bot": _slack_bot_status(webhook_plist), "status_channel": _status_channel_status(webhook_plist), "launchd": job, "process": process, "listener": listener,
             "log": log, "health": probe, "health_timeout_seconds": HEALTH_TIMEOUT, "classification": classification,
             "credential": credential, "credential_action": _credential_action(credential),
             "recovery_recommended": reliable_unhealthy,

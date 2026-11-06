@@ -13,7 +13,7 @@ After setup, run the required `agy` CLI in the operator shell on the new hub and
 
 If the MacPaw Gemini disk cleaner was installed by an earlier setup, remove it separately if desired.
 
-For Slack bot threads, run `SLACK_CHANNEL_ID=<id> make update-webhook-slack` on the new hub in a local terminal: it reads the login Keychain. After cutover, ask `/ask-docs` in that channel and confirm the reply appears in a thread.
+For Slack bot threads and analyzer status posts, run `SLACK_CHANNEL_ID=<id> K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack` on the new hub in a local terminal: it reads the login Keychain and writes both channel IDs to the webhook plist. After cutover, ask `/ask-docs` in the bot channel and confirm the reply appears in a thread. Also run an analyzer job and confirm its status post arrives in the configured status channel; `make webhook-doctor` should report `status_channel: configured`.
 
 For the step-by-step path, run `make hub-new HUB_OLD_HOST=<old>` followed by `make hub-cutover HUB_OLD_HOST=<old>`. `HUB_OLD_HOST` is required for hub-new; cutover can also use the host recorded in its passing report. If a stage stops, resolve its stated cause and rerun `make hub-new HUB_OLD_HOST=<old>`. Passed stages are retained; use `HUB_NEW_FROM=<stage>` only when intentionally restarting from a named stage. Never run bare `make up` for this process.
 
