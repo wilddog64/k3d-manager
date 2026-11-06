@@ -89,6 +89,7 @@ def fixture_metrics(tmp_path):
     metric_text += producer._release_metrics(repo, tally=release_tally,
                                           fixed_in={bug_path: {"release": release}})
     metric_text += producer._forecast_metrics(repo, now=1_800_000_000)
+    metric_text += producer._bug_open_history(repo, "HEAD", days=1)
 
     events = [{"ts": 1_800_000_000, "event": "start", "version": release,
                "slug": "fixture-dispatched", "spec": f"docs/plans/{release}-fixture-dispatched.md"}]
