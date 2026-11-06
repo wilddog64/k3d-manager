@@ -1,4 +1,4 @@
-# diruse: a Windows disk usage and purge tool
+# dirused: a Windows disk usage and purge tool
 
 **Status:** SCOPED; sequenced, not started. Own repo, so it takes no k3d-manager version and does not count toward any release's plan cap. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses while v1.47.0's e2e and gate work is active (operator, 2026-11-06). Dates are re-estimated after the move to the $100 plan. No implementation until the open decisions below are answered and each milestone has its own spec with an Acceptance block.
 **Approval:** Scoping: operator, 2026-11-06 ("modify plan accordingly base on your analysis"). Implementation: pending.
@@ -29,7 +29,7 @@ So `/file` is the main mode, not an extra, and every design choice below assumes
 
 ## How it fits intent-driven development
 
-diruse is an **intent-flow pilot**, not a platform feature: a real request, from draft to verified
+dirused is an **intent-flow pilot**, not a platform feature: a real request, from draft to verified
 software, with an operator who can judge the result by eye.
 
 | Roadmap item | Fit |
@@ -44,12 +44,12 @@ software, with an operator who can judge the result by eye.
 | # | You will see | It failed if |
 |---|---|---|
 | M1 | From one node, `/file /summary` shows every target's used and free space, matching each machine's Explorer; a full scan lists the largest files first | A folder or node it could not read leaves a low total or a missing row with no warning |
-| M2 | Clicking a row on any node previews the file, and the pie matches that volume | Previewing runs the file or downloads a cloud placeholder |
+| M2 | Each UNC path opened has its own tab; clicking a row previews the file, and the pie matches that tab's volume | A tab shows another UNC's files, or previewing runs the file or downloads a cloud placeholder |
 | M3 | A saved plan lists files per node; confirming it deletes exactly those and logs them | Anything is deleted that the plan did not list |
 | M4 | A target crossing the threshold writes one Event Log alert naming the node | A volume is over the threshold, or a node is unreachable, and no alert appears |
 | M5 | Usage falls back under the threshold, with deletes only inside `/purge-root` | A file outside the root, or newer than `/min-age`, is gone |
 
-**The draft as the operator wrote it, frozen on 2026-11-06.** Later interpretation is measured against this.
+**The draft as the operator wrote it, frozen on 2026-11-06.** Later interpretation is measured against this. It keeps the original name `diruse` and does not mention tabs; both later decisions are under "Changes from the draft".
 
 ```text
 diruse.exe, a windows command line/gui tool that measures a given windows node dirve, and directory size, sort file size from largest to smallerist
@@ -126,11 +126,11 @@ Every switch accepts `/name` and `--name`. The draft's `—` is read as an autoc
 
 | Command | Meaning |
 |---|---|
-| `diruse -h`, `/help`, `help` | Usage |
-| `diruse .` | Measure the current directory |
-| `diruse D:\path` | Measure a local path; `D:\` measures the drive |
-| `diruse \\node\d$\path` | Measure a UNC path |
-| `diruse /file targets.txt` | Measure each target listed, one per line; blank lines and `#` comments are ignored |
+| `dirused -h`, `/help`, `help` | Usage |
+| `dirused .` | Measure the current directory |
+| `dirused D:\path` | Measure a local path; `D:\` measures the drive |
+| `dirused \\node\d$\path` | Measure a UNC path |
+| `dirused /file targets.txt` | Measure each target listed, one per line; blank lines and `#` comments are ignored |
 | `/file targets.txt /summary` | Used, free and percent per volume, largest first, with no tree walk; takes seconds across a fleet |
 | `/top N` | Rows to show; default 50 |
 | `/timeout 30m`, `/parallel 4` | Limit per target, and targets scanned at once |
@@ -152,10 +152,16 @@ files, each sorted descending, with logical size and size on disk.
 
 ## GUI
 
+**Each UNC path opened gets its own tab (operator, 2026-11-06).** Opening a path from the GUI, or from
+`/gui` or `/file`, adds one tab, labelled with the UNC path. A tab has its own scan, progress, cancel,
+table, pie chart, preview and selection, so one slow or unreachable machine never blocks another tab.
+Opening a path that already has a tab selects that tab. Two paths on one node are two tabs. A local
+path follows the same rule (Claude's reading; the operator named UNC paths).
+
 1. Node list from `/file`: used percent per volume, largest first. A node that cannot be reached is
-   shown as such, never left out.
-2. Table: node, drive, file path, size, sorted descending. Sortable, filterable by node; multi-select.
-3. Pie chart of used and free for the selected volume.
+   shown as such, never left out. Clicking an entry opens or selects its tab.
+2. Table in each tab: drive, file path, size, sorted descending. Sortable; multi-select.
+3. Pie chart of used and free for the tab's volume.
 4. Preview pane on click:
    - Text: the first 1 MiB.
    - Images: rendered, with a size cap.
@@ -168,7 +174,7 @@ files, each sorted descending, with logical size and size on disk.
    - **Permanently delete:** also Shift+Delete.
    - **Edit in external editor:** a configured editor, Notepad by default. It never uses the shell's
      `open` verb, which would run a `.bat` or `.exe`.
-6. Every delete prompts first, stating the node count, file count and total bytes. On a UNC path the
+6. A delete acts only on the current tab's selection, so a GUI delete never spans machines. It prompts first, stating the node, file count and total bytes. On a UNC path the
    prompt says the delete is permanent, which is the normal case for this tool.
 
 ## Scan correctness
@@ -199,7 +205,7 @@ Every spec that can delete inherits these as `must_not` items.
 | Deletes files only, never directories or a drive root | Bounds the damage of a wrong target |
 | Re-checks size and modified time just before deleting; a changed file is skipped and reported | The dry run and the delete are separated in time |
 | Any delete spanning more than one node needs a saved plan and `/allow-multi` | One flag must not delete across a fleet |
-| Appends every delete to `%ProgramData%\diruse\purge-log.jsonl` on the central node: time, user, node, path, size, plan hash, result | Deletes on an admin share need a record |
+| Appends every delete to `%ProgramData%\dirused\purge-log.jsonl` on the central node: time, user, node, path, size, plan hash, result | Deletes on an admin share need a record |
 | A confirmed delete works from the saved plan and never rescans | A rescan of a remote fleet would pick a different list from the one reviewed |
 | One node failing does not stop the others, and the result reports each node | A partial fleet delete must be visible |
 
@@ -223,7 +229,7 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 | # | Scope | Deletes? |
 |---|---|---|
 | M1 | ACG Windows probe, VirtualBox box check, private repo, `windows-latest` CI gate, Vagrant VM, ACG fleet script; scanner and read-only CLI: paths, UNC, `/file`, `/summary`, `/top`, `/timeout`, `/parallel`, `/json`, `/csv`, exit codes | No |
-| M2 | Read-only GUI: node list, table, pie chart, preview pane | No |
+| M2 | Read-only GUI: node list, one tab per UNC path, table, pie chart, preview pane | No |
 | M3 | Manual deletes: saved plans, `/purge`, `/purge-plan`, `/purge-list`, GUI delete and editor actions, audit log, safety rules | Yes, confirmed |
 | M4 | `/threshold`, `/monitor` across targets, alerts to the console and the central node's Windows Event Log | No |
 | M5 | `/autopurge`, after a separate go | Yes, unattended |
@@ -240,8 +246,9 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 | `/autopurge` needs only `/confirm` | Needs root, age and byte limits; ships last | Unattended deletion |
 | `/threshold` and `/monitor` name no alert path | Exit code 2, console, Event Log, `/interval` | An alert needs somewhere to go |
 | Shift+right-click deletes permanently | A menu item and Shift+Delete | Shift+right-click opens the Windows extended menu; Shift+Delete is the convention |
-| Table has drive, path, size | Adds a node column | `/file` mixes machines |
+| Table has drive, path, size | Same columns, with one tab per UNC path; a node list opens them | The stated intent is many machines; operator, 2026-11-06 |
 | Preview shows "the file content" | Size caps, own viewer | Large, binary and cloud-placeholder files |
+| Name `diruse` | `dirused` | Operator, 2026-11-06 |
 | Not mentioned | `/top`, `/json`, `/csv`, exit codes, audit log | Needed for large drives, scripting and accountability |
 
 ## Out of scope for now
@@ -259,7 +266,7 @@ Reads ship before deletes, and manual deletes before automatic ones. Versions be
 - **Dev environment:** Vagrant with VirtualBox if it works and a Windows image, on the M4.
 - **Multi-node testing:** ACG AWS sandboxes.
 - **Audience:** private, possibly used at the operator's company; no public release.
-- **Name:** stays `diruse`. Where a server still has Microsoft's old `diruse.exe`, run this one by full path.
+- **Name:** `dirused` (operator, 2026-11-06), changed from the draft's `diruse`. The new name also avoids a clash with Microsoft's old `diruse.exe` on some servers.
 - **Stack:** C#/.NET.
 
 ## Open before any company use

@@ -1000,13 +1000,13 @@ Scope: [`v1.49.0-unfamiliar-app-onboarding.md`](plans/v1.49.0-unfamiliar-app-onb
 What the platform loses: the multi-service mesh traffic, RabbitMQ and Stripe payment flows. Keep one
 of those only if a platform feature still needs it to prove itself.
 
-### Candidate tool — diruse: Windows disk usage and purge, from one node across many machines
+### Candidate tool — dirused: Windows disk usage and purge, from one node across many machines
 
 **Proposed 2026-11-06 (operator).** A private C#/.NET tool in its own
 repo, independent of v2.0.0 and of k3d-manager's version numbers. M1 runs in a gap between releases; the main work starts after v1.46.1 and pauses during v1.47.0's e2e and gate work. It is also the pilot for the intent workflow:
 a real request from draft to verified software. Reads ship before deletes; `/autopurge` ships last on
 its own go. Development on Vagrant with VirtualBox, multi-node tests on ACG AWS; both are proven first.
-Scope: [`diruse-windows-disk-usage-tool.md`](plans/diruse-windows-disk-usage-tool.md).
+Scope: [`dirused-windows-disk-usage-tool.md`](plans/dirused-windows-disk-usage-tool.md).
 
 ### Candidate theme — v2.x: AI diagnostics and healing gateway
 

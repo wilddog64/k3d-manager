@@ -1,9 +1,9 @@
 # Bug: `make hub-cutover-forwards` ignores the old host in the cutover report, so the documented command fails
 
-**Status:** OPEN — root cause read; spec complete; dispatch pending
+**Status:** OPEN — root cause read; spec complete; dispatch approved
 **Priority:** P3
 **Severity:** low. The documented command stops with a clear message, and setting `HUB_OLD_HOST` works around it.
-**Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the failed rollout. Dispatch: pending.
+**Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the failed rollout. Dispatch: operator, 2026-11-06 ("please dispatch P2 and P3 to Luna").
 **Filed:** 2026-11-06
 **Detected by:** Operator, running the tunnel fix rollout on the M5, 2026-11-06
 **Affected:** `bin/hub-cutover` (host resolution for `--verify`, `--forwards`, `--rollback`)

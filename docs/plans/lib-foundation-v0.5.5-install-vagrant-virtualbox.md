@@ -3,7 +3,7 @@
 **Status:** OPEN — dispatched to Luna 2026-11-06
 **Approval:** operator, 2026-11-06 (k3d-manager session: "we need _install_vagrant and _install_virtualbox to handle two packages installation"). Dispatch: Claude; not a hub or Hostinger change.
 **Branch:** `feat/install-vagrant-virtualbox`
-**Requested by:** k3d-manager `docs/plans/v2.0.0-diruse-windows-disk-usage-tool.md` and `docs/plans/v1.43.15-control-node-linux.md`, both of which test in Vagrant VMs on VirtualBox.
+**Requested by:** k3d-manager `docs/plans/dirused-windows-disk-usage-tool.md` and `docs/plans/v1.43.15-control-node-linux.md`, both of which test in Vagrant VMs on VirtualBox.
 
 ## Problem
 
