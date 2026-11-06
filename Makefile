@@ -527,6 +527,10 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Install the fixed system launchd socket relays for browser listeners
+install-browser-relays:
+	bin/install-browser-relays.sh
+
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
 	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
