@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-06: Part B gap landed 632ac235; independent verify PASS recorded. Live E4 on the M5 open.
 - 2026-11-06: Part B gap attempt 2 passed the independent verifier (29/29); commit refused by _agent_audit (16 if lines, limit 8). Correction 2 sent to Luna: two helpers, no allowlist entry.
 - 2026-11-06: P0 S1 spec written in the P0 plan (Slice S1, Files, Acceptance) with fixtures in scripts/tests/fixtures/dispatch-gates; not dispatched. Part B gap attempt 2 under independent verification and full gates.
 - 2026-11-06: Part B gap dispatched to Luna (first attempt refused: no Files section). Review of attempt 1: _err exit aborts refresh before cloudflared; issuance uses current context. Correction 1 added, Luna resumed.
