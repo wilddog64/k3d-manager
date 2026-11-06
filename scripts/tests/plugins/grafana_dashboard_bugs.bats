@@ -916,3 +916,20 @@ assert p15["gridPos"]["h"] == new_panel["gridPos"]["h"]
 PY
   [ "${status}" -eq 0 ]
 }
+
+@test "30-day open history labels are readable without changing dashboard data" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panel = next(p for p in data["panels"] if p.get("title") == "Open by priority, last 30 days (from git)")
+options = panel["options"]
+assert options["xTickLabelRotation"] != 0, options["xTickLabelRotation"]
+assert options["xTickLabelSpacing"] > 0, options["xTickLabelSpacing"]
+
+assert options["xField"] == "date"
+assert options["stacking"] == "normal"
+PY
+  [ "${status}" -eq 0 ]
+}

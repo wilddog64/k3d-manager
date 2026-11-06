@@ -1792,7 +1792,8 @@ data:
               "placement": "bottom",
               "showLegend": true
             },
-            "xTickLabelRotation": 0,
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100,
             "tooltip": {
               "mode": "multi",
               "sort": "none"
