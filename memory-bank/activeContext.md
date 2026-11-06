@@ -2100,3 +2100,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: Part B correction 3: Luna asked about a frontend probe; answered match cluster-up (no probe); resumed (clarification).
 
 **Dispatching 2026-11-06:** `2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml` (operator's go). **Approved for the live checks:** delete the stale Job `secrets/vault-unseal-watchdog-29889925` (operator, 2026-11-06: "go ahead for those two"); look at it again first.
+
+**2026-11-06 (later):** PyYAML LANDED `785f25a4`, independent verify running, live E2 open. Operator confirmed repo gauges `e631902b` and 30-day panel `555ac6fa` live: both LIVE-VERIFIED; the agy row on Agent Activity is still open. Operator's go 2026-11-06 for: rewriting `2026-10-12-bug-dashboard-open-counts-do-not-say-what-to-do` around a `**Waiting on:**` line and dispatching it to Luna; adding prompts-by-model and who-sent/cause to S1. Per-run evidence table sorts run as text (operator asked; no fix requested yet).

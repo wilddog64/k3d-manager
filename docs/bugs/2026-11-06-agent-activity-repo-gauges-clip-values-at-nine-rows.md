@@ -1,6 +1,8 @@
 # Bug: Agent Activity repo gauges clip their values at nine rows
 
-**Status:** LANDED `e631902b`, independent verify PASS 2026-11-06 (M1 to M3, N1, N2 pass; M1 and M3 red on the parent; 9 mutants red). Claude removed Luna's table pinning every panel's y, which would redden on any later dashboard edit. The 36 px row height is an estimate of Grafana's layout, so only the live E2 at Window 30d can confirm the panels are readable. Live E2 open
+**Status:** LIVE-VERIFIED 2026-11-06 — operator confirmed on the M5 Grafana that the gauges show their values at nine rows ("this one is fixed", with a screenshot). Was: LANDED `e631902b`, independent verify PASS 2026-11-06 (M1 to M3, N1, N2 pass; M1 and M3 red on the parent; 9 mutants red). Claude removed Luna's table pinning every panel's y, which would redden on any later dashboard edit. The 36 px row height is an estimate of Grafana's layout, so only the live E2 at Window 30d can confirm the panels are readable. Live E2 open
+**Fix commit:** e631902b
+**Live evidence:** 2026-11-06 · run operator-grafana · env hub-m5 · scenario panel-read · commit e631902b · proves E2
 **Priority:** P3
 **Severity:** low. The data is correct; on Window 30d the values cannot be read.
 **Approval:** operator reported it 2026-11-06: "this became too crowdy to read for 30 d windows". Non-critical, Claude files and dispatches.

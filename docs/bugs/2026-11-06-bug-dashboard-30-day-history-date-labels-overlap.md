@@ -1,6 +1,8 @@
 # Bug: the 30-day open-bug history panel draws its date labels on top of each other
 
-**Status:** LANDED `555ac6fa`, independent verify PASS 2026-11-06 (M1, N1 pass; M1 red on the parent; 7 mutants red). Claude removed Luna's SHA-256 pins of the other panels, which would redden on any later dashboard edit. The verifier read the diff of the one dashboard file, against its brief. Live E2 open
+**Status:** LIVE-VERIFIED 2026-11-06 — operator confirmed on the M5 Grafana that the dates can be read ("so is this", with a screenshot). Was: LANDED `555ac6fa`, independent verify PASS 2026-11-06 (M1, N1 pass; M1 red on the parent; 7 mutants red). Claude removed Luna's SHA-256 pins of the other panels, which would redden on any later dashboard edit. The verifier read the diff of the one dashboard file, against its brief. Live E2 open
+**Fix commit:** 555ac6fa
+**Live evidence:** 2026-11-06 · run operator-grafana · env hub-m5 · scenario panel-read · commit 555ac6fa · proves E2
 **Priority:** P3
 **Severity:** low. The bars and tooltip still work; the x-axis cannot be read.
 **Approval:** operator reported it 2026-11-06: "this became unreadable". Non-critical, Claude files and dispatches.
