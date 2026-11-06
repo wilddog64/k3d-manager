@@ -1,6 +1,6 @@
 # Bug: `make hub-cutover-forwards` ignores the old host in the cutover report, so the documented command fails
 
-**Status:** OPEN — root cause read; spec complete; dispatch approved
+**Status:** LANDED `c151bcb1`, offline verification recorded 2026-11-06 (independent suite 12/12 on the landed commit, 6 red on pre-fix `2394272d`, 5 mutants killed). Live E2 open: `make hub-cutover-verify` on the M5 with no variable and no `old-host` file.
 **Priority:** P3
 **Severity:** low. The documented command stops with a clear message, and setting `HUB_OLD_HOST` works around it.
 **Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the failed rollout. Dispatch: operator, 2026-11-06 ("please dispatch P2 and P3 to Luna").

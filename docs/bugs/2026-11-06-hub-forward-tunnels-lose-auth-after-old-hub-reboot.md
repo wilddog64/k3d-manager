@@ -113,3 +113,18 @@ interface:
   - "bin/hub-cutover (forward install and pre-check)"
   - "env: HOME, SSH_AUTH_SOCK, PATH (ssh, launchctl stubs)"
 ```
+
+## Live E3, 2026-11-06, M4 to M5
+
+Run from the M4 at about 07:00 PST with the plist's forward-only key.
+
+| Check | Result |
+| --- | --- |
+| Remote command | rc 1, no output |
+| PTY | refused |
+| `-L` to 19094 | 200, no error |
+| `-L` to ports 22 and 9091 | `administratively prohibited` |
+| `-R` to 19198 and to 1 | rc 255, `remote port forwarding failed`; 0 M5 listeners on 19198 |
+| Real tunnels | 19094 200; 19100 buildinfo 200 (`/ready` is 404 on that endpoint) |
+
+`authorized_keys` on the M5 has one `k3dm-hub-forward` entry. An earlier E3 attempt had an invalid positive control because leftover test tunnels held the ports; they were killed and 0 remained before this run. E4 is open: it needs an M4 reboot with no Luna run active, then both ports up without a login and dispatch metrics reaching the M5.

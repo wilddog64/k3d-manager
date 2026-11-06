@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-06: hub-cutover P3 landed `c151bcb1`, verification recorded (independent 12/12; 6 red pre-fix `2394272d`; 5 mutants killed); live E2 open. P2 live E2 passed on the M5. Tunnel fix live E3 passed from the M4; E4 needs an M4 reboot.
+- 2026-11-06: filed six post-cutover bugs and four notes on existing docs from read-only M5 evidence (`1ed620c7`); none dispatched. Slack test post and ArgoCD token re-mint are with the operator.
 - 2026-11-06: P2 hub-cutover stopped-cluster fix landed `03f40c0a`, verification recorded (independent 20/20; 7 red pre-fix; 7/7 mutants). Live E2 open. Luna's other reds: webhook suite passes outside her sandbox; ESO wiring smoke fails on the base tree too (looks like `docs/bugs/2026-10-15-webhook-bats-load-module-removed-in-python-3-15.md`, unconfirmed); 4 pytest reds not rerun. `k3dm-hermes status` on the M5 exits 0 but reports `unknown` (cluster status source unavailable), not investigated.
 - 2026-11-06: lib-foundation PR #76 merged `b5e40f7` (operator), subtree synced `a4c44e62` (tree equals lib main). v0.5.5 not tagged. Operator approved the four dirused tab choices.
 - 2026-11-06: operator renamed diruse to dirused and required one GUI tab per UNC path; plan is now `docs/plans/dirused-windows-disk-usage-tool.md`. Operator gave the dispatch go for the P2 and P3 hub-cutover bugs and the lib-foundation v0.5.5 PR.

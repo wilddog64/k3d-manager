@@ -1,6 +1,6 @@
 # Bug: `make hub-cutover-forwards` can never pass once the old hub's cluster is stopped
 
-**Status:** LANDED `03f40c0a`, offline verification recorded 2026-11-06 (independent suite 20/20; 7 red on pre-fix; 7 of 7 mutants red). Docker filters run for real on the M4, 2026-11-06. Live E2 open: the operator reruns the rollout on the M5.
+**Status:** LANDED `03f40c0a`, VERIFIED: offline verification recorded 2026-11-06 (independent 20/20; 7 red pre-fix) and live E2 passed on the M5 2026-11-06.
 **Priority:** P2
 **Severity:** medium. The tunnel fix `8e5f8831` cannot be rolled out, so the M4's dispatch and test metrics and shipped logs stay off the M5. Worse, after three minutes the failure tells the operator to run `make hub-cutover-rollback` against a healthy hub.
 **Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the failed rollout. Dispatch: operator, 2026-11-06 ("please dispatch P2 and P3 to Luna").
@@ -74,3 +74,7 @@ interface:
   - "bin/hub-cutover [--verify|--forwards]"
   - "env: HOME, HUB_OLD_HOST, HUB_CUTOVER_STATE_DIR, HUB_CUTOVER_CONTEXT, PATH (ssh, kubectl, docker, make, curl, cloudflared, launchctl, jq stubs)"
 ```
+
+## Live E2, 2026-11-06, M5
+
+`make hub-cutover-forwards` run by the operator with the M4 cluster stopped. Printed `old cluster on m4-air.local is stopped; old controller cannot act`. Report rows: `pass` 14:54:12Z, `forwards-pass` 14:54:26Z. The same run printed `unknown` from Hermes and an untested webhook health, which it should not have accepted; filed as `docs/bugs/2026-11-06-hub-cutover-verify-accepts-hermes-unknown.md`.
