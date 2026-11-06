@@ -141,12 +141,17 @@ PY
     repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     run env K3DM_WEBHOOK_PATH="${repo_root}/bin/k3dm-webhook" python3 - <<'PY'
 import importlib.machinery
+import importlib.util
 import inspect
 import os
 
-webhook = importlib.machinery.SourceFileLoader(
-    "k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]
-).load_module()
+spec = importlib.util.spec_from_loader(
+    "k3dm_webhook", importlib.machinery.SourceFileLoader(
+        "k3dm_webhook", os.environ["K3DM_WEBHOOK_PATH"]
+    )
+)
+webhook = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(webhook)
 source = inspect.getsource(webhook._smoke_test_services)
 assert "_eso_health_results(app_context)" in source
 assert "_eso_health_results(\"k3d-k3d-cluster\", \"Hub \")" in source
