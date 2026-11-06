@@ -10,6 +10,13 @@
 
 set -euo pipefail
 
+if [[ -z "${BASH_VERSINFO[0]:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  cat <<'EOF' >&2
+[install-sudoers] bash 4.0 or newer is required. Install a newer bash with 'brew install bash' and put it first on PATH (for example, run 'eval "$(brew shellenv)"').
+EOF
+  exit 2
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/system.sh"

@@ -15,6 +15,68 @@ setup() {
   [[ "$output" == *"Usage"* ]]
 }
 
+@test "install-sudoers.sh refuses bash 3.2 before reaching mktemp" {
+  if /bin/bash -c '[[ ${BASH_VERSINFO[0]} -ge 4 ]]'; then
+    skip "host /bin/bash is bash 4 or newer; regression requires bash 3.2"
+  fi
+
+  local stub_bin="${BATS_TEST_TMPDIR}/stub-bin"
+  local mktemp_log="${BATS_TEST_TMPDIR}/mktemp.log"
+  [ "${BATS_TEST_TMPDIR}" != "/tmp" ]
+  mkdir -p "${stub_bin}"
+  [[ "${stub_bin}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${stub_bin}/mktemp" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/mktemp.log"
+exec /usr/bin/mktemp "$@"
+STUB
+  chmod +x "${stub_bin}/mktemp"
+  cat > "${stub_bin}/visudo" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+  chmod +x "${stub_bin}/visudo"
+
+  run env PATH="${stub_bin}:${PATH}" BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR}" \
+    /bin/bash "${SCRIPT}"
+  [ "$status" -ne 0 ]
+  local failed=0
+  if [[ "$output" != *"bash 4.0 or newer is required"* ]]; then
+    echo "M2 failed: bash 4 requirement was not reported"
+    failed=1
+  fi
+  if [[ "$output" == *"unbound variable"* ]]; then
+    echo "N1 failed: script reached the empty-array unbound-variable error"
+    failed=1
+  fi
+  if [[ -e "${mktemp_log}" ]]; then
+    echo "N2 failed: script reached mktemp"
+    failed=1
+  fi
+  [ "$failed" -eq 0 ]
+}
+
+@test "install-sudoers.sh reaches mktemp under bash 4 or newer (positive control)" {
+  local bash4
+  bash4="$(command -v bash)"
+  "$bash4" -c '[[ ${BASH_VERSINFO[0]} -ge 4 ]]' || skip "no bash 4 or newer on PATH"
+  local stub_bin="${BATS_TEST_TMPDIR}/stub-bin"
+  local mktemp_log="${BATS_TEST_TMPDIR}/mktemp.log"
+  mkdir -p "${stub_bin}"
+  [[ "${stub_bin}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${stub_bin}/mktemp" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/mktemp.log"
+exec /usr/bin/mktemp "$@"
+STUB
+  chmod +x "${stub_bin}/mktemp"
+
+  run env PATH="${stub_bin}:${PATH}" BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR}" \
+    "$bash4" "${SCRIPT}" --dry-run
+  [ "$status" -eq 0 ]
+  [ -s "${mktemp_log}" ]
+}
+
 @test "install-sudoers.sh --dry-run validates sudoers syntax" {
   run "$SCRIPT" --dry-run
   [ "$status" -eq 0 ]
