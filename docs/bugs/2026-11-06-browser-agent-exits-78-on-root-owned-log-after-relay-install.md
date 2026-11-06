@@ -1,9 +1,9 @@
 # Bug: a browser agent exits 78 forever when the legacy root daemon left its log root-owned, so the public frontend returns 502 after `make install-browser-relays`
 
-**Status:** OPEN — root cause proven on the M5; not dispatched
+**Status:** OPEN — root cause proven on the M5; dispatched to Luna 2026-11-06
 **Priority:** P1
 **Severity:** high. The Hostinger frontend is unreachable from the hub, publicly and in a browser, and nothing reports why. A one-time manual `chown` recovers it, but the install prints success and leaves the agent retrying.
-**Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the 502. Dispatch: pending.
+**Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the 502. Dispatch: operator, 2026-11-06 ("you can dispatch P1 bug").
 **Filed:** 2026-11-06
 **Detected by:** Claude (M5 live checks after D3 Part B, 2026-11-06)
 **Affected:** `bin/install-browser-relays.sh`, `com.k3d-manager.browser.hostinger-frontend-http`
