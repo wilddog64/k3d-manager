@@ -1,6 +1,6 @@
 # Bug: a new hub can finish with no webhook status channel, so every analyzer post is lost
 
-**Status:** OPEN — hand fix applied on the M5 2026-11-06 (`K3DM_STATUS_CHANNEL_ID=C4CAEH8HX`)
+**Status:** FIXED offline `c1e05278`, independent verify PASS 2026-11-06; live E3 pending. Hand fix on the M5 2026-11-06 (`K3DM_STATUS_CHANNEL_ID=C4CAEH8HX`)
 **Priority:** P2
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Filed:** 2026-11-06
