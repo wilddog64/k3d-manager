@@ -38,6 +38,7 @@ def analyze_env(monkeypatch, tmp_path):
 
 
 def _run(monkeypatch, tmp_path, alerts, response_url=""):
+    assert wh.JOB_DIR == tmp_path, "analyze fixture must target its scratch job directory"
     job_dir = tmp_path / "job"
     job_dir.mkdir()
     wh._run_analyze("job", {"alerts": alerts}, response_url=response_url)
@@ -183,6 +184,83 @@ def test_each_firing_alert_posts_to_status_channel(monkeypatch, analyze_env, tmp
     assert len(bot_calls) == 2
     assert [call[1] for call in bot_calls] == [{"channel_id": "C-STATUS"}] * 2
     assert webhook_calls == []
+
+
+def _captured_alert_batch():
+    fixture = ROOT / "scripts/tests/fixtures/webhook/alertmanager-analyze-batch.json"
+    # Read-only capture from m5-air.local, 2026-11-06; 26 firing alerts.
+    assert fixture.is_file(), "expected the task's captured Alertmanager fixture"
+    payload = json.loads(fixture.read_text())
+    assert len(payload["alerts"]) == 26
+    assert all(alert.get("status") == "firing" for alert in payload["alerts"])
+    return payload["alerts"]
+
+
+def test_captured_batch_is_capped_and_summarized_without_extra_analysis(
+    monkeypatch, analyze_env, tmp_path
+):
+    alerts = _captured_alert_batch()
+    analysis_calls = []
+    posts = []
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: analysis_calls.append(prompt) or "analysis")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: posts.append(text) or "123")
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: None)
+
+    _run(monkeypatch, tmp_path, alerts)
+
+    assert len(analysis_calls) == 5
+    assert len(posts) == 5 + 1
+    summary = posts[-1]
+    assert f"{len(alerts) - 5} alerts were not analyzed" in summary
+    for alert in alerts[5:]:
+        assert alert["labels"]["alertname"] in summary
+    assert (tmp_path / "job" / "status").read_text() == "success"
+
+
+def test_batch_at_cap_has_no_summary_and_still_analyzes_every_alert(
+    monkeypatch, analyze_env, tmp_path
+):
+    alerts = [_alert(f"Alert{index}") for index in range(5)]
+    analysis_calls = []
+    posts = []
+    monkeypatch.setattr(wh, "_call_gemini", lambda prompt: analysis_calls.append(prompt) or "analysis")
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: posts.append(text) or "123")
+
+    _run(monkeypatch, tmp_path, alerts)
+
+    assert len(analysis_calls) == 5
+    assert len(posts) == 5
+    assert all("not analyzed" not in post for post in posts)
+
+
+def test_resolved_alerts_do_not_count_toward_analysis_cap(monkeypatch, analyze_env, tmp_path):
+    alerts = [_alert(f"Alert{index}") for index in range(5)]
+    alerts.extend({"status": "resolved", "labels": {"alertname": "ResolvedOnly"}} for _ in range(3))
+    posts = []
+    monkeypatch.setattr(wh, "_post_slack_bot", lambda text, **kwargs: posts.append(text) or "123")
+
+    _run(monkeypatch, tmp_path, alerts)
+
+    assert len(posts) == 5
+    assert all("ResolvedOnly" not in post for post in posts)
+    assert all("not analyzed" not in post for post in posts)
+
+
+def test_failed_summary_post_records_delivery_failed(monkeypatch, analyze_env, tmp_path):
+    alerts = _captured_alert_batch()
+    posts = []
+
+    def post(text, **kwargs):
+        posts.append(text)
+        return "123" if len(posts) <= 5 else ""
+
+    monkeypatch.setattr(wh, "_post_slack_bot", post)
+    monkeypatch.setattr(wh, "_slack_post", lambda *args: False)
+    _run(monkeypatch, tmp_path, alerts)
+
+    assert len(posts) == 5 + 1
+    assert "not analyzed" in posts[-1]
+    assert (tmp_path / "job" / "status").read_text() == "delivery_failed"
 
 
 def test_bot_never_posts_to_task_channel(monkeypatch, analyze_env, tmp_path):

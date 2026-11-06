@@ -23,6 +23,7 @@ from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
     ANALYZE_MAX_BODY,
+    ANALYZE_MAX_ALERTS,
     SLACK_EVENT_MAX_BODY,
     _JOB_ID_RE,
     JOB_DIR,
@@ -2070,7 +2071,9 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             _finish("success")
             return
 
-        for alert in firing:
+        analyzed = firing[:ANALYZE_MAX_ALERTS]
+        skipped = firing[ANALYZE_MAX_ALERTS:]
+        for alert in analyzed:
             labels = alert.get("labels", {})
             argocd_app = labels.get("name", "")
             display_name = (
@@ -2130,6 +2133,34 @@ def _run_analyze(job_id, alert_payload, response_url=""):
                 if not posted and SLACK_WEBHOOK_URL:
                     route = "webhook_fallback" if route == "bot" else "webhook"
                     posted = bool(_slack_post(SLACK_WEBHOOK_URL, message))
+                    reason = "webhook_post_failed"
+            if not posted:
+                delivery_failed = True
+                _LOG.warning("slack notification failed job=%s route=%s reason=%s",
+                             job_id, route, reason)
+
+        if skipped:
+            names = [a.get("labels", {}).get("alertname", "unknown") for a in skipped]
+            summary = (
+                f"⚠️ *Analyze batch limit reached* — {len(skipped)} alerts were not analyzed: "
+                f"{', '.join(names)}"
+            )
+            _log(summary)
+            route = "none"
+            posted = False
+            reason = "no_route_configured"
+            if response_url:
+                route = "response_url"
+                posted = bool(_slack_post(response_url, summary))
+                reason = "post_failed"
+            else:
+                if SLACK_BOT_TOKEN and STATUS_CHANNEL_ID:
+                    route = "bot"
+                    posted = bool(_post_slack_bot(summary, channel_id=STATUS_CHANNEL_ID))
+                    reason = "bot_post_failed"
+                if not posted and SLACK_WEBHOOK_URL:
+                    route = "webhook_fallback" if route == "bot" else "webhook"
+                    posted = bool(_slack_post(SLACK_WEBHOOK_URL, summary))
                     reason = "webhook_post_failed"
             if not posted:
                 delivery_failed = True
