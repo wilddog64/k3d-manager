@@ -1,6 +1,6 @@
 # Bug: hub cutover leaves the Hermes ArgoCD token dead, and nothing reports it
 
-**Status:** OPEN — observed 2026-11-06 on the M5; re-mint given to the operator, not yet confirmed
+**Status:** OPEN — token re-minted by hand on the M5 2026-11-06, using the Vault password; neither defect is fixed in code
 **Priority:** P2
 **Approval:** pending
 **Branch:** `k3d-manager-v1.43.14`
@@ -27,7 +27,7 @@ On 2026-11-06 the operator ran `make argocd-hermes-token` on the M5 and got `HTT
 
 The target takes `ARGOCD_ADMIN_PASSWORD`, else `argocd-initial-admin-secret`. `admin.passwordMtime` in `argocd-secret` is 2026-11-01T12:14:02Z, and the monthly `argocd-credential-rotator` writes a new password to Vault `secret/argocd/admin`, which the target never reads. `accounts.hermes=apiKey` is set, so the account is not the cause. `bin/argocd-app-sync` already tries env, then Vault, then the initial secret, per `docs/bugs/2026-10-18-argocd-app-sync-stale-vault-admin-password.md`.
 
-Not yet proven: that the Vault copy logs in. The re-mint run with the Vault value is the test.
+Proven 2026-11-06T15:19Z on the M5: the operator reran the target with `ARGOCD_ADMIN_PASSWORD` taken from Vault and got `stored in Keychain`, `verified: 29 applications visible to hermes`, `Hermes restarted`. The Keychain item date moved to 2026-11-06T15:19:13Z.
 
 ## Files
 
