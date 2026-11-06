@@ -1,6 +1,6 @@
 # Bug: hub cut-over only boots out the old hub's agents, so a reboot restarts them and takes the public routes down
 
-**Status:** OPEN — live outage ended by hand 2026-11-06; all 15 singletons disabled on the M4 by hand; `bin/hub-cutover` not fixed
+**Status:** LANDED 2026-11-06 (`76f34498`), independent verify PASS (offline E1, E2, E4, E5). Live E3 still open. The M4 singletons were disabled by hand before this fix, so a rollback to the M4 still needs the undo steps below.
 **Priority:** P1
 **Approval:** M4 disable: operator 2026-11-06 ("go ahead to disable 14 old hub singletons"). Fix: operator 2026-11-06 ("might start after /clear so make sure you make a good handoff"). Dispatch: operator 2026-11-06 ("go ahead to dispath P1 pub-cutover to Luna now").
 **Filed:** 2026-11-06
@@ -66,6 +66,14 @@ Read from the diff; none of these was shown by the first attempt's tests.
 2. **A label both disabled and loaded is never stopped.** The `continue` skips the bootout, so the cut-over aborts at the "remains loaded" check, and a re-run after a failed bootout hits the same stop. Check loaded state for every label. Skip only the record and the disable for a label already disabled. Boot out any loaded label. Add it to `stopped-on-old` only if it is in `disabled-on-old`. Otherwise print a warning naming the label: it was disabled before the cut-over, so a rollback does not restore it.
 3. **Rollback can leave an enabled agent on the new hub.** A cut-over that fails at a bootstrap has already enabled that label, and rollback disables only loaded labels, so that agent starts at the new hub's next login beside the restored old hub. Rollback disables every listed label on the new hub and boots out those that are loaded. Remove `stopped-on-new`, which nothing reads, and the `mkdir -p` added for it.
 4. **The plan understates the change.** `print_plan`, which the operator reads before confirming, says only that loaded agents stop. It must also say that listed agents are disabled on the old host.
+
+## Verification (2026-11-06)
+
+Independent verifier's 13 tests, written from the Acceptance block, on the landed commit: rc 0, 13 pass. On pre-fix `22c2be80`: rc 1, 11 fail (M1, N1, N2, M3 to M10). M2 and N3 pass there because that code never disables anything; N3's paired control M4 is red.
+
+The first attempt was never committed, so E5's "red on Luna's first attempt" is shown by undoing one behaviour at a time in copies of the fix: re-run record kept (M6), disabled-and-loaded stop (M7), rollback disabling every label (M8), plan text (M9), truncate on a new host (M10), duplicate guard (M6). Each failed exactly the named test. The duplicate guard passed at first because M6 counted bootstraps only; Claude added the per-label enable count, which the Acceptance text requires, and reran every copy.
+
+Gates on the final tree: `hub_cutover.bats` and `makefile_hub_port_forward.bats` 44 of 44, shellcheck rc 0. `make test` rc 2 on one test, the ESO smoke wiring test, which also fails on the clean tree at `d2b005f7`. `make test-pytest` rc 2 with 4 failed and 1777 passed, the same four names and counts on that clean tree; all four neither name `hub-cutover` nor reach it.
 
 ## Files
 

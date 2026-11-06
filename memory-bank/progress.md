@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-06: P1 hub-cutover LANDED 76f34498, verify PASS (13 tests from Acceptance; 11 red pre-fix; 6 mutants red). Live E3 open. Tunnel fix (P2) now unblocked.
 - 2026-11-06: P1 hub-cutover first attempt reviewed; Correction 1 (re-run records, disabled+loaded, rollback on new hub, plan text) and M6-M10 added; resumed Luna.
 - 2026-11-06: filed P3 undeclared overlaps tile out of sight (not dispatched; operator picks the time). Empty 30-day panel not filed: waits on platform-ops, live E4 of bug-open-history.
 - 2026-11-06: chrome-cdp removed from the M4 (operator go). Tunnel fix option 1 chosen. P1 hub-cutover spec extended and dispatched to Luna.
