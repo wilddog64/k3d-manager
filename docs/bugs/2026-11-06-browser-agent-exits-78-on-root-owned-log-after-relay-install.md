@@ -1,6 +1,6 @@
 # Bug: a browser agent exits 78 forever when the legacy root daemon left its log root-owned, so the public frontend returns 502 after `make install-browser-relays`
 
-**Status:** OPEN — root cause proven on the M5; dispatched to Luna 2026-11-06
+**Status:** LANDED `9ae2698c`, offline verification recorded 2026-11-06 (independent suite 19/19; 14 red on pre-fix; 14 of 16 mutants red, the other two equivalent for M3). Live E2 open: it needs a root-owned log or the next hub rebuild.
 **Priority:** P1
 **Severity:** high. The Hostinger frontend is unreachable from the hub, publicly and in a browser, and nothing reports why. A one-time manual `chown` recovers it, but the install prints success and leaves the agent retrying.
 **Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the 502. Dispatch: operator, 2026-11-06 ("you can dispatch P1 bug").
@@ -42,7 +42,7 @@ Dry-run and uninstall modes change no ownership. No new sudoers rule: this runs 
 
 - `stat -f '%Su'` fails under GNU stat, which the M4's PATH resolves first (captured 2026-11-06), so the install would abort on any matching log. Use the repo's idiom: `stat -c '%U' -- FILE 2>/dev/null || stat -f '%Su' -- FILE`.
 - `*-browser-http*.log` also matches `*-browser-https*.log`, so an https log is visited twice. One pattern covers both.
-- `_run_command` without `--soft` exits inside itself, so the message naming the file never prints.
+- `_run_command` without `--soft` exits inside itself, so the message naming the file never prints. Cosmetic, as the verifier's surviving mutants showed: its own failure line already names the file and exits non-zero, so M3 held either way.
 - `$EUID` cannot be stubbed, so N4 was untestable. Read `id -u` in the repair function.
 - The stub's capture comment cited a command that had failed in her sandbox. Replaced with Claude's real capture.
 - M3, N3 and N4 had no tests, and the new test failed.
