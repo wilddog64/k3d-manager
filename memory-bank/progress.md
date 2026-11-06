@@ -2329,4 +2329,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-06: operator reported the 30-day history panel's date labels overlap; filed P3 `bug-dashboard-30-day-history-date-labels-overlap`, dispatched to Luna.
 - 2026-11-06: P3 Python 3.15 test LANDED `2ee593e3`, verify PASS on the landed commit.
 - 2026-11-06: hub-cutover token-dead LANDED `5b436578`, verify PASS on the landed commit, live E2 open.
+- 2026-11-06: 30-day panel label LANDED `555ac6fa`, verify PASS on the landed commit, live E2 open.
 - 2026-11-06: operator go for the next queue after this batch: D3 Correction 4, resume-model bug, read-only alert check, ACG pair, agy panels.
