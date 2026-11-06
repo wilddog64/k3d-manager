@@ -30,6 +30,8 @@ Reproduced by Claude on the M4, 2026-11-05, against `k3d-manager-v1.43.14` (`c97
 
 Recurrence: the operator reran it on the M2 on `k3d-manager-v1.43.14` and got the same error at line 183. So the bug is not specific to the stale branch.
 
+Root cause on the M2: the interactive shell did not have Homebrew on `PATH` until the operator ran `eval "$(brew shellenv)"`. After that, `make install-sudoers` succeeded (2026-11-05). So the M2's shell profile is missing `brew shellenv`, and a script without a bash-version guard fails silently into bash 3.2.
+
 ## Fix (proposal; the operator picks)
 
 - **A. Fail fast (recommended, smallest).** `bin/install-sudoers.sh` checks `BASH_VERSINFO` the same way `scripts/k3d-manager:16` does. On bash below 4 it exits 2 with a message naming `brew install bash` and the `PATH` workaround, before writing the temp file.

@@ -1,6 +1,6 @@
 # Bug: passwordless sudoers rules let any same-user process gain root (self-update and /usr/local/bin wildcards)
 
-**Status:** LANDED — `4c4f7dd1` (Luna implementation; Claude review hardening: the hosts-file override is ignored as root, and IPv4 octets are limited to 1–3 digits). Independent verify PASS (Sonnet, recorded in the ledger 2026-11-05); live E4 PASS on the M4 (2026-11-05). The M5 reinstall succeeded; the M2 is blocked by `docs/bugs/2026-11-05-install-sudoers-crashes-under-macos-bash-3-2.md`.
+**Status:** CLOSED: VERIFIED 2026-11-05. Fixed in `4c4f7dd1`. Independent verify PASS. Live E4 PASS on the M4. The fixed rules are reinstalled on M4, M5 and M2.
 **Priority:** P1
 **Severity:** high — local privilege escalation. Any process running as an `%admin` user (a dispatched Codex/agy agent, a compromised npm/pip postinstall, a malicious repo script) can become root with no password, on every Mac that ran `make install-sudoers`.
 **Filed:** 2026-11-05
@@ -131,3 +131,8 @@ The operator ran `make install-sudoers` on the M4 and the M5; both succeeded. `/
 Result on the M4: the listing has `(ALL) ALL` plus exactly the 16 expected `NOPASSWD` rules, the same lines as the M2 dry-run test. None of the six removed rules appears: no `/etc/sudoers.d` target, and no install/cp/chmod rule under `/usr/local/bin`. **N1 and N2 PASS live.**
 
 The M2 is pending until the bash 3.2 crash is fixed, or until it is installed with Homebrew bash (`/opt/homebrew/bin/bash bin/install-sudoers.sh`).
+
+## Remediation complete (2026-11-05)
+
+- **M2.** The operator ran `eval "$(brew shellenv)"`, then `make install-sudoers` on `k3d-manager-v1.43.14`. The output shows `Installed /etc/sudoers.d/k3d-manager` and `Installed /usr/local/bin/k3d-manager-update-hosts`. Claude cannot reach the M2, so the full `sudo -n -l` listing was checked on the M4 only.
+- **M5.** `make install-sudoers` succeeded (operator report).

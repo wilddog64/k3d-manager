@@ -36,7 +36,7 @@
 
 ## 2026-11-05 security + telemetry filings
 
-- [ ] P1 sudoers passwordless root escalation: LANDED `4c4f7dd1`. Independent verify PASS (recorded). install-sudoers: M4 and M5 OK; M2 blocked by bash 3.2 (P2 filed). E4 PASS live on the M4; the M2 is pending (Homebrew bash workaround or the P2 fix).
+- [x] P1 sudoers passwordless root escalation: CLOSED 2026-11-05 (reinstalled on all 3 Macs). LANDED `4c4f7dd1`. Independent verify PASS (recorded). install-sudoers: M4 and M5 OK; M2 blocked by bash 3.2 (P2 filed). E4 PASS live on the M4; the M2 is pending (Homebrew bash workaround or the P2 fix).
 - [ ] P1 sudoers LaunchDaemon/exec wildcards: design pending.
 - [ ] P2 dispatch resume ignores task model: Acceptance pending.
 - [ ] P2 agy no-data: root cause recorded; Fix direction is to read agy transcripts.
