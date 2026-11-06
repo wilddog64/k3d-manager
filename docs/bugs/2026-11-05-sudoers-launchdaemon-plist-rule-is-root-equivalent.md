@@ -102,7 +102,7 @@ The fix must therefore stop root from executing anything user-writable, not only
 4. C: the Linux rules (`k3s*`, `systemctl`, `apt-get`, `dnf`, `yum`, `microdnf`) are written only on Linux.
 5. Out of scope: `bin/cluster-up:152` calls `sudo -n` directly. That gets its own P3 later.
 
-## Files (Part A)
+## Files
 
 - `bin/install-browser-relays.sh`
 - `scripts/tests/bin/install_browser_relays.bats`
@@ -177,7 +177,7 @@ PASS means D1 is viable. FAIL means fall back to D2.
 3. `bin/install-sudoers.sh` removes the LaunchDaemon `install`, `bootstrap`, `bootout` and `rm` rules. It applies C: the Linux wildcards (`k3s`, `systemctl`, `apt-get`, `dnf`, `yum`, `microdnf`) are written only on Linux, and macOS gets only `true` plus `ifconfig lo0 alias/-alias`.
 4. The loopback-alias daemons (`/sbin/ifconfig lo0 alias 127.0.0.x`, static root args) move into the Part 1 installer, so they are installed once with a password.
 
-## Files
+### D1 file list (superseded)
 
 Part 1:
 - `scripts/etc/pf/k3dm-browser-redirects.conf`
@@ -186,7 +186,7 @@ Part 1:
 - `Makefile`
 - `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`
 
-## Acceptance (Part 1)
+### D1 acceptance (superseded)
 
 ```yaml
 must:
