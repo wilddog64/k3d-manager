@@ -120,6 +120,26 @@ remote_kubectl() {
   old_ssh "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH kubectl --context '$CONTEXT' -n '$ARGOCD_NS' $*"
 }
 
+verify_old_controller_stopped() {
+  local replicas rc containers running
+  if replicas="$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')"; then
+    [[ "$replicas" == 0 ]] || return 1
+    return 0
+  else
+    rc=$?
+  fi
+
+  # Only accept an unavailable API when Docker proves that this cluster exists
+  # on the old host and every one of its containers is stopped.
+  # shellcheck disable=SC2029
+  containers="$(old_ssh "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH docker ps -a --format '{{.Names}}' --filter 'name=^${CONTEXT}-'")" || return "$rc"
+  [[ -n "$containers" ]] || return 1
+  # shellcheck disable=SC2029
+  running="$(old_ssh "PATH=/opt/homebrew/bin:\$HOME/.local/bin:\$PATH docker ps --format '{{.Names}}' --filter 'name=^${CONTEXT}-' --filter 'status=running'")" || return 1
+  [[ -z "$running" ]] || return 1
+  echo "hub-cutover: old cluster on $OLD_HOST is stopped; old controller cannot act"
+}
+
 controller_stopped() {
   local side="$1" ready pods
   if [[ "$side" == old ]]; then
@@ -182,7 +202,7 @@ verify_cutover() {
   output="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret -l k3d-manager/role=app-cluster -o name)" || return 1
   grep -Fxq secret/cluster-ubuntu-hostinger <<<"$output" || return 1
   kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
-  [[ "$(remote_kubectl get "$CONTROLLER" -o 'jsonpath={.spec.replicas}')" == 0 ]] || return 1
+  verify_old_controller_stopped || return 1
   make webhook-doctor || return 1
   frontend_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://frontend.3ai-talk.org/)" || return 1
   [[ "$frontend_code" == 200 ]] || { echo "hub-cutover: frontend returned $frontend_code" >&2; return 1; }

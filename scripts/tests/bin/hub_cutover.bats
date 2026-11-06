@@ -108,7 +108,22 @@ if [[ "$2" == curl\ -* ]]; then
   echo "${STUB_FORWARD_BODY:-OK}"; exit 0
 fi
 if [[ "$2" == *'get statefulset'* ]]; then
+  if [[ "$2" == *'get statefulset/argocd-application-controller'* && "${STUB_OLD_API_REFUSES:-0}" == 1 ]]; then
+    echo 'The connection to the server 127.0.0.1:55730 was refused' >&2
+    exit 1
+  fi
   if [[ "$2" == *readyReplicas* ]]; then echo "${STUB_OLD_READY:-0}"; else cat "$WORK_OLD_REPLICAS"; fi
+  exit 0
+fi
+if [[ "$2" == *'docker ps -a'* ]]; then
+  [[ "${STUB_DOCKER_FAIL:-0}" == 0 ]] || exit 127
+  # Captured old-host output, m4-air.local, 2026-11-06: both cluster containers exited.
+  printf '%s\n' "${STUB_DOCKER_ALL-k3d-k3d-cluster-serverlb k3d-k3d-cluster-server-0}"
+  exit 0
+fi
+if [[ "$2" == *'docker ps '* ]]; then
+  [[ "${STUB_DOCKER_FAIL:-0}" == 0 ]] || exit 127
+  printf '%s' "${STUB_DOCKER_RUNNING:-}"
   exit 0
 fi
 if [[ "$2" == *'get pods'* ]]; then [[ "${STUB_OLD_POD:-0}" == 0 ]] || echo pod/controller; exit 0; fi
@@ -595,6 +610,60 @@ STUB
   run grep -q 'bootout\|bootstrap\|scale statefulset' "$CALLS"
   [ "$status" -eq 1 ]
   run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 1 ]
+}
+
+@test "verify accepts a refusing old API only when captured cluster containers are all stopped" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_OLD_API_REFUSES=1
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'old cluster on m4-air.local is stopped; old controller cannot act'* ]]
+  grep -q '"verify": "pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  grep -q "docker ps -a" "$CALLS"
+  grep -q "docker ps --format" "$CALLS"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+}
+
+@test "verify fails closed for reachable replicas, running cluster, missing containers, and Docker failure" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_DOCKER_ALL='k3d-k3d-cluster-server-0' STUB_DOCKER_RUNNING=''
+  echo 2 > "$WORK_OLD_REPLICAS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  grep -q '"verify": "verify-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+
+  export STUB_OLD_API_REFUSES=1 STUB_DOCKER_RUNNING='k3d-k3d-cluster-server-0'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  export STUB_DOCKER_RUNNING='' STUB_DOCKER_ALL=''
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  export STUB_DOCKER_ALL='k3d-k3d-cluster-server-0' STUB_DOCKER_FAIL=1
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+
+  export STUB_DOCKER_FAIL=0 STUB_SSH_DENIED=1
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+}
+
+@test "verify fallback makes no old-host start, stop, scale, or kubectl calls" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_OLD_API_REFUSES=1
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  run grep -E 'docker (start|stop)|k3d |kubectl .*scale' "$CALLS"
   [ "$status" -eq 1 ]
 }
 
