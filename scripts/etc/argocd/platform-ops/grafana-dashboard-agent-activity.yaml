@@ -1307,7 +1307,7 @@ data:
             }
           },
           "title": "agy tokens",
-          "description": "No data means no wrapped agy run reported parseable usage; interactive runs do not carry usage.",
+          "description": "Token totals use parseable transcript usage fields, or ledger usage when transcripts are unavailable. Interactive sessions may have no token fields; their session counts remain visible.",
           "gridPos": {
             "h": 8,
             "w": 6,
@@ -1342,6 +1342,77 @@ data:
               }
             },
             "overrides": []
+          }
+        },
+        {
+          "id": 102,
+          "type": "stat",
+          "title": "agy data source",
+          "description": "Reports the host named and its local source: interactive and print sessions when transcripts exist, otherwise the wrapper ledger. Hosts are not combined. A source of none warns that this host has no activity source.",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 60
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_agy_source_present{source!=\"none\"}",
+              "instant": true,
+              "legendFormat": "{{host}}: {{source}}"
+            },
+            {
+              "refId": "B",
+              "expr": "k3dm_agy_source_present{source=\"none\"}",
+              "instant": true,
+              "legendFormat": "{{host}}: {{source}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "textMode": "name",
+            "text": {
+              "valueSize": 20
+            }
           }
         },
         {

@@ -596,6 +596,7 @@ STUB
     ms --role "$role" --check
     [ "$status" -eq 0 ]
     [[ "$output" =~ ai:agy[[:space:]]+ok && "$output" =~ ai:gemini[[:space:]]+ok ]]
+    grep -Eq '^agy wrapper:[[:space:]]+absent \(warning; transcript collector is the data source\)$' <<< "$output"
     rm "$HOME_FX/.local/bin/gemini"
     ms --role "$role" --check
     [ "$status" -eq 0 ]

@@ -516,7 +516,12 @@ run_agents() {
 
 check_ai_clis() {
   [[ "$role" == hub || "$role" == worker ]] || return 0
-  local name
+  local name wrapper_dir="${AGY_WRAPPER_DIR:-$HOME/.local/share/k3d-manager/bin}"
+  if [[ -L "$wrapper_dir/agy" ]] && [[ "$(readlink "$wrapper_dir/agy")" == "$REPO_ROOT/bin/k3dm-agy" ]]; then
+    report 'agy wrapper:' present
+  else
+    report 'agy wrapper:' 'absent (warning; transcript collector is the data source)'
+  fi
   for name in agy gemini; do
     if (PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"; export PATH; hash -r; command -v "$name" >/dev/null 2>&1); then
       report "ai:${name}" ok

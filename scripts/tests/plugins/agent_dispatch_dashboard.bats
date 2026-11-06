@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98}
-assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 85 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 86 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -844,6 +844,32 @@ for title,group,metric,legend in (("Untracked by repo","repo, mode","k3dm_codex_
     assert panel["gridPos"]["h"]>=5 and panel["options"]["namePlacement"]=="top"
 PYTEST
   [ "$status" -eq 0 ]
+}
+
+@test "agent activity: agy data source names local host and source without overlap" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json,sys
+text=open(sys.argv[1]).read()
+panels=json.loads("\n".join(line[4:] for line in text.split("  agent-activity.json: |\n",1)[1].splitlines()))["panels"]
+panel=next(p for p in panels if p["title"]=="agy data source")
+assert panel["type"]=="stat" and panel["targets"][0]["expr"]=='k3dm_agy_source_present{source!="none"}'
+assert panel["targets"][1]["expr"]=='k3dm_agy_source_present{source="none"}'
+assert [target["refId"] for target in panel["targets"]]==["A","B"]
+assert panel["options"]["textMode"]=="name"
+assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":60}
+assert "host" in panel["targets"][0]["legendFormat"] and "source" in panel["targets"][0]["legendFormat"]
+assert "interactive and print" in panel["description"] and "not combined" in panel["description"]
+warning=panel["fieldConfig"]["overrides"][0]
+assert warning["matcher"]=={"id":"byFrameRefID","options":"B"}
+assert warning["properties"][0]["value"]["fixedColor"]=="red"
+for i,a in enumerate(panels):
+ for b in panels[i+1:]:
+  x,y=a["gridPos"],b["gridPos"]
+  assert not (x["x"]<y["x"]+y["w"] and y["x"]<x["x"]+x["w"] and x["y"]<y["y"]+y["h"] and y["y"]<x["y"]+x["h"])
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
 }
 
 @test "agent dispatch: outcome row accommodates nine labels and preserves subsequent layout" {
