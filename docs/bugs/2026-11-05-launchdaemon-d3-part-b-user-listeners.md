@@ -1,6 +1,6 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 PARTIAL on the M4 2026-11-06 (see below); agents, URLs, `make up` and the M5 pass are not proven.
+**Status:** FIX INCOMPLETE on the Hostinger path (Correction 4, found 2026-11-06, open). Landed so far: `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 PARTIAL on the M4 2026-11-06 (see below); agents, URLs, `make up` and the M5 pass are not proven.
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05
@@ -173,3 +173,13 @@ Read-only checks after the operator's reboot:
 launchd's override database still lists `com.k3d-manager.frontend-browser-http` as enabled; the plist is gone.
 
 The reboot also exposed a separate outage, not caused by Part B: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md`.
+
+## Correction 4 (Claude review, 2026-11-06): the Hostinger path never writes two of the agents (OPEN)
+
+Found by reading the code before the M5 pass. Not reproduced live.
+
+- `_hostinger_refresh_access_layer` writes the plist only for `browser.hostinger-frontend-http` (`scripts/lib/providers/k3s-hostinger.sh:722`). For `browser.argocd-https` and `browser.keycloak-http` it only calls `_hostinger_restart_launchd` (`:714`, `:719`), which returns 0 when the plist is absent, so the skip is silent.
+- The only writers of those two plists are `bin/cluster-up` and `bin/cluster-refresh`, the ACG paths.
+- `make install-browser-relays` removes the legacy root daemons. On the M5, which has no agents yet, `127.0.0.1:443` and `127.0.0.1:80` would then have no backend after `make refresh-edge`.
+
+Fix direction: the Hostinger refresh writes all three agents, and a missing plist there is an error rather than a silent return. A black-box test asserts all three plists exist after a Hostinger refresh on an empty LaunchAgents directory. E5 on the M5 waits for this.
