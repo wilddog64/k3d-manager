@@ -1,6 +1,6 @@
 # Bug: dispatch resume ignores the task's model and records a worker model that did not run
 
-**Status:** OPEN
+**Status:** OPEN — dispatched to Luna 2026-11-06
 **Priority:** P2
 **Severity:** medium — every Codex resume runs Codex's configured default model rather than the model the task was dispatched with, and the ledger's `resume` event claims the dispatched model. Per-model cost and quality comparisons, and the planned lead-model dashboard, are wrong for any task that was resumed.
 **Filed:** 2026-11-05
@@ -32,6 +32,13 @@ Code (`bin/k3dm-codex-dispatch` at `69f6a09f`):
 1. When `$run/model` is non-empty, pass `-m "$model"` to both `codex exec resume` invocations. Add `resume --model ID` to override it. An override updates `$run/model` and records `source: explicit`.
 2. The `resume` event records `source: inherited` only when a model is actually passed to Codex. When none is passed, record `model: unknown, source: unreported`.
 3. Metrics attribute tokens and runs per run, from that run's `identity` and `codex_usage` events. A task's Worker cell lists every distinct runtime model in run order, for example `gpt-6-luna → gpt-6.1-terra`.
+
+## Files
+
+- `bin/k3dm-codex-dispatch`
+- `bin/k3dm-dispatch-metrics`
+- `scripts/tests/bin/codex_dispatch.bats`
+- `scripts/tests/bin/test_dispatch_metrics.py`
 
 ## Acceptance
 
