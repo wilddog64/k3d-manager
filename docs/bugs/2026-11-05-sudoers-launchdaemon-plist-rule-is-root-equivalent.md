@@ -1,12 +1,12 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN — design needed; not dispatched
+**Status:** OPEN: design D1 chosen 2026-11-05. Waiting on pf test S1 (operator-run), then Part 1 goes to Luna.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
 **Detected by:** `docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md` (Terra Phase C worktree), confirmed by Claude against `bin/install-sudoers.sh` at `7c9927e9`.
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** operator, 2026-11-05: "go with your recommendation" (B plus C). Claude has since found that B is insufficient (see the finding below). The amended design is pending the operator; not dispatched.
+**Approval:** operator, 2026-11-05: "go with your recommendation" (B plus C). Claude has since found that B is insufficient (see the finding below). Operator, 2026-11-05: "let dispatch D1". Part 1 dispatches after the pf test (S1) passes on the M4.
 **Related:** `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md` (narrow fix, dispatched first)
 
 ## Evidence
@@ -42,6 +42,81 @@ The fix must therefore stop root from executing anything user-writable, not only
 - **D2. Root-owned runtime.** A one-time, password-gated install puts static wrappers, plus pinned copies of `socat` and `curl`, in a root-owned directory (`/usr/local/libexec/k3d-manager`, `root:wheel` 0755). Per-sandbox values (ports, cert paths) come from a data file that the wrapper validates strictly and never sources. Headless runs only `bootout`/`bootstrap`. This keeps a root process that parses user data.
 - C (split sudoers per OS) applies to either.
 
-## Acceptance
+## Design D1 (chosen)
 
-To be written once D1 or D2 is chosen.
+Static redirect map. These are the current binds, read from the live wrappers on the M4 on 2026-11-05:
+
+| Listener | Public bind (unchanged for browsers) | New user-level bind |
+|---|---|---|
+| ArgoCD HTTPS (socat) | 127.0.0.1:443 | 127.0.0.1:18443 |
+| Keycloak HTTP (kubectl port-forward) | 127.0.0.1:80 | 127.0.0.1:18080 |
+| Hostinger frontend (kubectl port-forward) | 127.0.0.2:80 | 127.0.0.2:18082 |
+| Sandbox frontend (kubectl port-forward) | 127.0.0.3:80 | 127.0.0.3:18083 |
+
+Root keeps only static, root-owned config, installed once with a password. Nothing root runs is user-writable.
+
+### S1: pf test (operator, M4, before any dispatch)
+
+The script is in Claude's session scratchpad; its full path is in the operator message. It does the following:
+- Starts a user-owned HTTP listener on `127.0.0.1:18081`.
+- Loads `rdr pass on lo0 inet proto tcp from any to 127.0.0.3 port 81 -> 127.0.0.1 port 18081` into anchor `com.apple/k3dm-pf-spike`. The stock `/etc/pf.conf` already has `rdr-anchor "com.apple/*"`.
+- Enables pf with a reference token, then curls `127.0.0.3:81`.
+- Flushes the anchor and releases the token on exit.
+
+PASS means D1 is viable. FAIL means fall back to D2.
+
+### Part 1: redirect infrastructure (dispatch 1)
+
+1. `scripts/etc/pf/k3dm-browser-redirects.conf`: the four `rdr pass on lo0` rules from the table, and nothing else.
+2. `bin/install-browser-redirects.sh` (`make install-browser-redirects`). It is operator-run and installs everything through `_run_command --interactive-sudo`:
+   - the rules as `/etc/pf.anchors/k3dm-browser-redirects` (`root:wheel` 0644)
+   - LaunchDaemon `com.k3d-manager.pf-redirects`, which runs only `/sbin/pfctl -a com.apple/k3dm-browser-redirects -f /etc/pf.anchors/k3dm-browser-redirects` and `/sbin/pfctl -E` at boot. Fixed root-owned args; no user path anywhere in the plist.
+   - `--dry-run` prints both files and runs `pfctl -n -f` syntax validation. `--uninstall` removes both and flushes the anchor.
+3. Does **not** touch the existing listeners or sudoers. With Part 1 alone, the redirects are inert, because nothing listens on the high ports yet.
+
+### Part 2: migrate the listeners and drop the rules (dispatch 2, filed after Part 1 lands)
+
+1. In `bin/cluster-up` and `scripts/lib/providers/k3s-hostinger.sh`, the four listeners become user LaunchAgents (`gui/$UID`) on the high ports. No `/Library/LaunchDaemons`, no sudo.
+2. Migration: on the first run after Part 2, the `bootout` and removal of the old system daemons need a password once. Headless runs skip it with a warning, as they do today.
+3. `bin/install-sudoers.sh` removes the LaunchDaemon `install`, `bootstrap`, `bootout` and `rm` rules. It applies C: the Linux wildcards (`k3s`, `systemctl`, `apt-get`, `dnf`, `yum`, `microdnf`) are written only on Linux, and macOS gets only `true` plus `ifconfig lo0 alias/-alias`.
+4. The loopback-alias daemons (`/sbin/ifconfig lo0 alias 127.0.0.x`, static root args) move into the Part 1 installer, so they are installed once with a password.
+
+## Files
+
+Part 1:
+- `scripts/etc/pf/k3dm-browser-redirects.conf`
+- `bin/install-browser-redirects.sh`
+- `scripts/tests/bin/install_browser_redirects.bats`
+- `Makefile`
+- `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`
+
+## Acceptance (Part 1)
+
+```yaml
+must:
+  - id: M1
+    text: "`bin/install-browser-redirects.sh --dry-run` prints the anchor rules and the LaunchDaemon plist, validates the rules with `pfctl -n -f` (stub-able via an env override of the pfctl path), and exits 0 without writing outside its scratch dir."
+  - id: M2
+    text: "The anchor file contains exactly the four rdr rules from the D1 table, each `rdr pass on lo0 inet proto tcp from any to <ip> port <low> -> <ip> port <high>`."
+  - id: M3
+    text: "Install mode performs every privileged write and pfctl call through `_run_command --interactive-sudo`."
+  - id: M4
+    text: "`--uninstall` removes the anchor file and the plist and flushes the anchor, via `_run_command --interactive-sudo`."
+must_not:
+  - id: N1
+    text: "The generated LaunchDaemon plist names no path under $HOME, /opt/homebrew, /usr/local/bin or any temp dir; ProgramArguments[0] is /sbin/pfctl or /bin/sh -c with only literal /sbin/pfctl commands."
+  - id: N2
+    text: "No rule redirects to a port below 1024 or to a non-loopback address, and no rule matches traffic not on lo0."
+  - id: N3
+    text: "The script never calls sudo directly (only `_run_command`) and never edits /etc/pf.conf."
+evidence:
+  - {id: E1, proves: [M1, M2, N1, N2], kind: offline, text: "BATS on --dry-run output with a stub pfctl; the stub's accept/reject lines are captured from a real `pfctl -n -f` run (host/date in comment)."}
+  - {id: E2, proves: [M3, M4, N3], kind: offline, text: "BATS with a logging `_run_command` stub and a scratch HOME (fixture asserts HOME is not the real home); asserts every privileged call is routed through it; `grep` gate for bare sudo and /etc/pf.conf."}
+  - {id: E3, proves: [M1, M2], kind: live, text: "Operator runs `make install-browser-redirects` on M4; Claude checks `sudo pfctl -a com.apple/k3dm-browser-redirects -s nat` shows the four rules (operator-run) and that a test listener on 127.0.0.1:18443 answers on 127.0.0.1:443 after the old ArgoCD daemon is stopped."}
+interface:
+  - "bin/install-browser-redirects.sh [--dry-run|--uninstall]"
+  - "make install-browser-redirects"
+  - "env: K3DM_PFCTL_BIN (test override), HOME"
+```
+
+Part 2's Acceptance is written when it is filed.
