@@ -74,3 +74,7 @@ Claude scanned first; a separately tasked verifier (`claude-sonnet-5-5`) repeate
 CI: run 42157751676, success, headSha `c08870a0`, `build-push` success. Scan validity checked: OS metadata populated, os-pkgs target present, arch amd64 matching node `srv1754834`, digests match. Recorded with `bin/k3dm-codex-dispatch verify` from the verifier's evidence file.
 
 Errors seen: the `_smartcd` shell hook on every call (the verifier's first outputs landed in the repo root because `cd` did not apply; moved out, `git status` clean); two of the verifier's own shell mistakes, rerun; Trivy's vendor-severity warning and update notice. None affects the comparison.
+
+## Note 2026-11-06, alert still firing
+
+`CriticalCVEFixAvailableNotRemediated` for `wilddog64/shopping-cart-payment`, `CVE-2026-111497`, has fired since 2026-11-02T18:23Z on the M5 hub. The running `payment-service` image is `sha256:b3fb4b07...1e38`. Whether that digest carries `c08870a0` was not checked. This alert is the live signal for the image reaching the cluster: it should clear once the CVE loop rolls the fixed image out. No new bug filed.

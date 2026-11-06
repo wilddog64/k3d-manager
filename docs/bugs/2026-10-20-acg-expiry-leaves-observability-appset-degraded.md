@@ -166,3 +166,7 @@ interface:
 - Do NOT modify or delete live ApplicationSets, Applications, cluster registrations or infrastructure as part of filing this bug.
 - Do NOT run `make down`, `make e2e-sandbox`, or a live expiry test without operator approval.
 - Do NOT commit directly to `main`; changes should go through a reviewed PR.
+
+## Recurrence note 2026-11-06, M5 hub
+
+`TargetDown` for `job=federate-acg`, `cluster=acg` has fired since 2026-11-04T10:00Z. The only kubectl contexts on the M5 are `k3d-k3d-cluster` and `ubuntu-hostinger`, so no sandbox exists to scrape, which fits an expired sandbox. The alert was still firing two days later. Not established: whether the lifecycle verification from this fix ran on the M5, or whether it is meant to clear this alert. Read that path before filing anything new.
