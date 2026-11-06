@@ -2266,4 +2266,6 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-01: gap P2 bug filed (held behind labels P3); v1.43.15 plan 5 claude cost attribution filed.
 - 2026-11-01: 6 fixes landed + verified (2a2a43c9..75d987ca); lib-foundation 6706f64 pushed; 2 P3s filed (cleanup env pin landed, cross-repo fast gate dispatched); hubkey in correction.
 
-- [ ] P2 `install-sudoers` crashes under macOS /bin/bash 3.2 (M2). Filed 2026-11-05; approval pending; recommended fix A (bash 4 guard).
+- [ ] P2 `install-sudoers` crashes under macOS /bin/bash 3.2 (M2). Filed 2026-11-05; fix A approved and dispatched to Luna 2026-11-05.
+- [x] Abandoned the keychain worktree (archived first). Lead-model dashboard plan approved.
+- [ ] P1 LaunchDaemon: B found insufficient (root daemons run user-writable wrappers); D1/D2 decision pending.

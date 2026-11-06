@@ -1,12 +1,12 @@
 # Bug: `make install-sudoers` crashes under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** OPEN
+**Status:** OPEN: dispatched to Luna (`gpt-6-luna`) 2026-11-05, fix A
 **Priority:** P2
 **Severity:** medium. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2, `make install-sudoers` stops before installing anything. That blocks the sudoers P1 remediation on that host. Workaround: run with Homebrew bash first on `PATH`.
 **Filed:** 2026-11-05
 **Detected by:** operator, running `make install-sudoers` on the M2. It succeeded on the M4 and M5.
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** pending
+**Approval:** operator, 2026-11-05: "yes" to fix A (bash 4 guard in `bin/install-sudoers.sh`). Option B is out of scope.
 **Related:** `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md` (its live E4 needs this host); `docs/bugs/2026-10-10-dr-drill-set-u-wrappers.md`
 
 ## Evidence
