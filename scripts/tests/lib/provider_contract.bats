@@ -837,8 +837,11 @@ JSON
 }
 
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
+  local _real_home="${HOME}"
   HOME="${BATS_TEST_TMPDIR}"
+  [ "${HOME}" != "${_real_home}" ]
   _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  ARGOCD_BROWSER_TLS_DIR="${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls"
   SCRIPT_DIR="${BATS_TEST_TMPDIR}/scripts"
   mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents" "${HOME}/.cloudflared"
   mkdir -p "${SCRIPT_DIR}/etc/launchd" "${SCRIPT_DIR}/etc/hostinger" "${SCRIPT_DIR}/etc/argocd" "${SCRIPT_DIR}/plugins" "${SCRIPT_DIR}/lib"
@@ -846,6 +849,7 @@ JSON
   : > "${SCRIPT_DIR}/plugins/shopping_cart.sh"
   : > "${SCRIPT_DIR}/etc/hostinger/vars.sh"
   cp "${REPO_ROOT}/scripts/lib/provider.sh" "${SCRIPT_DIR}/lib/provider.sh"
+  cp "${REPO_ROOT}/scripts/lib/port_forward_wrapper.sh" "${SCRIPT_DIR}/lib/port_forward_wrapper.sh"
   cp "${REPO_ROOT}/scripts/etc/argocd/port-forward-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
   cp "${REPO_ROOT}/scripts/etc/argocd/browser-https-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
@@ -926,6 +930,9 @@ EOF
 
   kubectl() {
     case "$*" in
+      config\ current-context)
+        printf '%s\n' 'k3d-k3d-cluster'
+        ;;
       --context\ ubuntu-hostinger\ -n\ monitoring\ get\ svc\ prometheus-pushgateway)
         return 0
         ;;
@@ -940,12 +947,26 @@ EOF
   }
 
   _warn() {
-    :
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/warnings.log"
   }
 
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  source "${SCRIPT_DIR}/lib/port_forward_wrapper.sh"
+  _hostinger_load_argocd_plugin() { :; }
+  _argocd_issue_browser_tls_material() {
+    mkdir -p "$1"
+    printf 'issued cert\n' > "${1}/fullchain.crt"
+    printf 'issued key\n' > "${1}/tls.key"
+  }
+  _argocd_write_browser_https_wrapper() {
+    mkdir -p "$(dirname "$1")"
+    printf '#!/usr/bin/env bash\n# bind %s:%s cert %s key %s\n' "$5" "$6" "$9" "${10}" > "$1"
+    chmod 700 "$1"
+  }
   _run_command() {
-    :
+    if [[ "$*" == '--quiet --soft -- kubectl config current-context' ]]; then
+      kubectl config current-context
+    fi
   }
   _hostinger_restart_launchd() {
     printf '%s %s %s\n' "$1" "$2" "$3" >> "${BATS_TEST_TMPDIR}/restart.log"
@@ -957,6 +978,38 @@ EOF
   run test -x "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  [ "$status" -eq 0 ]
+  [ -s "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/fullchain.crt" ]
+  [ -s "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/tls.key" ]
+  run grep -F 'bind 127.0.0.1:18443' "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
+  [ "$status" -eq 0 ]
+  run grep -F "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/fullchain.crt" "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
+  [ "$status" -eq 0 ]
+  run grep -F "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/tls.key" "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'svc/istio-ingressgateway' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'NAMESPACE=istio-system' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'CONTEXT=k3d-k3d-cluster' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'LOCAL_PORT=18080' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'REMOTE_PORT=80' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'ADDRESS=127.0.0.1' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'http://127.0.0.1:18080/health/ready' "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["Label"] == sys.argv[2]; assert d["ProgramArguments"][-1] and __import__("os").path.isfile(d["ProgramArguments"][-1])' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist" com.k3d-manager.browser.argocd-https
+  [ "$status" -eq 0 ]
+  run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["Label"] == sys.argv[2]; assert __import__("os").path.isfile(d["ProgramArguments"][-1])' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist" com.k3d-manager.browser.keycloak-http
+  [ "$status" -eq 0 ]
+  run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert "UserName" not in d' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert "UserName" not in d' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist"
+  [ "$status" -eq 0 ]
+  run python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["Label"] == sys.argv[2]; assert __import__("os").path.isfile(d["ProgramArguments"][-1]); assert "UserName" not in d' "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist" com.k3d-manager.browser.hostinger-frontend-http
   [ "$status" -eq 0 ]
   run grep -Eq '_attempt\s*<=\s*30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
@@ -1023,11 +1076,133 @@ EOF
   [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
   [[ "${output}" == *"com.k3d-manager.browser.argocd-https ${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist user"* ]]
+  [[ "${output}" == *"com.k3d-manager.browser.keycloak-http ${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist user"* ]]
+  [[ "${output}" == *"com.k3d-manager.browser.hostinger-frontend-http ${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist user"* ]]
   local browser_line cloudflare_line
   browser_line="$(grep -nF "com.k3d-manager.browser.argocd-https " "${BATS_TEST_TMPDIR}/restart.log" | cut -d: -f1)"
   cloudflare_line="$(grep -nF "com.k3d-manager.cloudflare-tunnel " "${BATS_TEST_TMPDIR}/restart.log" | cut -d: -f1)"
   [ "${browser_line}" -lt "${cloudflare_line}" ]
   [[ "${output}" == *"com.k3d-manager.vault-port-forward"* ]]
+
+  cp "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/fullchain.crt" "${BATS_TEST_TMPDIR}/cert.before"
+  cp "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/tls.key" "${BATS_TEST_TMPDIR}/key.before"
+  _argocd_issue_browser_tls_material() { printf '%s\n' called >> "${BATS_TEST_TMPDIR}/issuer.log"; exit 1; }
+  run _hostinger_refresh_access_layer
+  [ "$status" -eq 0 ]
+  [ ! -e "${BATS_TEST_TMPDIR}/issuer.log" ]
+  cmp -s "${BATS_TEST_TMPDIR}/cert.before" "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/fullchain.crt"
+  cmp -s "${BATS_TEST_TMPDIR}/key.before" "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/tls.key"
+
+  rm -f "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/fullchain.crt" "${_ACG_STATE_DIR}/k3s-hostinger/argocd-browser-https-tls/tls.key"
+  run _hostinger_refresh_access_layer
+  [ "$status" -eq 0 ]
+  grep -Fq 'ArgoCD browser HTTPS listener: failed to issue TLS material' "${BATS_TEST_TMPDIR}/warnings.log"
+  grep -Fq 'com.k3d-manager.cloudflare-tunnel' "${BATS_TEST_TMPDIR}/restart.log"
+
+  _hostinger_write_frontend_browser_plist() {
+    [[ "$4" != "com.k3d-manager.browser.keycloak-http" ]] || return 1
+    local plist_tmp="$1" wrapper="$2" log_file="$3" label="$4"
+    mkdir -p "$(dirname "$plist_tmp")"
+    printf '<plist><dict><key>Label</key><string>%s</string><key>ProgramArguments</key><array><string>/bin/bash</string><string>%s</string></array></dict></plist>\n' "$label" "$wrapper" > "$plist_tmp"
+  }
+  rm -f "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist"
+  run _hostinger_refresh_access_layer
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"com.k3d-manager.browser.keycloak-http"* ]]
+  run grep -F 'cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
+  [ "$status" -eq 0 ]
+}
+
+setup_hostinger_browser_correction() {
+  local real_home="${HOME}"
+  HOME="${BATS_TEST_TMPDIR}/home"
+  [ "${HOME}" != "${real_home}" ]
+  [[ "${HOME}" == "${BATS_TEST_TMPDIR}/"* ]]
+  _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  SCRIPT_DIR="${BATS_TEST_TMPDIR}/scripts"
+  ARGOCD_BROWSER_TLS_DIR="${_ACG_STATE_DIR}/tls"
+  ARGOCD_BROWSER_TLS_CERT_FILE="${ARGOCD_BROWSER_TLS_DIR}/fullchain.crt"
+  ARGOCD_BROWSER_TLS_KEY_FILE="${ARGOCD_BROWSER_TLS_DIR}/tls.key"
+  mkdir -p "${HOME}/Library/LaunchAgents" "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/logs" "${SCRIPT_DIR}/lib" "${SCRIPT_DIR}/plugins" "${SCRIPT_DIR}/etc/hostinger"
+  cp "${REPO_ROOT}/scripts/lib/provider.sh" "${SCRIPT_DIR}/lib/provider.sh"
+  : > "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+  : > "${SCRIPT_DIR}/etc/hostinger/vars.sh"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  uname() { printf '%s\n' Darwin; }
+  # Hub current-context captured on m5-air.local, 2026-11-05; alternate contexts are synthetic.
+  kubectl() {
+    if [[ "$*" == 'config current-context' ]]; then
+      printf '%s\n' "${fixture_context}"
+      return 0
+    fi
+    return 1
+  }
+  _info() { :; }
+  _warn() { printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/warnings.log"; }
+  _run_command() {
+    [[ "$*" == '--quiet --soft -- kubectl config current-context' ]] || return 1
+    kubectl config current-context
+  }
+  _hostinger_load_argocd_plugin() { :; }
+  _hostinger_write_argocd_port_forward_wrapper() { :; }
+  _hostinger_write_keycloak_port_forward_wrapper() { :; }
+  _hostinger_write_frontend_browser_wrapper() { : > "$1"; }
+  _hostinger_write_monitoring_port_forward_plist() { :; }
+  _hostinger_clear_matching_processes() { :; }
+  _hostinger_clear_port_listeners() { :; }
+  _hostinger_restart_launchd() { :; }
+  _hostinger_restart_cloudflared() { printf '%s\n' restarted >> "${BATS_TEST_TMPDIR}/cloudflared.log"; }
+  _argocd_issue_browser_tls_material() { printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/issuer.log"; }
+  _argocd_write_browser_https_wrapper() { : > "$1"; }
+  _argocd_write_port_forward_wrapper() { : > "$1"; }
+  fixture_context=k3d-k3d-cluster
+}
+
+@test "correction: TLS issuance requires the hub context" {
+  setup_hostinger_browser_correction
+  fixture_context=ubuntu-hostinger
+  run _hostinger_refresh_access_layer
+  [ "$status" -eq 0 ]
+  [ ! -e "${BATS_TEST_TMPDIR}/issuer.log" ]
+  grep -Fq 'ArgoCD browser HTTPS listener' "${BATS_TEST_TMPDIR}/warnings.log"
+  grep -Fq 'ubuntu-hostinger' "${BATS_TEST_TMPDIR}/warnings.log"
+  fixture_context=k3d-k3d-cluster
+  run _hostinger_refresh_access_layer
+  [ "$status" -eq 0 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/issuer.log")" = "${ARGOCD_BROWSER_TLS_DIR}" ]
+}
+
+@test "correction: exiting TLS issuer still permits cloudflared restart" {
+  setup_hostinger_browser_correction
+  _argocd_issue_browser_tls_material() { exit 1; }
+  run _hostinger_refresh_access_layer
+  [ "$status" -eq 0 ]
+  grep -Fq 'ArgoCD browser HTTPS listener' "${BATS_TEST_TMPDIR}/warnings.log"
+  [ -s "${BATS_TEST_TMPDIR}/cloudflared.log" ]
+}
+
+@test "correction: exiting ArgoCD browser wrapper writer still permits cloudflared restart" {
+  setup_hostinger_browser_correction
+  _argocd_write_browser_https_wrapper() { exit 1; }
+  run _hostinger_refresh_access_layer
+  [ "$status" -ne 0 ]
+  grep -Fq 'ArgoCD browser HTTPS listener' "${BATS_TEST_TMPDIR}/warnings.log"
+  [ -s "${BATS_TEST_TMPDIR}/cloudflared.log" ]
+}
+
+@test "correction: exiting Keycloak browser wrapper writer still permits cloudflared restart" {
+  setup_hostinger_browser_correction
+  _argocd_write_port_forward_wrapper() { exit 1; }
+  run _hostinger_refresh_access_layer
+  [ "$status" -ne 0 ]
+  grep -Fq 'com.k3d-manager.browser.keycloak-http' "${BATS_TEST_TMPDIR}/warnings.log"
+  [ -s "${BATS_TEST_TMPDIR}/cloudflared.log" ]
+}
+
+@test "_hostinger_restart_launchd keeps silently skipping optional missing agents" {
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  run _hostinger_restart_launchd "com.k3d-manager.optional-agent" "${BATS_TEST_TMPDIR}/missing.plist" user
+  [ "$status" -eq 0 ]
 }
 
 @test "_hostinger_reconcile_vault_cluster_store bootstraps vault-backend when ESO is present" {
