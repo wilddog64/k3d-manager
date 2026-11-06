@@ -1,12 +1,12 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** OPEN. Spec written 2026-11-05. Dispatch waits for an operator go, because the spec touches the Hostinger provider and the public frontend path.
+**Status:** OPEN. Spec written 2026-11-05. Dispatched to Luna 2026-11-05.
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05
 **Detected by:** Claude, as the planned Part B of `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`
 **Branch:** `k3d-manager-v1.43.14`
-**Approval:** D3 operator go 2026-11-05 ("let's get D3 a shot"). Part B dispatch: pending.
+**Approval:** D3 operator go 2026-11-05 ("let's get D3 a shot"). Part B dispatch go, operator 2026-11-05: "go ahead for Part B".
 **Depends on:** D3 Part A landed (`84da2bcc`): `bin/install-browser-relays.sh` installs the four root relays and the alias job.
 **Related:** `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md` (parent, has the D3 table and the spike); `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`
 
