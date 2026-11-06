@@ -2004,3 +2004,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - pf test S1 FAILED on the M4 (rule loaded, curl got nothing; pf was already enabled by another owner). Diagnostic `pf-spike2.sh` is waiting for the operator to run it.
 - pf test S2: `lo0 (skip)` in the system main ruleset, so pf never sees loopback traffic. D1 dropped. Proposed D3: a launchd socket relay (static `Sockets` plus `UserName nobody`, `/usr/bin/nc` to a user high port). It awaits the operator's go; spike `relay-spike.sh` is in the scratchpad.
 - D3 relay spike PASS on the M4 (launchd binds, nc runs as nobody). Spec has Part A (`bin/install-browser-relays.sh`) and Part B (user agents and dropping the sudoers rules). Operator go given 2026-11-05; Part A dispatched to Luna.
+- M2 shell fixed: zshdotfiles `4dcc13f` (`brew shellenv` after `path_helper`), and `~/.zprofile` links to it. Plain `make install-sudoers` works on the M2.

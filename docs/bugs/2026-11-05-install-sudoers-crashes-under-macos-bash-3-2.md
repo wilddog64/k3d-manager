@@ -89,3 +89,7 @@ The verifier's own first N1 test ran only `--dry-run`, and it passed on the pre-
 On `k3d-manager-v1.43.14`, the operator ran plain `make install-sudoers` in a shell without Homebrew on `PATH`. It printed `[install-sudoers] bash 4.0 or newer is required. Install a newer bash with 'brew install bash' and put it first on PATH (for example, run 'eval "$(brew shellenv)"').` and make stopped with `Error 2`. There was no `unbound variable` and no temp-file line. M2 and N1 PASS live.
 
 The other half of E3, a successful install with Homebrew bash, was already shown on the M2 earlier that day, with `eval "$(brew shellenv)"`. The guard does not change the bash 4+ path: M1 passes offline on both the fix and the pre-fix code.
+
+## Host fix on the M2 (2026-11-05)
+
+The M2 shell profile is fixed for good. `zshdotfiles` `4dcc13f` makes `zprofile` run `brew shellenv` after `path_helper`, and `~/.zprofile` on the M2 now links to it. In a new shell, `command -v bash` prints `/opt/homebrew/bin/bash`, and plain `make install-sudoers` installs with one password prompt (operator, 2026-11-05).
