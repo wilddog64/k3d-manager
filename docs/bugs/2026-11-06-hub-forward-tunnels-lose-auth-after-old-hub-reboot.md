@@ -1,6 +1,6 @@
 # Bug: the M4's hub tunnels authenticate through an agent that a reboot empties, so its dispatch metrics and logs stop reaching the hub
 
-**Status:** LANDED `8e5f8831`, offline verification recorded 2026-11-06 (independent suite 25/25; 20 red on pre-fix; 13 mutants red). Live E3 and E4 open; needs `make hub-cutover-forwards` on the M5. The P1 hub-cutover fix it followed landed as `76f34498`.
+**Status:** LANDED `8e5f8831`, offline verification recorded 2026-11-06 (independent suite 25/25; 20 red on pre-fix; 13 mutants red). Live E3 and E4 PASSED; E4 2026-11-06 (see below). The P1 hub-cutover fix it followed landed as `76f34498`.
 **Priority:** P2
 **Severity:** medium. M4 dispatch and test metrics and shipped logs do not reach the M5 until someone loads the key by hand. The dispatch ledger is durable, so the numbers can be pushed again later; nothing is lost from the ledger.
 **Approval:** operator, 2026-11-06: "go with your recommendation" (option 1, dedicated forward-only key). Dispatch: operator, 2026-11-06 ("yes you can dispatch tunnel fix to Luna now").
@@ -128,3 +128,7 @@ Run from the M4 at about 07:00 PST with the plist's forward-only key.
 | Real tunnels | 19094 200; 19100 buildinfo 200 (`/ready` is 404 on that endpoint) |
 
 `authorized_keys` on the M5 has one `k3dm-hub-forward` entry. An earlier E3 attempt had an invalid positive control because leftover test tunnels held the ports; they were killed and 0 remained before this run. E4 is open: it needs an M4 reboot with no Luna run active, then both ports up without a login and dispatch metrics reaching the M5.
+
+## Live E4 result, 2026-11-06 (Claude, on `m4-air.local`, after the operator's reboot)
+
+PASS. Both agents started at boot (07:33:22 PST, `runs = 1`, never exited). Each `ssh` runs with `-i ~/.ssh/k3dm_hub_forward -o IdentitiesOnly=yes -o IdentityAgent=none`, and `ssh-add -l` on the launchd socket says `The agent has no identities`, so nothing depends on a loaded key. `127.0.0.1:19094/-/ready` returned 200 and `127.0.0.1:19100/loki/api/v1/status/buildinfo` returned 200. `make dispatch-metrics` then moved `push_time_seconds{job="k3dm-dispatch"}` read on the M5 from 1793977826 to 1793979973, against a clock of 1793979974.

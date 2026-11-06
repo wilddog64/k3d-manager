@@ -2,7 +2,7 @@
 
 **Status:** OPEN — observed 2026-11-06 on the M5
 **Priority:** P3
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-10-12-vault-unseal-watchdog-gives-up-while-vault-boots.md`; `docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md` (noted it as "Separate, not filed")
 
@@ -22,6 +22,12 @@ The failed Job ran during the M5 cutover, around 2026-10-30 21:25Z, when Vault w
 ## Fix direction
 
 Confirm the CronJob's history settings. Either let a later success clear the old failure, or give the Job a TTL. The immediate clear is deleting that one Job, which the operator should approve.
+
+## Decisions (Claude, 2026-11-06)
+
+Read from the template: `failedJobsHistoryLimit: 3`, `successfulJobsHistoryLimit: 1`, `activeDeadlineSeconds: 150`, schedule every 5 minutes. A failed Job is removed only when three newer failures push it out, so a rare failure stays forever. That is why this one has lasted since the cutover.
+
+Fix: add `ttlSecondsAfterFinished: 3600` to the CronJob's `jobTemplate.spec`, and leave the history limits unchanged. A watchdog that keeps failing creates a new failed Job every 5 minutes, so the alert still fires. Deleting the one stale Job stays with the operator.
 
 ## Acceptance
 

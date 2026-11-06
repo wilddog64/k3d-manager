@@ -3,7 +3,7 @@
 **Status:** OPEN — not dispatched
 **Priority:** P3
 **Severity:** low. The count is correct; it reads 0 today. A nonzero count, which warns that two plans in a release could collide or land in the wrong order, would go unnoticed.
-**Approval:** Filing: operator, 2026-11-06 ("please file bugs accordingly and we can find a proper time to dispach them"). Dispatch: pending; the operator will pick the time with Claude.
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Filed:** 2026-11-06
 **Detected by:** Operator (dashboard screenshot, 2026-11-06)
 **Affected:** `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`, panel id 108

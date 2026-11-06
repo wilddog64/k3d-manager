@@ -2,7 +2,7 @@
 
 **Status:** OPEN — observed 2026-11-06 on the M5, in the operator's `make hub-cutover-forwards` run
 **Priority:** P2
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-06-hub-cutover-leaves-hermes-argocd-token-dead.md`; `docs/bugs/2026-11-06-hub-cutover-verify-fails-forever-after-old-cluster-is-stopped.md`
 
@@ -28,6 +28,16 @@ The same session showed Hermes blind to ArgoCD and to alert delivery, so the gat
 ## Fix direction
 
 Parse the status and fail on `unknown`, naming the reason. Report a webhook check that did not run as not verified, with the unlock step, rather than as a pass. Replace the Slack line with either a real test post or a statement that delivery was not tested.
+
+## Captured contract (Claude, 2026-11-06)
+
+`bin/k3dm-hermes status` reports one sensor, `status_checks`, and exits 0 when it is `unknown`. Captured from `m5-air.local`, 2026-11-06T15:50:35Z, over SSH with a locked Keychain:
+
+    {"data": {"checks": [], "counts": {}, "failed_ids": [], "warned_ids": []}, "evidence": "cluster status source unavailable", "sampled_at": "2026-11-06T15:50:35Z", "sensor": "status_checks", "status": "unknown"}
+
+Parse `status` and `evidence` with `jq`. This check covers only this one record: `alert_delivery` and `argocd` are not in this output, so the known `alert_delivery` `unknown` does not block it. `degraded` and `failed` are not in this bug's scope.
+
+Dispatch order: land this first. `2026-11-06-hub-cutover-leaves-hermes-argocd-token-dead` edits the same function afterwards.
 
 ## Acceptance
 

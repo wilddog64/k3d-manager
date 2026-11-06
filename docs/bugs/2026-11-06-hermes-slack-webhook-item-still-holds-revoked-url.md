@@ -2,7 +2,7 @@
 
 **Status:** OPEN — hand fix applied on the M5 2026-11-06: item date 15:26:43Z, Hermes code path `delivered: True`; operator saw the message from `k3dm-notices` at 07:26 PST. Code and how-to gaps remain
 **Priority:** P2
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-10-31-rotator-slack-notice-failure-is-silent.md` (found the revocation); `docs/bugs/2026-10-24-sandbox-reaper-slack-notice-always-fails.md` (same item); `docs/bugs/2026-11-06-hub-cutover-verify-accepts-hermes-unknown.md`
 
@@ -25,6 +25,12 @@ Two Keychain items hold a Slack webhook. The 2026-11-06 replacement updated `k3d
 ## Fix direction
 
 Decide whether one Keychain item can serve both, or document that a replacement must update both. Have Hermes record a failed post with the HTTP status and Slack's short reply, never the URL. Hermes should report a failing Slack route on its own status.
+
+## Decisions (Claude, 2026-11-06)
+
+- Keep both Keychain items. Merging them changes the rotators and the reaper notices for little gain, so the how-to names both and the check that proves each.
+- `bin/k3dm-slack-notify` stays unchanged; it is listed under interface only as a reader of the item.
+- A Hermes status sensor for the Slack route is out of scope. The Fix direction line about it is not part of this dispatch; M1 to M3 and N1 are.
 
 ## Acceptance
 

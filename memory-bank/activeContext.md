@@ -1,6 +1,18 @@
 # Active context — k3d-manager-v1.43.10
 
-## Handoff — 2026-11-06 M4 reboot for tunnel E4; start here
+## Handoff — 2026-11-06 bug batch dispatched in waves; start here
+
+- **Operator go, 2026-11-06:** dispatch the filed bugs in a batch by dependency and priority; investigate the 401s; S1 review by Codex at Claude's call. Live checks come after all fixes land, one at a time.
+- **Tunnel E4: PASS** (recorded in the bug doc). Forward-only key, empty agent, push reached the M5.
+- **`GET / 401`: explained.** Blackbox probe every 60s plus Hermes `public-endpoint-probe` bursts. Not an attack. Residual `/v1/models` probes are all refused and cannot be attributed: filed P3 `2026-11-06-webhook-access-log-cannot-identify-the-client`.
+- **Wave 1 (parallel, disjoint files):** `hub-cutover-verify-accepts-hermes-unknown`, `webhook-analyze-rejects-alert-batches-over-4096-bytes`, `hermes-slack-webhook-item-still-holds-revoked-url`, `hub-new-does-not-require-webhook-status-channel` (new, migration recurrence), `vault-unseal-watchdog-failed-job-keeps-kubejobfailed-firing`, `bug-dashboard-undeclared-overlaps-panel-out-of-sight`; plus `s1-spec-independent-review-brief` (Terra, read-only).
+- **Wave 2 (after its dependency lands):** `hub-cutover-leaves-hermes-argocd-token-dead` after verify; `webhook-analyze-reports-success-when-slack-post-fails` after the 413. **Wave 3:** `webhook-access-log-cannot-identify-the-client` after analyze-success.
+- **Every fix:** Claude reviews the diff, independent verifier from Acceptance only, land alone, then record. Hold tree-reading make commands for the operator until a wave is done.
+- **After 00:33Z 11-07:** read the newest analyze job on the M5 and ask the operator whether the post appeared in `#grafana-notification`. The operator also said "post approved" there if all is good: clarify what is meant before posting anything.
+- **Sunday 2026-11-08 02:30:** read the hub-snapshot result before touching that bug.
+- **Not on the operator's list:** Hermes `alert_delivery` is still `unknown` on the M5 (no PyYAML on `python3`).
+
+## Handoff — 2026-11-06 M4 reboot for tunnel E4
 
 - **On resume, in order:** (1) Tunnel E4: confirm the M4 forward ports 19094 and 19100 came up without a login and dispatch metrics reach the M5; spec `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`. (2) After 00:33Z 11-07: read the newest analyze job on the M5 and ask the operator whether the post appeared in `#grafana-notification`. (3) Ask the operator for dispatch timing; nothing is dispatched and no Luna run is active.
 - **Done live 2026-11-06:** Hermes ArgoCD token re-minted with the Vault password; `argocd` healthy from 15:20Z. Hermes Slack item fixed, message seen. Webhook has `K3DM_STATUS_CHANNEL_ID=C4CAEH8HX`.

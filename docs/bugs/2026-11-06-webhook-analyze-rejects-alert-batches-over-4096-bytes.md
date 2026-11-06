@@ -2,7 +2,7 @@
 
 **Status:** OPEN — observed 2026-11-06 on the M5; last rejection 2026-11-01T21:52Z
 **Priority:** P2
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-06-webhook-analyze-reports-success-when-slack-post-fails.md`
 
@@ -30,6 +30,12 @@ Not confirmed: whether the batch that stopped failing after Nov 1 shrank by chan
 ## Fix direction
 
 Give `/api/v1/analyze` and `/api/v1/cve-remediate` their own bounded limit, sized from a real captured payload, as `SLACK_EVENT_MAX_BODY` does for Slack events. Keep the auth check ahead of reading the body, and keep 4,096 on every other route.
+
+## Decisions and captured payload (Claude, 2026-11-06)
+
+- Limit: `ANALYZE_MAX_BODY = 262144` in `scripts/lib/webhook/config.py`, used only for `/api/v1/analyze` and `/api/v1/cve-remediate`. Measured on the hub 2026-11-06: largest group 26 alerts, 27,212 bytes as compact JSON; all active alert groups together 128,611 bytes.
+- Fixture, already committed, read only: `scripts/tests/fixtures/webhook/alertmanager-analyze-batch.json`. Built on 2026-11-06 from `m5-air.local` Alertmanager `/api/v2/alerts/groups` (the largest `TrivyCriticalVulnerabilityDetected` group) and wrapped in the v4 webhook envelope. It is real alert data, not a wire capture; send it compact, and let the test assert it is over 4096 bytes before posting.
+- The limit check at `bin/k3dm-webhook:2365` runs after `self._auth` and before the body read. Keep that order. Read how `_run_analyze` uses the body: if the larger body flows unbounded into a prompt, cap it there and say so in your report.
 
 ## Acceptance
 

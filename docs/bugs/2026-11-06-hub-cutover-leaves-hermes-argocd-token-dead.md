@@ -2,7 +2,8 @@
 
 **Status:** OPEN — token re-minted by hand on the M5 2026-11-06, using the Vault password; neither defect is fixed in code
 **Priority:** P2
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
+**Depends on:** `2026-11-06-hub-cutover-verify-accepts-hermes-unknown` (same function in `bin/hub-cutover`; land it first)
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/howto/hub-rebuild-from-gitops-vault.md` (the manual Aftermath step); `docs/bugs/2026-11-06-hub-cutover-verify-accepts-hermes-unknown.md`
 
@@ -39,6 +40,16 @@ Proven 2026-11-06T15:19Z on the M5: the operator reran the target with `ARGOCD_A
 ## Fix direction
 
 The token mint needs a terminal and must not run unattended, so keep it manual. Make the cutover refuse to report success while the Hermes ArgoCD credential is rejected, and print `make argocd-hermes-token` as the next step. Shared with the verify bug: resolve together. Make the target try env, then Vault, then the initial secret, as `bin/argocd-app-sync` does.
+
+## Captured contract (Claude, 2026-11-06)
+
+`bin/k3dm-hermes status` does not carry the ArgoCD sensor. Read it from the Hermes log, `~/Library/Logs/k3dm-hermes.log`: take the newest line beginning `{"records"`, then the record whose `sensor` is `argocd`. Captured from `m5-air.local`, 2026-11-06T15:48:11Z:
+
+    {"sensor": "argocd", "status": "healthy", "evidence": "29 applications healthy", "sampled_at": "2026-11-06T15:48:11Z", "data": {}}
+
+The rejected form, from the Symptom section above, has `"status": "unknown"` and evidence `ArgoCD status source unavailable: credential rejected; re-mint k3dm-hermes-argocd-token`. A missing log or missing record is reported as not verified, never as a pass. Only `credential rejected` fails with the re-mint step.
+
+For M3, copy the env, Vault, initial-secret order from `bin/argocd-app-sync` rather than inventing another one.
 
 ## Acceptance
 

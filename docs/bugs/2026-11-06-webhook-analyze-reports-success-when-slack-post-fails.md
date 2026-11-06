@@ -2,7 +2,8 @@
 
 **Status:** OPEN — cause of the missing posts found 2026-11-06: the M5 plist has no route; the silent success is still in the code
 **Priority:** P2
-**Approval:** pending
+**Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
+**Depends on:** `2026-11-06-webhook-analyze-rejects-alert-batches-over-4096-bytes` (same files; land it first)
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-06-webhook-analyze-rejects-alert-batches-over-4096-bytes.md`; `docs/bugs/2026-10-24-platform-ops-notifications-slack-url-lost-on-hub-rebuild.md`
 
@@ -35,6 +36,13 @@ On the M5 the case is exactly that one: the webhook plist has neither `K3DM_STAT
 ## Fix direction
 
 Record delivery in the job: a job whose analysis could not be posted logs `slack notification failed` with the route and reason, and ends with a distinct status. Never log the URL or token.
+
+## Decisions (Claude, 2026-11-06)
+
+- The distinct status is `delivery_failed`. Find every reader of job status (`/api/v1/status`, metrics, Slack reply paths) and confirm it handles the new value; list them in your report.
+- `_post_slack_bot` and `_slack_post` must both report their result to `_run_analyze`. Apply this only to the analyze path.
+
+Dispatch order: land `2026-11-06-webhook-analyze-rejects-alert-batches-over-4096-bytes` first; both edit `bin/k3dm-webhook` and the same test file.
 
 ## Acceptance
 
