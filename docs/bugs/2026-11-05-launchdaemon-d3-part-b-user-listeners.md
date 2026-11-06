@@ -1,6 +1,6 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify pending; live E5 pending (operator).
+**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify PASS 2026-11-06. Live E5 pending (operator).
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05
@@ -146,3 +146,12 @@ Fix:
 - Tests in `scripts/tests/bin/cluster_refresh.bats`:
   - M8;
   - N1 for `cluster-refresh`, using the block-extraction style already in that file, with `HOME` in `BATS_TEST_TMPDIR`, and the stubs asserted on PATH and logging their arguments. Show N1 red on the current worktree version of `cluster-refresh` (which still has the system-daemon code) before fixing it.
+
+## Independent verification (2026-11-06)
+
+A Sonnet verifier wrote 25 BATS tests from the Acceptance block (plus the Fix table's labels and binds) only, against `git archive` copies of `b122ffb1` (fix) and `3d369254` (pre-fix) in the scratchpad, with logging stubs for launchctl, sudo, ifconfig, kubectl and socat, and HOME under `BATS_TEST_TMPDIR`. Claude reran them with stdin `</dev/null`:
+- Fix `b122ffb1`: rc 0, 25/25.
+- Pre-fix `3d369254`: rc 1, 21 fail, covering N1, N2, N3, N4, M1–M6 and M8. The four passes on pre are the unchanged Linux sudoers rules (M7, two tests), the helper's positive control, and one cluster-down N1 test that passes vacuously because pre-fix cluster-down stops at a sudo gate when headless; the passwordless-sudo N1 variant is red on pre.
+- cluster-up and cluster-refresh were run as fragments, because the whole scripts start Chrome/Playwright. E5 is live and not covered.
+- Two notes from the verifier, both not defects: `cluster-refresh` `_launchd_ensure` uses `launchctl load` on the `~/Library/LaunchAgents` plist (it loads into `gui/<uid>`); `cluster-down` does not stop the Hostinger frontend agent, whose lifecycle the Fix table puts in `k3s-hostinger.sh` only.
+- Repo `git status` was clean afterwards. Recorded with `k3dm-codex-dispatch verify`.

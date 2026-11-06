@@ -1,10 +1,10 @@
 # Active context — k3d-manager-v1.43.10
 
-## Handoff — 2026-11-05 D3 Part B landed; verifier next
+## Handoff — 2026-11-06 D3 Part B verified; operator E5 next
 
 - Part B landed: `7e6d9324` (Luna + Claude corrections) and `b122ffb1` (cloudflared drift fixture to 18082). Land gate 400/400, with stdin `</dev/null` (hub_restore stdin recurrence, recorded in the 2026-10-06 bug).
-- Next: an independent Sonnet verifier from the Acceptance section only (scratchpad), Claude reruns it, then `verify`. Then E5 for the operator: `make install-browser-relays`, `make install-sudoers`, reboot; then Claude checks the agents, the URLs and `sudo -n -l`.
-- Payment PR wilddog64/shopping-cart-payment#100 is open: watch CI (E3) and Copilot. Still no `make platform-ops` until a clean payment image exists.
+- Independent verify PASS 2026-11-06, recorded. Next: E5 for the operator: `make install-browser-relays`, `make install-sudoers`, reboot; then Claude checks the agents, the URLs and `sudo -n -l`.
+- Payment PR #100 merged (`c08870a0`), E3 green; E1 Trivy compare waits on main CI run 42157751676. Still no `make platform-ops` until a clean payment image exists.
 - After that: P0 S1 (Luna dispatcher half, agy metrics/dashboard half).
 
 ## Handoff — 2026-11-05 sudoers P1 dispatched; lead-model dashboard planned

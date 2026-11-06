@@ -2271,9 +2271,10 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] P1 LaunchDaemon: D1 chosen; pf test S1 pending (operator), then Part 1 goes to Luna.
 - [x] P2 bash 3.2 install-sudoers guard landed `52b2bad6`. [x] independent verify PASS. [x] M2 live E3 PASS; bug CLOSED.
 - [ ] D1 pf test: S1 FAIL; S2 diagnostic pending (operator).
-- [ ] LaunchDaemon P1: D3 Part A landed + verified 2026-11-05; Part B landed 2026-11-05 as `7e6d9324` + `b122ffb1` (400/400 land gate). Next: independent verifier, then operator E5 (install-browser-relays, install-sudoers, reboot).
+- [ ] LaunchDaemon P1: D3 Part A landed + verified 2026-11-05; Part B landed 2026-11-05 as `7e6d9324` + `b122ffb1` (400/400 land gate). Independent verify PASS 2026-11-06 (25 tests; pre-fix 21 red). Next: operator E5 (install-browser-relays, install-sudoers, reboot).
 - [ ] P2 app-cve-scan GHCR tag pagination: landed 67296249, verify PASS 2026-11-05 (live E2 pending payment image). [ ] P2 payment runtime on EOL temurin 24: landed 0b8c2df on payment fix/runtime-lts-base (CI building; PR needs operator go). [x] operator replaced revoked Slack webhook 2026-11-06 (live probe 400, not 404).
 - [ ] bug-open-history (agy Flash): landed 71dd01e7 + test fix 0f518142; verify PASS 2026-11-05; live E4 pending platform-ops.
 - [ ] P0 dispatch gates: S1 (v1.43.14, Luna + agy in parallel) after current three tasks verified; S2–S5 moved to v1.43.16 (2026-11-05).
 - 2026-11-05: D3 Part B landed (`7e6d9324` + `b122ffb1`). First land refused by the fast gate: `makefile_cloudflared_config.bats` fixture still edited the old `127.0.0.2:80` origin; fixed to 18082. Second refusal: two hub_restore `_run_with_tty` tests red whenever stdin is inherited (reproduced on the base branch, pass with `</dev/null`); Recurrence appended to the 2026-10-06 hub-restore bug. Third land with `</dev/null`: 400/400.
 - 2026-11-06: payment PR #100: CI all green, Copilot no comments, E3 green (CI runtime base digest is alpine 3.24.4, plus apk upgrade). Waiting on operator merge; then E1 Trivy compare.
+- 2026-11-06: D3 Part B independent verify PASS (Sonnet, 25 tests from Acceptance; Claude rerun fix rc 0 25/25, pre rc 1 21 red); recorded. Payment PR #100 merged by operator (`c08870a0`); waiting on its main CI for E1.
