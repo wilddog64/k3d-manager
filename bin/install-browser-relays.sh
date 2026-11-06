@@ -81,6 +81,24 @@ for _old in "${_legacy[@]}"; do
   _run_command --interactive-sudo --soft -- /bin/launchctl bootout system "$_path" || true
   _run_command --interactive-sudo -- /bin/rm -f -- "$_path"
 done
+
+_repair_browser_log_owners() {
+  local _logs_dir="${HOME}/.local/share/k3d-manager/logs" _owner _user _log
+  [[ -d "$_logs_dir" ]] || return 0
+  _user="$(id -un)"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    _user="${SUDO_USER:-}"
+    [[ -n "$_user" ]] || { echo "Refusing to repair browser log ownership: SUDO_USER is unset" >&2; return 1; }
+  fi
+  for _log in "$_logs_dir"/*-browser-http*.log; do
+    [[ -f "$_log" && ! -L "$_log" ]] || continue
+    _owner="$(stat -c '%U' -- "$_log" 2>/dev/null || stat -f '%Su' -- "$_log")" || { echo "Unable to inspect browser log: $_log" >&2; return 1; }
+    [[ "$_owner" == root ]] || continue
+    _run_command --interactive-sudo --soft -- /usr/sbin/chown -h "$_user" -- "$_log" || { echo "Unable to change browser log owner: $_log" >&2; return 1; }
+  done
+}
+
+_repair_browser_log_owners
 for _job in "${_jobs[@]}"; do
   _path="${_launchd_dir}/${_job}.plist"
   _run_command --interactive-sudo --soft -- /bin/launchctl bootout system "$_path" || true
