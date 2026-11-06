@@ -1,9 +1,9 @@
 # Bug: the M4's hub tunnels authenticate through an agent that a reboot empties, so its dispatch metrics and logs stop reaching the hub
 
-**Status:** OPEN — root cause proven; option 1 chosen; spec complete; awaiting a dispatch go. The P1 hub-cutover fix it followed landed as `76f34498`.
+**Status:** OPEN — root cause proven; option 1 chosen; spec complete; dispatched to Luna 2026-11-06. The P1 hub-cutover fix it followed landed as `76f34498`.
 **Priority:** P2
 **Severity:** medium. M4 dispatch and test metrics and shipped logs do not reach the M5 until someone loads the key by hand. The dispatch ledger is durable, so the numbers can be pushed again later; nothing is lost from the ledger.
-**Approval:** operator, 2026-11-06: "go with your recommendation" (option 1, dedicated forward-only key).
+**Approval:** operator, 2026-11-06: "go with your recommendation" (option 1, dedicated forward-only key). Dispatch: operator, 2026-11-06 ("yes you can dispatch tunnel fix to Luna now").
 **Filed:** 2026-11-06
 **Detected by:** Claude (exit 255 in `launchctl list` after the M4 reboot for D3 Part B)
 **Affected:** `bin/hub-cutover` (tunnel plist in `:220-251`, pre-check in `:282`), `com.k3d-manager.hub-pushgateway-port-forward`, `com.k3d-manager.hub-loki-port-forward`

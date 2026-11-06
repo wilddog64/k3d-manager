@@ -7,7 +7,7 @@
 - **Known effect:** `k3s-hostinger.sh:1191` runs `_hostinger_refresh_access_layer || return 1`, so a browser listener error during `make refresh` skips the watchdog and IPAM sweep steps. Failure case only. Hermes R3 now reports a failed repair instead of a false success.
 - **P0 S1:** spec committed (`4c6dcd5a`), Claude's spec review done, agy review not run, not dispatched. Gate: D3 Part B and the two alert P2s verified.
 - **Operator decisions 2026-11-06:** tunnel fix is option 1, forward-only key; its spec needs key install steps and a `## Files` section, and it dispatches after the P1 lands (both edit `bin/hub-cutover`). `chrome-cdp` removed from the M4. P1 hub-cutover dispatched to Luna, scope extended to unloaded singletons and the rollback path on the new hub.
-- **P1 hub-cutover landed** `76f34498`, verify PASS; live E3 open. Next: tunnel fix spec (key install steps, `## Files`), then a dispatch go. A rollback to the M4 still needs the undo steps in the bug doc.
+- **P1 hub-cutover landed** `76f34498`, verify PASS; live E3 open. Tunnel fix dispatched to Luna; after landing the operator runs `make hub-cutover-forwards` on the M5. A rollback to the M4 still needs the undo steps in the bug doc.
 - **Filed, not dispatched:** `docs/bugs/2026-11-06-bug-dashboard-undeclared-overlaps-panel-out-of-sight.md` (P3); the operator picks the time. If the 30-day open-history panel is still empty after `make platform-ops`, file that too.
 - **With the operator on the M5:** `make platform-ops` then relays, sudoers, `refresh-edge`. These read the M5's own tree from origin, so Luna's M4 worktree does not affect them. Reboot last, after Claude checks.
 - **Done this session:** M4 `hub-vault-profile` reset; payment E1 recorded.
