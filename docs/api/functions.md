@@ -76,6 +76,8 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 |---|---|
 | `_install_helm` | Install Helm via apt/dnf/homebrew depending on platform. |
 | `_install_macmon` | Install macmon with Homebrew on Apple Silicon macOS; skips other platforms. |
+| `_install_virtualbox` | Install VirtualBox with its Homebrew cask on macOS when `VBoxManage` is missing. |
+| `_install_vagrant` | Install Vagrant with its Homebrew cask on macOS when `vagrant` is missing. |
 | `_install_kubernetes_cli` | Install `kubectl` (Debian/RedHat/mac). |
 | `_install_orbstack` | Install OrbStack on macOS. |
 | `_install_bats_from_source` | Build and install BATS from source tarball. |

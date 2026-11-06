@@ -4,6 +4,7 @@
 
 ### Added
 - `_install_macmon` installs the macmon sensor reader with Homebrew on Apple Silicon macOS.
+- `_install_virtualbox` and `_install_vagrant` install their Homebrew casks on macOS when their binaries are missing.
 
 ### Fixed
 - ACG provisioning validates the hub SSH key and its AWS fingerprint before deployment, using the matching imported-key algorithm for RSA and Ed25519; sandbox extend and restart use the active Playwright profile.
