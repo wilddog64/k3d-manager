@@ -2271,4 +2271,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [ ] P1 LaunchDaemon: D1 chosen; pf test S1 pending (operator), then Part 1 goes to Luna.
 - [x] P2 bash 3.2 install-sudoers guard landed `52b2bad6`. [x] independent verify PASS. [x] M2 live E3 PASS; bug CLOSED.
 - [ ] D1 pf test: S1 FAIL; S2 diagnostic pending (operator).
-- [ ] LaunchDaemon P1: D3 spike PASS, spec written (Part A/B); Part A dispatched to Luna 2026-11-05.
+- [ ] LaunchDaemon P1: D3 spike PASS; Part A landed 2026-11-05 (84da2bcc+2), independent verify running; Part B spec next.
