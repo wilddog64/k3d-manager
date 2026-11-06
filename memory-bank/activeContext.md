@@ -12,7 +12,7 @@
 - **Tunnel fix:** Luna's first attempt reviewed; Correction 1 (trailing newline, atomic write, port count, lost message). Then independent verifier, land, operator `make hub-cutover-forwards`, live E3, E4.
 - **diruse:** `docs/plans/diruse-windows-disk-usage-tool.md`. Own repo; M1 in a gap between releases, main work after v1.46.1; VM on the M4; operator holds a Windows 11 Pro licence (never record the key). Re-estimate v1.50.0 and diruse dates by about 2026-11-20 (first dates used $20-plan tags).
 - **Tunnel fix:** landed `8e5f8831`, verified offline. Operator runs `make hub-cutover-forwards` on the M5; Claude runs live E3; E4 needs an M4 reboot.
-- **Installers:** `docs/plans/lib-foundation-v0.5.5-install-vagrant-virtualbox.md` dispatched on lib-foundation `feat/install-vagrant-virtualbox`; review, verify, PR needs operator go, then subtree pull.
+- **Installers:** landed and verified on lib-foundation `feat/install-vagrant-virtualbox` `fc3bda0`, live E2 passed on the M4. Lib PR needs the operator's go, then subtree pull.
 - **Filed, not dispatched:** `docs/bugs/2026-11-06-bug-dashboard-undeclared-overlaps-panel-out-of-sight.md` (P3); the operator picks the time. If the 30-day open-history panel is still empty after `make platform-ops`, file that too.
 - **With the operator on the M5:** `make platform-ops` then relays, sudoers, `refresh-edge`. These read the M5's own tree from origin, so Luna's M4 worktree does not affect them. Reboot last, after Claude checks.
 - **Done this session:** M4 `hub-vault-profile` reset; payment E1 recorded.

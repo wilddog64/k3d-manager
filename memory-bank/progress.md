@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-06: VM installers LANDED on lib-foundation `feat/install-vagrant-virtualbox` `fc3bda0`, verify PASS (independent suite 22/22, 15 red on pre-fix, 10 of 11 mutants red, the survivor loses only a warning); live E2 passed on the M4. Lib PR needs the operator's go, then subtree pull.
 - 2026-11-06: P1 browser log fix LANDED `9ae2698c`, verify PASS (independent suite 19/19, 14 red on pre-fix, 14 of 16 mutants red, 2 equivalent for M3). Live E2 open until a root-owned log appears or the next hub rebuild. The verifier wrote its suite to the repo root after a failed cd; moved out before any commit.
 - 2026-11-06: tunnel fix LANDED `8e5f8831`, verify PASS (independent suite 25/25, 20 red on pre-fix, 13 mutants red; N4c strict excluded as beyond the spec). Live E3, E4 open.
 - 2026-11-06: M5 frontend back: log owner `cliang`, agent running, listener on 127.0.0.2:18082, public URL 200. P1 log bug dispatched; correction 1 sent (GNU stat abort, double glob, unreachable message, false capture comment, missing tests).
