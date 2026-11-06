@@ -2099,4 +2099,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: payment PR #100 opened (operator go); Copilot requested; E3 pending in PR CI, E1 after merge.
 - 2026-11-05: Part B correction 3: Luna asked about a frontend probe; answered match cluster-up (no probe); resumed (clarification).
 
-**Dispatching 2026-11-06:** `2026-11-04-agy-activity-no-data-local-ledger-coverage`, from transcripts on the exporter's host; combining hosts needs its own decision.
+**Dispatching 2026-11-06:** `2026-11-04-agy-activity-no-data-local-ledger-coverage`, from transcripts on the exporter's host; combining hosts needs its own decision. Resumed with a correction: Luna caught my wrong ledger event name (`agent_exit`, not `exit`), and Claude's review found the stat panel would show `1`, bad UTF-8 aborts the render, and the guide wrongly says missing sessions show as zero.

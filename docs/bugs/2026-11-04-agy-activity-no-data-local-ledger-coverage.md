@@ -119,10 +119,10 @@ Scope: the host running the exporter. Combining hosts is out of scope and needs 
 1. Add a transcript collector to `bin/k3dm-dispatch-metrics`. It reads `~/.gemini/antigravity-cli/brain/*/.system_generated/logs/transcript_full.jsonl`, skipping files not modified inside the longest window. `K3DM_AGY_BRAIN_DIR` overrides the root. The session id is the directory name.
 2. It reads only `created_at` and the three token fields. It must never read `content`, `thinking`, `tool_calls` or `error` into any output. Malformed lines and non-integer or boolean tokens are skipped, and skipped lines are counted in `k3dm_agy_transcript_skipped_lines`.
 3. For each window: a session counts in `k3dm_agy_sessions` if any step falls inside the window. Tokens sum the steps inside the window, as `kind` values `input_tokens`, `cache_read_tokens` and `output_tokens`. `k3dm_agy_active_seconds` sums the gaps between consecutive in-window steps, with each gap capped at 300 s, so a session left idle for hours does not count as work.
-4. Labels are `mode="unknown"` and `repo="unknown"`, because the transcript holds neither. A session is untracked unless its id equals a `session` on an `exit` event in the dispatch ledger with `agent` agy.
+4. Labels are `mode="unknown"` and `repo="unknown"`, because the transcript holds neither. A session is untracked unless its id equals a `session` on an `agent_exit` event in the dispatch ledger. Only `_dispatch_agy_exit` writes `agent_exit`, and those rows carry no `agent` field. Rows from before `session` was recorded have none, so they link to nothing. Read on `m4-air` 2026-11-06: 2 `agent_exit` rows, 1 with a session, and that session names a real brain directory. Corrected 2026-11-06: this said `exit` with `agent` agy, which no producer writes; Luna caught it.
 5. When the brain directory exists, it is the only source of these series, so a wrapper-recorded run is not counted twice. When it does not exist, today's `agy.jsonl` path runs unchanged. The wrapper stays for dispatch linkage.
 6. Emit `k3dm_agy_source_present{host="<short hostname>",source="transcripts|ledger|none"} 1` on every render, and `k3dm_agy_latest_step_timestamp` when a step was seen. Absence never emits a zero session count.
-7. Add one stat panel, `agy data source`, at x 12, y 60, w 6, h 8, showing the host and source, with `none` shown as a warning. Its description says what the row covers: the host named, interactive and print sessions, no combining across hosts.
+7. Add one stat panel, `agy data source`, at x 12, y 60, w 6, h 8, showing the host and source, with `none` shown as a warning. The panel must display the host and source text, not the series value `1`. Its description says what the row covers: the host named, interactive and print sessions, no combining across hosts.
 8. `make machine-check` (or `--check` in `bin/k3dm-machine-setup`) reports `agy wrapper: absent` as a warning that does not fail, never as the data source.
 
 ## Files
@@ -151,11 +151,11 @@ must:
   - id: M2
     text: "A step outside a window adds nothing to that window, and a session spanning the boundary counts only its in-window tokens and active time."
   - id: M3
-    text: "A session whose id appears on an agy exit event in the dispatch ledger is not counted in k3dm_agy_untracked_sessions; any other session is."
+    text: "A session whose id appears as `session` on an `agent_exit` event in the dispatch ledger, a row that has no `agent` field, is not counted in k3dm_agy_untracked_sessions; any other session is."
   - id: M4
     text: "k3dm_agy_source_present reports the host and source: transcripts when the brain directory exists, ledger when only agy.jsonl exists, none when neither does."
   - id: M5
-    text: "The dashboard has an `agy data source` panel reading k3dm_agy_source_present, overlapping no other panel."
+    text: "The dashboard has an `agy data source` panel reading k3dm_agy_source_present, overlapping no other panel, and set to display the series name (host and source) instead of the value."
   - id: M6
     text: "With no brain directory, the existing agy.jsonl metrics are the same as before the fix."
 must_not:
@@ -166,7 +166,7 @@ must_not:
   - id: N3
     text: "With both a transcript and an agy.jsonl row for the same run, the session is counted once."
   - id: N4
-    text: "Malformed lines, booleans or strings in token fields, and an unreadable transcript do not abort the render and add nothing to the token totals; skipped lines are counted."
+    text: "Malformed lines, bytes that are not valid UTF-8, booleans or strings in token fields, and an unreadable transcript do not abort the render and add nothing to the token totals; skipped lines are counted."
 evidence:
   - {id: E1, proves: [M1, M2, M3, M4, M6, N1, N2, N3, N4], kind: offline, text: "bin/k3dm-dispatch-metrics --dry-run with scratch HOME, K3DM_AGY_BRAIN_DIR, K3DM_AGENT_LEDGER_DIR and K3DM_WORKTREE_ROOT, asserted first. M1 to M4 red on the pre-fix commit; N1 to N4 red by mutants."}
   - {id: E2, proves: [M5], kind: offline, text: "The dashboard JSON parsed from the YAML: panel present with that query, and no two panels overlap."}
