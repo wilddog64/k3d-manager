@@ -81,9 +81,17 @@ old_loaded() {
   return 2
 }
 
+old_disabled() {
+  local label="$1" output rc
+  # Match the full quoted label from launchctl's real print-disabled output.
+  # shellcheck disable=SC2029
+  output="$(old_ssh "launchctl print-disabled gui/\$(id -u)")" || { rc=$?; echo "hub-cutover: could not inspect disabled labels on $OLD_HOST (exit $rc)" >&2; return 2; }
+  printf '%s\n' "$output" | grep -F "\"$label\" => disabled" >/dev/null
+}
+
 print_plan() {
   local label
-  echo "Cutover plan: stop loaded agents on $OLD_HOST in reverse order, then load on $(hostname -s) in this order:"
+  echo "Cutover plan: disable listed agents and stop loaded agents on $OLD_HOST in reverse order, then load on $(hostname -s) in this order:"
   for label in "${labels[@]}"; do echo "  $label"; done
 }
 
@@ -310,19 +318,30 @@ rollback() {
   fi
   for ((i=${#labels[@]}-1; i>=0; i--)); do
     label="${labels[i]}"
-    if local_loaded "$label"; then launchctl bootout "gui/$(id -u)/$label"; else rc=$?; [[ $rc -eq 1 ]] || return "$rc"; fi
+    launchctl disable "gui/$(id -u)/$label" || return 1
+    if local_loaded "$label"; then
+      launchctl bootout "gui/$(id -u)/$label" || return 1
+    else rc=$?; [[ $rc -eq 1 ]] || return "$rc"; fi
   done
   while IFS= read -r label; do
     [[ -n "$label" ]] || continue
     [[ " ${labels[*]} " == *" $label "* ]] || { echo "hub-cutover: invalid recorded label $label" >&2; return 1; }
   done < "$stopped"
   for_each_forward restore || return 1
+  while IFS= read -r label; do
+    [[ -n "$label" ]] || continue
+    [[ " ${labels[*]} " == *" $label "* ]] || { echo "hub-cutover: invalid disabled label $label" >&2; return 1; }
+    # shellcheck disable=SC2029
+    old_ssh "launchctl enable \"gui/\$(id -u)/$label\"" || return 1
+  done < <(cat "$STATE_DIR/disabled-on-old" 2>/dev/null || true)
   for label in "${labels[@]}"; do
     grep -Fxq "$label" "$stopped" || continue
     # shellcheck disable=SC2029
-    old_ssh "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\""
+    old_ssh "launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\"" || return 1
   done
   append_report rollback-pass
+  : > "$stopped"
+  : > "$STATE_DIR/disabled-on-old"
 }
 
 if [[ "${1:-}" == --rollback || "${1:-}" == --verify || "${1:-}" == --forwards ]]; then
@@ -358,15 +377,32 @@ read_handoff || exit 1
 if [[ "${DRY_RUN:-0}" == 1 ]]; then exit 0; fi
 confirm cutover || exit 1
 mkdir -p "$STATE_DIR"
+if [[ ! -f "$STATE_DIR/old-host" || "$(cat "$STATE_DIR/old-host")" != "$OLD_HOST" ]]; then
+  : > "$STATE_DIR/stopped-on-old"
+  : > "$STATE_DIR/disabled-on-old"
+fi
 printf '%s\n' "$OLD_HOST" > "$STATE_DIR/old-host"
-: > "$STATE_DIR/stopped-on-old"
+: >> "$STATE_DIR/stopped-on-old"
+: >> "$STATE_DIR/disabled-on-old"
 rm -f "$STATE_DIR/old-argocd-controller-replicas"
 for ((i=${#labels[@]}-1; i>=0; i--)); do
   label="${labels[i]}"
+  if old_disabled "$label"; then :
+  else
+    rc=$?; [[ $rc -eq 1 ]] || exit "$rc"
+    grep -Fxq "$label" "$STATE_DIR/disabled-on-old" || printf '%s\n' "$label" >> "$STATE_DIR/disabled-on-old"
+    # Disable first so a reboot cannot relaunch the agent after it is booted out.
+    # shellcheck disable=SC2029
+    old_ssh "launchctl disable \"gui/\$(id -u)/$label\"" || { echo "hub-cutover: could not disable $label on $OLD_HOST" >&2; exit 1; }
+  fi
   if old_loaded "$label"; then
     # shellcheck disable=SC2029
     old_ssh "launchctl bootout \"gui/\$(id -u)/$label\""
-    printf '%s\n' "$label" >> "$STATE_DIR/stopped-on-old"
+    if grep -Fxq "$label" "$STATE_DIR/disabled-on-old"; then
+      grep -Fxq "$label" "$STATE_DIR/stopped-on-old" || printf '%s\n' "$label" >> "$STATE_DIR/stopped-on-old"
+    else
+      echo "hub-cutover: $label was disabled before cutover; rollback will not restore it" >&2
+    fi
   else rc=$?; [[ $rc -eq 1 ]] || exit "$rc"; fi
 done
 for label in "${labels[@]}"; do
@@ -379,6 +415,7 @@ done
 handoff || exit 1
 for label in "${labels[@]}"; do
   [[ -f "$HOME/Library/LaunchAgents/$label.plist" ]] || { echo "hub-cutover: missing plist $label" >&2; append_report load-failed; exit 1; }
+  launchctl enable "gui/$(id -u)/$label" || { echo "hub-cutover: could not enable $label on new hub" >&2; append_report load-failed; exit 1; }
   launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" || { echo "hub-cutover: could not load $label; run make hub-cutover-rollback" >&2; append_report load-failed; exit 1; }
 done
 if verify_with_retries; then append_report pass; else append_report verify-failed; echo 'hub-cutover: verification failed; run make hub-cutover-rollback' >&2; exit 1; fi

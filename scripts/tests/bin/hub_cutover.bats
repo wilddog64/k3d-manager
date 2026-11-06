@@ -6,6 +6,7 @@ setup() {
   ROOT="$WORK/repo"
   mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$ROOT/bin" "$ROOT/scripts/etc/machine"
   cp "${HUB_CUTOVER_SOURCE:-$REPO/bin/hub-cutover}" "$ROOT/bin/hub-cutover"
+  chmod +x "$ROOT/bin/hub-cutover"
   cp "$REPO/scripts/etc/machine/hub-push-forwards.list" "$ROOT/scripts/etc/machine/"
   cp "$REPO/scripts/etc/machine/hub-singletons.list" "$ROOT/scripts/etc/machine/"
   export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
@@ -31,6 +32,10 @@ if [[ "$HOME" == "$OLD_HOME" ]]; then
   # Exit codes captured on m4-air 2026-10-31T11:57Z for an unloaded label: bootout 3, print 113.
   linger="$CALLS.linger"
   case "$1" in
+    # Real read-only capture: m4-air.local, 2026-11-06; absent labels are enabled.
+    print-disabled) cat "$OLD_DISABLED_FILE" 2>/dev/null || true ;;
+    disable) [[ "${STUB_OLD_DISABLE_FAIL:-}" != "${2##*/}" ]] || exit 5; printf '\t\t\"%s\" => disabled\n' "${2##*/}" >> "$OLD_DISABLED_FILE" ;;
+    enable) sed -i.bak "/\"${2##*/}\" => disabled/d" "$OLD_DISABLED_FILE"; rm -f "$OLD_DISABLED_FILE.bak" ;;
     bootout) [[ "${STUB_REMOTE_NOT_LOADED:-0}" == 0 ]] || { echo 'Boot-out failed: 3: No such process' >&2; exit 3; }
       echo "${STUB_REMOTE_LINGER:-0}" > "$linger" ;;
     print) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n > 0 )) || exit 113; echo $((n - 1)) > "$linger" ;;
@@ -50,6 +55,32 @@ fi
 if [[ "$1" == bootstrap ]]; then label="${label##*/com.k3d-manager.}"; printf '%s\n' "${label%.plist}" >> "$LOADED_FILE"; fi
 if [[ "$1" == bootout ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$LOADED_FILE"; rm -f "$LOADED_FILE.bak"; fi
 exit 0
+STUB
+  cat > "$WORK/stub/launchctl" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$HOME" == "$OLD_HOME" ]]; then
+  printf 'remote-launchctl %s\n' "$*" >> "$CALLS"
+  linger="$CALLS.linger"
+  case "$1" in
+    bootout) echo "${STUB_REMOTE_LINGER:-0}" > "$linger" ;;
+    print) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n > 0 )) || exit 113; echo $((n - 1)) > "$linger" ;;
+    bootstrap) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n == 0 )) || exit 5 ;;
+  esac
+  exit 0
+fi
+printf 'launchctl %s\n' "$*" >> "$CALLS"
+label="${*: -1}"
+label="${label##*/}"
+if [[ "$1" == print-disabled ]]; then cat "$NEW_DISABLED_FILE" 2>/dev/null || true; exit 0; fi
+if [[ "$1" == print ]]; then grep -Fxq "$label" "$LOADED_FILE" 2>/dev/null && { echo 'state = running'; exit 0; }; exit 113; fi
+if [[ "$1" == bootstrap ]]; then
+  label="${label%.plist}"
+  [[ "${STUB_NEW_BOOTSTRAP_FAIL:-}" != "$label" ]] || exit 5
+  printf '%s\n' "$label" >> "$LOADED_FILE"
+fi
+if [[ "$1" == bootout ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$LOADED_FILE"; rm -f "$LOADED_FILE.bak"; fi
+if [[ "$1" == disable ]]; then [[ "${STUB_NEW_DISABLE_FAIL:-}" != "${label##*/com.k3d-manager.}" ]] || exit 5; printf '%s\n' "${label##*/com.k3d-manager.}" >> "$NEW_DISABLED_FILE"; fi
+if [[ "$1" == enable ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$NEW_DISABLED_FILE"; rm -f "$NEW_DISABLED_FILE.bak"; fi
 STUB
   cat > "$WORK/stub/ssh" <<'STUB'
 #!/usr/bin/env bash
@@ -75,6 +106,7 @@ if [[ "$2" == *'get pods'* ]]; then [[ "${STUB_OLD_POD:-0}" == 0 ]] || echo pod/
 if [[ "$2" == *'scale statefulset'* ]]; then echo "${2##*--replicas=}" > "$WORK_OLD_REPLICAS"; exit 0; fi
 if [[ "$2" == *'test -f'* ]]; then exit 0; fi
 if [[ "$2" == *'launchctl print'* ]]; then
+  if [[ "$2" == *'print-disabled'* ]]; then cat "$OLD_DISABLED_FILE" 2>/dev/null || true; exit 0; fi
   label="${2##*com.k3d-manager.}"
   label="${label%\"*}"
   if [[ -f "$OLD_LOADED_FILE" ]] && grep -Fxq "$label" "$OLD_LOADED_FILE"; then echo 'state = running'; exit 0; fi
@@ -83,6 +115,19 @@ fi
 if [[ "$2" == *'launchctl bootout'* ]]; then
   label="${2##*com.k3d-manager.}"; label="${label%\"*}"
   if [[ "${STUB_OLD_STUCK:-0}" != 1 ]]; then sed -i.bak "/^$label$/d" "$OLD_LOADED_FILE"; rm -f "$OLD_LOADED_FILE.bak"; fi
+fi
+if [[ "$2" == *'launchctl disable'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%\"*}"
+  [[ "${STUB_OLD_DISABLE_FAIL:-}" != "$label" ]] || exit 5
+  printf '\t\t\"com.k3d-manager.%s\" => disabled\n' "$label" >> "$OLD_DISABLED_FILE"
+fi
+if [[ "$2" == *'launchctl enable'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%\"*}"
+  sed -i.bak "/\"com.k3d-manager.$label\" => disabled/d" "$OLD_DISABLED_FILE"; rm -f "$OLD_DISABLED_FILE.bak"
+fi
+if [[ "$2" == *'launchctl bootstrap'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%.plist*}"
+  printf '%s\n' "$label" >> "$OLD_LOADED_FILE"
 fi
 exit 0
 STUB
@@ -149,8 +194,9 @@ echo 501
 STUB
   for cmd in hostname id; do chmod +x "$WORK/stub/$cmd"; done
   chmod +x "$WORK/stub/"*
-  export LOADED_FILE="$WORK/loaded" OLD_LOADED_FILE="$WORK/old-loaded"
+  export LOADED_FILE="$WORK/loaded" OLD_LOADED_FILE="$WORK/old-loaded" OLD_DISABLED_FILE="$WORK/old-disabled" NEW_DISABLED_FILE="$WORK/new-disabled"
   : > "$LOADED_FILE"; : > "$OLD_LOADED_FILE"
+  : > "$OLD_DISABLED_FILE"; : > "$NEW_DISABLED_FILE"
   while IFS='|' read -r label _; do
     [[ -n "$label" && "$label" != \#* ]] || continue
     : > "$HOME/Library/LaunchAgents/com.k3d-manager.$label.plist"
@@ -158,6 +204,160 @@ STUB
 }
 
 teardown() { rm -rf "$WORK"; }
+
+@test "M6: retry preserves partial records and rollback restores both runs exactly once" {
+  printf 'cloudflare-tunnel\nwebhook\nssh-tunnel\n' > "$OLD_LOADED_FILE"
+  export STUB_OLD_DISABLE_FAIL=webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  grep -Fxq com.k3d-manager.cloudflare-tunnel "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  export STUB_OLD_DISABLE_FAIL=''
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(sort "$HUB_CUTOVER_STATE_DIR/disabled-on-old" | uniq -d | wc -l | tr -d ' ')" -eq 0 ]
+  [ "$(sort "$HUB_CUTOVER_STATE_DIR/stopped-on-old" | uniq -d | wc -l | tr -d ' ')" -eq 0 ]
+  [ "$(wc -l < "$HUB_CUTOVER_STATE_DIR/stopped-on-old" | tr -d ' ')" -eq 3 ]
+  cp "$HUB_CUTOVER_STATE_DIR/disabled-on-old" "$WORK/expected-disabled"
+  cp "$HUB_CUTOVER_STATE_DIR/stopped-on-old" "$WORK/expected-stopped"
+  : > "$CALLS"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  while IFS= read -r label; do
+    [ "$(grep -Fc "command=launchctl enable \"gui/\$(id -u)/$label\"" "$CALLS")" -eq 1 ]
+  done < "$WORK/expected-disabled"
+  while IFS= read -r label; do
+    [ "$(grep -Fc "command=launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\"" "$CALLS")" -eq 1 ]
+    grep -Fxq "${label#com.k3d-manager.}" "$OLD_LOADED_FILE"
+  done < "$WORK/expected-stopped"
+  [ -f "$HUB_CUTOVER_STATE_DIR/disabled-on-old" ] && [ ! -s "$HUB_CUTOVER_STATE_DIR/disabled-on-old" ]
+  [ -f "$HUB_CUTOVER_STATE_DIR/stopped-on-old" ] && [ ! -s "$HUB_CUTOVER_STATE_DIR/stopped-on-old" ]
+}
+
+@test "M7: loaded pre-disabled agent is stopped with a warning and remains unrestored" {
+  printf '\t\t"com.k3d-manager.cloud-bridge" => disabled\n' > "$OLD_DISABLED_FILE"
+  printf 'cloud-bridge\nwebhook\n' > "$OLD_LOADED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'com.k3d-manager.cloud-bridge was disabled before cutover'* ]]
+  run grep -Fxq cloud-bridge "$OLD_LOADED_FILE"
+  [ "$status" -eq 1 ]
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  run grep -E 'command=launchctl (enable|bootstrap).*cloud-bridge' "$CALLS"
+  [ "$status" -eq 1 ]
+  grep -q 'command=launchctl enable.*webhook' "$CALLS"
+  grep -q 'command=launchctl bootstrap.*webhook' "$CALLS"
+  grep -Fxq webhook "$OLD_LOADED_FILE"
+}
+
+@test "M8: rollback disables all new agents after bootstrap failure including the enabled unloaded agent" {
+  export STUB_NEW_BOOTSTRAP_FAIL=com.k3d-manager.webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  grep -q '^launchctl enable .*com.k3d-manager.webhook$' "$CALLS"
+  run grep -Fxq com.k3d-manager.webhook "$LOADED_FILE"
+  [ "$status" -eq 1 ]
+  run grep -Fxq com.k3d-manager.webhook "$NEW_DISABLED_FILE"
+  [ "$status" -eq 1 ]
+  : > "$CALLS"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  while IFS='|' read -r label _; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    grep -Fxq "com.k3d-manager.$label" "$NEW_DISABLED_FILE"
+    run grep -Fxq "com.k3d-manager.$label" "$LOADED_FILE"
+    [ "$status" -eq 1 ]
+  done < "$ROOT/scripts/etc/machine/hub-singletons.list"
+}
+
+@test "M9: plan states listed agents are disabled on the old host" {
+  run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'disable listed agents and stop loaded agents on m4-air.local'* ]]
+}
+
+@test "M10: records from another or missing old host are cleared before cutover" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  for previous in other-host absent; do
+    printf 'stale-label\n' > "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+    printf 'stale-label\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+    if [[ "$previous" == absent ]]; then rm -f "$HUB_CUTOVER_STATE_DIR/old-host"; else printf '%s\n' "$previous" > "$HUB_CUTOVER_STATE_DIR/old-host"; fi
+    : > "$OLD_DISABLED_FILE"
+    printf 'webhook\n' > "$OLD_LOADED_FILE"
+    run "$ROOT/bin/hub-cutover"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-host")" = "$HUB_OLD_HOST" ]
+    run grep -Fxq stale-label "$HUB_CUTOVER_STATE_DIR/disabled-on-old" "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+    [ "$status" -eq 1 ]
+    grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+    grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  done
+}
+
+@test "M1/M3/N1: cutover disables every eligible old singleton before loading the new hub and aborts on disable failure" {
+  printf 'webhook\n' > "$OLD_LOADED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'command=launchctl disable' "$CALLS")" -eq "$(grep -vc '^#\|^$' "$ROOT/scripts/etc/machine/hub-singletons.list")" ]
+  [ "$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" -gt "$(grep -n 'command=launchctl disable' "$CALLS" | tail -1 | cut -d: -f1)" ]
+  [ "$(grep -n 'command=launchctl disable.*webhook' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'command=launchctl bootout.*webhook' "$CALLS" | cut -d: -f1)" ]
+  : > "$CALLS"
+  : > "$OLD_LOADED_FILE"
+  : > "$OLD_DISABLED_FILE"
+  printf 'cutover\n' > "$HUB_CUTOVER_TTY"
+  export STUB_OLD_DISABLE_FAIL=webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  run grep -q '^launchctl bootstrap' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M4/N3: pre-disabled unloaded label remains untouched; newly disabled unloaded label is enabled without bootstrap on rollback" {
+  printf '\t\t"com.k3d-manager.cloud-bridge" => disabled\n\t\t"com.k3d-manager.argocd-port-forward" => disabled\n' > "$OLD_DISABLED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -Fxq com.k3d-manager.sandbox-reaper "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  run grep -Fxq com.k3d-manager.cloud-bridge "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  [ "$status" -eq 1 ]
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  grep -q 'command=launchctl enable.*sandbox-reaper' "$CALLS"
+  run grep -q 'command=launchctl bootstrap.*sandbox-reaper' "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -q 'command=launchctl enable.*cloud-bridge' "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -q 'command=launchctl enable.*argocd-port-forward' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M5: rollback disables the stopped new hub labels and cutover enables each before bootstrap" {
+  printf 'com.k3d-manager.webhook\n' > "$LOADED_FILE"
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf 'com.k3d-manager.webhook\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  grep -Fxq com.k3d-manager.webhook "$NEW_DISABLED_FILE"
+  run grep -Fxq com.k3d-manager.webhook "$LOADED_FILE"
+  [ "$status" -eq 1 ]
+  [ "$(grep -n '^launchctl disable .*com.k3d-manager.webhook$' "$CALLS" | cut -d: -f1)" -lt "$(grep -n '^launchctl bootout .*com.k3d-manager.webhook$' "$CALLS" | cut -d: -f1)" ]
+  : > "$CALLS"
+  printf 'cutover\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(grep -n '^launchctl enable' "$CALLS" | head -1 | cut -d: -f1)" -lt "$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" ]
+  while IFS='|' read -r label _; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    enable_line="$(grep -n "^launchctl enable .*com.k3d-manager.$label$" "$CALLS" | cut -d: -f1)"
+    bootstrap_line="$(grep -n "^launchctl bootstrap .*com.k3d-manager.$label.plist$" "$CALLS" | cut -d: -f1)"
+    [ -n "$enable_line" ] && [ -n "$bootstrap_line" ] && [ "$enable_line" -lt "$bootstrap_line" ]
+  done < "$ROOT/scripts/etc/machine/hub-singletons.list"
+}
 
 @test "M7: dry run prints full plan and changes nothing" {
   run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
@@ -212,6 +412,7 @@ teardown() { rm -rf "$WORK"; }
 @test "M9: rollback reloads exactly recorded old labels" {
   mkdir -p "$HUB_CUTOVER_STATE_DIR"
   printf 'com.k3d-manager.webhook\ncom.k3d-manager.cloudflare-tunnel\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'com.k3d-manager.webhook\ncom.k3d-manager.cloudflare-tunnel\n' > "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
   printf 'rollback\n' > "$HUB_CUTOVER_TTY"
   run "$ROOT/bin/hub-cutover" --rollback
   [ "$status" -eq 0 ]
@@ -219,6 +420,8 @@ teardown() { rm -rf "$WORK"; }
   run grep -q '^launchctl bootstrap' "$CALLS"
   [ "$status" -eq 1 ]
   [[ "$(grep '^ssh .*bootstrap' "$CALLS" | tr '\n' ' ')" == *'com.k3d-manager.webhook'*'com.k3d-manager.cloudflare-tunnel'* ]]
+  [ "$(grep -c 'command=launchctl enable' "$CALLS")" -eq 2 ]
+  [ "$(grep -n 'command=launchctl enable.*webhook' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'command=launchctl bootstrap.*webhook' "$CALLS" | cut -d: -f1)" ]
 }
 
 @test "M9: rollback unloads the M5 singletons in reverse order before reloading the old host" {
