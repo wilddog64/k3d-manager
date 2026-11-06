@@ -396,7 +396,7 @@ d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['id']==100)
 assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
-assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27, 70]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 6, 27]
 assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
@@ -412,6 +412,47 @@ exprs=[t['expr'] for p in added for t in p.get('targets',[])]
 assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
 assert all('and on(repo,release) k3dm_bug_current_release_info{repo="$repo"}' in e for e in exprs), exprs
 assert all('vector($release_mode) == 1' in e and 'vector($release_mode) == 0' in e for e in exprs), exprs
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "undeclared plan overlaps tile is last in the release plans row and warns only for nonzero counts" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+raw = Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1]
+data = json.loads(raw)
+panels = {panel["id"]: panel for panel in data["panels"]}
+overlaps = panels[108]
+assert overlaps["title"] == "Undeclared plan overlaps"
+assert overlaps["targets"][0]["expr"] == 'sum((k3dm_plan_undeclared_overlaps{repo="$repo"} and on(repo,release) k3dm_bug_current_release_info{repo="$repo"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo="$repo",release=~"$release"} and on() (vector($release_mode) == 0))) or vector(0)'
+
+row_ids = [101, 102, 103, 104, 105, 106, 108]
+row = [panels[panel_id] for panel_id in row_ids]
+assert [panel["title"] for panel in row] == [
+    "Plans in release", "Not yet implemented", "Implemented, unverified",
+    "Live-verified", "Status unknown", "Status lags dispatch",
+    "Undeclared plan overlaps",
+]
+positions = [panel["gridPos"] for panel in row]
+assert all(pos["y"] == 6 and pos["h"] == 4 for pos in positions), positions
+assert [pos["x"] for pos in positions] == [0, 3, 6, 9, 12, 15, 18], positions
+assert [pos["w"] for pos in positions] == [3, 3, 3, 3, 3, 3, 6], positions
+assert positions[0]["x"] == 0 and positions[-1]["x"] + positions[-1]["w"] == 24
+
+steps = overlaps["fieldConfig"]["defaults"]["thresholds"]["steps"]
+assert steps == [{"color": "green", "value": None}, {"color": "red", "value": 1}], steps
+
+def threshold_color(value):
+    color = steps[0]["color"]
+    for step in steps[1:]:
+        if value >= step["value"]:
+            color = step["color"]
+    return color
+
+assert threshold_color(0) == "green"
+assert threshold_color(1) == "red"  # positive control: warning appears when enabled
 PY
   [ "${status}" -eq 0 ]
 }

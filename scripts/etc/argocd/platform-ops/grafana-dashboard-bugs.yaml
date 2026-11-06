@@ -1823,7 +1823,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1869,9 +1869,9 @@ data:
           "type": "stat",
           "title": "Not yet implemented",
           "gridPos": {
-            "x": 4,
+            "x": 3,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1908,9 +1908,9 @@ data:
           "type": "stat",
           "title": "Implemented, unverified",
           "gridPos": {
-            "x": 8,
+            "x": 6,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1956,9 +1956,9 @@ data:
           "type": "stat",
           "title": "Live-verified",
           "gridPos": {
-            "x": 12,
+            "x": 9,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -2000,9 +2000,9 @@ data:
           "type": "stat",
           "title": "Status unknown",
           "gridPos": {
-            "x": 16,
+            "x": 12,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -2048,9 +2048,9 @@ data:
           "type": "stat",
           "title": "Status lags dispatch",
           "gridPos": {
-            "x": 20,
+            "x": 15,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -3097,9 +3097,10 @@ data:
           "type": "stat",
           "title": "Undeclared plan overlaps",
           "description": "Count of same-release plan pairs sharing Component paths without a dependency.",
-          "gridPos": {"x": 0, "y": 70, "w": 6, "h": 4},
+          "gridPos": {"x": 18, "y": 6, "w": 6, "h": 4},
           "targets": [{"refId": "A", "expr": "sum((k3dm_plan_undeclared_overlaps{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
           "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
