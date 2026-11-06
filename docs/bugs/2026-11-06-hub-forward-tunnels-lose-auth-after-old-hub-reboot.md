@@ -1,6 +1,6 @@
 # Bug: the M4's hub tunnels authenticate through an agent that a reboot empties, so its dispatch metrics and logs stop reaching the hub
 
-**Status:** OPEN — root cause proven; option 1 chosen; dispatch follows the P1 hub-cutover fix, since both edit `bin/hub-cutover`
+**Status:** OPEN — root cause proven; option 1 chosen; spec complete; awaiting a dispatch go. The P1 hub-cutover fix it followed landed as `76f34498`.
 **Priority:** P2
 **Severity:** medium. M4 dispatch and test metrics and shipped logs do not reach the M5 until someone loads the key by hand. The dispatch ledger is durable, so the numbers can be pushed again later; nothing is lost from the ledger.
 **Approval:** operator, 2026-11-06: "go with your recommendation" (option 1, dedicated forward-only key).
@@ -40,10 +40,36 @@ The cut-over pre-check (`bin/hub-cutover:282`) runs `ssh` over a login session, 
 
 Choose one (operator decision, Claude's recommendation first):
 
-1. **Dedicated forward-only key.** A new passphrase-less key on the M4, used only by these two plists through `-i`, with `IdentitiesOnly=yes`. On the M5 its `authorized_keys` line is `restrict,port-forwarding,permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100"`, so the key gives no shell and reaches only those two ports. Survives a reboot with no one logged in.
+1. **Dedicated forward-only key.** A new passphrase-less key on the M4, used only by these two plists through `-i`, with `IdentitiesOnly=yes`. On the M5 its `authorized_keys` options are in "Chosen fix" below, so the key runs no command and reaches only those two ports. Survives a reboot with no one logged in.
 2. **Load the existing key from the Keychain at login.** `ssh-add --apple-load-keychain` in a user agent, with `SSH_AUTH_SOCK` pointing at the launchd socket. No new key, but the tunnels depend on an unlocked login Keychain and a login after each boot, and the launchd agent would hold a full-access key.
 
 Either way, the pre-check must test what the launchd job can do, not what a login session can do.
+
+## Chosen fix (option 1)
+
+Claude corrected the options first proposed. `restrict,port-forwarding,permitopen=...` alone still lets the key run a remote command, because `restrict` does not stop commands, and still lets it use `-R`. OpenSSH on both Macs is 10.2p1.
+
+In `bin/hub-cutover`, inside `repoint_forwards`, in a new helper:
+
+1. **Key on the old host.** Over `old_ssh`, if `~/.ssh/k3dm_hub_forward` is absent, run `ssh-keygen -q -t ed25519 -N '' -C k3dm-hub-forward -f ~/.ssh/k3dm_hub_forward`. Reuse an existing key. Read only the `.pub` file back. The private key never leaves the old host.
+2. **Validate the public key** against `^ssh-ed25519 [A-Za-z0-9+/]+=* k3dm-hub-forward$` before writing it. Refuse anything else.
+3. **Authorize on the new hub.** The script runs there, so edit its own `~/.ssh/authorized_keys`, keeping mode 600 and creating `~/.ssh` as 700 if needed. Append once per key, matching on the key body, so a re-run adds nothing:
+
+   `command="/usr/bin/false",restrict,port-forwarding,permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100",permitlisten="127.0.0.1:1" ssh-ed25519 <body> k3dm-hub-forward`
+
+   Build the two `permitopen` entries from `hub-push-forwards.list`, not from literals. `command=` blocks commands; `-N` opens no session, so the forward still works. `permitlisten` on privileged port 1 leaves no usable `-R` listener for a non-root user.
+4. **Plist arguments.** In `change_forward`, add `-i <absolute path to the key on the old host>`, `-o IdentitiesOnly=yes` and `-o IdentityAgent=none` to `ProgramArguments`. Keep `-F /dev/null` and `BatchMode=yes`.
+5. **Pre-check.** Replace the check at `bin/hub-cutover:290`, which runs in a login session, with `env -u SSH_AUTH_SOCK` plus the plist's identity options, run on the old host. The forced command makes an authenticated login exit 1 and failed authentication exit 255, so rc 255 fails the check and any other rc passes. The message names `~/.ssh/k3dm_hub_forward` and the host, and does not suggest `ssh-copy-id`.
+
+Rollback restores the `.pre-cutover` plist as it does today. It leaves the key and the `authorized_keys` line in place, since they can do nothing beyond these two ports; `docs/howto/m5-hub-migration.md` says how to remove them.
+
+**Rollout, after landing.** The operator runs `make hub-cutover-forwards` on the M5 from the release branch. The M4 keeps its login key for all other SSH.
+
+## Files
+
+- `bin/hub-cutover`
+- `scripts/tests/bin/hub_cutover.bats`
+- `docs/howto/m5-hub-migration.md`
 
 ## Acceptance
 
@@ -55,15 +81,22 @@ must:
     text: "After a reboot with no interactive login, localhost:19094 and localhost:19100 on the old hub answer."
   - id: M3
     text: "The cut-over pre-check fails, and names the problem, when the tunnel's own command cannot authenticate without an agent (paired positive control: it passes when it can)."
+  - id: M4
+    text: "After make hub-cutover-forwards, the new hub's authorized_keys holds the key with the forced command, restrict, a permitopen for each port in hub-push-forwards.list and the permitlisten option."
 must_not:
   - id: N1
     text: "No private key, passphrase or token appears in plist values, process arguments, logs or metrics."
   - id: N2
-    text: "If a dedicated key is chosen, it cannot open a shell on the hub or forward any port other than 19094 and 19100."
+    text: "The dedicated key cannot open a shell or run a remote command on the hub, forward any port other than 19094 and 19100, or open a remote (-R) listener."
+  - id: N3
+    text: "A re-run does not add a second authorized_keys line for the same key and does not replace an existing key pair."
+  - id: N4
+    text: "A public key that fails validation is not written to authorized_keys, and the run fails."
 evidence:
   - {id: E1, proves: [M3], kind: offline, text: "BATS on bin/hub-cutover with an ssh stub that fails only when no agent socket is set; plist and pre-check arguments asserted. Red on the pre-fix commit."}
   - {id: E2, proves: [N1], kind: offline, text: "BATS parses the generated plist with plistlib and asserts the identity is a path only and no key material is present."}
-  - {id: E3, proves: [M1, N2], kind: live, text: "Claude, on the M4: env -u SSH_AUTH_SOCK with the plist's exact arguments succeeds; ssh with the key and a remote command is refused; -L to a third port is refused."}
+  - {id: E5, proves: [M4, N3, N4], kind: offline, text: "BATS with HOME in BATS_TEST_TMPDIR (asserted first) and the ssh stub returning a captured-format public key: options asserted, a second run leaves one line, an invalid key leaves the file unchanged and rc non-zero."}
+  - {id: E3, proves: [M1, N2], kind: live, text: "Claude, on the M4: env -u SSH_AUTH_SOCK with the plist's exact arguments succeeds; ssh with the key and a remote command runs only the forced command (rc 1, no output from the command asked for); -L to a third port is refused; -R is refused."}
   - {id: E4, proves: [M2], kind: live, text: "Operator reboots the M4; Claude checks both ports answer and a dispatch metrics push reaches the M5."}
 interface:
   - "bin/hub-cutover (forward install and pre-check)"
