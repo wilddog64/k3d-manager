@@ -92,4 +92,21 @@
 {"ts":2000000870,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"part-c","run":1,"exit":0}
 {"ts":2000000880,"event":"combine","version":"v9.9.9","repo":"k3d-manager","parent":"p-one","parts":["part-a","part-b","part-c"],"conflicts":1,"result":"pass","evidence_path":"ev.log","evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","recorded_by":"claude"}
 {"ts":2000000890,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"part-d","run":1,"agent":"codex","parent":"p-two","role":"build"}
+{"ts":2000000900,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"verify-fail","run":1,"agent":"codex"}
+{"ts":2000000910,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"verify-fail","run":1,"exit":0}
+{"ts":2000000920,"event":"verify","version":"v9.9.9","repo":"k3d-manager","slug":"verify-fail","result":"fail","verifier":"v","evidence_path":"ev.log","evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+{"ts":2000000930,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-rework","run":1,"agent":"codex"}
+{"ts":2000000940,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-rework","run":1,"exit":0}
+{"ts":2000000950,"event":"attempt_assessed","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-rework","run":1,"outcome":"rework","new_evidence_path":null,"new_evidence_sha256":null,"assessor":"claude","baseline_sha":"1111111111111111111111111111111111111111"}
+{"ts":2000000960,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-unknown","run":1,"agent":"codex"}
+{"ts":2000000970,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-unknown","run":1,"exit":1}
+{"ts":2000000980,"event":"attempt_assessed","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-unknown","run":1,"outcome":"unknown","new_evidence_path":null,"new_evidence_sha256":null,"assessor":"claude","baseline_sha":"1111111111111111111111111111111111111111"}
+{"ts":2000000990,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-overrides","run":1,"agent":"codex"}
+{"ts":2000001000,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-overrides","run":1,"exit":0}
+{"ts":2000001010,"event":"attempt_assessed","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-overrides","run":1,"outcome":"progress","new_evidence_path":null,"new_evidence_sha256":null,"assessor":"claude","baseline_sha":"1111111111111111111111111111111111111111"}
+{"ts":2000001020,"event":"resume","version":"v9.9.9","repo":"k3d-manager","slug":"assessed-overrides","run":2,"n":2,"reason":"correction"}
+{"ts":2000001030,"event":"start","version":"v9.9.9","repo":"k3d-manager","slug":"gates-open","run":1,"agent":"codex"}
+{"ts":2000001040,"event":"codex_exit","version":"v9.9.9","repo":"k3d-manager","slug":"gates-open","run":1,"exit":0}
+{"ts":2000001050,"event":"scope_gate","version":"v9.9.9","repo":"k3d-manager","slug":"gates-open","gate_state":"opened","paths":["x.sh"],"risk":"high","assessor":"claude","baseline_sha":"1111111111111111111111111111111111111111"}
+{"ts":2000001060,"event":"architecture_review","version":"v9.9.9","repo":"k3d-manager","slug":"gates-open","decision":"narrow_fix","reviewer":"agy","evidence_path":"ev.log","evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","baseline_sha":"1111111111111111111111111111111111111111"}
 {"ts":this line is deliberately corrupt

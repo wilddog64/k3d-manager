@@ -40,6 +40,14 @@
    "live_pending_tasks": 1,
    "stalled_tasks": 3
   },
+  "gate_events": {
+   "architecture_review": 1,
+   "attempt_assessed": 7,
+   "gate_cleared": 1,
+   "replan_reviewed": 2,
+   "scope_gate": 1,
+   "stall_gate": 1
+  },
   "split": {
    "p-one": {
     "build": 2,
@@ -61,6 +69,49 @@
    }
   },
   "tasks": {
+   "assessed-overrides": {
+    "ladder": {
+     "deployed": "pending",
+     "implemented": "pending",
+     "independently_verified": "pending",
+     "landed": "pending",
+     "live_verified": "pending",
+     "offline_tested": "pending"
+    },
+    "stall": "clear",
+    "streak": 0,
+    "unsuccessful": []
+   },
+   "assessed-rework": {
+    "ladder": {
+     "deployed": "pending",
+     "implemented": "done",
+     "independently_verified": "pending",
+     "landed": "pending",
+     "live_verified": "pending",
+     "offline_tested": "pending"
+    },
+    "stall": "clear",
+    "streak": 1,
+    "unsuccessful": [
+     1
+    ]
+   },
+   "assessed-unknown": {
+    "ladder": {
+     "deployed": "pending",
+     "implemented": "pending",
+     "independently_verified": "pending",
+     "landed": "pending",
+     "live_verified": "pending",
+     "offline_tested": "pending"
+    },
+    "stall": "clear",
+    "streak": 1,
+    "unsuccessful": [
+     1
+    ]
+   },
    "cleared-task": {
     "ladder": {
      "deployed": "pending",
@@ -107,6 +158,19 @@
      1,
      3
     ]
+   },
+   "gates-open": {
+    "ladder": {
+     "deployed": "pending",
+     "implemented": "done",
+     "independently_verified": "pending",
+     "landed": "pending",
+     "live_verified": "pending",
+     "offline_tested": "pending"
+    },
+    "stall": "clear",
+    "streak": 0,
+    "unsuccessful": []
    },
    "live-pending": {
     "ladder": {
@@ -312,6 +376,21 @@
     "unsuccessful": [
      1,
      2
+    ]
+   },
+   "verify-fail": {
+    "ladder": {
+     "deployed": "pending",
+     "implemented": "done",
+     "independently_verified": "pending",
+     "landed": "pending",
+     "live_verified": "pending",
+     "offline_tested": "pending"
+    },
+    "stall": "clear",
+    "streak": 1,
+    "unsuccessful": [
+     1
     ]
    }
   }
