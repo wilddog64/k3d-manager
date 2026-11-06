@@ -1,6 +1,6 @@
 # Bug: D3 Part B — browser listeners still run as root LaunchDaemons and need passwordless LaunchDaemon sudo
 
-**Status:** OPEN. Spec written 2026-11-05. Dispatched to Luna 2026-11-05.
+**Status:** FIXED — `7e6d9324` (Luna, corrections by Claude) + `b122ffb1` (cloudflared drift fixture follows the 18082 origin). Landed 2026-11-05, 400/400 in the land gate (stdin `</dev/null`, see the hub-restore Recurrence in `docs/bugs/2026-10-06-hub-restore-test-hangs-on-embeddings-prompt.md`). Independent verify pending; live E5 pending (operator).
 **Priority:** P1
 **Severity:** high. This is the second half of the LaunchDaemon root-escalation fix. Until it lands, `cluster-up` keeps writing root LaunchDaemons that run user-writable wrappers, and `/etc/sudoers.d/k3d-manager` keeps the passwordless `install … /Library/LaunchDaemons/com.k3d-manager.*.plist` and `launchctl bootstrap system …` rules. Those rules are root-equivalent.
 **Filed:** 2026-11-05

@@ -54,3 +54,11 @@ Grafana retry test completes under a TTY and verifies its three health probes.
 
 The adjacent Grafana failure test and the other non-interactive restore cases now use
 the same helper. Interactive prompt tests retain their explicit stdin fixtures.
+
+## Recurrence 2026-11-05: two `_run_with_tty` preflight tests fail when stdin is inherited
+
+- **Seen:** the D3 Part B land gate (`land-test.2.log`), tests "rejects an unreadable Keychain before any make step" (line 224) and "rejects the wrong Kubernetes context before any make step" (line 234), both `[ "${status}" -eq 2 ]`. The same two reds were seen once on 2026-10-30 (memory-bank progress, `hub-cutover` entry) and written off as not reproduced.
+- **Deterministic, not a flake:** on unchanged `k3d-manager-v1.43.14` (`3d369254`), `bats -f '…' scripts/tests/bin/hub_restore.bats` fails both tests 3/3 when stdin is inherited from Claude's Bash tool, and passes both with `</dev/null`. Not caused by Part B.
+- **Cause (likely):** the earlier fix gave the hub-restore tests `/dev/null` stdin through a helper, but these two run through `_run_with_tty` (`script -q …`), which forwards the caller's stdin into the pty. Not yet traced inside `bin/hub-restore`.
+- **Workaround used:** the Part B land ran its `--test` chain with `</dev/null`; 400/400 passed.
+- **Fix (not done):** have `_run_with_tty` feed `script` from `/dev/null` (or a closed pipe), so a test's result never depends on the caller's stdin. Add a test that runs the two cases with stdin inherited.

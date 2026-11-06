@@ -1,5 +1,12 @@
 # Active context — k3d-manager-v1.43.10
 
+## Handoff — 2026-11-05 D3 Part B landed; verifier next
+
+- Part B landed: `7e6d9324` (Luna + Claude corrections) and `b122ffb1` (cloudflared drift fixture to 18082). Land gate 400/400, with stdin `</dev/null` (hub_restore stdin recurrence, recorded in the 2026-10-06 bug).
+- Next: an independent Sonnet verifier from the Acceptance section only (scratchpad), Claude reruns it, then `verify`. Then E5 for the operator: `make install-browser-relays`, `make install-sudoers`, reboot; then Claude checks the agents, the URLs and `sudo -n -l`.
+- Payment PR wilddog64/shopping-cart-payment#100 is open: watch CI (E3) and Copilot. Still no `make platform-ops` until a clean payment image exists.
+- After that: P0 S1 (Luna dispatcher half, agy metrics/dashboard half).
+
 ## Handoff — 2026-11-05 sudoers P1 dispatched; lead-model dashboard planned
 
 - **P1 CLOSED (VERIFIED)**: reinstalled on M4/M5/M2; the M2 needed `eval "$(brew shellenv)"`. Was: **P1 LANDED `4c4f7dd1`** (Luna + Claude hardening), with the independent Sonnet verify **PASS** (15/15 on the fix, 11 red on the pre-fix code). Operator ran `make install-sudoers` successfully on M4 and M5 (2026-11-05). The M2 failed with `probe_args[@]: unbound variable` under /bin/bash 3.2, and it is also on stale branch v1.43.1. Filed P2 `docs/bugs/2026-11-05-install-sudoers-crashes-under-macos-bash-3-2.md` (approval pending). E4 PASS live on the M4 (full `sudo -n -l` listing; `sudo -n -l <cmd>` cannot tell NOPASSWD from password rules). The M2 also fails on v1.43.14; the workaround is `/opt/homebrew/bin/bash bin/install-sudoers.sh`: `docs/bugs/2026-11-05-sudoers-passwordless-rules-grant-root-escalation.md`. It removes the passwordless self-update and `/usr/local/bin` wildcard rules and validates `update-hosts-entry` input. Claude reviews it, runs the independent verifier, and then lands it. Operator remediation after merge: rerun `make install-sudoers` on M4, M5 and M2.
