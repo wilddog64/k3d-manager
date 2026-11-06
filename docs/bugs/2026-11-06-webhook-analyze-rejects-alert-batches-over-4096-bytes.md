@@ -1,6 +1,6 @@
 # Bug: webhook analyze rejects Alertmanager batches over 4,096 bytes, dropping them
 
-**Status:** OPEN — observed 2026-11-06 on the M5; last rejection 2026-11-01T21:52Z
+**Status:** FIXED offline `9691bbaa`, independent verify PASS 2026-11-06; live E2 pending. Larger batches now reach an uncapped per-alert loop: `docs/bugs/2026-11-06-webhook-analyze-unbounded-llm-call-and-slack-post-per-alert.md` goes live with it
 **Priority:** P2
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`
