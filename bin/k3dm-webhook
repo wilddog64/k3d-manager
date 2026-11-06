@@ -4,6 +4,7 @@
 import collections
 import datetime
 import http.server
+import ipaddress
 import json
 import os
 import re
@@ -2877,8 +2878,21 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if route.startswith("/api/v1/status/"):
             route = "/api/v1/status/{job_id}"
         duration_ms = int((time.monotonic() - getattr(self, "_request_started", time.monotonic())) * 1000)
-        _LOG.info("request method=%s path=%s status=%s role=%s duration_ms=%s",
-                  self.command, route, status, getattr(self, "_token_role", "unknown"), duration_ms)
+        client_header = self.headers.get("CF-Connecting-IP")
+        if client_header is None:
+            client = "local"
+        else:
+            try:
+                client = str(ipaddress.ip_address(client_header))
+            except ValueError:
+                client = "invalid"
+        user_agent = self.headers.get("User-Agent")
+        if user_agent is None:
+            user_agent = "-"
+        user_agent = re.sub(r"[^A-Za-z0-9 ._/()+;:,-]", "_", user_agent[:80])
+        _LOG.info("request method=%s path=%s status=%s role=%s duration_ms=%s client=%s ua=\"%s\"",
+                  self.command, route, status, getattr(self, "_token_role", "unknown"),
+                  duration_ms, client, user_agent)
 
 
 if __name__ == "__main__":

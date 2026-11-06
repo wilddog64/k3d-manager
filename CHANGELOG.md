@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add validated Cloudflare client IP and sanitized User-Agent fields to webhook request access logs.
+
 - Require `K3DM_STATUS_CHANNEL_ID` during hub preparation, report its plist presence in `webhook-doctor --check`, and document analyzer delivery verification during M5 migration.
 
 - Derive 30-day open-bug history from git commits on the release ref independent of Prometheus retention, publishing to Pushgateway group `k3dm-bug-open-history`, and add the "Open by priority, last 30 days (from git)" stacked bar chart to the Bugs dashboard.
