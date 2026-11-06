@@ -1,9 +1,9 @@
 # Bug: machine-setup leaves the nightly test agent without PyYAML
 
-**Status:** OPEN — filed 2026-11-06, not dispatched; hub spec, waits for the operator's go
+**Status:** OPEN — dispatched to Luna 2026-11-06
 **Priority:** P2
 **Severity:** medium. The nightly offline suite on the M5 has been red since the cutover, so `OfflineSuiteFailing`, `OfflineSuiteRunIncomplete` and `OfflineSuiteStale` fire on real and environmental failures alike. The suite cannot warn about a real regression.
-**Approval:** pending. Hub spec; the operator's go is needed before dispatch.
+**Approval:** operator, 2026-11-06: "go ahead for those two".
 **Filed:** 2026-11-06
 **Detected by:** Claude, read-only M5 check of `docs/bugs/2026-11-02-hostinger-offline-suite-alerts.md`
 **Branch:** `k3d-manager-v1.43.14`

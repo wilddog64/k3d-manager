@@ -2099,3 +2099,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-05: payment PR #100 opened (operator go); Copilot requested; E3 pending in PR CI, E1 after merge.
 - 2026-11-05: Part B correction 3: Luna asked about a frontend probe; answered match cluster-up (no probe); resumed (clarification).
 
+**Dispatching 2026-11-06:** `2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml` (operator's go). **Approved for the live checks:** delete the stale Job `secrets/vault-unseal-watchdog-29889925` (operator, 2026-11-06: "go ahead for those two"); look at it again first.
