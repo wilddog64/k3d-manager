@@ -1,6 +1,6 @@
 # Bug: dispatch resume ignores the task's model and records a worker model that did not run
 
-**Status:** OPEN — redispatched to Luna 2026-11-06 under slug `2026-11-06-dispatch-resume-keeps-task-model`. The first dispatch stopped without edits, because the Acceptance section was still a placeholder.
+**Status:** LANDED `38999adf`, independent verify PASS 2026-11-06 (M1 to M5, N1 to N3 pass; M1 to M5 and N1 red on the parent; 10 mutants red). Live E3 PASS: the correction resume ran with `-m gpt-6-luna` and its run 2 runtime identity reports `gpt-6-luna`; it used the worktree copy of the dispatcher before landing, which the correction did not edit. Claude's review sent one correction back: tokens were still charged per session. The verifier did not assert that session counts stay uninflated, so only Luna's test covers that. Luna's 27 `webhook.bats` reds did not reproduce: all 204 BATS tests in the land run passed outside its sandbox, and the cause inside it is not established
 **Priority:** P2
 **Severity:** medium — every Codex resume runs Codex's configured default model rather than the model the task was dispatched with, and the ledger's `resume` event claims the dispatched model. Per-model cost and quality comparisons, and the planned lead-model dashboard, are wrong for any task that was resumed.
 **Filed:** 2026-11-05
