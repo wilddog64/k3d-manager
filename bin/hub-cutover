@@ -198,12 +198,21 @@ handoff() {
 }
 
 verify_cutover() {
-  local label output count frontend_code webhook_code
+  local label output count frontend_code webhook_code webhook_report webhook_classification hermes_report hermes_status hermes_evidence
   output="$(kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get secret -l k3d-manager/role=app-cluster -o name)" || return 1
   grep -Fxq secret/cluster-ubuntu-hostinger <<<"$output" || return 1
   kubectl --context "$CONTEXT" -n "$ARGOCD_NS" get application ubuntu-hostinger-eso -o json | jq -e '.status.sync.status == "Synced" and .status.health.status == "Healthy"' >/dev/null || return 1
   verify_old_controller_stopped || return 1
-  make webhook-doctor || return 1
+  if webhook_report="$(make webhook-doctor 2>&1)"; then
+    webhook_classification="$(jq -r '.classification // empty' <<<"$webhook_report")" || return 1
+    if [[ "$webhook_classification" == keychain_interaction_required ]]; then
+      echo 'hub-cutover: webhook HTTP health was not verified; unlock it with: security unlock-keychain ~/Library/Keychains/login.keychain-db' >&2
+      return 1
+    fi
+  else
+    printf '%s\n' "$webhook_report" >&2
+    return 1
+  fi
   frontend_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://frontend.3ai-talk.org/)" || return 1
   [[ "$frontend_code" == 200 ]] || { echo "hub-cutover: frontend returned $frontend_code" >&2; return 1; }
   webhook_code="$(curl -s -o /dev/null -m 10 -A k3dm-hub-cutover -w '%{http_code}' https://webhook.3ai-talk.org/)" || return 1
@@ -215,8 +224,14 @@ verify_cutover() {
     output="$(launchctl print "gui/$(id -u)/$label")" || return 1
     [[ "$output" == *'state = running'* ]] || { echo "hub-cutover: $label is not running; run make hub-cutover-rollback" >&2; return 1; }
   done
-  bin/k3dm-hermes status || return 1
-  echo 'Operator check: confirm a Hermes message arrives in Slack.'
+  hermes_report="$(bin/k3dm-hermes status)" || return 1
+  hermes_status="$(jq -r '.status // empty' <<<"$hermes_report")" || return 1
+  if [[ "$hermes_status" == unknown ]]; then
+    hermes_evidence="$(jq -r '.evidence // "no evidence supplied"' <<<"$hermes_report")" || return 1
+    echo "hub-cutover: Hermes status is unknown: $hermes_evidence" >&2
+    return 1
+  fi
+  echo 'hub-cutover: Slack delivery was not tested.'
 }
 
 verify_with_retries() {

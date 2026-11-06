@@ -14,7 +14,8 @@ setup() {
   [[ "$HOME" == "$WORK/home" && "$HUB_CUTOVER_STATE_DIR" == "$WORK/state" ]]
   # Real read-only public-key format capture: ssh-keygen on cliang's workstation, 2026-11-06.
   ssh-keygen -q -t ed25519 -N '' -C k3dm-hub-forward -f "$WORK/captured-forward-key"
-  export STUB_FORWARD_PUBLIC_KEY="$(cat "$WORK/captured-forward-key.pub")"
+  STUB_FORWARD_PUBLIC_KEY="$(cat "$WORK/captured-forward-key.pub")"
+  export STUB_FORWARD_PUBLIC_KEY
   export OLD_HOME="$WORK/old-home"
   mkdir -p "$OLD_HOME/Library/LaunchAgents"
   python3 - "$OLD_HOME" <<'PYCODE'
@@ -185,9 +186,14 @@ STUB
   for cmd in make curl cloudflared; do
     cat > "$WORK/stub/$cmd" <<STUB
 #!/usr/bin/env bash
-printf '$cmd %s\\n' "\$*" >> "\$CALLS"
+printf '$cmd %s\n' "\$*" >> "\$CALLS"
 STUB
-    if [[ "$cmd" == curl ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
+    if [[ "$cmd" == make ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
+if [[ "$*" == webhook-doctor ]]; then
+  if [[ -n "${STUB_WEBHOOK_REPORT:-}" ]]; then printf '%s\n' "$STUB_WEBHOOK_REPORT"; else printf '%s\n' '{"classification": "healthy"}'; fi
+fi
+STUB
+    elif [[ "$cmd" == curl ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
 if [[ "$*" == *frontend* ]]; then echo 200; else echo 401; fi
 STUB
     elif [[ "$cmd" == cloudflared ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
@@ -205,6 +211,7 @@ STUB
   cat > "$ROOT/bin/k3dm-hermes" <<'STUB'
 #!/usr/bin/env bash
 printf 'hermes %s\n' "$*" >> "$CALLS"
+if [[ -n "${STUB_HERMES_REPORT:-}" ]]; then printf '%s\n' "$STUB_HERMES_REPORT"; else printf '%s\n' '{"status":"healthy","sensor":"status_checks"}'; fi
 exit 0
 STUB
   chmod +x "$ROOT/bin/k3dm-hermes"
@@ -490,6 +497,46 @@ STUB
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
   [[ "$output" == *'webhook returned 502'* ]]
+}
+
+@test "verify: Hermes unknown fails with captured evidence; healthy status passes" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_HERMES_REPORT='{"data":{"checks":[],"counts":{},"failed_ids":[],"warned_ids":[]},"evidence":"cluster status source unavailable","sampled_at":"2026-11-06T15:50:35Z","sensor":"status_checks","status":"unknown"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Hermes status is unknown: cluster status source unavailable'* ]]
+  export STUB_HERMES_REPORT='{"status":"healthy","sensor":"status_checks"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Slack delivery was not tested.'* ]]
+}
+
+@test "verify: webhook Keychain denial is unverified and gives unlock command" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_WEBHOOK_REPORT='{"classification": "keychain_interaction_required", "message": "HTTP health was not tested"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'HTTP health was not verified'* ]]
+  [[ "$output" == *'security unlock-keychain ~/Library/Keychains/login.keychain-db'* ]]
+  export STUB_WEBHOOK_REPORT='{"classification": "healthy"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+}
+
+@test "verify does not claim Slack delivery was checked" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'confirm a Hermes message arrives in Slack'* ]]
 }
 
 @test "N6: source never deletes plists or mutates a cluster" {
