@@ -1,6 +1,6 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify pending. Part B not yet specified. Do not run `make install-browser-relays` until Part B lands.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B is specified in `docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md` and awaits a dispatch go. Do not run `make install-browser-relays` until Part B lands.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
@@ -81,7 +81,7 @@ The fix must therefore stop root from executing anything user-writable, not only
 | `com.k3d-manager.relay.hostinger-frontend-http` | 127.0.0.2:80 | `/usr/bin/nc 127.0.0.2 18082` | kubectl port-forward 127.0.0.2:18082 |
 | `com.k3d-manager.relay.sandbox-frontend-http` | 127.0.0.3:80 | `/usr/bin/nc 127.0.0.3 18083` | kubectl port-forward 127.0.0.3:18083 |
 
-**Boot ordering.** A relay on `127.0.0.2/.3` can bind only after the alias exists. One root daemon, `com.k3d-manager.loopback-aliases`, runs `/bin/sh -c` with only literal commands: `/sbin/ifconfig lo0 alias 127.0.0.2 up`, the same for `.3`, then `/bin/launchctl kickstart -k` of the two alias-bound relays. That avoids the race at boot.
+**Boot ordering.** A relay on `127.0.0.2/.3` can bind only after the alias exists. One root daemon, `com.k3d-manager.loopback-aliases`, runs `/bin/sh -c` with only literal commands: `/sbin/ifconfig lo0 alias 127.0.0.2 up`, the same for `.3`, then a bootout and re-bootstrap of the two alias-bound relays from their literal plist paths. That avoids the race at boot. (The first draft used `kickstart -k`, which cannot rebind a socket; it was fixed at the Part A review.)
 
 ### Part A (dispatch 1): the root side, operator-installed once
 
@@ -95,6 +95,8 @@ The fix must therefore stop root from executing anything user-writable, not only
 3. Nothing else changes in Part A. The operator does not install it until Part B lands, because the relays forward to high ports that nothing listens on yet.
 
 ### Part B (dispatch 2, filed after A lands): the user side, then the sudoers rules
+
+The Part B spec is its own file: `docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`. The outline below is kept for history.
 
 1. In `bin/cluster-up` (around lines 838–925, 1523–1590 and 1699–1830) and `scripts/lib/providers/k3s-hostinger.sh`, the four listeners become `gui/$UID` LaunchAgents in `~/Library/LaunchAgents`, on the high ports, with no sudo. `k3s-hostinger.sh:243` already has the `gui` branch.
 2. If the relays are not installed, `cluster-up` prints one line, "run make install-browser-relays", instead of prompting for sudo.
@@ -149,6 +151,20 @@ Luna's diff: the `Makefile` target, `bin/install-browser-relays.sh`, and 4 BATS 
 At land, the fast gate also needed the new names classified. `install-browser-relays` and the five labels are now in `scripts/etc/machine/not-installed.list` (machine setup never installs them). The land used `--allow-out-of-scope` because the dispatch slug's scope file predates the spec's Part A file list. Both new files and the list are named in this doc.
 
 Fast gate at land: all suites PASS, including `install_browser_relays.bats`, `agent_classification.bats`, both `machine_setup` suites and shellcheck.
+
+## Part A independent verification (2026-11-05)
+
+A Sonnet verifier wrote 15 BATS tests from the Acceptance block only, covering M1–M4 and N1–N3, with stubbed `sudo`/`launchctl`/`install` on `PATH`. Claude reran them:
+- Fix `69f2db66`: rc 0, 15 of 15 pass.
+- Pre-fix `edb2e112`: rc 1, 15 of 15 fail. The script does not exist there, so every test fails at setup.
+
+Limits:
+- The EUID-0 gating of `K3DM_LAUNCHD_DIR` is checked statically only, because a behaviour test needs root.
+- `--interactive-sudo` cannot be seen from outside. The tests show only that every privileged call reaches the `sudo` stub.
+
+The verifier's early probe left one `/tmp/.k3dm-relays.*` staging dir, holding the five dry-run plists. Claude removed it. A rerun of the dry-run and of the full suite created no new dir.
+
+The result is recorded with `k3dm-codex-dispatch verify`.
 
 ## Design D1 (superseded)
 
