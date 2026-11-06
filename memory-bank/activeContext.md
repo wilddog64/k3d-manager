@@ -6,7 +6,8 @@
 - **`dispatch status` is the only exit signal:** the `resume` launcher returns at once; its completion notification does not mean Luna stopped.
 - **Known effect:** `k3s-hostinger.sh:1191` runs `_hostinger_refresh_access_layer || return 1`, so a browser listener error during `make refresh` skips the watchdog and IPAM sweep steps. Failure case only. Hermes R3 now reports a failed repair instead of a false success.
 - **P0 S1:** spec committed (`4c6dcd5a`), Claude's spec review done, agy review not run, not dispatched. Gate: D3 Part B and the two alert P2s verified.
-- **Waiting on the operator:** tunnel fix option; `chrome-cdp` off on the M4; P1 hub-cutover dispatch after Part B. M5 commands go out together after Part B lands; reboot last.
+- **Operator decisions 2026-11-06:** tunnel fix is option 1, forward-only key; its spec needs key install steps and a `## Files` section, and it dispatches after the P1 lands (both edit `bin/hub-cutover`). `chrome-cdp` removed from the M4. P1 hub-cutover dispatched to Luna, scope extended to unloaded singletons and the rollback path on the new hub.
+- **With the operator on the M5:** `make platform-ops` then relays, sudoers, `refresh-edge`. These read the M5's own tree from origin, so Luna's M4 worktree does not affect them. Reboot last, after Claude checks.
 - **Done this session:** M4 `hub-vault-profile` reset; payment E1 recorded.
 
 ## Handoff — 2026-11-06 M4 agents disabled; M5 reboot in progress
