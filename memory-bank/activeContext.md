@@ -1,6 +1,14 @@
 # Active context — k3d-manager-v1.43.10
 
-## Handoff — 2026-11-06 M4 agents disabled; M5 reboot in progress; start here after /clear
+## Handoff — 2026-11-06 Part B gap Correction 2 with Luna; S1 spec awaits agy review; start here after /clear
+
+- **Part B gap:** attempt 2 passed the independent verifier (29/29 on the attempt; red on pre-fix and attempt 1; N3 and N4 shown able to fail by mutation, since neither can be red on pre-fix). The commit was then refused by `_agent_audit`: 16 `if` lines against 8. Correction 2 sent to Luna: extract two helpers, no allowlist entry. After it exits: rerun `partb-verify/work/partb.bats` on the new tree, commit in the worktree through the hook, land alone, record verify. Scratchpad path: `/private/tmp/claude-501/-Users-cliang-src-gitrepo-personal-k3d-manager/aea992df-f2c1-4e82-b785-664f34f1676a/scratchpad/partb-verify`.
+- **Known effect to report:** `k3s-hostinger.sh:1152` runs `_hostinger_refresh_access_layer || return 1`, so a browser listener error skips the watchdog and IPAM sweep steps in that path. Hermes `repairs.py:115` also calls the refresh.
+- **P0 S1:** spec committed (`4c6dcd5a`), Claude's spec review done, agy review not run, not dispatched. Gate: D3 Part B and the two alert P2s verified.
+- **Waiting on the operator:** tunnel fix option; `chrome-cdp` off on the M4; P1 hub-cutover dispatch after Part B. M5 commands go out together after Part B lands; reboot last.
+- **Done this session:** M4 `hub-vault-profile` reset; payment E1 recorded.
+
+## Handoff — 2026-11-06 M4 agents disabled; M5 reboot in progress
 
 Order of work:
 

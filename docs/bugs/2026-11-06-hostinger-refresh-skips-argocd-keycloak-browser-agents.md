@@ -52,6 +52,17 @@ Not in scope: `bin/cluster-up`, `bin/cluster-refresh`, relays, sudoers, the k3s-
 - `_hostinger_write_argocd_browser_https_wrapper` is now dead; remove it.
 - Four new warnings are tagged `[k3d-hostinger]`; the file's tag is `[k3s-hostinger]`.
 
+## Correction 2 (commit refused by the pre-commit audit, 2026-11-06)
+
+The second attempt passed the independent verifier's 29 tests, but `_agent_audit` refused the commit: `_hostinger_refresh_access_layer` has 16 `if` lines against a limit of 8. It had 6 before this fix. Do not add it to `scripts/etc/agent/if-count-allowlist`, and do not raise `AGENT_AUDIT_MAX_IF`.
+
+Move the new code into two helpers in the same file, with no change in behaviour:
+
+- `_hostinger_refresh_browser_listener_files`: the TLS check and issuance, wrapper writes and plist writes for the argocd and keycloak listeners, and the frontend wrapper write. Returns non-zero if any step that sets `_browser_error` today fails.
+- `_hostinger_restart_browser_agent <label> <plist>`: restarts the agent if the plist exists; otherwise prints the existing `plist missing at restart` error. Returns non-zero on either failure.
+
+Keep the restart order, with cloudflared between argocd and keycloak, and keep the subshells around helpers that can call `exit`.
+
 ## Files
 
 - `scripts/lib/providers/k3s-hostinger.sh`
@@ -73,6 +84,8 @@ must:
     text: "If a browser plist is absent at restart, or TLS issuance or a wrapper write fails, including a helper that exits the process rather than returning (_err calls exit 1), the refresh prints an error or warning naming the listener and cloudflared is still restarted. An absent plist makes the refresh return non-zero."
   - id: M6
     text: "TLS issuance runs only when the current kube context is the hub, k3d-k3d-cluster (paired positive control for N5)."
+  - id: M7
+    text: "The change commits through the pre-commit _agent_audit with the default if-count limit."
 must_not:
   - id: N1
     text: "The refresh never silently succeeds when a browser plist is absent at restart."
@@ -84,7 +97,10 @@ must_not:
     text: "An optional agent's missing plist passed to _hostinger_restart_launchd directly still returns 0."
   - id: N5
     text: "When the current kube context is not the hub, for example ubuntu-hostinger, which also has a vault-root secret, no TLS issuance is attempted; a warning names the listener and the context."
+  - id: N6
+    text: "The fix adds no entry to if-count-allowlist and does not raise AGENT_AUDIT_MAX_IF."
 evidence:
+  - {id: E6, proves: [M7, N6], kind: offline, text: "The pre-commit hook passes on the real commit; git diff of scripts/etc/agent/if-count-allowlist is empty; the verifier's tests are rerun unchanged on the refactored tree."}
   - {id: E1, proves: [M1, M2, M3, N1, N2], kind: offline, text: "BATS: HOME and LaunchAgents in BATS_TEST_TMPDIR (fixture asserts HOME is not the real home), stubs on PATH for launchctl, kubectl, socat, curl and sudo that log args; plists parsed with plutil or python plistlib; N1 and the M1 plist assertions shown red on the pre-fix commit."}
   - {id: E2, proves: [M4, N3], kind: offline, text: "BATS with the TLS issuer stubbed to log its call: called when material is absent, not called when present, and the material's bytes are unchanged."}
   - {id: E3, proves: [M5, N4], kind: offline, text: "BATS: plist writer forced to fail, or plist removed before restart, then an issuer and a wrapper helper that each call exit 1; cloudflared restart log entry present; rc asserted. Direct _hostinger_restart_launchd call on a missing path returns 0."}
