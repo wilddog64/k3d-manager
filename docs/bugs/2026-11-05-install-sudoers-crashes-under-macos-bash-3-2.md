@@ -1,6 +1,6 @@
 # Bug: `make install-sudoers` crashes under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** FIXED in `52b2bad6`. Independent verify PASS on 2026-11-05. Live E3 on the M2 is still pending (operator).
+**Status:** CLOSED: VERIFIED 2026-11-05. Fixed in `52b2bad6`. Independent verify PASS. Live E3 PASS on the M2.
 **Priority:** P2
 **Severity:** medium. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2, `make install-sudoers` stops before installing anything. That blocks the sudoers P1 remediation on that host. Workaround: run with Homebrew bash first on `PATH`.
 **Filed:** 2026-11-05
@@ -83,3 +83,9 @@ Claude reran the tests:
 The `sudo` stub was never invoked, and the repo `git status` was clean afterwards. Recorded with `k3dm-codex-dispatch verify`.
 
 The verifier's own first N1 test ran only `--dry-run`, and it passed on the pre-fix code, which made it a false green. The verifier extended N1 to cover install mode, and it then failed on the pre-fix code as expected.
+
+## Live verification E3 (operator, M2, 2026-11-05)
+
+On `k3d-manager-v1.43.14`, the operator ran plain `make install-sudoers` in a shell without Homebrew on `PATH`. It printed `[install-sudoers] bash 4.0 or newer is required. Install a newer bash with 'brew install bash' and put it first on PATH (for example, run 'eval "$(brew shellenv)"').` and make stopped with `Error 2`. There was no `unbound variable` and no temp-file line. M2 and N1 PASS live.
+
+The other half of E3, a successful install with Homebrew bash, was already shown on the M2 earlier that day, with `eval "$(brew shellenv)"`. The guard does not change the bash 4+ path: M1 passes offline on both the fix and the pre-fix code.
