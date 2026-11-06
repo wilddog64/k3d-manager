@@ -24,3 +24,4 @@ sandbox.frontend-browser-http|system LaunchDaemon managed by cluster-up
 sandbox.prometheus-port-forward|managed by the ACG sandbox lifecycle (make up)
 sandbox.pushgateway-port-forward|managed by the ACG sandbox lifecycle (make up)
 heartbeat|not loaded by hub-new or cutover: bin/k3dm-heartbeat-setup renders a review candidate only
+install-browser-relays|not installed by setup: operator-run once with a password, and only after D3 Part B moves the listeners to user agents (docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md)
