@@ -1066,6 +1066,101 @@ def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):
     assert 'k3dm_dispatch_api_cost_per_landed_usd{window="1d"} 1.22827696' in output
 
 
+def test_session_usage_splits_cumulative_totals_by_run_model_and_keeps_session_count(tmp_path):
+    # Real ledger sequence read on m4-air, 2026-11-06; cached_input values exercise the same cumulative-counter split.
+    rows = [
+        event(10, "codex_usage", session="pr-checks-history-semantics-luna", model="gpt-6-luna",
+              input=1_310_459, cached_input=1_000_000, output=8_037),
+        event(11, "codex_usage", session="pr-checks-history-semantics-luna", model="gpt-6.1-sol",
+              input=2_013_348, cached_input=1_500_000, output=15_964),
+    ]
+    rates = {
+        "gpt-6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
+        "gpt-6.1-sol": {"input": 0.30, "cached_input": 0.03, "output": 1.50},
+    }
+    shares = dispatch_metrics._session_records(rows)["pr-checks-history-semantics-luna"]
+    assert [(item["model"], item["input"], item["cached_input"], item["output"]) for item in shares] == [
+        ("gpt-6-luna", 1_310_459, 1_000_000, 8_037),
+        ("gpt-6.1-sol", 702_889, 500_000, 7_927),
+    ]
+    luna_cost = dispatch_metrics._cost(shares[0], rates)
+    sol_cost = dispatch_metrics._cost(shares[1], rates)
+    assert luna_cost == pytest.approx(((310_459 * 0.20) + (1_000_000 * 0.02) + (8_037 * 1.20)) / 1_000_000)
+    assert sol_cost == pytest.approx(((202_889 * 0.30) + (500_000 * 0.03) + (7_927 * 1.50)) / 1_000_000)
+    assert sum(item["input"] for item in shares) == 2_013_348
+    assert sum(item["cached_input"] for item in shares) == 1_500_000
+    assert sum(item["output"] for item in shares) == 15_964
+    task = [event(9, "start", "pr-checks-history-semantics-luna"), *rows]
+    assert dispatch_metrics._task_metrics(task, {"ts": 12}, rates)["api_cost_usd"] == pytest.approx(luna_cost + sol_cost)
+
+    home = tmp_path / "codex"
+    write_session(home, "pr-checks-history-semantics-luna", 10, 20)
+    output = dispatch_metrics.render(rows, 0, 20, prices=rates, codex_home=home)
+    assert 'model="gpt-6-luna",kind="uncached_input"} 310459' in output
+    assert 'model="gpt-6-luna",kind="cached_input"} 1000000' in output
+    assert 'model="gpt-6-luna",kind="output"} 8037' in output
+    assert 'model="gpt-6.1-sol",kind="uncached_input"} 202889' in output
+    assert 'model="gpt-6.1-sol",kind="cached_input"} 500000' in output
+    assert 'model="gpt-6.1-sol",kind="output"} 7927' in output
+    assert f'model="gpt-6-luna"}} {luna_cost}' in output
+    assert f'model="gpt-6.1-sol"}} {sol_cost}' in output
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="true"} 1' in output
+
+
+def test_one_model_multi_event_session_keeps_previous_totals_and_cost():
+    # One-model positive control: cumulative session totals remain unchanged when events repeat one model.
+    rows = [
+        event(10, "codex_usage", session="single-model", model="gpt-6-luna",
+              input=1_310_459, cached_input=1_000_000, output=8_037),
+        event(11, "codex_usage", session="single-model", model="gpt-6-luna",
+              input=2_013_348, cached_input=1_500_000, output=15_964),
+    ]
+    rates = {"gpt-6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
+    shares = dispatch_metrics._session_records(rows)["single-model"]
+    assert len(shares) == 2
+    assert [item["input"] for item in shares] == [1_310_459, 702_889]
+    assert [item["cached_input"] for item in shares] == [1_000_000, 500_000]
+    assert [item["output"] for item in shares] == [8_037, 7_927]
+    assert sum(dispatch_metrics._cost(item, rates) for item in shares) == pytest.approx(
+        dispatch_metrics._cost(rows[-1], rates))
+
+
+def test_decreasing_session_totals_start_a_new_usage_segment_without_negatives():
+    rows = [
+        event(10, "codex_usage", session="reset", model="gpt-6-luna",
+              input=100, cached_input=30, output=50),
+        event(11, "codex_usage", session="reset", model="gpt-6.1-sol",
+              input=10, cached_input=5, output=4),
+        event(12, "codex_usage", session="reset", model="gpt-6.1-sol",
+              input=15, cached_input=6, output=9),
+    ]
+    shares = dispatch_metrics._session_records(rows)["reset"]
+    assert [(item["input"], item["cached_input"], item["output"]) for item in shares] == [
+        (100, 30, 50), (10, 5, 4), (5, 1, 5)]
+    assert all(item[key] >= 0 for item in shares for key in ("input", "cached_input", "output"))
+
+
+def test_null_model_event_is_unpriced_only_for_its_increment():
+    rows = [
+        event(10, "codex_usage", session="null-model", model="gpt-6-luna",
+              input=100, cached_input=30, output=50),
+        event(11, "codex_usage", session="null-model", model=None,
+              input=150, cached_input=45, output=70),
+    ]
+    rates = {"gpt-6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20}}
+    shares = dispatch_metrics._session_records(rows)["null-model"]
+    assert [item["input"] for item in shares] == [100, 50]
+    assert [item["cached_input"] for item in shares] == [30, 15]
+    assert [item["output"] for item in shares] == [50, 20]
+    assert dispatch_metrics._cost(shares[0], rates) is not None
+    assert dispatch_metrics._cost(shares[1], rates) is None
+    lines = []
+    dispatch_metrics._render_cost(lines, "1d", {"null-model": shares}, 0, rates)
+    assert any('model="gpt-6-luna",kind="uncached_input"} 70' in line for line in lines)
+    assert any('model="unknown",kind="uncached_input"} 35' in line for line in lines)
+    assert 'k3dm_dispatch_api_cost_unpriced_sessions{window="1d"} 1' in lines
+
+
 def test_unpriced_model_keeps_tokens_and_release_has_no_coverage(tmp_path):
     rows = [event(10, "codex_usage", model="other-model", session="u1", input=10,
                   cached_input=4, output=2, version="v9.9.9")]
@@ -2069,9 +2164,25 @@ def test_runtime_identity_prefers_latest_and_keeps_each_reported_model():
     worker_history = _identity_lines(output, "worker_history")
     coordinators = _identity_lines(output, "coordinator")
     assert len(workers) == 1 and 'model="other",source="runtime",status="reported"' in workers[0]
+    assert 'display="gpt-test-1 → gpt-test-2"' in workers[0]
     assert len(worker_history) == 1 and 'model="other",source="runtime",status="reported"' in worker_history[0]
     assert len(coordinators) == 1
     assert 'vendor="anthropic",model="other",source="declared",status="declared"' in coordinators[0]
+
+
+def test_worker_display_lists_distinct_runtime_models_in_run_order_once():
+    output = dispatch_metrics.render([
+        event(1, "start", "one-model", agent="codex"),
+        event(2, "identity", "one-model", run=1,
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "runtime", "status": "reported"}),
+        event(3, "identity", "one-model", run=2,
+              worker_identity={"vendor": "openai", "model": "gpt-6-luna", "source": "runtime", "status": "reported"}),
+        event(4, "land", "one-model"),
+    ], 0, 100)
+    worker = _identity_lines(output, "worker")
+    assert len(worker) == 1
+    assert 'display="gpt-6-luna"' in worker[0]
+    assert "→" not in worker[0]
 
 
 def test_invalid_runtime_identity_does_not_replace_legacy_value():

@@ -513,14 +513,27 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
 
 
 def _session_records(events):
-    latest = {}
-    for event in events:
+    sessions = defaultdict(list)
+    for index, event in enumerate(events):
         if event.get("event") != "codex_usage" or not event.get("session"):
             continue
-        key = event["session"]
-        if key not in latest or event.get("ts", 0) >= latest[key].get("ts", 0):
-            latest[key] = event
-    return latest
+        sessions[event["session"]].append((index, event))
+    usage = {}
+    fields = ("input", "cached_input", "output")
+    for session, records in sessions.items():
+        records.sort(key=lambda pair: (_timestamp(pair[1].get("ts", 0)), pair[0]))
+        previous = None
+        shares = []
+        for _, event in records:
+            totals = {key: int(event.get(key, 0) or 0) for key in fields}
+            if previous is None or any(totals[key] < previous[key] for key in fields):
+                share = totals
+            else:
+                share = {key: totals[key] - previous[key] for key in fields}
+            previous = totals
+            shares.append({**event, **share})
+        usage[session] = shares
+    return usage
 
 
 def _dispatch_worktree_repos(events):
@@ -871,7 +884,7 @@ def _task_metrics(task_events, land_event, prices=None):
                         and event["ts"] <= land_ts]
     post_exit_land = max(0, land_ts - max(qualifying_exits)) if qualifying_exits else None
     usage = _session_records(task_events)
-    session_costs = [_cost(item, prices or {}) for item in usage.values()]
+    session_costs = [_cost(item, prices or {}) for records in usage.values() for item in records]
     return {
         "tokens": token_events[-1]["tokens"] if token_events else None,
         "codex_seconds": codex_seconds,
@@ -1533,6 +1546,13 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             status = raw_status if isinstance(raw_status, str) and raw_status in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
             display = "unknown" if vendor == "unknown" else (
                 f"{vendor}/model not recorded ({status})" if model == "unknown" else f"{vendor}/{model} ({status})")
+            if role == "worker" and worker_runtime_identities:
+                runtime_models = list(dict.fromkeys(
+                    item["model"] for item in worker_runtime_identities
+                    if isinstance(item.get("model"), str)
+                    and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", item["model"])))
+                if runtime_models:
+                    display = " → ".join(runtime_models)
             identity_labels_tuple = (role, vendor, model, source, status, display)
             if identity_labels_tuple in emitted_identity_labels:
                 return
@@ -1585,10 +1605,11 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if time_scope:
         session_starts = {item["session"]: _timestamp(item["start"])
                           for item in coverage or []}
-        usage = {key: item for key, item in usage.items()
+        usage = {key: records for key, records in usage.items()
                  if key in session_starts and session_starts[key] >= now - WINDOWS[window]}
     else:
-        usage = {key: item for key, item in usage.items() if item.get("version") == window}
+        usage = {key: selected for key, records in usage.items()
+                 if (selected := [item for item in records if item.get("version") == window])}
     _render_cost(lines, window, usage, metrics["landed"], prices or {})
     if time_scope and coverage is not None:
         in_window = [item for item in coverage if _timestamp(item["start"]) >= now - WINDOWS[window]]
@@ -1649,9 +1670,9 @@ def _coverage_event(item):
 def _render_cost(lines, window, usage, landed, prices):
     total = cached = 0
     total_cost = 0
-    unpriced = 0
+    unpriced_sessions = set()
     by_model, tokens_by_model = defaultdict(float), defaultdict(lambda: defaultdict(int))
-    for item in usage.values():
+    for item in (record for records in usage.values() for record in records):
         model = item.get("model") or "unknown"
         inp, cache, output = (int(item.get(k, 0) or 0) for k in ("input", "cached_input", "output"))
         total += inp
@@ -1661,7 +1682,7 @@ def _render_cost(lines, window, usage, landed, prices):
         tokens_by_model[model]["output"] += output
         amount = _cost(item, prices)
         if amount is None:
-            unpriced += 1
+            unpriced_sessions.add(item.get("session"))
         else:
             total_cost += amount
             by_model[model] += amount
@@ -1675,7 +1696,7 @@ def _render_cost(lines, window, usage, landed, prices):
             lines.append(f'k3dm_dispatch_codex_tokens_by_model{{window="{window}",model="{model}",kind="{kind}"}} {value}')
     if total:
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
-    lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {unpriced}')
+    lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {len(unpriced_sessions)}')
 
 def _activity_metrics(lines, events, files, now, prices):
     associated = {e.get("session") for e in events if e.get("event") == "codex_usage"}

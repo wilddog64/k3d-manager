@@ -240,9 +240,11 @@ _dispatch_worker() {
       else env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec --sandbox workspace-write -C "$worktree" --add-dir "$run/state" -o "$run/last-message.md" - <"$run/prompt.md" >"$run/codex.log" 2>&1; fi
     fi
   elif (( network )); then
-    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    if [[ -n "$model" ]]; then env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -m "$model" -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    else env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -c sandbox_workspace_write.network_access=true -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1; fi
   else
-    env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    if [[ -n "$model" ]]; then env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -m "$model" -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1
+    else env "${state_vars[@]}" "${K3DM_CODEX_BIN:-codex}" exec resume -c 'sandbox_mode="workspace-write"' -c "sandbox_workspace_write.writable_roots=[\"$run/state\"]" -o "$run/last-message-$n.md" "$session_id" - <"$run/prompt-$n.md" >"$run/codex-$n.log" 2>&1; fi
   fi
   local exit_code="$?" log="$run/codex.log"
   [[ "$agent" == agy ]] && log="$run/agy.log"
@@ -295,7 +297,7 @@ Usage:
   bin/k3dm-codex-dispatch status [SLUG]
   bin/k3dm-codex-dispatch open [--version vX.Y.Z]
   bin/k3dm-codex-dispatch land --slug SLUG (--test CMD|--no-test) [--landing-actor ACTOR] [--landing-model VENDOR/MODEL] [--review-pending] [--allow-out-of-scope]
-  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--coordinator VENDOR/MODEL]
+  bin/k3dm-codex-dispatch resume --slug SLUG --prompt-file PATH --reason continue_prompt|clarification|correction|other [--model ID] [--coordinator VENDOR/MODEL]
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
@@ -994,12 +996,13 @@ PYOPEN
 }
 
 _dispatch_resume() {
-  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model coordinator="" coordinator_vendor="" coordinator_model=""
+  local slug="" prompt_file="" reason="" rel version task run session_id n network_slug agent model="" coordinator="" coordinator_vendor="" coordinator_model="" model_source recorded_model recorded_source
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
       --prompt-file) (($# >= 2)) || _dispatch_error "--prompt-file requires a path"; prompt_file="$2"; shift 2 ;;
       --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
+      --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; shift 2 ;;
       --coordinator) (($# >= 2)) || _dispatch_error "invalid coordinator"; coordinator="$2"; shift 2 ;;
       *) _dispatch_error "unknown resume option: $1" ;;
     esac
@@ -1020,7 +1023,12 @@ _dispatch_resume() {
     _dispatch_error "Codex is still running"
   fi
   agent="$(cat "$run/agent" 2>/dev/null || echo codex)"
-  model="$(cat "$run/model" 2>/dev/null || true)"
+  if [[ -z "$model" ]]; then model="$(cat "$run/model" 2>/dev/null || true)"; model_source=inherited
+  else
+    [[ "$agent" != agy ]] || _dispatch_error "--model is not supported for agy resume"
+    [[ "$model" =~ ^[A-Za-z0-9._:-]{1,64}$ ]] || _dispatch_error "invalid model"
+    model_source=explicit
+  fi
   if [[ "$agent" == agy ]]; then
     [[ -s "$run/session" ]] || _dispatch_error "agy run returned no conversation id; start a new task"
     session_id="$(<"$run/session")"
@@ -1035,11 +1043,14 @@ _dispatch_resume() {
   if [[ -f "$run/network" ]] && network_slug="$(_dispatch_network_task_running "$version")" && [[ "$network_slug" != "$slug" ]]; then
     _dispatch_error "network task $network_slug is still running; only one networked task at a time"
   fi
+  [[ "$model_source" != explicit ]] || printf '%s\n' "$model" >"$run/model"
   cp "$prompt_file" "$run/prompt-$n.md"
   rm -f "$run/exit" "$run/start"
   _dispatch_intervention --slug "$slug" --reason "$reason" >/dev/null
-  _dispatch_ledger_event_best_effort resume "$version" "$slug" --arg reason "$reason" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source inherited --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.reason=$reason|.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:(if $model=="" then "unknown" else $model end),source:$model_source,status:(if $model=="" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
-  _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" inherited </dev/null
+  recorded_model="$model"; recorded_source="$model_source"
+  if [[ -z "$model" ]]; then recorded_model=unknown; recorded_source=unreported; fi
+  _dispatch_ledger_event_best_effort resume "$version" "$slug" --arg reason "$reason" --argjson n "$n" --argjson run "$n" --arg agent "$agent" --arg model "$recorded_model" --arg vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg model_source "$recorded_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" '.reason=$reason|.["n"]=$n|.run=$run|.agent=$agent|.worker_identity={vendor:$vendor,model:$model,source:$model_source,status:(if $model=="unknown" then "unknown" else "unverified" end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+  _dispatch_detach_worker "$run" resume "$task" "$run" "$version" "$slug" "$([[ -f "$run/network" ]] && echo 1 || echo 0)" "$n" "$session_id" "$agent" "$model" "$model_source" </dev/null
   _dispatch_wait_for_start "$run" || _dispatch_log "$run" "resume worker did not acknowledge startup"
   _dispatch_schedule_metrics
   echo "resumed: $slug"; echo "resume: $n"
