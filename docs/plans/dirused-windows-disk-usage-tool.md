@@ -152,8 +152,9 @@ files, each sorted descending, with logical size and size on disk.
 
 ## GUI
 
-**Each UNC path opened gets its own tab (operator, 2026-11-06).** Opening a path from the GUI, or from
-`/gui` or `/file`, adds one tab, labelled with the UNC path. A tab has its own scan, progress, cancel,
+**Each UNC path opened gets its own tab (operator, 2026-11-06).** Opening a path in the GUI, or naming it
+to `/gui`, adds one tab, labelled with the UNC path. `/file` fills the node list and opens no tabs, so a
+long list does not start a full scan on every machine. A tab has its own scan, progress, cancel,
 table, pie chart, preview and selection, so one slow or unreachable machine never blocks another tab.
 Opening a path that already has a tab selects that tab. Two paths on one node are two tabs. A local
 path follows the same rule (Claude's reading; the operator named UNC paths).
