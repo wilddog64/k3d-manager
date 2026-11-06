@@ -1,6 +1,6 @@
 # Bug: payment's runtime base moved to eclipse-temurin:24-jre-alpine, a frozen non-LTS tag on alpine 3.22.1, so each new build has more CRITICAL CVEs than the deployed one
 
-**Status:** IN REVIEW. Fix `0b8c2df` on `fix/runtime-lts-base` (Luna, reviewed by Claude); E2 green. PR wilddog64/shopping-cart-payment#100 opened 2026-11-05 on the operator go ("go ahead for P2 bug"): all CI checks pass, Copilot left no comments. E3 green (see below). Waiting on the operator merge; E1 after merge.
+**Status:** FIXED, verified offline and by scan. Fix merged to `main` as `c08870a0` (PR wilddog64/shopping-cart-payment#100). E1, E2 and E3 pass; independent verify PASS 2026-11-06. The image reaches the cluster through the CVE loop, once the tag-pagination fix is deployed by `make platform-ops`.
 **Priority:** P2
 **Severity:** medium. If the newest payment image were promoted, it would replace one CRITICAL OS finding with five. Today the CVE loop cannot promote it (see the tag-pagination bug), so nothing bad has shipped yet. Once that bug is fixed, the loop would promote this image.
 **Filed:** 2026-11-05
@@ -59,3 +59,18 @@ interface:
 - `gh pr checks 100`: every check passes, including Image Build Check (run 42154175281, job 127685008246). Build, Scan & Push is skipped on a PR, as expected.
 - Copilot: one COMMENTED review, "No open issues", no inline comments. Its note says it could not run at the selected tier, so this is a light review.
 - **E3:** the job built the image with runtime `FROM eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c…` and ran `RUN apk upgrade --no-cache && addgroup …`. On the M4, `docker run --rm --entrypoint cat <that digest> /etc/alpine-release` gives `3.24.4`. The built image is that base plus `apk upgrade`, so it is 3.24 or newer. The PR job does not push an image, so this checks the base digest, not the built image's own file.
+
+## E1 and independent verification (2026-11-06)
+
+Claude scanned first; a separately tasked verifier (`claude-sonnet-5-5`) repeated it from the Acceptance section only. Trivy 0.76.1, DB 2026-11-05 19:01:45 UTC, all scans on the same DB, `--pkg-types os --severity CRITICAL --platform linux/amd64 --image-src remote`, all rc 0.
+
+| Image | OS | CRITICAL | New minus deployed |
+|---|---|---|---|
+| Deployed `sha256:b3fb4b07…` | alpine 3.24.2 | CVE-2026-111497 (brotli-libs 1.2.0-r1, fixed 1.2.1-r0) | n/a |
+| Fix `sha-c08870a0` `sha256:28a81600…` | alpine 3.24.4 | none | empty, rc 0 |
+| Newest `sha-321b7652` `sha256:34497a00…` | alpine 3.24.4 | none | empty, rc 0 |
+| Pre-fix control `sha-d5048735` `sha256:6dd2e6ee…` | alpine 3.22.1 | includes the three at right | CVE-2026-31789, CVE-2026-33845, CVE-2026-42010, rc 1 |
+
+CI: run 42157751676, success, headSha `c08870a0`, `build-push` success. Scan validity checked: OS metadata populated, os-pkgs target present, arch amd64 matching node `srv1754834`, digests match. Recorded with `bin/k3dm-codex-dispatch verify` from the verifier's evidence file.
+
+Errors seen: the `_smartcd` shell hook on every call (the verifier's first outputs landed in the repo root because `cd` did not apply; moved out, `git status` clean); two of the verifier's own shell mistakes, rerun; Trivy's vendor-severity warning and update notice. None affects the comparison.

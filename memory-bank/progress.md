@@ -1,5 +1,9 @@
 # Progress — compressed operational log
 
+- 2026-11-06: M4 `hub-vault-profile` reset to `laptop` (operator). Keychain worktree confirmed abandoned and archived; remote branch kept.
+- 2026-11-06: payment E1 PASS, independent verify recorded (fix 0 CRITICAL, pre-fix control red with 3 new). Bug marked FIXED; `make platform-ops` pending.
+- 2026-11-06: filed Part B gap spec (P1, dispatch go given) and hub tunnel auth P2: launchd's SSH agent is empty after a reboot, so M4 metrics and logs stop reaching the M5.
+
 - 2026-11-06: 12 more M4 agents disabled and stopped with the operator's go, each confirmed; one connector, routes answer. Kept: `chrome-cdp`, the Pushgateway and Loki forwards (two exit 255, cause unchecked). M4 profile not reset.
 
 - 2026-11-06: 14 remaining hub singletons disabled and stopped on the M4 with the operator's go (15 with the tunnel), each confirmed; routes unaffected. M4 `hub-vault-profile` not reset. P1 fix approved to start after `/clear`. M5 reboot on hold until Claude says go (not rebooted; has not pulled Part B). Part B gap found by reading the code: the Hostinger path does not write the ArgoCD and Keycloak browser agents (Correction 4, not fixed).

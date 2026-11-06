@@ -30,7 +30,7 @@ Read from `~/Library/Logs/k3dm-vault-failover.log` and `scripts/plugins/vault.sh
 - **Hostinger Vault was not written.** `vault_seed_hub_into_context` stopped at `could not read source vault-root token from k3d-k3d-cluster/secrets`, which comes before any port-forward or write.
 - **The ClusterSecretStore was not repointed.** The log says `_hostinger_reconcile_vault_cluster_store not loaded`. `vault-backend` still points at `vault-bridge` and is Valid.
 - **Hostinger is healthy.** Vault is unsealed and all 20 ExternalSecrets report Ready True.
-- **One M4 state change remains.** `~/.local/share/k3d-manager/hub-vault-profile` now says `hostinger`; it was `laptop` before. Nothing has reset it.
+- **One M4 state change remains.** `~/.local/share/k3d-manager/hub-vault-profile` now says `hostinger`; it was `laptop` before. Reset to `laptop` 2026-11-06 on the operator's instruction.
 
 The seed aborted only because the M4 cluster was stopped. This path should not be reachable from a machine that is no longer the hub.
 
@@ -38,7 +38,7 @@ The seed aborted only because the M4 cluster was stopped. This path should not b
 
 - **Disabled and stopped 2026-11-06, each confirmed not loaded and disabled:** `cloudflare-tunnel` (by the operator), then by Claude with the operator's go: `vault-failover`, `ssh-tunnel-vault`, `ssh-tunnel`, `cleanup`, `node-health-watch`, `sandbox-reaper`, `acg-watch`, `prometheus-credential-rotator`, `hub-snapshot`, `hub-data-export`, `test-metrics`, `cloud-bridge`, `webhook`, `hermes`. Afterwards: one tunnel connector, frontend 200, Keycloak 302, Grafana 302, ArgoCD 200.
 - **Undo:** `launchctl enable gui/$(id -u)/com.k3d-manager.<label>`, then `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.<label>.plist`. A `make hub-cutover-rollback` to the M4 today would not enable them, so this step is needed first.
-- **Not reset:** the M4 `hub-vault-profile` still says `hostinger`; the go covered the agents only.
+- **Reset later:** the M4 `hub-vault-profile` was left at `hostinger` here, because the go covered the agents only. It was reset to `laptop` on 2026-11-06.
 - **Also disabled and stopped 2026-11-06 with the operator's go, not in the list:** `webhook-token-rotate`, `argocd-port-forward`, `grafana-port-forward`, `keycloak-port-forward`, `frontend-port-forward`, `vault-port-forward`, `prometheus-port-forward`, `alertmanager-port-forward`, `prometheus-auth-proxy`, `alertmanager-auth-proxy`, `sandbox.prometheus-port-forward`, `sandbox.pushgateway-port-forward`. Each confirmed; the public routes still answered.
 - **Kept loaded:** `chrome-cdp`, `pushgateway-port-forward` (serves `127.0.0.1:9091`, healthy 200; which cluster it reaches is not checked), `hub-pushgateway-port-forward` and `hub-loki-port-forward` (both last exit 255, not running; cause not checked).
 
@@ -48,7 +48,7 @@ These 12 are outside `hub-singletons.list`, so the `bin/hub-cutover` fix does no
 
 - Cut-over runs `launchctl disable` for each singleton it stops on the old hub, and records it.
 - Rollback runs `launchctl enable` for those labels before bootstrapping them.
-- The M4's `hub-vault-profile` reset remains an operator decision.
+- The M4's `hub-vault-profile` was reset to `laptop` on 2026-11-06, on the operator's instruction.
 
 ## Acceptance
 

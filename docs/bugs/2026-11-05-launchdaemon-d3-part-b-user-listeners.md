@@ -176,6 +176,8 @@ The reboot also exposed a separate outage, not caused by Part B: `docs/bugs/2026
 
 ## Correction 4 (Claude review, 2026-11-06): the Hostinger path never writes two of the agents (OPEN)
 
+Fix spec: `docs/bugs/2026-11-06-hostinger-refresh-skips-argocd-keycloak-browser-agents.md`.
+
 Found by reading the code before the M5 pass. Not reproduced live.
 
 - `_hostinger_refresh_access_layer` writes the plist only for `browser.hostinger-frontend-http` (`scripts/lib/providers/k3s-hostinger.sh:722`). For `browser.argocd-https` and `browser.keycloak-http` it only calls `_hostinger_restart_launchd` (`:714`, `:719`), which returns 0 when the plist is absent, so the skip is silent.
