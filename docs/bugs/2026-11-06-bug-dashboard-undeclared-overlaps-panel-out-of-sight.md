@@ -1,6 +1,6 @@
 # Bug: the Undeclared plan overlaps tile sits at the bottom of the bug dashboard with no thresholds, so a nonzero count is easy to miss
 
-**Status:** OPEN — not dispatched
+**Status:** FIXED offline `0fd50a54`, independent verify PASS 2026-11-06; live E3 pending (Grafana API read and operator's eye after `hub-grafana-dashboards` syncs)
 **Priority:** P3
 **Severity:** low. The count is correct; it reads 0 today. A nonzero count, which warns that two plans in a release could collide or land in the wrong order, would go unnoticed.
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
