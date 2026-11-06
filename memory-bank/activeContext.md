@@ -2000,5 +2000,5 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - Lead-model dashboard plan APPROVED (intents too); dispatch waits for its prerequisite bugs and the v1.43.16 branch.
 - The keychain worktree `2026-11-02-acg-up-stalls-at-system-keychain-trust` is ABANDONED. First archived to `~/.local/share/k3d-manager/archive/2026-11-02-acg-up-stalls-at-system-keychain-trust/`: a bundle with the 2 unlanded commits `6491d5d2` and `f08a3775`, the uncommitted diff, and the untracked Phase C docs and tests.
 - LaunchDaemon P1: operator chose **D1** (pf redirect + user LaunchAgents), split into Part 1 (redirect installer) and Part 2 (migrate listeners, drop sudoers rules, per-OS split). Gate: operator runs pf test S1 (scratchpad `pf-spike.sh`); dispatch Part 1 to Luna on PASS.
-- P2 bash 3.2 (fix A) landed `52b2bad6` (Luna, plus Claude's positive control); pre-fix red confirmed. Pending: independent verify, then live E3 on the M2 (operator).
+- P2 bash 3.2 (fix A) landed `52b2bad6` (Luna, plus Claude's positive control); pre-fix red confirmed. Independent verify PASS. Pending: live E3 on the M2 (operator).
 - pf test S1 FAILED on the M4 (rule loaded, curl got nothing; pf was already enabled by another owner). Diagnostic `pf-spike2.sh` is waiting for the operator to run it.

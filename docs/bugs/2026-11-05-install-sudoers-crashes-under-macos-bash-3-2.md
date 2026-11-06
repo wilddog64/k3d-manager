@@ -1,6 +1,6 @@
 # Bug: `make install-sudoers` crashes under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** FIXED in `52b2bad6`, not verified yet. Still needed: the independent verify and live E3 on the M2 (operator).
+**Status:** FIXED in `52b2bad6`. Independent verify PASS on 2026-11-05. Live E3 on the M2 is still pending (operator).
 **Priority:** P2
 **Severity:** medium. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2, `make install-sudoers` stops before installing anything. That blocks the sudoers P1 remediation on that host. Workaround: run with Homebrew bash first on `PATH`.
 **Filed:** 2026-11-05
@@ -71,3 +71,15 @@ interface:
 - **Pre-fix red:** the bash 3.2 test run against `HEAD:bin/install-sudoers.sh` (`df3525ec`) fails M2, N1 and N2. The positive control passes on both versions.
 - Luna reported reds in `make test` (#495, ESO smoke) and in `make test-pytest` (4 dashboard and metrics tests). Neither touches the files changed here.
 - Focused gate at land: `install_sudoers.bats`, 13/13, plus shellcheck.
+
+## Independent verification (2026-11-05)
+
+A Sonnet verifier wrote 5 BATS tests from the Acceptance block only: M1, M2, M2b (install mode), N1 and N2. They run with a logging `mktemp` stub and a `sudo` tripwire stub, both inside the scratch dir.
+
+Claude reran the tests:
+- Fix `52b2bad6`: rc 0, 5/5 passed.
+- Pre-fix `df3525ec`: rc 1. M2, M2b, N1 and N2 failed; M1 passed, as the positive control.
+
+The `sudo` stub was never invoked, and the repo `git status` was clean afterwards. Recorded with `k3dm-codex-dispatch verify`.
+
+The verifier's own first N1 test ran only `--dry-run`, and it passed on the pre-fix code, which made it a false green. The verifier extended N1 to cover install mode, and it then failed on the pre-fix code as expected.
