@@ -27,7 +27,7 @@ On 2026-11-06 the operator ran `make argocd-hermes-token` on the M5 and got `HTT
 
 The target takes `ARGOCD_ADMIN_PASSWORD`, else `argocd-initial-admin-secret`. `admin.passwordMtime` in `argocd-secret` is 2026-11-01T12:14:02Z, and the monthly `argocd-credential-rotator` writes a new password to Vault `secret/argocd/admin`, which the target never reads. `accounts.hermes=apiKey` is set, so the account is not the cause. `bin/argocd-app-sync` already tries env, then Vault, then the initial secret, per `docs/bugs/2026-10-18-argocd-app-sync-stale-vault-admin-password.md`.
 
-Proven 2026-11-06T15:19Z on the M5: the operator reran the target with `ARGOCD_ADMIN_PASSWORD` taken from Vault and got `stored in Keychain`, `verified: 29 applications visible to hermes`, `Hermes restarted`. The Keychain item date moved to 2026-11-06T15:19:13Z.
+Proven 2026-11-06T15:19Z on the M5: the operator reran the target with `ARGOCD_ADMIN_PASSWORD` taken from Vault and got `stored in Keychain`, `verified: 29 applications visible to hermes`, `Hermes restarted`. The Keychain item date moved to 2026-11-06T15:19:13Z. The next Hermes record, sampled 2026-11-06T15:20:00Z, shows `argocd` and `values_branch` no longer `unknown` (`argocd healthy`, 29 applications) and no event raised; `alert_delivery` stays `unknown` for its own PyYAML cause.
 
 ## Files
 
