@@ -1,6 +1,6 @@
 # Bug: payment's runtime base moved to eclipse-temurin:24-jre-alpine, a frozen non-LTS tag on alpine 3.22.1, so each new build has more CRITICAL CVEs than the deployed one
 
-**Status:** OPEN. Filed 2026-11-05. Dispatched to Luna 2026-11-05 (repo `wilddog64/shopping-cart-payment`, branch `fix/runtime-lts-base`).
+**Status:** IN REVIEW. Fix `0b8c2df` on `fix/runtime-lts-base` (Luna, reviewed by Claude); E2 green, branch CI green (run 42151157909). PR wilddog64/shopping-cart-payment#100 opened 2026-11-05 on the operator go ("go ahead for P2 bug"). E3 in PR CI, E1 after merge.
 **Priority:** P2
 **Severity:** medium. If the newest payment image were promoted, it would replace one CRITICAL OS finding with five. Today the CVE loop cannot promote it (see the tag-pagination bug), so nothing bad has shipped yet. Once that bug is fixed, the loop would promote this image.
 **Filed:** 2026-11-05
