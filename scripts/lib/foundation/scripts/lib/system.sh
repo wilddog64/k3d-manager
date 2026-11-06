@@ -767,6 +767,31 @@ function _install_macmon() {
   _info "macmon installed"
 }
 
+function _install_mac_cask() {
+  local label="$1"
+  local binary="$2"
+  local cask="$3"
+  if ! _is_mac; then
+    _warn "${label} installation is supported only on macOS"
+    return 1
+  fi
+  _command_exist "${binary}" && return 0
+  if ! _command_exist brew; then
+    _warn "Homebrew is required to install ${label}"
+    return 1
+  fi
+  _run_command --soft -- brew install --cask "${cask}" || return $?
+  _info "${label} installed"
+}
+
+function _install_virtualbox() {
+  _install_mac_cask VirtualBox VBoxManage virtualbox
+}
+
+function _install_vagrant() {
+  _install_mac_cask Vagrant vagrant vagrant
+}
+
 function _is_linux() {
    if [[ "$(uname -s)" == "Linux" ]]; then
       return 0
