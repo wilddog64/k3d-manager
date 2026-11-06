@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-06: Hermes Slack post seen by the operator (`k3dm-notices`, 07:26 PST) after the Keychain copy. Handoff written; M4 reboot next for tunnel E4.
 - 2026-11-06: Hermes Slack item confirmed revoked (404 no_service); analyzer posts traced to the M5 plist having no status channel and no URL. New bug filed, recurrence added to the webhook migration bug; hand fixes with the operator.
 - 2026-11-06: `make argocd-hermes-token` got 401 on the M5; second defect added to the token bug (target ignores Vault `secret/argocd/admin`, rotated 2026-11-01).
 - 2026-11-06: hub-cutover P3 landed `c151bcb1`, verification recorded (independent 12/12; 6 red pre-fix `2394272d`; 5 mutants killed); live E2 open. P2 live E2 passed on the M5. Tunnel fix live E3 passed from the M4; E4 needs an M4 reboot.

@@ -1,6 +1,6 @@
 # Bug: Hermes still reads the revoked Slack webhook after the replacement
 
-**Status:** OPEN — hand fix applied on the M5 2026-11-06: item date 15:26:43Z, Hermes code path `delivered: True`; visible message awaits operator confirmation. Code and how-to gaps remain
+**Status:** OPEN — hand fix applied on the M5 2026-11-06: item date 15:26:43Z, Hermes code path `delivered: True`; operator saw the message from `k3dm-notices` at 07:26 PST. Code and how-to gaps remain
 **Priority:** P2
 **Approval:** pending
 **Branch:** `k3d-manager-v1.43.14`
