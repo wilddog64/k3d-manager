@@ -1,8 +1,8 @@
 # Bug: hub cut-over only boots out the old hub's agents, so a reboot restarts them and takes the public routes down
 
-**Status:** OPEN — live outage ended by hand 2026-11-06; code not fixed; 14 old-hub singletons still loaded on the M4
+**Status:** OPEN — live outage ended by hand 2026-11-06; all 15 singletons disabled on the M4 by hand; `bin/hub-cutover` not fixed
 **Priority:** P1
-**Approval:** pending
+**Approval:** M4 disable: operator 2026-11-06 ("go ahead to disable 14 old hub singletons"). Fix: operator 2026-11-06 ("might start after /clear so make sure you make a good handoff").
 **Filed:** 2026-11-06
 **Detected by:** Claude (M4 reboot check for D3 Part B) and the operator (Grafana 502)
 **Affected:** `bin/hub-cutover` (cut-over and rollback); `scripts/etc/machine/hub-singletons.list`
@@ -34,10 +34,12 @@ Read from `~/Library/Logs/k3dm-vault-failover.log` and `scripts/plugins/vault.sh
 
 The seed aborted only because the M4 cluster was stopped. This path should not be reachable from a machine that is no longer the hub.
 
-## Still loaded on the M4
+## State of the M4
 
-- **In the singleton list, loaded, not disabled:** `vault-failover`, `ssh-tunnel-vault`, `ssh-tunnel`, `cleanup`, `node-health-watch`, `sandbox-reaper`, `acg-watch`, `prometheus-credential-rotator`, `hub-snapshot`, `hub-data-export`, `test-metrics`, `cloud-bridge`, `webhook`, `hermes`.
-- **Loaded, not in the list:** `alertmanager-auth-proxy`, `alertmanager-port-forward`, `argocd-port-forward`, `chrome-cdp`, `frontend-port-forward`, `grafana-port-forward`, `hub-loki-port-forward`, `hub-pushgateway-port-forward`, `keycloak-port-forward`, `prometheus-auth-proxy`, `prometheus-port-forward`, `pushgateway-port-forward`, `sandbox.prometheus-port-forward`, `sandbox.pushgateway-port-forward`, `vault-port-forward`, `webhook-token-rotate`.
+- **Disabled and stopped 2026-11-06, each confirmed not loaded and disabled:** `cloudflare-tunnel` (by the operator), then by Claude with the operator's go: `vault-failover`, `ssh-tunnel-vault`, `ssh-tunnel`, `cleanup`, `node-health-watch`, `sandbox-reaper`, `acg-watch`, `prometheus-credential-rotator`, `hub-snapshot`, `hub-data-export`, `test-metrics`, `cloud-bridge`, `webhook`, `hermes`. Afterwards: one tunnel connector, frontend 200, Keycloak 302, Grafana 302, ArgoCD 200.
+- **Undo:** `launchctl enable gui/$(id -u)/com.k3d-manager.<label>`, then `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.<label>.plist`. A `make hub-cutover-rollback` to the M4 today would not enable them, so this step is needed first.
+- **Not reset:** the M4 `hub-vault-profile` still says `hostinger`; the go covered the agents only.
+- **Still loaded, not in the list:** `alertmanager-auth-proxy`, `alertmanager-port-forward`, `argocd-port-forward`, `chrome-cdp`, `frontend-port-forward`, `grafana-port-forward`, `hub-loki-port-forward`, `hub-pushgateway-port-forward`, `keycloak-port-forward`, `prometheus-auth-proxy`, `prometheus-port-forward`, `pushgateway-port-forward`, `sandbox.prometheus-port-forward`, `sandbox.pushgateway-port-forward`, `vault-port-forward`, `webhook-token-rotate`.
 
 Whether each of the second group belongs on a dev node is not decided here. `webhook-token-rotate` needs the first look, since it is a rotator outside the singleton list.
 
@@ -45,7 +47,7 @@ Whether each of the second group belongs on a dev node is not decided here. `web
 
 - Cut-over runs `launchctl disable` for each singleton it stops on the old hub, and records it.
 - Rollback runs `launchctl enable` for those labels before bootstrapping them.
-- The M4 needs a one-time disable of the listed singletons, and its `hub-vault-profile` reset. That is an operator decision, because it changes live agents.
+- The M4's `hub-vault-profile` reset remains an operator decision.
 
 ## Acceptance
 

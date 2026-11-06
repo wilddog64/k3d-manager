@@ -1,12 +1,22 @@
 # Active context — k3d-manager-v1.43.10
 
-## Handoff — 2026-11-06 M4 reboot caused a public outage; ended; P1 filed
+## Handoff — 2026-11-06 M4 agents disabled; M5 reboot in progress; start here after /clear
 
-- **Outage ended.** The M4 reboot restarted its old `cloudflare-tunnel` agent, so a second connector with no origins took frontend, Keycloak, Grafana and ArgoCD to 502. The operator ran `launchctl bootout` + `disable`; one connector left, routes answer. New P1: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md` (Approval pending, not dispatched).
-- **Decision waiting on the operator:** disable the 14 singletons still loaded on the M4 and reset its `hub-vault-profile`. M4 `vault-failover` ran a real failover at 03:56:01Z: Hostinger Vault was not written and the store was not repointed, but the M4 profile now reads `hostinger`.
-- **Do not reboot the M5 for E5** until the M4 is cleaned up and the M5 reboot behaviour is thought through.
-- **Part B E5 on the M4 is partial:** sudoers, relays, aliases and removal of the old LaunchDaemons pass. The `browser.*` agents, URLs and `make up` are not proven, because nothing has written the agents since the fix and the M4 cluster is stopped.
-- **Payment:** main CI run 42157751676 succeeded, with `build-push` success. E1 Trivy compare is the next step; then independent verify, then `make platform-ops` from a shell that can read the login Keychain.
+Order of work:
+
+1. **M5 reboot check.** The operator said "I will reboot m5 now" and may have rebooted before reading the warning. At last read the M5 was at `e94fbaac` with the old root LaunchDaemons and 0 `browser.*` agents, so a reboot in that state does NOT test Part B. First read `git log -1` and `/Library/LaunchDaemons` on the M5, and confirm the public routes and one tunnel connector. The M5 is the only hub. Its operator note: a reboot is fine any time, since they are the only user.
+2. **Part B E5 on the M5.** Operator steps on the M5: `git pull`, `make install-browser-relays`, `make install-sudoers`, `CLUSTER_PROVIDER=k3s-hostinger make refresh`, reboot. Then Claude checks agents, high ports, URLs, `sudo -n -l` and that nothing prompts. Check `make refresh` is the right lever before repeating it: the Hostinger refresh in `k3s-hostinger.sh` writes the agents, per the Part B doc.
+3. **Dispatch the P1 to Luna** (`docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md`, Acceptance present). Operator: "might start after /clear". Claude reviews, an independent verifier writes tests from Acceptance only. Commit before dispatch; launch via `make codex-dispatch`.
+4. **Payment E1.** Main CI run 42157751676 succeeded with `build-push` success; merge `c08870a0`. Trivy `--pkg-types os --severity CRITICAL` on the new `sha-c08870a0…` digest vs deployed `sha256:b3fb4b07…`, same DB. Then independent verifier, doc status (record the merge), and only then `make platform-ops` from a shell that can read the login Keychain. That unlocks bug-open-history live E4 and pagination live E2.
+5. **P0 S1:** spec section, agy review, ask for the dispatch go. Luna takes the dispatcher half, agy the metrics/dashboard half.
+
+State to keep in mind:
+
+- **M4 is no longer running hub singletons.** All 15 in `hub-singletons.list` are disabled and stopped, confirmed by `launchctl print` and `print-disabled`. After that: one connector, frontend 200, Keycloak 302, Grafana 302, ArgoCD 200. Undo steps are in the bug doc; a rollback to the M4 needs `launchctl enable` first.
+- **Still open on the M4, for the operator:** `hub-vault-profile` still says `hostinger` (the go covered agents only). 16 other agents remain loaded, listed in the bug doc; check `webhook-token-rotate` first, a 6-hour rotator outside the singleton list.
+- **Live webhook and Hermes are on the M5 only now.** Anything on the M4 that assumed a local webhook port will get connection refused; that is expected.
+- **Outage record:** M4 reboot restarted its tunnel agent; second connector with no origins, 502s. M4 `vault-failover` flipped its profile at 03:56:01Z; Hostinger Vault not written, store not repointed.
+- **Part B E5 on the M4 is partial:** sudoers, relays, aliases and removal of the old LaunchDaemons pass. `browser.*` agents, URLs and `make up` are not proven.
 - SSH to the M5 works as `m5-air.local`, not `m5-air`.
 
 ## Handoff — 2026-11-06 D3 Part B verified; operator E5 next
