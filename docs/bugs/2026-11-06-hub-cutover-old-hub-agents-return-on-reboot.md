@@ -58,6 +58,15 @@ Added on Claude's read of `bin/hub-cutover` before dispatch, the same defect in 
 
 Rollback on the old host enables every label in `disabled-on-old`, then bootstraps only the labels in `stopped-on-old`.
 
+## Correction 1 (Claude review of Luna's first attempt, 2026-11-06)
+
+Read from the diff; none of these was shown by the first attempt's tests.
+
+1. **A re-run forgets a partial cut-over.** A cut-over that aborts after disabling some labels, then runs again, truncates `disabled-on-old` and `stopped-on-old`. The labels from the first run now read as already disabled, so they are not recorded and a rollback leaves them disabled and stopped. Keep both records when the recorded `old-host` equals `OLD_HOST`, compared before that file is rewritten; truncate them when it differs or is absent. Do not record a label twice. At the end of a successful rollback, empty both files without removing them.
+2. **A label both disabled and loaded is never stopped.** The `continue` skips the bootout, so the cut-over aborts at the "remains loaded" check, and a re-run after a failed bootout hits the same stop. Check loaded state for every label. Skip only the record and the disable for a label already disabled. Boot out any loaded label. Add it to `stopped-on-old` only if it is in `disabled-on-old`. Otherwise print a warning naming the label: it was disabled before the cut-over, so a rollback does not restore it.
+3. **Rollback can leave an enabled agent on the new hub.** A cut-over that fails at a bootstrap has already enabled that label, and rollback disables only loaded labels, so that agent starts at the new hub's next login beside the restored old hub. Rollback disables every listed label on the new hub and boots out those that are loaded. Remove `stopped-on-new`, which nothing reads, and the `mkdir -p` added for it.
+4. **The plan understates the change.** `print_plan`, which the operator reads before confirming, says only that loaded agents stop. It must also say that listed agents are disabled on the old host.
+
 ## Files
 
 - `bin/hub-cutover`
@@ -90,6 +99,16 @@ must:
     text: A listed singleton that was not loaded and not disabled at cut-over is disabled on the old host; a rollback enables it again and does not load it.
   - id: M5
     text: After a rollback every label it stopped on the new hub is not loaded and disabled there, and a later cut-over enables each label before its bootstrap on the new hub.
+  - id: M6
+    text: After a cut-over that aborts partway and is run again against the same old host, a rollback enables every label either run disabled and bootstraps every label either run stopped, each once.
+  - id: M7
+    text: A listed singleton that was disabled and loaded before the cut-over is stopped, the cut-over succeeds, and a warning names it. A rollback neither enables nor bootstraps it.
+  - id: M8
+    text: After a rollback every listed label is disabled on the new hub, including a label that was enabled but not loaded when the rollback started.
+  - id: M9
+    text: The plan printed before the confirmation states that listed agents are disabled on the old host.
+  - id: M10
+    text: A cut-over against a different old host from the recorded one starts with empty records (paired positive control for M6).
 must_not:
   - id: N1
     text: A cut-over must not leave a stopped singleton in a state where launchd would load it at the next login.
@@ -98,6 +117,10 @@ must_not:
   - id: N3
     text: A rollback must not enable a label that was already disabled on the old host before the cut-over (paired positive control is M4).
 evidence:
+  - id: E5
+    proves: [M6, M7, M8, M9, M10]
+    kind: offline
+    text: Tests with the same stubs, including stubs that fail a disable, a bootout or a bootstrap on one label. M6, M7 and M8 shown red on Luna's first attempt.
   - id: E4
     proves: [M4, M5, N3]
     kind: offline
