@@ -2272,4 +2272,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - [x] P2 bash 3.2 install-sudoers guard landed `52b2bad6`. [x] independent verify PASS. [x] M2 live E3 PASS; bug CLOSED.
 - [ ] D1 pf test: S1 FAIL; S2 diagnostic pending (operator).
 - [ ] LaunchDaemon P1: D3 Part A landed + verified 2026-11-05; Part B dispatched to Luna 2026-11-05 (operator go).
-- [ ] P2 app-cve-scan GHCR tag pagination (filed 2026-11-05, approval pending). [ ] P2 payment runtime on EOL temurin 24 (payment repo; land before pagination fix). [x] operator replaced revoked Slack webhook 2026-11-06 (live probe 400, not 404).
+- [ ] P2 app-cve-scan GHCR tag pagination: dispatched to Luna 2026-11-05. [ ] P2 payment runtime on EOL temurin 24: dispatched to Luna 2026-11-05 (payment repo; ships before pagination deploy). [x] operator replaced revoked Slack webhook 2026-11-06 (live probe 400, not 404).
