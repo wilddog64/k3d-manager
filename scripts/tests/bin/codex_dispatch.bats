@@ -1040,6 +1040,41 @@ EOF
   [ "$(cd "$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/one" && pwd -P)" ]
 }
 
+@test "codex dispatch: resume passes stored and overridden models and records provenance" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/model.argv" STUB_ENV="$BATS_TEST_TMPDIR/model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug model --model gpt-6-luna >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6-luna"* ]]
+  jq -e 'select(.event=="resume" and .slug=="model") | .worker_identity.model=="gpt-6-luna" and .worker_identity.source=="inherited"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction --model gpt-6.1-terra >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6.1-terra"* ]]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/v9.9.9/model.run/model")" = gpt-6.1-terra ]
+  jq -e 'select(.event=="resume" and .slug=="model" and .run==3) | .worker_identity.model=="gpt-6.1-terra" and .worker_identity.source=="explicit"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6.1-terra"* ]]
+}
+
+@test "codex dispatch: model-less resume omits model and records unreported" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/no-model.argv" STUB_ENV="$BATS_TEST_TMPDIR/no-model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug no-model >/dev/null; sleep 1
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/no-model.run/model"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug no-model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -c"* ]]
+  [[ "$(tail -n 1 "$STUB_ARGV")" != *" -m "* ]]
+  jq -e 'select(.event=="resume" and .slug=="no-model") | .worker_identity.model=="unknown" and .worker_identity.source=="unreported"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: network resume passes the stored model" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/network-model.argv" STUB_ENV="$BATS_TEST_TMPDIR/network-model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug network-model --model gpt-6-luna --network >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug network-model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6-luna"* ]]
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"network_access=true"* ]]
+}
+
 @test "codex dispatch: resume refuses a landed task and a log without a session id" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
