@@ -39,9 +39,10 @@ The seed aborted only because the M4 cluster was stopped. This path should not b
 - **Disabled and stopped 2026-11-06, each confirmed not loaded and disabled:** `cloudflare-tunnel` (by the operator), then by Claude with the operator's go: `vault-failover`, `ssh-tunnel-vault`, `ssh-tunnel`, `cleanup`, `node-health-watch`, `sandbox-reaper`, `acg-watch`, `prometheus-credential-rotator`, `hub-snapshot`, `hub-data-export`, `test-metrics`, `cloud-bridge`, `webhook`, `hermes`. Afterwards: one tunnel connector, frontend 200, Keycloak 302, Grafana 302, ArgoCD 200.
 - **Undo:** `launchctl enable gui/$(id -u)/com.k3d-manager.<label>`, then `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.k3d-manager.<label>.plist`. A `make hub-cutover-rollback` to the M4 today would not enable them, so this step is needed first.
 - **Not reset:** the M4 `hub-vault-profile` still says `hostinger`; the go covered the agents only.
-- **Still loaded, not in the list:** `alertmanager-auth-proxy`, `alertmanager-port-forward`, `argocd-port-forward`, `chrome-cdp`, `frontend-port-forward`, `grafana-port-forward`, `hub-loki-port-forward`, `hub-pushgateway-port-forward`, `keycloak-port-forward`, `prometheus-auth-proxy`, `prometheus-port-forward`, `pushgateway-port-forward`, `sandbox.prometheus-port-forward`, `sandbox.pushgateway-port-forward`, `vault-port-forward`, `webhook-token-rotate`.
+- **Also disabled and stopped 2026-11-06 with the operator's go, not in the list:** `webhook-token-rotate`, `argocd-port-forward`, `grafana-port-forward`, `keycloak-port-forward`, `frontend-port-forward`, `vault-port-forward`, `prometheus-port-forward`, `alertmanager-port-forward`, `prometheus-auth-proxy`, `alertmanager-auth-proxy`, `sandbox.prometheus-port-forward`, `sandbox.pushgateway-port-forward`. Each confirmed; the public routes still answered.
+- **Kept loaded:** `chrome-cdp`, `pushgateway-port-forward` (serves `127.0.0.1:9091`, healthy 200; which cluster it reaches is not checked), `hub-pushgateway-port-forward` and `hub-loki-port-forward` (both last exit 255, not running; cause not checked).
 
-Whether each of the second group belongs on a dev node is not decided here. `webhook-token-rotate` needs the first look, since it is a rotator outside the singleton list.
+These 12 are outside `hub-singletons.list`, so the `bin/hub-cutover` fix does not cover them. Disabled agents cannot be bootstrapped, so a later cluster on the M4 needs `launchctl enable` first.
 
 ## Fix direction
 

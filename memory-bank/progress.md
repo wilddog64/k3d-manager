@@ -1,5 +1,7 @@
 # Progress — compressed operational log
 
+- 2026-11-06: 12 more M4 agents disabled and stopped with the operator's go, each confirmed; one connector, routes answer. Kept: `chrome-cdp`, the Pushgateway and Loki forwards (two exit 255, cause unchecked). M4 profile not reset.
+
 - 2026-11-06: 14 remaining hub singletons disabled and stopped on the M4 with the operator's go (15 with the tunnel), each confirmed; routes unaffected. M4 `hub-vault-profile` not reset. P1 fix approved to start after `/clear`. M5 reboot on hold until Claude says go (not rebooted; has not pulled Part B). Part B gap found by reading the code: the Hostinger path does not write the ArgoCD and Keycloak browser agents (Correction 4, not fixed).
 
 - 2026-11-06: M4 reboot for Part B E5 restarted old hub agents. Second tunnel connector caused public 502s (frontend, Keycloak, Grafana, ArgoCD); operator booted out and disabled the M4 agent, routes back. M4 `vault-failover` flipped its local profile to `hostinger` at 03:56:01Z; seed aborted before any write, store not repointed, Hostinger Vault unsealed, 20/20 ExternalSecrets Ready. P1 filed: `docs/bugs/2026-11-06-hub-cutover-old-hub-agents-return-on-reboot.md`; not dispatched. Part B E5 PARTIAL on the M4. Payment main CI run 42157751676 success; E1 pending.

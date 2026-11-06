@@ -13,7 +13,9 @@ Order of work:
 State to keep in mind:
 
 - **M4 is no longer running hub singletons.** All 15 in `hub-singletons.list` are disabled and stopped, confirmed by `launchctl print` and `print-disabled`. After that: one connector, frontend 200, Keycloak 302, Grafana 302, ArgoCD 200. Undo steps are in the bug doc; a rollback to the M4 needs `launchctl enable` first.
-- **Still open on the M4, for the operator:** `hub-vault-profile` still says `hostinger` (the go covered agents only). 16 other agents remain loaded, listed in the bug doc; check `webhook-token-rotate` first, a 6-hour rotator outside the singleton list.
+- **12 more M4 agents disabled** with the operator's go (port-forwards, auth proxies, `webhook-token-rotate`); list in the bug doc. A later cluster on the M4 needs `launchctl enable` first.
+- **Still open on the M4:** `hub-vault-profile` still says `hostinger`; reset to `laptop` not approved yet. `chrome-cdp` kept for the operator to decide. `pushgateway-port-forward` kept (9091 healthy; target cluster unchecked). `hub-pushgateway-port-forward` and `hub-loki-port-forward` kept but exit 255; check whether M4 dispatch and test metrics still reach the M5.
+- **M5 reboot:** required once to close Part B E5, after Correction 4 lands. Nothing else needs it.
 - **Live webhook and Hermes are on the M5 only now.** Anything on the M4 that assumed a local webhook port will get connection refused; that is expected.
 - **Outage record:** M4 reboot restarted its tunnel agent; second connector with no origins, 502s. M4 `vault-failover` flipped its profile at 03:56:01Z; Hostinger Vault not written, store not repointed.
 - **Part B E5 on the M4 is partial:** sudoers, relays, aliases and removal of the old LaunchDaemons pass. `browser.*` agents, URLs and `make up` are not proven.
