@@ -1,6 +1,6 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 failed its pf test on 2026-11-05 (`lo0` is skipped). D3 (launchd socket relay) is proposed and awaits the operator's go plus its own spike. Nothing has been dispatched.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Dispatching Part A to Luna needs the operator's go.
 **Priority:** P1
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
@@ -54,7 +54,7 @@ The fix must therefore stop root from executing anything user-writable, not only
 - D1 would therefore mean replacing Apple's main ruleset, which Part 1's N3 forbids. Apple or another tool could also reload that ruleset at any time.
 - D1 is dropped.
 
-## Proposed D3: launchd socket relay (pending operator go + relay spike)
+## D3: launchd socket relay (spike PASS; awaiting operator go)
 
 - launchd itself, which is already root, binds the low port from a static plist `Sockets` entry.
 - For each connection it starts `/usr/bin/nc 127.0.0.1 <high>` as **`UserName nobody`**, through `inetdCompatibility`.
@@ -64,6 +64,79 @@ The fix must therefore stop root from executing anything user-writable, not only
 - Homebrew `socat` as root was rejected, because it links `/opt/homebrew/opt/openssl@3` dylibs, which are user-writable.
 - **Relay spike** (operator-run, M4): a temporary system job on `127.0.0.1:81` and `127.0.0.3:81` relays to a user listener on 18081. It is removed on exit.
 - **Open check:** binding `127.0.0.2/.3` needs the loopback aliases to exist first. The spike shows whether launchd tolerates that ordering.
+
+### Relay spike result (operator, M4, 2026-11-05): PASS
+
+- `launchd` (pid 1, root) listened on `127.0.0.1:81` and `127.0.0.3:81`.
+- `curl` reached the user listener on 18081 through both addresses.
+- `launchctl print`: `program = /usr/bin/nc`, `username = nobody`, `properties = inetd-compatible`.
+- Cleanup: the plist was removed, and port 81 was free again.
+
+### D3 map
+
+| Relay label | launchd binds | Runs as `nobody` | User LaunchAgent listener |
+|---|---|---|---|
+| `com.k3d-manager.relay.argocd-https` | 127.0.0.1:443 | `/usr/bin/nc 127.0.0.1 18443` | socat TLS on 127.0.0.1:18443 |
+| `com.k3d-manager.relay.keycloak-http` | 127.0.0.1:80 | `/usr/bin/nc 127.0.0.1 18080` | kubectl port-forward 127.0.0.1:18080 |
+| `com.k3d-manager.relay.hostinger-frontend-http` | 127.0.0.2:80 | `/usr/bin/nc 127.0.0.2 18082` | kubectl port-forward 127.0.0.2:18082 |
+| `com.k3d-manager.relay.sandbox-frontend-http` | 127.0.0.3:80 | `/usr/bin/nc 127.0.0.3 18083` | kubectl port-forward 127.0.0.3:18083 |
+
+**Boot ordering.** A relay on `127.0.0.2/.3` can bind only after the alias exists. One root daemon, `com.k3d-manager.loopback-aliases`, runs `/bin/sh -c` with only literal commands: `/sbin/ifconfig lo0 alias 127.0.0.2 up`, the same for `.3`, then `/bin/launchctl kickstart -k` of the two alias-bound relays. That avoids the race at boot.
+
+### Part A (dispatch 1): the root side, operator-installed once
+
+1. Add `bin/install-browser-relays.sh` and `make install-browser-relays`, which is operator-run.
+   - It writes the four relay plists and the alias daemon, all `root:wheel` 0644, through `_run_command --interactive-sudo`.
+   - It boots out and removes the six legacy daemons: `argocd-browser-https`, `keycloak-browser-http`, `frontend-browser-http`, `sandbox.frontend-browser-http`, `loopback-alias` and `sandbox.loopback-alias`.
+   - It then bootstraps the new ones.
+   - `--dry-run` prints every plist and runs `plutil -lint`. `--uninstall` removes the D3 jobs.
+   - Every plist value is a literal from the table above, with no user input and no `$HOME` path.
+2. Add a test-only `K3DM_LAUNCHD_DIR` override, ignored when EUID is 0, the same pattern as `K3DM_HOSTS_FILE`.
+3. Nothing else changes in Part A. The operator does not install it until Part B lands, because the relays forward to high ports that nothing listens on yet.
+
+### Part B (dispatch 2, filed after A lands): the user side, then the sudoers rules
+
+1. In `bin/cluster-up` (around lines 838–925, 1523–1590 and 1699–1830) and `scripts/lib/providers/k3s-hostinger.sh`, the four listeners become `gui/$UID` LaunchAgents in `~/Library/LaunchAgents`, on the high ports, with no sudo. `k3s-hostinger.sh:243` already has the `gui` branch.
+2. If the relays are not installed, `cluster-up` prints one line, "run make install-browser-relays", instead of prompting for sudo.
+3. `bin/install-sudoers.sh` drops the LaunchDaemon `install`, `bootstrap`, `bootout` and `rm` rules, plus `ifconfig lo0 alias/-alias *`. That last rule could alias any address, such as a GitHub IP, onto loopback.
+4. C: the Linux rules (`k3s*`, `systemctl`, `apt-get`, `dnf`, `yum`, `microdnf`) are written only on Linux.
+5. Out of scope: `bin/cluster-up:152` calls `sudo -n` directly. That gets its own P3 later.
+
+## Files (Part A)
+
+- `bin/install-browser-relays.sh`
+- `scripts/tests/bin/install_browser_relays.bats`
+- `Makefile`
+- `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`
+
+## Acceptance (Part A)
+
+```yaml
+must:
+  - id: M1
+    text: "`bin/install-browser-relays.sh --dry-run` prints four relay plists and one alias plist, each passing `plutil -lint`, and exits 0 without writing outside its scratch dir."
+  - id: M2
+    text: "Each relay plist has Sockets.Listeners with exactly the SockNodeName/SockServiceName from the D3 table, inetdCompatibility Wait=false, UserName=nobody, and ProgramArguments exactly [/usr/bin/nc, <ip>, <high port>] from the table."
+  - id: M3
+    text: "The alias plist adds 127.0.0.2 and 127.0.0.3 to lo0 and kickstarts the two alias-bound relays, using only /sbin/ifconfig and /bin/launchctl with literal arguments."
+  - id: M4
+    text: "Install mode removes the six legacy daemons and bootstraps the five new jobs, every privileged call via `_run_command --interactive-sudo`; `--uninstall` removes the five."
+must_not:
+  - id: N1
+    text: "No generated plist names a path under $HOME, /Users, /opt/homebrew, /usr/local or a temp dir, and no ProgramArguments element is anything but a literal from the table or the fixed alias commands."
+  - id: N2
+    text: "No relay plist omits UserName=nobody, binds a non-loopback address, or binds an address other than 127.0.0.1/2/3."
+  - id: N3
+    text: "The script never calls sudo directly and honours K3DM_LAUNCHD_DIR only when EUID is not 0."
+evidence:
+  - {id: E1, proves: [M1, M2, M3, N1, N2], kind: offline, text: "BATS parsing --dry-run plists with plutil -extract (real /usr/bin/plutil); fixture asserts output dir is the scratch dir."}
+  - {id: E2, proves: [M4, N3], kind: offline, text: "BATS with a logging _run_command stub and K3DM_LAUNCHD_DIR in BATS_TEST_TMPDIR (fixture asserts it is not /Library/LaunchDaemons); paired positive control shows install mode does call bootstrap for all five; grep gate for bare sudo."}
+  - {id: E3, proves: [M2, M3], kind: live, text: "After Part B lands: operator runs make install-browser-relays on M4, reboots, and Claude checks launchctl print shows username=nobody for each relay and the four browser URLs answer."}
+interface:
+  - "bin/install-browser-relays.sh [--dry-run|--uninstall]"
+  - "make install-browser-relays"
+  - "env: K3DM_LAUNCHD_DIR (test only, ignored as root)"
+```
 
 ## Design D1 (superseded)
 
