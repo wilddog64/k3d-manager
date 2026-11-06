@@ -1,6 +1,6 @@
 # Bug: the analyzer makes one LLM call and one Slack post for every firing alert, with no cap
 
-**Status:** OPEN — filed 2026-11-06, not dispatched
+**Status:** OPEN — filed and dispatched to Luna 2026-11-06
 **Priority:** P2
 **Severity:** medium. A large batch spends LLM quota and floods `#grafana-notification`. Nothing is lost.
 **Approval:** not required: non-critical, Claude files and dispatches. Operator told 2026-11-06.
@@ -20,7 +20,7 @@ The batch in `scripts/tests/fixtures/webhook/alertmanager-analyze-batch.json`, t
 
 ## Fix
 
-Add `ANALYZE_MAX_ALERTS = 5` to `scripts/lib/webhook/config.py`. `_run_analyze` analyzes at most that many firing alerts, in payload order. If any are left over, it logs and sends one summary post that gives the number not analyzed and their alert names, without an LLM call. The job ends with its normal status.
+Add `ANALYZE_MAX_ALERTS = 5` to `scripts/lib/webhook/config.py`. `_run_analyze` analyzes at most that many firing alerts, in payload order. If any are left over, it logs and sends one summary post that gives the number not analyzed and their alert names, without an LLM call. The job ends with its normal status: `success`, or `delivery_failed` if any post fails, and that includes the summary post.
 
 ## Files
 
@@ -38,13 +38,15 @@ must:
     text: "That batch produces cap analysis posts and one summary post giving the number not analyzed and their alert names."
   - id: M3
     text: "A batch at or below the cap analyzes every firing alert and sends no summary post (paired positive control for N1)."
+  - id: M4
+    text: "When the summary post fails, the job ends with status delivery_failed."
 must_not:
   - id: N1
     text: "The summary post does not call the LLM."
   - id: N2
     text: "Resolved alerts do not count toward the cap."
 evidence:
-  - {id: E1, proves: [M1, M2, M3, N1, N2], kind: offline, text: "Tests using the captured 26-alert fixture, with the LLM, kubectl and Slack stubbed at their seams; M1 and M2 red on the pre-fix commit; N1 and N2 red by a mutant."}
+  - {id: E1, proves: [M1, M2, M3, M4, N1, N2], kind: offline, text: "Tests using the captured 26-alert fixture, with the LLM, kubectl and Slack stubbed at their seams; M1 and M2 red on the pre-fix commit; N1 and N2 red by a mutant."}
   - {id: E2, proves: [M1, M2], kind: live, text: "After the webhook restarts on the M5, a multi-alert group gives at most cap analysis posts plus one summary; the operator confirms in #grafana-notification."}
 interface:
   - "POST /api/v1/analyze"

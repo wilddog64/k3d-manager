@@ -2325,3 +2325,4 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-06: verify-unknown LANDED `ded4eb58`, verify PASS on the landed commit, live E2 open. Wave 2 dispatched: token-dead, analyze-success, P3 Python 3.15 test.
 - 2026-11-06: Hermes Slack LANDED `c98f05e0`, verify PASS on the landed commit after one failed N1 and a correction (path echo), live check open.
 - 2026-11-06: S1 review findings landed in `docs/issues/2026-11-06-s1-spec-review-findings.md`: verdict not ready, four blockers; Claude revises S1 before dispatch.
+- 2026-11-06: analyze-success LANDED `0bef9aea`, verify PASS on the landed commit, live E2 open. Fan-out cap dispatched.

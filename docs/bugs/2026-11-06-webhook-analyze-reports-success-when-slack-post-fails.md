@@ -1,6 +1,6 @@
 # Bug: webhook analyze reports success when its Slack post fails
 
-**Status:** OPEN — cause of the missing posts found 2026-11-06: the M5 plist has no route; the silent success is still in the code
+**Status:** FIXED offline `0bef9aea`, independent verify PASS 2026-11-06 (`_run_analyze` directly, HTTP route not exercised; one failed post in a batch ends `delivery_failed`); live E2 pending. Cause of the missing posts found 2026-11-06: the M5 plist has no route; the silent success is still in the code
 **Priority:** P2
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Depends on:** `2026-11-06-webhook-analyze-rejects-alert-batches-over-4096-bytes` (same files; land it first)
