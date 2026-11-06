@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-04
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — dispatched to Luna 2026-11-06; the Fix section below replaces "Proposed fix / acceptance"
+**Status:** LANDED `b44f5efd`, independent verify PASS 2026-11-06 (24 tests on the landed commit; 21 red on the parent, including M1 to M4; 14 mutants red). The verifier read the exporter's agy section for label shapes before writing its tests, which its brief ruled out; it did not read this spec's Fix or the diff. `scripts/tests/bin/machine_setup_acceptance.bats` landed outside `## Files` by allowed exception. Live E3, Claude half PASS on `m4-air` 2026-11-06: session and token totals equal an independent transcript read in 1d, 7d and 30d, source `transcripts`, 0 skipped lines, and the 1 dispatched session in 30d is tracked (89 of 90 untracked). The operator's Grafana check is open. The Fix section below replaces "Proposed fix / acceptance"
 **Approval:** operator, 2026-11-06: "go with your suggestion". The exporter and dashboard change only; it starts no hub workload change beyond the ArgoCD-synced dashboard.
 **Priority:** P2 — loss of AI activity observability across machine migration / worker execution
 **Severity:** Moderate — missing telemetry and misleading visibility, not evidence that agy itself stopped working

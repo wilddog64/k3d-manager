@@ -2332,6 +2332,7 @@ Operator screenshots show zero open/no history for k3d-manager and zero open/ret
 - 2026-11-06: 30-day panel label LANDED `555ac6fa`, verify PASS on the landed commit, live E2 open.
 - 2026-11-06: fan-out cap LANDED `62742959`, verify PASS on the landed commit, live E2 open.
 - 2026-11-06: filed P3 `agent-activity-repo-gauges-clip-values-at-nine-rows`; the 2026-11-01 fix's live E2 failed on the operator's screenshot.
+- 2026-11-06: agy transcripts LANDED `b44f5efd`, verify PASS on the landed commit, live E3 Claude half PASS on the M4, operator's Grafana check open.
 - 2026-11-06: ACG pair found already fixed in the subtree, removed unused `scripts/playwright/acg_extend.js`, live checks open. Wrote the agy panels spec and dispatched it.
 - 2026-11-06: resume model LANDED `38999adf`, verify PASS on the landed commit, live E3 PASS.
 - 2026-11-06: access log LANDED `b124fb83`, verify PASS on the landed commit, live E2 open.
