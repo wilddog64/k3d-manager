@@ -1,6 +1,6 @@
 # Bug: `make install-sudoers` crashes under macOS /bin/bash 3.2 (`probe_args[@]: unbound variable`)
 
-**Status:** OPEN: dispatched to Luna (`gpt-6-luna`) 2026-11-05, fix A
+**Status:** FIXED in `52b2bad6`, not verified yet. Still needed: the independent verify and live E3 on the M2 (operator).
 **Priority:** P2
 **Severity:** medium. On a Mac where `env bash` resolves to Apple's `/bin/bash` 3.2, `make install-sudoers` stops before installing anything. That blocks the sudoers P1 remediation on that host. Workaround: run with Homebrew bash first on `PATH`.
 **Filed:** 2026-11-05
@@ -63,3 +63,11 @@ evidence:
 interface:
   - "bin/install-sudoers.sh [--dry-run]"
 ```
+
+## Review notes (Claude, 2026-11-05)
+
+- Luna's guard sits right after `set -euo pipefail` and exits 2 with a `brew install bash` message, before the lib is sourced and before `mktemp`.
+- **Claude addition:** a paired positive control. Under bash 4 or newer, `--dry-run` reaches the stubbed `mktemp`, which shows the `mktemp` stub would catch a regression.
+- **Pre-fix red:** the bash 3.2 test run against `HEAD:bin/install-sudoers.sh` (`df3525ec`) fails M2, N1 and N2. The positive control passes on both versions.
+- Luna reported reds in `make test` (#495, ESO smoke) and in `make test-pytest` (4 dashboard and metrics tests). Neither touches the files changed here.
+- Focused gate at land: `install_sudoers.bats`, 13/13, plus shellcheck.
