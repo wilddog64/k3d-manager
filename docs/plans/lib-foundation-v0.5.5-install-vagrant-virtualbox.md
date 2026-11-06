@@ -34,8 +34,8 @@ function _install_vagrant() {
    This differs from `_install_macmon` deliberately: a caller about to run a VM must not be told the install succeeded.
 2. `_command_exist <binary>`: return 0 quietly (idempotent). No brew call.
 3. `brew` missing: `_warn` "Homebrew is required to install `<label>`", return 1.
-4. Otherwise `( _run_command -- brew install --cask <cask> ) || return $?`. The subshell keeps a failed install from
-   exiting the caller. On success, `_info` "`<label>` installed".
+4. Otherwise `_run_command --soft -- brew install --cask <cask> || return $?`. `--soft` keeps a failed install from
+   exiting the caller and returns brew's exit code. On success, `_info` "`<label>` installed".
 
 It never calls sudo itself: Homebrew's installer asks for the password. It creates no VM, downloads no box, starts
 nothing, and does not check versions. Linux hosts are out of scope.
