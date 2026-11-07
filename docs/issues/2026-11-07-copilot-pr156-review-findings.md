@@ -30,3 +30,15 @@ Three suites under `scripts/tests/bin/` assumed macOS or developer-machine tools
 - `plutil` absent on Linux, so the dependent tests now skip (`install_browser_relays.bats`).
 
 Root cause and process note are the same as Finding 2: portable tools (`grep`, a `stat` fallback) or an explicit skip when a macOS-only tool is missing.
+
+## CI red 3 — pytest hidden by the drift fixture's scratch HOME
+
+`scripts/tests/bin/test_release_milestones_drift.py` (`_fixture_repo`, changed on this branch in `11982d31`) runs a
+nested `python3 -m pytest` and the pre-commit hook with `HOME` set to `tmp_path`. CI installs pytest with
+`pip install --user`, under the real `~/.local`; Python derives the user site from `HOME`, so the child processes
+reported `No module named pytest` and two tests failed. macOS and a system-wide pytest hide this.
+
+Fix: the fixture passes `PYTHONUSERBASE` (the parent's value, or `site.getuserbase()`) to the child. Reproduced in
+`ubuntu:24.04` as a non-root user with `pip install --user pytest==9.1.1`: pre-fix 2 failed (rc 1), fixed 3 passed (rc 0).
+
+Process note: a test that swaps `HOME` and starts another Python must carry the user site with it.

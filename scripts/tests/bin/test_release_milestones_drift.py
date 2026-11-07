@@ -62,7 +62,10 @@ def _fixture_repo(tmp_path):
     (root / "docs/roadmap.md").write_text("### Candidate milestone — v1.0.2\n")
     (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": [
         {"version": "v1.0.2", "target": True}]}))
-    env = {**os.environ, "HOME": str(tmp_path), "GIT_AUTHOR_NAME": "Test",
+    import site
+    env = {**os.environ, "HOME": str(tmp_path),
+           "PYTHONUSERBASE": os.environ.get("PYTHONUSERBASE") or site.getuserbase(),
+           "GIT_AUTHOR_NAME": "Test",
            "GIT_AUTHOR_EMAIL": "test@example.invalid", "GIT_COMMITTER_NAME": "Test",
            "GIT_COMMITTER_EMAIL": "test@example.invalid"}
     def git(*args, input_text=None):
