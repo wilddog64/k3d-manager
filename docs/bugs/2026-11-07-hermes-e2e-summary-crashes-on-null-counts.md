@@ -2,9 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** LANDED 2026-11-07 — d619fcbd (Luna; reviewed by Claude); independent verifier pending
+**Fix commit:** d619fcbd
 **Priority:** P2 — every e2e run that fails before tests start is silent: no Slack post, no slot record, and the slot is rerun
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** explicit 2026-11-07 "can you investigate this issue, file bug if necessary and dispatch to Luna" (operator)
 **Severity:** medium
 **Related:** `docs/bugs/2026-11-07-e2e-results-never-reach-m5-hub.md`
