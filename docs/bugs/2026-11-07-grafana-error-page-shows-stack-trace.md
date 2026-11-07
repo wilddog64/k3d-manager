@@ -4,7 +4,7 @@
 **Branch:** `k3d-manager-v1.43.14`
 **Status:** OPEN
 **Priority:** P3 — information exposure of low value; nothing secret was shown, but the operator does not want internals on the page
-**Waiting on:** investigation — since 2026-11-07
+**Waiting on:** operator decision — since 2026-11-07
 **Approval:** explicit 2026-11-07 "can you file grafana error page showing a stack trace bug, and dispatch it" (operator); concern first raised 2026-11-07: "the exception should not explore on the page ... that's security concern"
 **Severity:** low
 **Related:** `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md`
@@ -46,6 +46,19 @@ Step 2 only: `pytest scripts/tests/bin/test_grafana_error_details.py`, with `PAT
 - Do NOT guess at a setting name; every setting you use must be cited from the v11.4.0 source or docs.
 - Do NOT commit, push or create a PR. Claude reviews and commits.
 - Do NOT touch `memory-bank/`, the header of this doc, or any file outside the Files list.
+
+## Findings
+
+**2026-11-07, Luna:** stopped without changes; its sandbox could not resolve `raw.githubusercontent.com`, so it could not read the source.
+
+**2026-11-07, Claude** (read at tag v11.4.0 with `gh api`):
+
+- `packages/grafana-ui/src/components/ErrorBoundary/ErrorBoundary.tsx:110-119` — `ErrorBoundaryAlert` with `style="alertbox"` renders `error.toString()` and `errorInfo.componentStack` inside a `<details>` element, with no condition on role, build mode or config.
+- `ErrorBoundary.tsx:122` and `ErrorWithStack.tsx:17-21` — `style="page"` renders `ErrorWithStack`, which does the same: title, then a `<details>` holding the error and the component stack, again unconditional.
+- `conf/defaults.ini` at v11.4.0 has no key matching `stack`, `error_detail`, `hide_*error` or `show_*error`.
+- Not read: Grafana's Go server and any feature toggles beyond the `defaults.ini` search; the dashboard-scenes error views were not traced separately.
+
+**Conclusion:** Grafana 11.4 has no supported setting that hides the stack. It is always rendered, collapsed inside `<details>`. What it exposes is the error text and React component names. Step 2 does not apply, and no config changed. Remaining levers, for the operator: (a) prevention, which is in place, since `73120c90` added a test that rejects unknown field matchers in every platform-ops dashboard; (b) access, since only people who can open Grafana can see the page; (c) close this as won't-fix upstream behaviour, or track a Grafana upgrade that changes it.
 
 ## Acceptance
 
