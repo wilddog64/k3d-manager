@@ -17,7 +17,9 @@
 
 _source_argocd_like_cluster_up() {
   local plugin="${1:-scripts/plugins/argocd.sh}"
-  /opt/homebrew/bin/bash -c '
+  local shell_bin=/opt/homebrew/bin/bash
+  [ -x "${shell_bin}" ] || shell_bin="$(command -v bash)"
+  "${shell_bin}" -c '
     SCRIPT_DIR="$PWD/scripts"
     source scripts/lib/core.sh >/dev/null 2>&1
     source scripts/lib/provider.sh >/dev/null 2>&1
