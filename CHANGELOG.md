@@ -4,6 +4,8 @@
 
 - Export Claude context per turn, post-compaction floor and observed ceiling, active-day turn rates, and cache rebuild counts and cost; add the matching Agent Cost dashboard row and guide.
 
+- Add a `control` machine role for local development on Macs that do not run a cluster.
+
 - Handle null or missing Hermes e2e counts and report pre-test failures by phase.
 
 - Clarify the security findings dashboard image ownership and label its firing place count as `firing in`.

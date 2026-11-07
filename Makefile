@@ -1647,8 +1647,8 @@ help:
 	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
-	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
-	@echo "    make machine-check ROLE=hub|worker|console  Read-only workstation inventory (docs/howto/machine-setup.md)"
+	@echo "    make machine-setup ROLE=hub|worker|console|control  Configure a workstation (docs/howto/machine-setup.md)"
+	@echo "    make machine-check ROLE=hub|worker|console|control  Read-only workstation inventory (docs/howto/machine-setup.md)"
 	@echo "    make machine-check-shell HOST=<mac>  Read-only SSH login-shell check of a new Mac"
 	@echo "    make fast-gate [BASE=<rev>]  Changed-file lint and tests before push (docs/howto/fast-gate.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
@@ -1743,12 +1743,12 @@ help:
 ## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
 .PHONY: machine-setup machine-check machine-check-shell machine-secrets-export machine-secrets-import
 machine-setup:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
 
 ## Read-only workstation inventory; exits nonzero when any item is missing; see docs/howto/machine-setup.md
 machine-check:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" --check
 
 machine-check-shell:
@@ -1756,7 +1756,7 @@ machine-check-shell:
 	@bin/k3dm-machine-setup --check-shell "$(HOST)"
 
 machine-secrets-export:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-secrets export --role "$(ROLE)"
 
 machine-secrets-import:

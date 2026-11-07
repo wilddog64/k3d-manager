@@ -15,11 +15,11 @@ gitrepo/personal/bde|SKIP: requires Bitbucket SSH key|-|hub,worker
 gitrepo/personal/codex-skill|https://github.com/wilddog64/codex-skill.git|main|hub,worker
 gitrepo/personal/gemini-skills|https://github.com/wilddog64/gemini-skills.git|main|hub,worker
 gitrepo/personal/jenkins-service|https://github.com/wilddog64/jenkins-service.git|dev|hub,worker
-gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console
+gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console,control
 gitrepo/personal/k3d-manager-console|https://github.com/wilddog64/k3d-manager-console.git|main|hub,worker
 gitrepo/personal/k3dm-mcp|https://github.com/wilddog64/k3dm-mcp.git|main|hub,worker
 gitrepo/personal/lib-acg|https://github.com/wilddog64/lib-acg.git|fix/acg-session-profile-selector|hub,worker
-gitrepo/personal/lib-foundation|https://github.com/wilddog64/lib-foundation.git|main|hub,worker,console
+gitrepo/personal/lib-foundation|https://github.com/wilddog64/lib-foundation.git|main|hub,worker,console,control
 gitrepo/personal/pygit|SKIP: requires Bitbucket SSH key|-|hub,worker
 gitrepo/personal/python/dreambox-pythonlib|SKIP: requires Bitbucket SSH key|-|worker
 gitrepo/personal/python/pyjenkinsapi|https://github.com/wilddog64/pyjenkinsapi.git|docs/next-improvements|worker

@@ -16,10 +16,92 @@ manifest_disjoint() {
 }
 
 @test "machine setup: all roles have readable phase manifests" {
-  for role in hub worker console; do
+  for role in hub worker console control; do
     [ -r "${MACHINE_DIR}/brew.${role}.list" ]
     [ -r "${MACHINE_DIR}/secrets.${role}.list" ]
     [ -r "${MACHINE_DIR}/agents.${role}.list" ]
+  done
+}
+
+@test "control role manifests stay limited to development tools and smartcd" {
+  [ -r "$MACHINE_DIR/brew.control.list" ]
+  [ -r "$MACHINE_DIR/secrets.control.list" ]
+  [ -r "$MACHINE_DIR/agents.control.list" ]
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || grep -Fxq "$item" "$MACHINE_DIR/brew.control.list"
+  done < "$MACHINE_DIR/brew.console.list"
+  run ! grep -Fxq 'cask:orbstack' "$MACHINE_DIR/brew.control.list"
+  control_casks="$(grep '^cask:' "$MACHINE_DIR/brew.control.list" | sort)"
+  console_casks="$(grep '^cask:' "$MACHINE_DIR/brew.console.list" | sort)"
+  [ "$control_casks" = "$console_casks" ]
+  [ "$(grep -vc '^#\|^$' "$MACHINE_DIR/agents.control.list")" -eq 1 ]
+  grep -Fqx 'smartcd-install' "$MACHINE_DIR/agents.control.list"
+  run ! grep -Eq '^(bin/|install-)' "$MACHINE_DIR/agents.control.list"
+  run ! grep -Eiq 'hub|acg|cloudflare|vault|webhook' "$MACHINE_DIR/secrets.control.list"
+  [ "$(grep -vc '^#\|^$' "$MACHINE_DIR/secrets.control.list")" -eq 1 ]
+  grep -Fqx 'gemini-cli-api-key|k3dm|Local find-similar-docs query embedding|operator: see docs/howto/find-prior-art.md' "$MACHINE_DIR/secrets.control.list"
+}
+
+@test "control role setup installs its listed tools and only smartcd" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+case "$1" in list) exit 1 ;; esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
+  touch "$CALL_LOG.installsmartcd"
+  touch "$CALL_LOG.secret-present"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://github.com/cxreg/smartcd.git /usr/bin/make -C "$FIXROOT" machine-setup ROLE=control SECRETS=skip
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  grep -Eq '^smartcd[[:space:]]+installed$' <<< "$output"
+  grep -Fxq "make -C $FIXHOME/src/gitrepo/personal/smartcd install" "$CALL_LOG"
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || {
+      case "$item" in
+        cask:*) grep -Fxq "brew install --cask ${item#cask:}" "$CALL_LOG" ;;
+        formula:*) grep -Fxq "brew install ${item#formula:}" "$CALL_LOG" ;;
+        *) grep -Fxq "brew install $item" "$CALL_LOG" ;;
+      esac
+    }
+  done < "$FIXROOT/scripts/etc/machine/brew.control.list"
+  run ! grep -Eq '^make -C .* (install-|bin/)' "$CALL_LOG"
+}
+
+@test "control role machine-check reports manifest inventory" {
+  setup_machine_fixture
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  run_machine --role control --check
+  [ "$status" -eq 1 ]
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || { item="${item#formula:}"; item="${item#cask:}"; grep -Eq "^brew:${item}[[:space:]]+ok$" <<< "$output"; }
+  done < "$MACHINE_DIR/brew.control.list"
+  grep -Eq '^smartcd[[:space:]]+missing$' <<< "$output"
+  run make -n machine-setup ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'--role "control"'* ]]
+  run make -n machine-check ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'--role "control" --check'* ]]
+  run make -n machine-secrets-export ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'export --role "control"'* ]]
+}
+
+@test "N4: existing role manifests remain byte-for-byte unchanged" {
+  for role in hub worker console; do
+    for phase in brew secrets agents; do
+      git show "HEAD:scripts/etc/machine/${phase}.${role}.list" | cmp -s - "$MACHINE_DIR/${phase}.${role}.list"
+    done
   done
 }
 
@@ -63,6 +145,7 @@ setup_machine_fixture() {
   CALL_LOG="$BATS_TEST_TMPDIR/calls"
   [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]] || return 1
   mkdir -p "$FIXROOT/bin" "$FIXROOT/scripts/lib" "$FIXROOT/scripts/etc/machine" "$FIXHOME" "$STUBS"
+  cp "$REPO_ROOT/Makefile" "$FIXROOT/Makefile"
   cp "$SCRIPT_SOURCE" "$FIXROOT/bin/k3dm-machine-setup"
   chmod +x "$FIXROOT/bin/k3dm-machine-setup"
   cat > "$FIXROOT/bin/k3dm-machine-secrets" <<'SH'
@@ -107,6 +190,7 @@ SH
 #!/bin/sh
 printf 'security %s\n' "$*" >> "$CALL_LOG"
 [ "$1" = show-keychain-info ] && exit 0
+if [ "$1" = find-generic-password ] && [ -e "$CALL_LOG.secret-present" ]; then exit 0; fi
 exit 1
 SH
   cat > "$STUBS/git" <<'SH'
@@ -245,7 +329,7 @@ run_machine() {
 @test "machine setup: repository manifest paths are unique" {
   duplicates="$(awk -F'|' '!/^#/ && NF > 1 { print $1 }' "$MACHINE_DIR/repos.list" | sort | uniq -d)"
   [ -z "$duplicates" ]
-  grep -Fxq 'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console' "$MACHINE_DIR/repos.list"
+  grep -Fxq 'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console,control' "$MACHINE_DIR/repos.list"
 }
 
 @test "machine setup: equivalent GitHub remotes identify the same existing checkout" {
