@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: spec v1.43.16-hub-deploy-ref-and-live-write-guard (a36fac97: deploy/hub ref, hub-promote/rollback, platform-ops from git-archive). v1.43.15 at cap, so v1.43.16 plan 4.
 - 2026-11-07: control-node-role independently verified (12/12, pre-fix 10 red); no real `security dump-keychain` capture exists in the repo — M4 gap recorded.
 - 2026-11-07: control-node-role landed 0b9f0461 (CHANGELOG conflict kept both bullets); verifier launched. Filed P3 verification-ladder-panel-clips-rows-and-cannot-sort from operator live check.
 - 2026-11-07: claude-context-cost-per-turn independently verified (15/15 on fix, 13 red pre-fix); ledger needed `verifier:` and `pre_fix_command:` header lines — added in a normalized copy.
