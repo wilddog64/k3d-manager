@@ -1541,6 +1541,20 @@ copy third-party question text or paywalled content.
 These are the vision items still unshipped. No version numbers committed — a theme becomes a
 milestone only when it gets a scope doc.
 
+- **Observability stack upgrade (kube-prometheus-stack 67.9.0 → current)** (operator, 2026-11-07: "go ahead to do
+  that"). The chart is pinned at `67.9.0` (`scripts/etc/argocd/applicationsets/observability.yaml:18`, and
+  `observability-acg.yaml`), from January 2025, which ships Grafana 11.4.0. Upstream fixes since then reach us only
+  through workarounds. Example: Grafana 11.4.0's bundled scenes 5.28.1 ignores natural and numerical variable sorts.
+  That was fixed in scenes 5.36.4 (`a5f78bee`), which Grafana 11.5.0 bundles, and v1.43.15 worked around it on the
+  data side (`docs/bugs/2026-11-07-dispatch-window-variable-sorts-versions-alphabetically.md`). Scope when specced:
+  - a major chart bump (Prometheus, Alertmanager and Grafana move together; likely Grafana 12+), hub and ACG values;
+  - read the chart's upgrade notes for each major crossed, CRD upgrades included;
+  - a live check of every dashboard under `scripts/etc/argocd/platform-ops/`: offline tests check the JSON, not
+    how this Grafana renders it;
+  - list the upstream-workaround bugs (see the version-review rule in `CLAUDE.md`), and remove each workaround once
+    its fix is confirmed live.
+  Needs its own release (it does not fit v1.43.16 or v1.43.17).
+
 - **Vendor-neutral AI engineering collaboration (future enhancement; P1-blocked).** Separate the agent
   coordinator from the worker backend in a proposed `k3dm-agent-dispatch`, with shared task identity,
   lifecycle, scoped permissions, Git/test evidence, independent acceptance, and backward-compatible

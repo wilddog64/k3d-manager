@@ -3,6 +3,7 @@
 **Status:** OPEN — `0a00bb39` (`sort: 8`) is live but inert on Grafana 11.4.0 (upstream scenes defect, fixed in Grafana 11.5.0); data-side fix specced and dispatched 2026-11-07 (operator: "go ahead with sorting on our side")
 **Priority:** P3 (cosmetic: the dropdown order is wrong, every option still works)
 **Waiting on:** fix running — since 2026-11-07
+**Fixed upstream in:** Grafana 11.5.0 (bundles `@grafana/scenes` 5.36.4, which has `a5f78bee`); hub runs 11.4.0
 **Severity:** low
 **Approval:** operator 2026-11-07: "go ahead, but don't forget the file a bug for it too"
 **Release:** v1.43.15 (bug docs do not count toward the plan cap)
