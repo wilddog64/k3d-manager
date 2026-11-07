@@ -129,7 +129,7 @@ from the data.
 
 Expected order: `v1.43.15, v1.43.14, v1.43.13, v1.43.12, ..., v1.43.10, v1.43.9, ..., v1.43.0, 1d, 7d, 30d`.
 
-## Files (amended fix)
+## Files
 
 - `bin/k3dm-dispatch-metrics`
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
