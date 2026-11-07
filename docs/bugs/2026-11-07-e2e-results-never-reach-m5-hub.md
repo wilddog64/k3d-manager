@@ -1,7 +1,7 @@
 # Bug: e2e results never reach the M5 hub, and runs dispatched from it fail before tests
 
 **Filed:** 2026-11-07
-**Branch:** `k3d-manager-v1.43.14`
+**Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.14`)
 **Status:** OPEN
 **Priority:** P2 — the hub has had no e2e signal since the 2026-10-31 cutover; the verification dashboards are empty and `E2EResultsMissing` has fired for the full 3-day window
 **Waiting on:** operator decision — since 2026-11-07

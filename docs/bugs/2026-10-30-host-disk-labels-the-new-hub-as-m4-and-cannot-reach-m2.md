@@ -4,12 +4,12 @@
 **Fix commit:** 1708c97a
 **Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** investigation — since 2026-11-07
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30
 **Detected by:** the operator (Host Disk dashboard on the M5 hub); root-caused by Claude
 **Affected:** `bin/k3dm-disk-metrics` (`DEFAULT_TARGETS`); `bin/k3dm-machine-setup` (copies `.ssh/config.d/operator` without the `Include` that loads it)
-**Branch:** `k3d-manager-v1.43.12`
+**Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.12`)
 **Related:** `docs/bugs/2026-10-30-hub-cutover-leaves-old-hub-producers-on-old-pushgateway.md`
 
 ## Observed failure

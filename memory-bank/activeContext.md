@@ -4,6 +4,8 @@ Compressed 2026-11-07: the two live files had reached ~370 KB each (~185K tokens
 
 ## Release v1.43.14 — cut plan (operator go 2026-11-07: "let's do what you propose to get this release cut")
 
+**Scope 2026-11-07 (operator):** finish the 5 plans + P1/P2 bugs with landed fixes; 4 no-fix P2s moved to v1.43.15; P3 forecast-milestones-drift dispatched to Luna. Remaining: release deploy (appsets-reapply + platform-ops), batched operator live checks, Sun 2026-11-08 02:30 hub-snapshot run, PR gate.
+
 Triage 2026-11-07 (bug docs touched on this branch vs main):
 1. Finish in flight: `security-findings-tier-v2`, `cve-autopatch-empty-tables-v2` (Luna); Hermes null counts landed `d619fcbd`, verifier running.
 2. Verification backlog: independent verifiers for the offline LANDED P2s (acg-up-on-dev-node, dispatch-resume-reason, acg-up-keychain-trust, agy-activity, dispatch-resume-model, hermes-argocd-token-dead, cutover-verify-fails-forever, forward-tunnels-lose-auth, machine-setup-pyyaml, webhook-analyze-unbounded) and LANDED P1s (browser-agent-78, hostinger-refresh, cutover-old-agents). Restate the 10 release-era `FIXED`/`Fixed` P2 docs as `LANDED` and verify them in the same batch. Then one live-check list for the operator.
