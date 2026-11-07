@@ -150,3 +150,7 @@ interface:
   - make hub-cutover-rollback
   - scripts/etc/machine/hub-singletons.list
 ```
+
+## Carried to v1.43.15 (operator, 2026-11-07)
+
+Live check carried over (operator: "carry over"). The M4 rebooted 2026-11-06 07:32 after the fix, and on 2026-11-07 all 15 singletons are disabled with no `cloudflared` running; the public routes answer. Those singletons were disabled by hand, so this does not prove `bin/hub-cutover` disables them. Check at the next cut-over or drill, then a reboot of the old hub.

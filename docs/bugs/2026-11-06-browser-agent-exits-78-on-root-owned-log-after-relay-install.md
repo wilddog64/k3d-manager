@@ -78,3 +78,7 @@ interface:
   - "bin/install-browser-relays.sh [--dry-run|--uninstall]"
   - "env: HOME, K3DM_LAUNCHD_DIR, SUDO_USER, PATH (stat, chown, launchctl, sudo stubs)"
 ```
+
+## Carried to v1.43.15 (operator, 2026-11-07)
+
+Live check carried over (operator: "carry over"). The trigger has not recurred. On the M5 on 2026-11-07, every `*-browser-http*.log` is owned by `cliang`, `browser.hostinger-frontend-http` is running, `127.0.0.2:18082` is listening and `frontend.3ai-talk.org` answers 200. But its plist (2026-11-06 04:26) predates the fix `9ae2698c` (05:12), so the fix's chown path has not run live. Check on the next hub rebuild, or when a log is root-owned again.

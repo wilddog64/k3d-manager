@@ -186,3 +186,7 @@ Found by reading the code before the M5 pass. Not reproduced live.
 - `make install-browser-relays` removes the legacy root daemons. On the M5, which has no agents yet, `127.0.0.1:443` and `127.0.0.1:80` would then have no backend after `make refresh-edge`.
 
 Fix direction: the Hostinger refresh writes all three agents, and a missing plist there is an error rather than a silent return. A black-box test asserts all three plists exist after a Hostinger refresh on an empty LaunchAgents directory. E5 on the M5 waits for this.
+
+## Carried to v1.43.15 (operator, 2026-11-07)
+
+Live check carried over (operator: "carry over"). On the M5, the operator reboots, then runs `make up` and `acg-up` and confirms no password prompt. Claude rechecks the four `browser.*` agents, the four browser URLs (the sandbox frontend needs a sandbox up) and the public frontend. The 2026-11-07 read on the M5, without a reboot, passed every other item (see `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`).

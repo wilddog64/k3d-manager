@@ -1,8 +1,9 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B landed and verified (`docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`); its live check is partial. This doc stays open until the old rule is confirmed gone from the machines. 2026-11-07: gone on the M4 and the M5, still present on the M2 (see `## Live recheck (Claude, 2026-11-07)`).
+**Status:** LIVE-VERIFIED 2026-11-07 — the old rule is gone from the M4, M5 and M2 (see `## Live recheck (Claude, 2026-11-07)`; M2 reinstalled by the operator 08:13). Was: OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B landed and verified (`docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`); its live check is partial. This doc stays open until the old rule is confirmed gone from the machines. 2026-11-07: gone on the M4 and the M5, still present on the M2 (see `## Live recheck (Claude, 2026-11-07)`).
 **Priority:** P1
-**Waiting on:** live check — since 2026-11-07
+**Fix commit:** `69f2db66`
+**Live evidence:** 2026-11-07 · run claude-sudo-n-l-read · env m4-m5-m2 · scenario launchdaemon-sudoers-rule-gone · commit acbc0956 · proves E3
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
 **Detected by:** `docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md` (Terra Phase C worktree), confirmed by Claude against `bin/install-sudoers.sh` at `7c9927e9`.
@@ -260,3 +261,8 @@ The M2 checkout is `6b7d068c` (2026-11-05 16:24), which predates Part A (`84da2b
 Remaining: the operator, on the M2, runs `git pull` then `make install-sudoers`. Claude then rechecks `sudo -n -l`.
 Browser URLs on the M5: argocd 200, keycloak 302, Hostinger frontend 200. The sandbox frontend (`127.0.0.3:80`) has no
 backend while no ACG sandbox is up.
+
+**M2 after the operator's reinstall (2026-11-07 08:13):** checkout `acbc0956`. `/etc/sudoers.d/k3d-manager` is 693 bytes.
+`sudo -n -l` lists the 5 macOS rules only. No line matches `LaunchDaemons`, `launchctl`, `ifconfig` or `sudoers.d`.
+The M2 has no relay LaunchDaemons; it never ran `install-browser-relays`. The fourth browser URL (sandbox frontend) and
+the reboot plus no-prompt `make up` belong to Part B's E5, carried to v1.43.15.
