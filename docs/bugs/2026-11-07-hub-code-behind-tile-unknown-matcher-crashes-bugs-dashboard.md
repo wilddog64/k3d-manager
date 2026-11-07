@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — `73120c90` (Luna); independent verifier pending
+**Status:** VERIFIED 2026-11-07 offline — independent verifier PASS (see `## Independent verification E1`); live E2 pending the operator's look at the tile. Was: LANDED 2026-11-07 — `73120c90` (Luna)
 **Fix commit:** 73120c90
 **Priority:** P1 — the whole Bugs dashboard fails to render; there is no workaround in the UI
 **Waiting on:** live check — since 2026-11-07
@@ -82,3 +82,17 @@ evidence:
     kind: live
     what: "Operator: after the dashboard syncs, the Bugs dashboard renders and the Hub code behind tile shows the behind count and the release state."
 ```
+
+## Independent verification E1 (2026-11-07)
+
+A separately tasked Sonnet agent wrote 5 pytest tests from the Acceptance block only. They read the dashboards through
+`git show <commit>:<path>`, after a fixture asserts both commits resolve and panel 19 is "Hub code behind". Claude reran them with rc captured:
+
+- `73120c90`: rc 0, `5 passed`.
+- `dc5f6bb0` (pre-fix): rc 1, `3 failed, 2 passed`. M1, M2 and N1 fail on `grafana-dashboard-bugs.yaml` `k3dm-bugs.json` panel 19 `byRefId`; the N1 positive control and N2 pass.
+
+Recorded with `bin/k3dm-codex-dispatch verify --slug bugs-dashboard-matcher --result pass`.
+
+Hub state for E2: the `monitoring/grafana-dashboard-bugs` ConfigMap has the `byFrameRefID` override. Prometheus has
+`k3dm_hub_checkout_code_commits_behind` = 12 and `k3dm_hub_checkout_on_newest_release` = 1, last checked 230 s before the read.
+So the tile should show 12 and "current release".
