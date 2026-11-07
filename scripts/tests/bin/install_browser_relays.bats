@@ -113,6 +113,7 @@ assert_repair_calls() {
 }
 
 @test "dry-run makes no chown call, while install does" {
+  [ -x /usr/bin/plutil ] || skip "plutil is macOS-only; the relay installer lints with it"
   setup_owner_fixture
   run_relay_fixture
   [ "$status" -eq 0 ]
@@ -152,6 +153,7 @@ assert_repair_calls() {
 }
 
 @test "dry-run prints five linted plists without writing outside scratch" {
+  [ -x /usr/bin/plutil ] || skip "plutil is macOS-only; the relay installer lints with it"
   run "$SCRIPT" --dry-run
   [ "$status" -eq 0 ]
   [ "$(grep -c '<plist version=' <<< "$output")" -eq 5 ]
@@ -160,6 +162,7 @@ assert_repair_calls() {
 }
 
 @test "relay output has exact socket settings and no unsafe executable paths" {
+  [ -x /usr/bin/plutil ] || skip "plutil is macOS-only; the relay installer lints with it"
   run "$SCRIPT" --dry-run
   [ "$status" -eq 0 ]
   # The five complete XML documents are extracted and inspected with Python's plist parser.

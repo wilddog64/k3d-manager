@@ -813,17 +813,17 @@ PYCODE
   [ "$status" -eq 1 ]
   run grep -Fq private-key-placeholder "$CALLS"
   [ "$status" -eq 1 ]
-  [ "$(stat -f '%Lp' "$HOME/.ssh")" = 700 ]
-  [ "$(stat -f '%Lp' "$authorized")" = 600 ]
+  [ "$(stat -c %a "$HOME/.ssh" 2>/dev/null || stat -f %Lp "$HOME/.ssh")" = 700 ]
+  [ "$(stat -c %a "$authorized" 2>/dev/null || stat -f %Lp "$authorized")" = 600 ]
   local original_inode
-  original_inode="$(stat -f '%i' "$authorized")"
+  original_inode="$(stat -c %i "$authorized" 2>/dev/null || stat -f %i "$authorized")"
   cp "$authorized" "$WORK/authorized-before"
   printf '[{"verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
   printf 'forwards\n' > "$HUB_CUTOVER_TTY"
   run "$ROOT/bin/hub-cutover" --forwards
   [ "$status" -eq 0 ]
   [ "$(grep -c 'k3dm-hub-forward' "$authorized")" -eq 1 ]
-  [ "$(stat -f '%i' "$authorized")" = "$original_inode" ]
+  [ "$(stat -c %i "$authorized" 2>/dev/null || stat -f %i "$authorized")" = "$original_inode" ]
   cmp "$WORK/authorized-before" "$authorized"
   [ "$(cat "$OLD_HOME/.ssh/k3dm_hub_forward")" = private-key-placeholder ]
 }
@@ -850,7 +850,7 @@ PYCODE
   printf 'existing key without newline' > "$HOME/.ssh/authorized_keys"
   cp "$HOME/.ssh/authorized_keys" "$WORK/authorized-before"
   local original_inode
-  original_inode="$(stat -f '%i' "$HOME/.ssh/authorized_keys")"
+  original_inode="$(stat -c %i "$HOME/.ssh/authorized_keys" 2>/dev/null || stat -f %i "$HOME/.ssh/authorized_keys")"
   cat > "$WORK/injection/sitecustomize.py" <<'PYCODE'
 import os
 original_replace = os.replace
@@ -865,7 +865,7 @@ PYCODE
   run env PYTHONPATH="$WORK/injection${PYTHONPATH:+:$PYTHONPATH}" "$ROOT/bin/hub-cutover"
   [ "$status" -ne 0 ]
   [[ "$output" == *'injected replacement failure'* ]]
-  [ "$(stat -f '%i' "$HOME/.ssh/authorized_keys")" = "$original_inode" ]
+  [ "$(stat -c %i "$HOME/.ssh/authorized_keys" 2>/dev/null || stat -f %i "$HOME/.ssh/authorized_keys")" = "$original_inode" ]
   cmp "$WORK/authorized-before" "$HOME/.ssh/authorized_keys"
   [ "$(find "$HOME/.ssh" -name '.authorized_keys.*' | wc -l | tr -d ' ')" -eq 0 ]
   printf 'forwards\n' > "$HUB_CUTOVER_TTY"
