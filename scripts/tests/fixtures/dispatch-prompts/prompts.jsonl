@@ -1,7 +1,9 @@
 {"event": "start", "repo": "k3d-manager", "slug": "prompt-before-marker", "ts": 1790544000, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
 {"event": "start", "repo": "k3d-manager", "slug": "prompt-crosses-marker", "ts": 1790544000, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
-{"event": "intervention_coverage_start", "repo": "k3d-manager", "slug": "marker-row", "ts": 1790976000, "version": "v9.9.9"}
 {"event": "start", "repo": "k3d-manager", "slug": "prompt-outside-windows", "ts": 1791148800, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-pre-marker", "ts": 1791494400, "version": "v9.9.9", "worker_identity": {"model": "gpt-pre"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-pre-marker", "ts": 1791494410, "version": "v9.9.9"}
+{"event": "intervention_coverage_start", "repo": "k3d-manager", "slug": "marker-row", "ts": 1791840000, "version": "v9.9.9"}
 {"event": "start", "model": "gemma-x", "repo": "k3d-manager", "slug": "prompt-fallback", "ts": 1792272000, "version": "v9.9.9", "worker_identity": {"model": "unknown"}}
 {"event": "intervention", "reason": "other", "repo": "k3d-manager", "slug": "prompt-fallback", "ts": 1792272010, "version": "v9.9.9"}
 {"event": "start", "repo": "k3d-manager", "slug": "prompt-keep", "ts": 1793308800, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}

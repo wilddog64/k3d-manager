@@ -71,6 +71,15 @@
 
 - 2026-11-01 Codex dispatch review PARTIAL: role guard landed/pushed `bd3002db`, focused BATS 157/157 and landing/pre-push fast gates passed; pre-fix and live checks pending. Resume task focused BATS 94/94, metrics pytest 169 and dashboard BATS 38/38 passed, but fast gate exposed a hub-data shared TMPDIR collision; isolated fix `8614ebb4` remains on task branch pending scope approval. Agent instruction refresh remains unlanded: broad tests and agy loading unverified. See docs/issues/2026-11-01-dispatch-review-pending-verification.md.
 
+## 2026-11-06 late verification and S1 revision
+
+- [x] `bug-open-history-from-git` LIVE-VERIFIED: E4 30/30 dates.
+- [x] S1 spec revised after the second review; `v1.43.16-prompts-by-model` filed.
+- [x] Waiting-on spec revised: `Open P*` tile descriptions dropped, `Waiting since` not shown.
+- [ ] S1 third check, then dispatch both halves.
+- [ ] Waiting-on correction to Luna, review, land, verify.
+- [ ] `agent-instruction-files-refresh` independent verifier result, then Status.
+
 ## 2026-11-05 security + telemetry filings
 
 - [x] P1 sudoers passwordless root escalation: CLOSED 2026-11-05 (reinstalled on all 3 Macs). LANDED `4c4f7dd1`. Independent verify PASS (recorded). install-sudoers: M4 and M5 OK; M2 blocked by bash 3.2 (P2 filed). E4 PASS live on the M4; the M2 is pending (Homebrew bash workaround or the P2 fix).

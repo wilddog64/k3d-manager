@@ -1,5 +1,5 @@
 {
-  "note": "Hand-derived from the rules in docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md, by case, not by running worker code.",
+  "note": "Hand-derived from the rules in docs/plans/v1.43.16-prompts-by-model.md, by case, not by running worker code.",
   "now": 1794000000,
   "windows": {
     "1d": {
@@ -71,7 +71,7 @@
       "by_reason": {
         "clarification": 1,
         "continue_prompt": 2,
-        "correction": 9,
+        "correction": 10,
         "other": 2
       },
       "per_task": {
@@ -148,6 +148,13 @@
           "reason": "continue_prompt",
           "sent_by": "unrecorded",
           "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-pre",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
         }
       ],
       "tasks": {
@@ -156,6 +163,7 @@
         "gemma-x": 1,
         "gpt-alpha": 4,
         "gpt-beta": 1,
+        "gpt-pre": 1,
         "other": 1,
         "unknown": 2,
         "zeta-1": 1

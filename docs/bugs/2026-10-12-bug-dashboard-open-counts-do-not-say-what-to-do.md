@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — spec rewritten 2026-11-06; dispatched to Luna 2026-11-06
+**Status:** OPEN — spec rewritten 2026-11-06; dispatched to Luna 2026-11-06 Revised 2026-11-06 after review: the first version collided with two existing dashboard guards (see Design limits).
 **Priority:** P2 — raised from P3 2026-11-06; a reader cannot tell a stalled bug from a shipped fix waiting for proof, and it misled the operator about seven rows that day
 **Approval:** explicit 2026-11-06 "go ahead" (operator, on rewriting this spec and dispatching it to Luna). Originally explicit 2026-10-12 "then maybe we should have same comment or explaination (short one) to present; otherwise this confuse people as we don't know what to do or panic".
 **Severity:** medium
@@ -75,25 +75,21 @@ Do not change the row's value, `sort_key`, `status`, `fix_sha`, any other label,
 
 ### 3. `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`
 
+**Design limits (Claude's spec error, found in review 2026-11-06).** The first version of this section asked for descriptions on the `Open P*` tiles and two new columns. Both broke guards that exist on purpose: a tile narrower than `w=4` has no description (`2026-10-19-bug-dashboard-verification-tile-labels-clipped`), and the table's widths plus 150 stay within 1350 so it fits a laptop without horizontal scrolling. Those guards stay as they are.
+
 **Bugs** table (the panel titled `Bugs`):
 
-- `renameByName`: `waiting_on` → `Waiting on`, `waiting_since` → `Waiting since`.
-- `indexByName`: put them immediately after `status`, and move the later columns along by two.
-- Overrides: `Waiting on` is filterable, width 130. `Waiting since` is width 110 and maps `-` to `—`,
-  as `Verified at` does.
-- Append to the panel description: "Waiting on says what an open bug needs next; filter that column to
-  separate live checks and scheduled runs from work nobody has picked up. `not stated` means the doc
-  has no Waiting on line."
+- `renameByName`: `waiting_on` → `Waiting on`.
+- `indexByName`: put `waiting_on` immediately after `status`, and move the later columns along by one.
+- `excludeByName`: `waiting_since` is true. The label is exported and not shown, because the table has no room for it.
+- Overrides: `Waiting on` is filterable, width 130. Reduce `Open for`, `Status` and `Priority` by 10 each, which keeps the total at the limit.
+- Append to the panel description: "Waiting on says what an open bug needs next; filter that column to separate live checks and scheduled runs from work nobody has picked up. `not stated` means the doc has no Waiting on line. The Open P0 to P3 tiles count every open doc, including fixes that landed and are waiting for a live check, so read this column before treating a count as an incident."
 
-Stats: give **Open P0**, **Open P1**, **Open P2** and **Open P3** this description, with their own
-priority: "Open bug docs at this priority. Open includes fixes that landed and are waiting for a live
-check. Read the Waiting on column in Bugs below before treating this as an incident."
-
-No colour, threshold or position change.
+No change to the tiles: no description, colour, threshold or position change.
 
 ### 4. Docs
 
-- `docs/guides/grafana-dashboards/k3dm-bugs.md`: the two columns, the six values, the line's format,
+- `docs/guides/grafana-dashboards/k3dm-bugs.md`: the column, that `waiting_since` is exported but not shown, the six values, the line's format,
   `not stated` and `invalid`, and that Open for still counts from filing.
 - `CHANGELOG.md` `[Unreleased]` → `### Fixed`.
 
@@ -106,7 +102,7 @@ open docs after landing.
 |---|---|
 | `scripts/lib/hermes/prior_art.py` | closed words, status cleanup, `doc_waiting_on` |
 | `bin/k3dm-vectordb-metrics` | two labels |
-| `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` | columns, descriptions |
+| `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` | column, widths, table description |
 | `scripts/tests/bin/test_prior_art.py` | tests |
 | `scripts/tests/bin/test_vectordb_bug_metrics.py` | tests |
 | `scripts/tests/plugins/grafana_dashboard_bugs.bats` | tests, column index updates |
@@ -130,6 +126,7 @@ string gaining the two new labels, stop and report it. Do not remove an assertio
 - Do NOT edit any bug doc, `CLAUDE.md` or the memory bank.
 - Do NOT change `fix_sha`, Open for, or how any row is sorted.
 - Do NOT add a label holding free text.
+- Do NOT add a description to a tile, or change the 1350 limit or the tile-description assertion in `grafana_dashboard_bugs.bats`.
 - Do NOT read the ledger or any live system to work out a value.
 - Do NOT commit, push or create a PR. Claude reviews and commits.
 - Do NOT modify files outside the Files list.
@@ -155,10 +152,10 @@ must:
   - id: M6
     text: "Status values beginning WITHDRAWN, OBSOLETE, COMPLETE or COMPLETED classify as closed. '✅ RESOLVED 2026-08-28' and '**WITHDRAWN (2026-06-12).**' classify as closed."
   - id: M7
-    text: "The Bugs table maps waiting_on and waiting_since to Waiting on and Waiting since, directly after Status, and Waiting on has custom.filterable true."
-  - id: M8
-    text: "Open P0, Open P1, Open P2 and Open P3 each have a description naming the Waiting on column."
+    text: "The Bugs table maps waiting_on to Waiting on, directly after Status, with custom.filterable true; waiting_since is excluded from the table; and the description says the Open tiles include fixes waiting for a live check."
 must_not:
+  - id: N7
+    text: "The dashboard's existing guards hold: no tile narrower than w=4 has a description, and the Bugs table's fixed widths plus 150 are at most 1350. Paired control: Waiting on has its width and is visible."
   - id: N1
     text: "A closed doc, or a deferred one, that still has a Waiting on line shows waiting_on=\"-\" and waiting_since=\"-\"."
   - id: N2
@@ -177,13 +174,13 @@ evidence:
     kind: offline
     what: "Claude's review run of the Gates in the Tests section on the task branch."
   - id: E2
-    proves: [M7, M8]
+    proves: [M7, N7]
     kind: offline
     what: "bats scripts/tests/plugins/grafana_dashboard_bugs.bats on the task branch."
   - id: E3
-    proves: [M1, M2, M3, M4, M5, M6, M7, M8, N1, N2, N3, N4, N5]
+    proves: [M1, M2, M3, M4, M5, M6, M7, N1, N2, N3, N4, N5, N7]
     kind: offline
-    what: "Independent verifier's tests, written from this block only, pass on the landed commit and are red on its parent. N1 to N5 hold by a paired positive control: each negative test sits beside a test of the same fixture that shows the label does appear when the rule permits. Mutants, each red: gate removed so closed docs show the line; header-block limit removed; free text passed through; RESOLVED match anchored without the cleanup; a word dropped from the six."
+    what: "Independent verifier's tests, written from this block only, pass on the landed commit and are red on its parent. N1 to N5 and N7 hold by a paired positive control: each negative test sits beside a test of the same fixture that shows the label does appear when the rule permits. Mutants, each red: gate removed so closed docs show the line; header-block limit removed; free text passed through; RESOLVED match anchored without the cleanup; a word dropped from the six; a description added to Open P1; a width raised past the limit."
   - id: E4
     proves: [N6]
     kind: offline
@@ -193,7 +190,7 @@ evidence:
     kind: live
     what: "Claude: after the docs carry the line and Hermes has polled the updated M5 checkout, hub Prometheus returns k3dm_bug_info rows with waiting_on=\"live check\" and none of the docs given a line reads not stated."
   - id: E6
-    proves: [M7, M8]
+    proves: [M7]
     kind: live
-    what: "Operator: after the dashboard is synced from the release branch, the Bugs table shows both columns, and filtering Waiting on works."
+    what: "Operator: after the dashboard is synced from the release branch, the Bugs table shows the column without horizontal scrolling at laptop width, the narrowed headers are readable, and filtering Waiting on works."
 ```

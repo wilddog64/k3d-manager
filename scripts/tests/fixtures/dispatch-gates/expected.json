@@ -108,8 +108,8 @@
           "offline_tested": "pending"
         },
         "next_action": "none",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 2,
@@ -132,8 +132,8 @@
           "offline_tested": "pending"
         },
         "next_action": "stall_review",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 2,
@@ -156,8 +156,8 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
@@ -177,11 +177,12 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 2,
+        "slug": "assessed-overrides",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -197,11 +198,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "assessed-rework",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -219,11 +221,12 @@
           "offline_tested": "pending"
         },
         "next_action": "resume_or_abandon",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "assessed-unknown",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -241,8 +244,8 @@
           "offline_tested": "unknown"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
@@ -262,8 +265,8 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
@@ -283,11 +286,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
+        "slug": "cleared-task",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": [
@@ -306,11 +310,12 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 2,
+        "slug": "double-count",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -328,11 +333,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 4,
+        "slug": "evidence-reset",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -351,11 +357,26 @@
           "offline_tested": "pending"
         },
         "next_action": "clear_gate",
-        "open_architecture": 1,
-        "open_scope": 1,
+        "open_architecture": [
+          {
+            "decision": "narrow_fix",
+            "reviewer": "agy",
+            "ts": 2000001060
+          }
+        ],
+        "open_scope": [
+          {
+            "paths": [
+              "x.sh"
+            ],
+            "risk": "high",
+            "ts": 2000001050
+          }
+        ],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "gates-open",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -371,8 +392,8 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
@@ -394,8 +415,8 @@
           "offline_tested": "pending"
         },
         "next_action": "stall_review",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
@@ -418,11 +439,12 @@
           "offline_tested": "done"
         },
         "next_action": "deploy",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "live-pending",
         "stall": "closed",
         "streak": 0,
         "unsuccessful": []
@@ -438,11 +460,12 @@
           "offline_tested": "done"
         },
         "next_action": "none",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "live-verified",
         "stall": "closed",
         "streak": 0,
         "unsuccessful": []
@@ -458,11 +481,12 @@
           "offline_tested": "pending"
         },
         "next_action": "stall_review",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 4,
+        "slug": "no-evidence-progress",
         "stall": "open",
         "streak": 2,
         "unsuccessful": [
@@ -481,11 +505,12 @@
           "offline_tested": "done"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "offline-only",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -501,8 +526,8 @@
           "offline_tested": "unknown"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
@@ -522,11 +547,12 @@
           "offline_tested": "unknown"
         },
         "next_action": "none",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "old-task",
         "stall": "closed",
         "streak": 0,
         "unsuccessful": []
@@ -542,11 +568,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-one",
         "role": "build",
         "runs": 1,
+        "slug": "part-a",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -562,11 +589,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-one",
         "role": "build",
         "runs": 1,
+        "slug": "part-b",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -582,11 +610,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-one",
         "role": "verify",
         "runs": 1,
+        "slug": "part-c",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -602,11 +631,12 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-two",
         "role": "build",
         "runs": 1,
+        "slug": "part-d",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -622,8 +652,8 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-four",
         "role": "review",
         "runs": 1,
@@ -643,8 +673,8 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-three",
         "role": "build",
         "runs": 1,
@@ -664,8 +694,8 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "p-three",
         "role": "verify",
         "runs": 1,
@@ -685,8 +715,8 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": "Bad Parent!",
         "role": "build",
         "runs": 1,
@@ -706,11 +736,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
+        "slug": "progress-task",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -726,11 +757,12 @@
           "offline_tested": "pending"
         },
         "next_action": "resume_or_abandon",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 2,
+        "slug": "quota-task",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -746,11 +778,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "rebase-only",
         "stall": "clear",
         "streak": 0,
         "unsuccessful": []
@@ -766,11 +799,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "refused-land",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -788,11 +822,12 @@
           "offline_tested": "pending"
         },
         "next_action": "stall_review",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
+        "slug": "replan-rejected",
         "stall": "open",
         "streak": 2,
         "unsuccessful": [
@@ -811,8 +846,8 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
@@ -832,11 +867,12 @@
           "offline_tested": "pending"
         },
         "next_action": "stall_review",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 3,
+        "slug": "stalled-task",
         "stall": "open",
         "streak": 2,
         "unsuccessful": [
@@ -855,8 +891,8 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 4,
@@ -880,8 +916,8 @@
           "offline_tested": "pending"
         },
         "next_action": "wait_for_run",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 4,
@@ -905,11 +941,12 @@
           "offline_tested": "pending"
         },
         "next_action": "land",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,
+        "slug": "verify-fail",
         "stall": "clear",
         "streak": 1,
         "unsuccessful": [
@@ -927,8 +964,8 @@
           "offline_tested": "pending"
         },
         "next_action": "verify",
-        "open_architecture": 0,
-        "open_scope": 0,
+        "open_architecture": [],
+        "open_scope": [],
         "parent": null,
         "role": null,
         "runs": 1,

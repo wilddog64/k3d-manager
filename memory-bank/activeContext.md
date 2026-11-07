@@ -16,6 +16,8 @@
 - **Sunday 2026-11-08 02:30:** read the hub-snapshot result before touching that bug.
 - **Not on the operator's list:** Hermes `alert_delivery` is still `unknown` on the M5 (no PyYAML on `python3`).
 
+- 2026-11-06 late: `bug-open-history-from-git` LIVE-VERIFIED (E4, 30/30 dates on `m5-air`). `agent-instruction-files-refresh` checks pass so far; independent verifier running, Status not changed yet. S1 revised after Terra's second review (not ready): oracle fixed, blockers 2 and 4 and should-fix 2 and 4 applied; prompts by model moved to `docs/plans/v1.43.16-prompts-by-model.md`; narrow third check next, then dispatch. Waiting-on: Luna's first result not landed because it loosened two dashboard guards, which came from Claude's spec; spec revised, correction goes to Luna.
+
 ## Handoff — 2026-11-06 M4 reboot for tunnel E4
 
 - **On resume, in order:** (1) Tunnel E4: confirm the M4 forward ports 19094 and 19100 came up without a login and dispatch metrics reach the M5; spec `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`. (2) After 00:33Z 11-07: read the newest analyze job on the M5 and ask the operator whether the post appeared in `#grafana-notification`. (3) Ask the operator for dispatch timing; nothing is dispatched and no Luna run is active.
