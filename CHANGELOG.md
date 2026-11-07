@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+## [1.43.14] - 2026-11-07
+
+- Export Claude context per turn, post-compaction floor and observed ceiling, active-day turn rates, and cache rebuild counts and cost; add the matching Agent Cost dashboard row and guide.
+
+- Add a `control` machine role for local development on Macs that do not run a cluster.
+
+- Handle null or missing Hermes e2e counts and report pre-test failures by phase.
+
+- Clarify the security findings dashboard image ownership and label its firing place count as `firing in`.
+
+- Use the absolute `scutil` path for launchd disk metrics and log sanitized publish failures from Hermes.
+
+- Fix the Bugs dashboard Hub code behind field override to use Grafana 11.4's `byFrameRefID` matcher and guard dashboard matcher IDs.
+
+- Remove the unused `scripts/playwright/acg_extend.js`, which still read the old login profile directory; `acg.sh` uses the lib-foundation copy.
+
+- Add validated Cloudflare client IP and sanitized User-Agent fields to webhook request access logs.
+
+- Require `K3DM_STATUS_CHANNEL_ID` during hub preparation, report its plist presence in `webhook-doctor --check`, and document analyzer delivery verification during M5 migration.
+
+- Derive 30-day open-bug history from git commits on the release ref independent of Prometheus retention, publishing to Pushgateway group `k3dm-bug-open-history`, and add the "Open by priority, last 30 days (from git)" stacked bar chart to the Bugs dashboard.
+
+- Collect agy session and token activity from local Antigravity transcripts when available, identify the reporting host and source, and warn in machine-check when the optional wrapper is absent.
+
+- Explain open bug dependencies in the Bug Tracking table with a safe Waiting on column, export the waiting-since date, and clarify that open priority counts can include fixes awaiting a live check.
+- Reject bug Status edits that the dashboard would silently misread as open, and document the recognized first words.
+- Show healthy empty-state text on the CVE Auto-Patch critical-CVE and missing-report tables.
+
+- Sort the Agent Dispatch Per run evidence table by version, slug and run newest first, and convert the run field to number so header clicks sort numerically.
+
+- Give Trivy candidate scans a 10-minute timeout, log sanitized failure detail, and retain app CVE scan Job results longer.
+
+- Add `make hub-sync` for guarded hub checkout catch-up, publish code lag and newest-release status, and show it on the Bugs dashboard.
+- Resolve S1 `link` and `mark` versions from their ledger slug, and resolve `combine` from its parts.
+- Make the Verification ladder table sortable, prevent clipped rows, and explain unknown status.
+
+- Add `.github/dependabot.yml` for weekly GitHub Actions updates in workflows and composite actions; the lib-foundation subtree's npm dependencies are updated upstream.
+- Pull lib-foundation through PR #77: `brace-expansion` 1.1.21 in the ACG lockfile clears three high DoS advisories.
+- Keep release forecasts aligned with roadmap milestones, folded releases, and work in progress.
+
+- Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.
+- Use provider-scoped SSH tunnel ports (`16443` for `k3s-aws`, `6443` for `k3s-hostinger`) and filter ArgoCD degraded apps by provider in webhook post-provision checks and cluster status.
+- Skip System Keychain Vault CA trust in headless or SSH sessions with a manual remediation warning, update `/etc/hosts` through `/usr/local/bin/k3d-manager-update-hosts`, and remove the ineffective `security add-trusted-cert` sudoers rule.
+- Require the recorded hub machine role before starting the local hub or running hub release operations.
+- Record resume reasons, classify reviewed runs, and list open dispatch tasks.
+- Retry observability LaunchAgent bootstraps across `bootout` teardown and avoid ephemeral `direnv` Python paths in auth-proxy plists.
+- Report an actionable M2 SSH key-authentication error when publishing DR drill results.
+
+- Require captured verifier evidence for dispatch passes and show legacy claims separately.
+
 ## [1.43.13] - 2026-11-01
 
 Machine-setup and bug-fix release for the M5 hub. The five plans first planned for v1.43.13 moved to v1.43.14, and v1.43.14's plans moved to v1.43.15; no plan work ships here.

@@ -8,6 +8,13 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
 Open for counts from filed until the bug is LIVE-VERIFIED, or a closed investigation has valid typed recovery proof.
+The **Bugs** table's **Waiting on** column describes the next dependency for open and unknown docs. Add
+`**Waiting on:** <value>` in the header before the first `## ` heading, using one of `dispatch`, `fix running`,
+`live check`, `scheduled run`, `investigation`, or `operator decision`. A date can follow as
+`**Waiting on:** <value> — since YYYY-MM-DD`; it must be a real calendar date. The `not stated` value means the
+header has no Waiting on line, and `invalid` means its value is outside the six accepted words. Other statuses
+show `—`. The `waiting_since` label is exported for open and unknown docs but is not shown in the table. Open for
+still counts from filing, including fixes awaiting proof.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
@@ -27,7 +34,22 @@ open vs fixed. `unset` there means the doc predates priorities (2026-10-09). Eac
 fixed colour (P0 dark red, P1 red, P2 orange, P3 yellow, unset grey; closed green, open orange),
 zero segments are dropped in the query, and counts are in the hover tooltip rather than on the bars,
 where Grafana placed them on the wrong segment. The bottom row has the per-release summary strip,
-scan age, a **Bugs** table, and open-by-priority over time (pinned to the last 3 days, the hub Prometheus retention). Each document is classified by status:
+scan age, a **Bugs** table, and two open-by-priority trend panels side by side: **Open by priority over time**
+(pinned to the last 3 days, the hub Prometheus retention) and **Open by priority, last 30 days (from git)**.
+
+The 30-day panel derives historical inventory directly from git rather than Prometheus metric retention.
+For each of the last 30 UTC dates D (today included), the scanner picks the last commit on the release ref
+at or before `D 23:59:59Z` (`git rev-list -1 --before=<D>T23:59:59Z <ref>`). Dates before the ref's first
+commit are skipped. Each distinct commit is evaluated once with `_bug_texts` and `doc_meta`, and its open
+bug counts by priority are reused for every date mapping to it. The entire 30-day history is published
+with `PUT` to the Pushgateway group `k3dm-bug-open-history` (instance = repo), emitting
+`k3dm_bug_open_history{repo,priority,date}` with all five priorities (P0, P1, P2, P3, unset; zeros included)
+so the stacked bars line up. The dashboard panel reads this with an instant query of
+`sum by (date, priority) (k3dm_bug_open_history{repo="$repo"})`, keeping the standard priority colours.
+Unlike the 3-day panel, which queries Prometheus timeseries `k3dm_bug_docs{state="open"}` and is limited
+to Prometheus's 3-day retention (`retention: 3d`), the 30-day panel's data is retained across Prometheus
+restarts or new hub cutovers. Like the 3-day panel, this is an inventory snapshot, not opened/fixed
+events: a falling count does not prove a fix. Each document is classified by status:
 
 | Status | Doc `**Status:**` value begins with |
 |---|---|
@@ -156,6 +178,19 @@ its clone at `origin/main`, configured by `K3DM_LIB_FOUNDATION_DIR` (default
 because lib-foundation has no release branch.
 
 ## Filters, release mode and the Bugs table
+
+### Writing a bug Status line
+
+The first word of `**Status:**` decides the row shown in the Bugs table. The accepted opening
+words are `OPEN`, `REOPENED`, and `DEFERRED`, plus `FIXED`, `CLOSED`, `RESOLVED`, `DONE`,
+`WONTFIX`, `WON'T FIX`, `SUPERSEDED`, `DUPLICATE`, `VERIFIED`, `LIVE-VERIFIED`,
+`IMPLEMENTED`, `LANDED`, `WITHDRAWN`, `OBSOLETE`, `COMPLETE`, and `COMPLETED` for closed work
+(also `Fixed on` and `Fixed in`). The first word is case-insensitive. A landed fix starts with
+`LANDED`, and starts with `VERIFIED` once independently verified; anything still open starts
+with `OPEN`.
+
+The pre-commit guard refuses a Status value that starts with none of those recognized words,
+and refuses `OPEN` followed by `fix landed`. Keep extra detail after the recognized first word.
 
 In the k3dm Bug Tracking dashboard, use the funnel icon in the **Bug** column header to filter rows by title. If the table is empty with no column filter selected, there are no `k3dm_bug_info` series for the current repository, release, and verification selections; check telemetry ingestion before concluding that a bug is missing.
 

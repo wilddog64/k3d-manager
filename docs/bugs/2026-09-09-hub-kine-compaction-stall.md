@@ -2,6 +2,7 @@
 
 **Status:** RECURRED 2026-10-28 — last successful compaction17:45:03Z, transaction failure17:50:14Z; current alert firing. See the new October28 recurrence filing below. Controlled recovery pending; no K3s restart. Earlier October24 history and invalidated close-out retained below.
 **Priority:** P2 — the hub control plane degrades as `state.db` grows; the workaround is a rebuild (`make hub-recover-all`, fixed by `docs/bugs/2026-10-11-hub-recover-all-never-rebuilds-the-hub.md`)
+**Waiting on:** investigation
 **Release:** v1.43.6 — verification-only; close-out check 2026-10-26 (14 clean days). Moved from v1.43.5 on 2026-10-24 (operator: "you can move those P2s to v1.43.6")
 
 ## What was observed

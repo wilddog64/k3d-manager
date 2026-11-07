@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Check shared agent rules and dispatched-agent instructions."""
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+NAMES = ('plan-cap', 'bug-priority', 'security')
+FILES = ('CLAUDE.md', 'AGENTS.md', 'GEMINI.md')
+
+
+def check(root):
+    errors = []
+    texts = {name: (root / name).read_bytes().decode("utf-8") for name in FILES}
+    for block in NAMES:
+        begin = f'<!-- shared:begin {block} -->'
+        end = f'<!-- shared:end {block} -->'
+        copies = []
+        for name, text in texts.items():
+            if text.count(begin) != 1 or text.count(end) != 1 or text.index(begin) > text.index(end):
+                errors.append(f'{name}: invalid {block} markers')
+                continue
+            copies.append((name, text.split(begin, 1)[1].split(end, 1)[0]))
+        if len(copies) == len(FILES) and len({value for _, value in copies}) != 1:
+            errors.append(f'{block}: shared blocks differ')
+    for name in FILES[1:]:
+        text = texts[name]
+        for path in re.findall(r'`((?:scripts/|bin/|docs/|memory-bank/|Makefile)[^`\n]*)`', text):
+            if '<' not in path and not (root / path).exists():
+                errors.append(f'{name}: missing path {path}')
+        if re.search(r'0\.0\.0\.0:|config\s+use-context', text, re.I):
+            errors.append(f'{name}: forbidden bind or context switch')
+        for sentence in re.split(r'(?<=[.!?])\s+|\n', text):
+            if re.search(r'\b(?:git\s+(?:commit|push)|gh\s+pr\s+create|commit\s+(?:and\s+push|your\s+own\s+work)|push\s+to\s+remote)\b', sentence, re.I):
+                if not re.search(r'\b(?:do\s+not|don\x27t|never)\b', sentence, re.I):
+                    errors.append(f'{name}: forbidden instruction: {sentence.strip()}')
+    return errors
+
+
+def main():
+    errors = check(Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT)
+    if errors:
+        print('\n'.join(errors), file=sys.stderr)
+        return 1
+    print('Agent docs check passed')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

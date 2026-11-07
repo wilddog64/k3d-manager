@@ -157,7 +157,7 @@ def test_ref_cat_file_starts_once(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("status", ["FIXED", "CLOSED", "RESOLVED", "DONE", "WONTFIX",
-                                     "WON'T FIX", "SUPERSEDED", "DUPLICATE", "VERIFIED live 2026-10-09",
+                                     "WON'T FIX", "SUPERSEDED", "DUPLICATE", "WITHDRAWN", "OBSOLETE", "COMPLETE", "COMPLETED", "✅ RESOLVED 2026-08-28", "**WITHDRAWN (2026-06-12).**", "VERIFIED live 2026-10-09",
                                      "LIVE-VERIFIED now", "Fixed on 2026-10-09", "Fixed in v1.0.0"])
 def test_doc_meta_closed_status_prefixes(status):
     assert pa.doc_meta(f"**Status:** {status}\n") == ("unset", "closed")
@@ -165,6 +165,8 @@ def test_doc_meta_closed_status_prefixes(status):
 
 def test_doc_meta_open_and_unknown_states():
     assert pa.doc_meta("**Status:** OPEN — no release\n") == ("unset", "open")
+    assert pa.doc_meta("**Status:** OPEN — fix landed\n") == ("unset", "open")
+    assert pa.doc_meta("**Status:** REVERTED — not on the closed list\n") == ("unset", "open")
     assert pa.doc_meta("**Status:** IMPLEMENTED — no release\n") == ("unset", "closed")  # agent-audit: allow assert-removed IMPLEMENTED now classifies as closed by design
     assert pa.doc_meta("# bug\nno status\n") == ("unset", "unknown")
     assert pa.doc_meta("Status: FIXED\n") == ("unset", "closed")
@@ -217,6 +219,20 @@ def test_doc_meta_priority_wins_and_only_first_line_counts():
     assert pa.doc_meta("**Priority:** P1 — urgent\n**Severity:** P2\n") == ("P1", "unknown")
     assert pa.doc_meta("**Priority:** P3\n**Priority:** P0\n") == ("P3", "unknown")
     assert pa.doc_meta("**Severity:** high\n") == ("unset", "unknown")
+
+
+@pytest.mark.parametrize("value", ["dispatch", "fix running", "live check", "scheduled run", "investigation", "operator decision"])
+def test_doc_waiting_on_accepts_six_words_and_optional_real_date(value):
+    assert pa.doc_waiting_on(f"**Waiting on:** {value.upper()}\n") == (value, "-")
+    assert pa.doc_waiting_on(f"**Waiting on:** {value} — since 2026-11-06\n") == (value, "2026-11-06")
+
+
+def test_doc_waiting_on_limits_header_and_sanitizes_labels():
+    below = "# bug\n## Problem\n**Waiting on:** live check\n"
+    assert pa.doc_waiting_on(below) == ("not stated", "-")
+    assert pa.doc_waiting_on("# bug\n**Waiting on:** dispatch\n## Problem\n**Waiting on:** investigation\n") == ("dispatch", "-")
+    assert pa.doc_waiting_on('**Waiting on:** live check\", evil=\"1\n') == ("invalid", "-")
+    assert pa.doc_waiting_on("**Waiting on:** live check — since 2026-13-40\n") == ("live check", "-")
 
 
 def test_doc_release_uses_branch_or_added_release():

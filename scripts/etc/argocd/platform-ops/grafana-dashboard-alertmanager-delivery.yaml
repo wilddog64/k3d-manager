@@ -383,7 +383,7 @@ data:
           "id": 10,
           "type": "table",
           "title": "Security findings by image",
-          "description": "One row per image. tier=\"upstream\" is a third-party image we only consume; anything else is ours and has a remediation path through the CVE loop. This is a backlog, not a page.",
+          "description": "One row per image. (upstream) marks a third-party image we only consume, with no auto-remediation; no suffix means one of our images, remediated through the CVE loop. firing in is the number of cluster and namespace places where the image has critical CVEs, not the number of CVEs; see the CVE inventory dashboard for counts. This is a backlog, not a page.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -402,8 +402,8 @@ data:
             "showHeader": true,
             "sortBy": [
               {
-                "displayName": "tier",
-                "desc": false
+                "displayName": "firing in",
+                "desc": true
               }
             ]
           },
@@ -413,7 +413,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "count by (tier, image_repository, alertname) (ALERTS{alertstate=\"firing\",alertname=~\"Trivy.*\"})",
+              "expr": "count by (image, alertname) (label_replace(label_replace(label_join(ALERTS{alertstate=\"firing\",alertname=~\"Trivy.*\"}, \"image\", \"|\", \"image_repository\", \"tier\"), \"image\", \"$1 ($2)\", \"image\", \"(.+)\\\\|(.+)\"), \"image\", \"$1\", \"image\", \"(.+)\\\\|\"))",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -427,13 +427,12 @@ data:
                   "Time": true
                 },
                 "indexByName": {
-                  "tier": 0,
-                  "image_repository": 1,
-                  "alertname": 2,
-                  "Value": 3
+                  "image": 0,
+                  "alertname": 1,
+                  "Value": 2
                 },
                 "renameByName": {
-                  "Value": "findings"
+                  "Value": "firing in"
                 }
               }
             }

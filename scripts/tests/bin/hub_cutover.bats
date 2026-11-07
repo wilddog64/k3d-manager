@@ -4,13 +4,19 @@ setup() {
   REPO="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   WORK="$(mktemp -d "${BATS_TEST_TMPDIR}/hub-cutover.XXXXXX")"
   ROOT="$WORK/repo"
-  mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$ROOT/bin" "$ROOT/scripts/etc/machine"
+  mkdir -p "$WORK/stub" "$WORK/home/Library/LaunchAgents" "$WORK/home/Library/Logs" "$ROOT/bin" "$ROOT/scripts/etc/machine"
   cp "${HUB_CUTOVER_SOURCE:-$REPO/bin/hub-cutover}" "$ROOT/bin/hub-cutover"
+  chmod +x "$ROOT/bin/hub-cutover"
   cp "$REPO/scripts/etc/machine/hub-push-forwards.list" "$ROOT/scripts/etc/machine/"
   cp "$REPO/scripts/etc/machine/hub-singletons.list" "$ROOT/scripts/etc/machine/"
   export HOME="$WORK/home" PATH="$WORK/stub:/opt/homebrew/bin:/usr/bin:/bin" CALLS="$WORK/calls"
+  printf '%s\n' '{"records":[{"sensor":"argocd","status":"healthy","evidence":"29 applications healthy"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
   export HUB_CUTOVER_STATE_DIR="$WORK/state" HUB_NEW_STATE_DIR="$WORK/new-state" HUB_OLD_HOST=m4-air.local HUB_NEW_HOST=m5-air.local
   [[ "$HOME" == "$WORK/home" && "$HUB_CUTOVER_STATE_DIR" == "$WORK/state" ]]
+  # Real read-only public-key format capture: ssh-keygen on cliang's workstation, 2026-11-06.
+  ssh-keygen -q -t ed25519 -N '' -C k3dm-hub-forward -f "$WORK/captured-forward-key"
+  STUB_FORWARD_PUBLIC_KEY="$(cat "$WORK/captured-forward-key.pub")"
+  export STUB_FORWARD_PUBLIC_KEY
   export OLD_HOME="$WORK/old-home"
   mkdir -p "$OLD_HOME/Library/LaunchAgents"
   python3 - "$OLD_HOME" <<'PYCODE'
@@ -31,6 +37,10 @@ if [[ "$HOME" == "$OLD_HOME" ]]; then
   # Exit codes captured on m4-air 2026-10-31T11:57Z for an unloaded label: bootout 3, print 113.
   linger="$CALLS.linger"
   case "$1" in
+    # Real read-only capture: m4-air.local, 2026-11-06; absent labels are enabled.
+    print-disabled) cat "$OLD_DISABLED_FILE" 2>/dev/null || true ;;
+    disable) [[ "${STUB_OLD_DISABLE_FAIL:-}" != "${2##*/}" ]] || exit 5; printf '\t\t\"%s\" => disabled\n' "${2##*/}" >> "$OLD_DISABLED_FILE" ;;
+    enable) sed -i.bak "/\"${2##*/}\" => disabled/d" "$OLD_DISABLED_FILE"; rm -f "$OLD_DISABLED_FILE.bak" ;;
     bootout) [[ "${STUB_REMOTE_NOT_LOADED:-0}" == 0 ]] || { echo 'Boot-out failed: 3: No such process' >&2; exit 3; }
       echo "${STUB_REMOTE_LINGER:-0}" > "$linger" ;;
     print) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n > 0 )) || exit 113; echo $((n - 1)) > "$linger" ;;
@@ -51,6 +61,32 @@ if [[ "$1" == bootstrap ]]; then label="${label##*/com.k3d-manager.}"; printf '%
 if [[ "$1" == bootout ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$LOADED_FILE"; rm -f "$LOADED_FILE.bak"; fi
 exit 0
 STUB
+  cat > "$WORK/stub/launchctl" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$HOME" == "$OLD_HOME" ]]; then
+  printf 'remote-launchctl %s\n' "$*" >> "$CALLS"
+  linger="$CALLS.linger"
+  case "$1" in
+    bootout) echo "${STUB_REMOTE_LINGER:-0}" > "$linger" ;;
+    print) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n > 0 )) || exit 113; echo $((n - 1)) > "$linger" ;;
+    bootstrap) n="$(cat "$linger" 2>/dev/null || echo 0)"; (( n == 0 )) || exit 5 ;;
+  esac
+  exit 0
+fi
+printf 'launchctl %s\n' "$*" >> "$CALLS"
+label="${*: -1}"
+label="${label##*/}"
+if [[ "$1" == print-disabled ]]; then cat "$NEW_DISABLED_FILE" 2>/dev/null || true; exit 0; fi
+if [[ "$1" == print ]]; then grep -Fxq "$label" "$LOADED_FILE" 2>/dev/null && { echo 'state = running'; exit 0; }; exit 113; fi
+if [[ "$1" == bootstrap ]]; then
+  label="${label%.plist}"
+  [[ "${STUB_NEW_BOOTSTRAP_FAIL:-}" != "$label" ]] || exit 5
+  printf '%s\n' "$label" >> "$LOADED_FILE"
+fi
+if [[ "$1" == bootout ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$LOADED_FILE"; rm -f "$LOADED_FILE.bak"; fi
+if [[ "$1" == disable ]]; then [[ "${STUB_NEW_DISABLE_FAIL:-}" != "${label##*/com.k3d-manager.}" ]] || exit 5; printf '%s\n' "${label##*/com.k3d-manager.}" >> "$NEW_DISABLED_FILE"; fi
+if [[ "$1" == enable ]]; then sed -i.bak "/^${label##*/com.k3d-manager.}$/d" "$NEW_DISABLED_FILE"; rm -f "$NEW_DISABLED_FILE.bak"; fi
+STUB
   cat > "$WORK/stub/ssh" <<'STUB'
 #!/usr/bin/env bash
 opts=""
@@ -58,7 +94,13 @@ while [[ "$1" == -o ]]; do opts+="$2 "; shift 2; done
 [[ "$opts" == *BatchMode=yes* && "$opts" == *ClearAllForwardings=yes* ]] || { echo "ssh without BatchMode/ClearAllForwardings" >&2; exit 97; }
 [[ "${STUB_SSH_DENIED:-0}" == 0 ]] || exit 255
 printf 'ssh host=%s command=%s\n' "$1" "$2" >> "$CALLS"
-if [[ "$2" == ssh\ -o* ]]; then exit "${STUB_FORWARD_SSH_DENIED:-0}"; fi
+if [[ "$2" == *'cat "$HOME/.ssh/k3dm_hub_forward.pub"'* ]]; then
+  mkdir -p "$OLD_HOME/.ssh"
+  if [[ ! -f "$OLD_HOME/.ssh/k3dm_hub_forward" ]]; then printf 'private-key-placeholder\n' > "$OLD_HOME/.ssh/k3dm_hub_forward"; fi
+  if [[ "${STUB_INVALID_FORWARD_KEY:-0}" == 1 ]]; then printf 'ssh-rsa invalid\n'; else printf '%s\n' "$STUB_FORWARD_PUBLIC_KEY"; fi
+  exit 0
+fi
+if [[ "$2" == *'ssh -F /dev/null'* ]]; then exit "${STUB_FORWARD_SSH_DENIED:-1}"; fi
 if [[ "$2" == python3\ -* ]]; then HOME="$OLD_HOME" bash -c "$2"; exit $?; fi
 if [[ "$2" == curl\ -* ]]; then
   if [[ -n "${STUB_FORWARD_FAIL_FIRST:-}" ]]; then
@@ -68,13 +110,29 @@ if [[ "$2" == curl\ -* ]]; then
   echo "${STUB_FORWARD_BODY:-OK}"; exit 0
 fi
 if [[ "$2" == *'get statefulset'* ]]; then
+  if [[ "$2" == *'get statefulset/argocd-application-controller'* && "${STUB_OLD_API_REFUSES:-0}" == 1 ]]; then
+    echo 'The connection to the server 127.0.0.1:55730 was refused' >&2
+    exit 1
+  fi
   if [[ "$2" == *readyReplicas* ]]; then echo "${STUB_OLD_READY:-0}"; else cat "$WORK_OLD_REPLICAS"; fi
+  exit 0
+fi
+if [[ "$2" == *'docker ps -a'* ]]; then
+  [[ "${STUB_DOCKER_FAIL:-0}" == 0 ]] || exit 127
+  # Captured old-host output, m4-air.local, 2026-11-06: both cluster containers exited.
+  printf '%s\n' "${STUB_DOCKER_ALL-k3d-k3d-cluster-serverlb k3d-k3d-cluster-server-0}"
+  exit 0
+fi
+if [[ "$2" == *'docker ps '* ]]; then
+  [[ "${STUB_DOCKER_FAIL:-0}" == 0 ]] || exit 127
+  printf '%s' "${STUB_DOCKER_RUNNING:-}"
   exit 0
 fi
 if [[ "$2" == *'get pods'* ]]; then [[ "${STUB_OLD_POD:-0}" == 0 ]] || echo pod/controller; exit 0; fi
 if [[ "$2" == *'scale statefulset'* ]]; then echo "${2##*--replicas=}" > "$WORK_OLD_REPLICAS"; exit 0; fi
 if [[ "$2" == *'test -f'* ]]; then exit 0; fi
 if [[ "$2" == *'launchctl print'* ]]; then
+  if [[ "$2" == *'print-disabled'* ]]; then cat "$OLD_DISABLED_FILE" 2>/dev/null || true; exit 0; fi
   label="${2##*com.k3d-manager.}"
   label="${label%\"*}"
   if [[ -f "$OLD_LOADED_FILE" ]] && grep -Fxq "$label" "$OLD_LOADED_FILE"; then echo 'state = running'; exit 0; fi
@@ -83,6 +141,19 @@ fi
 if [[ "$2" == *'launchctl bootout'* ]]; then
   label="${2##*com.k3d-manager.}"; label="${label%\"*}"
   if [[ "${STUB_OLD_STUCK:-0}" != 1 ]]; then sed -i.bak "/^$label$/d" "$OLD_LOADED_FILE"; rm -f "$OLD_LOADED_FILE.bak"; fi
+fi
+if [[ "$2" == *'launchctl disable'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%\"*}"
+  [[ "${STUB_OLD_DISABLE_FAIL:-}" != "$label" ]] || exit 5
+  printf '\t\t\"com.k3d-manager.%s\" => disabled\n' "$label" >> "$OLD_DISABLED_FILE"
+fi
+if [[ "$2" == *'launchctl enable'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%\"*}"
+  sed -i.bak "/\"com.k3d-manager.$label\" => disabled/d" "$OLD_DISABLED_FILE"; rm -f "$OLD_DISABLED_FILE.bak"
+fi
+if [[ "$2" == *'launchctl bootstrap'* ]]; then
+  label="${2##*com.k3d-manager.}"; label="${label%.plist*}"
+  printf '%s\n' "$label" >> "$OLD_LOADED_FILE"
 fi
 exit 0
 STUB
@@ -116,9 +187,14 @@ STUB
   for cmd in make curl cloudflared; do
     cat > "$WORK/stub/$cmd" <<STUB
 #!/usr/bin/env bash
-printf '$cmd %s\\n' "\$*" >> "\$CALLS"
+printf '$cmd %s\n' "\$*" >> "\$CALLS"
 STUB
-    if [[ "$cmd" == curl ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
+    if [[ "$cmd" == make ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
+if [[ "$*" == webhook-doctor ]]; then
+  if [[ -n "${STUB_WEBHOOK_REPORT:-}" ]]; then printf '%s\n' "$STUB_WEBHOOK_REPORT"; else printf '%s\n' '{"classification": "healthy"}'; fi
+fi
+STUB
+    elif [[ "$cmd" == curl ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
 if [[ "$*" == *frontend* ]]; then echo 200; else echo 401; fi
 STUB
     elif [[ "$cmd" == cloudflared ]]; then cat >> "$WORK/stub/$cmd" <<'STUB'
@@ -136,6 +212,7 @@ STUB
   cat > "$ROOT/bin/k3dm-hermes" <<'STUB'
 #!/usr/bin/env bash
 printf 'hermes %s\n' "$*" >> "$CALLS"
+if [[ -n "${STUB_HERMES_REPORT:-}" ]]; then printf '%s\n' "$STUB_HERMES_REPORT"; else printf '%s\n' '{"status":"healthy","sensor":"status_checks"}'; fi
 exit 0
 STUB
   chmod +x "$ROOT/bin/k3dm-hermes"
@@ -149,15 +226,207 @@ echo 501
 STUB
   for cmd in hostname id; do chmod +x "$WORK/stub/$cmd"; done
   chmod +x "$WORK/stub/"*
-  export LOADED_FILE="$WORK/loaded" OLD_LOADED_FILE="$WORK/old-loaded"
+  export LOADED_FILE="$WORK/loaded" OLD_LOADED_FILE="$WORK/old-loaded" OLD_DISABLED_FILE="$WORK/old-disabled" NEW_DISABLED_FILE="$WORK/new-disabled"
   : > "$LOADED_FILE"; : > "$OLD_LOADED_FILE"
+  : > "$OLD_DISABLED_FILE"; : > "$NEW_DISABLED_FILE"
   while IFS='|' read -r label _; do
     [[ -n "$label" && "$label" != \#* ]] || continue
     : > "$HOME/Library/LaunchAgents/com.k3d-manager.$label.plist"
   done < "$ROOT/scripts/etc/machine/hub-singletons.list"
 }
 
+@test "verify fails on rejected Hermes ArgoCD credential without minting or exposing a token" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  printf '%s\n' '{"records":[{"sensor":"argocd","status":"unknown","evidence":"ArgoCD status source unavailable: credential rejected; re-mint k3dm-hermes-argocd-token"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
+  run env STUB_HERMES_REPORT='{"data":{"checks":[],"counts":{},"failed_ids":[],"warned_ids":[]},"evidence":"cluster status source unavailable","sampled_at":"2026-11-06T15:50:35Z","sensor":"status_checks","status":"unknown"}' "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Hermes ArgoCD credential was rejected; run make argocd-hermes-token'* ]]
+  [[ "$output" != *'token='* ]]
+  run grep -E 'security (add|find)-generic-password|argocd-hermes-token' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "verify accepts healthy and degraded Hermes ArgoCD sensor records" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  for sensor_status in healthy degraded; do
+    printf '{"records":[{"sensor":"argocd","status":"%s","evidence":"credential accepted"}]}\n' "$sensor_status" > "$HOME/Library/Logs/k3dm-hermes.log"
+    run "$ROOT/bin/hub-cutover" --verify
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "verify treats a missing Hermes argocd record as not verified" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  printf '%s\n' '{"records":[{"sensor":"status_checks","status":"healthy"}]}' > "$HOME/Library/Logs/k3dm-hermes.log"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'argocd status not verified'* ]]
+}
+
 teardown() { rm -rf "$WORK"; }
+
+@test "M6: retry preserves partial records and rollback restores both runs exactly once" {
+  printf 'cloudflare-tunnel\nwebhook\nssh-tunnel\n' > "$OLD_LOADED_FILE"
+  export STUB_OLD_DISABLE_FAIL=webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  grep -Fxq com.k3d-manager.cloudflare-tunnel "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  export STUB_OLD_DISABLE_FAIL=''
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(sort "$HUB_CUTOVER_STATE_DIR/disabled-on-old" | uniq -d | wc -l | tr -d ' ')" -eq 0 ]
+  [ "$(sort "$HUB_CUTOVER_STATE_DIR/stopped-on-old" | uniq -d | wc -l | tr -d ' ')" -eq 0 ]
+  [ "$(wc -l < "$HUB_CUTOVER_STATE_DIR/stopped-on-old" | tr -d ' ')" -eq 3 ]
+  cp "$HUB_CUTOVER_STATE_DIR/disabled-on-old" "$WORK/expected-disabled"
+  cp "$HUB_CUTOVER_STATE_DIR/stopped-on-old" "$WORK/expected-stopped"
+  : > "$CALLS"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  while IFS= read -r label; do
+    [ "$(grep -Fc "command=launchctl enable \"gui/\$(id -u)/$label\"" "$CALLS")" -eq 1 ]
+  done < "$WORK/expected-disabled"
+  while IFS= read -r label; do
+    [ "$(grep -Fc "command=launchctl bootstrap gui/\$(id -u) \"\$HOME/Library/LaunchAgents/$label.plist\"" "$CALLS")" -eq 1 ]
+    grep -Fxq "${label#com.k3d-manager.}" "$OLD_LOADED_FILE"
+  done < "$WORK/expected-stopped"
+  [ -f "$HUB_CUTOVER_STATE_DIR/disabled-on-old" ] && [ ! -s "$HUB_CUTOVER_STATE_DIR/disabled-on-old" ]
+  [ -f "$HUB_CUTOVER_STATE_DIR/stopped-on-old" ] && [ ! -s "$HUB_CUTOVER_STATE_DIR/stopped-on-old" ]
+}
+
+@test "M7: loaded pre-disabled agent is stopped with a warning and remains unrestored" {
+  printf '\t\t"com.k3d-manager.cloud-bridge" => disabled\n' > "$OLD_DISABLED_FILE"
+  printf 'cloud-bridge\nwebhook\n' > "$OLD_LOADED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'com.k3d-manager.cloud-bridge was disabled before cutover'* ]]
+  run grep -Fxq cloud-bridge "$OLD_LOADED_FILE"
+  [ "$status" -eq 1 ]
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  run grep -E 'command=launchctl (enable|bootstrap).*cloud-bridge' "$CALLS"
+  [ "$status" -eq 1 ]
+  grep -q 'command=launchctl enable.*webhook' "$CALLS"
+  grep -q 'command=launchctl bootstrap.*webhook' "$CALLS"
+  grep -Fxq webhook "$OLD_LOADED_FILE"
+}
+
+@test "M8: rollback disables all new agents after bootstrap failure including the enabled unloaded agent" {
+  export STUB_NEW_BOOTSTRAP_FAIL=com.k3d-manager.webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  grep -q '^launchctl enable .*com.k3d-manager.webhook$' "$CALLS"
+  run grep -Fxq com.k3d-manager.webhook "$LOADED_FILE"
+  [ "$status" -eq 1 ]
+  run grep -Fxq com.k3d-manager.webhook "$NEW_DISABLED_FILE"
+  [ "$status" -eq 1 ]
+  : > "$CALLS"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  while IFS='|' read -r label _; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    grep -Fxq "com.k3d-manager.$label" "$NEW_DISABLED_FILE"
+    run grep -Fxq "com.k3d-manager.$label" "$LOADED_FILE"
+    [ "$status" -eq 1 ]
+  done < "$ROOT/scripts/etc/machine/hub-singletons.list"
+}
+
+@test "M9: plan states listed agents are disabled on the old host" {
+  run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'disable listed agents and stop loaded agents on m4-air.local'* ]]
+}
+
+@test "M10: records from another or missing old host are cleared before cutover" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  for previous in other-host absent; do
+    printf 'stale-label\n' > "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+    printf 'stale-label\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+    if [[ "$previous" == absent ]]; then rm -f "$HUB_CUTOVER_STATE_DIR/old-host"; else printf '%s\n' "$previous" > "$HUB_CUTOVER_STATE_DIR/old-host"; fi
+    : > "$OLD_DISABLED_FILE"
+    printf 'webhook\n' > "$OLD_LOADED_FILE"
+    run "$ROOT/bin/hub-cutover"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-host")" = "$HUB_OLD_HOST" ]
+    run grep -Fxq stale-label "$HUB_CUTOVER_STATE_DIR/disabled-on-old" "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+    [ "$status" -eq 1 ]
+    grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+    grep -Fxq com.k3d-manager.webhook "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  done
+}
+
+@test "M1/M3/N1: cutover disables every eligible old singleton before loading the new hub and aborts on disable failure" {
+  printf 'webhook\n' > "$OLD_LOADED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'command=launchctl disable' "$CALLS")" -eq "$(grep -vc '^#\|^$' "$ROOT/scripts/etc/machine/hub-singletons.list")" ]
+  [ "$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" -gt "$(grep -n 'command=launchctl disable' "$CALLS" | tail -1 | cut -d: -f1)" ]
+  [ "$(grep -n 'command=launchctl disable.*webhook' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'command=launchctl bootout.*webhook' "$CALLS" | cut -d: -f1)" ]
+  : > "$CALLS"
+  : > "$OLD_LOADED_FILE"
+  : > "$OLD_DISABLED_FILE"
+  printf 'cutover\n' > "$HUB_CUTOVER_TTY"
+  export STUB_OLD_DISABLE_FAIL=webhook
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  run grep -q '^launchctl bootstrap' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M4/N3: pre-disabled unloaded label remains untouched; newly disabled unloaded label is enabled without bootstrap on rollback" {
+  printf '\t\t"com.k3d-manager.cloud-bridge" => disabled\n\t\t"com.k3d-manager.argocd-port-forward" => disabled\n' > "$OLD_DISABLED_FILE"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -Fxq com.k3d-manager.sandbox-reaper "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  run grep -Fxq com.k3d-manager.cloud-bridge "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
+  [ "$status" -eq 1 ]
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  grep -q 'command=launchctl enable.*sandbox-reaper' "$CALLS"
+  run grep -q 'command=launchctl bootstrap.*sandbox-reaper' "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -q 'command=launchctl enable.*cloud-bridge' "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -q 'command=launchctl enable.*argocd-port-forward' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
+@test "M5: rollback disables the stopped new hub labels and cutover enables each before bootstrap" {
+  printf 'com.k3d-manager.webhook\n' > "$LOADED_FILE"
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf 'com.k3d-manager.webhook\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'rollback\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --rollback
+  [ "$status" -eq 0 ]
+  grep -Fxq com.k3d-manager.webhook "$NEW_DISABLED_FILE"
+  run grep -Fxq com.k3d-manager.webhook "$LOADED_FILE"
+  [ "$status" -eq 1 ]
+  [ "$(grep -n '^launchctl disable .*com.k3d-manager.webhook$' "$CALLS" | cut -d: -f1)" -lt "$(grep -n '^launchctl bootout .*com.k3d-manager.webhook$' "$CALLS" | cut -d: -f1)" ]
+  : > "$CALLS"
+  printf 'cutover\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  [ "$(grep -n '^launchctl enable' "$CALLS" | head -1 | cut -d: -f1)" -lt "$(grep -n '^launchctl bootstrap' "$CALLS" | head -1 | cut -d: -f1)" ]
+  while IFS='|' read -r label _; do
+    [[ -n "$label" && "$label" != \#* ]] || continue
+    enable_line="$(grep -n "^launchctl enable .*com.k3d-manager.$label$" "$CALLS" | cut -d: -f1)"
+    bootstrap_line="$(grep -n "^launchctl bootstrap .*com.k3d-manager.$label.plist$" "$CALLS" | cut -d: -f1)"
+    [ -n "$enable_line" ] && [ -n "$bootstrap_line" ] && [ "$enable_line" -lt "$bootstrap_line" ]
+  done < "$ROOT/scripts/etc/machine/hub-singletons.list"
+}
 
 @test "M7: dry run prints full plan and changes nothing" {
   run env DRY_RUN=1 "$ROOT/bin/hub-cutover"
@@ -212,6 +481,7 @@ teardown() { rm -rf "$WORK"; }
 @test "M9: rollback reloads exactly recorded old labels" {
   mkdir -p "$HUB_CUTOVER_STATE_DIR"
   printf 'com.k3d-manager.webhook\ncom.k3d-manager.cloudflare-tunnel\n' > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf 'com.k3d-manager.webhook\ncom.k3d-manager.cloudflare-tunnel\n' > "$HUB_CUTOVER_STATE_DIR/disabled-on-old"
   printf 'rollback\n' > "$HUB_CUTOVER_TTY"
   run "$ROOT/bin/hub-cutover" --rollback
   [ "$status" -eq 0 ]
@@ -219,6 +489,8 @@ teardown() { rm -rf "$WORK"; }
   run grep -q '^launchctl bootstrap' "$CALLS"
   [ "$status" -eq 1 ]
   [[ "$(grep '^ssh .*bootstrap' "$CALLS" | tr '\n' ' ')" == *'com.k3d-manager.webhook'*'com.k3d-manager.cloudflare-tunnel'* ]]
+  [ "$(grep -c 'command=launchctl enable' "$CALLS")" -eq 2 ]
+  [ "$(grep -n 'command=launchctl enable.*webhook' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'command=launchctl bootstrap.*webhook' "$CALLS" | cut -d: -f1)" ]
 }
 
 @test "M9: rollback unloads the M5 singletons in reverse order before reloading the old host" {
@@ -263,6 +535,46 @@ STUB
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
   [[ "$output" == *'webhook returned 502'* ]]
+}
+
+@test "verify: Hermes unknown fails with captured evidence; healthy status passes" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_HERMES_REPORT='{"data":{"checks":[],"counts":{},"failed_ids":[],"warned_ids":[]},"evidence":"cluster status source unavailable","sampled_at":"2026-11-06T15:50:35Z","sensor":"status_checks","status":"unknown"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'Hermes status is unknown: cluster status source unavailable'* ]]
+  export STUB_HERMES_REPORT='{"status":"healthy","sensor":"status_checks"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Slack delivery was not tested.'* ]]
+}
+
+@test "verify: webhook Keychain denial is unverified and gives unlock command" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_WEBHOOK_REPORT='{"classification": "keychain_interaction_required", "message": "HTTP health was not tested"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'HTTP health was not verified'* ]]
+  [[ "$output" == *'security unlock-keychain ~/Library/Keychains/login.keychain-db'* ]]
+  export STUB_WEBHOOK_REPORT='{"classification": "healthy"}'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+}
+
+@test "verify does not claim Slack delivery was checked" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  echo 0 > "$WORK_OLD_REPLICAS"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'confirm a Hermes message arrives in Slack'* ]]
 }
 
 @test "N6: source never deletes plists or mutates a cluster" {
@@ -386,6 +698,60 @@ STUB
   [ "$status" -eq 1 ]
 }
 
+@test "verify accepts a refusing old API only when captured cluster containers are all stopped" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_OLD_API_REFUSES=1
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'old cluster on m4-air.local is stopped; old controller cannot act'* ]]
+  grep -q '"verify": "pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  grep -q "docker ps -a" "$CALLS"
+  grep -q "docker ps --format" "$CALLS"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+}
+
+@test "verify fails closed for reachable replicas, running cluster, missing containers, and Docker failure" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_DOCKER_ALL='k3d-k3d-cluster-server-0' STUB_DOCKER_RUNNING=''
+  echo 2 > "$WORK_OLD_REPLICAS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  grep -q '"verify": "verify-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+
+  export STUB_OLD_API_REFUSES=1 STUB_DOCKER_RUNNING='k3d-k3d-cluster-server-0'
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  export STUB_DOCKER_RUNNING='' STUB_DOCKER_ALL=''
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+  export STUB_DOCKER_ALL='k3d-k3d-cluster-server-0' STUB_DOCKER_FAIL=1
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+
+  export STUB_DOCKER_FAIL=0 STUB_SSH_DENIED=1
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 1 ]
+}
+
+@test "verify fallback makes no old-host start, stop, scale, or kubectl calls" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  printf '%s\n' com.k3d-manager.ssh-tunnel com.k3d-manager.ssh-tunnel-vault > "$LOADED_FILE"
+  export STUB_OLD_API_REFUSES=1
+  : > "$CALLS"
+  run "$ROOT/bin/hub-cutover" --verify
+  [ "$status" -eq 0 ]
+  run grep -E 'docker (start|stop)|k3d |kubectl .*scale' "$CALLS"
+  [ "$status" -eq 1 ]
+}
+
 @test "verify requires the labeled registration and healthy ESO application" {
   export STUB_NO_REGISTRATION=1
   run "$ROOT/bin/hub-cutover"
@@ -424,16 +790,134 @@ for label, port in (("hub-pushgateway-port-forward", "19094"), ("hub-loki-port-f
     with open(path, 'rb') as f: current = plistlib.load(f)
     with open(path + '.pre-cutover', 'rb') as f: original = plistlib.load(f)
     assert original['ProgramArguments'] == ['kubectl']
-    assert current['ProgramArguments'] == ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    args = current['ProgramArguments']
+    assert args[:14] == ['/usr/bin/ssh', '-F', '/dev/null', '-N', '-i', os.path.join(sys.argv[1], '.ssh/k3dm_hub_forward'), '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes']
+    assert args[14:] == ['-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3', '-L', '127.0.0.1:' + port + ':127.0.0.1:' + port, 'm5-air.local']
+    assert args[5].startswith('/') and os.environ['STUB_FORWARD_PUBLIC_KEY'].split()[1] not in ' '.join(args)
+    assert 'private-key-placeholder' not in open(path, 'rb').read().decode('latin1')
     assert current['KeepAlive'] and current['StandardOutPath'] == '/tmp/forward.log'
 PYCODE
   grep -q '"verify": "forwards-pass"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
 }
 
+@test "forwards: dedicated key is authorized once with forward-only restrictions" {
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  local authorized="$HOME/.ssh/authorized_keys"
+  [ "$(grep -c 'k3dm-hub-forward' "$authorized")" -eq 1 ]
+  grep -Fq 'command="/usr/bin/false",restrict,port-forwarding,permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100",permitlisten="127.0.0.1:1"' "$authorized"
+  grep -Fq 'env -u SSH_AUTH_SOCK ssh -F /dev/null -i ~/.ssh/k3dm_hub_forward -o IdentitiesOnly=yes -o IdentityAgent=none -o BatchMode=yes' "$CALLS"
+  run grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$CALLS"
+  [ "$status" -eq 1 ]
+  run grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  [ "$status" -eq 1 ]
+  run grep -Fq private-key-placeholder "$CALLS"
+  [ "$status" -eq 1 ]
+  [ "$(stat -c %a "$HOME/.ssh" 2>/dev/null || stat -f %Lp "$HOME/.ssh")" = 700 ]
+  [ "$(stat -c %a "$authorized" 2>/dev/null || stat -f %Lp "$authorized")" = 600 ]
+  local original_inode
+  original_inode="$(stat -c %i "$authorized" 2>/dev/null || stat -f %i "$authorized")"
+  cp "$authorized" "$WORK/authorized-before"
+  printf '[{"verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'k3dm-hub-forward' "$authorized")" -eq 1 ]
+  [ "$(stat -c %i "$authorized" 2>/dev/null || stat -f %i "$authorized")" = "$original_inode" ]
+  cmp "$WORK/authorized-before" "$authorized"
+  [ "$(cat "$OLD_HOME/.ssh/k3dm_hub_forward")" = private-key-placeholder ]
+}
+
+@test "forwards: existing authorized keys retain their bytes and an unterminated last line is separated" {
+  [[ "$HOME" == "$WORK/home" ]]
+  mkdir -p "$HOME/.ssh"
+  printf 'first existing line\nlast existing line' > "$HOME/.ssh/authorized_keys"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  python3 - "$HOME/.ssh/authorized_keys" <<'PYCODE'
+import os, sys
+contents = open(sys.argv[1], 'rb').read()
+prefix = b'first existing line\nlast existing line\n'
+assert contents.startswith(prefix)
+assert contents[len(prefix):].endswith(os.environ['STUB_FORWARD_PUBLIC_KEY'].encode() + b'\n')
+assert contents.count(b'k3dm-hub-forward') == 1
+PYCODE
+}
+
+@test "forwards: failed atomic replacement preserves authorized keys and a retry succeeds" {
+  [[ "$HOME" == "$WORK/home" ]]
+  mkdir -p "$HOME/.ssh" "$WORK/injection"
+  printf 'existing key without newline' > "$HOME/.ssh/authorized_keys"
+  cp "$HOME/.ssh/authorized_keys" "$WORK/authorized-before"
+  local original_inode
+  original_inode="$(stat -c %i "$HOME/.ssh/authorized_keys" 2>/dev/null || stat -f %i "$HOME/.ssh/authorized_keys")"
+  cat > "$WORK/injection/sitecustomize.py" <<'PYCODE'
+import os
+original_replace = os.replace
+def fail_authorized_replace(source, destination, *args, **kwargs):
+    if destination == os.path.join(os.environ['HOME'], '.ssh', 'authorized_keys'):
+        with open(source, 'wb') as target:
+            target.write(b'partial temporary write')
+        raise OSError('injected replacement failure')
+    return original_replace(source, destination, *args, **kwargs)
+os.replace = fail_authorized_replace
+PYCODE
+  run env PYTHONPATH="$WORK/injection${PYTHONPATH:+:$PYTHONPATH}" "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'injected replacement failure'* ]]
+  [ "$(stat -c %i "$HOME/.ssh/authorized_keys" 2>/dev/null || stat -f %i "$HOME/.ssh/authorized_keys")" = "$original_inode" ]
+  cmp "$WORK/authorized-before" "$HOME/.ssh/authorized_keys"
+  [ "$(find "$HOME/.ssh" -name '.authorized_keys.*' | wc -l | tr -d ' ')" -eq 0 ]
+  printf 'forwards\n' > "$HUB_CUTOVER_TTY"
+  run "$ROOT/bin/hub-cutover" --forwards
+  [ "$status" -eq 0 ]
+  grep -Fq "$STUB_FORWARD_PUBLIC_KEY" "$HOME/.ssh/authorized_keys"
+}
+
+@test "forwards: each manifest port is authorized, including a third forward" {
+  printf 'extra-forward|19101|fixture\n' >> "$ROOT/scripts/etc/machine/hub-push-forwards.list"
+  python3 - "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.extra-forward.plist" <<'PYCODE'
+import plistlib, sys
+with open(sys.argv[1], 'wb') as target:
+    plistlib.dump({'ProgramArguments': ['kubectl']}, target)
+PYCODE
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -eq 0 ]
+  grep -Fq 'permitopen="127.0.0.1:19094",permitopen="127.0.0.1:19100",permitopen="127.0.0.1:19101"' "$HOME/.ssh/authorized_keys"
+}
+
+@test "forwards: an empty manifest is refused before authorization" {
+  [[ "$HOME" == "$WORK/home" && "$ROOT" == "$WORK/repo" ]]
+  printf '# no forwards\n' > "$ROOT/scripts/etc/machine/hub-push-forwards.list"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'empty hub forwards manifest'* ]]
+  [ ! -e "$HOME/.ssh/authorized_keys" ]
+}
+
+@test "forwards: failed plist install reports how to retry" {
+  rm "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist"
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'rerun make hub-cutover-forwards'* ]]
+  grep -q '"verify": "forwards-failed"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+}
+
+@test "forwards: invalid tunnel public key fails before authorization" {
+  export STUB_INVALID_FORWARD_KEY=1
+  # Fixture proves both destinations are isolated before running the program.
+  [[ "$HOME" == "$WORK/home" && "$OLD_HOME" == "$WORK/old-home" ]]
+  run "$ROOT/bin/hub-cutover"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'invalid public key'* ]]
+  [ ! -e "$HOME/.ssh/authorized_keys" ]
+}
+
 @test "forwards: failed batch login skips changes after a passing cutover" {
-  export STUB_FORWARD_SSH_DENIED=1
+  export STUB_FORWARD_SSH_DENIED=255
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 1 ]
+  [[ "$output" == *'tunnel key ~/.ssh/k3dm_hub_forward on m4-air.local cannot authenticate to m5-air.local without an agent'* ]]
   grep -q '"verify": "forwards-skipped"' "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
   [ ! -e "$OLD_HOME/Library/LaunchAgents/com.k3d-manager.hub-loki-port-forward.plist.pre-cutover" ]
   run grep -q 'command=python3 -' "$CALLS"
@@ -557,4 +1041,69 @@ open(p, 'w').write(json.dumps(r))
 PY
   run "$ROOT/bin/hub-cutover"
   [ "$status" -eq 2 ]; [[ "$output" == *differs* ]]; [ ! -s "$CALLS" ]
+}
+
+@test "recovery modes use last cutover report host when old-host is absent" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"stale.example","verify":"pass"},{"old_host":"recorded.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    printf '[{"old_host":"stale.example","verify":"pass"},{"old_host":"recorded.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    grep -q '^ssh host=recorded.example ' "$CALLS"
+    if grep -q '^ssh host=stale.example ' "$CALLS"; then false; fi
+  done
+  [ ! -e "$HUB_CUTOVER_STATE_DIR/old-host" ]
+}
+
+@test "recovery modes reject invalid report host before ssh" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"bad host;touch /tmp/pwned","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
+}
+
+@test "recovery modes with no old host source refuse before ssh" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
+}
+
+@test "recovery host precedence is environment then old-host then report" {
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '[{"old_host":"report.example","verify":"pass"}]\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  printf 'file.example\n' > "$HUB_CUTOVER_STATE_DIR/old-host"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  run "$ROOT/bin/hub-cutover" --rollback
+  grep -q '^ssh host=m4-air.local ' "$CALLS"
+  [ "$(cat "$HUB_CUTOVER_STATE_DIR/old-host")" = file.example ]
+  rm -f "$HUB_CUTOVER_STATE_DIR/old-host"
+  : > "$CALLS"
+  unset HUB_OLD_HOST
+  run "$ROOT/bin/hub-cutover" --rollback
+  grep -q '^ssh host=report.example ' "$CALLS"
+}
+
+@test "recovery modes refuse a report that is valid JSON but not a list" {
+  unset HUB_OLD_HOST
+  mkdir -p "$HUB_CUTOVER_STATE_DIR"
+  printf '{}\n' > "$HUB_CUTOVER_STATE_DIR/hub-cutover-report.json"
+  : > "$HUB_CUTOVER_STATE_DIR/stopped-on-old"
+  for mode in --verify --forwards --rollback; do
+    : > "$CALLS"
+    run "$ROOT/bin/hub-cutover" "$mode"
+    [ "$status" -eq 2 ]; [[ "$output" == *'set HUB_OLD_HOST'* ]]; [ ! -s "$CALLS" ]
+  done
 }

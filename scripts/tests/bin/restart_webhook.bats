@@ -9,6 +9,10 @@ _restart_webhook_stubs() {
   STUB_BIN="${BATS_TEST_TMPDIR}/bin"
   STUB_CALLS="${BATS_TEST_TMPDIR}/launchctl.calls"
   mkdir -p "${STUB_HOME}/Library/LaunchAgents" "${STUB_BIN}"
+  export XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+  [[ "${XDG_CONFIG_HOME}" == "${BATS_TEST_TMPDIR}/"* ]]
+  mkdir -p "${XDG_CONFIG_HOME}/k3d-manager"
+  printf 'hub\n' > "${XDG_CONFIG_HOME}/k3d-manager/machine-role"
   cat > "${STUB_BIN}/launchctl" <<'SH'
 #!/bin/sh
 printf '%s\n' "$*" >> "$STUB_CALLS"

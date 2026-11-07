@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+from unittest.mock import patch
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,52 @@ DASHBOARD = Path(os.environ.get(
     "BUG_DASHBOARD_PATH", ROOT / "scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml"))
 GUIDE = ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md"
 PROMETHEUS_IMAGE = "prom/prometheus:v3.1.0"
+
+# Captured from packages/grafana-data/src/transformations/matchers/ids.ts at
+# Grafana tag v11.4.0, recorded by Claude in the 2026-11-07 bug spec.
+GRAFANA_FIELD_MATCHER_IDS = {
+    "anyMatch", "allMatch", "invertMatch", "alwaysMatch", "neverMatch",
+    "numeric", "time", "first", "firstTimeField", "byType", "byTypes",
+    "byName", "byNames", "byRegexp", "byRegexpOrNames", "byFrameRefID",
+    "byValue",
+}
+PLATFORM_OPS = ROOT / "scripts/etc/argocd/platform-ops"
+DASHBOARD_JSON_MARKER = re.compile(r"^  [^\n]+\.json: \|\n", re.MULTILINE)
+
+
+def embedded_dashboard_json(path):
+    """Parse the dashboard JSON embedded in its ConfigMap YAML."""
+    content = path.read_text()
+    match = DASHBOARD_JSON_MARKER.search(content)
+    assert match, f"{path} has no embedded dashboard JSON"
+    return json.loads("\n".join(line[4:] for line in content[match.end():].splitlines()))
+
+
+def invalid_field_matchers(dashboard):
+    """Return field override matcher IDs outside Grafana's field registry."""
+    invalid = []
+    for panel in dashboard.get("panels", []):
+        for override in panel.get("fieldConfig", {}).get("overrides", []):
+            matcher_id = override.get("matcher", {}).get("id")
+            if matcher_id not in GRAFANA_FIELD_MATCHER_IDS:
+                invalid.append(matcher_id)
+    return invalid
+
+
+def test_platform_ops_field_override_matchers_are_grafana_114_field_matchers():
+    dashboard_paths = sorted(PLATFORM_OPS.glob("grafana-dashboard-*.yaml"))
+    assert dashboard_paths, f"no platform-ops dashboards found under {PLATFORM_OPS}"
+    assert all(path.parent == PLATFORM_OPS for path in dashboard_paths)
+    for path in dashboard_paths:
+        assert invalid_field_matchers(embedded_dashboard_json(path)) == [], path
+
+
+def test_field_matcher_guard_rejects_frame_only_matchers():
+    for matcher_id in ("byRefId", "byIndex"):
+        synthetic = {"panels": [{"fieldConfig": {"overrides": [
+            {"matcher": {"id": matcher_id}},
+        ]}}]}
+        assert invalid_field_matchers(synthetic) == [matcher_id]
 
 
 def load_module(name, path):
@@ -89,10 +136,32 @@ def fixture_metrics(tmp_path):
     metric_text += producer._release_metrics(repo, tally=release_tally,
                                           fixed_in={bug_path: {"release": release}})
     metric_text += producer._forecast_metrics(repo, now=1_800_000_000)
+    metric_text += producer._bug_open_history(repo, "HEAD", days=1)
 
     events = [{"ts": 1_800_000_000, "event": "start", "version": release,
                "slug": "fixture-dispatched", "spec": f"docs/plans/{release}-fixture-dispatched.md"}]
     metric_text += dispatch.render(events, 0, now=1_800_000_000)
+
+    hermes = load_module("hermes_checkout_dashboard_test", ROOT / "bin/k3dm-hermes")
+    hermes.ROOT = repo
+    captured = []
+
+    class Response:
+        def close(self):
+            pass
+
+    def capture_push(request, timeout):
+        assert request.full_url.endswith("/metrics/job/k3dm-hub-checkout")
+        assert timeout == 5
+        captured.append(request.data.decode())
+        return Response()
+
+    # This scratch repository and exact request target are asserted before the
+    # producer output is appended; the patched HTTP client never sends it.
+    assert hermes.ROOT == repo
+    with patch.object(hermes.urllib.request, "urlopen", side_effect=capture_push):
+        hermes._push_checkout_lag("HEAD", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")
+    metric_text += "".join(captured)
     return metric_text, set(texts)
 
 

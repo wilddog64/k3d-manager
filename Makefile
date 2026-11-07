@@ -35,6 +35,7 @@ K3DM_PYTHON3_PATH ?= /opt/homebrew/opt/python@3.14/bin/python3.14
 K3DM_MANAGER_BIN ?= ./scripts/k3d-manager
 
 .PHONY: appsets-reapply appsets-check codex-dispatch codex-status codex-land codex-land-pending codex-resume codex-abandon codex-prune codex-release-merged dispatch-metrics agy-wrapper-install agy-wrapper-uninstall bug-tally vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export hub-data-export-setup hub-data-export-schedule hub-data-export-unschedule hub-data-prune dr-drill dr-drill-publish snapshot-schedule snapshot-unschedule orbstack-upgrade
+.PHONY: trust-vault-ca
 .PHONY: e2e-sandbox-provision-preview
 .PHONY: vuln-scan-report
 
@@ -48,6 +49,10 @@ hub-migrate:
 
 hub-new:
 	@bin/hub-new
+
+.PHONY: hub-sync
+hub-sync:
+	@bin/k3dm-hub-sync
 
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:
@@ -76,12 +81,16 @@ install-test-metrics:
 	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
 
-.PHONY: fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+
+## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
+trust-vault-ca:
+	./bin/cluster-up --trust-vault-ca
 
 ## Provision full stack (provider-aware: k3d → local Hub only; k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3d) bin/hub-up ;; \
+	  k3d) bin/k3dm-require-role hub && bin/hub-up ;; \
 	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
 	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
@@ -422,6 +431,7 @@ sync-main:
 
 ## Reapply every ApplicationSet pinned to a release branch (BRANCH=, default: current branch)
 appsets-reapply:
+	@bin/k3dm-require-role hub
 	@_b='$(BRANCH)'; \
 	if ! printf '%s\n' "$$_b" | grep -Eq '^k3d-manager-v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 	  echo "[appsets-reapply] ERROR: '$$_b' is not a release branch (k3d-manager-vX.Y.Z)." >&2; \
@@ -440,7 +450,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',)
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',) $(if $(PARENT),--parent '$(PARENT)',) $(if $(ROLE),--role '$(ROLE)',)
 
 ## Show Codex worktree task status
 codex-status:
@@ -454,9 +464,9 @@ codex-land:
 codex-land-pending:
 	@bin/k3dm-codex-land-pending --slug '$(SLUG)' --test '$(TEST)' $(if $(LANDING_ACTOR),--landing-actor '$(LANDING_ACTOR)',) $(if $(LANDING_MODEL),--landing-model '$(LANDING_MODEL)',)
 
-## Resume a Codex task (SLUG=slug, PROMPT=path)
+## Resume a Codex task (SLUG=slug, PROMPT=path, REASON=continue_prompt|clarification|correction|other)
 codex-resume:
-	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
+	@bin/k3dm-codex-dispatch resume --slug '$(SLUG)' --prompt-file '$(PROMPT)' --reason '$(REASON)' $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',)
 
 ## Record an explicit coordinator handoff (SLUG=slug, ACTING_COORDINATOR=vendor/model)
 codex-handoff:
@@ -521,6 +531,10 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Install the fixed system launchd socket relays for browser listeners
+install-browser-relays:
+	bin/install-browser-relays.sh
+
 ## Diagnose webhook read-only (DRY_RUN=1 prints only the probe plan)
 webhook-doctor:
 	@bin/k3dm-webhook-doctor $(if $(filter 1,$(DRY_RUN)),--dry-run,--check)
@@ -531,6 +545,7 @@ cloudflare-preflight:
 
 ## Restart the k3dm-webhook LaunchAgent (picks up code changes)
 restart-webhook:
+	@bin/k3dm-require-role hub
 	@launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	@_attempt=1; while [ "$$_attempt" -le 5 ]; do \
 		if _bootstrap_output=$$(launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>&1); then \
@@ -721,15 +736,13 @@ uninstall-alertmanager-port-forward:
 
 install-alertmanager-auth-proxy:
 	sed \
-	  -e "s|{{PYTHON3_PATH}}|$$(command -v python3)|g" \
+	  -e "s|{{PYTHON3_PATH}}|$(K3DM_PYTHON3_PATH)|g" \
 	  -e "s|{{ALERTMANAGER_PROXY_BIN}}|$(CURDIR)/bin/alertmanager-auth-proxy|g" \
 	  -e "s|{{ALERTMANAGER_AUTH_FILE}}|$(HOME)/.local/share/k3d-manager/alertmanager-basic-auth.env|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
-	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
-	launchctl bootstrap "gui/$$(id -u)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+	bin/launchd-reload com.k3d-manager.alertmanager-auth-proxy "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
 	@echo "Alertmanager auth proxy installed — localhost:9093 now requires basic auth"
 
 uninstall-alertmanager-auth-proxy:
@@ -1150,8 +1163,9 @@ signing-restore:
 ## Required after ANY ArgoCD rebuild: a rebuild regenerates server.secretkey, which permanently
 ## invalidates every token minted before it — the CLI reports "token signature is invalid", which
 ## is neither an expiry nor a revocation, and retrying can never succeed.
-## The admin password resolves from ARGOCD_ADMIN_PASSWORD, else the argocd-initial-admin-secret
-## Secret. Override the endpoint with ARGOCD_HOST. Never prints the token.
+## The admin password resolves from ARGOCD_ADMIN_PASSWORD, Vault secret/argocd/admin,
+## then the argocd-initial-admin-secret Secret. Override the endpoint with ARGOCD_HOST.
+## Never prints the token or either password.
 argocd-hermes-token:
 	@[ -t 0 ] || { \
 	  echo "[argocd-hermes-token] ERROR: refusing to run without a terminal." >&2; \
@@ -1161,11 +1175,22 @@ argocd-hermes-token:
 	_host="$${ARGOCD_HOST:-argocd.3ai-talk.org}"; \
 	_ns="$${ARGOCD_NAMESPACE:-cicd}"; \
 	_pw="$${ARGOCD_ADMIN_PASSWORD:-}"; \
+	if [ -z "$$_pw" ]; then \
+	  _vault_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null || true); \
+	  if [ -n "$$_vault_tok" ]; then \
+	    _vault_hdr=$$(mktemp); trap 'rm -f "$$_vault_hdr"' EXIT; \
+	    printf 'X-Vault-Token: %s\n' "$$_vault_tok" >"$$_vault_hdr"; \
+	    _pw=$$(curl -sf -H "@$$_vault_hdr" http://127.0.0.1:18200/v1/secret/data/argocd/admin 2>/dev/null | \
+	      python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["data"].get("password", ""))' 2>/dev/null || true); \
+	    rm -f "$$_vault_hdr"; trap - EXIT; \
+	  fi; \
+	fi; \
 	[ -n "$$_pw" ] || _pw=$$(kubectl get secret argocd-initial-admin-secret -n "$$_ns" \
-	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null); \
 	[ -n "$$_pw" ] || { \
-	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, or check" >&2; \
-	  echo "[argocd-hermes-token]        that argocd-initial-admin-secret still exists in $$_ns." >&2; \
+	  echo "[argocd-hermes-token] ERROR: no admin password. Set ARGOCD_ADMIN_PASSWORD, check Vault" >&2; \
+	  echo "[argocd-hermes-token]        secret/argocd/admin, or check argocd-initial-admin-secret in $$_ns." >&2; \
 	  exit 1; \
 	}; \
 	_tok=$$(ARGOCD_HOST="$$_host" ARGOCD_ADMIN_PW="$$_pw" python3 -c 'import json,os,urllib.request as u; UA="k3d-manager/argocd-hermes-token"; h=os.environ["ARGOCD_HOST"]; j={"Content-Type":"application/json","User-Agent":UA}; s=json.loads(u.urlopen(u.Request("https://%s/api/v1/session" % h, data=json.dumps({"username":"admin","password":os.environ["ARGOCD_ADMIN_PW"]}).encode(), headers=j, method="POST"), timeout=30).read())["token"]; k=dict(j); k["Authorization"]="Bearer "+s; print(json.loads(u.urlopen(u.Request("https://%s/api/v1/account/hermes/token" % h, data=json.dumps({"expiresIn":0}).encode(), headers=k, method="POST"), timeout=30).read())["token"])') || { \
@@ -1263,6 +1288,7 @@ observability:
 
 ## Reconcile Hub platform-ops resources (CVE scanner, retry limits, and dashboards)
 platform-ops:
+	@bin/k3dm-require-role hub
 	./scripts/k3d-manager deploy_argocd_platform_ops --confirm
 
 ## Apply hub PrometheusRules only (scripts/etc/prometheus/rules) — no full observability redeploy
@@ -1407,6 +1433,21 @@ lint-python:
 	 done < <(git ls-files | grep -v '^scripts/lib/foundation/' | grep -v '\.py$$'); \
 	 "$$ruff" check -- "$${files[@]}"
 
+## Check docs/release-milestones.json against roadmap and plan versions
+check-release-milestones:
+	@set -euo pipefail; \
+	 if [ -n "$${PYTEST:-}" ]; then set -- $$PYTEST; \
+	 elif command -v pytest >/dev/null 2>&1; then set -- pytest; \
+	 elif python3 -m pytest --version >/dev/null 2>&1; then set -- python3 -m pytest; \
+	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 else \
+	   echo "[make] no pytest found. Install pytest or set PYTEST." >&2; \
+	   exit 2; \
+	 fi; \
+	 "$$@" -q scripts/tests/bin/test_release_milestones_drift.py::test_release_milestones_stay_in_sync_with_roadmap
+
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
@@ -1467,6 +1508,10 @@ check-repo-root:
 fast-gate:
 	@scripts/ci/fast_gate.sh $(BASE)
 
+check-agent-docs:
+	@./bin/k3dm-check-agent-docs
+
+test-pytest: check-agent-docs
 test-pytest:
 	@set -euo pipefail; \
 	 if [ -n "$${PYTEST:-}" ]; then set -- $$PYTEST; \
@@ -1617,8 +1662,8 @@ help:
 	@echo "    make hub-cutover-rollback  Move recorded agents back to the old hub"
 	@echo "    make hub-restore   Restore Keychain-backed hub credentials + local agents (run in Terminal.app)"
 	@echo "    make hub-recover   Full hub DR: hub-up + hub-restore (run in Terminal.app)"
-	@echo "    make machine-setup ROLE=hub|worker|console  Configure a workstation (docs/howto/machine-setup.md)"
-	@echo "    make machine-check ROLE=hub|worker|console  Read-only workstation inventory (docs/howto/machine-setup.md)"
+	@echo "    make machine-setup ROLE=hub|worker|console|control  Configure a workstation (docs/howto/machine-setup.md)"
+	@echo "    make machine-check ROLE=hub|worker|console|control  Read-only workstation inventory (docs/howto/machine-setup.md)"
 	@echo "    make machine-check-shell HOST=<mac>  Read-only SSH login-shell check of a new Mac"
 	@echo "    make fast-gate [BASE=<rev>]  Changed-file lint and tests before push (docs/howto/fast-gate.md)"
 	@echo "    make argocd-admin-resync  Revalidate and repair the Vault ArgoCD admin password"
@@ -1634,6 +1679,7 @@ help:
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make status-public Sustained multi-sample public-endpoint probe (JSON=1 for machine output)"
+	@echo "    make check-release-milestones  Check roadmap and plan versions against milestones"
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make index-docs    Embed docs/ into the vector store (DRY_RUN=1, LIMIT=n)"
 	@echo "    make find-similar-docs Q=\"...\" [K=5]  Find prior art by similarity (advisory)"
@@ -1713,12 +1759,12 @@ help:
 ## Install and configure a workstation from its role manifest; see docs/howto/machine-setup.md
 .PHONY: machine-setup machine-check machine-check-shell machine-secrets-export machine-secrets-import
 machine-setup:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" $(if $(FROM),--from "$(FROM)") $(if $(SECRETS),--secrets "$(SECRETS)") $(if $(AGENTS),--agents "$(AGENTS)")
 
 ## Read-only workstation inventory; exits nonzero when any item is missing; see docs/howto/machine-setup.md
 machine-check:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-setup --role "$(ROLE)" --check
 
 machine-check-shell:
@@ -1726,7 +1772,7 @@ machine-check-shell:
 	@bin/k3dm-machine-setup --check-shell "$(HOST)"
 
 machine-secrets-export:
-	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console' >&2; exit 2; }
+	@test -n "$(ROLE)" || { echo 'Set ROLE=hub|worker|console|control' >&2; exit 2; }
 	@bin/k3dm-machine-secrets export --role "$(ROLE)"
 
 machine-secrets-import:

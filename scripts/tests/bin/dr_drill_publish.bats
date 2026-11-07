@@ -102,3 +102,35 @@ STUB
   [[ "$output" == *"metrics push failed"* ]]
   grep -q 'git push origin results' "$LOG"
 }
+
+@test "dr drill publish: M2 authentication failure is actionable and stops publishing" {
+  cat > "$STUB_BIN/ssh" <<'STUB'
+#!/usr/bin/env bash
+printf 'ssh %s\n' "$*" >> "$LOG"
+printf '%s\n' 'Permission denied (publickey,password,keyboard-interactive).' >&2
+exit 255
+STUB
+  cat > "$STUB_BIN/ssh-add" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' '256 SHA256:fixtureFingerprint example@host (ED25519)'
+STUB
+  chmod +x "$STUB_BIN/ssh" "$STUB_BIN/ssh-add"
+  run bin/dr-drill-publish
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cannot authenticate to m2jump"* ]]
+  [[ "$output" == *"SHA256:fixtureFingerprint"* ]]
+  [[ "$output" == *"ssh-copy-id -i ~/.ssh/id_ed25519.pub m2jump"* ]]
+  [ "$(grep -c '^git clone\|^git push\|^curl ' "$LOG" || true)" -eq 0 ]
+}
+
+@test "dr drill publish: SSH options do not weaken authentication or write authorized_keys" {
+  run grep -Eq 'StrictHostKeyChecking=no|PasswordAuthentication' bin/dr-drill-publish
+  [ "$status" -ne 0 ]
+  run grep -Eq '(^|[[:space:]])(>>?|tee)[[:space:]].*authorized_keys|authorized_keys[[:space:]]+(>>?|tee)' bin/dr-drill-publish
+  [ "$status" -ne 0 ]
+
+  cp bin/dr-drill-publish "$BATS_TEST_TMPDIR/dr-drill-publish"
+  printf '\n%s\n' 'StrictHostKeyChecking=no' >> "$BATS_TEST_TMPDIR/dr-drill-publish"
+  run grep -Eq 'StrictHostKeyChecking=no|PasswordAuthentication' "$BATS_TEST_TMPDIR/dr-drill-publish"
+  [ "$status" -eq 0 ]
+}

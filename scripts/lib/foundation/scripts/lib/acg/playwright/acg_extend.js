@@ -8,12 +8,12 @@ const path = require('path');
  *
  * Static Playwright script to extend the ACG sandbox TTL by 4 hours.
  * Launches a persistent Chrome context — session persists across runs via auth dir.
- * Auth dir: ~/.local/share/k3d-manager/profile
+ * Auth dir: PLAYWRIGHT_AUTH_DIR or ~/.local/share/k3d-manager/pw-profile
  *
  * Usage: node acg_extend.js <sandbox-url>
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
+const AUTH_DIR = process.env.PLAYWRIGHT_AUTH_DIR || path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'pw-profile');
 
 const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
 const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
@@ -164,12 +164,6 @@ async function _findExtendButton(page, selectors, targetUrl, waitMs = 15000) {
 }
 
 async function extendSandbox() {
-  if (_isFirstRun()) {
-    console.error(`ERROR: Auth dir is empty (${AUTH_DIR}).`);
-    console.error('ERROR: Run acg_get_credentials <sandbox-url> first to bootstrap the Pluralsight session.');
-    process.exit(1);
-  }
-
   const checkMode = process.argv[3] === '--check';
 
   let targetUrl = process.argv[2];
@@ -196,6 +190,11 @@ async function extendSandbox() {
     }
 
     if (!browserContext) {
+      if (_isFirstRun()) {
+        console.error(`ERROR: Auth dir is empty (${AUTH_DIR}).`);
+        console.error('ERROR: Run acg_get_credentials <sandbox-url> first to bootstrap the Pluralsight session.');
+        process.exit(1);
+      }
       browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
         headless: false,
         channel: 'chrome',

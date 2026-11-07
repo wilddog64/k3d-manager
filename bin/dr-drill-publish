@@ -9,12 +9,40 @@ chmod 700 "$stage"
 _publish_cleanup() { rm -rf -- "$stage"; }
 trap _publish_cleanup EXIT
 
-remote_file="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$DR_DRILL_HOST" 'cd ~/.k3dm/dr-drill && find . -maxdepth 1 -type f -name "*.json" -print | sort -r | head -1')"
+_m2_ssh() {
+  local stderr_file status
+  stderr_file="${stage}/ssh.stderr"
+  if ssh -o BatchMode=yes -o ConnectTimeout=10 "$DR_DRILL_HOST" "$@" 2>"$stderr_file"; then
+    cat "$stderr_file" >&2
+    return 0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq 255 ]] && grep -q 'Permission denied' "$stderr_file"; then
+    cat "$stderr_file" >&2
+    printf "[dr-drill-publish] cannot authenticate to %s: its authorized_keys does not accept this host's key\n" "$DR_DRILL_HOST" >&2
+    if ssh-add -l >&2; then
+      :
+    elif [[ -r "$HOME/.ssh/id_ed25519.pub" ]]; then
+      ssh-keygen -lf "$HOME/.ssh/id_ed25519.pub" >&2 || true
+    else
+      printf '[dr-drill-publish] key fingerprint unavailable (no agent identities or readable ~/.ssh/id_ed25519.pub)\n' >&2
+    fi
+    printf '[dr-drill-publish] remedy: run ssh-copy-id -i ~/.ssh/id_ed25519.pub %s from a host that is already authorized, or append the public key to ~/.ssh/authorized_keys on that host\n' "$DR_DRILL_HOST" >&2
+    return 1
+  fi
+
+  cat "$stderr_file" >&2
+  return "$status"
+}
+
+remote_file="$(_m2_ssh 'cd ~/.k3dm/dr-drill && find . -maxdepth 1 -type f -name "*.json" -print | sort -r | head -1')"
 [[ -n "$remote_file" ]] || { echo '[dr-drill-publish] M2 has no result JSON' >&2; exit 1; }
 remote_name="${remote_file##*/}"
 [[ "$remote_file" == "./${remote_name}" && "$remote_name" =~ ^[0-9]{8}T[0-9]{6}Z\.json$ ]] || { echo '[dr-drill-publish] refusing unexpected M2 result path' >&2; exit 1; }
 result="${stage}/result.json"
-ssh -o BatchMode=yes -o ConnectTimeout=10 "$DR_DRILL_HOST" cat -- ".k3dm/dr-drill/${remote_name}" > "$result"
+_m2_ssh cat -- ".k3dm/dr-drill/${remote_name}" > "$result"
 jq -e '(.run_timestamp|type == "string" and test("^[0-9]{8}T[0-9]{6}Z$")) and (.success|type == "boolean") and (.rto_seconds|type == "number") and (.rpo_seconds|type == "number") and (.checks|type == "object")' "$result" >/dev/null || { echo '[dr-drill-publish] invalid result schema' >&2; exit 1; }
 stamp="$(jq -r .run_timestamp "$result")"
 repo="${stage}/repo"

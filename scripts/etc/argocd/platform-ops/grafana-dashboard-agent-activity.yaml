@@ -601,7 +601,7 @@ data:
           "title": "Untracked by repo",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 0,
             "y": 26
@@ -644,7 +644,7 @@ data:
           "options": {
             "orientation": "horizontal",
             "namePlacement": "top",
-            "minVizHeight": 8,
+            "minVizHeight": 36,
             "text": {
               "titleSize": 12,
               "valueSize": 16
@@ -657,7 +657,7 @@ data:
           "title": "Sessions by mode",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 6,
             "y": 26
@@ -708,7 +708,7 @@ data:
           "title": "Tokens by repo",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 12,
             "y": 26
@@ -751,7 +751,7 @@ data:
           "options": {
             "orientation": "horizontal",
             "namePlacement": "top",
-            "minVizHeight": 8,
+            "minVizHeight": 36,
             "text": {
               "titleSize": 12,
               "valueSize": 16
@@ -769,7 +769,7 @@ data:
           "title": "Codex active hours",
           "description": "",
           "gridPos": {
-            "h": 8,
+            "h": 12,
             "w": 6,
             "x": 18,
             "y": 26
@@ -818,7 +818,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 34
+            "y": 38
           },
           "datasource": {
             "type": "prometheus",
@@ -859,7 +859,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 40
+            "y": 44
           }
         },
         {
@@ -876,7 +876,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -922,7 +922,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -968,7 +968,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -1014,7 +1014,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 41
+            "y": 45
           },
           "datasource": {
             "type": "prometheus",
@@ -1055,7 +1055,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 47
+            "y": 51
           }
         },
         {
@@ -1072,7 +1072,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1118,7 +1118,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1164,7 +1164,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1205,7 +1205,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 48
+            "y": 52
           },
           "datasource": {
             "type": "prometheus",
@@ -1256,7 +1256,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 56
+            "y": 60
           },
           "datasource": {
             "type": "prometheus",
@@ -1307,12 +1307,12 @@ data:
             }
           },
           "title": "agy tokens",
-          "description": "No data means no wrapped agy run reported parseable usage; interactive runs do not carry usage.",
+          "description": "Token totals use parseable transcript usage fields, or ledger usage when transcripts are unavailable. Interactive sessions may have no token fields; their session counts remain visible.",
           "gridPos": {
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 56
+            "y": 60
           },
           "datasource": {
             "type": "prometheus",
@@ -1345,6 +1345,77 @@ data:
           }
         },
         {
+          "id": 102,
+          "type": "stat",
+          "title": "agy data source",
+          "description": "Reports the host named and its local source: interactive and print sessions when transcripts exist, otherwise the wrapper ledger. Hosts are not combined. A source of none warns that this host has no activity source.",
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 60
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "k3dm_agy_source_present{source!=\"none\"}",
+              "instant": true,
+              "legendFormat": "{{host}}: {{source}}"
+            },
+            {
+              "refId": "B",
+              "expr": "k3dm_agy_source_present{source=\"none\"}",
+              "instant": true,
+              "legendFormat": "{{host}}: {{source}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "textMode": "name",
+            "text": {
+              "valueSize": 20
+            }
+          }
+        },
+        {
           "id": 83,
           "type": "stat",
           "title": "Unpriced Codex sessions",
@@ -1353,7 +1424,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 34
+            "y": 38
           },
           "datasource": {
             "type": "prometheus",

@@ -36,19 +36,19 @@ _make_config() {
 }
 
 @test "cloudflared-config: drift is reported and not written without APPLY" {
-  sed 's#127.0.0.2:80#127.0.0.1:8000#' "${BATS_TEST_TMPDIR}/expected.yml" > "$CF_CONFIG"
+  sed 's#127.0.0.2:18082#127.0.0.1:8000#' "${BATS_TEST_TMPDIR}/expected.yml" > "$CF_CONFIG"
   cp "$CF_CONFIG" "${BATS_TEST_TMPDIR}/before.yml"
 
   _make_config
 
   [ "$status" -eq 2 ]
-  [[ "$output" == *"127.0.0.2:80"* ]]
+  [[ "$output" == *"127.0.0.2:18082"* ]]
   [[ "$output" == *"drift: rerun with APPLY=1 to install"* ]]
   cmp "$CF_CONFIG" "${BATS_TEST_TMPDIR}/before.yml"
 }
 
 @test "cloudflared-config: APPLY installs render and keeps a backup" {
-  sed 's#127.0.0.2:80#127.0.0.1:8000#' "${BATS_TEST_TMPDIR}/expected.yml" > "$CF_CONFIG"
+  sed 's#127.0.0.2:18082#127.0.0.1:8000#' "${BATS_TEST_TMPDIR}/expected.yml" > "$CF_CONFIG"
 
   APPLY=1 _make_config
 

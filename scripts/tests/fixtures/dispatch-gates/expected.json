@@ -1,0 +1,1137 @@
+{
+  "ca_trust": {
+    "at_first_open": {
+      "as_of": 1793622702,
+      "stall": "open",
+      "streak": 2
+    },
+    "before_first_open": {
+      "as_of": 1793622701,
+      "stall": "clear",
+      "streak": 1
+    },
+    "final": {
+      "stall": "closed",
+      "streak": 13
+    },
+    "first_open_ts": 1793622702,
+    "human_interventions": 23,
+    "runs": 24,
+    "slug": "2026-11-02-acg-up-stalls-at-system-keychain-trust",
+    "unsuccessful": [
+      1,
+      2,
+      6,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      18,
+      20,
+      21,
+      22
+    ]
+  },
+  "synthetic": {
+    "bad_lines": 1,
+    "counts": {
+      "live_pending_tasks": 2,
+      "stalled_tasks": 5
+    },
+    "gate_events": {
+      "architecture_review": 1,
+      "attempt_assessed": 10,
+      "gate_cleared": 3,
+      "replan_reviewed": 2,
+      "scope_gate": 1,
+      "stall_gate": 1
+    },
+    "split": {
+      "p-four": {
+        "build": 0,
+        "combine": "pending",
+        "conflicts": null,
+        "elapsed_seconds": null,
+        "parts": 1,
+        "review": 1,
+        "verify": 0
+      },
+      "p-one": {
+        "build": 2,
+        "combine": "pass",
+        "conflicts": 1,
+        "elapsed_seconds": 70,
+        "parts": 3,
+        "review": 0,
+        "verify": 1
+      },
+      "p-orphan": {
+        "build": 0,
+        "combine": "pass",
+        "conflicts": 0,
+        "elapsed_seconds": null,
+        "parts": 0,
+        "review": 0,
+        "verify": 0
+      },
+      "p-three": {
+        "build": 1,
+        "combine": "pass",
+        "conflicts": 0,
+        "elapsed_seconds": 50,
+        "parts": 2,
+        "review": 0,
+        "verify": 1
+      },
+      "p-two": {
+        "build": 1,
+        "combine": "pending",
+        "conflicts": null,
+        "elapsed_seconds": null,
+        "parts": 1,
+        "review": 0,
+        "verify": 0
+      }
+    },
+    "split_parents_dropped": 1,
+    "tasks": {
+      "abandoned": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "none",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 2,
+        "slug": "abandoned",
+        "stall": "closed",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          2
+        ],
+        "version": "v9.9.9"
+      },
+      "agy-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "stall_review",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 2,
+        "slug": "agy-task",
+        "stall": "open",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          2
+        ],
+        "version": "v9.9.9"
+      },
+      "assess-latest-wins": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "assess-latest-wins",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "assessed-overrides": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 2,
+        "slug": "assessed-overrides",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "assessed-rework": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "assessed-rework",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "assessed-unknown": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "resume_or_abandon",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "assessed-unknown",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "boundary-before": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "unknown",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "unknown",
+          "offline_tested": "unknown"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "boundary-before",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "boundary-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "boundary-task",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "cleared-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "cleared-task",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [
+          1,
+          2
+        ],
+        "version": "v9.9.9"
+      },
+      "double-count": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 1,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 2,
+        "slug": "double-count",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "evidence-reset": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 4,
+        "slug": "evidence-reset",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1,
+          3
+        ],
+        "version": "v9.9.9"
+      },
+      "gates-open": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "clear_gate",
+        "open_architecture": [
+          {
+            "decision": "narrow_fix",
+            "reviewer": "agy",
+            "ts": 2000001060
+          }
+        ],
+        "open_scope": [
+          {
+            "paths": [
+              "x.sh"
+            ],
+            "risk": "high",
+            "ts": 2000001050
+          }
+        ],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "gates-open",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "late-assessment": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "late-assessment",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "legacy-numbering": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "stall_review",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "legacy-numbering",
+        "stall": "open",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          3
+        ],
+        "version": "v9.9.9"
+      },
+      "live-pending": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "done",
+          "landed": "done",
+          "live_verified": "pending",
+          "offline_tested": "done"
+        },
+        "next_action": "deploy",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "live-pending",
+        "stall": "closed",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "live-verified": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "done",
+          "implemented": "done",
+          "independently_verified": "done",
+          "landed": "done",
+          "live_verified": "done",
+          "offline_tested": "done"
+        },
+        "next_action": "none",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "live-verified",
+        "stall": "closed",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "no-evidence-progress": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "stall_review",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 4,
+        "slug": "no-evidence-progress",
+        "stall": "open",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          3
+        ],
+        "version": "v9.9.9"
+      },
+      "offline-only": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "done",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "done"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "offline-only",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "old-open": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "unknown",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "unknown",
+          "offline_tested": "unknown"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "old-open",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "old-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "unknown",
+          "implemented": "done",
+          "independently_verified": "unknown",
+          "landed": "done",
+          "live_verified": "unknown",
+          "offline_tested": "unknown"
+        },
+        "next_action": "none",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "old-task",
+        "stall": "closed",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-a": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-one",
+        "role": "build",
+        "runs": 1,
+        "slug": "part-a",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-b": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-one",
+        "role": "build",
+        "runs": 1,
+        "slug": "part-b",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-c": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-one",
+        "role": "verify",
+        "runs": 1,
+        "slug": "part-c",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-d": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-two",
+        "role": "build",
+        "runs": 1,
+        "slug": "part-d",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-e": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-four",
+        "role": "review",
+        "runs": 1,
+        "slug": "part-e",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-f": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-three",
+        "role": "build",
+        "runs": 1,
+        "slug": "part-f",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-g": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "p-three",
+        "role": "verify",
+        "runs": 1,
+        "slug": "part-g",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "part-h": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": "Bad Parent!",
+        "role": "build",
+        "runs": 1,
+        "slug": "part-h",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "progress-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "progress-task",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "quota-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "resume_or_abandon",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 2,
+        "slug": "quota-task",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "rebase-only": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "rebase-only",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "refused-land": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "refused-land",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "replan-rejected": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "stall_review",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "replan-rejected",
+        "stall": "open",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          2
+        ],
+        "version": "v9.9.9"
+      },
+      "restart-after-abandon": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "restart-after-abandon",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [],
+        "version": "v9.9.9"
+      },
+      "stalled-task": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "stall_review",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 3,
+        "slug": "stalled-task",
+        "stall": "open",
+        "streak": 2,
+        "unsuccessful": [
+          1,
+          2
+        ],
+        "version": "v9.9.9"
+      },
+      "tie-clear-after": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 4,
+        "slug": "tie-clear-after",
+        "stall": "clear",
+        "streak": 0,
+        "unsuccessful": [
+          1,
+          2,
+          3
+        ],
+        "version": "v9.9.9"
+      },
+      "tie-clear-before": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "pending",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "wait_for_run",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 4,
+        "slug": "tie-clear-before",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1,
+          2,
+          3
+        ],
+        "version": "v9.9.9"
+      },
+      "verify-fail": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "pending",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "land",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "verify-fail",
+        "stall": "clear",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      },
+      "verify-flip": {
+        "advisory": true,
+        "as_of": null,
+        "bad_lines": 1,
+        "human_interventions": 0,
+        "ladder": {
+          "deployed": "pending",
+          "implemented": "done",
+          "independently_verified": "pending",
+          "landed": "done",
+          "live_verified": "pending",
+          "offline_tested": "pending"
+        },
+        "next_action": "verify",
+        "open_architecture": [],
+        "open_scope": [],
+        "parent": null,
+        "role": null,
+        "runs": 1,
+        "slug": "verify-flip",
+        "stall": "closed",
+        "streak": 1,
+        "unsuccessful": [
+          1
+        ],
+        "version": "v9.9.9"
+      }
+    }
+  }
+}

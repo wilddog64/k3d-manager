@@ -113,6 +113,20 @@ patch. 6/6 pass; the platform-ops bootstrap, rotator and `argocd.bats` suites st
 clean. Red on the pre-fix `argocd.sh`: tests 1, 2, 4, 5. Mutations, all red: `--type=json`, no base64,
 no empty-value check, deploy without the sync call.
 
+## Recurrence 2026-11-05: the synced URL is revoked, so acg-expiry-check fails (KubeJobFailed)
+
+- **Alert:** operator report, 2026-11-05: `[FIRING] KubeJobFailed on hub (3)`, namespace `platform-ops`. The failed Jobs are `acg-expiry-check-29896530`, `-560` and `-590` (11-04 11:30, 12:00 and 12:30Z), each with 7 pods, all `exit=56`.
+- **Failure pattern:** in Prometheus, every run inside the script's POST window failed. That window is 3.5h–8h after the sandbox's `provisioned-at` (04:59Z): runs 08:30–12:30Z on 11-04, plus three in the 11-01 window. Every run outside the window passed. `failedJobsHistoryLimit: 3` keeps only the last three, and those are the three alerts. They stay firing until the Job objects are removed or replaced.
+- **Cause:** the Slack POST fails. The secret's host is `https://hooks.slack.com`, and the URL is 79 bytes. On the M5, the job's own image (`curlimages/curl:8.7.1`) POSTed `{}` to it (no message is posted) and got `http=404 ver=2 body=no_service`. The same call with `-f` gives rc 56, not 22, because of how HTTP/2 error responses fail under `-f`.
+- **Status:** this is the revoked webhook already recorded in `docs/bugs/2026-10-31-rotator-slack-notice-failure-is-silent.md`. The second half of E2 here (a notice arrives) cannot pass until the operator replaces it: create a new incoming webhook in Slack, update the Keychain record `k3dm-platform-ops-slack-url`, then run `make platform-ops`. The three failed Jobs can then be deleted to clear the alert.
+- **Resolved 2026-11-06:**
+  - The operator created a new incoming webhook for #grafana-notification (Slack app `k3dm-notices`), stored it in the M5 Keychain record, unlocked the login keychain, and reran `make platform-ops`. The first run printed `present in Keychain but unreadable (login Keychain locked?)` and synced nothing.
+  - `platform-ops-notifications` was updated at 2026-11-06T02:11:25Z. The URL fingerprint (sha1, first 12) went from `31445809d0c3` to `64c2b2fabb6c`.
+  - An empty-payload POST from the job image now returns `http=400 invalid_payload`, so the webhook is live and nothing was posted.
+  - The three failed Jobs were deleted by the operator.
+  - The Slack half of E2 (a real notice arrives) is still open until the next expiry, rotation or CVE notice.
+- **Separate, not filed:** `vault-unseal-watchdog-29889925` in `secrets` has also been failed since 2026-10-30 21:25Z, around the M5 cutover. Later watchdog runs succeed. Not investigated.
+
 ## Workaround
 
 The operator patches the URL in by hand from their own shell, as `make platform-ops` prints. Pick

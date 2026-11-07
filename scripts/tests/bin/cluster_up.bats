@@ -1,5 +1,196 @@
 #!/usr/bin/env bats
 
+function _run_vault_ca_trust_test() {
+  local os_name="$1" verify_rc="$2" add_rc="${3:-0}" tty_mode="${4:-headless}" ssh_sim="${5:-}"
+  local helper="${BATS_TEST_TMPDIR}/acg-trust-helper.sh"
+  local runner="${BATS_TEST_TMPDIR}/acg-trust-runner.sh"
+  local stub_log="${BATS_TEST_TMPDIR}/trust-stub.log"
+  local output_log="${BATS_TEST_TMPDIR}/trust-output.log"
+  sed -n '/^function _acg_trust_vault_ca()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  if [[ ! -s "${helper}" ]]; then
+    printf 'function _acg_trust_vault_ca() {\n  local _argocd_browser_tls_dir="${1%%/ca.crt}"\n' > "${helper}"
+    sed -n '/if \[\[ "\$(uname)" == "Darwin" \]\]; then/,/^    fi$/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" >> "${helper}"
+    printf '}\n' >> "${helper}"
+  fi
+  : > "${stub_log}"
+  cat > "${runner}" <<'RUNNER'
+uname() { printf '%s\n' "${TRUST_UNAME}" > "${TRUST_LOG}.target"; printf '%s\n' "${TRUST_UNAME}"; }
+security() { printf 'security %s\n' "$*" >> "${TRUST_LOG}"; [[ "$1" == verify-cert ]] && return "${VERIFY_RC}"; return "${ADD_RC}"; }
+_info() { printf 'INFO %s\n' "$*" >> "${OUTPUT_LOG}"; }
+_warn() { printf 'WARN %s\n' "$*" >> "${OUTPUT_LOG}"; }
+_run_command() { printf '_run_command %s\n' "$*" >> "${TRUST_LOG}"; return "${ADD_RC}"; }
+source "${TRUST_HELPER}"
+_acg_trust_vault_ca '/scratch/ca.crt'
+RUNNER
+  if [[ "${tty_mode}" == "tty" ]]; then
+    run /usr/bin/env SSH_CONNECTION="${ssh_sim}" SSH_TTY= TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /usr/bin/python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' "${runner}"
+  else
+    run /usr/bin/env SSH_CONNECTION="${ssh_sim}" SSH_TTY= TRUST_UNAME="${os_name}" VERIFY_RC="${verify_rc}" ADD_RC="${add_rc}" TRUST_LOG="${stub_log}" TRUST_HELPER="${helper}" OUTPUT_LOG="${output_log}" /bin/bash "${runner}"
+  fi
+  [ -f "${stub_log}.target" ]
+  [[ "${stub_log}.target" == "${BATS_TEST_TMPDIR}"/* ]]
+  [[ "${stub_log}" == "${BATS_TEST_TMPDIR}"/* ]]
+  TRUST_STUB_LOG="${stub_log}"
+  TRUST_OUTPUT_LOG="${output_log}"
+}
+
+function _run_hosts_entry_test() {
+  local hosts_file="${BATS_TEST_TMPDIR}/hosts" helper_bin="${BATS_TEST_TMPDIR}/update-hosts" helper="${BATS_TEST_TMPDIR}/hosts-helper.sh"
+  local calls="${BATS_TEST_TMPDIR}/hosts-calls" output_log="${BATS_TEST_TMPDIR}/hosts-output"
+  sed -n '/^function _acg_update_hosts_entry()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  : > "${calls}"
+  : > "${output_log}"
+  printf '%s\n' "${1:-127.0.0.2 demo.shopping-cart.local}" > "${hosts_file}"
+  [[ "${hosts_file}" == "${BATS_TEST_TMPDIR}"/* ]]
+  [[ "${helper_bin}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${helper_bin}" <<'HELPER'
+#!/usr/bin/env bash
+printf 'helper %s %s\n' "$1" "$2" >> "${HOSTS_CALLS}"
+exit "${HELPER_RC:-0}"
+HELPER
+  chmod +x "${helper_bin}"
+  run env K3DM_HOSTS_FILE="${hosts_file}" K3DM_UPDATE_HOSTS_BIN="${helper_bin}" HOSTS_CALLS="${calls}" HOSTS_OUTPUT="${output_log}" HELPER_RC="${HELPER_RC:-0}" bash -c '
+    _info() { printf "INFO %s\n" "$*" >> "${HOSTS_OUTPUT}"; }
+    _warn() { printf "WARN %s\n" "$*" >> "${HOSTS_OUTPUT}"; }
+    _run_command() { printf "run %s\n" "$*" >> "${HOSTS_CALLS}"; "${K3DM_UPDATE_HOSTS_BIN}" "${@: -2}"; }
+    source "$1"
+    _acg_update_hosts_entry demo.shopping-cart.local 127.0.0.2
+  ' bash "${helper}"
+  HOSTS_TEST_CALLS="${calls}"
+  HOSTS_TEST_OUTPUT="${output_log}"
+}
+
+@test "acg-up Vault CA N3 skips trust over SSH even with a TTY" {
+  _run_vault_ca_trust_test Darwin 1 0 tty "10.0.0.1 22"
+  [ "${status}" -eq 0 ]
+  run grep -F 'SecurityAgent requires interactive approval' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  run grep -F '_run_command' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up hosts M4 uses the scoped helper and reports success or failure" {
+  HELPER_RC=0 _run_hosts_entry_test '127.0.0.1 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  run grep -F 'run --interactive-sudo --soft --' "${HOSTS_TEST_CALLS}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'helper demo.shopping-cart.local 127.0.0.2' "${HOSTS_TEST_CALLS}"
+  [ "${status}" -eq 0 ]
+  run grep -F '/etc/hosts: demo.shopping-cart.local → 127.0.0.2' "${HOSTS_TEST_OUTPUT}"
+  [ "${status}" -eq 0 ]
+  HELPER_RC=1 _run_hosts_entry_test '127.0.0.1 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  run grep -F 'please add manually: 127.0.0.2 demo.shopping-cart.local' "${HOSTS_TEST_OUTPUT}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up hosts M5 leaves an existing desired entry alone" {
+  _run_hosts_entry_test '127.0.0.2 demo.shopping-cart.local'
+  [ "${status}" -eq 0 ]
+  [ ! -s "${HOSTS_TEST_CALLS}" ]
+}
+
+@test "acg-up N4 never writes hosts through shell or preferred sudo" {
+  run grep -nE -- '--prefer-sudo|sh -c' "${CLUSTER_UP_FILE:-bin/cluster-up}"
+  [ "${status}" -ne 0 ] || [[ "${output}" != *'/etc/hosts'* ]]
+  run grep -F '_acg_update_hosts_entry "${_h}" "${_desired_ip}"' "${CLUSTER_UP_FILE:-bin/cluster-up}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up Vault CA M1 keeps interactive trust and warns on add failure" {
+  _run_vault_ca_trust_test Darwin 1 7 tty
+  [ "${status}" -eq 0 ]
+  run grep -Fc '_run_command --interactive-sudo --soft -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /scratch/ca.crt' "${TRUST_STUB_LOG}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+  run grep -F 'Could not add Vault CA to System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "acg-up Vault CA M2 skips an already trusted certificate in headless and SSH sessions" {
+  _run_vault_ca_trust_test Darwin 0
+  [ "${status}" -eq 0 ]
+  run grep -F 'already trusted in System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  _run_vault_ca_trust_test Darwin 0 0 tty "10.0.0.1 22"
+  [ "${status}" -eq 0 ]
+  run grep -F 'already trusted in System Keychain' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "acg-up Vault CA M3 does not call security off macOS" {
+  _run_vault_ca_trust_test Linux 1
+  [ "${status}" -eq 0 ]
+  [ ! -s "${TRUST_STUB_LOG}" ]
+}
+
+@test "acg-up Vault CA N1 skips trust in a headless Darwin session" {
+  _run_vault_ca_trust_test Darwin 1
+  [ "${status}" -eq 0 ]
+  run grep -F 'SecurityAgent requires interactive approval' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /scratch/ca.crt' "${TRUST_OUTPUT_LOG}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'add-trusted-cert' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+  run grep -F '_run_command' "${TRUST_STUB_LOG}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "standalone Vault CA trust requires GUI approval when untrusted and headless" {
+  local helper="${BATS_TEST_TMPDIR}/standalone-ca.sh"
+  sed -n '/^function _acg_export_and_trust_vault_ca()/,/^}/p' "${CLUSTER_UP_FILE:-bin/cluster-up}" > "${helper}"
+  [ -s "${helper}" ]
+  [[ "${helper}" == "${BATS_TEST_TMPDIR}"/* ]]
+  cat > "${BATS_TEST_TMPDIR}/runner.sh" <<'RUNNER'
+uname() { printf 'Darwin\n'; }
+security() { printf 'security %s\n' "$*" >> "${CALLS}"; [[ "$1" == verify-cert ]] && return "${VERIFY_RC:-1}"; }
+kubectl() { printf 'kubectl %s\n' "$*" >> "${CALLS}"; printf 'test certificate\n'; }
+_info() { :; }
+_run_command() { printf '%s\n' "$*" >> "${CALLS}"; }
+_err() { printf '%s\n' "$*" > "${MESSAGE}"; exit 81; }
+source "${HELPER}"
+_acg_export_and_trust_vault_ca "${CA_CERT}"
+RUNNER
+  local cert="${BATS_TEST_TMPDIR}/ca.crt" calls="${BATS_TEST_TMPDIR}/calls" message="${BATS_TEST_TMPDIR}/message"
+  rm -f "${cert}"
+  : > "${calls}"
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 81 ]
+  run grep -F 'make trust-vault-ca' "${message}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'kubectl exec -n secrets vault-0 --context k3d-k3d-cluster -- vault read -field=certificate pki/cert/ca' "${calls}"
+  [ "${status}" -eq 0 ]
+  run grep -F "security verify-cert -c ${cert}" "${calls}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'security add-trusted-cert' "${calls}"
+  [ "${status}" -ne 0 ]
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 K3DM_ALLOW_GUI_SECURITY_AGENT=1 /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '--interactive-sudo -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain' "${calls}"
+  [ "${status}" -eq 0 ]
+  : > "${calls}"
+  run env SSH_CONNECTION= SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 \
+    python3 -c 'import os, pty, subprocess, sys; master, slave = pty.openpty(); result = subprocess.run(["/bin/bash", sys.argv[1]], stdin=slave, stdout=slave, stderr=slave); os.close(master); os.close(slave); raise SystemExit(result.returncode)' \
+    "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 0 ]
+  run grep -F -- '--interactive-sudo -- security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain' "${calls}"
+  [ "${status}" -eq 0 ]
+  : > "${calls}"
+  run env SSH_CONNECTION='127.0.0.1 22' SSH_TTY= HELPER="${helper}" CA_CERT="${cert}" CALLS="${calls}" MESSAGE="${message}" VERIFY_RC=1 K3DM_ALLOW_GUI_SECURITY_AGENT=1 /bin/bash "${BATS_TEST_TMPDIR}/runner.sh"
+  [ "${status}" -eq 81 ]
+  run grep -F 'make trust-vault-ca' "${message}"
+  [ "${status}" -eq 0 ]
+  run grep -F 'security add-trusted-cert' "${calls}"
+  [ "${status}" -ne 0 ]
+}
+
 function _run_sandbox_ttl_helper() {
   local first_ttl="$1" reread_ttl="$2" extend_rc="$3" restart_rc="$4" provision_floor="${5:-}"
   local helper="${BATS_TEST_TMPDIR}/ensure-sandbox-ttl.sh"
@@ -303,6 +494,9 @@ exit 1
 STUB
   chmod +x "${stub_bin}"/*
 
+  mkdir -p "${HOME}/.config/k3d-manager"
+  printf 'hub\n' > "${HOME}/.config/k3d-manager/machine-role"
+  export XDG_CONFIG_HOME="${HOME}/.config"
   export HOME STUB_LOG="${stub_log}"
   export PATH="${stub_bin}:$PATH"
   run env DRY_RUN=1 CLUSTER_PROVIDER=k3s-aws bin/cluster-up

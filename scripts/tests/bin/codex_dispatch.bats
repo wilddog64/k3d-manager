@@ -102,6 +102,327 @@ AGY
 
 dispatch() { (cd "$FIXTURE" && "$BATS_TEST_DIRNAME/../../../bin/k3dm-codex-dispatch" "$@"); }
 
+s1_snapshot() {
+  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -print | sort
+  find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -type f -exec shasum -a 256 {} \; | sort
+}
+
+s1_refused_unchanged() {
+  local before after
+  before="$(s1_snapshot)"
+  run dispatch "$@"
+  [ "$status" -eq 2 ]
+  after="$(s1_snapshot)"
+  [ "$before" = "$after" ]
+}
+
+s1_start_finished() {
+  local slug="$1" run_dir="$K3DM_WORKTREE_ROOT/v9.9.9/$1.run" tries
+  export STUB_ARGV="$BATS_TEST_TMPDIR/$slug.argv" STUB_ENV="$BATS_TEST_TMPDIR/$slug.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null
+  local pid=""
+  for tries in {1..100}; do
+    [[ -n "$pid" || ! -f "$run_dir/pid" ]] || pid="$(<"$run_dir/pid")"
+    if [[ -f "$run_dir/exit" && -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then return 0; fi
+    sleep 0.1
+  done
+  echo "worker did not finish: $slug" >&2
+  return 1
+}
+
+@test "codex dispatch S1 resolves mark link and combine versions from ledger starts" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  git -C "$FIXTURE" checkout -q -b feature/s1-no-version
+  local sha evidence before
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  evidence="$BATS_TEST_TMPDIR/s1-evidence"; printf 'offline evidence\n' >"$evidence"
+  mkdir -p "$K3DM_WORKTREE_ROOT/v8.8.8/task.run" "$K3DM_WORKTREE_ROOT/v9.9.9/task.run"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v8.8.8/task.run/repo"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v9.9.9/task.run/repo"
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'EOF'
+{"ts":1,"event":"start","version":"v8.8.8","slug":"task","run":1}
+{"ts":2,"event":"start","version":"v8.8.8","slug":"part-a","run":1,"parent":"bundle","role":"build"}
+{"ts":3,"event":"start","version":"v8.8.8","slug":"part-b","run":1,"parent":"bundle","role":"build"}
+{"ts":4,"event":"start","version":"v9.9.9","slug":"later","run":1}
+EOF
+  dispatch link --slug task --parent p-one --role build
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+.slug')" = link:v8.8.8:task ]
+  dispatch mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+.state')" = state_mark:v8.8.8:offline_tested ]
+  dispatch combine --parent bundle --parts part-a,part-b --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+(.parts|join(","))')" = combine:v8.8.8:part-a,part-b ]
+  printf '%s\n' '{"ts":5,"event":"start","version":"v9.9.9","slug":"task","run":1}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  s1_refused_unchanged link --slug task --parent p-one --role build
+  s1_refused_unchanged mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  dispatch link --slug task --version v8.8.8 --parent p-one --role build
+  dispatch mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  s1_refused_unchanged link --slug missing --parent p --role build
+  s1_refused_unchanged mark --slug missing --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  s1_refused_unchanged mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence"
+  s1_refused_unchanged mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence"
+  s1_refused_unchanged link --slug task --parent p
+  s1_refused_unchanged link --slug task --version v8.8.8 --parent p
+  dispatch link --slug task --version v8.8.8 --parent p-one --role build
+  dispatch mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  printf '%s\n' '{"ts":7,"event":"start","version":"v9.9.9","slug":"other-part","run":1,"parent":"bundle","role":"build"}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch combine --parent bundle --parts part-a,other-part --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$status" -eq 2 ]
+  [ "$before" = "$(s1_snapshot)" ]
+  dispatch combine --version v8.8.8 --parent bundle --parts part-a,part-b --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+(.parts|join(","))')" = combine:v8.8.8:part-a,part-b ]
+}
+
+s1_add_open_gates() {
+  local slug="$1"
+  printf '%s\n' \
+    "{\"ts\":2000000001,\"event\":\"resume\",\"version\":\"v9.9.9\",\"slug\":\"$slug\",\"run\":2,\"n\":2,\"reason\":\"correction\"}" \
+    "{\"ts\":2000000002,\"event\":\"codex_exit\",\"version\":\"v9.9.9\",\"slug\":\"$slug\",\"run\":2,\"exit\":1}" \
+    "{\"ts\":2000000003,\"event\":\"resume\",\"version\":\"v9.9.9\",\"slug\":\"$slug\",\"run\":3,\"n\":3,\"reason\":\"correction\"}" \
+    "{\"ts\":2000000004,\"event\":\"scope_gate\",\"version\":\"v9.9.9\",\"slug\":\"$slug\",\"gate_state\":\"opened\",\"paths\":[\"x.sh\"],\"risk\":\"normal\",\"assessor\":\"claude\",\"baseline_sha\":\"1111111111111111111111111111111111111111\"}" \
+    "{\"ts\":2000000005,\"event\":\"architecture_review\",\"version\":\"v9.9.9\",\"slug\":\"$slug\",\"decision\":\"diagnose_first\",\"reviewer\":\"agy\",\"baseline_sha\":\"1111111111111111111111111111111111111111\"}" \
+    >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+}
+
+@test "codex dispatch S1 gate-status matches hand-derived fixture and is read-only" {
+  local gates="$BATS_TEST_DIRNAME/../fixtures/dispatch-gates"
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  cp "$gates/synthetic.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  local before after listing_before listing_after slug expected actual
+  listing_before="$(find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -print | sort)"
+  before="$(find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -type f -exec shasum -a 256 {} \; | sort)"
+  while IFS= read -r slug; do
+    expected="$(jq -c --arg slug "$slug" '.synthetic.tasks[$slug]' "$gates/expected.json")"
+    actual="$(dispatch gate-status --slug "$slug" --version v9.9.9 --json)"
+    [ "$(jq -cS . <<<"$actual")" = "$(jq -cS . <<<"$expected")" ] || { echo "slug=$slug"; diff -u <(jq -S . <<<"$expected") <(jq -S . <<<"$actual"); return 1; }
+  done < <(jq -r '.synthetic.tasks | keys[]' "$gates/expected.json")
+  listing_after="$(find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -print | sort)"
+  after="$(find "$K3DM_WORKTREE_ROOT" "$FIXTURE" -type f -exec shasum -a 256 {} \; | sort)"
+  [ "$before" = "$after" ]
+  [ "$listing_before" = "$listing_after" ]
+  cp "$gates/ca-trust-stall.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  actual="$(dispatch gate-status --slug 2026-11-02-acg-up-stalls-at-system-keychain-trust --version v1.43.14 --as-of 1793622701 --json)"
+  [ "$(jq -r '.stall+":"+(.streak|tostring)' <<<"$actual")" = clear:1 ]
+  actual="$(dispatch gate-status --slug 2026-11-02-acg-up-stalls-at-system-keychain-trust --version v1.43.14 --as-of 1793622702 --json)"
+  [ "$(jq -r '.stall+":"+(.streak|tostring)' <<<"$actual")" = open:2 ]
+  actual="$(dispatch gate-status --slug 2026-11-02-acg-up-stalls-at-system-keychain-trust --version v1.43.14 --json)"
+  [ "$(jq -r '.stall+":"+(.streak|tostring)+":"+(.runs|tostring)+":"+(.human_interventions|tostring)' <<<"$actual")" = closed:13:24:23 ]
+  cp "$gates/synthetic.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  sed -i.bak '/"event":"gate_coverage_start"/d' "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  actual="$(dispatch gate-status --slug boundary-task --version v9.9.9 --json)"
+  [ "$(jq -r '.ladder.offline_tested+":"+.ladder.deployed+":"+.ladder.live_verified' <<<"$actual")" = unknown:unknown:unknown ]
+  actual="$(dispatch gate-status --slug boundary-task --version v9.9.9 --json)"
+  [ "$(jq -r '.ladder.implemented+":"+.ladder.independently_verified+":"+.ladder.landed' <<<"$actual")" = pending:pending:pending ]
+}
+
+@test "codex dispatch S1 writes coverage marker once and records split link" {
+  cp "$BATS_TEST_DIRNAME/../fixtures/dispatch-gates/synthetic.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  dispatch gate-coverage-start
+  dispatch gate-coverage-start
+  dispatch link --slug part-a --version v9.9.9 --parent p-one --role build
+  [ "$(grep -c '"event":"gate_coverage_start"' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(grep -c '"event":"link".*"role":"build"' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  sed '/"event":"gate_coverage_start"/d; /deliberately corrupt/d' "$BATS_TEST_DIRNAME/../fixtures/dispatch-gates/synthetic.jsonl" >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  dispatch gate-coverage-start
+  dispatch gate-coverage-start
+  [ "$(grep -c '"event":"gate_coverage_start"' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  sed '/deliberately corrupt/d' "$BATS_TEST_DIRNAME/../fixtures/dispatch-gates/synthetic.jsonl" >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/parented.argv" STUB_ENV="$BATS_TEST_TMPDIR/parented.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug parented --parent split-story --role build >/dev/null
+  [ "$(jq -r -s '[.[]|select(.slug=="parented" and .event=="start")][-1] | .parent+":"+.role' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = split-story:build ]
+}
+
+@test "codex dispatch S1 marks and gate-record validate without side effects on refusal" {
+  local sha evidence empty dir
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/task.run"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v9.9.9/task.run/repo"
+  printf '%s\n' '{"ts":0,"event":"gate_coverage_start","version":"v9.9.9","repo":"k3d-manager"}' '{"ts":1,"event":"start","version":"v9.9.9","slug":"task","run":1,"agent":"codex","worker_identity":{"model":"gpt-6-luna"}}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  evidence="$BATS_TEST_TMPDIR/evidence.txt"; printf 'offline test output\n' >"$evidence"
+  empty="$BATS_TEST_TMPDIR/empty.txt"; : >"$empty"
+  dir="$BATS_TEST_TMPDIR/evidence-dir"; mkdir "$dir"
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state offline_tested --sha "$sha" --evidence "$empty" --by operator
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state offline_tested --sha "$sha" --evidence "$evidence"
+  dispatch mark --slug task --version v9.9.9 --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.state')" = state_mark:offline_tested ]
+  local actual
+  actual="$(dispatch gate-status --slug task --version v9.9.9 --json)"
+  [ "$(jq -r '.ladder.offline_tested+":"+.ladder.live_verified' <<<"$actual")" = done:pending ]
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state live_verified --sha "$sha" --evidence "$evidence" --by operator
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state live_verified --sha "$sha" --evidence "$BATS_TEST_TMPDIR/absent-evidence" --by operator
+  printf 'artifact: sha-%s\nenvironment: scratch\ncommand: test\nrc: 0\n---\n' "$sha" >"$evidence"
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state deployed --sha "$sha" --evidence "$evidence" --by operator
+  printf 'artifact: sha-%s\nenvironment: scratch\ncommand: test\nrc: 0\n---\nobserved output\n' "$sha" >"$evidence"
+  dispatch mark --slug task --version v9.9.9 --state live_verified --sha "$sha" --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.state')" = live_verified ]
+  actual="$(dispatch gate-status --slug task --version v9.9.9 --json)"
+  [ "$(jq -r '.ladder.live_verified' <<<"$actual")" = done ]
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event attempt_assessed --run 77 --outcome progress --assessor claude --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event attempt_assessed --run not-a-number --outcome progress --assessor claude --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event stall_gate --runs 1,nope --reason test --assessor claude --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event replan_reviewed --decision narrow_fix --reviewer agy --plan "$evidence" --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event replan_reviewed --decision approved --reviewer agy --plan "$evidence" --baseline-sha "$sha" --unlisted x
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event architecture_review --decision approved --reviewer agy --evidence "$evidence" --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event replan_reviewed --decision approved --reviewer gpt-6-luna --plan "$evidence" --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event replan_reviewed --decision approved --reviewer agy --plan "$dir" --baseline-sha "$sha"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event replan_reviewed --decision approved --reviewer agy --plan "$evidence" --baseline-sha "not-a-commit"
+  dispatch gate-record --slug task --version v9.9.9 --event replan_reviewed --decision approved --reviewer agy --plan "$evidence" --baseline-sha "$sha"
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.decision')" = replan_reviewed:approved ]
+  dispatch gate-record --slug task --version v9.9.9 --event attempt_assessed --run 1 --outcome progress --assessor operator --baseline-sha "$sha"
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.new_evidence_path == null and .new_evidence_sha256 == null')" = true ]
+  printf '%s\n' '{"ts":2,"event":"start","version":"v9.9.9","slug":"part","run":1}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  dispatch link --slug part --version v9.9.9 --parent bundle --role build
+  dispatch combine --version v9.9.9 --parent bundle --parts part --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.parent+":"+(.parts|join(","))+":"+.result')" = combine:bundle:part:pass ]
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event gate_cleared --gate scope --by operator --evidence "$evidence"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event gate_cleared --gate stall --evidence "$evidence"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event gate_cleared --gate arch --evidence "$evidence"
+  s1_refused_unchanged gate-record --slug task --version v9.9.9 --event attempt_assessed --run
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state offline_tested --sha
+  s1_refused_unchanged mark --slug task --version v9.9.9 --state offline_tested --sha "$sha" --evidence "$evidence"
+}
+
+@test "codex dispatch S1 malformed ledger bytes are counted and status stays read-only" {
+  printf '%s\n' '{"ts":1,"event":"start","version":"v9.9.9","slug":"binary","run":1}' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  printf '\377\n' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  local before after actual
+  before="$(s1_snapshot)"
+  actual="$(dispatch gate-status --slug binary --version v9.9.9 --json)"
+  [ "$(jq -r '.bad_lines' <<<"$actual")" -eq 1 ]
+  after="$(s1_snapshot)"
+  [ "$before" = "$after" ]
+}
+
+@test "codex dispatch S1 resolution, rework rules, and read-only edge cases" {
+  local gates="$BATS_TEST_DIRNAME/../fixtures/dispatch-gates" before after actual
+  cp "$gates/synthetic.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  git -C "$FIXTURE" checkout -q -b feature/s1-resolution
+  before="$(s1_snapshot)"
+  actual="$(dispatch gate-status --slug old-task --json)"
+  [ "$(jq -r '.version' <<<"$actual")" = v9.9.9 ]
+  after="$(s1_snapshot)"; [ "$before" = "$after" ]
+  printf '%s\n' '{"ts":2100000000,"event":"start","version":"v1.0.0","slug":"duplicate","run":1}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  printf '%s\n' '{"ts":2100000001,"event":"start","version":"v2.0.0","slug":"duplicate","run":1}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch gate-status --slug duplicate --json
+  [ "$status" -eq 2 ]
+  after="$(s1_snapshot)"; [ "$before" = "$after" ]
+  actual="$(dispatch gate-status --slug duplicate --version v2.0.0 --json)"
+  [ "$(jq -r '.version+":"+.stall' <<<"$actual")" = v2.0.0:clear ]
+  run dispatch gate-status --slug no-start --version v9.9.9 --json
+  [ "$status" -eq 2 ]
+  actual="$(dispatch gate-status --slug cleared-task --version v9.9.9 --json)"
+  [ "$(jq -c '.unsuccessful' <<<"$actual")" = '[1,2]' ]
+  [ "$(jq -r '.streak' <<<"$actual")" -eq 0 ]
+  actual="$(dispatch gate-status --slug double-count --version v9.9.9 --json)"
+  [ "$(jq -r '(.human_interventions|tostring)+":"+(.unsuccessful|tostring)' <<<"$actual")" = '1:[1]' ]
+  actual="$(dispatch gate-status --slug replan-rejected --version v9.9.9 --json)"
+  [ "$(jq -r '(.streak|tostring)+":"+.stall' <<<"$actual")" = '2:open' ]
+  actual="$(dispatch gate-status --slug evidence-reset --version v9.9.9 --json)"
+  [ "$(jq -r '.streak' <<<"$actual")" -eq 1 ]
+  cp "$gates/synthetic.jsonl" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch gate-status --slug absent --version v9.9.9 --json
+  [ "$status" -eq 2 ]
+  after="$(s1_snapshot)"; [ "$before" = "$after" ]
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch gate-status --slug old-task --version v9.9.9 --json
+  [ "$status" -eq 2 ]
+  after="$(s1_snapshot)"; [ "$before" = "$after" ]
+  rm "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch gate-status --slug old-task --version v9.9.9 --json
+  [ "$status" -eq 2 ]
+  after="$(s1_snapshot)"; [ "$before" = "$after" ]
+}
+
+@test "codex dispatch S1 runs counts start and resume only, not a run named by an exit" {
+  [ "$K3DM_WORKTREE_ROOT" != "$HOME/.local/share/k3d-manager/worktrees" ]
+  local actual
+  printf '%s\n' \
+    '{"ts":100,"event":"start","version":"v9.9.9","slug":"exit-only","run":1}' \
+    '{"ts":101,"event":"codex_exit","version":"v9.9.9","slug":"exit-only","run":1,"exit":0}' \
+    '{"ts":102,"event":"codex_exit","version":"v9.9.9","slug":"exit-only","run":7,"exit":3}' \
+    >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  actual="$(dispatch gate-status --slug exit-only --version v9.9.9 --json)"
+  [ "$(jq -r '.runs' <<<"$actual")" -eq 1 ]
+  printf '%s\n' '{"ts":103,"event":"resume","version":"v9.9.9","slug":"exit-only","run":2,"reason":"other"}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  actual="$(dispatch gate-status --slug exit-only --version v9.9.9 --json)"
+  [ "$(jq -r '.runs' <<<"$actual")" -eq 2 ]
+}
+
+@test "codex dispatch S1 open advisory gates do not block resume, land, or a new task" {
+  local prompt="$BATS_TEST_TMPDIR/followup.md" open_rc clear_rc open_events clear_events
+  printf 'continue safely\n' >"$prompt"
+  : >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  s1_start_finished resume-open
+  s1_start_finished resume-clear
+  s1_add_open_gates resume-open
+  export STUB_ARGV="$BATS_TEST_TMPDIR/resume-open.argv" STUB_ENV="$BATS_TEST_TMPDIR/resume-open.env"
+  run dispatch resume --slug resume-open --prompt-file "$prompt" --reason continue_prompt
+  open_rc="$status"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/resume-clear.argv" STUB_ENV="$BATS_TEST_TMPDIR/resume-clear.env"
+  run dispatch resume --slug resume-clear --prompt-file "$prompt" --reason continue_prompt
+  clear_rc="$status"
+  [ "$open_rc" -eq "$clear_rc" ] && [ "$open_rc" -eq 0 ]
+  [ "$(grep -c 'exec resume' "$BATS_TEST_TMPDIR/resume-open.argv")" -eq 1 ]
+  [ "$(grep -c 'exec resume' "$BATS_TEST_TMPDIR/resume-clear.argv")" -eq 1 ]
+  open_events="$(jq -c -s '[.[]|select(.slug=="resume-open" and (.event=="intervention" or (.event=="resume" and .reason=="continue_prompt")))|{event,reason,run,n}]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  clear_events="$(jq -c -s '[.[]|select(.slug=="resume-clear" and (.event=="intervention" or (.event=="resume" and .reason=="continue_prompt")))|{event,reason,run,n}]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$open_events" = "$clear_events" ] || { echo "open=$open_events clear=$clear_events"; return 1; }
+  open_events="$(jq -c -s '[.[]|select(.slug=="resume-open" and (.event=="intervention" or (.event=="resume" and .reason=="continue_prompt")))|keys_unsorted|map(select(.!="ts" and .!="slug" and .!="version" and .!="pid" and .!="duration"))|sort]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  clear_events="$(jq -c -s '[.[]|select(.slug=="resume-clear" and (.event=="intervention" or (.event=="resume" and .reason=="continue_prompt")))|keys_unsorted|map(select(.!="ts" and .!="slug" and .!="version" and .!="pid" and .!="duration"))|sort]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$open_events" = "$clear_events" ]
+
+  s1_start_finished land-open
+  s1_start_finished land-clear
+  s1_add_open_gates land-open
+  for slug in land-open land-clear; do
+    printf 'committed edit\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/$slug/a.txt"
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" add a.txt
+    git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" commit -m "$slug" >/dev/null
+  done
+  run dispatch land --slug land-open --no-test
+  open_rc="$status"
+  [ "$open_rc" -eq 0 ] || { echo "$output"; return 1; }
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+  run dispatch land --slug land-clear --no-test --superseding land-open
+  clear_rc="$status"
+  [ "$open_rc" -eq "$clear_rc" ] && [ "$open_rc" -eq 0 ] || echo "land-open=$open_rc land-clear=$clear_rc output=$output"
+  [ "$(jq -r -s '[.[]|select(.slug=="land-open" and .event=="land")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -r -s '[.[]|select(.slug=="land-clear" and .event=="land")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  open_events="$(jq -c -s '[.[]|select(.slug=="land-open" and (.event=="land" or .event=="land_refused"))|keys_unsorted|map(select(.!="ts" and .!="slug" and .!="version" and .!="pid" and .!="duration" and .!="wait_seconds"))|sort]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  clear_events="$(jq -c -s '[.[]|select(.slug=="land-clear" and (.event=="land" or .event=="land_refused"))|keys_unsorted|map(select(.!="ts" and .!="slug" and .!="version" and .!="pid" and .!="duration" and .!="wait_seconds"))|sort]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$open_events" = "$clear_events" ]
+  git -C "$FIXTURE" push -q origin k3d-manager-v9.9.9
+
+  s1_start_finished context-open
+  s1_add_open_gates context-open
+  export STUB_ARGV="$BATS_TEST_TMPDIR/new-open.argv" STUB_ENV="$BATS_TEST_TMPDIR/new-open.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug new-open
+  open_rc="$status"
+  export STUB_ARGV="$BATS_TEST_TMPDIR/new-clear.argv" STUB_ENV="$BATS_TEST_TMPDIR/new-clear.env"
+  run dispatch start --spec docs/plans/v9.9.9-demo.md --slug new-clear
+  clear_rc="$status"
+  [ "$open_rc" -eq "$clear_rc" ] && [ "$open_rc" -eq 0 ]
+  local tries
+  for slug in new-open new-clear; do
+    for tries in {1..100}; do [[ -f "$K3DM_WORKTREE_ROOT/v9.9.9/$slug.run/exit" ]] && break; sleep 0.1; done
+    [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/$slug.run/exit" ]
+    [ -s "$BATS_TEST_TMPDIR/$slug.argv" ]
+  done
+  open_events="$(jq -c -s '[.[]|select(.slug=="new-open" and .event=="start")|{event,run,agent,model,parent,role}]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  clear_events="$(jq -c -s '[.[]|select(.slug=="new-clear" and .event=="start")|{event,run,agent,model,parent,role}]' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ "$open_events" = "$clear_events" ]
+}
+
+
 @test "codex dispatch: explicit primary, handoff, and landing actor are separate ledger facts" {
   export STUB_ARGV="$BATS_TEST_TMPDIR/codex.argv" STUB_ENV="$BATS_TEST_TMPDIR/codex.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug primary --primary-coordinator openai/gpt-6-luna >/dev/null
@@ -303,7 +624,7 @@ GIT
   [ "$(jq -r 'select(.event=="identity")|.worker_identity.model+":"+.worker_identity.source+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1:runtime:reported" ]
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/runtime-prompt.md"
   export STUB_MODEL_LINE='model: gpt-test-2'
-  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --coordinator anthropic/claude-test >/dev/null
+  dispatch resume --slug runtime --prompt-file "$BATS_TEST_TMPDIR/runtime-prompt.md" --reason continue_prompt --coordinator anthropic/claude-test >/dev/null
   sleep 1
   [ "$(jq -r -s '[.[]|select(.event=="identity")|.worker_identity.model]|join(",")' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "gpt-test-1,gpt-test-2" ]
   [ "$(jq -r 'select(.event=="resume" and .slug=="runtime")|.coordinator_identity.vendor+":"+.coordinator_identity.model+":"+.coordinator_identity.source' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "anthropic:claude-test:declared" ]
@@ -334,10 +655,10 @@ GIT
   sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   rm "$K3DM_WORKTREE_ROOT/v9.9.9/resume.run/session"
-  run dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"agy run returned no conversation id; start a new task"* ]]
   printf 'agy-conversation-1\n' >"$K3DM_WORKTREE_ROOT/v9.9.9/resume.run/session"
-  dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null
+  dispatch resume --slug resume --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null
   sleep 1
   grep -q -- '--conversation agy-conversation-1' "$BATS_TEST_TMPDIR/agy.argv"
   run ! grep -q -- '--continue' "$BATS_TEST_TMPDIR/agy.argv"
@@ -994,7 +1315,7 @@ EOF
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 0 ]; sleep 1
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
   [ -s "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex-2.log" ]
@@ -1007,8 +1328,8 @@ EOF
   [ "$(jq -r -s 'map(select(.slug=="one" and .event=="resume"))[0] | (.run|tostring)+":"+.worker_identity.vendor+":"+.worker_identity.status' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = "2:openai:unknown" ]
   [ "$(jq -r -s '[.[]|select(.slug=="one" and .event=="start")]|length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
   export STUB_SLEEP=5
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"Codex is still running"* ]]
   sleep 6
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
@@ -1022,7 +1343,7 @@ EOF
   rm "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit"
   sed -i.bak 's/^process_start=.*/process_start=not-the-worker/' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/start"
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 0 ]
   sleep 1
   [ "$(<"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit")" = 0 ]
@@ -1033,11 +1354,46 @@ EOF
   export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null; sleep 1
   resume_argv="$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv")"
   [[ "$resume_argv" == *"writable_roots=[\"$K3DM_WORKTREE_ROOT/v9.9.9/one.run/state\"]"* ]]
   [[ "$resume_argv" != *"network_access=true"* ]]
   [ "$(cd "$(tail -n 1 "$BATS_TEST_TMPDIR/a.argv.cwd")" && pwd -P)" = "$(cd "$K3DM_WORKTREE_ROOT/v9.9.9/one" && pwd -P)" ]
+}
+
+@test "codex dispatch: resume passes stored and overridden models and records provenance" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/model.argv" STUB_ENV="$BATS_TEST_TMPDIR/model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug model --model gpt-6-luna >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6-luna"* ]]
+  jq -e 'select(.event=="resume" and .slug=="model") | .worker_identity.model=="gpt-6-luna" and .worker_identity.source=="inherited"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction --model gpt-6.1-terra >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6.1-terra"* ]]
+  [ "$(cat "$K3DM_WORKTREE_ROOT/v9.9.9/model.run/model")" = gpt-6.1-terra ]
+  jq -e 'select(.event=="resume" and .slug=="model" and .run==3) | .worker_identity.model=="gpt-6.1-terra" and .worker_identity.source=="explicit"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+  dispatch resume --slug model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6.1-terra"* ]]
+}
+
+@test "codex dispatch: model-less resume omits model and records unreported" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/no-model.argv" STUB_ENV="$BATS_TEST_TMPDIR/no-model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug no-model >/dev/null; sleep 1
+  rm "$K3DM_WORKTREE_ROOT/v9.9.9/no-model.run/model"
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug no-model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -c"* ]]
+  [[ "$(tail -n 1 "$STUB_ARGV")" != *" -m "* ]]
+  jq -e 'select(.event=="resume" and .slug=="no-model") | .worker_identity.model=="unknown" and .worker_identity.source=="unreported"' "$K3DM_WORKTREE_ROOT/ledger.jsonl" >/dev/null
+}
+
+@test "codex dispatch: network resume passes the stored model" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/network-model.argv" STUB_ENV="$BATS_TEST_TMPDIR/network-model.env"
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug network-model --model gpt-6-luna --network >/dev/null; sleep 1
+  printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
+  dispatch resume --slug network-model --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null; sleep 1
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"exec resume -m gpt-6-luna"* ]]
+  [[ "$(tail -n 1 "$STUB_ARGV")" == *"network_access=true"* ]]
 }
 
 @test "codex dispatch: resume refuses a landed task and a log without a session id" {
@@ -1045,15 +1401,15 @@ EOF
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   sed -i.bak '/^session id: /d' "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/codex.log"
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"no valid session id"* ]]
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/empty.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/empty.md" --reason continue_prompt
   [ "$status" -eq 2 ]
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug two >/dev/null; sleep 1
   git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" add a.txt; git -C "$K3DM_WORKTREE_ROOT/v9.9.9/two" commit -m edit >/dev/null
   dispatch land --slug two --no-test >/dev/null
-  run dispatch resume --slug two --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug two --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]
 }
 
@@ -1062,7 +1418,7 @@ EOF
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one --network >/dev/null; sleep 1
   STUB_SLEEP=5 dispatch start --spec docs/plans/v9.9.9-demo.md --slug two --network >/dev/null
-  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  run dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt
   [ "$status" -eq 2 ]; [[ "$output" == *"network task two is still running"* ]]
   [ -f "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/exit" ]
   [ ! -e "$K3DM_WORKTREE_ROOT/v9.9.9/one.run/prompt-2.md" ]
@@ -1086,12 +1442,19 @@ EOF
 
 @test "codex dispatch: verify records pass tokens only for a landed task" {
   printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"verified"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
-  run dispatch verify --slug verified --result pass --tokens 456 --verifier codex
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: bats test\nrc: 0\npre_fix_sha: %s\npre_fix_command: bats test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$BATS_TEST_TMPDIR/evidence"
+  run dispatch verify --slug verified --result pass --tokens 456 --verifier codex --evidence "$BATS_TEST_TMPDIR/evidence"
   [ "$status" -eq 0 ]
   [ "$(jq -r -s '.[-1].event' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = verify ]
   [ "$(jq -r -s '.[-1].result' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = pass ]
   [ "$(jq -r -s '.[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 456 ]
   [ "$(jq -r -s '.[-1].verifier' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = codex ]
+  copy="$K3DM_WORKTREE_ROOT/$(jq -r -s '.[-1].evidence_path' "$K3DM_WORKTREE_ROOT/ledger.jsonl")"
+  [ -f "$copy" ]
+  [ "$(shasum -a 256 "$copy" | cut -d' ' -f1)" = "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
 }
 
 @test "codex dispatch: verify refusals do not append ledger events" {
@@ -1141,7 +1504,7 @@ EOF
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug one >/dev/null; sleep 1
   printf 'follow up\n' >"$BATS_TEST_TMPDIR/p.md"
   export STUB_TOKENS=20000
-  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" >/dev/null; sleep 1
+  dispatch resume --slug one --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason continue_prompt >/dev/null; sleep 1
   [ "$(jq -r -s 'map(select(.event == "resume"))[0].n' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 2 ]
   [ "$(jq -r -s 'map(select(.event == "codex_exit"))[-1].tokens' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = 20000 ]
 }
@@ -1269,14 +1632,16 @@ EOF
   [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
   run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md PRIMARY_COORDINATOR=openai/gpt-6-luna PRIMARY_COORDINATOR_SOURCE=runtime-reported
   [ "$status" -eq 0 ] && [[ "$output" == *"--primary-coordinator 'openai/gpt-6-luna' --primary-coordinator-source 'runtime-reported'"* ]]
+  run make -s -n -C "$root" codex-dispatch SPEC=docs/plans/x.md PARENT=p0-s1 ROLE=build
+  [ "$status" -eq 0 ] && [[ "$output" == *"--parent 'p0-s1' --role 'build'"* ]]
   run make -s -n -C "$root" codex-handoff SLUG=x ACTING_COORDINATOR=openai/gpt-6-luna HANDOFF_REASON=manual
   [ "$status" -eq 0 ] && [[ "$output" == *"handoff --slug 'x' --acting-coordinator 'openai/gpt-6-luna' --reason 'manual'"* ]]
   run make -s -n -C "$root" codex-land SLUG=x TEST=true LANDING_ACTOR=codex LANDING_MODEL=openai/gpt-6-luna
   [ "$status" -eq 0 ] && [[ "$output" == *"--landing-actor 'codex' --landing-model 'openai/gpt-6-luna'"* ]]
   run make -s -n -C "$root" codex-land-pending SLUG=x TEST=true LANDING_ACTOR=human
   [ "$status" -eq 0 ] && [[ "$output" == *"codex-land-pending --slug 'x' --test 'true' --landing-actor 'human'"* ]]
-  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md COORDINATOR=anthropic/claude-test
-  [ "$status" -eq 0 ] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
+  run make -s -n -C "$root" codex-resume SLUG=x PROMPT=/tmp/p.md REASON=correction COORDINATOR=anthropic/claude-test
+  [ "$status" -eq 0 ] && [[ "$output" == *"--reason 'correction'"* ]] && [[ "$output" == *"--coordinator 'anthropic/claude-test'"* ]]
 }
 
 @test "codex dispatch: release-merged records one merge timestamp idempotently" {
@@ -1336,4 +1701,99 @@ EOF
   [ "$status" -eq 0 ]
   [ "$(cat "$run_dir/land-fast-gate.log")" = "$(printf '%s\n%s' "$run_dir/state/jobs" "$run_dir/state/tmp")" ]
   [[ "$output" == *"$run_dir/state/jobs"* && "$output" == *"$run_dir/state/tmp"* ]]
+}
+
+@test "codex dispatch: evidence refusals and failure without evidence" {
+  printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"sample"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$FIXTURE" != "$(git rev-parse --show-toplevel)" ]
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  file="$BATS_TEST_TMPDIR/evidence"
+  for variant in missing missing_file empty separator verifier tests_from fix_missing command rc_missing pre_missing pre_command pre_rc_missing rc pre_rc fix_sha pre_sha; do
+    printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: test\nrc: 0\npre_fix_sha: %s\npre_fix_command: test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$file"
+    case "$variant" in
+      empty) : >"$file" ;;
+      separator) sed -i.bak '/^---$/d' "$file" ;;
+      verifier) sed -i.bak '/^verifier:/d' "$file" ;;
+      tests_from) sed -i.bak '/^tests_from:/d' "$file" ;;
+      fix_missing) sed -i.bak '/^fix_sha:/d' "$file" ;;
+      command) sed -i.bak '/^command:/d' "$file" ;;
+      rc_missing) sed -i.bak '/^rc:/d' "$file" ;;
+      pre_missing) sed -i.bak '/^pre_fix_sha:/d' "$file" ;;
+      pre_command) sed -i.bak '/^pre_fix_command:/d' "$file" ;;
+      pre_rc_missing) sed -i.bak '/^pre_fix_rc:/d' "$file" ;;
+      rc) sed -i.bak 's/^rc: 0/rc: 1/' "$file" ;;
+      pre_rc) sed -i.bak 's/^pre_fix_rc: 1/pre_fix_rc: 0/' "$file" ;;
+      fix_sha) sed -i.bak 's/^fix_sha:.*/fix_sha: deadbeef/' "$file" ;;
+      pre_sha) sed -i.bak 's/^pre_fix_sha:.*/pre_fix_sha: deadbeef/' "$file" ;;
+    esac
+    if [ "$variant" = missing ]; then run dispatch verify --slug sample --result pass
+    elif [ "$variant" = missing_file ]; then run dispatch verify --slug sample --result pass --evidence "$file.absent"
+    else run dispatch verify --slug sample --result pass --evidence "$file"; fi
+    [ "$status" -ne 0 ]
+    [ "$(wc -l <"$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+    [ ! -d "$K3DM_WORKTREE_ROOT/v9.9.9/sample.run" ]
+  done
+  run dispatch verify --slug sample --result fail
+  [ "$status" -eq 0 ]
+  [ "$(jq -r -s '.[-1].result' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" = fail ]
+}
+
+@test "codex dispatch: evidence SHAs resolve in the task's work repository" {
+  printf '{"ts":1,"event":"land","version":"v9.9.9","slug":"other"}\n' >"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$K3DM_WORKTREE_ROOT" = "$BATS_TEST_TMPDIR/worktrees" ]
+  other="$BATS_TEST_TMPDIR/other-repo"
+  git init -q "$other"
+  git -C "$other" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m other
+  sha="$(git -C "$other" rev-parse HEAD)"
+  [ "$other" != "$(git rev-parse --show-toplevel)" ]
+  run git -C "$FIXTURE" cat-file -e "$sha^{commit}"
+  [ "$status" -ne 0 ]
+  printf 'verifier: codex\ntests_from: acceptance\nfix_sha: %s\ncommand: test\nrc: 0\npre_fix_sha: %s\npre_fix_command: test\npre_fix_rc: 1\n---\noutput\n' "$sha" "$sha" >"$BATS_TEST_TMPDIR/evidence"
+  run dispatch verify --slug other --result pass --evidence "$BATS_TEST_TMPDIR/evidence"
+  [ "$status" -ne 0 ]
+  mkdir -p "$K3DM_WORKTREE_ROOT/v9.9.9/other.run"
+  printf '%s\n' "$other" >"$K3DM_WORKTREE_ROOT/v9.9.9/other.run/repo"
+  run dispatch verify --slug other --result pass --evidence "$BATS_TEST_TMPDIR/evidence"
+  [ "$status" -eq 0 ]
+  [ -n "$(jq -r -s '.[-1].evidence_sha256' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" ]
+}
+
+@test "codex dispatch: resume requires a reason and records both events" {
+  export STUB_ARGV="$BATS_TEST_TMPDIR/a.argv" STUB_ENV="$BATS_TEST_TMPDIR/a.env"
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  dispatch start --spec docs/plans/v9.9.9-demo.md --slug reason >/dev/null
+  sleep 1
+  printf 'continue\n' >"$BATS_TEST_TMPDIR/p.md"
+  cp "$K3DM_WORKTREE_ROOT/ledger.jsonl" "$BATS_TEST_TMPDIR/before"
+  cp "$STUB_ARGV" "$BATS_TEST_TMPDIR/argv-before"
+  run dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md"
+  [ "$status" -eq 2 ]
+  run dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason invalid
+  [ "$status" -eq 2 ]
+  cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  cmp "$BATS_TEST_TMPDIR/argv-before" "$STUB_ARGV"
+  dispatch resume --slug reason --prompt-file "$BATS_TEST_TMPDIR/p.md" --reason correction >/dev/null
+  [ "$(jq -s '[.[] | select(.event == "resume" and .reason == "correction")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+  [ "$(jq -s '[.[] | select(.event == "intervention" and .reason == "correction")] | length' "$K3DM_WORKTREE_ROOT/ledger.jsonl")" -eq 1 ]
+}
+
+@test "codex dispatch: open lists only unfinished tasks without writes" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  # Event shapes copied from the M4 ledger, 2026-11-01.
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'LEDGER'
+{"ts":1,"event":"start","version":"v9.9.9","slug":"pending","repo":"k3d-manager"}
+{"ts":2,"event":"codex_exit","version":"v9.9.9","slug":"pending","repo":"k3d-manager"}
+{"ts":1,"event":"start","version":"v9.9.9","slug":"done","repo":"k3d-manager"}
+{"ts":2,"event":"land","version":"v9.9.9","slug":"done","repo":"k3d-manager"}
+{"ts":1,"event":"start","version":"v8.0.0","slug":"other","repo":"k3d-manager"}
+LEDGER
+  cp "$K3DM_WORKTREE_ROOT/ledger.jsonl" "$BATS_TEST_TMPDIR/before"
+  run dispatch open --version v9.9.9
+  [ "$status" -eq 1 ]; [[ "$output" == *"v9.9.9 pending "*" codex_exit"* ]]
+  [[ "$output" != *done* && "$output" != *other* ]]
+  run dispatch open --version v7.0.0
+  [ "$status" -eq 0 ]; [ -z "$output" ]
+  cmp "$BATS_TEST_TMPDIR/before" "$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  [ "$(find "$K3DM_WORKTREE_ROOT" -mindepth 1 | wc -l | tr -d ' ')" -eq 1 ]
 }

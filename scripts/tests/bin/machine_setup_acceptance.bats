@@ -69,6 +69,8 @@ complete_machine() {
   touch "$T/complete"
   mkdir -p "$T/sudoers.d"; : > "$T/sudoers.d/k3d-manager"
   for x in ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$STUBS/$x"; chmod +x "$STUBS/$x"; done
+  mkdir -p "$HOME_FX/.local/share/k3d-manager/venv/bin"
+  for x in python ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; chmod +x "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; done
   if [ "$role" = hub ]; then
     mkdir -p "$HOME_FX/.ssh"
     (umask 077; printf 'fixture private key\n' > "$HOME_FX/.ssh/k3d-manager-key.pem")
@@ -558,10 +560,11 @@ STUB
 @test "PY: venv under fixture HOME data dir counts as ok" {
   complete_machine console
   rm -f "$STUBS/ruff" "$STUBS/pytest"
+  rm -rf "$HOME_FX/.local/share/k3d-manager/venv"
   ms --role console --check
   [[ "$output" == *"python-tools"*missing* ]]
   mkdir -p "$HOME_FX/.local/share/k3d-manager/venv/bin"
-  for x in ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; chmod +x "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; done
+  for x in python ruff pytest; do printf '#!/bin/bash\nexit 0\n' > "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; chmod +x "$HOME_FX/.local/share/k3d-manager/venv/bin/$x"; done
   ms --role console --check
   [ "$status" -eq 0 ]
   if [[ "$output" == *"python-tools"*missing* ]]; then false; fi
@@ -596,6 +599,7 @@ STUB
     ms --role "$role" --check
     [ "$status" -eq 0 ]
     [[ "$output" =~ ai:agy[[:space:]]+ok && "$output" =~ ai:gemini[[:space:]]+ok ]]
+    grep -Eq '^agy wrapper:[[:space:]]+absent \(warning; transcript collector is the data source\)$' <<< "$output"
     rm "$HOME_FX/.local/bin/gemini"
     ms --role "$role" --check
     [ "$status" -eq 0 ]

@@ -1,13 +1,14 @@
 # Bug: acg_extend refuses on the new hub ("Auth dir is empty") because it checks a profile directory the session no longer lives in
 
-**Status:** OPEN
+**Status:** LANDED — fix in the subtree: both scripts resolve `PLAYWRIGHT_AUTH_DIR` or `pw-profile` (lib-foundation `bb7f1f2`, synced `c22646e1`). The unused `scripts/playwright/acg_extend.js` was removed 2026-11-06; nothing called it. Live E2 open: read the pre-flight extend in the next M5 `/cluster-up aws` log.
 **Priority:** P2
+**Waiting on:** live check
 **Severity:** medium — on the M5 every sandbox extend fails (acg-up pre-flight and the 30-minute ACG watcher), so a sandbox dies at its first deadline; the M4 works only because a stale `profile/` dir from before October still exists there
 **Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; hub-migration gaps are filed as found); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01
 **Detected by:** Claude, job `87c78389` on the M5
 **Affected:** lib-foundation `scripts/lib/acg/playwright/acg_extend.js` (`AUTH_DIR`, `_isFirstRun`, line ~16/47/168), `acg_restart.js` (`AUTH_DIR`, line 29); k3d-manager's copy `scripts/playwright/acg_extend.js`. Fix upstream in lib-foundation, then subtree-pull.
-**Branch:** `k3d-manager-v1.43.13`
+**Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-11-01-hub-has-no-ec2-ssh-key-acg-up-fails.md` (same run)
 
 ## Observed failure

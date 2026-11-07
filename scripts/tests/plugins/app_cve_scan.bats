@@ -60,6 +60,29 @@ case "${_last}" in
       printf 'lookup failed: no such host\n' >&2
       exit 1
     fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "refused" ]; then
+      printf 'dial tcp: connection refused\n' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "timeout" ]; then
+      # Captured from Trivy on the M4, 2026-11-06.
+      printf '%s\n' 'FATAL\tFatal error\trun error: image scan error: scan error: scan failed: failed analysis: analyze error: pipeline error: failed to analyze layer (sha256:ac271d74ef3d9c496439d99c5e8b7979ea5dfd47a333612551f0fcecd292089b): post analysis error: post analysis error: walk dir error: walk error: context deadline exceeded' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "redaction" ]; then
+      printf 'detail %s ghp_abcdefghijklmnopqrstuvwxyz0123456789 github_pat_abcdefghijklmnopqrstuvwxyz0123456789 visible-tail\n' "${GH_TOKEN:-secret-sentinel}" >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "cut-token" ]; then
+      printf '012345678901234567890123456789%s' "${TEST_CUT_TOKEN}" >&2
+      _i=0
+      while [ "${_i}" -lt 395 ]; do
+        printf x >&2
+        _i=$((_i + 1))
+      done
+      printf '\n' >&2
+      exit 1
+    fi
     if [ "${TEST_TRIVY_MODE:-ok}" = "invalid" ]; then
       printf 'unexpected scanner output\n'
       exit 0
@@ -157,7 +180,7 @@ case "${_url}" in
     printf '{"token":"registry-token"}' >"${_out_file}"
     exit 0
     ;;
-  https://ghcr.io/v2/*/tags/list)
+  https://ghcr.io/v2/*/tags/list*)
     [ "${_out_mode}" = "file" ] || exit 1
     if [ "${TEST_NO_CANDIDATE:-0}" = "1" ]; then
       printf '{"name":"repo","tags":["latest"]}\n' >"${_out_file}"
@@ -236,8 +259,41 @@ case "${_url}" in
     if [ "${TEST_TOKEN_EMPTY:-0}" = 1 ]; then : >"${_body}"; printf 401
     else printf '{"token":"registry-token"}' >"${_body}"; printf 200; fi
     ;;
-  https://ghcr.io/v2/*/tags/list)
-    if [ "${TEST_TAGS_401:-0}" = 1 ]; then printf 401
+  https://ghcr.io/v2/*/tags/list*)
+    # Captured GHCR shape: M4 against ghcr.io, 2026-11-06; payment page 1 used a
+    # Link rel=next path and page 2 held sha-d50487355de33131eb8a8744a70ab168d3ff30e9.
+    if [ "${TEST_PAGINATED_TAGS:-0}" = 1 ]; then
+      grep -q '^header = "Authorization: Bearer registry-token"$' "${_config}" || exit 98
+      if [ -n "${TEST_LINK_MODE:-}" ]; then
+        case "${TEST_LINK_MODE}" in
+          host) _next='https://evil.example/v2/wilddog64/shopping-cart-payment/tags/list?last=page2&n=0' ;;
+          path) _next='/v2/other/repo/tags/list?last=page2&n=0' ;;
+          repeat) _next='/v2/wilddog64/shopping-cart-payment/tags/list?last=page1&n=0' ;;
+        esac
+        printf '{"name":"wilddog64/shopping-cart-payment","tags":["sha-old"]}' >"${_body}"
+        printf 'HTTP/1.1 200 OK\r\nLink: <%s>; rel="next"\r\n\r\n' "${_next}" >"${_headers}"
+        printf 200
+        exit 0
+      fi
+      case "${_url}" in
+        *'last=page1'*)
+          printf '{"name":"wilddog64/shopping-cart-payment","tags":["sha-old"]}' >"${_body}"
+          printf 'HTTP/1.1 200 OK\r\nLink: </v2/wilddog64/shopping-cart-payment/tags/list?last=page2&n=0>; rel="next"\r\n\r\n' >"${_headers}"
+          printf 200
+          ;;
+        *'last=page2'*)
+          if [ -n "${TEST_TAGS_PAGE2_CODE:-}" ]; then printf '%s' "${TEST_TAGS_PAGE2_CODE}"; exit 0; fi
+          printf '{"name":"wilddog64/shopping-cart-payment","tags":["sha-d50487355de33131eb8a8744a70ab168d3ff30e9"]}' >"${_body}"
+          printf 'HTTP/1.1 200 OK\r\n\r\n' >"${_headers}"
+          printf 200
+          ;;
+        *)
+          printf '{"name":"wilddog64/shopping-cart-payment","tags":["sha-old"]}' >"${_body}"
+          printf 'HTTP/1.1 200 OK\r\nLink: </v2/wilddog64/shopping-cart-payment/tags/list?last=page2&n=0>; rel="next"\r\n\r\n' >"${_headers}"
+          printf 200
+          ;;
+      esac
+    elif [ "${TEST_TAGS_401:-0}" = 1 ]; then printf 401
     elif [ "${TEST_TAGS_503:-0}" = 1 ]; then printf 503
     elif [ "${TEST_NO_CANDIDATE:-0}" = 1 ]; then printf '{"name":"repo","tags":["latest"]}' >"${_body}"; printf 200
     else printf '{"name":"repo","tags":["latest","%s","sha-old"]}' "${TEST_SHA_TAG:-sha-new}" >"${_body}"; printf 200; fi
@@ -250,7 +306,7 @@ case "${_url}" in
       printf 404
     elif [ "${TEST_NO_LATEST_DIGEST:-0}" = 1 ] && [ "${_tag}" = latest ]; then printf 404
     else
-      if [ "${_tag}" = latest ] || [ "${_tag}" = "${TEST_SHA_TAG:-sha-new}" ]; then _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"; else _digest=sha256:abad1dea; fi
+      if [ "${_tag}" = latest ] || [ "${_tag}" = "${TEST_SHA_TAG:-sha-new}" ] || [ "${_tag}" = sha-d50487355de33131eb8a8744a70ab168d3ff30e9 ]; then _digest="${TEST_LATEST_DIGEST:-sha256:deadbeef}"; else _digest=sha256:abad1dea; fi
       printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n\r\n' "${_digest}" >"${_headers}"
       printf 200
     fi
@@ -384,7 +440,8 @@ _run_basket_candidate_scan() {
   run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
-    APP_SERVICES="shopping-cart-basket" GH_TOKEN="test-token" TEST_TRIVY_MODE="${_mode}" \
+    APP_SERVICES="shopping-cart-basket" GH_TOKEN="${TEST_GH_TOKEN:-test-token}" TEST_TRIVY_MODE="${_mode}" \
+    TEST_GH_TOKEN="${TEST_GH_TOKEN:-test-token}" TEST_CUT_TOKEN="${TEST_CUT_TOKEN:-}" \
     TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0" \
     TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0" \
     TEST_LATEST_CVES_shopping_cart_basket=1 TEST_LATEST_SEVERITY="${_severity}" \
@@ -553,6 +610,7 @@ _run_basket_candidate_scan() {
 
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=registry-auth)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: unauthorized: <redacted>"* ]]
   [[ "${output}" == *"FATAL: 1 candidate scan(s) failed"* ]]
   [[ "${output}" != *"${GH_TOKEN}"* ]]
   _assert_no_candidate_promotion_or_rebuild
@@ -603,6 +661,7 @@ _run_basket_candidate_scan() {
   _run_basket_candidate_scan execution HIGH
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=execution)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: scan engine failed unexpectedly"* ]]
   _assert_no_candidate_promotion_or_rebuild
 }
 
@@ -610,6 +669,90 @@ _run_basket_candidate_scan() {
   _run_basket_candidate_scan transport HIGH
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=registry-transport)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: lookup failed: no such host"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy connection refused remains a registry transport failure" {
+  _run_basket_candidate_scan refused HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=registry-transport)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: dial tcp: connection refused"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail is stderr only and scan failure remains on stdout" {
+  export APP_SERVICES="shopping-cart-basket"
+  export GH_TOKEN="stderr-control-token"
+  export TEST_TRIVY_MODE="timeout"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  _stdout_file="${BATS_TEST_TMPDIR}/scan.stdout"
+  _stderr_file="${BATS_TEST_TMPDIR}/scan.stderr"
+
+  run /bin/sh -c '"$1" >"$2" 2>"$3"; exit "$?"' sh "${TEST_SCAN_SCRIPT}" "${_stdout_file}" "${_stderr_file}"
+  [ "${status}" -eq 1 ]
+  grep -q 'candidate scan failed (reason=timeout)' "${_stdout_file}"
+  grep -q 'FATAL: 1 candidate scan(s) failed' "${_stdout_file}"
+  grep -q 'trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new:.*context deadline exceeded' "${_stderr_file}"
+  run grep -q 'trivy error for' "${_stdout_file}"
+  [ "${status}" -eq 1 ]
+  run grep -q 'candidate scan failed' "${_stderr_file}"
+  [ "${status}" -eq 1 ]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "only the app-cve-scan CronJob deadlines and TTL change" {
+  _cronjob="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  _app_values="$(awk '/name: app-cve-scan$/ { in_app=1 } in_app && /activeDeadlineSeconds:/ { deadline=$2 } in_app && /ttlSecondsAfterFinished:/ { ttl=$2; print deadline, ttl; exit }' "${_cronjob}")"
+  _verify_values="$(awk '/name: cve-remediation-verify$/ { in_verify=1 } in_verify && /ttlSecondsAfterFinished:/ { ttl=$2 } in_verify && /activeDeadlineSeconds:/ { print $2, ttl; exit }' "${_cronjob}")"
+  [ "${_app_values}" = "2400 90000" ]
+  [ "${_verify_values}" = "120 3600" ]
+}
+
+@test "Trivy deadline exceeded is logged as timeout and remains a failed candidate" {
+  _run_basket_candidate_scan timeout HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=timeout)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new:"* ]]
+  [[ "${output}" == *"context deadline exceeded"* ]]
+  [[ "${output}" != *"immutable candidate ghcr.io/wilddog64/shopping-cart-basket:sha-new is clean"* ]]
+  [[ "${output}" != *"candidate scan failed (reason=execution)"* ]]
+  grep -q -- '--timeout 10m' "${TRIVY_LOG}"
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts all supported token forms and keeps surrounding text" {
+  _run_basket_candidate_scan redaction HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: detail <redacted> <redacted> <redacted> visible-tail"* ]]
+  [[ "${output}" != *"test-token"* ]]
+  [[ "${output}" != *"ghp_abcdefghijklmnopqrstuvwxyz0123456789"* ]]
+  [[ "${output}" != *"github_pat_abcdefghijklmnopqrstuvwxyz0123456789"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts GH_TOKEN before cutting at the 400 character boundary" {
+  export TEST_CUT_TOKEN="test-token-value-that-extends-past-the-cut-boundary"
+  export TEST_GH_TOKEN="${TEST_CUT_TOKEN}"
+  _run_basket_candidate_scan cut-token HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -20}"* ]]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -5}"* ]]
+  _detail="$(printf '%s\n' "${output}" | sed -n 's/^.*trivy error for .*: //p' | head -n1)"
+  [ "${#_detail}" -le 400 ]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts ghp_ tokens before cutting at the 400 character boundary" {
+  export TEST_CUT_TOKEN="ghp_abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZ"
+  export TEST_GH_TOKEN="different-gh-token"
+  _run_basket_candidate_scan cut-token HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -20}"* ]]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -5}"* ]]
+  _detail="$(printf '%s\n' "${output}" | sed -n 's/^.*trivy error for .*: //p' | head -n1)"
+  [ "${#_detail}" -le 400 ]
   _assert_no_candidate_promotion_or_rebuild
 }
 
@@ -644,6 +787,7 @@ _run_basket_candidate_scan() {
     TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
+  [[ "${output}" != *"trivy error for"* ]]
   grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
@@ -1011,7 +1155,7 @@ case "${_url}" in
     printf '{"token":"registry-token"}' >"${_out_file}"
     exit 0
     ;;
-  https://ghcr.io/v2/*/tags/list)
+  https://ghcr.io/v2/*/tags/list*)
     printf '{"name":"repo","tags":["latest","sha-other"]}\n' >"${_out_file}"
     exit 0
     ;;
@@ -1101,6 +1245,45 @@ EOF
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"reason=no-latest"* ]]
   [[ "${output}" != *"reason=no-match"* ]]
+}
+
+@test "GHCR pagination resolves a matching sha tag from page two" {
+  run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 \
+    /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
+    _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ] || { cat "${CURL_LOG}"; printf '%s\n' "${output}"; return 1; }
+  [[ "${output}" == "sha-d50487355de33131eb8a8744a70ab168d3ff30e9|sha256:deadbeef" ]]
+}
+
+@test "single page GHCR tags retain existing candidate resolution (positive control)" {
+  run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" \
+    /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
+    _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == "sha-new|sha256:deadbeef" ]]
+}
+
+@test "GHCR pagination classifies errors on any page" {
+  for _code in 401 403 503; do
+    export TEST_PAGINATED_TAGS=1 TEST_TAGS_PAGE2_CODE="${_code}"
+    : >"${CURL_LOG}"
+    run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" CURL_LOG="${CURL_LOG}" TEST_PAGINATED_TAGS=1 TEST_TAGS_PAGE2_CODE="${_code}" \
+      /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
+      _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
+    [ "${status}" -eq 1 ]
+    if [ "${_code}" = 401 ] || [ "${_code}" = 403 ]; then [[ "${output}" == "reason=auth" ]] || { cat "${CURL_LOG}"; return 1; }; else [[ "${output}" == "reason=no-latest" ]] || { cat "${CURL_LOG}"; return 1; }; fi
+  done
+}
+
+@test "GHCR pagination rejects foreign, out-of-repo and repeated Link targets" {
+  for _mode in host path repeat; do
+    run env -i PATH="${PATH}" TEST_BIN_DIR="${TEST_BIN_DIR}" TEST_PAGINATED_TAGS=1 TEST_LINK_MODE="${_mode}" \
+      /bin/sh -c 'test "$(command -v curl)" = "$TEST_BIN_DIR/curl" || exit 97; tmp="$1"; awk "/^# === MAIN ===/ { exit } { print }" "$2" >"$tmp"; . "$tmp"; _resolve_candidate_image ghcr.io/wilddog64/shopping-cart-payment' \
+      _ "${BATS_TEST_TMPDIR}/functions.sh" "${TEST_SCAN_SCRIPT}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == "reason=no-match" ]]
+    [ "$(wc -l <"${CURL_LOG}")" -lt 20 ]
+  done
 }
 
 @test "manifest 404 is rejected even when it includes a digest header" {

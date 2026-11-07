@@ -2,6 +2,7 @@
 
 **Status:** OPEN — filed 2026-10-24; not dispatched
 **Priority:** P3
+**Waiting on:** dispatch
 **Severity:** low — the reap itself works; only the notice that says it happened is missing
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
 **Filed:** 2026-10-24, by Claude, during the bug-status cleanup, while verifying `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md`
@@ -94,3 +95,7 @@ interface:
 - Do NOT read or print the webhook URL or the Keychain item, and do not post to Slack, in tests or by hand.
 - Do NOT change the reap logic or its timings.
 - Do NOT edit `scripts/lib/foundation/`.
+
+## Note 2026-11-06
+
+The item this notifier reads holds a revoked URL on the M5 (`no_service http=404`), filed as `docs/bugs/2026-11-06-hermes-slack-webhook-item-still-holds-revoked-url.md`. That is a later cause than the Oct 24 failures, so it does not settle this bug.

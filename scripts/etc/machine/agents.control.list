@@ -1,0 +1,3 @@
+# Ordered actions; make target or setup command, one per line.
+# smartcd provides the shell navigation tools used by the development workflow.
+smartcd-install

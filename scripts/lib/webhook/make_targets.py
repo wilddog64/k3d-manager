@@ -21,6 +21,7 @@ _ARG_PATTERNS = {
 }
 
 MAKE_TARGETS = {
+    "trust-vault-ca": {"min_role": "admin", "timeout": 120, "summary": "export Hub Vault PKI root CA and trust it in macOS System Keychain"},
     "fix-list": {"min_role": "reader", "summary": "list fix targets"},
     "fix-status": {"min_role": "reader", "required": ("NS",), "optional": ("FIX_CONTEXT",), "summary": "node + pod status for a namespace"},
     "status-public": {"min_role": "reader", "summary": "probe public Cloudflare hostnames"},

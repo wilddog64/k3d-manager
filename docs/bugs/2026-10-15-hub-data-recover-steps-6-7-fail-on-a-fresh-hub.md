@@ -221,3 +221,34 @@ Keycloak and restarts Keycloak, Grafana and `argocd-server`; after the report, r
   `hub_data_export_setup` (`make hub-data-export-setup`), which the recovery never runs. Until
   then, the scheduled export also fails. Fix: the recovery's final step runs `hub_data_export_setup`
   (it is idempotent and self-tests).
+
+
+## Recurrence — 2026-11-04, M5 one-command hub migration (P2; live investigation)
+
+**Observed:** After the hub was migrated to M5 using the one-command machine setup workflow, the operator attempted `make dr-drill` on M2. Phase 1 refused with `[dr-drill] newest export is missing or older than 26h`. GitHub's independent `Hub DR drill freshness` workflow also failed because the last published successful drill was `20261010T182508Z` (24d 17h old at the Nov 4 run; the 8-day freshness gate correctly rejected it).
+
+**Failure reproduced on M5:** A manual `make hub-data-export` failed during inventory collection:
+
+```text
+error: failed to create token: serviceaccounts "hub-data-export" not found
+kubectl command failed (1): kubectl -n secrets create token hub-data-export --duration=10m
+ERROR: failed to execute kubectl -n secrets create token hub-data-export --duration=10m: 1
+ERROR: [hub-data] could not record the inventory (Vault paths, Keycloak users, LDAP entries); nothing was pushed
+```
+
+The GitHub `k3dm-hub-data` `snapshots` branch showed no newer snapshot directory than `20261030T103446Z` at investigation time. The `results` branch had only the successful October 10 result (V0–V7 true; RTO 499 s, RPO 459 s). This establishes **missing backup evidence** and a blocked drill, not a failed restore.
+
+**Operator recovery:** Following `make hub-data-export-setup`, `kubectl --context k3d-k3d-cluster -n secrets get serviceaccount hub-data-export` reported the ServiceAccount present, age 75s, with 0 Secrets (normal for projected tokens). At the time of this note, success of a new export, drill, and publication has **not** yet been verified. Do not mark the incident fixed solely because the ServiceAccount exists.
+
+**Probable lifecycle gap:** The October 15 defect's missing post-recovery ServiceAccount recurred on the M5 hub migration path. `scripts/etc/machine/hub-singletons.list` includes `hub-data-export|make hub-data-export-schedule`, but installing a LaunchAgent schedule does not itself prove that `hub_data_export_setup` ran and successfully provisioned the ServiceAccount, Kubernetes/Vault auth role and policy. It remains unverified whether one-command setup omitted the initializer, ignored a failed initializer, or the identity was later removed. Diagnose the actual path before choosing the code fix.
+
+### Required follow-up / regression acceptance
+
+- [ ] Trace M5 `setup machine` → `hub-new` / hub recovery → hub singleton cutover; identify where `hub_data_export_setup` is called, whether its error propagates, and whether its resources survive rebuilds. Preserve explicit errors rather than silently proceeding.
+- [ ] Add idempotent post-provisioning readiness verification of `secrets/hub-data-export`, required Vault policy/role and a functional short-lived token/login self-test. The setup/recovery result must fail or report degraded state when the backup-export prerequisite is missing.
+- [ ] Add regression tests starting from a fresh/rebuilt hub without `hub-data-export`; verify setup creates it *before* the scheduled export starts, and that an initializer failure produces a visible non-success outcome. Ensure no use of static long-lived ServiceAccount tokens.
+- [ ] Validate daily LaunchAgent installation and scheduled-path execution (`launchctl kickstart gui/$(id -u)/com.k3d-manager.hub-data-export` plus exporter log), not only a manually launched export.
+- [ ] Live-verify on M5: `make hub-data-export-setup` → `make hub-data-export` creates a fresh encrypted snapshot, then on M2 `make dr-drill` succeeds, followed on M5 by `make dr-drill-publish`; confirm results branch freshness and the GitHub Actions check. A recovery drill must not be invoked automatically merely to turn the workflow green.
+- [ ] Cross-reference the already-queued `docs/plans/v1.46.0-scheduled-dr-drill.md`; do not duplicate its unattended drill/publishing work or relax the 26-hour export / 8-day drill thresholds.
+
+**Disposition:** Reopened for M5 migration recurrence / live verification. Existing October 15 fixes for Steps 6–7 may be correct independently; this addendum tracks the unclosed post-provisioning readiness contract. No PR; do not apply the fix directly to `main`.

@@ -14,7 +14,9 @@ Uses a dispatcher pattern with lazy plugin loading.
 
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
+<!-- shared:begin plan-cap -->
 - **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
+<!-- shared:end plan-cap -->
 - **No network path out of a cloud session** — if you are running in a Claude cloud
   environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
   or any host. Do not search for a token, do not attempt a tunnel, and do not ask the operator to
@@ -91,10 +93,18 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 
 ## Docs Conventions
 
+<!-- shared:begin bug-priority -->
 Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
 without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+<!-- shared:end bug-priority -->
 
+**Waiting on line (operator, 2026-11-06).** An open `docs/bugs/` doc says what it needs next, in its
+header, with `**Waiting on:** <word>` or `**Waiting on:** <word> — since YYYY-MM-DD`. The word is one of
+`dispatch`, `fix running`, `live check`, `scheduled run`, `investigation`, `operator decision`. The Bugs
+table shows it; a doc without the line reads `not stated`, and any other word reads `invalid`. Update it
+whenever the bug moves, and only write what you can support: leave it out rather than guess.
+**Status first word (operator, 2026-11-06).** The Bugs table reads only the first word of a bug's Status. A landed fix starts `LANDED`, `VERIFIED` once independently verified; anything still open starts `OPEN`. The pre-commit hook refuses other forms when a Status changes.
 **Acceptance block (operator, 2026-10-17).** Every new `docs/bugs/` or `docs/plans/` spec that gets
 dispatched carries an `## Acceptance` section: a YAML block with `must`, `must_not` and `evidence`
 (IDs like M1/N1/E1; each evidence item names what it `proves`, and whether it is `offline` or `live`),
@@ -138,6 +148,7 @@ dispatched tests:
 
 ---
 
+<!-- shared:begin security -->
 ## Security Rules (treat violations as bugs — catch before commit)
 
 **Shell Injection (OWASP A03)**
@@ -175,3 +186,4 @@ dispatched tests:
 - `_run_command` handles sudo probing and escalation safely.
 - `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
 - ESO syncs credentials from Vault without exposing them in git.
+<!-- shared:end security -->

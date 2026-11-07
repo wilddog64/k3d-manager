@@ -4,6 +4,7 @@
 import collections
 import datetime
 import http.server
+import ipaddress
 import json
 import os
 import re
@@ -22,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib
 from webhook.config import (  # noqa: E402
     PORT,
     MAX_BODY,
+    ANALYZE_MAX_BODY,
+    ANALYZE_MAX_ALERTS,
     SLACK_EVENT_MAX_BODY,
     _JOB_ID_RE,
     JOB_DIR,
@@ -199,6 +202,27 @@ def _provider_context(provider=None):
         "k3s-gcp": "ubuntu-gcp",
         "k3s-hostinger": "ubuntu-hostinger",
     }.get(provider, "ubuntu-k3s")
+
+
+def _tunnel_port_for_provider(provider=None):
+    """Return the local tunnel port used by this provider's app cluster."""
+    app_context = _provider_context(provider)
+    if app_context == "ubuntu-k3s":
+        return int(os.environ.get("TUNNEL_SANDBOX_LOCAL_PORT", "16443"))
+    return int(os.environ.get("TUNNEL_LOCAL_PORT", "6443"))
+
+
+_APP_CLUSTER_PREFIXES = (
+    "ubuntu-k3s-", "ubuntu-hostinger-", "ubuntu-gcp-", "ubuntu-azure-",
+)
+
+
+def _app_matches_provider_context(app_name, app_context):
+    """Keep shared Hub apps and apps belonging to the selected app cluster."""
+    for prefix in _APP_CLUSTER_PREFIXES:
+        if app_name.startswith(prefix):
+            return prefix == f"{app_context}-"
+    return True
 
 
 def _acg_stack_probe(provider):
@@ -592,6 +616,13 @@ def _parse_cluster_args(command):
     dry_run = any(p.lower() in _DRY_RUN_TOKENS for p in parts)
     provider = next((p.lower() for p in parts if p.lower() in _PROVIDER_TOKENS), "hostinger")
     return provider, dry_run
+
+
+_TRUST_VAULT_CA_TOKENS = {"--trust-vault-ca", "trust-vault-ca"}
+
+
+def _has_trust_vault_ca_flag(command):
+    return any(p.lower() in _TRUST_VAULT_CA_TOKENS for p in command.strip().split()[1:])
 
 
 
@@ -1082,7 +1113,7 @@ def _handle_thread_command(job_id, command, role="admin", channel_id="", user_id
         threading.Thread(
             target=_run_cluster,
             args=(new_job_id, "up", _up_provider),
-            kwargs={"dry_run": _up_dry},
+            kwargs={"dry_run": _up_dry, "trust_vault_ca": _has_trust_vault_ca_flag(command)},
             daemon=True,
         ).start()
         _up_tag = " — DRY_RUN preview" if _up_dry else ""
@@ -1723,7 +1754,7 @@ def _clear_stale_jobs():
                     f"❌ *cluster-{action}* orphaned — webhook restarted mid-job; "
                     f"check cluster state manually (job `{entry.name}`)",
                 )
-            elif status in {"success", "failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
+            elif status in {"success", "failed", "delivery_failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
                 shutil.rmtree(entry, ignore_errors=True)
                 _LOG.info("purged old job %s (status=%s)", entry.name, status)
         except Exception:
@@ -1841,14 +1872,17 @@ def _run_post_provision_check(job_id, provider):
 
     lines = []
 
+    app_context = _provider_context(provider)
+    tunnel_port = _tunnel_port_for_provider(provider)
+
     # SSH tunnel — Python socket, no subprocess
     import socket as _socket
     try:
-        with _socket.create_connection(("localhost", 6443), timeout=3):
+        with _socket.create_connection(("localhost", tunnel_port), timeout=3):
             tunnel_ok = True
     except OSError:
         tunnel_ok = False
-    lines.append(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
+    lines.append(f"*SSH tunnel ({tunnel_port}):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
     if not tunnel_ok:
         lines.append("⚠️ SSH tunnel down — ACG cluster API unreachable. Service endpoints may still be accessible via port-forwards.")
@@ -1864,7 +1898,8 @@ def _run_post_provision_check(job_id, provider):
         lines.append("_ArgoCD app status unavailable_")
         degraded = []
     else:
-        app_lines = [l for l in apps_out.strip().splitlines() if l]
+        app_lines = [l for l in apps_out.strip().splitlines()
+                     if l and _app_matches_provider_context(l.split()[0], app_context)]
         degraded = [l.split()[0] for l in app_lines
                     if len(l.split()) >= 2 and l.split()[1] == "Degraded"]
         healthy_count = len(app_lines) - len(degraded)
@@ -1896,7 +1931,6 @@ def _run_post_provision_check(job_id, provider):
             if not desc_timeout and desc_out.strip():
                 diag_parts.append(f"ArgoCD Application:\n{desc_out[-2000:]}")
 
-            app_context = _provider_context(provider)
             pods_out, pods_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-A", "--context", app_context,
                  "--no-headers", "--request-timeout=8s",
@@ -2028,6 +2062,8 @@ def _run_analyze(job_id, alert_payload, response_url=""):
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
 
+    delivery_failed = False
+
     try:
         (job_dir / "status").write_text("running")
         alerts = alert_payload.get("alerts", [])
@@ -2036,7 +2072,9 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             _finish("success")
             return
 
-        for alert in firing:
+        analyzed = firing[:ANALYZE_MAX_ALERTS]
+        skipped = firing[ANALYZE_MAX_ALERTS:]
+        for alert in analyzed:
             labels = alert.get("labels", {})
             argocd_app = labels.get("name", "")
             display_name = (
@@ -2081,16 +2119,56 @@ def _run_analyze(job_id, alert_payload, response_url=""):
             _log(analysis + "\n")
 
             message = f"🔍 *{alert_name}* — `{display_name}`\n{analysis}"
+            route = "none"
+            posted = False
+            reason = "no_route_configured"
             if response_url:
-                _slack_post(response_url, message)
+                route = "response_url"
+                posted = bool(_slack_post(response_url, message))
+                reason = "post_failed"
             else:
-                posted = ""
                 if SLACK_BOT_TOKEN and STATUS_CHANNEL_ID:
-                    posted = _post_slack_bot(message, channel_id=STATUS_CHANNEL_ID)
+                    route = "bot"
+                    posted = bool(_post_slack_bot(message, channel_id=STATUS_CHANNEL_ID))
+                    reason = "bot_post_failed"
                 if not posted and SLACK_WEBHOOK_URL:
-                    _slack_post(SLACK_WEBHOOK_URL, message)
+                    route = "webhook_fallback" if route == "bot" else "webhook"
+                    posted = bool(_slack_post(SLACK_WEBHOOK_URL, message))
+                    reason = "webhook_post_failed"
+            if not posted:
+                delivery_failed = True
+                _LOG.warning("slack notification failed job=%s route=%s reason=%s",
+                             job_id, route, reason)
 
-        _finish("success")
+        if skipped:
+            names = [a.get("labels", {}).get("alertname", "unknown") for a in skipped]
+            summary = (
+                f"⚠️ *Analyze batch limit reached* — {len(skipped)} alerts were not analyzed: "
+                f"{', '.join(names)}"
+            )
+            _log(summary)
+            route = "none"
+            posted = False
+            reason = "no_route_configured"
+            if response_url:
+                route = "response_url"
+                posted = bool(_slack_post(response_url, summary))
+                reason = "post_failed"
+            else:
+                if SLACK_BOT_TOKEN and STATUS_CHANNEL_ID:
+                    route = "bot"
+                    posted = bool(_post_slack_bot(summary, channel_id=STATUS_CHANNEL_ID))
+                    reason = "bot_post_failed"
+                if not posted and SLACK_WEBHOOK_URL:
+                    route = "webhook_fallback" if route == "bot" else "webhook"
+                    posted = bool(_slack_post(SLACK_WEBHOOK_URL, summary))
+                    reason = "webhook_post_failed"
+            if not posted:
+                delivery_failed = True
+                _LOG.warning("slack notification failed job=%s route=%s reason=%s",
+                             job_id, route, reason)
+
+        _finish("delivery_failed" if delivery_failed else "success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
         _finish("failed")
@@ -2331,7 +2409,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if length is None:
             self._json(400, {"error": "invalid content-length"})
             return
-        if length > MAX_BODY:
+        max_body = ANALYZE_MAX_BODY if self.path in (
+            "/api/v1/analyze", "/api/v1/cve-remediate",
+        ) else MAX_BODY
+        if length > max_body:
             self._json(413, {"error": "request too large"})
             return
         try:
@@ -2438,6 +2519,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         if route["handler"] == "cluster":
             action = body.get("action", "")
+            trust_vault_ca = bool(body.get("trust_vault_ca"))
+            if action == "trust-vault-ca":
+                action = "up"
+                trust_vault_ca = True
             if action == "kill":
                 job_id = body.get("job_id", "")
                 if not job_id or not _JOB_ID_RE.match(job_id):
@@ -2481,6 +2566,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             threading.Thread(
                 target=_run_cluster,
                 args=(job_id, action, provider),
+                **({"kwargs": {"trust_vault_ca": True}} if trust_vault_ca else {}),
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2759,7 +2845,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         status = (job_dir / "status").read_text().strip()
         output = read_job_output(job_dir, redact=_redact_secrets)
-        classification = {"success": "passed", "failed": "failed_untriaged"}.get(
+        classification = {"success": "passed", "failed": "failed_untriaged",
+                          "delivery_failed": "failed_untriaged"}.get(
             status, "in_progress")
         payload = {
             "job_id": job_id,
@@ -2791,8 +2878,21 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if route.startswith("/api/v1/status/"):
             route = "/api/v1/status/{job_id}"
         duration_ms = int((time.monotonic() - getattr(self, "_request_started", time.monotonic())) * 1000)
-        _LOG.info("request method=%s path=%s status=%s role=%s duration_ms=%s",
-                  self.command, route, status, getattr(self, "_token_role", "unknown"), duration_ms)
+        client_header = self.headers.get("CF-Connecting-IP")
+        if client_header is None:
+            client = "local"
+        else:
+            try:
+                client = str(ipaddress.ip_address(client_header))
+            except ValueError:
+                client = "invalid"
+        user_agent = self.headers.get("User-Agent")
+        if user_agent is None:
+            user_agent = "-"
+        user_agent = re.sub(r"[^A-Za-z0-9 ._/()+;:,-]", "_", user_agent[:80])
+        _LOG.info("request method=%s path=%s status=%s role=%s duration_ms=%s client=%s ua=\"%s\"",
+                  self.command, route, status, getattr(self, "_token_role", "unknown"),
+                  duration_ms, client, user_agent)
 
 
 if __name__ == "__main__":

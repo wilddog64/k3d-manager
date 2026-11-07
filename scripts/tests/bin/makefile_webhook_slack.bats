@@ -47,6 +47,10 @@ _slack_stubs() {
   STUB_HOME="${BATS_TEST_TMPDIR}/home-slack"
   STUB_BIN="${BATS_TEST_TMPDIR}/bin-slack"
   mkdir -p "${STUB_HOME}/Library/LaunchAgents" "${STUB_BIN}"
+  export XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+  [[ "${XDG_CONFIG_HOME}" == "${BATS_TEST_TMPDIR}/"* ]]
+  mkdir -p "${XDG_CONFIG_HOME}/k3d-manager"
+  printf 'hub\n' > "${XDG_CONFIG_HOME}/k3d-manager/machine-role"
   printf '#!/bin/sh\necho TOKEN-SENTINEL\n' > "${STUB_BIN}/security"
   printf '#!/bin/sh\nexit 0\n' > "${STUB_BIN}/launchctl"
   chmod +x "${STUB_BIN}/security" "${STUB_BIN}/launchctl"
@@ -84,6 +88,10 @@ _secret_stubs() {
   STUB_HOME="${BATS_TEST_TMPDIR}/home"
   STUB_BIN="${BATS_TEST_TMPDIR}/bin"
   mkdir -p "${STUB_HOME}/Library/LaunchAgents" "${STUB_BIN}"
+  export XDG_CONFIG_HOME="${BATS_TEST_TMPDIR}/config"
+  [[ "${XDG_CONFIG_HOME}" == "${BATS_TEST_TMPDIR}/"* ]]
+  mkdir -p "${XDG_CONFIG_HOME}/k3d-manager"
+  printf 'hub\n' > "${XDG_CONFIG_HOME}/k3d-manager/machine-role"
   printf '#!/bin/sh\necho called >> "%s/launchctl.calls"\nexit 0\n' "${BATS_TEST_TMPDIR}" > "${STUB_BIN}/launchctl"
   chmod +x "${STUB_BIN}/launchctl"
 }

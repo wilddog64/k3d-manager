@@ -1,6 +1,6 @@
 # Machine setup
 
-`make machine-setup ROLE=hub|worker|console` installs the tools and repositories in the matching `scripts/etc/machine/` manifests. `make machine-check ROLE=...` prints a redacted inventory and exits nonzero when an item is missing. `--check` and `--dry-run` are read-only. Install output (Homebrew, git clone, `make install-*`) goes to `~/.local/state/k3d-manager/machine-setup.log` (mode 600); a failed install reports `missing (see machine-setup.log)`. Run setup from a terminal: secret prompts and the hub setup scripts need it.
+`make machine-setup ROLE=hub|worker|console|control` installs the tools and repositories in the matching `scripts/etc/machine/` manifests. `make machine-check ROLE=...` prints a redacted inventory and exits nonzero when an item is missing. `--check` and `--dry-run` are read-only. Install output (Homebrew, git clone, `make install-*`) goes to `~/.local/state/k3d-manager/machine-setup.log` (mode 600); a failed install reports `missing (see machine-setup.log)`. Run setup from a terminal: secret prompts and the hub setup scripts need it.
 
 Ruff and pytest come from `PATH` or from the setup-managed `${XDG_DATA_HOME:-$HOME/.local/share}/k3d-manager/venv/bin`; add that directory to `PATH` when using the managed venv.
 
@@ -13,6 +13,11 @@ Download `bin/machine-bootstrap` as a file and read it before running it. Do not
 - **hub (M5):** developer and agent tools, hub utilities, and hub LaunchAgents. Do not cut over the hub until the M5 setup and restore are verified.
 - **worker (M4):** developer tools, Codex dispatch, tests, ACG sandbox and Playwright. This role does not remove or install hub LaunchAgents; keep the M4 hub services until the cut-over is complete.
 - **console (M2):** browser, dashboards and SSH client tools. It does not install hub services.
+- **control (M2 when travelling):** k3d-manager development, tests, documentation and Codex dispatch. It installs no cluster runtime, hub services or ACG/Playwright tools.
+
+## Working away from home
+
+On a `control` Mac, run git, tests (`make test`, bats and pytest), shellcheck, documentation work, bug filing, `make find-similar-docs`, Codex dispatch and cloud requests locally. Run cluster and hub work such as `make up`, `make platform-ops`, `make appsets-reapply` and kubectl commands over SSH on the hub. Hub work requires a network path to the hub; `m5-air.local` resolves only on the home LAN, and this setup does not provide a remote path.
 
 ## M5 hub cut-over
 
@@ -65,3 +70,5 @@ After GitHub SSH authentication is available, setup switches managed wilddog64 H
 ## Last step: check the login shell
 
 As the last new-Mac setup step, run `make machine-check-shell HOST=<new-Mac-hostname>` from the connecting Mac. This read-only check opens an SSH login shell, exits immediately, and fails on credential prompts, command errors, insecure completion directories, a nonzero exit or a 60-second timeout. Matched output is redacted.
+
+Machine setup records the selected role in `${XDG_CONFIG_HOME:-$HOME/.config}/k3d-manager/machine-role`. Hub operations require `hub`; on the hub, run `make machine-setup ROLE=hub` to record it. `K3DM_ALLOW_LOCAL_HUB=1` overrides the check.

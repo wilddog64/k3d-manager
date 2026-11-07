@@ -52,7 +52,7 @@ Everything for a task lives under `~/.local/share/k3d-manager/worktrees/<version
 
 Codex gets `K3DM_REPO_ROOT`, `K3DM_JOB_DIR`, `K3DM_RUN_DIR`, `K3DM_STATE_DIR`, `K3DM_LOG_DIR`, `K3DM_TMP_ROOT`, `K3DM_PORT_CACHE_DIR` and `TMPDIR` pointed into that folder, so it never touches the live webhook's state.
 
-Two tasks can run in parallel with different slugs. Each has its own worktree and state directory, though two full suites compete for CPU. If Codex finishes without implementing the spec, use `make codex-resume SLUG=example PROMPT=/path/follow-up.md` to continue the same session. Use `abandon` and re-dispatch only when the task should be discarded or its session cannot be resumed; resume does not change the recorded scope.
+Two tasks can run in parallel with different slugs. Each has its own worktree and state directory, though two full suites compete for CPU. If Codex finishes without implementing the spec, use `make codex-resume SLUG=example PROMPT=/path/follow-up.md REASON=correction` to continue the same session. Use `abandon` and re-dispatch only when the task should be discarded or its session cannot be resumed; resume does not change the recorded scope.
 
 To remove an abandoned task, preview first and then confirm:
 
@@ -93,6 +93,35 @@ small fixes as new commits) and any live evidence follow when Claude is back, an
 the status change to FIXED. If the change touches dashboards, ApplicationSets, `platform-ops` or
 the webhook, landing is safe, but hold `make appsets-reapply`, `make platform-ops` and
 `make restart-webhook` until that review.
+
+## Advisory S1 status and evidence
+
+The S1 commands record self-reported milestones and provide a read-only summary. They do not
+enforce dispatch, resume, scope, landing, deployment, or reviewer authorization. Recorded digests
+show that a file existed at record time; they do not establish independent verification, deployment,
+or reviewer identity. The reviewer check compares literal identity strings only.
+
+```bash
+bin/k3dm-codex-dispatch gate-status --slug example --json
+bin/k3dm-codex-dispatch mark --slug example --state offline_tested --sha <commit> --evidence /path/result.txt --by operator
+bin/k3dm-codex-dispatch gate-record --slug example --event attempt_assessed --run 2 --outcome progress --assessor operator --baseline-sha <commit>
+bin/k3dm-codex-dispatch gate-coverage-start
+bin/k3dm-codex-dispatch link --slug example-review --parent example --role review
+bin/k3dm-codex-dispatch combine --parent example --parts example,example-review --conflicts 0 --result pass --evidence /path/combine.txt --by operator
+```
+
+`gate-status` makes no network call and does not create a missing ledger or run directory. The
+ladder keeps implementation, offline testing, independent verification, landing, deployment, and
+live verification as separate states. Only captured deployment evidence with the required header
+can record `deployed` or `live_verified`; an offline result cannot promote the live rung. `--as-of`
+filters valid ledger events by timestamp while preserving append order. Malformed lines are counted
+and skipped.
+
+`gate-record` appends assessments, review decisions, scope/architecture observations, and gate
+clears. Evidence paths are recorded as supplied with a SHA-256 digest. `start --parent P --role R`
+and `make codex-dispatch PARENT=P ROLE=R` attach split work; `link` can attach an existing task.
+`combine` records a parent result and is repeatable. These records do not independently prove that
+the stated reviewer or evidence is authentic.
 
 `land` tests the rebased commit before it is pushed, so a test that requires HEAD to be on
 `origin` fails there. The four `e2e_remote.bats` dispatch tests do: give `TEST` a `bats -f`
@@ -156,6 +185,27 @@ reported. Use `bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail`; i
 `--verifier NAME` when the verifier identity is useful and `--tokens N` only when that verifier
 was itself a Codex task. A verifier run outside Codex has no token value. The command requires an
 existing `land` event and refuses invalid values without appending a ledger event.
+
+A passing result requires `--evidence FILE`; failures may also provide it. Ask the independent
+verifier to write this file itself using its own captured command output, including the red runs
+for every `must_not`; do not construct it from a summary. For example:
+
+```text
+verifier: codex
+tests_from: acceptance
+fix_sha: abc1234
+command: bats scripts/tests/example.bats
+rc: 0
+pre_fix_sha: def5678
+pre_fix_command: bats scripts/tests/example.bats
+pre_fix_rc: 1
+---
+Raw captured test output goes here.
+```
+
+Each SHA must resolve to a commit, and each pre-fix triple must appear in order. The dispatcher
+copies valid evidence into the task run directory and records its path and SHA-256. A legacy pass
+without an evidence hash is claimed and remains awaiting verification.
 
 A spec is **delivered** when its latest independent verification passed and, if its Acceptance
 requires live evidence, its document is `LIVE-VERIFIED` with well-formed `Live evidence`. Delivered

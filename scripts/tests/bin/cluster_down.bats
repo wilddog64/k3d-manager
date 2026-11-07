@@ -23,9 +23,20 @@ bats_require_minimum_version 1.5.0
 @test "cluster-down scopes tunnel cleanup and frontend agent ownership" {
   run grep -nF 'TUNNEL_SCOPE=sandbox _tunnel_remove_agent_files' bin/cluster-down
   [ "$status" -eq 0 ]
-  run grep -nF 'grep -Fq -- '\''<string>ubuntu-k3s</string>'\''' bin/cluster-down
+  run grep -nF '<string>ubuntu-k3s</string>' bin/cluster-down
   [ "$status" -eq 0 ]
-  run grep -nF 'com.k3d-manager.sandbox.frontend-browser-http is still installed' bin/cluster-down
+  run grep -nF 'com.k3d-manager.browser.sandbox-frontend-http' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -nF 'com.k3d-manager.browser.hostinger-frontend-http' bin/cluster-down
+  [ "$status" -ne 0 ]
+}
+
+@test "cluster-down browser listener uses user launchd without sudo" {
+  run grep -F '_stop_browser_agent "${_frontend_browser_plist}"' bin/cluster-down
+  [ "$status" -eq 0 ]
+  run grep -F '_acg_has_launchdaemon_sudo' bin/cluster-down
+  [ "$status" -ne 0 ]
+  run grep -F 'launchctl bootout "gui/$(id -u)" "${plist}"' bin/cluster-down
   [ "$status" -eq 0 ]
 }
 
@@ -185,7 +196,7 @@ case "$*" in
     touch "${BATS_TEST_TMPDIR}/launchctl-mutation-called"
     ;;
 esac
-if [[ "${STUB_LAUNCHCTL_BOOTOUT_FAIL:-0}" == "1" && "$*" == *"bootout system"* ]]; then
+if [[ "${STUB_LAUNCHCTL_BOOTOUT_FAIL:-0}" == "1" && "$*" == bootout* ]]; then
   echo "Boot-out failed: 5: Input/output error" >&2
   exit 5
 fi
@@ -197,6 +208,10 @@ STUB
 #!/usr/bin/env bash
 set -euo pipefail
 echo "sudo $*" >> "${BATS_TEST_TMPDIR}/sudo.log"
+if [[ "${STUB_SUDO_EXPIRED_FALLBACK:-0}" == "1" && "${1:-}" == "-n" ]]; then
+  if [[ "${2:-}" == "true" ]]; then exit 1; fi
+  if [[ "${2:-}" == "-l" ]]; then exit 0; fi
+fi
 if [[ "${STUB_SUDO_FAIL:-0}" == "1" ]]; then
   exit 1
 fi
@@ -276,6 +291,10 @@ exit 0
 STUB
     chmod +x "${BATS_TEST_TMPDIR}/bin/${_stub}"
   done
+
+  [[ "${HOME}" == "${BATS_TEST_TMPDIR}/home" ]]
+  [[ "$(command -v launchctl)" == "${BATS_TEST_TMPDIR}/bin/launchctl" ]]
+  [[ "$(command -v sudo)" == "${BATS_TEST_TMPDIR}/bin/sudo" ]]
 
   _k3s_aws_deregister_cluster() {
     printf 'deregister\n' >> "${BATS_TEST_TMPDIR}/deregister.log"
@@ -513,7 +532,7 @@ _make_down_flag() {
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
   run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
+  [[ "$output" == *"Stopping ArgoCD browser HTTPS LaunchAgent"* ]]
   [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" ]
   [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" ]
   [ -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" ]
@@ -523,25 +542,20 @@ _make_down_flag() {
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
   _stub_uname_darwin
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
-  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
+  run env DRY_RUN=0 bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
+  [[ "$output" == *"ArgoCD browser HTTPS LaunchAgent was not loaded; continuing"* ]]
+  grep -F "bootout gui/$(id -u) ${HOME}/Library/LaunchAgents/com.k3d-manager.browser.argocd-https.plist" "${BATS_TEST_TMPDIR}/launchctl.log"
 }
 
 @test "acg-down removes the Keycloak browser HTTP listener" {
   _stub_uname_darwin
-  touch \
-    "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
-    "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \
-    "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  run bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
+  local plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.keycloak-http.plist"
+  touch "${plist}"
+  run env DRY_RUN=0 bash -c 'bin/cluster-down --confirm --delete-hub --discard-hub-data 2>&1'
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
-  run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down
-  [ "$status" -eq 0 ]
-  [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
-  [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
-  [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log" ]
+  grep -F "bootout gui/$(id -u) ${plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ ! -e "${plist}" ]
 }
 
 @test "cluster-down puts ~/.local/bin on PATH before the hub teardown" {
@@ -560,7 +574,7 @@ _make_down_flag() {
 
 @test "M1/N1: keep-hub removes sandbox Pushgateway and frontend agents exactly once" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.sandbox-frontend-http.plist"
   frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
   pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
   mkdir -p "$(dirname "${frontend_wrapper}")"
@@ -570,7 +584,7 @@ _make_down_flag() {
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
 
   [ "$status" -eq 0 ]
-  run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  run grep -F "bootout gui/$(id -u) ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 0 ]
   run grep -F "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 0 ]
@@ -578,27 +592,35 @@ _make_down_flag() {
   [ "$status" -eq 0 ]
   run grep -F "${pgw_plist}" "${BATS_TEST_TMPDIR}/rm.log"
   [ "$status" -eq 0 ]
-  [ "$(grep -F -c "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  [ "$(grep -F -c "bootout gui/$(id -u) ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
   [ "$(grep -F -c "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
 }
 
-@test "M2: headless keep-hub warns and skips sandbox frontend bootout without sudo" {
+@test "M2: headless keep-hub stops sandbox frontend without sudo" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  local frontend_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.sandbox-frontend-http.plist"
   touch "${frontend_plist}"
-
   run env DRY_RUN=0 STUB_SUDO_FAIL=1 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
-    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
-
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1' </dev/null
   [ "$status" -eq 0 ]
-  [[ "$output" == *"no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"* ]]
-  run grep -F "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
-  [ "$status" -eq 1 ]
+  grep -F "bootout gui/$(id -u) ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ ! -s "${BATS_TEST_TMPDIR}/sudo.log" ]
+}
+
+@test "cluster-down stops the sandbox listener without sudo after timestamp expiry" {
+  _stub_uname_darwin
+  local frontend_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.sandbox-frontend-http.plist"
+  touch "${frontend_plist}"
+  run env DRY_RUN=0 STUB_SUDO_EXPIRED_FALLBACK=1 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
+    bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  grep -F "bootout gui/$(id -u) ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ ! -s "${BATS_TEST_TMPDIR}/sudo.log" ]
 }
 
 @test "M3: delete-hub removes sandbox agents once without changing hub cleanup" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
+  frontend_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.sandbox-frontend-http.plist"
   frontend_wrapper="${HOME}/.local/share/k3d-manager/k3s-aws/bin/frontend-browser-http.sh"
   pgw_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.sandbox.pushgateway-port-forward.plist"
   mkdir -p "$(dirname "${frontend_wrapper}")"
@@ -608,7 +630,7 @@ _make_down_flag() {
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --delete-hub --discard-hub-data 2>&1'
 
   [ "$status" -eq 0 ]
-  [ "$(grep -F -c "bootout system ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
+  [ "$(grep -F -c "bootout gui/$(id -u) ${frontend_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
   [ "$(grep -F -c "unload ${pgw_plist}" "${BATS_TEST_TMPDIR}/launchctl.log")" -eq 1 ]
   run grep -F "Stopping Cloudflare named tunnel launchd agent" <<<"$output"
   [ "$status" -eq 0 ]
@@ -616,13 +638,16 @@ _make_down_flag() {
 
 @test "N2: keep-hub leaves hub and Hostinger agents untouched" {
   _stub_uname_darwin
-  frontend_plist="${BATS_TEST_TMPDIR}/sandbox-frontend-browser-http.plist"
-  touch "${frontend_plist}"
+  frontend_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.sandbox-frontend-http.plist"
+  touch "${frontend_plist}" "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist"
 
   run env DRY_RUN=0 FRONTEND_BROWSER_LISTENER_PLIST="${frontend_plist}" \
     bash -c '"$CLUSTER_DOWN_SCRIPT" --confirm --keep-hub 2>&1'
 
   [ "$status" -eq 0 ]
+  [ -e "${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist" ]
+  run grep -F "browser.hostinger-frontend-http" "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -ne 0 ]
   run grep -E 'com\.k3d-manager\.(pushgateway-port-forward|hub-pushgateway-port-forward|alertmanager-|keycloak-port-forward|argocd-browser-https|cloudflare-tunnel)' "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 1 ]
   run grep -E 'com\.k3d-manager\.(pushgateway-port-forward|hub-pushgateway-port-forward|alertmanager-|keycloak-port-forward|argocd-browser-https|cloudflare-tunnel)' "${BATS_TEST_TMPDIR}/rm.log"

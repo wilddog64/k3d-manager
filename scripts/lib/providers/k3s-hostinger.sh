@@ -362,34 +362,6 @@ function _hostinger_write_keycloak_port_forward_wrapper() {
   chmod 700 "${wrapper_path}"
 }
 
-function _hostinger_write_argocd_browser_https_wrapper() {
-  local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
-  local socat_bin curl_bin
-
-  if [[ ! -r "${template_path}" ]]; then
-    _warn "[k3s-hostinger] ArgoCD browser HTTPS template missing — leaving wrapper untouched"
-    return 0
-  fi
-
-  socat_bin="$(command -v socat 2>/dev/null || printf '%s' socat)"
-  curl_bin="$(command -v curl 2>/dev/null || printf '%s' curl)"
-  mkdir -p "$(dirname "${wrapper_path}")"
-  SOCAT_BIN="${socat_bin}" \
-  CURL_BIN="${curl_bin}" \
-  LOG_FILE="${log_file}" \
-  LOCAL_HOST="127.0.0.1" \
-  LOCAL_PORT="${ARGOCD_BROWSER_PORT:-443}" \
-  UPSTREAM_HOST="127.0.0.1" \
-  UPSTREAM_PORT="8080" \
-  CERT_FILE="${ARGOCD_BROWSER_TLS_CERT_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/fullchain.crt}" \
-  KEY_FILE="${ARGOCD_BROWSER_TLS_KEY_FILE:-$(_acg_provider_state_dir "${CLUSTER_PROVIDER:-k3s-hostinger}")/argocd-browser-https-tls/tls.key}" \
-  HEALTHZ_URL="https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz" \
-  STARTUP_TIMEOUT="${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}" \
-    envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $CERT_FILE $KEY_FILE $HEALTHZ_URL $STARTUP_TIMEOUT' \
-      < "${template_path}" > "${wrapper_path}"
-  chmod 700 "${wrapper_path}"
-}
-
 function _hostinger_write_frontend_browser_wrapper() {
   local wrapper_path="$1" log_file="$2"
   local kubectl_bin
@@ -402,9 +374,9 @@ set -euo pipefail
 export KUBECONFIG="${HOME}/.kube/config"
 _log="${log_file}"
 while true; do
-  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:18082" >> "\${_log}"
   ${kubectl_bin} --context "${_HOSTINGER_KUBE_CONTEXT}" port-forward --address=127.0.0.2 \
-    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+    svc/frontend 18082:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
 FRONTEND_WRAPPER
@@ -412,7 +384,7 @@ FRONTEND_WRAPPER
 }
 
 function _hostinger_write_frontend_browser_plist() {
-  local plist_tmp="$1" wrapper="$2" log_file="$3"
+  local plist_tmp="$1" wrapper="$2" log_file="$3" label="${4:-com.k3d-manager.browser.hostinger-frontend-http}"
   mkdir -p "$(dirname "${plist_tmp}")"
   cat > "${plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -420,7 +392,7 @@ function _hostinger_write_frontend_browser_plist() {
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.k3d-manager.frontend-browser-http</string>
+  <string>${label}</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
@@ -592,12 +564,86 @@ function _hostinger_clear_matching_processes() {
   fi
 }
 
+# Prepare browser listener TLS, wrappers and plists while preserving later work on failure.
+function _hostinger_refresh_browser_listener_files() {
+  local _browser_error=0
+  local _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
+  local _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-$(_acg_provider_state_dir k3s-hostinger)/argocd-browser-https-tls}"
+  local _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
+  local _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
+  local _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.browser.argocd-https}"
+  local _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-${HOME}/Library/LaunchAgents/${_argocd_browser_label}.plist}"
+  local _keycloak_browser_label="com.k3d-manager.browser.keycloak-http"
+  local _keycloak_browser_plist="${HOME}/Library/LaunchAgents/${_keycloak_browser_label}.plist"
+  local _keycloak_browser_wrapper="${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh"
+  local _keycloak_browser_log="${_ACG_STATE_DIR}/logs/keycloak-browser-http.log"
+  local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
+  if ! _hostinger_load_argocd_plugin; then
+    _warn "[k3s-hostinger] ArgoCD browser HTTPS listener: unable to load ArgoCD plugin"
+    _browser_error=1
+  else
+    if [[ ! -s "${_argocd_browser_tls_cert}" || ! -s "${_argocd_browser_tls_key}" ]]; then
+      local _argocd_browser_context
+      _argocd_browser_context="$(_run_command --quiet --soft -- kubectl config current-context 2>/dev/null)" || _argocd_browser_context=""
+      if [[ "${_argocd_browser_context}" != "k3d-k3d-cluster" ]]; then
+        _warn "[k3s-hostinger] ArgoCD browser HTTPS listener: skipping TLS issuance for current context ${_argocd_browser_context:-<unavailable>}"
+      elif ! ( _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" ); then
+        _warn "[k3s-hostinger] ArgoCD browser HTTPS listener: failed to issue TLS material"
+      fi
+    fi
+    if ! ( _argocd_write_browser_https_wrapper \
+      "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat 2>/dev/null || true)" \
+      "$(command -v curl 2>/dev/null || true)" "127.0.0.1" "18443" "127.0.0.1" "8080" \
+      "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:18443/healthz" ); then
+      _warn "[k3s-hostinger] ArgoCD browser HTTPS listener: failed to write wrapper"
+      _browser_error=1
+    fi
+    if ! _hostinger_write_frontend_browser_plist "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "${_argocd_browser_label}"; then
+      _warn "[k3s-hostinger] ${_argocd_browser_label}: failed to write plist"
+      _browser_error=1
+    fi
+  fi
+  mkdir -p "$(dirname "${_keycloak_browser_wrapper}")" "$(dirname "${_keycloak_browser_log}")"
+  if ! _hostinger_load_argocd_plugin || ! ( _argocd_write_port_forward_wrapper \
+    "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl 2>/dev/null || true)" \
+    "$(command -v curl 2>/dev/null || true)" "istio-system" "k3d-k3d-cluster" \
+    "svc/istio-ingressgateway" "18080" "80" "http://127.0.0.1:18080/health/ready" \
+    "${HOME}/.kube/config" "127.0.0.1" "keycloak-browser-http" ); then
+    _warn "[k3s-hostinger] ${_keycloak_browser_label}: failed to write wrapper"
+    _browser_error=1
+  elif ! _hostinger_write_frontend_browser_plist "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "${_keycloak_browser_label}"; then
+    _warn "[k3s-hostinger] ${_keycloak_browser_label}: failed to write plist"
+    _browser_error=1
+  fi
+  if ! ( _hostinger_write_frontend_browser_wrapper \
+    "${_frontend_browser_wrapper}" \
+    "${_frontend_browser_log}" ); then
+    _warn "[k3s-hostinger] com.k3d-manager.browser.hostinger-frontend-http: failed to write wrapper"
+    _browser_error=1
+  fi
+  return "${_browser_error}"
+}
+
+# Restart a required browser agent in the user domain.
+function _hostinger_restart_browser_agent() {
+  local label="$1" plist="$2"
+  if [[ -f "${plist}" ]]; then
+    _hostinger_restart_launchd "${label}" "${plist}" user
+  else
+    printf 'ERROR: %s\n' "[k3s-hostinger] ${label} plist missing at restart" >&2
+    return 1
+  fi
+}
+
 function _hostinger_refresh_access_layer() {
   if [[ "$(uname)" != "Darwin" ]]; then
     return 0
   fi
 
   _info "[k3s-hostinger] Refreshing local access layer listeners..."
+  local _browser_error=0
   local _argocd_pf_label="com.k3d-manager.argocd-port-forward"
   local _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
   local _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
@@ -606,8 +652,10 @@ function _hostinger_refresh_access_layer() {
   local _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
   local _kc_pf_log="${_ACG_STATE_DIR}/logs/keycloak-pf.log"
   local _kc_pf_wrapper="${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
-  local _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
-  local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
+  local _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.browser.argocd-https}"
+  local _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-${HOME}/Library/LaunchAgents/${_argocd_browser_label}.plist}"
+  local _keycloak_browser_label="com.k3d-manager.browser.keycloak-http"
+  local _keycloak_browser_plist="${HOME}/Library/LaunchAgents/${_keycloak_browser_label}.plist"
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   local _grafana_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
@@ -674,12 +722,7 @@ PLIST
 </plist>
 PLIST
   fi
-  _hostinger_write_argocd_browser_https_wrapper \
-    "${_argocd_browser_wrapper}" \
-    "${_argocd_browser_log}"
-  _hostinger_write_frontend_browser_wrapper \
-    "${_frontend_browser_wrapper}" \
-    "${_frontend_browser_log}"
+  _hostinger_refresh_browser_listener_files || _browser_error=1
   _hostinger_write_monitoring_port_forward_plist \
     "${_grafana_pf_plist}" \
     "${_grafana_pf_log}" \
@@ -710,33 +753,13 @@ PLIST
     "${_kc_pf_label}" \
     "${_kc_pf_plist}" \
     user
+  _hostinger_restart_browser_agent "${_argocd_browser_label}" "${_argocd_browser_plist}" || _browser_error=1
   _hostinger_restart_cloudflared
-  _hostinger_restart_launchd \
-    "com.k3d-manager.argocd-browser-https" \
-    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
-    system
-  _hostinger_restart_launchd \
-    "com.k3d-manager.keycloak-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
-    system
-  local _frontend_browser_plist_tmp="${_ACG_STATE_DIR}/run/frontend-browser-http.plist"
-  _hostinger_write_frontend_browser_plist \
-    "${_frontend_browser_plist_tmp}" \
-    "${_frontend_browser_wrapper}" \
-    "${_frontend_browser_log}"
-  if [[ ! -f "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" ]] || \
-      ! diff -q "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" >/dev/null 2>&1; then
-    _run_command --interactive-sudo --quiet --soft -- install -m 644 \
-        "${_frontend_browser_plist_tmp}" \
-        "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-      || _warn "[k3s-hostinger] could not install frontend-browser-http plist — public frontend may still point at another provider"
-  fi
-  rm -f "${_frontend_browser_plist_tmp}"
-  _hostinger_restart_launchd \
-    "com.k3d-manager.frontend-browser-http" \
-    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
-    system
+  _hostinger_restart_browser_agent "${_keycloak_browser_label}" "${_keycloak_browser_plist}" || _browser_error=1
+  local _frontend_browser_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.browser.hostinger-frontend-http.plist"
+  local _frontend_browser_label="com.k3d-manager.browser.hostinger-frontend-http"
+  _hostinger_write_frontend_browser_plist "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" "${_frontend_browser_log}" "${_frontend_browser_label}" || _browser_error=1
+  _hostinger_restart_browser_agent "${_frontend_browser_label}" "${_frontend_browser_plist}" || _browser_error=1
   if [[ ! -f "${_vault_pf_plist}" && -f "${_vault_pf_tmpl}" ]]; then
     _info "[k3s-hostinger] Vault port-forward plist missing — installing from template..."
     local _vault_pf_kubectl
@@ -761,6 +784,7 @@ PLIST
       "${_pushgateway_pf_plist}" \
       user
   fi
+  return "${_browser_error}"
 }
 
 function _hostinger_clear_stale_platform_tracking_ids() {

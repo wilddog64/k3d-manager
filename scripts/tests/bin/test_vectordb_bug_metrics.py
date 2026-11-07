@@ -35,6 +35,44 @@ def _repo(tmp_path):
     return tmp_path
 
 
+def test_bug_metrics_waiting_on_labels_are_safe_and_status_gated(metrics, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    assert root.name == "fixture-repo" and not (root / "docs/bugs").resolve() == (ROOT / "docs/bugs").resolve()
+    texts = {
+        "docs/bugs/2026-11-01-open.md": "# open\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** OPEN — fix landed\n**Waiting on:** live check — since 2026-11-06\n",
+        "docs/bugs/2026-11-01-unknown.md": "# unknown\n**Priority:** P2\n**Filed:** 2026-11-01\n**Waiting on:** scheduled run\n",
+        "docs/bugs/2026-11-01-closed.md": "# closed\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** FIXED\n**Waiting on:** dispatch\n",
+        "docs/bugs/2026-11-01-deferred.md": "# deferred\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** DEFERRED\n**Waiting on:** operator decision\n",
+        "docs/bugs/2026-11-01-malformed.md": '# malformed\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** OPEN\n**Waiting on:** live check", evil="1\n',
+    }
+    output = metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts=texts)
+    assert 'bug="2026-11-01-open",' in output
+    rows = {re.search(r'bug="([^"]+)"', line).group(1): line for line in output.splitlines() if line.startswith("k3dm_bug_info{")}
+    assert 'waiting_on="live check",waiting_since="2026-11-06"' in rows["2026-11-01-open"]
+    assert 'waiting_on="scheduled run",waiting_since="-"' in rows["2026-11-01-unknown"]
+    assert 'waiting_on="-",waiting_since="-"' in rows["2026-11-01-closed"]
+    assert 'waiting_on="-",waiting_since="-"' in rows["2026-11-01-deferred"]
+    assert 'waiting_on="invalid",waiting_since="-"' in rows["2026-11-01-malformed"]
+    assert 'evil=' not in rows["2026-11-01-malformed"]
+
+
+def test_waiting_on_does_not_change_metric_identity_fields(metrics, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    assert root.name == "fixture-repo"
+    base = "# bug\n**Priority:** P1\n**Filed:** 2026-11-01\n**Status:** OPEN\n"
+    outputs = [metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts={"docs/bugs/2026-11-01-x.md": base + tail}) for tail in ("", "**Waiting on:** dispatch\n", "**Waiting on:** live check\n")]
+    def identity(output):
+        line = next(line for line in output.splitlines() if line.startswith("k3dm_bug_info{"))
+        labels = line.split("} ", 1)[0]
+        return line.split("} ", 1)[1], *(re.search(rf'{name}="([^"]*)"', labels).group(1) for name in ("status", "sort_key", "fix_sha"))
+    assert identity(outputs[0]) == identity(outputs[1]) == identity(outputs[2])
+    fixed = base.replace("OPEN", "FIXED") + "**Fix commit:** `abcdef1234567890`\n"
+    fixed_outputs = [metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts={"docs/bugs/2026-11-01-x.md": fixed + tail}) for tail in ("", "**Waiting on:** dispatch\n")]
+    assert identity(fixed_outputs[0]) == identity(fixed_outputs[1])
+
+
 def _git_repo(root, docs):
     bugs = root / "docs/bugs"
     bugs.mkdir(parents=True)
@@ -989,9 +1027,9 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert len(info) == 201
-    # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
+    # agent-audit: allow assert-removed label tail now carries waiting placeholders after live_evidence
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-"')
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-",waiting_on="not stated",waiting_since="-"')
         for line in info)
     assert all("_at=" not in line for line in output.splitlines()
                if line.startswith("k3dm_bug_status_docs{"))
@@ -1381,10 +1419,12 @@ def test_lib_foundation_series_carry_repo_and_push_to_their_own_instance(metrics
     assert {job: method for job, (method, _body) in pushes.items()} == {
         "k3dm-bug-docs": "POST", "k3dm-bug-open": "PUT", "k3dm-bug-releases": "POST",
         "k3dm-plan-docs": "PUT",
+        "k3dm-bug-open-history/instance/k3d-manager": "PUT",
         "k3dm-bug-docs/instance/lib-foundation": "POST",
         "k3dm-bug-open/instance/lib-foundation": "PUT",
         "k3dm-bug-releases/instance/lib-foundation": "POST",
-    }
+        "k3dm-bug-open-history/instance/lib-foundation": "PUT",
+    }  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-bug-open-history
     for job, (_method, body) in pushes.items():
         if job == "k3dm-plan-docs":
             assert 'k3dm_plan_info_skipped{repo="k3d-manager"}' in body
@@ -1428,10 +1468,10 @@ def test_lib_foundation_failures_leave_k3d_manager_pushes_and_result(metrics, mo
     lf_jobs = {job for job in pushes if job.endswith("/instance/lib-foundation")}
     assert lf_jobs == {
         "missing_dir": set(), "no_origin_main": set(),
-        "tally_fails": {"k3dm-bug-docs/instance/lib-foundation"},
+        "tally_fails": {"k3dm-bug-docs/instance/lib-foundation", "k3dm-bug-open-history/instance/lib-foundation"},
         "fetch_fails": {"k3dm-bug-docs/instance/lib-foundation", "k3dm-bug-open/instance/lib-foundation",
-                        "k3dm-bug-releases/instance/lib-foundation"},
-    }[breakage]
+                        "k3dm-bug-releases/instance/lib-foundation", "k3dm-bug-open-history/instance/lib-foundation"},
+    }[breakage]  # agent-audit: allow assert-removed exact-set asserts extended with k3dm-bug-open-history
     assert "lib-foundation" in capsys.readouterr().err
 
 
@@ -1460,3 +1500,211 @@ def test_not_before_floor_is_midnight_in_the_operator_time_zone(metrics, monkeyp
     pacific = ZoneInfo("America/Los_Angeles")
     for bound in ("low", "mid", "high"):
         assert datetime.fromtimestamp(row[bound], pacific).strftime("%Y-%m-%d %H:%M") == "2026-11-03 00:00"
+
+
+def test_bug_open_history_across_dates_and_commits_e1(metrics, tmp_path):
+    # E1 proves [M1, M2, M3, N1, N2]
+    # Fixture asserts scratch repo is not the real repository tree
+    assert tmp_path.resolve() != ROOT.resolve()
+    assert not (tmp_path / ".git").exists() or (tmp_path / ".git").resolve() != (ROOT / ".git").resolve()
+
+    repo = tmp_path / "repo"
+    bugs = repo / "docs/bugs"
+    bugs.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    # Day 1: 2026-11-01T10:00:00Z
+    (bugs / "bug1.md").write_text("# bug1\n**Priority:** P1\n**Status:** Open\n", encoding="utf-8")
+    (bugs / "bug2.md").write_text("# bug2\n**Priority:** P2\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 1 commit", "2026-11-01T10:00:00Z")
+
+    # Day 2: 2026-11-02T15:00:00Z
+    (bugs / "bug3.md").write_text("# bug3\n**Priority:** P0\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 2 commit", "2026-11-02T15:00:00Z")
+
+    # Day 3: doc closed on day 3, plus positive control commit at 23:59:58Z
+    (bugs / "bug1.md").write_text("# bug1\n**Priority:** P1\n**Status:** FIXED\n", encoding="utf-8")
+    _commit(repo, "day 3 close bug1", "2026-11-03T12:00:00Z")
+    (bugs / "bug4.md").write_text("# bug4\n**Priority:** P3\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 3 late commit 23:59:58Z", "2026-11-03T23:59:58Z")
+
+    # Day 4: commit at 00:00:01Z on day 4
+    (bugs / "bug5.md").write_text("# bug5\n**Priority:** P1\n**Status:** Open\n", encoding="utf-8")
+    _commit(repo, "day 4 early commit 00:00:01Z", "2026-11-04T00:00:01Z")
+
+    now = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc)
+    output = metrics._bug_open_history(repo, "main", days=5, now=now)
+
+    # N1: a date before the ref's first commit emits no sample (no zero rows invented for pre-history)
+    assert 'date="2026-10-31"' not in output
+    # N1 positive control: a date on or after the first commit does emit samples
+    assert 'date="2026-11-01"' in output
+
+    # M3: every emitted date carries all five priorities (P0 P1 P2 P3 unset), zeros included
+    for date_str in ("2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04"):
+        for priority in ("P0", "P1", "P2", "P3", "unset"):
+            pattern = f'k3dm_bug_open_history{{repo="k3d-manager",priority="{priority}",date="{date_str}"}} '
+            assert pattern in output
+
+    # N2: a commit made after a date's 23:59:59Z never changes that date's counts
+    # bug5 committed on 2026-11-04T00:00:01Z must NOT be counted on 2026-11-03
+    # on Day 3: bug1 is fixed, bug5 not added -> P1 is 0
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P1",date="2026-11-03"} 0' in output
+    # N2 positive control: commit at 23:59:58Z (bug4) does change day 3
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P3",date="2026-11-03"} 1' in output
+    # Day 4 includes bug5 -> P1 is 1
+    assert 'k3dm_bug_open_history{repo="k3d-manager",priority="P1",date="2026-11-04"} 1' in output
+
+    # M1 & M2: for today's date the history equals the current k3dm_bug_docs{state="open"} counts on the same ref
+    current_inventory = metrics._bug_metrics(repo, "main")
+    for priority in ("P0", "P1", "P2", "P3", "unset"):
+        history_val = re.search(rf'k3dm_bug_open_history\{{repo="k3d-manager",priority="{priority}",date="2026-11-04"\}} (\d+)', output).group(1)
+        current_val = re.search(rf'k3dm_bug_docs\{{repo="k3d-manager",priority="{priority}",state="open"\}} (\d+)', current_inventory).group(1)
+        assert history_val == current_val
+
+
+def test_bug_open_history_push_and_failure_isolation_e2(metrics, monkeypatch, tmp_path, capsys):
+    # E2 proves [M4, N3, N4, N5]
+    # N5: tests never push to the live hub Pushgateway (assert URL points to stub/127.0.0.1:9 first)
+    monkeypatch.setenv("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://127.0.0.1:9/stub")
+    push_url = metrics._pushgateway_url()
+    assert push_url.startswith("http://127.0.0.1:9") or "stub" in push_url
+
+    pushed = []
+    monkeypatch.setitem(
+        metrics.publish_bug_metrics.__globals__,
+        "_push_bug_group",
+        lambda job, payload, method="POST", instance=None: pushed.append((job, method, instance, payload)) or True
+    )
+
+    km = tmp_path / "km"
+    _git_repo(km, {"km-open.md": "# km open\n**Priority:** P1\n**Status:** OPEN\n"})
+    lf = _lib_foundation(tmp_path)
+    monkeypatch.setenv("K3DM_LIB_FOUNDATION_DIR", str(lf))
+    km_tally = {"releases": {"v1.43.0": _bucket()}, "fixed_in": {}}
+    monkeypatch.setitem(
+        metrics.publish_bug_metrics.__globals__,
+        "_tally",
+        lambda root, ref=None, full=False, repo="k3d-manager", repo_dir=None: km_tally if full else km_tally["releases"]
+    )
+
+    # 1. Normal run (no failure):
+    assert metrics.publish_bug_metrics(km) is True
+
+    # M4: k3dm-bug-open-history pushed with PUT once for k3d-manager and once for lib-foundation (instance = repo)
+    calls = [(job, method, instance) for job, method, instance, _payload in pushed]
+    assert ("k3dm-bug-open-history", "PUT", "k3d-manager") in calls
+    assert ("k3dm-bug-open-history", "PUT", "lib-foundation") in calls
+
+    # N3 positive control: run with no failure pushes dates
+    km_history_body = next(payload for job, _method, inst, payload in pushed if job == "k3dm-bug-open-history" and inst == "k3d-manager")
+    assert 'k3dm_bug_open_history{repo="k3d-manager"' in km_history_body
+
+    # N4: existing groups and series keep their names, labels and values on the same fixture
+    assert ("k3dm-bug-docs", "POST", None) in calls
+    assert ("k3dm-bug-open", "PUT", None) in calls
+    assert ("k3dm-bug-releases", "POST", None) in calls
+    assert ("k3dm-plan-docs", "PUT", None) in calls
+
+    # 2. Failure run: cat-file call fails for one date
+    pushed.clear()
+    real_bug_texts = metrics.publish_bug_metrics.__globals__["_bug_texts"]
+
+    def failing_bug_texts(root, ref=None, repo="k3d-manager"):
+        # Fail during history scan when called on specific commit ref
+        if ref and len(ref) == 40:
+            raise subprocess.CalledProcessError(1, ["git", "cat-file", "--batch"], stderr="simulated cat-file failure")
+        return real_bug_texts(root, ref, repo=repo)
+
+    monkeypatch.setitem(metrics.publish_bug_metrics.__globals__, "_bug_texts", failing_bug_texts)
+    assert metrics.publish_bug_metrics(km) is True
+
+    failure_calls = [(job, method, instance) for job, method, instance, _payload in pushed]
+    # N3: failure while computing any date pushes nothing for k3dm-bug-open-history
+    assert not any(job == "k3dm-bug-open-history" and inst == "k3d-manager" for job, _m, inst in failure_calls)
+    # N3: does not stop other bug groups from publishing
+    assert any(job == "k3dm-bug-docs" and inst is None for job, _m, inst in failure_calls)
+    assert any(job == "k3dm-bug-open" and inst is None for job, _m, inst in failure_calls)
+    assert any(job == "k3dm-bug-releases" and inst is None for job, _m, inst in failure_calls)
+    err = capsys.readouterr().err
+    assert "bug open history skipped (non-fatal):" in err
+
+
+def test_folded_row_and_count_have_unfolded_control(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    path = root / "docs/release-milestones.json"
+    items = [{"version": "v1.0.1", "state": "folded"},
+             {"version": "v1.0.2", "target": True}]
+    globals_ = metrics._forecast_metrics.__globals__
+    current_release = globals_["_current_release"]
+    monkeypatch.setitem(globals_, "_release_tags", lambda _root: [("v1.0.0", 0)])
+    monkeypatch.setitem(globals_, "_cadence", lambda _tags: {"p25": 10, "p50": 10, "p75": 10, "last_ts": 0, "gaps": 6})
+    monkeypatch.setitem(globals_, "_current_release", lambda *_args: None)
+    def output(entries):
+        path.write_text(json.dumps({"milestones": entries}))
+        return metrics._forecast_metrics(root, now=15)
+    folded = output(items)
+    absent = output(items[1:])
+    assert folded == absent
+    assert 'version="v1.0.1"' not in folded
+    assert 'k3dm_release_milestones_remaining{repo="k3d-manager"} 1' in folded
+    control = output([{"version": "v1.0.1"}, items[1]])
+    assert 'version="v1.0.1"' in control
+    assert 'k3dm_release_milestones_remaining{repo="k3d-manager"} 2' in control
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.0.2"], cwd=root, check=True)
+    monkeypatch.setitem(globals_, "_current_release", current_release)
+    current = output(items)
+    assert 'state="in_progress"' in current
+    assert 'version="v1.0.2",bound="mid"' in current
+
+
+def test_current_release_and_following_are_not_overdue(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.0.1"], cwd=root, check=True)
+    items = [{"version": "v1.0.1"}, {"version": "v1.0.2", "target": True}]
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": items}))
+    globals_ = metrics._forecast_metrics.__globals__
+    monkeypatch.setitem(globals_, "_release_tags", lambda _root: [])
+    monkeypatch.setitem(globals_, "_cadence", lambda _tags: {
+        "p25": 10, "p50": 20, "p75": 30, "last_ts": 0, "gaps": 6})
+    def info(output):
+        return [line for line in output.splitlines()
+                if line.startswith("k3dm_release_milestone_info{")]
+    subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=root, check=True)
+    control = info(metrics._forecast_metrics(root, now=100))
+    assert len(control) == 2 and all('overdue="true"' in row for row in control)
+    subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/k3d-manager-v1.0.1"],
+                   cwd=root, check=True)
+    output = metrics._forecast_metrics(root, now=100)
+    rows = info(output)
+    assert 'state="in_progress"' in rows[0]
+    assert all('overdue="false"' in row for row in rows)
+    for version, bounds in (("v1.0.1", (100, 100, 100)), ("v1.0.2", (110, 120, 130))):
+        for bound, value in zip(("low", "mid", "high"), bounds):
+            assert (f'k3dm_release_milestone_forecast_seconds{{repo="k3d-manager",'
+                    f'version="{version}",bound="{bound}"}} {value}') in output
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 0}
+    floored = metrics._forecast([{**items[0], "not_before": "2026-01-01"}],
+                                [], cadence, 100, current_release="v1.0.1")[0]
+    assert floored["state"] == "in_progress" and floored["low"] > 100
+    blocked = metrics._forecast([{**items[0], "blocked_by": "external"}, items[1]],
+                                [], cadence, 100, current_release="v1.0.1")
+    assert [row["state"] for row in blocked] == ["blocked", "after_blocked"]
+
+
+@pytest.mark.parametrize("item", [{"version": "v1.0.1", "state": "unknown"},
+                                  {"version": "v1.0.1", "state": "folded", "target": True}])
+def test_load_milestones_rejects_invalid_state_and_folded_target(metrics, tmp_path, item):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    items = [item] if item.get("target") else [item, {"version": "v1.0.2", "target": True}]
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": items}))
+    with pytest.raises(ValueError):
+        metrics._load_milestones(root)

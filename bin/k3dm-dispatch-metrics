@@ -2,10 +2,12 @@
 """Export Codex dispatch ledger facts to a Pushgateway."""
 
 import argparse
+import calendar
 import glob
 import hashlib
 import shlex
 import json
+import socket
 import math
 import os
 import re
@@ -37,6 +39,17 @@ MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
     "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
+}
+RUNGS = ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed")
+STATUSES = ("done", "pending", "unknown")
+ROLES = ("build", "review", "verify")
+GATE_EVENTS = ("attempt_assessed", "stall_gate", "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared")
+COMBINE_RESULTS = ("pass", "fail", "pending")
+PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+NEW_S1_EVENTS = {
+    "gate_coverage_start", "combine", "attempt_assessed", "stall_gate",
+    "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared",
+    "state_mark", "link",
 }
 
 
@@ -153,6 +166,8 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
         pass
     compactions = []
     reads = []
+    context_turns = []
+    context_boundaries = []
     root = Path(projects_dir)
     if root.is_dir():
         for path in sorted(root.rglob("*.jsonl")):
@@ -194,6 +209,7 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
+                            context_boundaries.append({"ts": item.get("timestamp"), "session": hashlib.sha256(key.encode()).hexdigest()})
                             before = {name: dict(ranges) for name, ranges in latest.items()}
                             segment_seen.clear()
                             continue
@@ -251,16 +267,31 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                 continue
                             mid, model = message.get("id"), message.get("model")
                             usage = message.get("usage") or {}
+                            if context_out is not None and isinstance(mid, str) and isinstance(model, str):
+                                creation = usage.get("cache_creation") or {}
+                                cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
+                                cache1 = creation.get("ephemeral_1h_input_tokens", 0)
+                                values = [usage.get("input_tokens", 0), usage.get("cache_read_input_tokens", 0), cache5, cache1]
+                                if all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0 for value in values):
+                                    context_turns.append({"id": mid, "ts": item.get("timestamp"), "context": sum(values),
+                                        "session": hashlib.sha256(key.encode()).hexdigest(), "subagent": "/subagents/" in key,
+                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1})
+                                if mid in cache["records"]:
+                                    cached = cache["records"][mid]
+                                    cached.setdefault("id", mid)
+                                    cached.setdefault("subagent", "/subagents/" in key)
+                                    cached.setdefault("session", hashlib.sha256(key.encode()).hexdigest())
                             if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
                                 continue
                             creation = usage.get("cache_creation") or {}
                             cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
                             cache1 = creation.get("ephemeral_1h_input_tokens", 0)
-                            cache["records"][mid] = {"ts": item.get("timestamp"), "model": model,
+                            cache["records"][mid] = {"id": mid, "ts": item.get("timestamp"), "model": model,
                                 "speed": usage.get("speed"), "input": usage.get("input_tokens", 0),
                                 "cache_5m": cache5, "cache_1h": cache1,
                                 "cache_read": usage.get("cache_read_input_tokens", 0),
-                                "output": usage.get("output_tokens", 0)}
+                                "output": usage.get("output_tokens", 0), "subagent": "/subagents/" in key,
+                                "session": hashlib.sha256(key.encode()).hexdigest()}
                         except (ValueError, TypeError, AttributeError):
                             continue
                     cache["offsets"][key] = stream.tell()
@@ -269,6 +300,8 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
     if context_out is not None:
         context_out["compactions"] = compactions
         context_out["reads"] = reads
+        context_out["turns"] = context_turns
+        context_out["boundaries"] = context_boundaries
     target = Path(cache_path)
     temp = None
     try:
@@ -513,14 +546,27 @@ def _render_claude(lines, window, records, rates, landed, now, cutoff=None, task
 
 
 def _session_records(events):
-    latest = {}
-    for event in events:
+    sessions = defaultdict(list)
+    for index, event in enumerate(events):
         if event.get("event") != "codex_usage" or not event.get("session"):
             continue
-        key = event["session"]
-        if key not in latest or event.get("ts", 0) >= latest[key].get("ts", 0):
-            latest[key] = event
-    return latest
+        sessions[event["session"]].append((index, event))
+    usage = {}
+    fields = ("input", "cached_input", "output")
+    for session, records in sessions.items():
+        records.sort(key=lambda pair: (_timestamp(pair[1].get("ts", 0)), pair[0]))
+        previous = None
+        shares = []
+        for _, event in records:
+            totals = {key: int(event.get(key, 0) or 0) for key in fields}
+            if previous is None or any(totals[key] < previous[key] for key in fields):
+                share = totals
+            else:
+                share = {key: totals[key] - previous[key] for key in fields}
+            previous = totals
+            shares.append({**event, **share})
+        usage[session] = shares
+    return usage
 
 
 def _dispatch_worktree_repos(events):
@@ -732,6 +778,8 @@ def read_ledger(path):
 def _task_states(events):
     states = defaultdict(list)
     for event in events:
+        if event.get("event") in NEW_S1_EVENTS or not event.get("slug"):
+            continue
         key = (event.get("version"), event.get("slug"))
         states[key].append(event)
     return states
@@ -871,7 +919,7 @@ def _task_metrics(task_events, land_event, prices=None):
                         and event["ts"] <= land_ts]
     post_exit_land = max(0, land_ts - max(qualifying_exits)) if qualifying_exits else None
     usage = _session_records(task_events)
-    session_costs = [_cost(item, prices or {}) for item in usage.values()]
+    session_costs = [_cost(item, prices or {}) for records in usage.values() for item in records]
     return {
         "tokens": token_events[-1]["tokens"] if token_events else None,
         "codex_seconds": codex_seconds,
@@ -898,7 +946,7 @@ def _task_metrics(task_events, land_event, prices=None):
 
 def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
     states = _task_states(events)
-    known = delivered = awaiting = unknown = codex_delivered = 0
+    known = delivered = awaiting = unknown = claimed = codex_delivered = 0
     delivered_tokens = []
     review = 0
     for land in landed:
@@ -908,6 +956,9 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
                           key=lambda event: event.get("ts", 0))
         if any(event.get("result") == "fail" for event in verifies):
             review += 1
+        latest = verifies[-1] if verifies else None
+        if latest and latest.get("result") == "pass" and not latest.get("evidence_sha256"):
+            claimed += 1
         starts = [event for event in task_events if event.get("event") == "start"]
         start = max(starts, key=lambda event: event.get("ts", 0)) if starts else {}
         spec = start.get("spec")
@@ -923,10 +974,9 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
         known += 1
         acceptance = re.search(r"(?ms)^## Acceptance\s*\n(.*?)(?=^## |\Z)", text)
         requires_live = bool(acceptance and re.search(r"(?m)^\s*(?:-\s*)?kind:\s*live\s*$", acceptance.group(1)))
-        latest = verifies[-1] if verifies else None
         if requires_live:
             is_live = doc_verification(text) == "live" and bool(doc_live_evidence(text))
-            if latest is None or latest.get("result") != "pass" or not is_live:
+            if latest is None or latest.get("result") != "pass" or not latest.get("evidence_sha256") or not is_live:
                 awaiting += 1
                 continue
             live_commit_ts = _live_status_commit_timestamp(repo_root, spec)
@@ -935,7 +985,7 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
                 continue
             delivered_at = max(int(latest.get("ts", 0)), live_commit_ts)
         else:
-            if latest is None or latest.get("result") != "pass":
+            if latest is None or latest.get("result") != "pass" or not latest.get("evidence_sha256"):
                 awaiting += 1
                 continue
             delivered_at = int(latest.get("ts", 0))
@@ -958,6 +1008,7 @@ def _verification_metrics(events, landed, repo_root, cutoff=None, release=None):
         "delivered": delivered,
         "delivered_tokens": token_mean,
         "awaiting": awaiting,
+        "claimed": claimed,
         "unknown": unknown,
         "review": review,
     }
@@ -1048,10 +1099,18 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None)
             else:
                 increment = token_count - previous_tokens
                 previous_tokens = token_count
-            exit_ts = exit_event.get("ts", 0)
-            next_launch = next((event.get("ts", 0) for event in all_launches if event.get("ts", 0) > exit_ts), None)
-            refusal = next ( (event for event in refusals if event.get("ts", 0) > exit_ts and
-                               (next_launch is None or event.get("ts", 0) < next_launch)), None)
+            ordered_events = [event for _, event in ordered]
+            exit_index = next(i for i, event in enumerate(ordered_events) if event is exit_event)
+            following = ordered_events[exit_index + 1:]
+            next_event = next((event for event in following if event.get("event") in {"start", "resume"}), None)
+            next_launch = next_event.get("ts", 0) if next_event else None
+            between = following[:next(i for i, event in enumerate(following) if event is next_event)] if next_event else following
+            intervention = next((event for event in reversed(between) if event.get("event") == "intervention"), None)
+            reason = next_event.get("reason") if next_event else None
+            source = "resume"
+            if not reason and intervention:
+                reason, source = intervention.get("reason"), "intervention"
+            refusal = next((event for event in between if event in refusals), None)
             test_refusal = refusal is not None
             accepted = bool(land and land.get("test_result") == "passed" and land.get("tree")
                             and land.get("tree") == exit_event.get("tree"))
@@ -1068,7 +1127,12 @@ def _run_outcome_metrics(events, repo_root, cutoff=None, release=None, now=None)
             elif land and (not land.get("tree") or not land.get("test_result")):
                 outcome, evidence = "unrecorded", "none"
             elif next_launch is not None:
-                outcome, evidence = "superseded", "none"
+                if exit_event.get("exit") == 0 and reason == "correction":
+                    outcome, evidence = "rework", f"{source}.correction"
+                elif exit_event.get("exit") == 0 and reason in {"continue_prompt", "clarification"}:
+                    outcome, evidence = "progress", f"{source}.{reason}"
+                else:
+                    outcome, evidence = "superseded", "none"
             elif land is None and not abandon:
                 outcome = "open" if ordered[-1][1].get("ts", 0) > now - 7 * 86400 else "stale"
                 evidence = "none"
@@ -1148,8 +1212,8 @@ def _direct_bug_costs(states, repo_root, release=None, cutoff=None):
                               and event.get("result") in {"pass", "fail"}]
         verifications[spec].extend(task_verifications)
         if (any(event.get("event") == "land" and event.get("test_result") == "passed" for event in task_events)
-                and any(event.get("result") == "pass" for event in task_verifications)):
-            closure_ts = max([event.get("ts", 0) for event in task_verifications if event.get("result") == "pass"])
+                and any(event.get("result") == "pass" and event.get("evidence_sha256") for event in task_verifications)):
+            closure_ts = max([event.get("ts", 0) for event in task_verifications if event.get("result") == "pass" and event.get("evidence_sha256")])
             closures[spec] = max(closures.get(spec, 0), closure_ts)
     costs = []
     first_pass = {"pass": 0, "fail": 0}
@@ -1350,6 +1414,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if verification["delivered_tokens"] is not None:
         lines.append(f'k3dm_dispatch_codex_tokens_per_delivered{{window="{window}"}} {verification["delivered_tokens"]}')
     lines.append(f'k3dm_dispatch_awaiting_verification{{window="{window}"}} {verification["awaiting"]}')
+    lines.append(f'k3dm_dispatch_verification_claimed{{window="{window}"}} {verification["claimed"]}')
     lines.append(f'k3dm_dispatch_verification_unknown{{window="{window}"}} {verification["unknown"]}')
     run_metrics = metrics["run_outcomes"]
     for outcome, count in run_metrics["outcomes"].items():
@@ -1516,6 +1581,13 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             status = raw_status if isinstance(raw_status, str) and raw_status in {"selected", "runtime_reported", "reported", "unverified", "unknown", "declared"} else "unknown"
             display = "unknown" if vendor == "unknown" else (
                 f"{vendor}/model not recorded ({status})" if model == "unknown" else f"{vendor}/{model} ({status})")
+            if role == "worker" and worker_runtime_identities:
+                runtime_models = list(dict.fromkeys(
+                    item["model"] for item in worker_runtime_identities
+                    if isinstance(item.get("model"), str)
+                    and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", item["model"])))
+                if runtime_models:
+                    display = " → ".join(runtime_models)
             identity_labels_tuple = (role, vendor, model, source, status, display)
             if identity_labels_tuple in emitted_identity_labels:
                 return
@@ -1568,10 +1640,11 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
     if time_scope:
         session_starts = {item["session"]: _timestamp(item["start"])
                           for item in coverage or []}
-        usage = {key: item for key, item in usage.items()
+        usage = {key: records for key, records in usage.items()
                  if key in session_starts and session_starts[key] >= now - WINDOWS[window]}
     else:
-        usage = {key: item for key, item in usage.items() if item.get("version") == window}
+        usage = {key: selected for key, records in usage.items()
+                 if (selected := [item for item in records if item.get("version") == window])}
     _render_cost(lines, window, usage, metrics["landed"], prices or {})
     if time_scope and coverage is not None:
         in_window = [item for item in coverage if _timestamp(item["start"]) >= now - WINDOWS[window]]
@@ -1632,9 +1705,9 @@ def _coverage_event(item):
 def _render_cost(lines, window, usage, landed, prices):
     total = cached = 0
     total_cost = 0
-    unpriced = 0
+    unpriced_sessions = set()
     by_model, tokens_by_model = defaultdict(float), defaultdict(lambda: defaultdict(int))
-    for item in usage.values():
+    for item in (record for records in usage.values() for record in records):
         model = item.get("model") or "unknown"
         inp, cache, output = (int(item.get(k, 0) or 0) for k in ("input", "cached_input", "output"))
         total += inp
@@ -1644,7 +1717,7 @@ def _render_cost(lines, window, usage, landed, prices):
         tokens_by_model[model]["output"] += output
         amount = _cost(item, prices)
         if amount is None:
-            unpriced += 1
+            unpriced_sessions.add(item.get("session"))
         else:
             total_cost += amount
             by_model[model] += amount
@@ -1658,7 +1731,7 @@ def _render_cost(lines, window, usage, landed, prices):
             lines.append(f'k3dm_dispatch_codex_tokens_by_model{{window="{window}",model="{model}",kind="{kind}"}} {value}')
     if total:
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
-    lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {unpriced}')
+    lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {len(unpriced_sessions)}')
 
 def _activity_metrics(lines, events, files, now, prices):
     associated = {e.get("session") for e in events if e.get("event") == "codex_usage"}
@@ -1793,7 +1866,7 @@ def _quota_efficiency(lines, events, quota, now):
                   f"k3dm_codex_quota_efficiency_interval_end_timestamp_seconds {end_ts}"])
 
 
-def _agy_metrics(lines, ledger, now):
+def _agy_ledger_metrics(lines, ledger, now):
     rows = []
     try:
         for raw in Path(ledger).read_text(encoding="utf-8").splitlines():
@@ -1841,14 +1914,110 @@ def _agy_metrics(lines, ledger, now):
                 lines.append(f'k3dm_agy_tokens{{window="{window}",mode="{mode}",kind="{kind}"}} {value}')
 
 
-def _render_claude_context(lines, now, claude_context, repo_root):
-    verified = _verified_specs(repo_root, now)
-    incidents, auto_tokens = _read_context_tally(repo_root, now)
+def _agy_metrics(lines, ledger, now, brain_root=None, events=None):
+    brain_root = Path(brain_root or os.environ.get(
+        "K3DM_AGY_BRAIN_DIR", str(Path.home() / ".gemini/antigravity-cli/brain")))
+    host = re.sub(r"[^A-Za-z0-9_.-]", "_", socket.gethostname().split(".", 1)[0])
+    if brain_root.is_dir():
+        lines.append(f'k3dm_agy_source_present{{host="{host}",source="transcripts"}} 1')
+        dispatch_sessions = {event.get("session") for event in (events or [])
+                             if event.get("event") == "agent_exit"
+                             and isinstance(event.get("session"), str) and event.get("session")}
+        skipped = 0
+        sessions = []
+        latest = None
+        cutoff = now - WINDOWS["30d"]
+        try:
+            paths = brain_root.glob("*/.system_generated/logs/transcript_full.jsonl")
+            for path in paths:
+                try:
+                    if path.stat().st_mtime < cutoff:
+                        continue
+                    session_id = path.parents[2].name
+                    steps = []
+                    with path.open("rb") as stream:
+                        for raw_bytes in stream:
+                            try:
+                                raw = raw_bytes.decode("utf-8")
+                                row = json.loads(raw)
+                                stamp = row.get("created_at") if isinstance(row, dict) else None
+                                parsed = time.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ") if isinstance(stamp, str) else None
+                                ts = calendar.timegm(parsed) if parsed else None
+                                if ts is None:
+                                    skipped += 1
+                                    continue
+                                tokens = {}
+                                bad_token = False
+                                for kind in ("input_tokens", "cache_read_tokens", "output_tokens"):
+                                    value = row.get(kind)
+                                    if value is not None:
+                                        if type(value) is not int or value < 0:
+                                            bad_token = True
+                                            continue
+                                        tokens[kind] = value
+                                if bad_token:
+                                    skipped += 1
+                                steps.append((ts, tokens))
+                                latest = ts if latest is None else max(latest, ts)
+                            except (ValueError, TypeError, OverflowError):
+                                skipped += 1
+                    if steps:
+                        sessions.append((session_id, steps))
+                except OSError:
+                    skipped += 1
+        except OSError:
+            skipped += 1
+        lines.append(f"k3dm_agy_transcript_skipped_lines {skipped}")
+        if latest is not None:
+            lines.append(f"k3dm_agy_latest_step_timestamp {latest}")
+        for window, seconds in WINDOWS.items():
+            cutoff = now - seconds
+            selected = []
+            for session_id, steps in sessions:
+                in_window = [(ts, tokens) for ts, tokens in steps if cutoff <= ts <= now]
+                if in_window:
+                    selected.append((session_id, in_window))
+            if not selected:
+                continue
+            count = len(selected)
+            untracked = sum(session_id not in dispatch_sessions for session_id, _ in selected)
+            active = 0
+            totals = defaultdict(int)
+            for _, steps in selected:
+                stamps = sorted(ts for ts, _ in steps)
+                active += sum(min(300, max(0, right-left)) for left, right in zip(stamps, stamps[1:]))
+                for _, tokens in steps:
+                    for kind, value in tokens.items():
+                        totals[kind] += value
+            labels = f'window="{window}",mode="unknown",repo="unknown"'
+            lines.append(f"k3dm_agy_sessions{{{labels}}} {count}")
+            lines.append(f"k3dm_agy_untracked_sessions{{{labels}}} {untracked}")
+            lines.append(f'k3dm_agy_active_seconds{{window="{window}",mode="unknown"}} {active}')
+            for kind, value in totals.items():
+                lines.append(f'k3dm_agy_tokens{{window="{window}",mode="unknown",kind="{kind}"}} {value}')
+        return
+    ledger_path = Path(ledger)
+    if ledger_path.is_file():
+        lines.append(f'k3dm_agy_source_present{{host="{host}",source="ledger"}} 1')
+        _agy_ledger_metrics(lines, ledger_path, now)
+    else:
+        lines.append(f'k3dm_agy_source_present{{host="{host}",source="none"}} 1')
+
+
+def _render_claude_context(lines, now, claude_context, repo_root, metric_windows=None, legacy=True):
+    windows = metric_windows or WINDOWS
+    verified = _verified_specs(repo_root, now) if legacy else None
+    incidents, auto_tokens = _read_context_tally(repo_root, now) if legacy else ({}, None)
     compactions = (claude_context or {}).get("compactions") or []
     reads = (claude_context or {}).get("reads") or []
-    for window, seconds in WINDOWS.items():
+    turns_by_id = {}
+    for turn in (claude_context or {}).get("turns") or []:
+        turns_by_id.setdefault(turn.get("id"), turn)
+    turns = list(turns_by_id.values())
+    boundaries = (claude_context or {}).get("boundaries") or []
+    for window, seconds in windows.items():
         cutoff = now - seconds
-        if claude_context is not None:
+        if legacy and claude_context is not None:
             comp_counts = {t: 0 for t in COMPACT_TRIGGERS}
             comp_tokens = {t: 0 for t in COMPACT_TRIGGERS}
             for item in compactions:
@@ -1878,12 +2047,351 @@ def _render_claude_context(lines, now, claude_context, repo_root):
             for tool in ("read", "bash"):
                 count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("tool") == tool)
                 lines.append(f'k3dm_claude_reads_by_tool{{window="{window}",tool="{tool}"}} {count}')
-        for level in ("live", "verified", "unverified"):
-            lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
-        for kind in INCIDENT_KINDS:
-            lines.append(f'k3dm_claude_context_incidents{{window="{window}",kind="{kind}"}} {incidents[window][kind]}')
-    if auto_tokens is not None:
+        scoped = [turn for turn in turns if _timestamp(turn.get("ts")) >= cutoff]
+        main = [turn for turn in scoped if not turn.get("subagent")]
+        for agent in ("main", "subagent"):
+            selected = [turn for turn in scoped if bool(turn.get("subagent")) == (agent == "subagent")]
+            if not selected:
+                continue
+            values = sorted(float(turn["context"]) for turn in selected)
+            days = {time.strftime("%Y-%m-%d", time.gmtime(_timestamp(turn.get("ts")))) for turn in selected}
+            for quantile, fraction in (("0.5", 0.5), ("0.9", 0.9)):
+                rank = max(1, math.ceil(fraction * len(values)))
+                lines.append(f'k3dm_claude_context_tokens{{window="{window}",agent="{agent}",quantile="{quantile}"}} {values[rank - 1]:g}')
+            lines.append(f'k3dm_claude_context_tokens_sum{{window="{window}",agent="{agent}"}} {sum(values):g}')
+            lines.append(f'k3dm_claude_context_turns{{window="{window}",agent="{agent}"}} {len(values)}')
+            lines.append(f'k3dm_claude_turns_per_active_day{{window="{window}",agent="{agent}"}} {len(values) / len(days):g}')
+        if main:
+            lines.append(f'k3dm_claude_context_ceiling_tokens{{window="{window}"}} {max(float(t["context"]) for t in main):g}')
+            after_boundary = []
+            for boundary in boundaries:
+                bt = _timestamp(boundary.get("ts"))
+                if bt < cutoff:
+                    continue
+                candidates = [turn for turn in main if turn.get("session") == boundary.get("session") and _timestamp(turn.get("ts")) >= bt]
+                if candidates:
+                    after_boundary.append(min(candidates, key=lambda turn: _timestamp(turn.get("ts"))))
+            if after_boundary:
+                vals = sorted(float(turn["context"]) for turn in after_boundary)
+                median = (vals[(len(vals)-1)//2] + vals[len(vals)//2]) / 2
+                lines.append(f'k3dm_claude_context_floor_tokens{{window="{window}"}} {median:g}')
+            rebuilds = {cause: [] for cause in ("compaction", "idle", "other")}
+            by_session = defaultdict(list)
+            for turn in turns:
+                if not turn.get("subagent"):
+                    by_session[turn.get("session")].append(turn)
+            scoped_ids = {turn.get("id") for turn in main}
+            for session_turns in by_session.values():
+                session_turns.sort(key=lambda turn: _timestamp(turn.get("ts")))
+                for index, turn in enumerate(session_turns):
+                    if turn.get("id") not in scoped_ids:
+                        continue
+                    writes = sum(float(turn.get(field, 0) or 0) for field in ("cache_5m", "cache_1h"))
+                    if writes <= 50000:
+                        continue
+                    ts = _timestamp(turn.get("ts"))
+                    previous_ts = _timestamp(session_turns[index-1].get("ts")) if index else None
+                    same_session_boundaries = [_timestamp(b.get("ts")) for b in boundaries if b.get("session") == turn.get("session")]
+                    cause = "compaction" if any((previous_ts is None or previous_ts < b) and b <= ts for b in same_session_boundaries) else "idle" if previous_ts is not None and ts - previous_ts > 3600 else "other"
+                    rebuilds[cause].append(turn)
+            for cause, rows in rebuilds.items():
+                lines.append(f'k3dm_claude_cache_rebuilds{{window="{window}",cause="{cause}"}} {len(rows)}')
+                costs = sum((_cache_write_cost(turn, (claude_context or {}).get("rates") or {}) or 0) for turn in rows)
+                lines.append(f'k3dm_claude_cache_rebuild_cost_usd{{window="{window}",cause="{cause}"}} {costs:g}')
+        if legacy:
+            for level in ("live", "verified", "unverified"):
+                lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
+            for kind in INCIDENT_KINDS:
+                lines.append(f'k3dm_claude_context_incidents{{window="{window}",kind="{kind}"}} {incidents[window][kind]}')
+    if legacy and auto_tokens is not None:
         lines.append(f"k3dm_claude_auto_compact_tokens {auto_tokens}")
+
+
+def _cache_write_cost(turn, prices):
+    key = turn.get("model")
+    if turn.get("speed") not in (None, "standard"):
+        key = f'{key}@{turn["speed"]}'
+    rates = prices.get(key) if isinstance(key, str) else None
+    if not isinstance(rates, dict):
+        return None
+    values = (turn.get("cache_5m", 0), turn.get("cache_1h", 0))
+    rates_for_writes = (rates.get("cache_write_5m"), rates.get("cache_write_1h"))
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0 for value in values):
+        return None
+    if any(not isinstance(rate, (int, float)) or isinstance(rate, bool) or rate < 0 for rate in rates_for_writes):
+        return None
+    return sum(value * rate for value, rate in zip(values, rates_for_writes)) / 1_000_000
+
+
+def _render_dispatch_gates(lines, events):
+    cov_idx = None
+    for idx, e in enumerate(events):
+        if e.get("event") == "gate_coverage_start":
+            cov_idx = idx
+            break
+
+    versions_latest = {}
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        if isinstance(v, str) and v:
+            versions_latest[v] = idx
+
+    sorted_versions = sorted(versions_latest.keys(), key=lambda v: versions_latest[v], reverse=True)[:10]
+    covered_versions = sorted(sorted_versions)
+
+    tasks_events = {}
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        s = e.get("slug")
+        if v and s:
+            tasks_events.setdefault((v, s), []).append((idx, e))
+
+    tasks = {k: v for k, v in tasks_events.items() if any(e.get("event") == "start" for _, e in v)}
+
+    task_parent_role = {}
+    task_parent_idx = {}
+    task_earliest_start = {}
+    combines_by_parent = {}
+
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        if not v or not isinstance(v, str):
+            continue
+        evt = e.get("event")
+        s = e.get("slug")
+        if evt == "start" and s:
+            if (v, s) not in task_earliest_start and isinstance(e.get("ts"), (int, float)):
+                task_earliest_start[(v, s)] = e["ts"]
+            if "parent" in e:
+                p = e.get("parent")
+                r = e.get("role")
+                if isinstance(p, str):
+                    task_parent_role[(v, s)] = (p, r if r in ROLES else None)
+                    task_parent_idx[(v, s)] = idx
+        elif evt == "link" and s:
+            if (v, s) in tasks and "parent" in e:
+                p = e.get("parent")
+                r = e.get("role")
+                if isinstance(p, str):
+                    task_parent_role[(v, s)] = (p, r if r in ROLES else None)
+                    task_parent_idx[(v, s)] = idx
+        elif evt == "combine":
+            p = e.get("parent")
+            if isinstance(p, str):
+                combines_by_parent.setdefault((v, p), []).append((idx, e))
+
+    parents_by_version = {}
+    for (v, s), (p, r) in task_parent_role.items():
+        idx = task_parent_idx.get((v, s), -1)
+        cur = parents_by_version.setdefault(v, {})
+        cur[p] = max(cur.get(p, -1), idx)
+
+    for (v, p), c_list in combines_by_parent.items():
+        last_c_idx = c_list[-1][0]
+        cur = parents_by_version.setdefault(v, {})
+        cur[p] = max(cur.get(p, -1), last_c_idx)
+
+    all_valid_parents = {}
+    for v, p_dict in parents_by_version.items():
+        for p, idx in p_dict.items():
+            if PARENT_RE.fullmatch(p):
+                all_valid_parents[(v, p)] = idx
+
+    sorted_valid_parents = sorted(all_valid_parents.keys(), key=lambda vp: all_valid_parents[vp], reverse=True)
+    top_20_parents = set(sorted_valid_parents[:20])
+
+    for v in covered_versions:
+        v_tasks = [evts for (tv, s), evts in tasks.items() if tv == v]
+
+        ladder_counts = {r: {st: 0 for st in STATUSES} for r in RUNGS}
+        stalled_count = 0
+        live_pending_count = 0
+
+        for evts in v_tasks:
+            first_start_idx = next(idx for idx, e in evts if e.get("event") == "start")
+            outside_cov = cov_idx is None or first_start_idx < cov_idx
+
+            last_start_idx = max(idx for idx, e in evts if e.get("event") == "start")
+            attempt_evts = [(idx, e) for idx, e in evts if idx >= last_start_idx]
+
+            distinct_runs = set()
+            latest_run = None
+            run_exits = {}
+            run_natural_charge = {}
+            run_assessments = {}
+            has_land = any(e.get("event") == "land" for _, e in attempt_evts)
+            has_abandon = any(e.get("event") == "abandon" for _, e in attempt_evts)
+            stall_clear_idx = None
+
+            for idx, e in attempt_evts:
+                evt_name = e.get("event")
+                if evt_name == "start":
+                    r = e.get("run") if isinstance(e.get("run"), int) else 1
+                    latest_run = r
+                    distinct_runs.add(r)
+                elif evt_name == "resume":
+                    if e.get("reason") == "correction" and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                    if isinstance(e.get("run"), int):
+                        r = e["run"]
+                    elif isinstance(e.get("n"), int):
+                        r = e["n"]
+                    else:
+                        r = (latest_run or 0) + 1
+                    latest_run = r
+                    distinct_runs.add(r)
+                elif evt_name in ("codex_exit", "agent_exit"):
+                    r = e.get("run") if isinstance(e.get("run"), int) else latest_run
+                    run_exits[r] = e.get("exit")
+                    if e.get("exit") not in (0, None):
+                        if r not in run_natural_charge:
+                            run_natural_charge[r] = idx
+                elif evt_name == "verify":
+                    if e.get("result") == "fail" and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                elif evt_name == "land_refused":
+                    if e.get("reason") in ("tests", "fast-gate") and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                elif evt_name == "attempt_assessed":
+                    r = e.get("run")
+                    if isinstance(r, int):
+                        run_assessments[r] = (idx, e)
+                elif evt_name == "gate_cleared":
+                    if e.get("gate") == "stall":
+                        stall_clear_idx = idx
+
+            unsuccessful = []
+            charge_lines = {}
+            P = 0
+            for r in distinct_runs:
+                if r in run_assessments:
+                    a_idx, a_evt = run_assessments[r]
+                    if a_evt.get("outcome") == "progress" and a_evt.get("new_evidence_sha256"):
+                        P = max(P, r)
+
+            for r in distinct_runs:
+                if r in run_assessments:
+                    a_idx, a_evt = run_assessments[r]
+                    outc = a_evt.get("outcome")
+                    if outc in ("failed", "rework"):
+                        unsuccessful.append(r)
+                        charge_lines[r] = a_idx
+                    elif outc in ("progress", "quota"):
+                        pass
+                    else:
+                        if r in run_natural_charge:
+                            unsuccessful.append(r)
+                            charge_lines[r] = run_natural_charge[r]
+                else:
+                    if r in run_natural_charge:
+                        unsuccessful.append(r)
+                        charge_lines[r] = run_natural_charge[r]
+            unsuccessful.sort()
+
+            streak = 0
+            for r in unsuccessful:
+                if r > P:
+                    if stall_clear_idx is None or charge_lines[r] > stall_clear_idx:
+                        streak += 1
+
+            if has_land or has_abandon:
+                stall = "closed"
+            elif streak >= 2:
+                stall = "open"
+            else:
+                stall = "clear"
+
+            if stall == "open":
+                stalled_count += 1
+
+            task_ladder = {}
+            last_exit = run_exits.get(latest_run)
+            task_ladder["implemented"] = "done" if last_exit == 0 else "pending"
+
+            for rung in ("offline_tested", "deployed", "live_verified"):
+                if any(e.get("event") == "state_mark" and e.get("state") == rung for _, e in attempt_evts):
+                    task_ladder[rung] = "done"
+                elif outside_cov:
+                    task_ladder[rung] = "unknown"
+                else:
+                    task_ladder[rung] = "pending"
+
+            verifies = [e for _, e in attempt_evts if e.get("event") == "verify"]
+            if verifies:
+                last_v = verifies[-1]
+                if last_v.get("result") == "pass":
+                    task_ladder["independently_verified"] = "done" if last_v.get("evidence_sha256") else "unknown"
+                else:
+                    task_ladder["independently_verified"] = "pending"
+            else:
+                task_ladder["independently_verified"] = "pending"
+
+            task_ladder["landed"] = "done" if has_land else "pending"
+
+            if task_ladder["landed"] == "done" and task_ladder["live_verified"] == "pending":
+                live_pending_count += 1
+
+            for rung in RUNGS:
+                st = task_ladder[rung]
+                ladder_counts[rung][st] += 1
+
+        for rung in RUNGS:
+            for st in STATUSES:
+                lines.append(f'k3dm_dispatch_ladder_tasks{{version="{v}",rung="{rung}",status="{st}"}} {ladder_counts[rung][st]}')
+
+        lines.append(f'k3dm_dispatch_stalled_tasks{{version="{v}"}} {stalled_count}')
+        lines.append(f'k3dm_dispatch_live_pending_tasks{{version="{v}"}} {live_pending_count}')
+
+        gate_counts = {ge: 0 for ge in GATE_EVENTS}
+        for e in events:
+            if e.get("version") == v and e.get("event") in gate_counts:
+                gate_counts[e["event"]] += 1
+
+        for ge in GATE_EVENTS:
+            lines.append(f'k3dm_dispatch_gate_events{{version="{v}",event="{ge}"}} {gate_counts[ge]}')
+
+        named_in_v = parents_by_version.get(v, {})
+        valid_in_v = {p: idx for p, idx in named_in_v.items() if PARENT_RE.fullmatch(p)}
+        invalid_in_v = {p: idx for p, idx in named_in_v.items() if not PARENT_RE.fullmatch(p)}
+
+        exported_in_v = sorted(p for p in valid_in_v if (v, p) in top_20_parents)
+        dropped_in_v = len(invalid_in_v) + len([p for p in valid_in_v if (v, p) not in top_20_parents])
+
+        for p in exported_in_v:
+            members = [(s, r) for (tv, s), (tp, r) in task_parent_role.items() if tv == v and tp == p]
+            combines = combines_by_parent.get((v, p), [])
+            if combines:
+                last_c = combines[-1][1]
+                comb_res = last_c.get("result")
+                conflicts = last_c.get("conflicts")
+                last_c_ts = last_c.get("ts", 0)
+                if members:
+                    member_starts = [task_earliest_start[(v, s)] for s, _ in members if (v, s) in task_earliest_start]
+                    elapsed = max(0, int(last_c_ts - min(member_starts))) if member_starts else None
+                else:
+                    elapsed = None
+            else:
+                comb_res = "pending"
+                conflicts = None
+                elapsed = None
+
+            if comb_res in COMBINE_RESULTS:
+                lines.append(f'k3dm_dispatch_split_parent_info{{version="{v}",parent="{p}",combine="{comb_res}"}} 1')
+
+            for r in ROLES:
+                r_cnt = sum(1 for _, mr in members if mr == r)
+                lines.append(f'k3dm_dispatch_split_parent_parts{{version="{v}",parent="{p}",role="{r}"}} {r_cnt}')
+
+            if conflicts is not None and type(conflicts) is int:
+                lines.append(f'k3dm_dispatch_split_parent_conflicts{{version="{v}",parent="{p}"}} {conflicts}')
+
+            if elapsed is not None:
+                lines.append(f'k3dm_dispatch_split_parent_elapsed_seconds{{version="{v}",parent="{p}"}} {elapsed}')
+
+        lines.append(f'k3dm_dispatch_split_parents_dropped{{version="{v}"}} {dropped_in_v}')
 
 
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
@@ -1952,14 +2460,38 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
     if claude_context is not None or repo_root is not None:
+        if claude_context is not None:
+            claude_context["rates"] = claude_prices or {}
         _render_claude_context(lines, now, claude_context, repo_root)
+        if claude_context is not None:
+            all_turns = (claude_context or {}).get("turns") or []
+            all_boundaries = (claude_context or {}).get("boundaries") or []
+            task_windows = defaultdict(list)
+            for key, task_events in _task_states(events).items():
+                starts = [row["ts"] for row in task_events if row.get("event") == "start"]
+                lands = [row["ts"] for row in task_events if row.get("event") == "land"]
+                release = _normalize_version(key[0])
+                if starts and lands and release:
+                    task_windows[release].append((min(starts), max(lands)))
+            for release, intervals in task_windows.items():
+                selected_turns = [turn for turn in all_turns if any(start <= _timestamp(turn.get("ts")) <= end
+                                  for start, end in intervals)]
+                if not selected_turns:
+                    continue
+                selected_boundaries = [boundary for boundary in all_boundaries if any(
+                    start <= _timestamp(boundary.get("ts")) <= end for start, end in intervals)]
+                release_context = {"turns": selected_turns, "boundaries": selected_boundaries,
+                                   "rates": claude_prices or {}}
+                _render_claude_context(lines, now, release_context, repo_root,
+                                       metric_windows={release: 10**12}, legacy=False)
     if coverage is not None:
         _activity_metrics(lines, events, coverage, now, prices)
         newest_quota = max((r.get("quota") for r in coverage if r.get("quota") and _timestamp(r["quota"][0])), key=lambda q: _timestamp(q[0]), default=None)
         _quota_efficiency(lines, events, newest_quota, now)
     else:
         _quota_efficiency(lines, events, None, now)
-    _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now)
+    _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events)
+    _render_dispatch_gates(lines, events)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
 

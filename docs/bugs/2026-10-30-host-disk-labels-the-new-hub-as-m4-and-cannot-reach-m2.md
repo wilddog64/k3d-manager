@@ -1,14 +1,15 @@
 # Bug: Host Disk dashboard labels the new hub's disk as "m4" and shows m2 down after the cutover
 
-**Status:** LIVE-VERIFIED 2026-10-31 — `1708c97a` (Luna); E3 live on the M5 at `4f409ba6`: probe_success 1 for m5 (822 GiB), m4 (173 GiB), m2 and hostinger
+**Status:** REGRESSION UNDER INVESTIGATION 2026-11-04 (E2E runner); previously LIVE-VERIFIED 2026-10-31 — `1708c97a` (Luna); E3 live on the M5 at `4f409ba6`: probe_success 1 for m5 (822 GiB), m4 (173 GiB), m2 and hostinger
 **Fix commit:** 1708c97a
 **Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
 **Priority:** P2
+**Waiting on:** investigation — since 2026-11-07
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30
 **Detected by:** the operator (Host Disk dashboard on the M5 hub); root-caused by Claude
 **Affected:** `bin/k3dm-disk-metrics` (`DEFAULT_TARGETS`); `bin/k3dm-machine-setup` (copies `.ssh/config.d/operator` without the `Include` that loads it)
-**Branch:** `k3d-manager-v1.43.12`
+**Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.12`)
 **Related:** `docs/bugs/2026-10-30-hub-cutover-leaves-old-hub-producers-on-old-pushgateway.md`
 
 ## Observed failure
@@ -118,3 +119,31 @@ out of scope for this fix (see What NOT to do). Track it as a `hub-new` checklis
 
 - **Fix:** `1708c97a` (Luna; Claude review). Offline: `test_disk_metrics.py` 9/9, `machine_setup.bats` 61/61 outside the sandbox, shellcheck clean; the four new tests were red on the pre-fix scripts.
 - **E3 (live, 2026-10-31 ~14:20Z):** the M5 checkout was fast-forwarded to `4f409ba6`. Running `bin/k3dm-disk-metrics` on the M5 pushed `k3dm_disk_probe_success` = 1 for m5, m4, m2 and hostinger. `m5` reports 822 GiB free (the M5's disk), and `m4` reports 173 GiB (the real M4, measured over ssh). The M5 reaches both `m4-air.local` and `m2jump` with key login.
+
+
+## Regression evidence — 2026-11-04 (M5 E2E runner)
+
+**Status:** OPEN recurrence investigation. October 31 live verification remains valid historical evidence; the current cause is unconfirmed.
+
+**Operator symptom:** E2E Verification Grafana dashboard status, duration, failure trends and details show No data; failing runs shows 0. Operator suspects M5 migration left M2 runner setup incomplete.
+
+**Cloud-bridge live evidence (read-only; 2026-11-04 16:35–16:37 UTC):**
+- E2E runner health request `20261104T163520Z-make-e2e-runner-health`, job `cf42e64f`: `hub_context=k3d-k3d-cluster`, `hub=ok`, `runner=m2jump`, `runner_status=unreachable`, `severity=warning`. Exit code 0 denotes a warning, not healthy runner reachability.
+- Hub pods request `20261104T163519Z-diagnose-pods-e2e`, job `e2d3ef86`: vulnerability-inventory-exporter-754b96678b-wqrl9 is Running 1/1 with zero restarts in `platform-ops`.
+- Exporter logs request `20261104T163630Z-diagnose-logs-e2e-exporter`, job `0114e526`: completed but returned `(no output returned)`; this does not prove metric ingestion.
+
+**Important contrast:** On 2026-10-31, this bug's E3 live verification showed successful M5-to-M2 SSH disk probing. Do not conclude M2 was never configured. Identify whether the runner-health check has different SSH/configuration requirements or connectivity regressed since then.
+
+**Investigation / acceptance:**
+1. Compare the SSH resolution, user, authentication and connection behavior in `e2e_runner_health` to the successful `k3dm-disk-metrics` M2 probe. Separate alias/Include, known_hosts, authorization, network reachability, and runner-specific preflight causes. Never expose secret material.
+2. Check that one-command machine setup / hub cutover documents and verifies M5-to-M2 E2E runner connectivity with a read-only acceptance gate, without silently modifying SSH trust.
+3. Separately check E2E result ConfigMaps (`k3dm.k3d.io/e2e-result=true`), exported `e2e_*` metrics, and Prometheus ingestion. See related existing 2026-10-16 hub-rebuild-loses-e2e-results bug for lost historical records; absence of runner connectivity alone does not prove lost history.
+4. Live acceptance: E2E runner reports reachable, and Grafana status metrics actually return series; keep these as separate requirements.
+
+No cluster changes or recovery actions were performed. This evidence is on branch `k3d-manager-v1.43.14`; P2 priority is retained.
+
+## Recurrence note 2026-11-06: metrics frozen since Oct 31
+
+`HostDiskMetricsStale` has fired since 2026-10-31T15:14Z. On the M5 Pushgateway, `push_time_seconds{job="k3dm-disk"}` is 2026-10-31T14:13:42Z, about six days old, while the `m5`, `m4`, `m2` and `hostinger` `k3dm_disk_probe_success` series still read 1. Those 1s are frozen values, not live probes, so the Oct 31 live verification is the last known good and cannot speak for today. Hermes runs `bin/k3dm-disk-metrics` with `check=False` and captured output (`_publish_disk_metrics`), so a failure leaves no trace in its log. Cause not established.
+
+**Cause found 2026-11-07 (Claude):** `bin/k3dm-disk-metrics` runs bare `scutil`, which this doc's fix added; Hermes's launchd PATH has no `/usr/sbin`, so the script dies with `FileNotFoundError` and Hermes discards the traceback. Fix and acceptance: `docs/bugs/2026-11-07-disk-metrics-crash-under-launchd-scutil-not-on-path.md`.

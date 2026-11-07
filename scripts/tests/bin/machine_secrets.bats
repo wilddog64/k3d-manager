@@ -199,6 +199,30 @@ SH
   [[ "$output" == *'bin/k3dm-machine-secrets import --in "/tmp/example.enc" --force'* ]]
 }
 
+@test "control role export and pull accept only the control secret manifest" {
+  grep -Fqx 'gemini-cli-api-key|k3dm|Local find-similar-docs query embedding|operator: see docs/howto/find-prior-art.md' "$ROOT/scripts/etc/machine/secrets.control.list"
+  [ "$(grep -vc '^#\|^$' "$ROOT/scripts/etc/machine/secrets.control.list")" -eq 1 ]
+  make_fake_ssh
+  printf 'gemini-cli-api-key\tk3dm\t746f6b656e\nk3dm-cloudflare-api-token\tk3dm\t68696464656e\n' > "$FIXTURE"
+  tty_run fixture-password "$SCRIPT" pull --from old-mac.local --role control --force
+  [ "$status" -eq 0 ]
+  grep -Fq 'add-generic-password -U -s gemini-cli-api-key -a k3dm -X 746f6b656e' "$SECURITY_LOG.stdin"
+  run ! grep -Fq 'k3dm-cloudflare-api-token' "$SECURITY_LOG.stdin"
+  grep -Fq '<old-mac.local>' "$SSH_LOG"
+  grep -Fq 'export --role control --stream --unlock' "$SSH_LOG"
+}
+
+@test "control role stream filters control secrets with a hub positive control" {
+  printf 'gemini-cli-api-key\tk3dm\t746f6b656e\nk3dm-cloudflare-api-token\tk3dm\t68696464656e\n' > "$FIXTURE"
+  run "$SCRIPT" export --role control --stream
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'gemini-cli-api-key\tk3dm\t746f6b656e'* ]]
+  [[ "$output" != *'k3dm-cloudflare-api-token'* ]]
+  run "$SCRIPT" export --role hub --stream
+  [ "$status" -eq 0 ]
+  [[ "$output" == *$'k3dm-cloudflare-api-token\tk3dm\t68696464656e'* ]]
+}
+
 @test "M8: stream export unlocks from stdin and emits records only on stdout" {
   printf 'k3dm-cloudflare-api-token\tk3dm\t746f6b656e\n' > "$FIXTURE"
   run bash -c "printf 'fixture-password\\n' | '$SCRIPT' export --role hub --stream --unlock"

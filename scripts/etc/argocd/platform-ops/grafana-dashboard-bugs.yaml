@@ -110,7 +110,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 1,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -155,9 +155,9 @@ data:
           "type": "stat",
           "title": "Bugs filed",
           "gridPos": {
-            "x": 4,
+            "x": 3,
             "y": 1,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -199,9 +199,9 @@ data:
           "type": "stat",
           "title": "Bugs open",
           "gridPos": {
-            "x": 8,
+            "x": 6,
             "y": 1,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -247,9 +247,9 @@ data:
           "type": "stat",
           "title": "Bugs fixed",
           "gridPos": {
-            "x": 12,
+            "x": 9,
             "y": 1,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -292,7 +292,7 @@ data:
           "type": "stat",
           "title": "Open, scheduled later",
           "gridPos": {
-            "x": 16,
+            "x": 12,
             "y": 1,
             "w": 4,
             "h": 4
@@ -337,7 +337,7 @@ data:
           "type": "stat",
           "title": "Open, untriaged",
           "gridPos": {
-            "x": 20,
+            "x": 16,
             "y": 1,
             "w": 4,
             "h": 4
@@ -379,6 +379,23 @@ data:
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
+          }
+        },
+        {
+          "id": 19,
+          "type": "stat",
+          "title": "Hub code behind",
+          "description": "Commits with code changes on the hub's branch that the hub's checkout has not pulled. Doc text does not need a pull: it appears within about 5 minutes. If a fix is not showing, run make hub-sync in a shell on the hub. The count is for the branch the hub is on. If the second value says older release, run make hub-sync BRANCH=<the branch it names>.",
+          "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {"refId": "A", "expr": "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)", "instant": true, "legendFormat": "{{branch}}"},
+            {"refId": "B", "expr": "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)", "instant": true, "legendFormat": "{{newest_branch}}"}
+          ],
+          "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "fieldConfig": {
+            "defaults": {"noValue": "unknown", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}},
+            "overrides": [{"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"1": {"text": "current release", "color": "green"}, "0": {"text": "older release", "color": "orange"}}}]}]}]
           }
         },
         {
@@ -1074,7 +1091,7 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Live evidence reports whether the recorded proof commit contains the fix: current, stale proof, missing, unchecked, n/a, or —. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the **Fix commit:** header when the doc has one, otherwise the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified.",
+          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Live evidence reports whether the recorded proof commit contains the fix: current, stale proof, missing, unchecked, n/a, or —. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the **Fix commit:** header when the doc has one, otherwise the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified. Waiting on says what an open bug needs next; filter that column to separate live checks and scheduled runs from work nobody has picked up. `not stated` means the doc has no Waiting on line. The Open P0 to P3 tiles count every open doc, including fixes that landed and are waiting for a live check, so read this column before treating a count as an incident.",
           "targets": [
             {
               "refId": "A",
@@ -1105,14 +1122,15 @@ data:
                   "filed": 3,
                   "Value": 4,
                   "status": 5,
-                  "fixed_in": 6,
-                  "fix_sha": 7,
-                  "verified_sha": 8,
-                  "verified": 9,
-                  "verified_at": 10,
-                  "live_verified": 11,
-                  "live_verified_at": 12,
-                  "live_evidence": 13
+                  "waiting_on": 6,
+                  "fixed_in": 7,
+                  "fix_sha": 8,
+                  "verified_sha": 9,
+                  "verified": 10,
+                  "verified_at": 11,
+                  "live_verified": 12,
+                  "live_verified_at": 13,
+                  "live_evidence": 14
                 },
                 "excludeByName": {
                   "sort_key": true,
@@ -1121,7 +1139,8 @@ data:
                   "job": true,
                   "instance": true,
                   "Time": true,
-                  "repo": true
+                  "repo": true,
+                  "waiting_since": true
                 },
                 "renameByName": {
                   "priority": "Priority",
@@ -1130,6 +1149,7 @@ data:
                   "filed": "Filed",
                   "Value": "Open for",
                   "status": "Status",
+                  "waiting_on": "Waiting on",
                   "fixed_in": "Fixed in",
                   "fix_sha": "Fix commit",
                   "verified_sha": "Verified commit",
@@ -1159,6 +1179,13 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {"id": "byName", "options": "Waiting on"},
+                "properties": [
+                  {"id": "custom.width", "value": 130},
+                  {"id": "custom.filterable", "value": true}
+                ]
+              },
               {
                 "matcher": {"id": "byName", "options": "Verified at"},
                 "properties": [
@@ -1262,7 +1289,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 75
+                    "value": 65
                   },
                   {
                     "id": "custom.filterable",
@@ -1401,7 +1428,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 80
+                    "value": 70
                   },
                   {
                     "id": "unit",
@@ -1464,7 +1491,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Status"},
                 "properties": [
-                  {"id": "custom.width", "value": 80},
+                  {"id": "custom.width", "value": 70},
                   {"id": "custom.filterable", "value": true},
                   {"id": "custom.cellOptions", "value": {"type": "color-text"}},
                   {"id": "mappings", "value": [{"type": "value", "options": {
@@ -1516,7 +1543,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 62,
-            "w": 24,
+            "w": 12,
             "h": 8
           },
           "description": "This is an inventory snapshot. A falling open count does not prove a fix, because a doc can be archived, superseded or deleted. Hub Prometheus keeps 3 days (retention: 3d), so this panel always shows the last 3 days, whatever range the dashboard is set to. A new hub starts empty and fills to 3 days.",
@@ -1633,6 +1660,174 @@ data:
           }
         },
         {
+          "id": 18,
+          "type": "barchart",
+          "title": "Open by priority, last 30 days (from git)",
+          "description": "Counts are open docs per day, read from the last commit of each UTC day on the release ref. This is an inventory snapshot, not opened/fixed events: a falling count does not prove a fix. Not limited by Prometheus retention.",
+          "gridPos": {
+            "x": 12,
+            "y": 62,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (date, priority) (k3dm_bug_open_history{repo=\"$repo\"})",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "date"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "rowField": "date",
+                "columnField": "priority",
+                "valueField": "Value",
+                "emptyValue": "null"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "date\\\\priority",
+                "renamePattern": "date"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "date": 0,
+                  "P0": 1,
+                  "P1": 2,
+                  "P2": 3,
+                  "P3": 4,
+                  "unset": 5
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "fillOpacity": 80
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P0"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "dark-red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P1"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P2"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "orange"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P3"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "yellow"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "unset"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#8e8e8e"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "xField": "date",
+            "stacking": "normal",
+            "showValue": "never",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100,
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          }
+        },
+        {
           "id": 100,
           "type": "row",
           "title": "Release plans",
@@ -1656,7 +1851,7 @@ data:
           "gridPos": {
             "x": 0,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1702,9 +1897,9 @@ data:
           "type": "stat",
           "title": "Not yet implemented",
           "gridPos": {
-            "x": 4,
+            "x": 3,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1741,9 +1936,9 @@ data:
           "type": "stat",
           "title": "Implemented, unverified",
           "gridPos": {
-            "x": 8,
+            "x": 6,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1789,9 +1984,9 @@ data:
           "type": "stat",
           "title": "Live-verified",
           "gridPos": {
-            "x": 12,
+            "x": 9,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1833,9 +2028,9 @@ data:
           "type": "stat",
           "title": "Status unknown",
           "gridPos": {
-            "x": 16,
+            "x": 12,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -1881,9 +2076,9 @@ data:
           "type": "stat",
           "title": "Status lags dispatch",
           "gridPos": {
-            "x": 20,
+            "x": 15,
             "y": 6,
-            "w": 4,
+            "w": 3,
             "h": 4
           },
           "targets": [
@@ -2617,7 +2812,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(1 * label_replace(label_join(k3dm_release_milestone_info{repo=\"$repo\",state=\"blocked\"}, \"blocker\", \": \", \"version\", \"blocked_by\"), \"blocker\", \"blocked at $1\", \"blocker\", \"(.*)\") and on(repo) k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"forecast\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
+              "expr": "(1 * label_replace(label_join(k3dm_release_milestone_info{repo=\"$repo\",state=\"blocked\"}, \"blocker\", \": \", \"version\", \"blocked_by\"), \"blocker\", \"blocked at $1\", \"blocker\", \"(.*)\") and on(repo) k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"forecast|in_progress\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
               "instant": true
             }
           ],
@@ -2930,9 +3125,10 @@ data:
           "type": "stat",
           "title": "Undeclared plan overlaps",
           "description": "Count of same-release plan pairs sharing Component paths without a dependency.",
-          "gridPos": {"x": 0, "y": 70, "w": 6, "h": 4},
+          "gridPos": {"x": 18, "y": 6, "w": 6, "h": 4},
           "targets": [{"refId": "A", "expr": "sum((k3dm_plan_undeclared_overlaps{repo=\"$repo\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo=\"$repo\",release=~\"$release\"} and on() (vector($release_mode) == 0))) or vector(0)", "instant": true}],
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
           "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]

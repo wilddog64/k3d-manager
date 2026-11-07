@@ -13,7 +13,7 @@ After setup, run the required `agy` CLI in the operator shell on the new hub and
 
 If the MacPaw Gemini disk cleaner was installed by an earlier setup, remove it separately if desired.
 
-For Slack bot threads, run `SLACK_CHANNEL_ID=<id> make update-webhook-slack` on the new hub in a local terminal: it reads the login Keychain. After cutover, ask `/ask-docs` in that channel and confirm the reply appears in a thread.
+For Slack bot threads and analyzer status posts, run `SLACK_CHANNEL_ID=<id> K3DM_STATUS_CHANNEL_ID=<id> make update-webhook-slack` on the new hub in a local terminal: it reads the login Keychain and writes both channel IDs to the webhook plist. After cutover, ask `/ask-docs` in the bot channel and confirm the reply appears in a thread. Also run an analyzer job and confirm its status post arrives in the configured status channel; `make webhook-doctor` should report `status_channel: configured`.
 
 For the step-by-step path, run `make hub-new HUB_OLD_HOST=<old>` followed by `make hub-cutover HUB_OLD_HOST=<old>`. `HUB_OLD_HOST` is required for hub-new; cutover can also use the host recorded in its passing report. If a stage stops, resolve its stated cause and rerun `make hub-new HUB_OLD_HOST=<old>`. Passed stages are retained; use `HUB_NEW_FROM=<stage>` only when intentionally restarting from a named stage. Never run bare `make up` for this process.
 
@@ -30,12 +30,16 @@ Do not manually start a `hub-singletons.list` agent on either host during the mo
 ## Cut over (step-by-step and recovery)
 
 1. Review the printed agent plan with `make hub-cutover DRY_RUN=1`.
-2. Run `make hub-cutover` and type `cutover` when prompted. It stops the loaded singleton agents on the M4 over SSH, confirms that none remain loaded there, stops the old ArgoCD application controller, hands Hostinger to the new hub’s ArgoCD, loads the agents on the M5, and performs read-only checks for webhook health, public hostnames, the Cloudflare connector, Hostinger SSH tunnels and Hermes status.
+2. Run `make hub-cutover` and type `cutover` when prompted. It disables the listed singleton agents on the M4 over SSH, so a reboot of the M4 cannot start them again, and stops those that are loaded. It then confirms that none remain loaded there, stops the old ArgoCD application controller, hands Hostinger to the new hub’s ArgoCD, loads the agents on the M5, and performs read-only checks for webhook health, public hostnames, the Cloudflare connector, Hostinger SSH tunnels and Hermes status.
 3. Run `kubectl -n cicd get applications | grep ubuntu-hostinger` and confirm the applications are Synced. Confirm a Hermes message arrives in Slack. Hermes delivery is an operator check because the command does not send a test message.
 4. Review `~/.local/share/k3d-manager/hub-cutover/stopped-on-old` and `hub-cutover-report.json`. If verification failed only on a check that has since recovered, `make hub-cutover-verify` re-runs it without changing anything and records the new result; a pass unblocks `make hub-cutover-forwards`. Verification retries for about three minutes while the webhook starts and Cloudflare drops the M4 connector. If it still fails it prints the rollback command; run `make hub-cutover-rollback` and type `rollback` to stop the M5 controller, restore the M4 controller, unload the M5 agents and restore exactly the recorded agents on the M4.
 5. Once the cut-over has passed, stop the M4 cluster on the M4 with `k3d cluster stop k3d-cluster`. The old controller has already stopped; the running M4 cluster would still have alerts firing next to the M5’s. The M4's `hub-local.list` port-forward agents will then fail to connect, which is expected.
 
-To roll back after step 5, start the M4 cluster first with `k3d cluster start k3d-cluster` on the M4, wait for its pods to be ready, then run `make hub-cutover-rollback` on the M5.
+6. From the M5, run `make hub-cutover-forwards`. This creates or reuses `~/.ssh/k3dm_hub_forward` on the M4 and authorizes its public key on the M5 for the two loopback forwards in `scripts/etc/machine/hub-push-forwards.list`. The key is dedicated to these tunnels; it has no interactive shell or remote command access. The launch agents use this key directly and do not depend on a logged-in SSH agent, so they can reconnect after an M4 reboot. Rollback restores the previous plist files but intentionally leaves the restricted key authorization in place.
+
+To remove the tunnel access after it is no longer needed, remove the `k3dm-hub-forward` entry from `~/.ssh/authorized_keys` on the M5 and remove `~/.ssh/k3dm_hub_forward` plus `~/.ssh/k3dm_hub_forward.pub` on the M4. Check the key body before removing the authorization if another installation may use the same comment.
+
+To roll back after step 5, start the M4 cluster first with `k3d cluster start k3d-cluster` on the M4, wait for its pods to be ready, then run `make hub-cutover-rollback` on the M5. Rollback enables on the M4 only the agents the cut-over disabled, loads only those it stopped, and disables every listed agent on the M5. An agent already disabled on the M4 before the cut-over stays disabled; a cut-over stops it if it is loaded and names it in a warning, and rollback does not restore it.
 
 The command does not delete plists, clusters or data. Keep the M4 cluster stopped and intact for **7 days** as the rollback path. Do not run hub singletons on both Macs.
 

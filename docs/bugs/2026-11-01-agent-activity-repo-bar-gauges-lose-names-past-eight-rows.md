@@ -1,6 +1,6 @@
 # Bug: Agent Activity "Untracked by repo" and "Tokens by repo" lose every bar name once the window holds ~20 repos
 
-**Status:** VERIFIED — `badbb970` (Luna; Claude review, independent verify); E2 live screenshot pending
+**Status:** VERIFIED — `badbb970` (Luna; Claude review, independent verify); E2 FAILED 2026-11-06, operator's screenshot at Window 30d: the names are back but the values clip at nine rows. Fix: `docs/bugs/2026-11-06-agent-activity-repo-gauges-clip-values-at-nine-rows.md`
 **Fix commit:** badbb970
 **Priority:** P3
 **Severity:** low — the bar values are correct; the operator cannot tell which repo a bar belongs to; no runtime impact

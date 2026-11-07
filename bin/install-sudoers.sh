@@ -10,6 +10,13 @@
 
 set -euo pipefail
 
+if [[ -z "${BASH_VERSINFO[0]:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
+  cat <<'EOF' >&2
+[install-sudoers] bash 4.0 or newer is required. Install a newer bash with 'brew install bash' and put it first on PATH (for example, run 'eval "$(brew shellenv)"').
+EOF
+  exit 2
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/system.sh"
@@ -29,49 +36,29 @@ _SUDOERS_CONTENT='# k3d-manager passwordless '"${_SUDO}"' rules
 
 # 60-minute credential cache — '"${_SUDO}"' -v prewarm at session start covers a full make up/down run
 Defaults:%admin  timestamp_timeout=60
-
-# macOS System Keychain — trust Vault PKI CA certificate
-%admin  ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *
-
-# macOS loopback alias — 127.0.0.2 for frontend port-forward
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *
-%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 -alias *
-
-# macOS launchd — system-scope daemon lifecycle for k3d-manager plists only
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.*.plist
-
-# macOS LaunchDaemons — install and remove k3d-manager plists only
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist
-%admin  ALL=(root) NOPASSWD: /bin/rm -f /Library/LaunchDaemons/com.k3d-manager.*.plist *
-
-# Self-update — allow passwordless re-run of make install-sudoers after first install
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 0755 * /usr/local/bin/k3d-manager-update-hosts
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m 0440 /tmp/k3d-manager-sudoers.* /etc/sudoers.d/k3d-manager
-%admin  ALL=(root) NOPASSWD: /bin/rm -f /usr/local/bin/k3d-manager-update-hosts
+%admin  ALL=(root) NOPASSWD: /usr/bin/true
 
 # /etc/hosts management — scoped helper only (no bare sh -c wildcard)
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3d-manager-update-hosts *
-
-# Binary install to /usr/local/bin (k3s, kubectl, istioctl, vcluster, etc.)
-%admin  ALL=(root) NOPASSWD: /usr/bin/install -m [0-9][0-9][0-9] * /usr/local/bin/*
-%admin  ALL=(root) NOPASSWD: /bin/cp * /usr/local/bin/*
-%admin  ALL=(root) NOPASSWD: /bin/chmod [0-9][0-9][0-9] /usr/local/bin/*
 
 # k3s lifecycle (local k3s node)
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s *
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 %admin  ALL=(root) NOPASSWD: /usr/local/bin/k3s-killall.sh
 
-# systemd service management (Linux / Ubuntu EC2 — harmless on macOS where paths do not exist)
+'
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  _SUDOERS_CONTENT+='# systemd service management (Linux / Ubuntu EC2)
 %admin  ALL=(root) NOPASSWD: /usr/bin/systemctl *
 
-# Package managers (Linux only — paths do not resolve on macOS)
+# Package managers (Linux only)
 %admin  ALL=(root) NOPASSWD: /usr/bin/apt-get *
 %admin  ALL=(root) NOPASSWD: /usr/bin/dnf *
 %admin  ALL=(root) NOPASSWD: /usr/bin/yum *
 %admin  ALL=(root) NOPASSWD: /usr/bin/microdnf *
 '
+fi
 
 _mode="install"
 for _arg in "$@"; do
@@ -130,6 +117,6 @@ case "$_mode" in
     rm -f "$_tmpfile"
     echo "[install-sudoers] Installed $_SUDOERS_FILE"
     echo "[install-sudoers] Installed /usr/local/bin/k3d-manager-update-hosts"
-    echo "[install-sudoers] Verify: ${_SUDO} -l | grep -E 'launchctl|security|k3d-manager'"
+    echo "[install-sudoers] Verify: ${_SUDO} -l | grep -E 'launchctl|k3d-manager'"
     ;;
 esac

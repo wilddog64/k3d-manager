@@ -3,6 +3,7 @@
 **Status:** OPEN — RESEARCH REQUIRED; documentation taxonomy defect/ambiguity, solution not decided
 **Branch:** `k3d-manager-v1.50.1` (triage 2026-10-15, operator-approved placement)
 **Priority:** P2 (tracking and retrieval reliability)
+**Waiting on:** investigation
 **Filed:** 2026-10-13, operator request
 **Release:** v1.50.1 (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file research bug; no bulk rename or migration authorized

@@ -16,10 +16,92 @@ manifest_disjoint() {
 }
 
 @test "machine setup: all roles have readable phase manifests" {
-  for role in hub worker console; do
+  for role in hub worker console control; do
     [ -r "${MACHINE_DIR}/brew.${role}.list" ]
     [ -r "${MACHINE_DIR}/secrets.${role}.list" ]
     [ -r "${MACHINE_DIR}/agents.${role}.list" ]
+  done
+}
+
+@test "control role manifests stay limited to development tools and smartcd" {
+  [ -r "$MACHINE_DIR/brew.control.list" ]
+  [ -r "$MACHINE_DIR/secrets.control.list" ]
+  [ -r "$MACHINE_DIR/agents.control.list" ]
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || grep -Fxq "$item" "$MACHINE_DIR/brew.control.list"
+  done < "$MACHINE_DIR/brew.console.list"
+  run ! grep -Fxq 'cask:orbstack' "$MACHINE_DIR/brew.control.list"
+  control_casks="$(grep '^cask:' "$MACHINE_DIR/brew.control.list" | sort)"
+  console_casks="$(grep '^cask:' "$MACHINE_DIR/brew.console.list" | sort)"
+  [ "$control_casks" = "$console_casks" ]
+  [ "$(grep -vc '^#\|^$' "$MACHINE_DIR/agents.control.list")" -eq 1 ]
+  grep -Fqx 'smartcd-install' "$MACHINE_DIR/agents.control.list"
+  run ! grep -Eq '^(bin/|install-)' "$MACHINE_DIR/agents.control.list"
+  run ! grep -Eiq 'hub|acg|cloudflare|vault|webhook' "$MACHINE_DIR/secrets.control.list"
+  [ "$(grep -vc '^#\|^$' "$MACHINE_DIR/secrets.control.list")" -eq 1 ]
+  grep -Fqx 'gemini-cli-api-key|k3dm|Local find-similar-docs query embedding|operator: see docs/howto/find-prior-art.md' "$MACHINE_DIR/secrets.control.list"
+}
+
+@test "control role setup installs its listed tools and only smartcd" {
+  setup_machine_fixture
+  cat > "$STUBS/brew" <<'SH'
+#!/bin/sh
+printf 'brew %s\n' "$*" >> "$CALL_LOG"
+case "$1" in list) exit 1 ;; esac
+exit 0
+SH
+  chmod +x "$STUBS/brew"
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  mkdir -p "$FIXHOME/src/gitrepo/personal/smartcd/.git"
+  touch "$CALL_LOG.installsmartcd"
+  touch "$CALL_LOG.secret-present"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://github.com/cxreg/smartcd.git /usr/bin/make -C "$FIXROOT" machine-setup ROLE=control SECRETS=skip
+  [ "$status" -eq 0 ] || { printf '%s\n' "$output"; return 1; }
+  grep -Eq '^smartcd[[:space:]]+installed$' <<< "$output"
+  grep -Fxq "make -C $FIXHOME/src/gitrepo/personal/smartcd install" "$CALL_LOG"
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || {
+      case "$item" in
+        cask:*) grep -Fxq "brew install --cask ${item#cask:}" "$CALL_LOG" ;;
+        formula:*) grep -Fxq "brew install ${item#formula:}" "$CALL_LOG" ;;
+        *) grep -Fxq "brew install $item" "$CALL_LOG" ;;
+      esac
+    }
+  done < "$FIXROOT/scripts/etc/machine/brew.control.list"
+  run ! grep -Eq '^make -C .* (install-|bin/)' "$CALL_LOG"
+}
+
+@test "control role machine-check reports manifest inventory" {
+  setup_machine_fixture
+  cp "$MACHINE_DIR/brew.control.list" "$FIXROOT/scripts/etc/machine/brew.control.list"
+  cp "$MACHINE_DIR/secrets.control.list" "$FIXROOT/scripts/etc/machine/secrets.control.list"
+  cp "$MACHINE_DIR/agents.control.list" "$FIXROOT/scripts/etc/machine/agents.control.list"
+  : > "$FIXROOT/scripts/etc/machine/repos.list"
+  run_machine --role control --check
+  [ "$status" -eq 1 ]
+  while IFS= read -r item; do
+    [[ -z "$item" || "$item" == \#* ]] || { item="${item#formula:}"; item="${item#cask:}"; grep -Eq "^brew:${item}[[:space:]]+ok$" <<< "$output"; }
+  done < "$MACHINE_DIR/brew.control.list"
+  grep -Eq '^smartcd[[:space:]]+missing$' <<< "$output"
+  run make -n machine-setup ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'--role "control"'* ]]
+  run make -n machine-check ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'--role "control" --check'* ]]
+  run make -n machine-secrets-export ROLE=control
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'export --role "control"'* ]]
+}
+
+@test "N4: existing role manifests remain byte-for-byte unchanged" {
+  for role in hub worker console; do
+    for phase in brew secrets agents; do
+      git show "HEAD:scripts/etc/machine/${phase}.${role}.list" | cmp -s - "$MACHINE_DIR/${phase}.${role}.list"
+    done
   done
 }
 
@@ -63,6 +145,7 @@ setup_machine_fixture() {
   CALL_LOG="$BATS_TEST_TMPDIR/calls"
   [[ "$FIXHOME" == "$BATS_TEST_TMPDIR/"* && "$FIXHOME" != "$HOME" ]] || return 1
   mkdir -p "$FIXROOT/bin" "$FIXROOT/scripts/lib" "$FIXROOT/scripts/etc/machine" "$FIXHOME" "$STUBS"
+  cp "$REPO_ROOT/Makefile" "$FIXROOT/Makefile"
   cp "$SCRIPT_SOURCE" "$FIXROOT/bin/k3dm-machine-setup"
   chmod +x "$FIXROOT/bin/k3dm-machine-setup"
   cat > "$FIXROOT/bin/k3dm-machine-secrets" <<'SH'
@@ -107,6 +190,7 @@ SH
 #!/bin/sh
 printf 'security %s\n' "$*" >> "$CALL_LOG"
 [ "$1" = show-keychain-info ] && exit 0
+if [ "$1" = find-generic-password ] && [ -e "$CALL_LOG.secret-present" ]; then exit 0; fi
 exit 1
 SH
   cat > "$STUBS/git" <<'SH'
@@ -130,6 +214,8 @@ SH
   for tool in ruff pytest; do
     printf '#!/bin/sh\nexit 0\n' > "$STUBS/$tool"
   done
+  # Read-only stub baseline: m4-air.local, 2026-11-06; python3 3.15.2,
+  # pip 26.2.2 at /opt/homebrew/lib/python3.15/site-packages/pip.
   cat > "$STUBS/python3" <<'SH'
 #!/bin/sh
 printf 'python3 %s\n' "$*" >> "$CALL_LOG"
@@ -138,6 +224,14 @@ mkdir -p "$3/bin"
 cat > "$3/bin/python" <<'VENV'
 #!/bin/sh
 printf 'venv-python %s\n' "$*" >> "$CALL_LOG"
+case "$1" in
+  -c) [ -e "$(dirname "$0")/yaml-installed" ] ;;
+  -m)
+    [ "$2" = pip ] && [ "$3" = install ] || exit 1
+    touch "$(dirname "$0")/yaml-installed"
+    ;;
+  *) exit 1 ;;
+esac
 for tool in ruff pytest; do
   printf '#!/bin/sh\nexit 0\n' > "$(dirname "$0")/$tool"
   chmod +x "$(dirname "$0")/$tool"
@@ -145,6 +239,17 @@ done
 VENV
 chmod +x "$3/bin/python"
 SH
+  # Default fixture models an already-complete managed venv.
+  local default_venv="$FIXHOME/.local/share/k3d-manager/venv"
+  mkdir -p "$default_venv/bin"
+  touch "$default_venv/bin/yaml-installed"
+  for tool in ruff pytest; do printf '#!/bin/sh\nexit 0\n' > "$default_venv/bin/$tool"; chmod +x "$default_venv/bin/$tool"; done
+  cat > "$default_venv/bin/python" <<'VENV'
+#!/bin/sh
+printf 'venv-python %s\n' "$*" >> "$CALL_LOG"
+[ -e "$(dirname "$0")/yaml-installed" ]
+VENV
+  chmod +x "$default_venv/bin/python"
   cat > "$STUBS/make" <<'SH'
 #!/bin/sh
 printf 'make %s\n' "$*" >> "$CALL_LOG"
@@ -164,7 +269,7 @@ SH
 }
 
 run_machine() {
-  run env HOME="$FIXHOME" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
+  run env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="${FIX_XDG_DATA_HOME:-$FIXHOME/.local/share}" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" GH_STATUS_TEXT="${GH_STATUS_TEXT:-authenticated}" REMOTE_FIXTURE="${REMOTE_FIXTURE:-https://example.test/existing.git}" "$FIXROOT/bin/k3dm-machine-setup" "$@"
 }
 
 @test "N1: agents option rejects unsupported values" {
@@ -224,7 +329,7 @@ run_machine() {
 @test "machine setup: repository manifest paths are unique" {
   duplicates="$(awk -F'|' '!/^#/ && NF > 1 { print $1 }' "$MACHINE_DIR/repos.list" | sort | uniq -d)"
   [ -z "$duplicates" ]
-  grep -Fxq 'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console' "$MACHINE_DIR/repos.list"
+  grep -Fxq 'gitrepo/personal/k3d-manager|https://github.com/wilddog64/k3d-manager.git|main|hub,worker,console,control' "$MACHINE_DIR/repos.list"
 }
 
 @test "machine setup: equivalent GitHub remotes identify the same existing checkout" {
@@ -483,7 +588,7 @@ tty_machine() {
   command -v script >/dev/null || skip 'script(1) is required for a pseudo-terminal'
   local wrapper="$BATS_TEST_TMPDIR/tty-machine"
   printf '#!/usr/bin/env bash\nexec' > "$wrapper"
-  printf ' %q' env HOME="$FIXHOME" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" SECRETS_STUB_RC="${SECRETS_STUB_RC:-0}" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://example.test/existing.git "$FIXROOT/bin/k3dm-machine-setup" "$@" >> "$wrapper"
+  printf ' %q' env HOME="$FIXHOME" XDG_CONFIG_HOME="$FIXHOME/.config" XDG_DATA_HOME="$FIXHOME/.local/share" PATH="$STUBS:/usr/bin:/bin:/usr/sbin:/sbin" CALL_LOG="$CALL_LOG" SECRETS_STUB_RC="${SECRETS_STUB_RC:-0}" GH_STATUS_TEXT=authenticated REMOTE_FIXTURE=https://example.test/existing.git "$FIXROOT/bin/k3dm-machine-setup" "$@" >> "$wrapper"
   printf '\n' >> "$wrapper"
   chmod +x "$wrapper"
   if [[ "$(uname -s)" == Darwin ]]; then
@@ -577,12 +682,13 @@ tty_machine() {
   [[ "$output" == *'github-setup-git'*'missing'*'agent:fake-target'*'installed'* ]]
 }
 
-@test "machine setup: Python tools on PATH need no Python invocation" {
+@test "machine setup: Python tools on PATH still populate the managed venv" {
   setup_machine_fixture
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
   run_machine --role console
   [ "$status" -eq 0 ]
-  grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  grep -Fq 'PyYAML==6.0.3' "$CALL_LOG"
+  [ -e "$FIXHOME/.local/share/k3d-manager/venv/bin/yaml-installed" ]
 }
 
 @test "machine setup: an existing data-dir virtualenv is recognized" {
@@ -590,15 +696,23 @@ tty_machine() {
   rm "$STUBS/ruff" "$STUBS/pytest"
   mkdir -p "$FIXHOME/.local/share/k3d-manager/venv/bin"
   for tool in ruff pytest; do touch "$FIXHOME/.local/share/k3d-manager/venv/bin/$tool"; chmod +x "$FIXHOME/.local/share/k3d-manager/venv/bin/$tool"; done
+  cat > "$FIXHOME/.local/share/k3d-manager/venv/bin/python" <<'SH'
+#!/bin/sh
+printf 'venv-python %s\n' "$*" >> "$CALL_LOG"
+[ -e "$(dirname "$0")/yaml-installed" ]
+SH
+  chmod +x "$FIXHOME/.local/share/k3d-manager/venv/bin/python"
+  touch "$FIXHOME/.local/share/k3d-manager/venv/bin/yaml-installed"
   run_machine --role console --check
   [ "$status" -eq 0 ]
   grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -q 'pip install' "$CALL_LOG"
 }
 
 @test "machine setup: missing Python tools are reported read-only" {
   setup_machine_fixture
   rm "$STUBS/ruff" "$STUBS/pytest"
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
   for mode in --check --dry-run; do
     run_machine --role console "$mode"
     if [ "$status" -ne 1 ] || ! grep -Eq '^python-tools[[:space:]]+missing$' <<< "$output"; then printf '%s\n' "$output"; return 1; fi
@@ -611,18 +725,85 @@ tty_machine() {
 @test "machine setup: Python tools install outside the repository and second setup is idle" {
   setup_machine_fixture
   rm "$STUBS/ruff" "$STUBS/pytest"
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
   run_machine --role console
   [ "$status" -eq 0 ]
   grep -Fq 'installed (add ~/.local/share/k3d-manager/venv/bin to PATH)' <<< "$output"
   [ -x "$FIXHOME/.local/share/k3d-manager/venv/bin/ruff" ]
   [ -x "$FIXHOME/.local/share/k3d-manager/venv/bin/pytest" ]
+  [ -e "$FIXHOME/.local/share/k3d-manager/venv/bin/yaml-installed" ]
   [ ! -e "$FIXROOT/.venv" ]
-  grep -Fq 'venv-python -m pip install pytest==9.1.1 ruff==0.15.8' "$CALL_LOG"
+  grep -Fq 'venv-python -m pip install pytest==9.1.1 ruff==0.15.8 PyYAML==6.0.3' "$CALL_LOG"
   : > "$CALL_LOG"
   run_machine --role console
   [ "$status" -eq 0 ]
   grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
-  run ! grep -Eq '^(python3|venv-python) ' "$CALL_LOG"
+  run ! grep -q 'pip install' "$CALL_LOG"
+}
+
+@test "M1 and N2: existing tool executables get pinned PyYAML; complete venv is idle" {
+  setup_machine_fixture
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
+  rm "$STUBS/ruff" "$STUBS/pytest"
+  local venv="$FIXHOME/.local/share/k3d-manager/venv"
+  mkdir -p "$venv/bin"
+  for tool in ruff pytest; do printf '#!/bin/sh\nexit 0\n' > "$venv/bin/$tool"; chmod +x "$venv/bin/$tool"; done
+  cat > "$venv/bin/python" <<'SH'
+#!/bin/sh
+printf 'venv-python %s\n' "$*" >> "$CALL_LOG"
+if [ "$1" = -c ]; then
+  if [ -e "$(dirname "$0")/yaml-installed" ]; then exit 0; else exit 1; fi
+fi
+if [ "$1" = -m ] && [ "$2" = pip ] && [ "$3" = install ]; then
+  case " $* " in *' PyYAML==6.0.3 '*) touch "$(dirname "$0")/yaml-installed"; exit 0 ;; esac
+fi
+exit 1
+SH
+  chmod +x "$venv/bin/python"
+  # Assert the target venv resolves inside the scratch HOME before invoking setup.
+  [[ "$venv" == "$FIXHOME"/* && "$FIXROOT" == "$BATS_TEST_TMPDIR"/* ]]
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  [ -e "$venv/bin/yaml-installed" ]
+  grep -Fq 'PyYAML==6.0.3' "$CALL_LOG"
+  : > "$CALL_LOG"
+  run_machine --role console
+  [ "$status" -eq 0 ]
+  grep -Eq '^python-tools[[:space:]]+ok$' <<< "$output"
+  run ! grep -q 'pip install' "$CALL_LOG"
+}
+
+@test "M2 and N1: check reports missing yaml without changing scratch venv" {
+  setup_machine_fixture
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
+  rm "$STUBS/ruff" "$STUBS/pytest"
+  local venv="$FIXHOME/.local/share/k3d-manager/venv"
+  mkdir -p "$venv/bin"
+  for tool in ruff pytest; do printf '#!/bin/sh\nexit 0\n' > "$venv/bin/$tool"; chmod +x "$venv/bin/$tool"; done
+  cat > "$venv/bin/python" <<'SH'
+#!/bin/sh
+printf 'venv-python %s\n' "$*" >> "$CALL_LOG"
+exit 1
+SH
+  chmod +x "$venv/bin/python"
+  [[ "$venv" == "$FIXHOME"/* && "$FIXROOT" == "$BATS_TEST_TMPDIR"/* ]]
+  cp -R "$venv" "$BATS_TEST_TMPDIR/venv-before"
+  run_machine --role console --check
+  [ "$status" -eq 1 ]
+  grep -Eq '^python-tools[[:space:]]+missing$' <<< "$output"
+  diff -r "$BATS_TEST_TMPDIR/venv-before" "$venv"
+  run ! grep -q 'pip install' "$CALL_LOG"
+}
+
+@test "M3: rendered test-metrics plist puts managed venv first on PATH" {
+  setup_machine_fixture
+  local rendered="$BATS_TEST_TMPDIR/test-metrics.plist"
+  local template="$REPO_ROOT/scripts/etc/launchd/com.k3d-manager.test-metrics.plist.tmpl"
+  sed -e "s|{{K3DM_REPO_ROOT}}|$FIXROOT|g" -e "s|{{HOME}}|$FIXHOME|g" \
+    "$template" > "$rendered"
+  [[ "$FIXHOME" == "$BATS_TEST_TMPDIR"/* && "$FIXROOT" == "$BATS_TEST_TMPDIR"/* ]]
+  grep -A1 '<key>PATH</key>' "$rendered" | grep -Fq "<string>${FIXHOME}/.local/share/k3d-manager/venv/bin:"
+  run ! grep -q '{{HOME}}' "$rendered"
 }
 
 @test "machine setup: custom XDG data directory holds the Python virtualenv" {
@@ -639,6 +820,7 @@ tty_machine() {
 @test "machine setup: virtualenv failure is reported and later phases run" {
   setup_machine_fixture
   rm "$STUBS/ruff" "$STUBS/pytest"
+  rm -rf "$FIXHOME/.local/share/k3d-manager/venv"
   printf '#!/bin/sh\nexit 1\n' > "$STUBS/python3"; chmod +x "$STUBS/python3"
   printf '%s\n' 'fake-target' > "$FIXROOT/scripts/etc/machine/agents.console.list"
   run_machine --role console
@@ -1278,4 +1460,14 @@ SH
   [ ! "$BATS_TEST_TMPDIR/original" -ot "$FIXHOME/.ssh/k3d-manager-key.pem" ]
   [[ "$output" != *'PRIVATE-KEY-TEST-MATERIAL'* ]]
   run ! grep -q '^ssh-keygen called' "$CALL_LOG"
+}
+
+@test "machine setup: records each setup role in scratch XDG config" {
+  setup_machine_fixture
+  for role in hub worker console; do
+    run_machine --role "$role" --agents skip --secrets skip
+    [ "$(cat "$FIXHOME/.config/k3d-manager/machine-role")" = "$role" ]
+  done
+  run_machine --role worker --check
+  [ "$(cat "$FIXHOME/.config/k3d-manager/machine-role")" = console ]
 }

@@ -5,7 +5,7 @@ ingress:
   - hostname: argocd.${CLOUDFLARE_DOMAIN}
     service: http://127.0.0.1:8080
   - hostname: frontend.${CLOUDFLARE_DOMAIN}
-    service: http://127.0.0.2:80
+    service: http://127.0.0.2:18082
   - hostname: keycloak.${CLOUDFLARE_DOMAIN}
     service: http://127.0.0.1:8880
   # k3dm-webhook — ArgoCD CVE upgrade pipeline trigger

@@ -87,7 +87,55 @@ def test_dashboard_has_adjacent_no_report_table_and_warning_alert():
     document = yaml.safe_load(DASHBOARD.read_text())
     dashboard = json.loads(document["data"]["cve-autopatch.json"])
     critical = next(panel for panel in dashboard["panels"] if panel["id"] == 11)
-    no_report = next(panel for panel in dashboard["panels"] if panel["title"] == "Our images with no Trivy report")
+    no_report = next(panel for panel in dashboard["panels"] if panel["id"] == 15)
+    assert critical["fieldConfig"]["defaults"]["noValue"] == "None open: no critical CVEs in our images"
+    assert no_report["fieldConfig"]["defaults"]["noValue"] == "All our images have a Trivy report"
+    assert "empty-table text is the healthy state" in critical["description"]
+    assert "empty-table text is the healthy state" in no_report["description"]
+    for panel in (critical, no_report):
+        assert "up series" in panel["description"]
+        assert "stale-data alerts" in panel["description"]
+    assert all(
+        "noValue" not in panel.get("fieldConfig", {}).get("defaults", {})
+        for panel in dashboard["panels"] if panel["id"] not in (11, 15)
+    )
+    assert critical["targets"] == [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": 'trivy_vulnerability_inventory{severity="CRITICAL", image_repository=~"wilddog64/.*"}',
+        "format": "table", "instant": True, "refId": "A",
+    }]
+    assert no_report["targets"] == [{
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "expr": 'trivy_image_scan_coverage{scanned="false"}',
+        "format": "table", "instant": True, "refId": "A",
+    }]
+    assert critical["transformations"] == [{
+        "id": "organize", "options": {
+            "excludeByName": {"Time": True, "Value": True, "__name__": True, "container": True,
+                               "endpoint": True, "instance": True, "job": True, "namespace": True,
+                               "pod": True, "prometheus": True, "service": True, "severity": True,
+                               "image_digest": True, "title": True},
+            "indexByName": {"cluster": 0, "image_repository": 1, "vulnerability_id": 2, "package": 3,
+                            "installed_version": 4, "fixed_version": 5, "patch_status": 6,
+                            "exported_namespace": 7, "resource_name": 8},
+            "renameByName": {"cluster": "Cluster", "image_repository": "Image", "vulnerability_id": "CVE ID",
+                              "package": "Package", "installed_version": "Installed", "fixed_version": "Fixed in",
+                              "patch_status": "Fix available", "exported_namespace": "Namespace",
+                              "resource_name": "Workload"},
+        },
+    }]
+    assert no_report["transformations"] == [{
+        "id": "organize", "options": {
+            "indexByName": {"cluster": 0, "exported_namespace": 1, "workload": 2, "image_repository": 3, "scanned": 4},
+            "renameByName": {"cluster": "Cluster", "exported_namespace": "Namespace", "workload": "Workload",
+                              "image_repository": "Image", "scanned": "Scanned"},
+            "excludeByName": {"Time": True, "Value": True, "__name__": True, "scanned": True,
+                               "namespace": True, "job": True, "instance": True, "pod": True, "endpoint": True,
+                               "container": True, "service": True},
+        },
+    }]
+    assert critical["gridPos"] == {"h": 9, "w": 12, "x": 0, "y": 39}
+    assert no_report["gridPos"] == {"h": 9, "w": 12, "x": 12, "y": 39}
     assert no_report["targets"][0]["expr"] == 'trivy_image_scan_coverage{scanned="false"}'
     assert "critical table cannot vouch" in no_report["description"]
     assert "Check the no-report table first: an unscanned image also shows nothing here." in critical["description"]

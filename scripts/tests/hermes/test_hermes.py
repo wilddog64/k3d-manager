@@ -1,9 +1,11 @@
 import base64
+from io import BytesIO
 import importlib.machinery
 import importlib.util
 import json
 import re
 import sys
+from urllib.error import HTTPError
 from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -17,6 +19,7 @@ from hermes.sensors import (argocd, ci, data_layer, eso, github_token_expiry, ki
                             _human_age, _human_bytes, hostnet_drift, node_pressure, reachability,
                             stale_acg_registration,
                             status_checks, token_expiry_advisory, values_branch)
+from hermes.slack import post_summary
 
 ROOT = Path(__file__).resolve().parents[3]
 loader = importlib.machinery.SourceFileLoader("k3dm_hermes_status", str(ROOT / "bin" / "k3dm-hermes"))
@@ -31,6 +34,77 @@ def status_payload(overall, checks=None):
                        "counts": {"services_failed": len([item for item in checks if item.get("status") == "error"]),
                                   "services_warning": len([item for item in checks if item.get("status") == "warning"]),
                                   "services_healthy": 0}})
+
+
+def test_post_summary_logs_http_failure_without_webhook_url_and_succeeds_cleanly(caplog):
+    # Captured read-only probe: M5, 2026-10-31, Slack reply `no_service`, HTTP 404.
+    relay_url = "http://127.0.0.1:9/webhook/sensitive-token"
+    assert relay_url.startswith("http://127.0.0.1:9/"), "test must target its local stub endpoint"
+
+    def refused_opener(request, timeout):
+        assert request.full_url == relay_url
+        assert timeout == 10
+        raise HTTPError(relay_url, 404, "Not Found", {}, BytesIO(b"no_service"))
+
+    def accepted_opener(request, timeout):
+        assert request.full_url == relay_url
+        assert timeout == 10
+        return type("Response", (), {"__enter__": lambda self: self,
+                                     "__exit__": lambda self, *_args: False})()
+
+    caplog.set_level("WARNING", logger="k3dm-hermes")
+    assert not post_summary(relay_url, "summary", refused_opener)
+    failure_logs = [record.getMessage() for record in caplog.records]
+    assert any("HTTP 404" in line and "no_service" in line for line in failure_logs)
+    assert all(relay_url not in line for line in failure_logs)
+
+    caplog.clear()
+    assert post_summary(relay_url, "summary", accepted_opener)
+    assert not caplog.records
+
+
+def _post_refused_reply(relay_url, reply, caplog):
+    assert relay_url.startswith("http://127.0.0.1:9"), "test must target its local stub endpoint"
+
+    def refused_opener(request, timeout):
+        assert request.full_url == relay_url
+        assert timeout == 10
+        raise HTTPError(relay_url, 404, "Not Found", {}, BytesIO(reply.encode()))
+
+    caplog.set_level("WARNING", logger="k3dm-hermes")
+    assert not post_summary(relay_url, "summary", refused_opener)
+    return "\n".join(record.getMessage() for record in caplog.records)
+
+
+def test_post_summary_redacts_path_echo_in_reply(caplog):
+    path = "/services/T000/B000/SECRETQZ7K"
+    log = _post_refused_reply("http://127.0.0.1:9" + path, "no_service " + path, caplog)
+    assert "HTTP 404" in log
+    assert path not in log
+    assert "[redacted]" in log
+
+
+def test_post_summary_redacts_path_before_truncating_long_reply(caplog):
+    path = "/services/T000/B000/SECRETQZ7K"
+    log = _post_refused_reply("http://127.0.0.1:9" + path, "x" * 185 + path, caplog)
+    assert "HTTP 404" in log
+    assert "/services/T000" not in log
+    assert "[redacted]" in log
+
+
+def test_post_summary_redacts_full_url_before_path(caplog):
+    relay_url = "http://127.0.0.1:9/services/T000/B000/SECRETQZ7K"
+    log = _post_refused_reply(relay_url, "no_service " + relay_url, caplog)
+    assert "HTTP 404 no_service [redacted]" in log
+    assert relay_url not in log
+
+
+def test_post_summary_keeps_slashes_in_reply_for_root_or_empty_path(caplog):
+    for relay_url in ("http://127.0.0.1:9/", "http://127.0.0.1:9"):
+        caplog.clear()
+        log = _post_refused_reply(relay_url, "no_service retry/after", caplog)
+        assert "HTTP 404" in log
+        assert "no_service retry/after" in log
 
 
 def test_status_checks_debounce_warn_and_unknown_contracts():

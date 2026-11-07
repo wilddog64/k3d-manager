@@ -518,3 +518,170 @@ EOF
   [[ "${output}" == *"FUNCTION_RETURNED"* ]]
   run ! grep -F 'kubectl config delete-context' "${calls}"
 }
+
+_acg_key_fixture() {
+  [ "${HOME}" = "${BATS_TEST_TMPDIR}/home" ]
+  mkdir -p "${HOME}/.ssh" "${BATS_TEST_TMPDIR}/key-bin"
+  export ACG_CALLS_FILE="${BATS_TEST_TMPDIR}/key-calls" ACG_KEY_SCENARIO="${1}"
+  cat >"${BATS_TEST_TMPDIR}/key-bin/aws" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$*" in
+  *import-key-pair*)
+    # k3d-manager M5 read-only capture, 2026-11-01: DryRunOperation.
+    case "${ACG_KEY_SCENARIO}" in denied) echo 'An error occurred (DryRunOperation)' >&2; exit 1;; duplicate|mismatch) echo 'An error occurred (InvalidKeyPair.Duplicate)' >&2; exit 1;; esac ;;
+  *describe-key-pairs*)
+    if [[ -n "${ACG_REMOTE_FP:-}" ]]; then printf '%s\n' "${ACG_REMOTE_FP}"; exit 0; fi
+    case "${ACG_KEY_SCENARIO}" in missing) echo 'not found' >&2; exit 1;; mismatch) echo 'SHA256:bb:bb';; *) echo 'SHA256:aa:aa';; esac ;;
+  *describe-images*) echo ami-test ;;
+esac
+STUB
+  cat >"${BATS_TEST_TMPDIR}/key-bin/ssh-keygen" <<'STUB'
+#!/usr/bin/env bash
+printf 'ssh-keygen %s\n' "$*" >>"${ACG_CALLS_FILE}"
+case "$1" in
+  -y) [[ "${ACG_KEY_SCENARIO}" != derive-fails ]] || exit 1; echo 'ssh-ed25519 test-public-material' ;;
+  -E) echo '256 SHA256:aa:aa comment (ED25519)' ;;
+esac
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/key-bin/"{aws,ssh-keygen}
+  export PATH="${BATS_TEST_TMPDIR}/key-bin:${PATH}"
+  _acg_check_credentials() { :; }
+  _run_command() { while [[ "$1" == --* ]]; do [[ "$1" == -- ]] && { shift; break; }; shift; done; "$@"; }
+}
+
+@test "acg provisioning rejects missing private key before AWS" {
+  _acg_key_fixture success
+  run acg_provision --confirm --recreate
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"${_ACG_KEY_PEM}"* && "$output" == *'make machine-setup ROLE=hub'* ]]
+  [ ! -e "${ACG_CALLS_FILE}" ]
+}
+
+@test "acg provisioning derives empty public key and imports it" {
+  _acg_key_fixture success
+  touch "${_ACG_KEY_PEM}" "${_ACG_KEY_PEM%.pem}.pub"
+  run acg_provision --confirm
+  [ "$status" -eq 0 ]
+  grep -q 'ssh-keygen -y' "${ACG_CALLS_FILE}"
+  grep -q 'import-key-pair' "${ACG_CALLS_FILE}"
+  grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+  [[ "$output" != *test-public-material* ]]
+}
+
+@test "acg provisioning removes failed public key derivation" {
+  _acg_key_fixture derive-fails
+  touch "${_ACG_KEY_PEM}" "${_ACG_KEY_PEM%.pem}.pub"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [ ! -e "${_ACG_KEY_PEM%.pem}.pub" ]
+  run ! grep -q 'import-key-pair' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning accepts matching duplicate and rejects mismatched fingerprint" {
+  _acg_key_fixture duplicate
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -eq 0 ]
+  grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+  : >"${ACG_CALLS_FILE}"
+  export ACG_KEY_SCENARIO=mismatch
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'aa:aa'* && "$output" == *'bb:bb'* ]]
+  [[ "$output" != *test-public-material* ]]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning stops when imported pair cannot be found" {
+  _acg_key_fixture missing
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+@test "acg provisioning shows import errors and stops" {
+  _acg_key_fixture denied
+  touch "${_ACG_KEY_PEM}"
+  run acg_provision --confirm
+  [ "$status" -ne 0 ]
+  [[ "$output" == *DryRunOperation* ]]
+  [[ "$output" != *test-public-material* ]]
+  run ! grep -q 'cloudformation deploy' "${ACG_CALLS_FILE}"
+}
+
+# Fingerprint commands follow AWS EC2 "Verify the fingerprint of your key pair"
+# and DescribeKeyPairs documentation, retrieved 2026-11-01. Keys are ephemeral.
+_acg_real_duplicate_key() {
+  local kind="$1"
+  local real_ssh real_openssl
+  real_ssh="$(command -v ssh-keygen)"
+  [[ "$HOME" == "$BATS_TEST_TMPDIR/"* ]]
+  _acg_key_fixture duplicate
+  "$real_ssh" -q -t "$kind" -N '' -f "$_ACG_KEY_PEM"
+  mv "$_ACG_KEY_PEM.pub" "${_ACG_KEY_PEM%.pem}.pub"
+  cat >"${BATS_TEST_TMPDIR}/key-bin/ssh-keygen" <<'STUB'
+#!/usr/bin/env bash
+exec "$REAL_SSH_KEYGEN" "$@"
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/key-bin/ssh-keygen"
+  export REAL_SSH_KEYGEN="$real_ssh"
+  if [[ "$kind" == ed25519 ]]; then
+    # Captured on m5-air, 2026-11-03: AWS returns bare SHA-256 Base64 with padding.
+    ACG_REMOTE_FP="$("$real_ssh" -E sha256 -lf "${_ACG_KEY_PEM%.pem}.pub" | awk '{sub(/^SHA256:/, "", $2); print $2"="}')"
+  else
+    real_openssl="$(command -v openssl)"
+    ACG_REMOTE_FP="$("$real_ssh" -f "${_ACG_KEY_PEM%.pem}.pub" -e -m PKCS8 | "$real_openssl" pkey -pubin -outform DER | "$real_openssl" md5 -c | awk '{print $NF}')"
+  fi
+  export ACG_REMOTE_FP
+}
+
+@test "acg provisioning accepts matching imported Ed25519 fingerprint and rejects mismatch" {
+  local local_fp
+  _acg_real_duplicate_key ed25519
+  local_fp="${ACG_REMOTE_FP%=}"
+  run _acg_imported_key_fingerprint "${_ACG_KEY_PEM%.pem}.pub"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$local_fp" ]
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="$local_fp"
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="SHA256:${local_fp}="
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP="${local_fp}=junk"
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  export ACG_REMOTE_FP="${local_fp}=="
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  export ACG_REMOTE_FP='wrong'
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'fingerprint mismatch'* ]]
+}
+
+@test "acg provisioning accepts matching imported RSA fingerprint and rejects mismatch" {
+  _acg_real_duplicate_key rsa
+  run _acg_import_key
+  [ "$status" -eq 0 ]
+  export ACG_REMOTE_FP='00:00:00:00'
+  run _acg_import_key
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'fingerprint mismatch'* ]]
+}
+
+@test "acg imported key fingerprint refuses unsupported and malformed keys" {
+  local public="${BATS_TEST_TMPDIR}/invalid.pub"
+  [[ "$public" == "$BATS_TEST_TMPDIR/"* ]]
+  printf 'ssh-dss fake\n' > "$public"
+  run _acg_imported_key_fingerprint "$public"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'Unsupported public key type'* ]]
+  printf 'ssh-rsa invalid\n' > "$public"
+  run _acg_imported_key_fingerprint "$public"
+  [ "$status" -ne 0 ]
+}

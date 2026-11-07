@@ -12,6 +12,43 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "Release row shows guarded hub checkout lag and release age" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["title"]:p for p in d["panels"]}
+expected={"Release":(0,3),"Bugs filed":(3,3),"Bugs open":(6,3),"Bugs fixed":(9,3),
+          "Open, scheduled later":(12,4),"Open, untriaged":(16,4),"Hub code behind":(20,4)}
+for title,(x,w) in expected.items():
+    p=panels[title]
+    assert p["gridPos"] == {"x":x,"y":1,"w":w,"h":4}, (title,p["gridPos"])
+hub=panels["Hub code behind"]
+assert hub["type"] == "stat"
+assert hub["fieldConfig"]["defaults"]["noValue"] == "unknown"
+assert hub["fieldConfig"]["defaults"]["thresholds"]["steps"] == [
+    {"color":"green","value":None},{"color":"orange","value":1}]
+targets={t["refId"]:t for t in hub["targets"]}
+assert targets["A"]["expr"] == "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
+assert targets["A"]["legendFormat"] == "{{branch}}"
+assert targets["B"]["expr"] == "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
+assert targets["B"]["legendFormat"] == "{{newest_branch}}"
+override=hub["fieldConfig"]["overrides"][0]
+assert override["matcher"] == {"id":"byFrameRefID","options":"B"}
+mapping=override["properties"][0]["value"][0]["options"]
+assert mapping["1"] == {"text":"current release","color":"green"}
+assert mapping["0"] == {"text":"older release","color":"orange"}
+occupied=set()
+for p in d["panels"]:
+    pos=p["gridPos"]
+    for x in range(pos["x"],pos["x"]+pos["w"]):
+        for y in range(pos["y"],pos["y"]+pos["h"]):
+            assert (x,y) not in occupied, (p["title"],x,y)
+            occupied.add((x,y))
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "release forecast panels align by version and map dates and states" {
   run python3 - "${dashboard}" <<'PY'
 import json, re, sys
@@ -80,7 +117,7 @@ assert p[31]["options"]["text"] == {"titleSize": 16, "valueSize": 40}
 assert p[31]["fieldConfig"]["defaults"]["noValue"] == "-"
 assert 'label_join(k3dm_release_milestone_info{repo="$repo",state="blocked"}' in blocked
 assert 'state=~"blocked|after_blocked"' in blocked
-assert 'k3dm_release_milestone_info{repo="$repo",target="true",state="forecast"}' in blocked
+assert 'k3dm_release_milestone_info{repo="$repo",target="true",state=~"forecast|in_progress"}' in blocked
 PY
   [ "${status}" -eq 0 ]
 }
@@ -287,9 +324,9 @@ assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
     {"x": 16, "y": 37, "w": 8, "h": 9},
 ]
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
-assert organize["indexByName"]["fixed_in"] == 6
+assert organize["indexByName"]["fixed_in"] == 7
 assert organize["renameByName"]["fixed_in"] == "Fixed in"
-assert [organize["indexByName"][k] for k in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at")] == [7, 8, 9, 10, 11, 12]
+assert [organize["indexByName"][k] for k in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at")] == [8, 9, 10, 11, 12, 13]
 PY
   [ "${status}" -eq 0 ]
 }
@@ -396,7 +433,7 @@ d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
 panels=d['panels']; row=next(p for p in panels if p['id']==100)
 assert row['title']=='Release plans', row['title']
 added=[p for p in panels if p['id'] >= 100]
-assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 27, 70]
+assert sorted(p['gridPos']['y'] for p in added) == [5, 6, 6, 6, 6, 6, 6, 6, 27]
 assert next(p for p in panels if p['id'] == 21)['gridPos']['y'] == 36
 table=next(p for p in added if p['title']=='Plans')
 expr=table['targets'][0]['expr']
@@ -412,6 +449,47 @@ exprs=[t['expr'] for p in added for t in p.get('targets',[])]
 assert exprs and all('release=~"$release"' in e and 'release_order=~' not in e for e in exprs)
 assert all('and on(repo,release) k3dm_bug_current_release_info{repo="$repo"}' in e for e in exprs), exprs
 assert all('vector($release_mode) == 1' in e and 'vector($release_mode) == 0' in e for e in exprs), exprs
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "undeclared plan overlaps tile is last in the release plans row and warns only for nonzero counts" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+raw = Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1]
+data = json.loads(raw)
+panels = {panel["id"]: panel for panel in data["panels"]}
+overlaps = panels[108]
+assert overlaps["title"] == "Undeclared plan overlaps"
+assert overlaps["targets"][0]["expr"] == 'sum((k3dm_plan_undeclared_overlaps{repo="$repo"} and on(repo,release) k3dm_bug_current_release_info{repo="$repo"} and on() (vector($release_mode) == 1) or k3dm_plan_undeclared_overlaps{repo="$repo",release=~"$release"} and on() (vector($release_mode) == 0))) or vector(0)'
+
+row_ids = [101, 102, 103, 104, 105, 106, 108]
+row = [panels[panel_id] for panel_id in row_ids]
+assert [panel["title"] for panel in row] == [
+    "Plans in release", "Not yet implemented", "Implemented, unverified",
+    "Live-verified", "Status unknown", "Status lags dispatch",
+    "Undeclared plan overlaps",
+]
+positions = [panel["gridPos"] for panel in row]
+assert all(pos["y"] == 6 and pos["h"] == 4 for pos in positions), positions
+assert [pos["x"] for pos in positions] == [0, 3, 6, 9, 12, 15, 18], positions
+assert [pos["w"] for pos in positions] == [3, 3, 3, 3, 3, 3, 6], positions
+assert positions[0]["x"] == 0 and positions[-1]["x"] + positions[-1]["w"] == 24
+
+steps = overlaps["fieldConfig"]["defaults"]["thresholds"]["steps"]
+assert steps == [{"color": "green", "value": None}, {"color": "red", "value": 1}], steps
+
+def threshold_color(value):
+    color = steps[0]["color"]
+    for step in steps[1:]:
+        if value >= step["value"]:
+            color = step["color"]
+    return color
+
+assert threshold_color(0) == "green"
+assert threshold_color(1) == "red"  # positive control: warning appears when enabled
 PY
   [ "${status}" -eq 0 ]
 }
@@ -459,9 +537,10 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 3
+assert len(bars) == 4
 for panel in bars:
-    assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
+    if panel["id"] in (7, 8, 25):
+        assert panel["targets"][0]["expr"].rstrip().endswith("> 0"), panel["title"]
     matrix = next(x for x in panel["transformations"] if x["id"] == "groupingToMatrix")
     assert matrix["options"]["emptyValue"] == "null", panel["title"]
     assert not panel["fieldConfig"]["defaults"].get("mappings"), panel["title"]
@@ -478,10 +557,10 @@ def colours(panel):
     return {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
             for o in panel["fieldConfig"]["overrides"] if o["properties"][0]["id"] == "color"}
 panels = {panel["id"]: panel for panel in data["panels"]}
-by_priority = [panels[index] for index in (7, 25)]
+by_priority = [panels[index] for index in (7, 18, 25)]
 by_state = [p for p in data["panels"] if p["type"] == "barchart"
             and "state)" in " ".join(t["expr"] for t in p["targets"])]
-assert len(by_priority) == 2 and len(by_state) == 1
+assert len(by_priority) == 3 and len(by_state) == 1
 first = colours(by_priority[0])
 assert set(first) == {"P0", "P1", "P2", "P3", "unset"}
 assert all(colours(p) == first for p in by_priority)
@@ -496,7 +575,7 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
 bars = [panel for panel in data["panels"] if panel["type"] == "barchart"]
-assert len(bars) == 3
+assert len(bars) == 4
 for panel in bars:
     assert panel["options"]["showValue"] == "never", panel["title"]
     assert panel["options"]["tooltip"]["mode"] == "multi", panel["title"]
@@ -567,15 +646,21 @@ elif check == "columns":
     assert {"sort_key", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     assert not {"bug", "branch"} & hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
-    assert organize["indexByName"]["fixed_in"] == 6
-    assert organize["indexByName"]["fix_sha"] == 7
-    assert organize["indexByName"]["verified_sha"] == 8
-    assert organize["indexByName"]["verified"] == 9
-    assert organize["indexByName"]["verified_at"] == 10
-    assert organize["indexByName"]["live_verified"] == 11
-    assert organize["indexByName"]["live_verified_at"] == 12
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Waiting on", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
+    assert organize["excludeByName"]["waiting_since"] is True
+    assert "waiting_since" not in organize["renameByName"]
+    assert organize["indexByName"]["waiting_on"] == 6
+    assert organize["indexByName"]["fixed_in"] == 7
+    assert organize["indexByName"]["fix_sha"] == 8
+    assert organize["indexByName"]["verified_sha"] == 9
+    assert organize["indexByName"]["verified"] == 10
+    assert organize["indexByName"]["verified_at"] == 11
+    assert organize["indexByName"]["live_verified"] == 12
+    assert organize["indexByName"]["live_verified_at"] == 13
     assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
+    waiting = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Waiting on")
+    assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.filterable"] is True
+    assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.width"] == 130
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -734,6 +819,20 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bugs table describes waiting-on values and hides exported waiting date" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+table=next(p for p in d["panels"] if p["type"] == "table" and p["title"] == "Bugs")
+assert "not stated" in table["description"] and "Waiting on line" in table["description"]
+assert "The Open P0 to P3 tiles count every open doc" in table["description"]
+organize=next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+assert organize["excludeByName"]["waiting_since"] is True
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bugs table columns fit a laptop-width panel without horizontal scrolling" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
@@ -742,6 +841,7 @@ table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] ==
 assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 assert "Bug" not in widths, widths
+assert widths["Waiting on"] == 130
 assert widths["Fixed in"] and sum(widths.values()) + 150 <= 1350, sum(widths.values())
 for column in ("Verified at", "Live-verified at"):
     assert widths[column] <= 100, column
@@ -827,6 +927,67 @@ data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1
 panel = next(p for p in data["panels"] if p["title"] == "Open by priority over time")
 assert panel.get("timeFrom") == "3d", panel.get("timeFrom")
 assert "retention: 3d" in panel["description"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "bug dashboard has 30-day open-by-priority history panel next to 3-day panel" {
+  run python3 - "${dashboard}" "${metrics}" <<'PY'
+import json, sys
+from pathlib import Path
+dashboard, metrics_path = sys.argv[1:]
+data = json.loads(Path(dashboard).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panels = {p["id"]: p for p in data["panels"]}
+
+# New panel exists with instant query and $repo scope
+new_panel = next((p for p in data["panels"] if p.get("title") == "Open by priority, last 30 days (from git)"), None)
+assert new_panel is not None, "new panel missing"
+assert new_panel["type"] == "barchart"
+target = new_panel["targets"][0]
+assert target["expr"] == 'sum by (date, priority) (k3dm_bug_open_history{repo="$repo"})'
+assert target.get("instant") is True
+
+# Metric is emitted by exporter
+source = Path(metrics_path).read_text()
+assert "k3dm_bug_open_history" in source
+
+# 3-day panel is unchanged
+p15 = panels[15]
+assert p15["title"] == "Open by priority over time"
+assert p15["targets"][0]["expr"] == 'sum by (priority) (k3dm_bug_docs{repo="$repo",state="open"})'
+assert p15.get("timeFrom") == "3d"
+
+# Positions do not overlap
+cells = set()
+for panel in data["panels"]:
+    pos = panel["gridPos"]
+    assert pos["x"] + pos["w"] <= 24, panel["title"]
+    for x in range(pos["x"], pos["x"] + pos["w"]):
+        for y in range(pos["y"], pos["y"] + pos["h"]):
+            assert (x, y) not in cells, f"collision at ({x}, {y}) for {panel['title']}"
+            cells.add((x, y))
+
+# Next to 3-day panel at y=62
+assert p15["gridPos"]["y"] == 62
+assert new_panel["gridPos"]["y"] == 62
+assert p15["gridPos"]["h"] == new_panel["gridPos"]["h"]
+PY
+  [ "${status}" -eq 0 ]
+}
+
+@test "30-day open history labels are readable without changing dashboard data" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n", 1)[1])
+panel = next(p for p in data["panels"] if p.get("title") == "Open by priority, last 30 days (from git)")
+options = panel["options"]
+assert options["xTickLabelRotation"] != 0, options["xTickLabelRotation"]
+assert options["xTickLabelSpacing"] > 0, options["xTickLabelSpacing"]
+
+assert options["xField"] == "date"
+assert options["stacking"] == "normal"
 PY
   [ "${status}" -eq 0 ]
 }

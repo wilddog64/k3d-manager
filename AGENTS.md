@@ -1,118 +1,75 @@
-# Repository Guidelines
+# AGENTS.md — dispatched work
 
-## Project Structure & Module Organization
-`scripts/` houses the dispatcher (`k3d-manager`), shared libs in `scripts/lib/`, provider glue in `scripts/lib/providers/`, and optional `scripts/plugins/*.sh`. Tests live under `scripts/tests/` with helper BATS harness files beside suite directories (`lib`, `plugins`). Documentation is in `docs/` (architecture, providers, guides, issues) while `memory-bank/` tracks active spec context. Use `bin/` for helper binaries and keep user-specific scratch work in `scratch/`.
+## Dispatch and hand-back
 
-## Build, Test, and Development Commands
-- `./scripts/k3d-manager <function>` — primary entrypoint; run `deploy_cluster`, `deploy_vault`, etc. from repo root.
-- All `deploy_*` invocations require explicit options or `--confirm`; add `--dry-run`/`-n` to print the planned commands and `--plan` (Vault) for a read-only state report.
-- `./scripts/k3d-manager test all` — runs the curated BATS bundles defined in `scripts/lib/test.sh`.
-- `bats scripts/tests` — executes every suite; handy before large refactors.
-- `shellcheck scripts/**/*.sh` — lint every touched shell file; CI blocks on failures.
-- `./install.sh` — bootstrap local deps (bash 5, bats, shellcheck, jq) if the host is fresh.
+You receive a worktree and a spec. Do not run git add, git commit, git push, or create a PR. Do not touch `memory-bank/`. Leave changes in the working tree. End by listing every changed file and pasting the spec's gate output, including failures and skips.
 
-## Coding Style & Naming Conventions
-Write pure Bash with portable `#!/usr/bin/env bash`. Match the existing 2-space indentation used in `scripts/`, prefer snake_case for functions/files (`deploy_vault`, `plugins/shopping_cart.sh`), and guard sourced files with `# shellcheck source=` hints. Keep functions idempotent, avoid unbounded `if` depth (Agent Rigor flags this), and favor `_run_command` helpers instead of raw subshell pipelines. Templates in `scripts/etc/` should stay `.yaml.tmpl` and load values from `vars.sh`.
+## Spec contract
 
-## Testing Guidelines
+Read the full spec and the current memory-bank context before acting. The `## Acceptance` block is the contract: implement its `must` and `must_not` requirements, and show each `must_not` test red on the pre-fix code. If the spec is ambiguous or contradicts the code, stop and say so in the last message; do not guess.
 
-Bug priority convention: P0 is outage/data loss/security now, P1 is broken without a workaround,
-P2 is degraded with a workaround, and P3 is cosmetic/hygiene/test-only. Every new `docs/bugs/`
-file must include `**Priority:** P0` through `P3` under its Status line.
-BATS is the canonical framework. Name suites `<area>.bats` and tests `@test "<component>: <expectation>"`. Extend shared helpers via `scripts/tests/test_helpers.bash` rather than duplicating logic. Every PR must keep `./scripts/k3d-manager test all` green, preserve or increase `@test` counts (enforced by `_agent_audit`), and document new suites in `docs/tests` if they cover novel flows. For provider-specific behavior, add focused suites under `scripts/tests/lib/provider_contract.bats` or create plugin-level suites mirroring the file under test.
+## Test rules
 
-## Commit & Pull Request Guidelines
-Follow the short, Conventional-style prefixes seen in history (`docs:`, `fix:`, `v0.9.0 — …`). Squash unrelated work, explain *why* in the body, and mention linked issues or specs when possible. Before committing, run `_agent_checkpoint`, `_agent_lint`, and `_agent_audit` (pre-commit hook) to prove specs, lint, and security gates pass. Pull requests should state the scenario exercised, include command output for key flows (e.g., `bats` summary), and attach screenshots when UI manifests (Jenkins, ArgoCD) change. Keep branches rebased so Agent Rigor diffs stay tight.
+Never weaken, skip, or delete a test. Pair each test asserting no effect with a positive control that shows the effect when enabled. Capture external-tool stubs from real read-only output and record the host and date beside them. Before asserting a result, a fixture must assert its target (scratch HOME, stub endpoint, or fake repo root).
 
----
+Isolate tests from live state: use a scratch HOME, point Pushgateway at `127.0.0.1:9`, and never access the real Keychain or `~/Library/LaunchAgents`. Sandbox deny-tests need a run outside the sandbox to prove the application denial rather than the sandbox denial. Preserve task-provided environment variables.
 
-## Agent Session Rules (read every session — no exceptions)
+## Gates
 
-### 1. Read memory-bank first
-Before touching any file, read both:
-- `memory-bank/activeContext.md` — current branch, focus, open items
-- `memory-bank/progress.md` — what is complete, what is pending
+Run `make test`, `make test-pytest`, shellcheck on touched shell files, and `_agent_audit`, along with the spec's gates. Read per-suite counts and skips, not just exit codes. Report actual output.
 
-These contain decisions already made. Do not re-derive them from scratch.
-The newest `## Handoff — <date> <objective>` section in `memory-bank/activeContext.md` is the resume point after a context reset (`/clear`): its objective, evidence, decisions and verification status are settled. Its `Next, in order` list is Claude's planning queue, not a work order; act only on the task you were dispatched or assigned.
+## Code rules
 
-### 2. Verify your machine
-First command of every session:
-```bash
-hostname && uname -n
-```
-Confirm you are on the correct machine before doing anything else.
+Use the existing Bash and Python styles. Route privileged and external commands through `_run_command`. Make lib-foundation changes upstream, then subtree-pull; do not edit its subtree directly. Stay within the spec scope and report unrelated findings in the hand-back. Never delete comments marked DO NOT REMOVE.
 
-### 3. Proof of work — commit SHA + test results required
-Reporting "done" requires ALL of the following — paste actual output, not summaries:
+## Shared rules
 
-- **Commit SHA** — run `git log origin/<branch> --oneline -3` and paste the output
-- **BATS output** — paste the full `bats scripts/tests/...` result (pass/fail counts)
-- **shellcheck** — paste `shellcheck scripts/plugins/<touched>.sh` output (must be clean)
-- **`_agent_audit`** — must pass (all functions ≤ 8 if-blocks)
+<!-- shared:begin plan-cap -->
+- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
+<!-- shared:end plan-cap -->
 
-A memory-bank update alone is NOT proof of completion.
-A summary like "all tests passed" without pasted output is NOT proof of completion.
+<!-- shared:begin bug-priority -->
+Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
+without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
+new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+<!-- shared:end bug-priority -->
 
-### 4. Commit before reporting done
-Every task ends with a real git commit pushed to the remote branch.
-Never report completion without a verifiable commit SHA on the remote.
+<!-- shared:begin security -->
+## Security Rules (treat violations as bugs — catch before commit)
 
-### 5. Do NOT create PRs — that is Claude's job
-Your task ends at: commit + push to branch + update memory-bank.
-Do NOT run `gh pr create`. Do NOT rerun CI jobs (`gh run rerun`).
-If CI fails, read the failure logs (`gh run view <id> --log-failed`), fix the root cause, and push a new commit.
+**Shell Injection (OWASP A03)**
+- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments.
+- Never pass external or user-supplied input to `eval`.
+- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
+- Variables expanded via `envsubst` in `*.yaml.tmpl` must not contain shell metacharacters — validate before substitution.
 
-### 6. Do not revert intentional decisions
-Comments marked `# DO NOT REMOVE` or `<!-- DO NOT REMOVE -->` in code must not be deleted.
-Decisions recorded in `memory-bank/` must not be silently reversed.
-If you believe a decision is wrong, report it — do not quietly undo it.
+**Least Privilege (OWASP A01)**
+- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
+- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
+- New ClusterRoles must be justified — prefer namespace-scoped resources.
+- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
 
-### 7. Stay within spec scope
-Do not add features, refactor code, or make improvements beyond what the spec requires.
-Do not modify files outside the scope of the current task.
-If you find a bug outside your scope, report it in the memory-bank — do not fix it silently.
+**Cryptographic Failures (OWASP A02)**
+- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only. Never introduce in production config paths.
+- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
+- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
 
-### 8. Never bypass hooks
-- Never use `git commit --no-verify`
-- Never use `git push --force` on shared branches
-- Never use `git rebase` or `git reset --hard` on shared branches
-- If a pre-commit hook fails, fix the underlying issue and retry
+**Secret Hygiene (OWASP A02)**
+- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
+- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in lib-foundation's `scripts/lib/system.sh` (change it upstream, then subtree-pull; `scripts/lib/system.sh` here only loads it).
+- Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
+- No secrets in `kubectl exec` command strings that appear in logs.
 
-### 9. Update memory-bank on completion
-When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
-to reflect what you completed. Include the real commit SHA and PR URL.
+**Security Misconfiguration (OWASP A05)**
+- Every new deployed service must use its own namespace — never `default`.
+- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
 
-### 12. Document findings and create issue docs
-After every task — implementation or verification — you must:
-- Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with results (pass, fail, or partial)
-- If anything failed, behaved unexpectedly, or was skipped: create `docs/issues/YYYY-MM-DD-<slug>.md` with:
-  - What was tested / attempted
-  - Actual output (paste verbatim — no summaries)
-  - Root cause if known
-  - Recommended follow-up
-- If the task was a live test, include the full terminal output in the issue doc or memory-bank notes
-- Do NOT omit issue docs to keep the report clean — unexpected behavior must be recorded
+**Supply Chain Integrity (OWASP A08)**
+- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
+- New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
 
-### 11. Stop at 5 plan docs per milestone
-Each release is a sprint story with a maximum of 5 spec files. If the current milestone
-already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
-immediately. A 6th spec means the release is too large and must be split into two smaller
-releases. Claude decides how to split; you do not proceed until told to.
-
-### 13. `--approval-mode yolo` is for tightly scoped prompts only
-
-`--approval-mode yolo` disables all confirmation prompts for the inner gemini subprocess.
-It is only permitted when ALL of the following are true:
-
-- The prompt specifies **exactly one file to write** and **one command to run** — nothing else
-- The write target is inside `${HOME}/.gemini/tmp/k3d-manager/` — never the project workspace
-- The prompt contains **no open-ended instructions** ("fix issues", "clean up", "improve")
-
-Never use `--approval-mode yolo` with broad or ambiguous prompts. Violation = treat as a bug.
-
-### 10. If-count allowlist is for legacy code only
-The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
-legacy functions that still exceed the limit, document the specific `file:function` pair in
-`scripts/etc/agent/if-count-allowlist` (with a follow-up issue) instead of raising the
-threshold. New or refactored code must stay within the budget.
+**Existing protections — do not remove or weaken:**
+- `_run_command` handles sudo probing and escalation safely.
+- `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
+- ESO syncs credentials from Vault without exposing them in git.
+<!-- shared:end security -->

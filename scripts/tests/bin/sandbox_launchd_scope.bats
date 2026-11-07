@@ -4,11 +4,13 @@ setup() {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
 }
 
-@test "sandbox frontend label is used by up, refresh, and down" {
-  for script in bin/cluster-up bin/cluster-refresh bin/cluster-down; do
-    run grep -nF 'com.k3d-manager.sandbox.frontend-browser-http' "${script}"
+@test "sandbox frontend label is scoped in up, down and refresh" {
+  for script in bin/cluster-up bin/cluster-down bin/cluster-refresh; do
+    run grep -nF 'com.k3d-manager.browser.sandbox-frontend-http' "${script}"
     [ "${status}" -eq 0 ]
   done
+  run grep -nF 'com.k3d-manager.sandbox.frontend-browser-http' bin/cluster-refresh
+  [ "${status}" -ne 0 ]
 }
 
 @test "cluster-up has no Hostinger frontend label or address" {
@@ -21,18 +23,20 @@ setup() {
   [ "${output}" -eq 0 ]
 }
 
-@test "cluster-up scopes the loopback alias and Pushgateway port" {
+@test "cluster-up checks the sandbox loopback alias and scopes Pushgateway" {
   run grep -nF '9092:9091' bin/cluster-up
   [ "${status}" -eq 0 ]
-  run grep -nF 'com.k3d-manager.sandbox.loopback-alias' bin/cluster-up
+  run grep -nF '/sbin/ifconfig lo0' bin/cluster-up
   [ "${status}" -eq 0 ]
+  run grep -nF 'com.k3d-manager.sandbox.loopback-alias' bin/cluster-up
+  [ "${status}" -ne 0 ]
 }
 
-@test "cluster-up loopback alias failure is soft and can prompt for sudo" {
-  run grep -nF -- '--interactive-sudo --quiet --soft -- /sbin/ifconfig lo0 alias 127.0.0.3' bin/cluster-up
+@test "cluster-up does not install the loopback alias or invoke sudo for it" {
+  run grep -nE 'ifconfig lo0 (alias|-alias)' bin/cluster-up
+  [ "${status}" -ne 0 ]
+  run grep -nF 'make install-browser-relays' bin/cluster-up
   [ "${status}" -eq 0 ]
-  run grep -nF -- '--prefer-sudo --quiet -- /sbin/ifconfig lo0 alias' bin/cluster-up
-  [ "${status}" -eq 1 ]
 }
 
 @test "cluster-refresh has only the sandbox frontend address and plist" {
@@ -42,7 +46,7 @@ setup() {
   [ "${status}" -ne 0 ]
 }
 
-@test "cluster-down removes legacy sandbox-owned plists but preserves Hostinger plists" {
+@test "cluster-down leaves legacy frontend plists and scopes legacy Pushgateway cleanup" {
   local block="${BATS_TEST_TMPDIR}/legacy-cleanup.sh"
   local frontend="${BATS_TEST_TMPDIR}/frontend.plist"
   local pushgateway="${BATS_TEST_TMPDIR}/pushgateway.plist"
@@ -72,8 +76,9 @@ STUB
       source "$2"
     ' bash "${BATS_TEST_TMPDIR}/state" "${block}"
   [ "${status}" -eq 0 ]
+  [ -e "${frontend}" ]
   run grep -F "rm -f ${frontend}" "${rm_log}"
-  [ "${status}" -eq 0 ]
+  [ "${status}" -ne 0 ]
   run grep -F "rm -f ${pushgateway}" "${rm_log}"
   [ "${status}" -eq 0 ]
 
@@ -127,7 +132,8 @@ STUB
     ' bash "${BATS_TEST_TMPDIR}/state" "${block}"
   [ "${status}" -eq 0 ]
   [ ! -s "${rm_log}" ]
-  grep -Fq 'DRY_RUN: would unload legacy sandbox frontend browser HTTP daemon' <<<"${output}"
+  [ -e "${frontend}" ]
+  [[ "${output}" != *"legacy sandbox frontend browser HTTP daemon"* ]]
   grep -Fq 'DRY_RUN: would unload legacy sandbox Pushgateway port-forward LaunchAgent' <<<"${output}"
 }
 

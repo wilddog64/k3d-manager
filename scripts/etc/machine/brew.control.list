@@ -1,0 +1,19 @@
+# Control role: console access plus local k3d-manager development.
+formula:gh
+formula:git
+formula:jq
+formula:tmux
+
+cask:google-chrome
+cask:iterm2
+
+# Repository development and test tools.
+bats-core
+shellcheck
+yq
+ripgrep
+git-extras
+kubernetes-cli
+python@3
+dtach
+socat

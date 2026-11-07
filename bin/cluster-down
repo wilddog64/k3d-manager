@@ -28,6 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/deployment_metrics.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
@@ -195,6 +196,15 @@ esac
 _dry_guard "clear active-provider markers for ${_cluster_provider}" \
   _acg_unrecord_provider "${_cluster_provider}"
 
+_stop_browser_agent() {
+  local plist="$1" description="$2"
+  if _dry_run_active; then
+    _info "DRY_RUN: would unload ${description} LaunchAgent"
+  elif ! launchctl bootout "gui/$(id -u)" "${plist}" >/dev/null 2>&1; then
+    _warn "[acg-down] ${description} LaunchAgent was not loaded; continuing"
+  fi
+}
+
 _info "[acg-down] Stopping Vault port-forward..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
@@ -207,25 +217,10 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   fi
 fi
 if _is_mac; then
-  _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
-  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.sandbox.frontend-browser-http.plist}"
-  _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
-  _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
-  _frontend_browser_log_target="${_frontend_browser_launchctl_log}"
-  _dry_run_active && _frontend_browser_log_target=/dev/null
-  _dry_guard "truncate frontend browser launchctl log" sh -c ': > "$1"' sh "${_frontend_browser_launchctl_log}"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-    _warn "[acg-down] no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"
-  else
-    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
-        >"${_frontend_browser_log_target}" 2>&1; then
-      _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
-    fi
-  fi
-  _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
-  if ! _dry_run_active && [[ -e "${_frontend_browser_plist}" ]]; then
-    _warn "[acg-down] com.k3d-manager.sandbox.frontend-browser-http is still installed (see ${_frontend_browser_launchctl_log}); remove it with: sudo launchctl bootout system ${_frontend_browser_plist}; sudo rm -f ${_frontend_browser_plist}"
-  fi
+  _frontend_browser_label="com.k3d-manager.browser.sandbox-frontend-http"
+  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-${HOME}/Library/LaunchAgents/${_frontend_browser_label}.plist}"
+  _stop_browser_agent "${_frontend_browser_plist}" "frontend browser"
+  _dry_guard "remove frontend browser LaunchAgent" rm -f "${_frontend_browser_plist}" "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
 
   _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
   _pgw_pf_label="com.k3d-manager.sandbox.pushgateway-port-forward"
@@ -249,6 +244,7 @@ if _is_mac; then
   fi
   _dry_guard "remove ACG Prometheus port-forward plist" rm -f "${_acg_prom_pf_plist}"
 fi
+
 
 if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
   _vault_pf_label="com.k3d-manager.vault-port-forward"
@@ -316,54 +312,27 @@ fi
 _dry_guard "remove ArgoCD port-forward plist" rm -f "${_argocd_pf_plist}"
 fi
 
-if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
-  _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
-  _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
-  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
-  _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
-  _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
-  _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-    _warn "[acg-down] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon bootout"
-  else
-    if _run_command --prefer-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
-        >"${_keycloak_browser_launchctl_log}" 2>&1; then
-      _info "[acg-down] Keycloak browser HTTP listener launchd daemon unloaded"
-    elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-      _warn "[acg-down] existing Keycloak browser HTTP listener was not loaded; continuing"
-    fi
-  fi
-  _run_command --prefer-sudo --soft -- rm -f "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" >/dev/null 2>&1 || true
 
-  _info "[acg-down] Stopping ArgoCD browser HTTPS listener launchd daemon..."
-  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
-  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
+if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
+  _keycloak_browser_label="com.k3d-manager.browser.keycloak-http"
+  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-${HOME}/Library/LaunchAgents/${_keycloak_browser_label}.plist}"
+  _stop_browser_agent "${_keycloak_browser_plist}" "Keycloak browser"
+  _dry_guard "remove Keycloak browser LaunchAgent" rm -f "${_keycloak_browser_plist}" "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
+
+  _info "[acg-down] Stopping ArgoCD browser HTTPS LaunchAgent..."
+  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.browser.argocd-https}"
+  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-${HOME}/Library/LaunchAgents/${_argocd_browser_label}.plist}"
   _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
   _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${_ACG_STATE_DIR}/argocd-browser-https-tls}"
   _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
   _argocd_browser_tls_ca="${ARGOCD_BROWSER_TLS_CA_FILE:-${_argocd_browser_tls_dir}/ca.crt}"
-  _argocd_browser_launchctl_log="${_ACG_STATE_DIR}/logs/argocd-browser-https-launchctl.log"
-  _argocd_browser_log_target="${_argocd_browser_launchctl_log}"
-  _dry_run_active && _argocd_browser_log_target=/dev/null
-  _dry_guard "truncate ArgoCD browser launchctl log" sh -c ': > "$1"' sh "${_argocd_browser_launchctl_log}"
-  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-    _warn "[acg-down] no sudo in headless context — skipping argocd-browser-https LaunchDaemon bootout"
-  else
-    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
-        >"${_argocd_browser_log_target}" 2>&1; then
-      _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
-    elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-      _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
-    fi
-  fi
-  _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
-  _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
+  _stop_browser_agent "${_argocd_browser_plist}" "ArgoCD browser HTTPS"
+  _dry_guard "remove ArgoCD browser LaunchAgent" rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}"
+  _dry_guard "remove ArgoCD browser TLS files" rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" || true
   _argocd_browser_tls_dir_legacy="${HOME}/.local/share/k3d-manager/argocd-browser-https-tls"
   if [[ "${_argocd_browser_tls_dir_legacy}" != "${_argocd_browser_tls_dir}" ]]; then
-    _run_command --prefer-sudo --soft -- rm -f \
+    _dry_guard "remove legacy ArgoCD browser TLS files" rm -f \
       "${_argocd_browser_tls_dir_legacy}/fullchain.crt" \
       "${_argocd_browser_tls_dir_legacy}/tls.key" \
       "${_argocd_browser_tls_dir_legacy}/ca.crt" \
@@ -391,19 +360,10 @@ if [[ "${_keep_hub}" -eq 0 ]] && _is_mac; then
       >/dev/null 2>&1 || true
   fi
 
+
+
   # legacy-unscoped-cleanup:begin
-  _legacy_frontend_plist="${LEGACY_FRONTEND_BROWSER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist}"
   _legacy_pushgateway_plist="${LEGACY_PUSHGATEWAY_PLIST:-${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist}"
-  if [[ -f "${_legacy_frontend_plist}" ]] && grep -Fq -- "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh" "${_legacy_frontend_plist}"; then
-    if _dry_run_active; then
-      _info "DRY_RUN: would unload legacy sandbox frontend browser HTTP daemon"
-    else
-      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_legacy_frontend_plist}" >/dev/null 2>&1 || true
-    fi
-    _dry_guard "remove legacy frontend browser HTTP plist" _run_command --prefer-sudo --soft -- rm -f "${_legacy_frontend_plist}"
-  elif [[ -f "${_legacy_frontend_plist}" ]]; then
-    _info "[acg-down] unscoped com.k3d-manager.frontend-browser-http belongs to another provider — left in place"
-  fi
   if [[ -f "${_legacy_pushgateway_plist}" ]] && grep -Fq -- 'ubuntu-k3s' "${_legacy_pushgateway_plist}"; then
     if _dry_run_active; then
       _info "DRY_RUN: would unload legacy sandbox Pushgateway port-forward LaunchAgent"

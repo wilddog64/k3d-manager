@@ -589,3 +589,182 @@ EOF
   [ "$status" -eq 0 ]
   [ ! -e "${MANAGER_LOG}" ]
 }
+
+macmon_fixture() {
+  export MACMON_BIN="${BATS_TEST_TMPDIR}/macmon-bin"
+  export MACMON_LOG="${BATS_TEST_TMPDIR}/macmon.log"
+  mkdir -p "${MACMON_BIN}"
+  : > "${MACMON_LOG}"
+  cat > "${MACMON_BIN}/uname" <<'STUB'
+#!/bin/bash
+# uname -m captured on m4-air, 2026-11-01: arm64
+printf '%s\n' "${MACMON_ARCH:-arm64}"
+STUB
+  cat > "${MACMON_BIN}/brew" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "${MACMON_LOG}"
+exit "${MACMON_BREW_STATUS:-0}"
+STUB
+  cat > "${MACMON_BIN}/sudo" <<'STUB'
+#!/bin/bash
+printf 'sudo %s\n' "$*" >> "${MACMON_LOG}"
+exit 1
+STUB
+  chmod +x "${MACMON_BIN}/uname" "${MACMON_BIN}/brew" "${MACMON_BIN}/sudo"
+  export PATH="${MACMON_BIN}:/usr/bin:/bin"
+  [ "$(command -v brew)" = "${MACMON_BIN}/brew" ]
+  _is_mac() { return 0; }
+}
+
+@test "_install_macmon installs on Apple Silicon" {
+  macmon_fixture
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ "$(cat "${MACMON_LOG}")" = "install macmon" ]
+  [[ "$output" == *"macmon installed"* ]]
+}
+
+@test "_install_macmon skips an existing binary" {
+  macmon_fixture
+  printf '#!/bin/bash\nexit 0\n' > "${MACMON_BIN}/macmon"
+  chmod +x "${MACMON_BIN}/macmon"
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon returns install failure" {
+  macmon_fixture
+  export MACMON_BREW_STATUS=1
+  run _install_macmon
+  [ "$status" -ne 0 ]
+  [ "$(cat "${MACMON_LOG}")" = "install macmon" ]
+}
+
+@test "_install_macmon skips Linux" {
+  macmon_fixture
+  _is_mac() { return 1; }
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon skips Intel Macs" {
+  macmon_fixture
+  export MACMON_ARCH=x86_64
+  run _install_macmon
+  [ "$status" -eq 0 ]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+@test "_install_macmon requires Homebrew without sudo" {
+  macmon_fixture
+  rm "${MACMON_BIN}/brew"
+  run _install_macmon
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Homebrew is required to install macmon"* ]]
+  [ ! -s "${MACMON_LOG}" ]
+}
+
+vm_cask_fixture() {
+  export VM_CASK_BIN="${BATS_TEST_TMPDIR}/vm-cask-bin"
+  export VM_CASK_LOG="${BATS_TEST_TMPDIR}/vm-cask.log"
+  mkdir -p "${VM_CASK_BIN}"
+  : > "${VM_CASK_LOG}"
+  cat > "${VM_CASK_BIN}/brew" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${VM_CASK_LOG}"
+exit "${VM_CASK_BREW_STATUS:-0}"
+STUB
+  cat > "${VM_CASK_BIN}/sudo" <<'STUB'
+#!/usr/bin/env bash
+printf 'sudo %s\n' "$*" >> "${VM_CASK_LOG}"
+exit 1
+STUB
+  for binary in VBoxManage vagrant; do
+    cat > "${VM_CASK_BIN}/${binary}" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+  done
+  chmod +x "${VM_CASK_BIN}/brew" "${VM_CASK_BIN}/sudo" "${VM_CASK_BIN}/VBoxManage" "${VM_CASK_BIN}/vagrant"
+  export PATH="${VM_CASK_BIN}:/usr/bin:/bin"
+  [ "$(command -v brew)" = "${VM_CASK_BIN}/brew" ]
+  _is_mac() { return 0; }
+}
+
+@test "_install_virtualbox installs its cask when VBoxManage is absent" {
+  vm_cask_fixture
+  rm "${VM_CASK_BIN}/VBoxManage"
+  run _install_virtualbox
+  [ "${status}" -eq 0 ]
+  [ "$(cat "${VM_CASK_LOG}")" = "install --cask virtualbox" ]
+  [[ "${output}" == *"VirtualBox installed"* ]]
+}
+
+@test "_install_vagrant installs its cask when vagrant is absent" {
+  vm_cask_fixture
+  rm "${VM_CASK_BIN}/vagrant"
+  run _install_vagrant
+  [ "${status}" -eq 0 ]
+  [ "$(cat "${VM_CASK_LOG}")" = "install --cask vagrant" ]
+  [[ "${output}" == *"Vagrant installed"* ]]
+}
+
+@test "VM cask installers skip existing binaries without calling brew" {
+  vm_cask_fixture
+  run _install_virtualbox
+  [ "${status}" -eq 0 ]
+  [ -z "${output}" ]
+  run _install_vagrant
+  [ "${status}" -eq 0 ]
+  [ -z "${output}" ]
+  [ ! -s "${VM_CASK_LOG}" ]
+}
+
+@test "VM cask installers install independently when the other binary exists" {
+  vm_cask_fixture
+  rm "${VM_CASK_BIN}/VBoxManage"
+  run _install_virtualbox
+  [ "${status}" -eq 0 ]
+  [ "$(cat "${VM_CASK_LOG}")" = "install --cask virtualbox" ]
+  : > "${VM_CASK_LOG}"
+  rm "${VM_CASK_BIN}/vagrant"
+  run _install_vagrant
+  [ "${status}" -eq 0 ]
+  [ "$(cat "${VM_CASK_LOG}")" = "install --cask vagrant" ]
+}
+
+@test "VM cask installer failure returns non-zero and caller continues" {
+  vm_cask_fixture
+  rm "${VM_CASK_BIN}/VBoxManage"
+  export VM_CASK_BREW_STATUS=17
+  if _install_virtualbox; then status=0; else status=$?; fi
+  [ "${status}" -eq 17 ]
+  [ "$(cat "${VM_CASK_LOG}")" = "install --cask virtualbox" ]
+}
+
+@test "VM cask installers reject non-macOS without calling brew" {
+  vm_cask_fixture
+  _is_mac() { return 1; }
+  run _install_virtualbox
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"VirtualBox installation is supported only on macOS"* ]]
+  run _install_vagrant
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"Vagrant installation is supported only on macOS"* ]]
+  [ ! -s "${VM_CASK_LOG}" ]
+}
+
+@test "VM cask installers require Homebrew without calling sudo" {
+  vm_cask_fixture
+  rm "${VM_CASK_BIN}/VBoxManage" "${VM_CASK_BIN}/vagrant" "${VM_CASK_BIN}/brew"
+  run _install_virtualbox
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"Homebrew is required to install VirtualBox"* ]]
+  run _install_vagrant
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"Homebrew is required to install Vagrant"* ]]
+  [ ! -s "${VM_CASK_LOG}" ]
+}
