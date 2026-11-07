@@ -1,7 +1,9 @@
 # Bug: observability LaunchAgent installs race launchd bootout/bootstrap and embed ephemeral direnv python3 paths
 
-**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: Fixed & Verified (`fadbfb80`; live-verified on `m5-air.local` via Slack job `0d15432a` on `2026-11-03`)
+**Status:** LIVE-VERIFIED 2026-11-07 — Claude read the M5 agents (see `## Live verification (Claude, M5, 2026-11-07)`). Was: VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: Fixed & Verified (`fadbfb80`; live-verified on `m5-air.local` via Slack job `0d15432a` on `2026-11-03`)
 **Priority:** P1
+**Fix commit:** `fadbfb80`
+**Live evidence:** 2026-11-07 · run claude-m5-launchctl-read · env hub · scenario observability-agents-loaded-no-direnv-python · commit fadbfb80 · proves fix
 **Severity:** high — `make up` aborts at Step 14/14 (`exit 5`) or leaves `com.k3d-manager.alertmanager-port-forward` unloaded (`HTTP 502` on Alertmanager login) when reloading a running LaunchAgent; running from a `direnv` shell writes a `.cache/direnv/layouts/...` Python path into LaunchAgent plists
 **Filed:** 2026-11-03
 **Detected by:** M5 live verification (`2026-11-03 19:02:02 PST` unified log & Slack job `4a9b212c`)
@@ -118,3 +120,17 @@ evidence:
   - `bats scripts/tests/lib/observability.bats`
   - `shellcheck -x -S warning scripts/plugins/observability.sh`
   - `git --no-pager diff --check`
+
+## Live verification (Claude, M5, 2026-11-07)
+
+The Acceptance has no live item; this records the deployed state on the hub, read over SSH (read-only).
+
+- M5 checkout `8e483765` contains `fadbfb80` (committed 2026-11-03 19:41). The four plists in `~/Library/LaunchAgents`
+  were rewritten 2026-11-03 20:59, after the fix.
+- `alertmanager-auth-proxy` and `prometheus-auth-proxy`: `state = running`, `ProgramArguments[0]` is
+  `/opt/homebrew/opt/python@3.14/bin/python3.14` (the first candidate of `_observability_python3_path`); no
+  `.cache/direnv` string in either plist.
+- `alertmanager-port-forward`: `state = running`. `http://127.0.0.1:9093/` answers 401 (auth proxy asks for a login), not 502.
+- `prometheus-credential-rotator`: loaded, `runs = 0`. It runs on `StartCalendarInterval` day 1 00:00 and has not
+  reached its first run; loaded means the bootstrap succeeded.
+- The Status's earlier "live-verified via Slack job `0d15432a`" claim had no recorded output; this read replaces it.
