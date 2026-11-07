@@ -208,6 +208,7 @@ for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.js
     var=next(v for v in d["templating"]["list"] if v["name"]=="window")
     assert var["type"]=="query" and var["definition"]=="label_values(k3dm_dispatch_landed, window)"
     assert var["current"]["value"]=="7d" and var["label"]=="Window"
+    assert var["sort"]==8, (filename, var["sort"])
 PY
   [ "$status" -eq 0 ]
 }

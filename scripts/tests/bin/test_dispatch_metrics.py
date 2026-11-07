@@ -1008,7 +1008,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     window = dashboard["templating"]["list"][0]
     assert window["type"] == "query"
     assert window["query"]["query"] == "label_values(k3dm_dispatch_landed, window)"
-    assert window["sort"] == 7 and window["current"]["value"] == "7d"
+    assert window["sort"] == 8 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed sort 7 to 8 (natural descending), bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
     assert sum("$window" in expr for expr in expressions) == 94  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets

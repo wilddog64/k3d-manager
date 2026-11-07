@@ -61,7 +61,7 @@ data:
             },
             "definition": "label_values(k3dm_dispatch_landed, window)",
             "refresh": 2,
-            "sort": 7,
+            "sort": 8,
             "includeAll": false,
             "multi": false,
             "current": {
