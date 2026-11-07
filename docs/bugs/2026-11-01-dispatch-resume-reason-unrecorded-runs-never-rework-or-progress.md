@@ -1,6 +1,7 @@
 # Bug: run outcomes never classify a resumed run as rework or progress, so a third of recent runs have no verdict
 
-**Status:** LANDED — `2c7fc95c` and fixture fix `22110d0c`; independent evidence and live verification pending
+**Status:** VERIFIED 2026-11-07 — `2c7fc95c` and fixture fix `22110d0c`; independent verifier PASS (bats 12/12, pytest 17/17 on `22110d0c`; M1, M3, M4, M5 red on `6774f198`); live E3 pending
+**Waiting on:** live check — since 2026-11-07
 **Priority:** P2
 **Severity:** medium — "Run outcome coverage" is 67% (7d) and 63% (v1.43.13), so the dashboard cannot support an efficiency claim; the gap recurs on every release, it is not only old data ageing out. Workaround: read the ledger by hand
 **Approval:** operator, 2026-11-01 ("how could we close the gap … investigate and file bug/plan … if this a bug then prioritize it")
