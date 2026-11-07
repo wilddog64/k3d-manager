@@ -71,6 +71,23 @@ if [[ "${K3DM_SKIP_BUG_EVIDENCE:-0}" != "1" && -f "${SCRIPT_DIR}/check-bug-evide
    fi
 fi
 
+# Guard: changed bug Status values must use a dashboard-recognized first word.
+# Bypass: K3DM_SKIP_BUG_STATUS=1
+if [[ "${K3DM_SKIP_BUG_STATUS:-0}" != "1" && -f "${SCRIPT_DIR}/check-bug-status.py" ]]; then
+   staged_bug_docs=()
+   while IFS= read -r _f; do
+      [[ -n "${_f}" && -f "${_f}" ]] && staged_bug_docs+=("${_f}")
+   done < <(git diff --cached --name-only --diff-filter=ACMR -- 'docs/bugs/*.md')
+   if (( ${#staged_bug_docs[@]} > 0 )); then
+      if ! python3 "${SCRIPT_DIR}/check-bug-status.py" "${staged_bug_docs[@]}"; then
+         echo "Pre-commit hook: bug Status must start with a recognized first word" >&2
+         echo "  landed fix: LANDED; independently verified: VERIFIED; still open: OPEN" >&2
+         echo "  bypass:     K3DM_SKIP_BUG_STATUS=1 git commit ..." >&2
+         exit 1
+      fi
+   fi
+fi
+
 # Guard: test/job debris at the repo root, written by a path derived from an empty
 # variable (usually an unchecked "$(mktemp)"). Staged files only.
 # Bypass: K3DM_SKIP_ROOT_DEBRIS=1
