@@ -26,6 +26,11 @@ Since the summary has null counts, Hermes then crashes (separate bug, linked abo
 
 - 2026-11-07: operator ran `gh auth refresh` on the M5 (F2 step 1). Next: one e2e run dispatched from the M5 shows whether `deploying-substrate` now passes (E2).
 - 2026-11-07 (Claude, read-only over ssh): the M5's `gh auth status` still lists `Token scopes: 'gist', 'read:org', 'repo', 'workflow'`. There is no `read:packages`: the refresh was run without `-s read:packages`, so it kept the old scopes. An e2e run now would fail at `deploying-substrate` again. Next: the operator runs `gh auth refresh -h github.com -s read:packages` on the M5 (browser approval). Then one e2e run is dispatched from the M5.
+- 2026-11-07 21:24Z: the operator logged in to `gh` again on the M5. The scopes are now `admin:public_key, gist, read:org, repo`: still no `read:packages`, and `workflow` is gone. The first dispatch was refused with `capacity_cpu`. On the M2, session `/tmp/m2-air.dtach` had attached to itself (client PID 76249 runs inside the session's own zsh, 34517); the two dtach processes used about 190% CPU for nearly two days, which put the load at about 6 of 8. The retry ran as run `1794086678-29708` and failed at `deploying-substrate`. Transcript on the M5, `~/.k3dm/e2e/dispatch/m2-20261107T212437Z.log`:
+  - line 12: `GHCR_PAT env var authenticates but cannot pull from ghcr.io — it is missing the read:packages scope`. This confirms F2's cause.
+  - line 14: `error: context "k3d-k3d-cluster" does not exist`, in the Vault fallback. This is the secondary issue, still open.
+  - line 30: `cliang@m5-air.local: Permission denied (publickey,...)`, then the result was kept as pending. This run's publish-back target is already the M5, and only the forced-command entry is missing, which the F1 fix installs. The M5 has no `e2e-remote.env`, so where the M5 target came from is not established.
+  - Next: `gh auth refresh -h github.com -s read:packages,workflow` on the M5, then one more run.
 
 ## Decision (operator, 2026-11-07: option a for F1)
 
