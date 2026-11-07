@@ -2,9 +2,9 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** LANDED — 35fbd4bb (2026-11-07, gpt-6-luna worker; Claude moved the guide section and pinned the N2 baseline to 028b898f); bats 43/43, new test red on pre-fix
 **Priority:** P3 — cosmetic; every number is correct, but the last rows are cut off and the order cannot be changed
-**Waiting on:** dispatch — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** operator 2026-11-07 live check: "how do you classify unknown? also it seems number are cut off a bit! can we allow sort on number?"
 **Severity:** low
 

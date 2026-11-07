@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: verification-ladder-table LANDED 35fbd4bb (table, sort by tasks, unknown explained); verifier pending.
 - 2026-11-07: v1.43.17 specs dev-hub-vcluster + argocd-ha-zero-downtime-upgrade (rehearse in dev hub; takes ArgoCD part of v1.28.0). Prereq OrbStack 24 GB.
 - 2026-11-07: spec v1.43.16-hub-deploy-ref-and-live-write-guard (a36fac97: deploy/hub ref, hub-promote/rollback, platform-ops from git-archive). v1.43.15 at cap, so v1.43.16 plan 4.
 - 2026-11-07: control-node-role independently verified (12/12, pre-fix 10 red); no real `security dump-keychain` capture exists in the repo — M4 gap recorded.
