@@ -25,6 +25,7 @@ Since the summary has null counts, Hermes then crashes (separate bug, linked abo
 ## Progress
 
 - 2026-11-07: operator ran `gh auth refresh` on the M5 (F2 step 1). Next: one e2e run dispatched from the M5 shows whether `deploying-substrate` now passes (E2).
+- 2026-11-07 (Claude, read-only over ssh): the M5's `gh auth status` still lists `Token scopes: 'gist', 'read:org', 'repo', 'workflow'`. There is no `read:packages`: the refresh was run without `-s read:packages`, so it kept the old scopes. An e2e run now would fail at `deploying-substrate` again. Next: the operator runs `gh auth refresh -h github.com -s read:packages` on the M5 (browser approval). Then one e2e run is dispatched from the M5.
 
 ## Decision (operator, 2026-11-07: option a for F1)
 
