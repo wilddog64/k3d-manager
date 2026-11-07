@@ -20,6 +20,7 @@
 
 - Explain open bug dependencies in the Bug Tracking table with a safe Waiting on column, export the waiting-since date, and clarify that open priority counts can include fixes awaiting a live check.
 - Reject bug Status edits that the dashboard would silently misread as open, and document the recognized first words.
+- Show healthy empty-state text on the CVE Auto-Patch critical-CVE and missing-report tables.
 
 - Sort the Agent Dispatch Per run evidence table by version, slug and run newest first, and convert the run field to number so header clicks sort numerically.
 
