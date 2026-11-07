@@ -2,8 +2,7 @@
 
 **Filed:** 2026-11-06
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
-**Waiting on:** fix running — since 2026-11-06
+**Status:** VERIFIED `7d7cd7bd`; independent verification recorded (37 tests, 9 red before the fix, 5 mutants red)
 **Priority:** P3 — the documented commands exit 2; passing `--version` works, and nothing is written wrongly
 **Approval:** implied 2026-11-06, within the operator's "go ahead to work on S1 spec then dispatch to Luna"; this is a defect in that S1 dispatcher slice, found by its independent verifier.
 **Severity:** low
