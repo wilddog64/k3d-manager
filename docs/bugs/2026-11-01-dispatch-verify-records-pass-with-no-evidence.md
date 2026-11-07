@@ -1,7 +1,9 @@
 # Bug: `codex-dispatch verify` records a pass with no evidence, so "verified" on the dashboard can be a bare claim
 
-**Status:** VERIFIED — 2026-11-01: fixed `6fe94bda` (Luna; Claude added cross-repo SHA resolution from `<run>/repo`); land TEST codex_dispatch.bats + agent_dispatch_dashboard.bats + test_dispatch_metrics.py passed; independent Acceptance-only suite (Sonnet verifier) 12/12 on `6fe94bda`, 11/12 red on pre-fix `90380e17` (M3 green on both, as expected); verify recorded with evidence sha256 `e6a2c500…`. E3 live (dashboard "Claimed, no evidence" panel) pending — needs `make platform-ops` on the M5
+**Status:** LIVE-VERIFIED 2026-11-07 — E3 by Claude on the hub (see `## Live verification E3`). Was: VERIFIED — 2026-11-01: fixed `6fe94bda` (Luna; Claude added cross-repo SHA resolution from `<run>/repo`); land TEST codex_dispatch.bats + agent_dispatch_dashboard.bats + test_dispatch_metrics.py passed; independent Acceptance-only suite (Sonnet verifier) 12/12 on `6fe94bda`, 11/12 red on pre-fix `90380e17` (M3 green on both, as expected); verify recorded with evidence sha256 `e6a2c500…`. E3 live (dashboard "Claimed, no evidence" panel) pending — needs `make platform-ops` on the M5
 **Priority:** P1
+**Fix commit:** `6fe94bda`
+**Live evidence:** 2026-11-07 · run claude-hub-prometheus-read · env hub · scenario dispatch-claimed-vs-delivered · commit 11982d31 · proves E3
 **Severity:** high — the release gate trusts a `verified` column that nothing backs; the operator cannot tell a verified fix from one Claude said was verified. Second occurrence (operator, 2026-11-01: "this is the second time that this happened")
 **Approval:** operator, 2026-11-01 ("we need to fix this problem otherwise, I have no idea if they have been verified or just you said so"); dispatch go: operator, 2026-11-01 ("go ahead to dispatch P1 bug to Luna")
 **Filed:** 2026-11-01
@@ -107,3 +109,14 @@ interface:
   - ledger.jsonl and <version>/<slug>.run/ under K3DM_WORKTREE_ROOT
   - bin/k3dm-dispatch-metrics output (k3dm_dispatch_delivered, k3dm_dispatch_verification_claimed)
 ```
+
+## Live verification E3 (Claude, hub on the M5, 2026-11-07)
+
+- `make appsets-check` on the M5: all Applications read `k3d-manager-v1.43.14`. The hub ConfigMap
+  `monitoring/grafana-dashboard-agent-dispatch` (ArgoCD `hub-grafana-dashboards`) holds the "Claimed, no evidence" panel.
+- Hub Prometheus, read with `kubectl exec … wget localhost:9090/api/v1/query`, about 5 minutes after a push from
+  `bin/k3dm-codex-dispatch verify` at `11982d31` (it contains `6fe94bda`):
+  - `k3dm_dispatch_verification_claimed`: v1.43.12 = 8, v1.43.13 = 11 (legacy bare passes), v1.43.14 = 0.
+  - `k3dm_dispatch_delivered`: v1.43.13 = 0, v1.43.14 = 36 (every v1.43.14 pass carries evidence).
+- Legacy passes show under "Claimed, no evidence", and newly verified fixes count as delivered: E3 holds.
+  The operator screenshot named in E3 was replaced by this read of the same series; CLAUDE.md allows Claude to run live evidence.

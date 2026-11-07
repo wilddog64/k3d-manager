@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: P1 1/9 dispatch-verify-records-pass-with-no-evidence LIVE-VERIFIED (Claude, hub Prometheus: v1.43.13 claimed 11, v1.43.14 delivered 36). M5 checkout is 54 behind origin: host-side P1 checks need operator git pull + make platform-ops on the M5.
 - 2026-11-07: forecast drift P3 LANDED 11982d31 and VERIFIED (verifier 17/17, 13 red pre-fix); live E2 after platform-ops. P1 live-check pass started (operator: one at a time, then cut).
 - 2026-11-07: dispatch-stall plan Status reworded to lead with VERIFIED (Plans panel read "S1" as unknown). Its "no record" dispatch is an exporter gap: S1 was dispatched as p0-s1-dispatcher/p0-s1-metrics from docs/issues briefs, and k3dm_dispatch_plan_state maps plans only by start spec stem.
 - 2026-11-07: ladder table live-verified (operator). Hub specs got dispatch go; reordered: hub-deploy-ref → v1.43.15 p5, claude-cost-task-attribution → v1.43.16 p5, dev-hub-vcluster → v1.43.16 p4, argocd-ha → v1.43.17 p1.
