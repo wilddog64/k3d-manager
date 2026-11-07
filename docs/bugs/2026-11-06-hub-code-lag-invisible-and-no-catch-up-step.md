@@ -116,6 +116,7 @@ Claude, not the worker, updates `CLAUDE.md` afterwards.
 - `scripts/tests/plugins/grafana_dashboard_bugs.bats`
 - `docs/howto/hub-sync.md`
 - `CHANGELOG.md`
+- `scripts/tests/bin/test_dashboard_queries.py`
 
 ## Tests
 
@@ -137,6 +138,14 @@ If an existing test pins a Release-row `gridPos` or width, stop and report it. D
 - Do NOT run anything against the real hub, or call the real `launchctl`.
 - Do NOT commit, push or create a PR. Claude reviews and commits.
 - Do NOT modify files outside the Files list.
+
+## Review findings
+
+Claude reran the suites outside the worker's sandbox, and an independent verifier tested the Acceptance block. Three corrections followed:
+
+- **Make target:** `hub-sync: export BRANCH := $(BRANCH)` broke the `recover B4-21` and `B4-22` tests and supplied a default branch. The line was deleted.
+- **Dashboard fixture:** the new tile had no series in `test_every_bug_dashboard_target_matches_producer_series`. The series now come from the real `_push_checkout_lag`, which is why that test file joined the Files list.
+- **Stale count:** with a newer release branch on origin, only that branch was fetched, so a checkout 2 code commits behind published 0. Hermes now also fetches the checkout's own branch on those cycles, and publishes no count for the cycle if that fetch fails.
 
 ## Acceptance
 
