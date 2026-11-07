@@ -72,6 +72,14 @@
 
 - 2026-11-01 Codex dispatch review PARTIAL: role guard landed/pushed `bd3002db`, focused BATS 157/157 and landing/pre-push fast gates passed; pre-fix and live checks pending. Resume task focused BATS 94/94, metrics pytest 169 and dashboard BATS 38/38 passed, but fast gate exposed a hub-data shared TMPDIR collision; isolated fix `8614ebb4` remains on task branch pending scope approval. Agent instruction refresh remains unlanded: broad tests and agy loading unverified. See docs/issues/2026-11-01-dispatch-review-pending-verification.md.
 
+## 2026-11-06 evening landings
+
+- [x] Landed: S1 dispatcher `58a15947`, S1 metrics `04a6e7d2`, Run sort `49765821`, Status guard `f832a140`, CVE timeout `6da25436`.
+- [x] S1 E6 and E7 pass.
+- [ ] Independent verifiers (S1, Run sort, Status guard, CVE timeout) running.
+- [ ] Hub catch-up with Luna.
+- [ ] Live checks after all fixes, one at a time.
+
 ## 2026-11-06 late verification and S1 revision
 
 - [x] `bug-open-history-from-git` LIVE-VERIFIED: E4 30/30 dates.

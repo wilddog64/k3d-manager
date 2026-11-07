@@ -2,6 +2,8 @@
 
 ## Handoff — 2026-11-06 bug batch dispatched in waves; start here
 
+- **Landed and pushed, 2026-11-06 evening:** S1 dispatcher `58a15947`, S1 metrics `04a6e7d2`, Run sort `49765821`, Status guard `f832a140`, CVE timeout `6da25436`. S1 E6 PASS (39 isolated ledgers, 0 mismatches; stalled 5, live-pending 2, 16 ladder counts equal the gate-status sums). S1 E7 PASS (CA-trust 24 runs, 23 interventions, streak 13; ledger hash unchanged). Independent verifiers running for all four, from Acceptance only; nothing recorded until each returns and Claude reruns its tests. Claude made one direct fix in the S1 dispatcher (exit events no longer add to `runs`, with a test shown red on revert), instead of a third Luna resume. `land` compares only the release branch with origin, not the task branch, so push the release branch between lands. Hub catch-up dispatched to Luna. Next: gate-coverage-start and S1 parent link on the real ledger, live checks one at a time.
+
 - **Workers exited, 2026-11-06:** S1 dispatcher, S1 metrics, Run sort all exit 0, unreviewed. Land dispatcher, metrics, then Run sort (rebase it), then S1 E6 and E9. Dispatch CVE timeout and Status guard to Luna now; hub catch-up (`2026-11-06-hub-code-lag-invisible-and-no-catch-up-step`) only after S1 lands. Payment newest image scanned clean: read tonight's 09:00Z app-cve-scan run; do not promote by hand. Hermes reads docs from origin; the M5 checkout lags only for code.
 - **Operator go, 2026-11-06:** dispatch the filed bugs in a batch by dependency and priority; investigate the 401s; S1 review by Codex at Claude's call. Live checks come after all fixes land, one at a time.
 - **Tunnel E4: PASS** (recorded in the bug doc). Forward-only key, empty agent, push reached the M5.

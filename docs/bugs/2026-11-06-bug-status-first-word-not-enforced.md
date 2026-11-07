@@ -2,8 +2,8 @@
 
 **Filed:** 2026-11-06
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
-**Waiting on:** fix running — since 2026-11-06
+**Status:** LANDED `f832a140`; independent verifier running, live check pending
+**Waiting on:** live check — since 2026-11-06
 **Priority:** P3 — hygiene; the row is wrong until someone notices, and no service is affected
 **Approval:** explicit 2026-11-06 "file as P3 and dispatch when allow" (operator, after four landed bugs showed as Open).
 **Severity:** low
