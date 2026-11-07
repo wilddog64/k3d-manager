@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: hermes-e2e-null-counts landed d619fcbd, verified pass. Memory bank compressed 7353f147.
 - 2026-11-07: verified disk-metrics-scutil (pass). Grafana error-page stack: no supported setting in 11.4 (findings 0afa2504, pending land, operator decision). CVE empty-tables spec cited (5d8f4d8e), redispatched v2.
 - 2026-11-07: disk fix landed d70047d5; filed cve-autopatch-empty-tables and grafana-error-page-stack-trace (P3); tier spec corrected; 4 dispatches.
 - 2026-11-07: matcher fix landed 73120c90; filed disk-metrics-scutil, hermes-e2e-null-counts, e2e-results-never-reach-m5-hub, security-findings-tier-column; watchdog Job deleted.

@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — d619fcbd (Luna; reviewed by Claude); independent verifier pending
+**Status:** VERIFIED 2026-11-07 — d619fcbd (Luna; reviewed by Claude); independent verifier PASS (fix 8 passed, pre-fix 5 red); live E2 pending
 **Fix commit:** d619fcbd
 **Priority:** P2 — every e2e run that fails before tests start is silent: no Slack post, no slot record, and the slot is rerun
 **Waiting on:** live check — since 2026-11-07
