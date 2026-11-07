@@ -37,6 +37,7 @@
 - Make the Verification ladder table sortable, prevent clipped rows, and explain unknown status.
 
 - Add `.github/dependabot.yml` for weekly GitHub Actions updates in workflows and composite actions; the lib-foundation subtree's npm dependencies are updated upstream.
+- Pull lib-foundation through PR #77: `brace-expansion` 1.1.21 in the ACG lockfile clears three high DoS advisories.
 
 ## [1.43.14] - Unreleased
 
