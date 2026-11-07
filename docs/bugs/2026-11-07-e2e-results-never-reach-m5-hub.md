@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.14`)
-**Status:** OPEN — F1 fix specced 2026-11-07 (machine-setup ROLE=hub installs the publish-back target) and dispatched; F2 waits on one e2e run from the M5
+**Status:** OPEN — F2 fixed live 2026-11-07 (`read:packages` scope; run 1794086864-5662 passed 91/0); F1 fix specced and dispatched (machine-setup ROLE=hub installs the publish-back target)
 **Priority:** P2 — the hub has had no e2e signal since the 2026-10-31 cutover; the verification dashboards are empty and `E2EResultsMissing` has fired for the full 3-day window
 **Waiting on:** fix running — since 2026-11-07
 **Approval:** operator 2026-11-07: "please spec (a) dispatch to Luna" (F1 option a: `make machine-setup ROLE=hub` installs the conf file and forced-command entry)
@@ -31,6 +31,7 @@ Since the summary has null counts, Hermes then crashes (separate bug, linked abo
   - line 14: `error: context "k3d-k3d-cluster" does not exist`, in the Vault fallback. This is the secondary issue, still open.
   - line 30: `cliang@m5-air.local: Permission denied (publickey,...)`, then the result was kept as pending. This run's publish-back target is already the M5, and only the forced-command entry is missing, which the F1 fix installs. The M5 has no `e2e-remote.env`, so where the M5 target came from is not established.
   - Next: `gh auth refresh -h github.com -s read:packages,workflow` on the M5, then one more run.
+- 2026-11-07 21:27Z: after `gh auth refresh -h github.com -s read:packages,workflow`, the M5's scopes include `read:packages` and `workflow`. Hermes (`bin/k3dm-hermes e2e 2026-11-07`) dispatched run `1794086864-5662` from the M5. Transcript line 12: `using validated GHCR_PAT from env for ghcr-pull-secret`. Summary: `phase recording-result, result pass, passed 91, failed 0, total 102`. **E2 / M2 met (live, Claude): F2 is fixed by the scope; the Vault-fallback kubeconfig issue was not reached.** Publish-back was still refused, and the result is kept as `1794086864-5662.publication_pending.json`. The M2 now holds 79 `publication_pending` files. The hub has no e2e-result ConfigMaps. Waiting on F1 (Luna). The operator's manual run at 21:29Z was refused `status=busy` because Hermes held the runner lock. Interactive dispatches get `E2E_M2_PUBLISH_BACK_HOST=cliang@m5-air.local` from `.envrc` line 8; launchd and Hermes runs need `e2e-remote.env`.
 
 ## Decision (operator, 2026-11-07: option a for F1)
 
