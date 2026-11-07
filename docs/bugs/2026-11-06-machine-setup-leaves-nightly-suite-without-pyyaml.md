@@ -1,6 +1,6 @@
 # Bug: machine-setup leaves the nightly test agent without PyYAML
 
-**Status:** LANDED `785f25a4`, independent verify running. Claude tightened Luna's M3 test (it did not prove the venv came first on PATH) and removed a test-only template override. `scripts/tests/bin/machine_setup_acceptance.bats` landed outside `## Files` by allowed exception: its complete-machine fixture needed a complete venv; no assertion changed. A real install of the three pins on Python 3.15.2 passed on the M4; the M5 venv has pytest and ruff and lacks yaml. Live E2 open.
+**Status:** LANDED `785f25a4`, VERIFY PASS (independent tests from Acceptance only, rerun by Claude: 5 of 5 on the landed tree; M1, M2, M3 red pre-fix; N1 and N2 red by mutants). Claude tightened Luna's M3 test (it did not prove the venv came first on PATH) and removed a test-only template override. `scripts/tests/bin/machine_setup_acceptance.bats` landed outside `## Files` by allowed exception: its complete-machine fixture needed a complete venv; no assertion changed. A real install of the three pins on Python 3.15.2 passed on the M4; the M5 venv has pytest and ruff and lacks yaml. Live E2 open.
 **Priority:** P2
 **Severity:** medium. The nightly offline suite on the M5 has been red since the cutover, so `OfflineSuiteFailing`, `OfflineSuiteRunIncomplete` and `OfflineSuiteStale` fire on real and environmental failures alike. The suite cannot warn about a real regression.
 **Approval:** operator, 2026-11-06: "go ahead for those two".

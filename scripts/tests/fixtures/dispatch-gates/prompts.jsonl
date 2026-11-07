@@ -1,0 +1,51 @@
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-before-marker", "ts": 1790544000, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-crosses-marker", "ts": 1790544000, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "intervention_coverage_start", "repo": "k3d-manager", "slug": "marker-row", "ts": 1790976000, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-outside-windows", "ts": 1791148800, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "start", "model": "gemma-x", "repo": "k3d-manager", "slug": "prompt-fallback", "ts": 1792272000, "version": "v9.9.9", "worker_identity": {"model": "unknown"}}
+{"event": "intervention", "reason": "other", "repo": "k3d-manager", "slug": "prompt-fallback", "ts": 1792272010, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-keep", "ts": 1793308800, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "resume", "reason": "other_x", "repo": "k3d-manager", "slug": "prompt-keep", "ts": 1793308805, "version": "v9.9.9", "worker_identity": {"model": ""}}
+{"cause": "because", "event": "intervention", "reason": "continue_prompt", "repo": "k3d-manager", "sent_by": "robot", "slug": "prompt-keep", "ts": 1793308810, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-nomodel", "ts": 1793740800, "version": "v9.9.9"}
+{"cause": "environment", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-nomodel", "ts": 1793740810, "version": "v9.9.9"}
+{"event": "resume", "reason": "correction", "repo": "k3d-manager", "slug": "prompt-nomodel", "ts": 1793740811, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-spec", "ts": 1793827200, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-spec", "ts": 1793827210, "version": "v9.9.9"}
+{"event": "resume", "reason": "correction", "repo": "k3d-manager", "slug": "prompt-spec", "ts": 1793827211, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-switch", "ts": 1793978400, "version": "v9.9.9", "worker_identity": {"model": "gpt-alpha"}}
+{"cause": "worker", "event": "intervention", "reason": "continue_prompt", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-switch", "ts": 1793978410, "version": "v9.9.9"}
+{"event": "resume", "reason": "continue_prompt", "repo": "k3d-manager", "slug": "prompt-switch", "ts": 1793978411, "version": "v9.9.9", "worker_identity": {"model": "gpt-beta"}}
+{"cause": "unknown", "event": "intervention", "reason": "clarification", "repo": "k3d-manager", "sent_by": "operator", "slug": "prompt-switch", "ts": 1793978420, "version": "v9.9.9"}
+{"event": "resume", "reason": "clarification", "repo": "k3d-manager", "slug": "prompt-switch", "ts": 1793978421, "version": "v9.9.9", "worker_identity": {"model": "gpt-beta"}}
+{"event": "start", "repo": "k3d-manager", "slug": "prompt-weird", "ts": 1793978500, "version": "v9.9.9", "worker_identity": {"model": "zeta-1"}}
+{"cause": "spec", "event": "intervention", "reason": "weird", "repo": "k3d-manager", "sent_by": "operator", "slug": "prompt-weird", "ts": 1793978510, "version": "v9.9.9"}
+{"event": "start", "model": "Bad Model!", "repo": "k3d-manager", "slug": "prompt-badlabel", "ts": 1793982000, "version": "v9.9.9"}
+{"cause": "worker", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "prompt-badlabel", "ts": 1793982010, "version": "v9.9.9"}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-orphan", "ts": 1793985600, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-0", "ts": 1793989200, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "eps-0", "ts": 1793989205, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-1", "ts": 1793989220, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "eps-1", "ts": 1793989225, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-2", "ts": 1793989240, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "eps-2", "ts": 1793989245, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-3", "ts": 1793989260, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "eps-3", "ts": 1793989265, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-4", "ts": 1793989280, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"cause": "spec", "event": "intervention", "reason": "correction", "repo": "k3d-manager", "sent_by": "operator", "slug": "eps-4", "ts": 1793989285, "version": "v9.9.9"}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-5", "ts": 1793989300, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-6", "ts": 1793989320, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-7", "ts": 1793989340, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-8", "ts": 1793989360, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "eps-9", "ts": 1793989380, "version": "v9.9.9", "worker_identity": {"model": "eps-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-0", "ts": 1793992800, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-1", "ts": 1793992820, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-2", "ts": 1793992840, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-3", "ts": 1793992860, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-4", "ts": 1793992880, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-5", "ts": 1793992900, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-6", "ts": 1793992920, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-7", "ts": 1793992940, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-8", "ts": 1793992960, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"event": "start", "repo": "k3d-manager", "slug": "delta-9", "ts": 1793992980, "version": "v9.9.9", "worker_identity": {"model": "delta-many"}}
+{"cause": "spec", "event": "intervention", "reason": "other", "repo": "k3d-manager", "sent_by": "coordinator", "slug": "prompt-crosses-marker", "ts": 1793996400, "version": "v9.9.9"}

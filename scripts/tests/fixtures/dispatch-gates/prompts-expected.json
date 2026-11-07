@@ -1,0 +1,244 @@
+{
+  "note": "Hand-derived from the rules in docs/plans/v1.43.14-dispatch-stall-detection-and-escalation-gates.md, by case, not by running worker code.",
+  "now": 1794000000,
+  "windows": {
+    "1d": {
+      "by_reason": {
+        "clarification": 1,
+        "continue_prompt": 1,
+        "correction": 7,
+        "other": 1
+      },
+      "per_task": {
+        "delta-many": 0,
+        "eps-many": 0.5
+      },
+      "prompts": [
+        {
+          "cause": "worker",
+          "model": "gpt-alpha",
+          "reason": "continue_prompt",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-alpha",
+          "reason": "other",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "unknown",
+          "model": "gpt-beta",
+          "reason": "clarification",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "worker",
+          "model": "other",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "eps-many",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 5
+        },
+        {
+          "cause": "spec",
+          "model": "unknown",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        }
+      ],
+      "tasks": {
+        "delta-many": 10,
+        "eps-many": 10,
+        "gpt-alpha": 2,
+        "gpt-beta": 1,
+        "other": 1,
+        "unknown": 1,
+        "zeta-1": 1
+      }
+    },
+    "30d": {
+      "by_reason": {
+        "clarification": 1,
+        "continue_prompt": 2,
+        "correction": 9,
+        "other": 2
+      },
+      "per_task": {
+        "delta-many": 0,
+        "eps-many": 0.5
+      },
+      "prompts": [
+        {
+          "cause": "worker",
+          "model": "gpt-alpha",
+          "reason": "continue_prompt",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-alpha",
+          "reason": "other",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "unknown",
+          "model": "gpt-beta",
+          "reason": "clarification",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "worker",
+          "model": "other",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "eps-many",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 5
+        },
+        {
+          "cause": "spec",
+          "model": "unknown",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-alpha",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "environment",
+          "model": "unknown",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "unrecorded",
+          "model": "gemma-x",
+          "reason": "other",
+          "sent_by": "unrecorded",
+          "value": 1
+        },
+        {
+          "cause": "unrecorded",
+          "model": "gpt-alpha",
+          "reason": "continue_prompt",
+          "sent_by": "unrecorded",
+          "value": 1
+        }
+      ],
+      "tasks": {
+        "delta-many": 10,
+        "eps-many": 10,
+        "gemma-x": 1,
+        "gpt-alpha": 4,
+        "gpt-beta": 1,
+        "other": 1,
+        "unknown": 2,
+        "zeta-1": 1
+      }
+    },
+    "7d": {
+      "by_reason": {
+        "clarification": 1,
+        "continue_prompt": 1,
+        "correction": 9,
+        "other": 1
+      },
+      "per_task": {
+        "delta-many": 0,
+        "eps-many": 0.5
+      },
+      "prompts": [
+        {
+          "cause": "worker",
+          "model": "gpt-alpha",
+          "reason": "continue_prompt",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-alpha",
+          "reason": "other",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "unknown",
+          "model": "gpt-beta",
+          "reason": "clarification",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "worker",
+          "model": "other",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "eps-many",
+          "reason": "correction",
+          "sent_by": "operator",
+          "value": 5
+        },
+        {
+          "cause": "spec",
+          "model": "unknown",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "spec",
+          "model": "gpt-alpha",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        },
+        {
+          "cause": "environment",
+          "model": "unknown",
+          "reason": "correction",
+          "sent_by": "coordinator",
+          "value": 1
+        }
+      ],
+      "tasks": {
+        "delta-many": 10,
+        "eps-many": 10,
+        "gpt-alpha": 3,
+        "gpt-beta": 1,
+        "other": 1,
+        "unknown": 2,
+        "zeta-1": 1
+      }
+    }
+  }
+}
