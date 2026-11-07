@@ -88,6 +88,13 @@ new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directl
 **Supply Chain Integrity (OWASP A08)**
 - GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
 - New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
+- **Pins get reviewed, not only set (operator, 2026-11-07).** A pinned chart or image never moves by itself: the
+  observability stack sat at kube-prometheus-stack `67.9.0` (Grafana 11.4.0) for nearly two years. Severity sets the
+  response. A critical or high CVE in a pinned image calls for a patch release. An upstream bug that hurts us and has a
+  cheap workaround gets the workaround, with `**Fixed upstream in:** <component> <version>` in its bug doc. An upstream
+  bug with no workaround, or several fixed-upstream bugs piling up, calls for an upgrade release. Absent any of those,
+  review the pinned stack versions once a quarter and plan an upgrade when one is more than about two minor versions
+  behind.
 
 **Existing protections — do not remove or weaken:**
 - `_run_command` handles sudo probing and escalation safely.
