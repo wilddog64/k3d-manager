@@ -4,7 +4,7 @@
 **Fix commit:** 1708c97a
 **Live evidence:** 2026-10-31 · run k3dm-disk-metrics-m5-1420z · env m5-air · scenario host-disk-probe-m5-m4-m2-hostinger · commit 4f409ba6 · proves E3
 **Priority:** P2
-**Waiting on:** investigation — since 2026-11-04
+**Waiting on:** fix running — since 2026-11-07
 **Approval:** operator, 2026-10-30 ("this does not seems to look right? m4 never has 821G ... why m2 is down? also we should include m5")
 **Filed:** 2026-10-30
 **Detected by:** the operator (Host Disk dashboard on the M5 hub); root-caused by Claude
@@ -145,3 +145,5 @@ No cluster changes or recovery actions were performed. This evidence is on branc
 ## Recurrence note 2026-11-06: metrics frozen since Oct 31
 
 `HostDiskMetricsStale` has fired since 2026-10-31T15:14Z. On the M5 Pushgateway, `push_time_seconds{job="k3dm-disk"}` is 2026-10-31T14:13:42Z, about six days old, while the `m5`, `m4`, `m2` and `hostinger` `k3dm_disk_probe_success` series still read 1. Those 1s are frozen values, not live probes, so the Oct 31 live verification is the last known good and cannot speak for today. Hermes runs `bin/k3dm-disk-metrics` with `check=False` and captured output (`_publish_disk_metrics`), so a failure leaves no trace in its log. Cause not established.
+
+**Cause found 2026-11-07 (Claude):** `bin/k3dm-disk-metrics` runs bare `scutil`, which this doc's fix added; Hermes's launchd PATH has no `/usr/sbin`, so the script dies with `FileNotFoundError` and Hermes discards the traceback. Fix and acceptance: `docs/bugs/2026-11-07-disk-metrics-crash-under-launchd-scutil-not-on-path.md`.

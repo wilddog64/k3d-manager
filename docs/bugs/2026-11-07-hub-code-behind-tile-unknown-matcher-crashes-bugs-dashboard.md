@@ -2,9 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** LANDED 2026-11-07 — `73120c90` (Luna); independent verifier pending
+**Fix commit:** 73120c90
 **Priority:** P1 — the whole Bugs dashboard fails to render; there is no workaround in the UI
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** explicit 2026-11-07 "go ahead." (operator, dispatch go)
 **Severity:** high
 
