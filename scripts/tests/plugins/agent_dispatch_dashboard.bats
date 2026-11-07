@@ -397,13 +397,30 @@ fpo=panels[48]["options"]
 assert panels[48]["type"]=="bargauge" and fpo.get("orientation")=="horizontal" and fpo.get("namePlacement")=="left",fpo
 assert fpo.get("text")=={"titleSize":14,"valueSize":24},fpo
 for target in table["targets"]:
-  assert target["expr"].startswith("sum by (version, slug, run, ") and "label_join(" not in target["expr"] and "plans/" not in target["expr"] and "bugs/" not in target["expr"]
+  assert target["expr"].startswith("sum by (version, slug, run, ") and '"doc"' not in target["expr"] and "plans/" not in target["expr"] and "bugs/" not in target["expr"]
+  assert target["expr"].count("label_join(") == 1 and ', "vsort", "|", "vsort", "slug", "rpad"))' in target["expr"]
+  sum_by = target["expr"].split(") (", 1)[0]
+  assert "rpad" not in sum_by and "vsort" in sum_by
+assert table["targets"][0]["expr"].startswith("sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, spec_url, vsort) (")
+assert table["targets"][1]["expr"].startswith("sum by (version, slug, run, vsort) (")
 assert "spec_url" in table["targets"][0]["expr"]
 ids=[t["id"] for t in table.get("transformations",[])]
 assert ids[:3]==["merge","sortBy","organize"],ids
+assert any(t["id"]=="convertFieldType" and any(c.get("targetField")=="run" and c.get("destinationType")=="number" for c in t.get("options",{}).get("conversions",[])) for t in table.get("transformations",[])[3:])
 assert table["transformations"][1]["options"]["sort"]==[{"field":"vsort","desc":True}] and "sortBy" not in table["options"]
 for target in table["targets"]:
   assert target["expr"].split(") (",1)[0].endswith(", vsort") and '"v$1.0$2.$3"' in target["expr"] and '"$1.0$2"' in target["expr"]
+def pad_run(run_str, expr):
+  pats = re.findall(r'"rpad",\s*"([^"]+)",\s*"run",\s*"([^"]+)"', expr)
+  assert len(pats) == 3, pats
+  val = run_str
+  for repl, pat in pats:
+    m = re.fullmatch(pat, run_str)
+    if m:
+      val = repl.replace("$1", m.group(1))
+  return val
+assert pad_run("9", table["targets"][0]["expr"]) < pad_run("10", table["targets"][0]["expr"]) < pad_run("100", table["targets"][0]["expr"])
+assert pad_run("1", table["targets"][0]["expr"]) < pad_run("2", table["targets"][0]["expr"]) < pad_run("3", table["targets"][0]["expr"])
 org=table["transformations"][2]["options"]
 for hidden in ("Time","__name__","job","window","Value #A","vsort"):
   assert org["excludeByName"].get(hidden) is True,hidden

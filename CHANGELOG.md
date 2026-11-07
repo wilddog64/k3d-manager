@@ -14,6 +14,8 @@
 
 - Explain open bug dependencies in the Bug Tracking table with a safe Waiting on column, export the waiting-since date, and clarify that open priority counts can include fixes awaiting a live check.
 
+- Sort the Agent Dispatch Per run evidence table by version, slug and run newest first, and convert the run field to number so header clicks sort numerically.
+
 ## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.
