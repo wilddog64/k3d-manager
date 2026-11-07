@@ -13,6 +13,7 @@
 - Collect agy session and token activity from local Antigravity transcripts when available, identify the reporting host and source, and warn in machine-check when the optional wrapper is absent.
 
 - Explain open bug dependencies in the Bug Tracking table with a safe Waiting on column, export the waiting-since date, and clarify that open priority counts can include fixes awaiting a live check.
+- Reject bug Status edits that the dashboard would silently misread as open, and document the recognized first words.
 
 ## [1.43.14] - Unreleased
 
