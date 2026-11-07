@@ -1,6 +1,6 @@
 # Bug: hub cut-over only boots out the old hub's agents, so a reboot restarts them and takes the public routes down
 
-**Status:** LANDED 2026-11-06 (`76f34498`), independent verify PASS (offline E1, E2, E4, E5). Live E3 still open. The M4 singletons were disabled by hand before this fix, so a rollback to the M4 still needs the undo steps below.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED 2026-11-06 (`76f34498`), independent verify PASS (offline E1, E2, E4, E5). Live E3 still open. The M4 singletons were disabled by hand before this fix, so a rollback to the M4 still needs the undo steps below.
 **Priority:** P1
 **Approval:** M4 disable: operator 2026-11-06 ("go ahead to disable 14 old hub singletons"). Fix: operator 2026-11-06 ("might start after /clear so make sure you make a good handoff"). Dispatch: operator 2026-11-06 ("go ahead to dispath P1 pub-cutover to Luna now").
 **Filed:** 2026-11-06

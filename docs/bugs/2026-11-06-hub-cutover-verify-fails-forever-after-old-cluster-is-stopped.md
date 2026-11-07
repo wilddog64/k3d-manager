@@ -1,6 +1,6 @@
 # Bug: `make hub-cutover-forwards` can never pass once the old hub's cluster is stopped
 
-**Status:** LANDED `03f40c0a`, VERIFIED: offline verification recorded 2026-11-06 (independent 20/20; 7 red pre-fix) and live E2 passed on the M5 2026-11-06.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED `03f40c0a`, VERIFIED: offline verification recorded 2026-11-06 (independent 20/20; 7 red pre-fix) and live E2 passed on the M5 2026-11-06.
 **Priority:** P2
 **Severity:** medium. The tunnel fix `8e5f8831` cannot be rolled out, so the M4's dispatch and test metrics and shipped logs stay off the M5. Worse, after three minutes the failure tells the operator to run `make hub-cutover-rollback` against a healthy hub.
 **Approval:** Filing: Claude, 2026-11-06, told the operator when reporting the failed rollout. Dispatch: operator, 2026-11-06 ("please dispatch P2 and P3 to Luna").

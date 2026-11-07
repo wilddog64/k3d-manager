@@ -1,6 +1,6 @@
 # Bug: payment's runtime base moved to eclipse-temurin:24-jre-alpine, a frozen non-LTS tag on alpine 3.22.1, so each new build has more CRITICAL CVEs than the deployed one
 
-**Status:** FIXED, verified offline and by scan. Fix merged to `main` as `c08870a0` (PR wilddog64/shopping-cart-payment#100). E1, E2 and E3 pass; independent verify PASS 2026-11-06. The image reaches the cluster through the CVE loop, once the tag-pagination fix is deployed by `make platform-ops`.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: FIXED, verified offline and by scan. Fix merged to `main` as `c08870a0` (PR wilddog64/shopping-cart-payment#100). E1, E2 and E3 pass; independent verify PASS 2026-11-06. The image reaches the cluster through the CVE loop, once the tag-pagination fix is deployed by `make platform-ops`.
 **Priority:** P2
 **Severity:** medium. If the newest payment image were promoted, it would replace one CRITICAL OS finding with five. Today the CVE loop cannot promote it (see the tag-pagination bug), so nothing bad has shipped yet. Once that bug is fixed, the loop would promote this image.
 **Filed:** 2026-11-05

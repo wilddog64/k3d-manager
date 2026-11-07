@@ -1,6 +1,6 @@
 # Bug: observability LaunchAgent installs race launchd bootout/bootstrap and embed ephemeral direnv python3 paths
 
-**Status:** Fixed & Verified (`fadbfb80`; live-verified on `m5-air.local` via Slack job `0d15432a` on `2026-11-03`)
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: Fixed & Verified (`fadbfb80`; live-verified on `m5-air.local` via Slack job `0d15432a` on `2026-11-03`)
 **Priority:** P1
 **Severity:** high — `make up` aborts at Step 14/14 (`exit 5`) or leaves `com.k3d-manager.alertmanager-port-forward` unloaded (`HTTP 502` on Alertmanager login) when reloading a running LaunchAgent; running from a `direnv` shell writes a `.cache/direnv/layouts/...` Python path into LaunchAgent plists
 **Filed:** 2026-11-03

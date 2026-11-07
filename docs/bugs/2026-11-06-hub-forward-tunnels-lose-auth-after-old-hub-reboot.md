@@ -1,6 +1,6 @@
 # Bug: the M4's hub tunnels authenticate through an agent that a reboot empties, so its dispatch metrics and logs stop reaching the hub
 
-**Status:** LANDED `8e5f8831`, offline verification recorded 2026-11-06 (independent suite 25/25; 20 red on pre-fix; 13 mutants red). Live E3 and E4 PASSED; E4 2026-11-06 (see below). The P1 hub-cutover fix it followed landed as `76f34498`.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED `8e5f8831`, offline verification recorded 2026-11-06 (independent suite 25/25; 20 red on pre-fix; 13 mutants red). Live E3 and E4 PASSED; E4 2026-11-06 (see below). The P1 hub-cutover fix it followed landed as `76f34498`.
 **Priority:** P2
 **Severity:** medium. M4 dispatch and test metrics and shipped logs do not reach the M5 until someone loads the key by hand. The dispatch ledger is durable, so the numbers can be pushed again later; nothing is lost from the ledger.
 **Approval:** operator, 2026-11-06: "go with your recommendation" (option 1, dedicated forward-only key). Dispatch: operator, 2026-11-06 ("yes you can dispatch tunnel fix to Luna now").

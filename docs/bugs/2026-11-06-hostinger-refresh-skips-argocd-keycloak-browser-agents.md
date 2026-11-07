@@ -1,6 +1,6 @@
 # Bug: the Hostinger refresh never writes the argocd and keycloak browser agents, so `make install-browser-relays` would leave the hub's browser URLs with no backend
 
-**Status:** LANDED 2026-11-06 (`632ac235`), independent verify PASS (offline E1, E2, E3, E5, E6). Live E4 on the M5 still open, with Part B E5. Not reproduced live; found by reading the code before the M5 pass.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED 2026-11-06 (`632ac235`), independent verify PASS (offline E1, E2, E3, E5, E6). Live E4 on the M5 still open, with Part B E5. Not reproduced live; found by reading the code before the M5 pass.
 **Priority:** P1
 **Severity:** high on the M5 only when its Part B pass runs. `make install-browser-relays` removes the root daemons, and nothing then listens on 18443 or 18080. Today nothing is broken, because the M5 still runs the legacy daemons.
 **Approval:** operator, 2026-11-05: "dispatch Part B gap".

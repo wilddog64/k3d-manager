@@ -1,6 +1,6 @@
 # Bug: no standalone make trust-vault-ca / webhook cluster-up --trust-vault-ca path and headless LaunchDaemon sudo probes fail when timestamp cache expires
 
-**Status:** Fixed & Verified (`ecae8a73`; live-verified on `m5-air.local` via `./bin/install-sudoers.sh` and Slack job `0d15432a` on `2026-11-03`)
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: Fixed & Verified (`ecae8a73`; live-verified on `m5-air.local` via `./bin/install-sudoers.sh` and Slack job `0d15432a` on `2026-11-03`)
 **Priority:** P2
 **Severity:** medium — after Option A (`0b11c1f9`) skips System Keychain trust in headless/SSH `acg-up` runs, operators have no `make trust-vault-ca` (`bin/cluster-up --trust-vault-ca`) or corresponding webhook endpoint support to export and trust the Hub Vault PKI root CA once from the Mac console, and headless `cluster-up`/`cluster-down` runs after the 60-minute sudo timestamp expires fail `sudo -n true` (`a password is required ; COMMAND=/usr/bin/true`) even when `/etc/sudoers.d/k3d-manager` is installed
 **Filed:** 2026-11-03

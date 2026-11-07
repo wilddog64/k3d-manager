@@ -1,6 +1,6 @@
 # Bug: hub-cutover verify passes when Hermes and the webhook check could not look
 
-**Status:** FIXED offline `ded4eb58`, independent verify PASS 2026-11-06; live E2 pending. Observed 2026-11-06 on the M5, in the operator's `make hub-cutover-forwards` run
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: FIXED offline `ded4eb58`, independent verify PASS 2026-11-06; live E2 pending. Observed 2026-11-06 on the M5, in the operator's `make hub-cutover-forwards` run
 **Priority:** P2
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Branch:** `k3d-manager-v1.43.14`

@@ -1,6 +1,6 @@
 # Bug: hub cutover leaves the Hermes ArgoCD token dead, and nothing reports it
 
-**Status:** LANDED `5b436578`, independent verify PASS 2026-11-06 (6 of 6 on the fix, M1 and M3 red on the parent, 5 mutants red). Live E2 open. Landed with `--allow-out-of-scope` for `scripts/tests/bin/makefile_argocd_hermes_token.bats`, which pins the changed recipe and was missing from `## Files`. The listed howto needed no change: its Aftermath re-mint step still holds.
+**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED `5b436578`, independent verify PASS 2026-11-06 (6 of 6 on the fix, M1 and M3 red on the parent, 5 mutants red). Live E2 open. Landed with `--allow-out-of-scope` for `scripts/tests/bin/makefile_argocd_hermes_token.bats`, which pins the changed recipe and was missing from `## Files`. The listed howto needed no change: its Aftermath re-mint step still holds.
 **Priority:** P2
 **Approval:** operator, 2026-11-06: "dispatch them in a batch base on dependencies or priority"
 **Depends on:** `2026-11-06-hub-cutover-verify-accepts-hermes-unknown` (same function in `bin/hub-cutover`; land it first)
