@@ -1074,7 +1074,7 @@ data:
             "w": 24,
             "h": 12
           },
-          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Live evidence reports whether the recorded proof commit contains the fix: current, stale proof, missing, unchecked, n/a, or —. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the **Fix commit:** header when the doc has one, otherwise the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified.",
+          "description": "Every bug doc from the same scan. Open and unknown statuses map to Open, IMPLEMENTED and other closed statuses map to Fixed, and DEFERRED maps to Deferred. Hide live-verified is the default; n/a means the doc was filed before v1.43.2. Click a name to open the doc on the scanned branch. Live evidence reports whether the recorded proof commit contains the fix: current, stale proof, missing, unchecked, n/a, or —. Verified at and Live-verified at show when it happened (UTC): the date in the Status line, otherwise the commit that set it. Fix commit is the **Fix commit:** header when the doc has one, otherwise the commit that marked it fixed (the one Fixed in comes from); Verified commit is the one that first marked it verified. Waiting on says what an open bug needs next; filter that column to separate live checks and scheduled runs from work nobody has picked up. `not stated` means the doc has no Waiting on line. The Open P0 to P3 tiles count every open doc, including fixes that landed and are waiting for a live check, so read this column before treating a count as an incident.",
           "targets": [
             {
               "refId": "A",
@@ -1105,14 +1105,15 @@ data:
                   "filed": 3,
                   "Value": 4,
                   "status": 5,
-                  "fixed_in": 6,
-                  "fix_sha": 7,
-                  "verified_sha": 8,
-                  "verified": 9,
-                  "verified_at": 10,
-                  "live_verified": 11,
-                  "live_verified_at": 12,
-                  "live_evidence": 13
+                  "waiting_on": 6,
+                  "fixed_in": 7,
+                  "fix_sha": 8,
+                  "verified_sha": 9,
+                  "verified": 10,
+                  "verified_at": 11,
+                  "live_verified": 12,
+                  "live_verified_at": 13,
+                  "live_evidence": 14
                 },
                 "excludeByName": {
                   "sort_key": true,
@@ -1121,7 +1122,8 @@ data:
                   "job": true,
                   "instance": true,
                   "Time": true,
-                  "repo": true
+                  "repo": true,
+                  "waiting_since": true
                 },
                 "renameByName": {
                   "priority": "Priority",
@@ -1130,6 +1132,7 @@ data:
                   "filed": "Filed",
                   "Value": "Open for",
                   "status": "Status",
+                  "waiting_on": "Waiting on",
                   "fixed_in": "Fixed in",
                   "fix_sha": "Fix commit",
                   "verified_sha": "Verified commit",
@@ -1159,6 +1162,13 @@ data:
               }
             },
             "overrides": [
+              {
+                "matcher": {"id": "byName", "options": "Waiting on"},
+                "properties": [
+                  {"id": "custom.width", "value": 130},
+                  {"id": "custom.filterable", "value": true}
+                ]
+              },
               {
                 "matcher": {"id": "byName", "options": "Verified at"},
                 "properties": [
@@ -1262,7 +1272,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 75
+                    "value": 65
                   },
                   {
                     "id": "custom.filterable",
@@ -1401,7 +1411,7 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 80
+                    "value": 70
                   },
                   {
                     "id": "unit",
@@ -1464,7 +1474,7 @@ data:
               {
                 "matcher": {"id": "byName", "options": "Status"},
                 "properties": [
-                  {"id": "custom.width", "value": 80},
+                  {"id": "custom.width", "value": 70},
                   {"id": "custom.filterable", "value": true},
                   {"id": "custom.cellOptions", "value": {"type": "color-text"}},
                   {"id": "mappings", "value": [{"type": "value", "options": {

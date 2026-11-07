@@ -8,6 +8,13 @@ Hermes publishes two Pushgateway groups on every poll through `bin/k3dm-vectordb
 `**Branch:**` line, else the first tag that contains it). It covers the release branch Hermes
 indexes and the five shipped releases before it, in `k3dm_bug_release_docs{release,order,priority,state}`.
 Open for counts from filed until the bug is LIVE-VERIFIED, or a closed investigation has valid typed recovery proof.
+The **Bugs** table's **Waiting on** column describes the next dependency for open and unknown docs. Add
+`**Waiting on:** <value>` in the header before the first `## ` heading, using one of `dispatch`, `fix running`,
+`live check`, `scheduled run`, `investigation`, or `operator decision`. A date can follow as
+`**Waiting on:** <value> — since YYYY-MM-DD`; it must be a real calendar date. The `not stated` value means the
+header has no Waiting on line, and `invalid` means its value is outside the six accepted words. Other statuses
+show `—`. The `waiting_since` label is exported for open and unknown docs but is not shown in the table. Open for
+still counts from filing, including fixes awaiting proof.
 `k3dm_bug_current_release_info{release}` names the current release. `k3dm_bug_later_release_open_docs`
 counts open docs already scheduled for a later release, such as a patch release.
 
