@@ -2,6 +2,7 @@
 
 **Status:** ROOT CAUSE FOUND 2026-11-06 — still firing; fix spec `docs/bugs/2026-11-06-machine-setup-leaves-nightly-suite-without-pyyaml.md`
 **Priority:** P2
+**Waiting on:** live check — since 2026-11-06
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
 **Branch:** k3d-manager-v1.43.14

@@ -2,6 +2,7 @@
 
 **Status:** OPEN — one failure observed; next scheduled run Sunday 2026-11-08 02:30 local decides whether a fix is needed
 **Priority:** P2
+**Waiting on:** scheduled run — since 2026-11-06
 **Approval:** pending
 **Branch:** `k3d-manager-v1.43.14`
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md`; `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`

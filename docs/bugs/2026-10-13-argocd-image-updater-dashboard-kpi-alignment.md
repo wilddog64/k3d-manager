@@ -3,6 +3,7 @@
 **Status:** OPEN — UI defect observed; fractional job metric requires investigation
 **Branch:** unscheduled P3 backlog (triage 2026-10-15, operator-approved placement)
 **Priority:** P3
+**Waiting on:** investigation
 **Filed:** 2026-10-13, operator request
 **Release:** unscheduled (triage 2026-10-15, operator-approved placement)
 **Approval:** explicit operator request to file a P3 bug; no implementation authorized

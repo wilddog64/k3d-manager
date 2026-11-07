@@ -2,6 +2,7 @@
 
 **Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B is specified in `docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md` and awaits a dispatch go. Do not run `make install-browser-relays` until Part B lands.
 **Priority:** P1
+**Waiting on:** live check
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
 **Detected by:** `docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md` (Terra Phase C worktree), confirmed by Claude against `bin/install-sudoers.sh` at `7c9927e9`.

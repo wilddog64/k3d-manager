@@ -99,6 +99,11 @@ without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or tes
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
 <!-- shared:end bug-priority -->
 
+**Waiting on line (operator, 2026-11-06).** An open `docs/bugs/` doc says what it needs next, in its
+header, with `**Waiting on:** <word>` or `**Waiting on:** <word> — since YYYY-MM-DD`. The word is one of
+`dispatch`, `fix running`, `live check`, `scheduled run`, `investigation`, `operator decision`. The Bugs
+table shows it; a doc without the line reads `not stated`, and any other word reads `invalid`. Update it
+whenever the bug moves, and only write what you can support: leave it out rather than guess.
 **Acceptance block (operator, 2026-10-17).** Every new `docs/bugs/` or `docs/plans/` spec that gets
 dispatched carries an `## Acceptance` section: a YAML block with `must`, `must_not` and `evidence`
 (IDs like M1/N1/E1; each evidence item names what it `proves`, and whether it is `offline` or `live`),

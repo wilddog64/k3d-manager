@@ -2,6 +2,7 @@
 
 **Status:** FIX IN SUBTREE — both scripts resolve `PLAYWRIGHT_AUTH_DIR` or `pw-profile` (lib-foundation `bb7f1f2`, synced `c22646e1`). The unused `scripts/playwright/acg_extend.js` was removed 2026-11-06; nothing called it. Live E2 open: read the pre-flight extend in the next M5 `/cluster-up aws` log.
 **Priority:** P2
+**Waiting on:** live check
 **Severity:** medium — on the M5 every sandbox extend fails (acg-up pre-flight and the 30-minute ACG watcher), so a sandbox dies at its first deadline; the M4 works only because a stale `profile/` dir from before October still exists there
 **Approval:** operator, 2026-11-01 (session goal: finish v1.43.13 items; hub-migration gaps are filed as found); dispatch go: operator, 2026-11-01 ("go ahead to dispatch hub fixes")
 **Filed:** 2026-11-01

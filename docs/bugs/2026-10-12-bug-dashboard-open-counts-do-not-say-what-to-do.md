@@ -2,8 +2,9 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — fix landed `6d42c201` (Luna; corrected after Claude's review), independent verify running, live E5 and E6 pending. E4: of 1004 docs, doc_status changes for exactly the four expected. Spec revised 2026-11-06 after review: the first version collided with two existing dashboard guards (see Design limits).
+**Status:** OPEN — fix landed `6d42c201` (Luna; corrected after Claude's review). Independent verify PASS 2026-11-06, recorded in the ledger: 93 tests pass on the fix, 84 fail on the parent, 12 mutants red. E4: of 1004 docs, doc_status changes for exactly the four expected. N6: plan metrics identical at parent and fix except the scan timestamp. Waiting on lines added to 26 of the 56 open docs on 2026-11-06; the other 30 stay `not stated` until someone reads them. Live E5 and E6 pending.
 **Priority:** P2 — raised from P3 2026-11-06; a reader cannot tell a stalled bug from a shipped fix waiting for proof, and it misled the operator about seven rows that day
+**Waiting on:** live check — since 2026-11-06
 **Approval:** explicit 2026-11-06 "go ahead" (operator, on rewriting this spec and dispatching it to Luna). Originally explicit 2026-10-12 "then maybe we should have same comment or explaination (short one) to present; otherwise this confuse people as we don't know what to do or panic".
 **Severity:** medium
 
@@ -155,7 +156,7 @@ must:
     text: "The Bugs table maps waiting_on to Waiting on, directly after Status, with custom.filterable true; waiting_since is excluded from the table; and the description says the Open tiles include fixes waiting for a live check."
 must_not:
   - id: N7
-    text: "The dashboard's existing guards hold: no tile narrower than w=4 has a description, and the Bugs table's fixed widths plus 150 are at most 1350. Paired control: Waiting on has its width and is visible."
+    text: "The dashboard's existing guards hold: the Open P0 to P3 tiles (w=2) have no description and no tile below w=4 gains one (Fixed, Verified, Deferred and Scan age, w=3, already had one; wording corrected after the verifier found the earlier text could not hold on either tree), and the Bugs table's fixed widths plus 150 are at most 1350. Paired control: Waiting on has its width and is visible."
   - id: N1
     text: "A closed doc, or a deferred one, that still has a Waiting on line shows waiting_on=\"-\" and waiting_since=\"-\"."
   - id: N2

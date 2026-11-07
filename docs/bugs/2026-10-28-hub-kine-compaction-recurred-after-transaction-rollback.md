@@ -2,6 +2,7 @@
 
 **Status:** OPEN — live recurrence confirmed 2026-10-28; recovery = M5 new-hub build (operator decision 2026-10-29)
 **Priority:** P2 — retention is stalled with a controlled rebuild workaround; API remains ready
+**Waiting on:** investigation
 **Filed:** 2026-10-28
 **Release:** v1.43.9 bug; no new enhancement plan
 **Branch:** `k3d-manager-v1.43.9`

@@ -4,6 +4,7 @@
 **Branch:** `k3d-manager-v1.43.14`
 **Status:** OPEN
 **Priority:** P3 — cosmetic; the rows are all present and correct, only their order misleads
+**Waiting on:** fix running — since 2026-11-06
 **Approval:** explicit 2026-11-06 "you can file run column as P3 and dispatch to Gemini Flash 3.8" (operator).
 **Severity:** low
 

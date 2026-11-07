@@ -77,6 +77,7 @@
 - [x] S1 spec revised after the second review; `v1.43.16-prompts-by-model` filed.
 - [x] Waiting-on spec revised: `Open P*` tile descriptions dropped, `Waiting since` not shown.
 - [x] S1 third check landed; three gaps fixed by Claude.
+- [x] Waiting-on independent verify PASS; lines on 26 open docs; convention in `CLAUDE.md`. Live E5/E6 open.
 - [ ] S1 dispatcher (Luna) and metrics (Flash 3.8) running.
 - [ ] P3 Run column sort: Flash 3.8 running.
 - [x] Waiting-on corrected and landed `6d42c201`.

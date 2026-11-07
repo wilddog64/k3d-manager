@@ -2,6 +2,7 @@
 
 **Status:** OPEN — filed 2026-10-24; not dispatched
 **Priority:** P3
+**Waiting on:** dispatch
 **Severity:** low — the reap itself works; only the notice that says it happened is missing
 **Release:** bug (does not count toward the five-plan cap); candidate for the vendor-LLM P2/P3 trial
 **Filed:** 2026-10-24, by Claude, during the bug-status cleanup, while verifying `docs/bugs/2026-10-09-expired-acg-sandbox-leaves-hub-registration-and-apps.md`

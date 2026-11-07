@@ -21,6 +21,7 @@
 - 2026-11-06 late: `agent-instruction-files-refresh` LIVE-VERIFIED: independent verify PASS recorded, E3 read from later dispatches. Second-review findings landed. Terra third check dispatched; Waiting-on correction sent to Luna.
 
 - 2026-11-06 late, later: Waiting-on landed `6d42c201`; verifier running; after PASS, add Waiting on lines to open docs, hand-triage the rows, add the convention to `CLAUDE.md`. Terra's third S1 check landed: three coverage gaps fixed by Claude with no fourth review; `p0-s1-dispatcher` (Luna) and `p0-s1-metrics` (Flash 3.8) dispatched. P3 `2026-11-06-per-run-evidence-run-column-sorts-as-text` filed and dispatched to Flash 3.8 by operator's request; it narrows the `label_join` guard to `"doc"`, tried on the hub first. Analyzer: no job at 00:37Z 11-07 (last 12:33Z 11-06); read again later.
+- 2026-11-06 late, latest: Waiting-on verify PASS, recorded; lines on 26 of 56 open docs, 30 stay `not stated`; convention in `CLAUDE.md`; live E5/E6 pending. Scheduled analyzer post confirmed in Slack 16:38 (job `57118b20`). It shows a real gap: payment pinned to a 10-18 digest with `CVE-2026-111497`, `cve-auto-1794009810` failed `reason=execution` with stderr deleted; candidate scan of `sha-321b76` running, bug not filed yet. S1 briefs committed; dispatcher (Luna), metrics (Flash 3.8) and Run sort (Flash 3.8) being started from this commit.
 
 ## Handoff — 2026-11-06 M4 reboot for tunnel E4
 
