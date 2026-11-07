@@ -36,6 +36,8 @@
 - Resolve S1 `link` and `mark` versions from their ledger slug, and resolve `combine` from its parts.
 - Make the Verification ladder table sortable, prevent clipped rows, and explain unknown status.
 
+- Add `.github/dependabot.yml` for weekly GitHub Actions updates in workflows and composite actions; the lib-foundation subtree's npm dependencies are updated upstream.
+
 ## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.
