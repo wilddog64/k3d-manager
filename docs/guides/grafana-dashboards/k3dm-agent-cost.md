@@ -130,3 +130,19 @@ output rates there when pricing changes. Models without an explicit entry remain
 `bin/k3dm-codex-dispatch usage-backfill` records usage for existing dispatch logs when their Codex
 session files are available. It is safe to rerun; it skips already-recorded `(release, spec, session)`
 tuples and reports missing session files.
+
+## Claude context per turn
+
+The **Claude context per turn** row follows the selected **Window** (`1d`, `7d`, `30d`, or a
+release where Claude release attribution is available). Context per turn reports nearest-rank p50
+and p90 for main and subagent turns. Mean context divides context-token sum by turn count. Turns
+shows turns per active UTC day and main turns per verified spec; dates without turns do not dilute
+the daily rate, and a window with no verified specs has no per-spec value.
+
+The **post-compaction floor** is the median context size of the first main turn after each compact
+boundary. Compare it with the **observed ceiling**, the largest main turn in the window, and the
+configured auto-compact threshold. If the configured threshold is above the observed ceiling, the
+setting has no effect on the observed compaction behavior. Cache rebuilds counts main turns that
+write more than 50,000 cache tokens, grouped by compaction, idle gap, or other cause, and shows the
+estimated write cost at the configured Claude model rates. These measures are available for time
+windows.

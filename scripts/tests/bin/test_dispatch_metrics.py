@@ -2,8 +2,10 @@ import importlib.machinery
 from textwrap import dedent
 import importlib.util
 import calendar
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1009,7 +1011,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 7 and window["current"]["value"] == "7d"
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 86  # agent-audit: allow assert-removed remove the unrequested duplicate view while retaining Codex and agy activity rows, identity, latency, intervention, complexity, coordinator attribution, and cost state columns and summary stats; whole-system cost row adds Claude + Codex at API prices and per live-verified spec; observed compaction point panel; repo bar gauges add an other series each
+    assert sum("$window" in expr for expr in expressions) == 94  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1440,7 +1442,9 @@ def test_claude_rollup_save_failure_is_reported_and_cleaned(tmp_path, monkeypatc
     monkeypatch.setattr(dispatch_metrics.os, "replace", fail_replace)
     records = dispatch_metrics._claude_rollup(projects, cache)
     assert records == [{"ts": "2026-10-24T12:00:00Z", "model": "m", "speed": None,
-        "input": 1, "cache_5m": 0, "cache_1h": 0, "cache_read": 0, "output": 0}]
+        "input": 1, "cache_5m": 0, "cache_1h": 0, "cache_read": 0, "output": 0,
+        "id": "one", "subagent": False,
+        "session": hashlib.sha256(str(transcript).encode()).hexdigest()}]
     assert "claude rollup cache not saved: simulated rename race" in capsys.readouterr().err
     assert list(tmp_path.glob("cache.json.*.tmp")) == []
 
@@ -3013,3 +3017,121 @@ def test_dispatch_gates_parent_reassignment_drops_stale_parent(tmp_path):
     assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="old-parent",role="review"} 0' in out_control
     assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="old-parent",role="verify"} 0' in out_control
     assert 'k3dm_dispatch_split_parents_dropped{version="v1.0.0"} 0' in out_control
+
+
+def test_claude_context_turn_metrics_deduplicate_split_agents_and_classify_rebuilds(tmp_path, monkeypatch):
+    # Fixture field shape sampled read-only from assistant usage records (content omitted): host m4-air.local, 2026-11-07.
+    # Fields observed: timestamp, message.id, model, input_tokens, cache_read_input_tokens, cache_creation.ephemeral_5m_input_tokens, cache_creation.ephemeral_1h_input_tokens.
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+    t0 = calendar.timegm(time.strptime("2026-11-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
+    def turn(mid, sec, input_tokens, write=0):
+        usage = {"input_tokens": input_tokens, "cache_read_input_tokens": 10,
+                 "cache_creation": {"ephemeral_5m_input_tokens": write, "ephemeral_1h_input_tokens": 0}}
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0 + sec)),
+                "message": {"id": mid, "model": "m", "usage": usage}}
+    main_path = projects / "main.jsonl"
+    rows = [turn("a", 0, 100), turn("a", 0, 100), turn("b", 3600, 200),
+            {"type": "system", "subtype": "compact_boundary", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0 + 3601))},
+            turn("c", 3602, 300, 50001), turn("d", 7203, 400, 50001)]
+    main_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+    subdir = projects / "subagents"
+    subdir.mkdir()
+    (subdir / "sub.jsonl").write_text(json.dumps(turn("sub", 10, 999999)) + "\n")
+    context = {}
+    records = dispatch_metrics._claude_rollup(projects, scratch_home / "rollup.json", context)
+    output = dispatch_metrics.render([], 0, t0 + 86400, claude_records=records,
+                                     claude_prices=_claude_rates(), claude_context=context,
+                                     repo_root=fake_repo)
+    assert 'k3dm_claude_context_turns{window="1d",agent="main"} 4' in output
+    assert 'k3dm_claude_context_tokens{window="1d",agent="main",quantile="0.5"} 210' in output
+    assert any(line.startswith('k3dm_claude_context_tokens{window="1d",agent="subagent"') for line in output.splitlines())
+    assert 'k3dm_claude_context_floor_tokens{window="1d"} 50311' in output, [line for line in output.splitlines() if "context_floor" in line]
+    assert 'k3dm_claude_context_ceiling_tokens{window="1d"} 50411' in output
+    assert 'k3dm_claude_cache_rebuilds{window="1d",cause="compaction"} 1' in output
+    assert 'k3dm_claude_cache_rebuilds{window="1d",cause="idle"} 1' in output
+    assert 'k3dm_claude_cache_rebuilds{window="1d",cause="other"} 0' in output
+    assert 'k3dm_claude_cache_rebuild_cost_usd{window="1d",cause="compaction"} 0.050001' in output
+    assert 'k3dm_claude_cache_rebuild_cost_usd{window="1d",cause="idle"} 0.050001' in output
+    unpriced = dispatch_metrics.render([], 0, t0 + 86400, claude_records=records,
+        claude_context=context, repo_root=fake_repo)
+    assert 'k3dm_claude_cache_rebuild_cost_usd{window="1d",cause="compaction"} 0' in unpriced
+    assert 'k3dm_claude_turns_per_active_day{window="1d",agent="main"} 4' in output
+    assert not any('agent="subagent"' in line and any(metric in line for metric in
+                   ("context_floor", "context_ceiling", "cache_rebuild")) for line in output.splitlines())
+    assert 'k3dm_claude_context_floor_tokens' in output and 'session=' not in output
+    assert not any("main.jsonl" in line or str(scratch_home) in line for line in output.splitlines())
+
+
+def test_claude_context_active_days_ignore_idle_dates_and_short_idle_gap(tmp_path, monkeypatch):
+    scratch_home = tmp_path / "home"
+    scratch_home.mkdir()
+    monkeypatch.setenv("HOME", str(scratch_home))
+    assert Path(os.environ["HOME"]) == scratch_home
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    projects = scratch_home / ".claude/projects"
+    projects.mkdir(parents=True)
+    fake_repo = tmp_path / "repo"
+    fake_repo.mkdir()
+    assert fake_repo.is_dir()
+    day1 = calendar.timegm(time.strptime("2026-11-01T00:00:00", "%Y-%m-%dT%H:%M:%S"))
+    def row(mid, stamp, write):
+        return {"type": "assistant", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(stamp)),
+                "message": {"id": mid, "model": "m", "usage": {"input_tokens": 1,
+                "cache_creation": {"ephemeral_5m_input_tokens": write}}}}
+    session = projects / "session.jsonl"
+    session.write_text("\n".join(json.dumps(x) for x in [row("one", day1, 50000),
+        row("two", day1 + 3599, 50001), row("three", day1 + 86400 * 2, 0)]) + "\n")
+    context = {}
+    records = dispatch_metrics._claude_rollup(projects, scratch_home / "rollup.json", context)
+    out = dispatch_metrics.render([], 0, day1 + 86400 * 3, claude_records=records,
+                                 claude_context=context, repo_root=fake_repo)
+    assert 'k3dm_claude_turns_per_active_day{window="7d",agent="main"} 1.5' in out
+    assert not any(line.startswith('k3dm_claude_turns_per_active_day{window="7d",agent="subagent"}')
+                   for line in out.splitlines())
+    assert 'k3dm_claude_cache_rebuilds{window="7d",cause="idle"} 0' in out
+
+
+def test_claude_context_dashboard_has_five_window_panels_and_guarded_spec_ratio():
+    dashboard = load_dashboard(DASHBOARD_PATH.with_name("grafana-dashboard-agent-cost.yaml"), "agent-cost.json")
+    row_index = next(i for i, panel in enumerate(dashboard["panels"])
+                     if panel.get("title") == "Claude context per turn")
+    panels = dashboard["panels"][row_index + 1:row_index + 6]
+    assert [panel["title"] for panel in panels] == ["Context per turn",
+        "Floor, observed ceiling and configured threshold", "Cache rebuilds by cause",
+        "Mean context per turn", "Turns"]
+    expressions = [target["expr"] for panel in panels for target in panel.get("targets", [])]
+    emitted = {"k3dm_claude_context_tokens", "k3dm_claude_context_floor_tokens",
+        "k3dm_claude_context_ceiling_tokens", "k3dm_claude_auto_compact_tokens",
+        "k3dm_claude_cache_rebuilds", "k3dm_claude_cache_rebuild_cost_usd",
+        "k3dm_claude_context_tokens_sum", "k3dm_claude_context_turns",
+        "k3dm_claude_turns_per_active_day", "k3dm_claude_verified_specs"}
+    for expression in expressions:
+        assert "$window" in expression or "k3dm_claude_auto_compact_tokens" in expression
+        assert set(re.findall(r"k3dm_claude_[a-z_]+", expression)) <= emitted
+    ratio = expressions[-1]
+    assert "/ on(window) (sum by (window) (k3dm_claude_verified_specs" in ratio  # agent-audit: allow assert-removed denominator keeps the window label so on(window) matches
+    assert 'level=~"live|verified"' in ratio
+    assert all("$window" in panel.get("description", "") for panel in panels)
+
+
+def test_claude_context_metrics_follow_release_scoped_claude_turns():
+    now = 1_800_000_000
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 20))
+    context = {"turns": [{"id": "r1", "ts": ts, "context": 123, "session": "opaque",
+                           "subagent": False, "model": "m", "cache_5m": 0, "cache_1h": 0}],
+               "boundaries": [], "compactions": [], "reads": []}
+    rows = [event(now - 30, "start", "task", version="v1.0.0"),
+            event(now - 10, "land", "task", version="v1.0.0")]
+    output = dispatch_metrics.render(rows, 0, now, claude_records=[_claude_message("r1", now - 20, input=123)],
+                                     claude_context=context, repo_root=Path("/nonexistent"))
+    assert 'k3dm_claude_context_tokens{window="v1.0.0",agent="main",quantile="0.5"} 123' in output
+    assert 'k3dm_claude_context_turns{window="v1.0.0",agent="main"} 1' in output

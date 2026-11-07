@@ -921,6 +921,180 @@ data:
           "targets": [{"expr": "(sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_claude_api_cost_observed_days{window=\"7d\"}) * 30 + sum(k3dm_dispatch_api_cost_usd{window=\"7d\"}) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30 + (sum(k3dm_dispatch_unledgered_api_cost_usd{window=\"7d\"}) or sum(k3dm_dispatch_claude_api_cost_usd{window=\"7d\"}) * 0) / sum(k3dm_dispatch_api_cost_observed_days{window=\"7d\"}) * 30) / (sum(k3dm_dispatch_subscription_usd_per_month{plan=\"claude\"}) + sum(k3dm_dispatch_subscription_usd_per_month{plan=\"chatgpt\"}))", "instant": true}],
           "fieldConfig": {"defaults": {"unit": "x", "decimals": 1, "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []},
           "options": {"text": {"valueSize": 32}}
+        },
+        {
+          "id": 107,
+          "type": "row",
+          "title": "Claude context per turn",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 52
+          },
+          "panels": []
+        },
+        {
+          "id": 108,
+          "type": "bargauge",
+          "title": "Context per turn",
+          "description": "p50 and p90 context tokens by agent for the selected $window.",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 53
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_context_tokens{window=\"$window\"}",
+              "legendFormat": "{{agent}} p{{quantile}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 109,
+          "type": "stat",
+          "title": "Floor, observed ceiling and configured threshold",
+          "description": "Post-compaction floor, observed main-turn ceiling, and configured auto-compact threshold. Context metrics follow the selected $window; configured threshold is global.",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 53
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_context_floor_tokens{window=\"$window\"}",
+              "legendFormat": "floor"
+            },
+            {
+              "expr": "k3dm_claude_context_ceiling_tokens{window=\"$window\"}",
+              "legendFormat": "observed"
+            },
+            {
+              "expr": "k3dm_claude_auto_compact_tokens",
+              "legendFormat": "configured"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 110,
+          "type": "timeseries",
+          "title": "Cache rebuilds by cause",
+          "description": "Main-turn cache rebuild count and cache-write cost by cause for the selected $window.",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 60
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_cache_rebuilds{window=\"$window\"}",
+              "legendFormat": "{{cause}} count"
+            },
+            {
+              "expr": "k3dm_claude_cache_rebuild_cost_usd{window=\"$window\"}",
+              "legendFormat": "{{cause}} cost"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 111,
+          "type": "bargauge",
+          "title": "Mean context per turn",
+          "description": "Mean context is context token sum divided by turns for the selected $window.",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 60
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_context_tokens_sum{window=\"$window\"} / k3dm_claude_context_turns{window=\"$window\"}",
+              "legendFormat": "{{agent}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 112,
+          "type": "timeseries",
+          "title": "Turns",
+          "description": "Turns per active day and main turns per verified spec for the selected $window. A verified spec count of zero produces no value.",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 67
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "k3dm_claude_turns_per_active_day{window=\"$window\"}",
+              "legendFormat": "{{agent}} turns / active day"
+            },
+            {
+              "expr": "k3dm_claude_context_turns{window=\"$window\",agent=\"main\"} / on(window) (sum by (window) (k3dm_claude_verified_specs{window=\"$window\",level=~\"live|verified\"}) > 0)",
+              "legendFormat": "main turns / verified spec"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+            },
+            "overrides": []
+          }
         }
       ]
     }

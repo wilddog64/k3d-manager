@@ -166,6 +166,8 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
         pass
     compactions = []
     reads = []
+    context_turns = []
+    context_boundaries = []
     root = Path(projects_dir)
     if root.is_dir():
         for path in sorted(root.rglob("*.jsonl")):
@@ -207,6 +209,7 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                             pre_tokens = meta.get("preTokens")
                             pre = pre_tokens if type(pre_tokens) is int and pre_tokens >= 0 else 0
                             compactions.append({"ts": item.get("timestamp"), "trigger": trigger, "pre_tokens": pre})
+                            context_boundaries.append({"ts": item.get("timestamp"), "session": hashlib.sha256(key.encode()).hexdigest()})
                             before = {name: dict(ranges) for name, ranges in latest.items()}
                             segment_seen.clear()
                             continue
@@ -264,16 +267,31 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
                                 continue
                             mid, model = message.get("id"), message.get("model")
                             usage = message.get("usage") or {}
+                            if context_out is not None and isinstance(mid, str) and isinstance(model, str):
+                                creation = usage.get("cache_creation") or {}
+                                cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
+                                cache1 = creation.get("ephemeral_1h_input_tokens", 0)
+                                values = [usage.get("input_tokens", 0), usage.get("cache_read_input_tokens", 0), cache5, cache1]
+                                if all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0 for value in values):
+                                    context_turns.append({"id": mid, "ts": item.get("timestamp"), "context": sum(values),
+                                        "session": hashlib.sha256(key.encode()).hexdigest(), "subagent": "/subagents/" in key,
+                                        "model": model, "speed": usage.get("speed"), "cache_5m": cache5, "cache_1h": cache1})
+                                if mid in cache["records"]:
+                                    cached = cache["records"][mid]
+                                    cached.setdefault("id", mid)
+                                    cached.setdefault("subagent", "/subagents/" in key)
+                                    cached.setdefault("session", hashlib.sha256(key.encode()).hexdigest())
                             if not isinstance(mid, str) or not isinstance(model, str) or model == "<synthetic>" or mid in cache["records"]:
                                 continue
                             creation = usage.get("cache_creation") or {}
                             cache5 = creation.get("ephemeral_5m_input_tokens", usage.get("cache_creation_input_tokens", 0))
                             cache1 = creation.get("ephemeral_1h_input_tokens", 0)
-                            cache["records"][mid] = {"ts": item.get("timestamp"), "model": model,
+                            cache["records"][mid] = {"id": mid, "ts": item.get("timestamp"), "model": model,
                                 "speed": usage.get("speed"), "input": usage.get("input_tokens", 0),
                                 "cache_5m": cache5, "cache_1h": cache1,
                                 "cache_read": usage.get("cache_read_input_tokens", 0),
-                                "output": usage.get("output_tokens", 0)}
+                                "output": usage.get("output_tokens", 0), "subagent": "/subagents/" in key,
+                                "session": hashlib.sha256(key.encode()).hexdigest()}
                         except (ValueError, TypeError, AttributeError):
                             continue
                     cache["offsets"][key] = stream.tell()
@@ -282,6 +300,8 @@ def _claude_rollup(projects_dir, cache_path, context_out=None):
     if context_out is not None:
         context_out["compactions"] = compactions
         context_out["reads"] = reads
+        context_out["turns"] = context_turns
+        context_out["boundaries"] = context_boundaries
     target = Path(cache_path)
     temp = None
     try:
@@ -1984,14 +2004,20 @@ def _agy_metrics(lines, ledger, now, brain_root=None, events=None):
         lines.append(f'k3dm_agy_source_present{{host="{host}",source="none"}} 1')
 
 
-def _render_claude_context(lines, now, claude_context, repo_root):
-    verified = _verified_specs(repo_root, now)
-    incidents, auto_tokens = _read_context_tally(repo_root, now)
+def _render_claude_context(lines, now, claude_context, repo_root, metric_windows=None, legacy=True):
+    windows = metric_windows or WINDOWS
+    verified = _verified_specs(repo_root, now) if legacy else None
+    incidents, auto_tokens = _read_context_tally(repo_root, now) if legacy else ({}, None)
     compactions = (claude_context or {}).get("compactions") or []
     reads = (claude_context or {}).get("reads") or []
-    for window, seconds in WINDOWS.items():
+    turns_by_id = {}
+    for turn in (claude_context or {}).get("turns") or []:
+        turns_by_id.setdefault(turn.get("id"), turn)
+    turns = list(turns_by_id.values())
+    boundaries = (claude_context or {}).get("boundaries") or []
+    for window, seconds in windows.items():
         cutoff = now - seconds
-        if claude_context is not None:
+        if legacy and claude_context is not None:
             comp_counts = {t: 0 for t in COMPACT_TRIGGERS}
             comp_tokens = {t: 0 for t in COMPACT_TRIGGERS}
             for item in compactions:
@@ -2021,12 +2047,80 @@ def _render_claude_context(lines, now, claude_context, repo_root):
             for tool in ("read", "bash"):
                 count = sum(1 for item in reads if _timestamp(item.get("ts")) >= cutoff and item.get("tool") == tool)
                 lines.append(f'k3dm_claude_reads_by_tool{{window="{window}",tool="{tool}"}} {count}')
-        for level in ("live", "verified", "unverified"):
-            lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
-        for kind in INCIDENT_KINDS:
-            lines.append(f'k3dm_claude_context_incidents{{window="{window}",kind="{kind}"}} {incidents[window][kind]}')
-    if auto_tokens is not None:
+        scoped = [turn for turn in turns if _timestamp(turn.get("ts")) >= cutoff]
+        main = [turn for turn in scoped if not turn.get("subagent")]
+        for agent in ("main", "subagent"):
+            selected = [turn for turn in scoped if bool(turn.get("subagent")) == (agent == "subagent")]
+            if not selected:
+                continue
+            values = sorted(float(turn["context"]) for turn in selected)
+            days = {time.strftime("%Y-%m-%d", time.gmtime(_timestamp(turn.get("ts")))) for turn in selected}
+            for quantile, fraction in (("0.5", 0.5), ("0.9", 0.9)):
+                rank = max(1, math.ceil(fraction * len(values)))
+                lines.append(f'k3dm_claude_context_tokens{{window="{window}",agent="{agent}",quantile="{quantile}"}} {values[rank - 1]:g}')
+            lines.append(f'k3dm_claude_context_tokens_sum{{window="{window}",agent="{agent}"}} {sum(values):g}')
+            lines.append(f'k3dm_claude_context_turns{{window="{window}",agent="{agent}"}} {len(values)}')
+            lines.append(f'k3dm_claude_turns_per_active_day{{window="{window}",agent="{agent}"}} {len(values) / len(days):g}')
+        if main:
+            lines.append(f'k3dm_claude_context_ceiling_tokens{{window="{window}"}} {max(float(t["context"]) for t in main):g}')
+            after_boundary = []
+            for boundary in boundaries:
+                bt = _timestamp(boundary.get("ts"))
+                if bt < cutoff:
+                    continue
+                candidates = [turn for turn in main if turn.get("session") == boundary.get("session") and _timestamp(turn.get("ts")) >= bt]
+                if candidates:
+                    after_boundary.append(min(candidates, key=lambda turn: _timestamp(turn.get("ts"))))
+            if after_boundary:
+                vals = sorted(float(turn["context"]) for turn in after_boundary)
+                median = (vals[(len(vals)-1)//2] + vals[len(vals)//2]) / 2
+                lines.append(f'k3dm_claude_context_floor_tokens{{window="{window}"}} {median:g}')
+            rebuilds = {cause: [] for cause in ("compaction", "idle", "other")}
+            by_session = defaultdict(list)
+            for turn in turns:
+                if not turn.get("subagent"):
+                    by_session[turn.get("session")].append(turn)
+            scoped_ids = {turn.get("id") for turn in main}
+            for session_turns in by_session.values():
+                session_turns.sort(key=lambda turn: _timestamp(turn.get("ts")))
+                for index, turn in enumerate(session_turns):
+                    if turn.get("id") not in scoped_ids:
+                        continue
+                    writes = sum(float(turn.get(field, 0) or 0) for field in ("cache_5m", "cache_1h"))
+                    if writes <= 50000:
+                        continue
+                    ts = _timestamp(turn.get("ts"))
+                    previous_ts = _timestamp(session_turns[index-1].get("ts")) if index else None
+                    same_session_boundaries = [_timestamp(b.get("ts")) for b in boundaries if b.get("session") == turn.get("session")]
+                    cause = "compaction" if any((previous_ts is None or previous_ts < b) and b <= ts for b in same_session_boundaries) else "idle" if previous_ts is not None and ts - previous_ts > 3600 else "other"
+                    rebuilds[cause].append(turn)
+            for cause, rows in rebuilds.items():
+                lines.append(f'k3dm_claude_cache_rebuilds{{window="{window}",cause="{cause}"}} {len(rows)}')
+                costs = sum((_cache_write_cost(turn, (claude_context or {}).get("rates") or {}) or 0) for turn in rows)
+                lines.append(f'k3dm_claude_cache_rebuild_cost_usd{{window="{window}",cause="{cause}"}} {costs:g}')
+        if legacy:
+            for level in ("live", "verified", "unverified"):
+                lines.append(f'k3dm_claude_verified_specs{{window="{window}",level="{level}"}} {verified[window][level]}')
+            for kind in INCIDENT_KINDS:
+                lines.append(f'k3dm_claude_context_incidents{{window="{window}",kind="{kind}"}} {incidents[window][kind]}')
+    if legacy and auto_tokens is not None:
         lines.append(f"k3dm_claude_auto_compact_tokens {auto_tokens}")
+
+
+def _cache_write_cost(turn, prices):
+    key = turn.get("model")
+    if turn.get("speed") not in (None, "standard"):
+        key = f'{key}@{turn["speed"]}'
+    rates = prices.get(key) if isinstance(key, str) else None
+    if not isinstance(rates, dict):
+        return None
+    values = (turn.get("cache_5m", 0), turn.get("cache_1h", 0))
+    rates_for_writes = (rates.get("cache_write_5m"), rates.get("cache_write_1h"))
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0 for value in values):
+        return None
+    if any(not isinstance(rate, (int, float)) or isinstance(rate, bool) or rate < 0 for rate in rates_for_writes):
+        return None
+    return sum(value * rate for value, rate in zip(values, rates_for_writes)) / 1_000_000
 
 
 def _render_dispatch_gates(lines, events):
@@ -2366,7 +2460,30 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
     if claude_context is not None or repo_root is not None:
+        if claude_context is not None:
+            claude_context["rates"] = claude_prices or {}
         _render_claude_context(lines, now, claude_context, repo_root)
+        if claude_context is not None:
+            all_turns = (claude_context or {}).get("turns") or []
+            all_boundaries = (claude_context or {}).get("boundaries") or []
+            task_windows = defaultdict(list)
+            for key, task_events in _task_states(events).items():
+                starts = [row["ts"] for row in task_events if row.get("event") == "start"]
+                lands = [row["ts"] for row in task_events if row.get("event") == "land"]
+                release = _normalize_version(key[0])
+                if starts and lands and release:
+                    task_windows[release].append((min(starts), max(lands)))
+            for release, intervals in task_windows.items():
+                selected_turns = [turn for turn in all_turns if any(start <= _timestamp(turn.get("ts")) <= end
+                                  for start, end in intervals)]
+                if not selected_turns:
+                    continue
+                selected_boundaries = [boundary for boundary in all_boundaries if any(
+                    start <= _timestamp(boundary.get("ts")) <= end for start, end in intervals)]
+                release_context = {"turns": selected_turns, "boundaries": selected_boundaries,
+                                   "rates": claude_prices or {}}
+                _render_claude_context(lines, now, release_context, repo_root,
+                                       metric_windows={release: 10**12}, legacy=False)
     if coverage is not None:
         _activity_metrics(lines, events, coverage, now, prices)
         newest_quota = max((r.get("quota") for r in coverage if r.get("quota") and _timestamp(r["quota"][0])), key=lambda q: _timestamp(q[0]), default=None)
