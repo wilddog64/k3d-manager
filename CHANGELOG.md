@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Handle null or missing Hermes e2e counts and report pre-test failures by phase.
+
 - Use the absolute `scutil` path for launchd disk metrics and log sanitized publish failures from Hermes.
 
 - Fix the Bugs dashboard Hub code behind field override to use Grafana 11.4's `byFrameRefID` matcher and guard dashboard matcher IDs.

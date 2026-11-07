@@ -342,10 +342,20 @@ def _e2e_previous(directory, slot):
     return _load_state(max(markers, key=lambda path: path.stat().st_mtime)).get("groups", [])
 
 
+def _e2e_counts(summary):
+    return {key: int(summary.get(key) or 0) for key in ("passed", "failed", "total")}
+
+
 def _e2e_text(slot, run, summary, filed, changes):
-    passed, failed, total = (summary.get(key, 0) for key in ("passed", "failed", "total"))
+    counts = _e2e_counts(summary)
+    passed, failed, total = (counts[key] for key in ("passed", "failed", "total"))
     head = f"Hermes e2e {slot} (run {run}, M2): "
-    head += f"PASS {passed}/{total}" if summary.get("result") == "pass" else f"FAIL — {passed} passed, {failed} failed, {max(total - passed - failed, 0)} skipped"
+    if summary.get("result") == "pass":
+        head += f"PASS {passed}/{total}"
+    elif passed == failed == total == 0:
+        head += f"FAIL — before tests (phase {summary.get('phase') or 'unknown'})"
+    else:
+        head += f"FAIL — {passed} passed, {failed} failed, {max(total - passed - failed, 0)} skipped"
     lines = [head]
     for group in filed.get("groups", []):
         lines.append(f"[{group['status']}] {group['kind']} {group['target']} ({group['count']} tests) → {group.get('path', '')}")
@@ -385,7 +395,7 @@ def _run_e2e(slot, runner=_e2e_run, now=None):
     filed = e2e_bugs.file_bugs(ROOT, groups, run, slot)
     post_summary(_keychain_secret("k3dm-slack-webhook"), _e2e_text(slot, run["run_id"], summary, filed, changes))
     _e2e_write(directory / f"{slot}.json", {"outcome": summary.get("result", "fail"), "run_id": run["run_id"],
-                                              "counts": {key: summary.get(key, 0) for key in ("passed", "failed", "total")},
+                                              "counts": _e2e_counts(summary),
                                               "groups": [{key: group[key] for key in ("slug", "kind", "target", "count")} for group in groups]})
     (directory / f"{slot}.claim").unlink(missing_ok=True)
     return 0
