@@ -1,8 +1,8 @@
 # Bug: the Window dropdown on the Agent Dispatch and Agent Cost dashboards sorts releases alphabetically
 
-**Status:** OPEN — filed 2026-11-07; fix in progress on `k3d-manager-v1.43.15`
+**Status:** LANDED — `0a00bb39` on `k3d-manager-v1.43.15` (sort 8 on both dashboards; E1 green, red on pre-fix); E2 live check not yet run
 **Priority:** P3 (cosmetic: the dropdown order is wrong, every option still works)
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Severity:** low
 **Approval:** operator 2026-11-07: "go ahead, but don't forget the file a bug for it too"
 **Release:** v1.43.15 (bug docs do not count toward the plan cap)
