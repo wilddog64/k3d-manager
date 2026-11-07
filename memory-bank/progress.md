@@ -1,3 +1,5 @@
+**2026-11-07 — v1.43.17 plan 3 written:** `service-password-tailnet-read` (operator: a Tailscale function so Windows/Linux can reach the hub and show service passwords securely). Forced-command SSH key (`from=100.64.0.0/10`, `restrict`, `command=bin/k3dm-password-read`) over a tcp:22-only tailnet grant; output only to the caller's terminal; audit line without output. Spec only — Tailscale install/enrol and every live step need a separate operator go. v1.43.17 now 3 of 5 plans.
+
 # Progress — compressed operational log
 
 - 2026-11-07: v1.43.14 release prep: CHANGELOG promoted to [1.43.14] - 2026-11-07, README + docs/releases.md rows, README Issue Logs refreshed, docs/howto/argocd.md documents make trust-vault-ca. Scope check: 282 files map to the 5 plans, the bugs, the lib-foundation subtree and 2 k3dm-cve-promoter pins. Hub appsets on v1.43.14 (21 refs). Next: PR to main.
