@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+from unittest.mock import patch
 from pathlib import Path
 
 import pytest
@@ -94,6 +95,27 @@ def fixture_metrics(tmp_path):
     events = [{"ts": 1_800_000_000, "event": "start", "version": release,
                "slug": "fixture-dispatched", "spec": f"docs/plans/{release}-fixture-dispatched.md"}]
     metric_text += dispatch.render(events, 0, now=1_800_000_000)
+
+    hermes = load_module("hermes_checkout_dashboard_test", ROOT / "bin/k3dm-hermes")
+    hermes.ROOT = repo
+    captured = []
+
+    class Response:
+        def close(self):
+            pass
+
+    def capture_push(request, timeout):
+        assert request.full_url.endswith("/metrics/job/k3dm-hub-checkout")
+        assert timeout == 5
+        captured.append(request.data.decode())
+        return Response()
+
+    # This scratch repository and exact request target are asserted before the
+    # producer output is appended; the patched HTTP client never sends it.
+    assert hermes.ROOT == repo
+    with patch.object(hermes.urllib.request, "urlopen", side_effect=capture_push):
+        hermes._push_checkout_lag("HEAD", "k3d-manager-v1.43.14", "k3d-manager-v1.43.14")
+    metric_text += "".join(captured)
     return metric_text, set(texts)
 
 

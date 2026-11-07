@@ -19,6 +19,8 @@
 
 - Give Trivy candidate scans a 10-minute timeout, log sanitized failure detail, and retain app CVE scan Job results longer.
 
+- Add `make hub-sync` for guarded hub checkout catch-up, publish code lag and newest-release status, and show it on the Bugs dashboard.
+
 ## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.

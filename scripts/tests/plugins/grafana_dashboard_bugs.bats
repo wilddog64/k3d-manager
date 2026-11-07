@@ -12,6 +12,43 @@ setup() {
   [ "${status}" -eq 0 ]
 }
 
+@test "Release row shows guarded hub checkout lag and release age" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+panels={p["title"]:p for p in d["panels"]}
+expected={"Release":(0,3),"Bugs filed":(3,3),"Bugs open":(6,3),"Bugs fixed":(9,3),
+          "Open, scheduled later":(12,4),"Open, untriaged":(16,4),"Hub code behind":(20,4)}
+for title,(x,w) in expected.items():
+    p=panels[title]
+    assert p["gridPos"] == {"x":x,"y":1,"w":w,"h":4}, (title,p["gridPos"])
+hub=panels["Hub code behind"]
+assert hub["type"] == "stat"
+assert hub["fieldConfig"]["defaults"]["noValue"] == "unknown"
+assert hub["fieldConfig"]["defaults"]["thresholds"]["steps"] == [
+    {"color":"green","value":None},{"color":"orange","value":1}]
+targets={t["refId"]:t for t in hub["targets"]}
+assert targets["A"]["expr"] == "k3dm_hub_checkout_code_commits_behind and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
+assert targets["A"]["legendFormat"] == "{{branch}}"
+assert targets["B"]["expr"] == "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
+assert targets["B"]["legendFormat"] == "{{newest_branch}}"
+override=hub["fieldConfig"]["overrides"][0]
+assert override["matcher"] == {"id":"byRefId","options":"B"}
+mapping=override["properties"][0]["value"][0]["options"]
+assert mapping["1"] == {"text":"current release","color":"green"}
+assert mapping["0"] == {"text":"older release","color":"orange"}
+occupied=set()
+for p in d["panels"]:
+    pos=p["gridPos"]
+    for x in range(pos["x"],pos["x"]+pos["w"]):
+        for y in range(pos["y"],pos["y"]+pos["h"]):
+            assert (x,y) not in occupied, (p["title"],x,y)
+            occupied.add((x,y))
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "release forecast panels align by version and map dates and states" {
   run python3 - "${dashboard}" <<'PY'
 import json, re, sys

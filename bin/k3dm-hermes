@@ -580,6 +580,62 @@ def _push_index_metrics(metrics):
         print(f"vectordb index metrics push skipped (non-fatal): {exc}", file=sys.stderr)
 
 
+_RELEASE_BRANCH = re.compile(r"^k3d-manager-v([0-9]+)\.([0-9]+)\.([0-9]+)$")
+_METRIC_LABEL = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
+
+
+def _newest_release_branch(current, env):
+    """Return the highest numeric release branch on origin, never downgrading."""
+    match = _RELEASE_BRANCH.fullmatch(current)
+    if not match:
+        return current
+    current_version = tuple(map(int, match.groups()))
+    try:
+        result = subprocess.run(["git", "ls-remote", "--heads", "origin", "k3d-manager-v*"],
+                                cwd=ROOT, capture_output=True, text=True, timeout=60,
+                                check=False, env=env)
+        if result.returncode != 0:
+            return current
+        branches = []
+        for line in result.stdout.splitlines():
+            fields = line.split()
+            if len(fields) != 2 or not fields[1].startswith("refs/heads/"):
+                continue
+            branch = fields[1].removeprefix("refs/heads/")
+            candidate = _RELEASE_BRANCH.fullmatch(branch)
+            if candidate:
+                branches.append((tuple(map(int, candidate.groups())), branch))
+        newer = [item for item in branches if item[0] > current_version]
+        return max(newer)[1] if newer else current
+    except Exception:
+        return current
+
+
+def _push_checkout_lag(upstream_ref, upstream_branch, newest_branch):
+    """Publish code-only checkout lag. Failures are intentionally non-fatal."""
+    try:
+        if not (_METRIC_LABEL.fullmatch(upstream_branch or "") and
+                _METRIC_LABEL.fullmatch(newest_branch or "")):
+            return
+        result = subprocess.run(
+            ["git", "rev-list", "--count", f"HEAD..{upstream_ref}", "--", ".",
+             ":!docs", ":!memory-bank", ":!CHANGELOG.md"], cwd=ROOT,
+            capture_output=True, text=True, timeout=60, check=False)
+        if result.returncode != 0 or not result.stdout.strip().isdigit():
+            return
+        count = int(result.stdout.strip())
+        newest = int(upstream_branch == newest_branch)
+        body = (f'k3dm_hub_checkout_code_commits_behind{{branch="{upstream_branch}"}} {count}\n'
+                f'k3dm_hub_checkout_on_newest_release{{newest_branch="{newest_branch}"}} {newest}\n'
+                f'k3dm_hub_checkout_last_check_timestamp_seconds {time.time()}\n').encode()
+        base = os.environ.get("K3DM_VECTORDB_PUSHGATEWAY_URL", "http://localhost:19094").rstrip("/")
+        request = urllib.request.Request(f"{base}/metrics/job/k3dm-hub-checkout", data=body,
+                                         method="POST", headers={"Content-Type": "text/plain; charset=utf-8"})
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception as exc:
+        print(f"hub checkout lag push skipped (non-fatal): {type(exc).__name__}", file=sys.stderr)
+
+
 def _maybe_probe_retrieval(state, ref, now):
     """Run one advisory retrieval probe per day; failures never affect indexing or the tick."""
     try:
@@ -626,17 +682,45 @@ def _refresh_index(state, now=None):
         metrics["paused_until"] = 0
         state["index_paused_until"] = 0
     try:
-        ref, branch = _index_ref()
+        upstream_ref, upstream_branch = _index_ref()
+        ref, branch = upstream_ref, upstream_branch
+        newest_branch = branch
         state["index_ref"] = ref
         fetch_env = os.environ.copy()
         if sys.platform == "darwin" and "GIT_SSH_COMMAND" not in fetch_env:
             fetch_env["GIT_SSH_COMMAND"] = (
                 "/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=8 -o UseKeychain=yes")
-        fetched = subprocess.run(["git", "fetch", "--quiet", "origin", branch], cwd=ROOT,
+        if not os.environ.get("K3DM_INDEX_REF", "").strip():
+            newest_branch = _newest_release_branch(branch, fetch_env)
+            branch = newest_branch
+            ref = f"origin/{branch}"
+            state["index_ref"] = ref
+        fetch_args = (["git", "fetch", "--quiet", "origin", branch]
+                      if os.environ.get("K3DM_INDEX_REF", "").strip() else
+                      ["git", "fetch", "--quiet", "origin",
+                       f"+refs/heads/{branch}:refs/remotes/origin/{branch}"])
+        fetched = subprocess.run(fetch_args, cwd=ROOT,
                                  capture_output=True, text=True, timeout=60, check=False,
                                  env=fetch_env)
         if fetched.returncode != 0:
             raise RuntimeError(f"git fetch failed: {(fetched.stderr or '').strip()}")
+        lag_ref_fetched = True
+        if (not os.environ.get("K3DM_INDEX_REF", "").strip() and
+                newest_branch != upstream_branch):
+            try:
+                upstream_fetch = subprocess.run(
+                    ["git", "fetch", "--quiet", "origin",
+                     f"+refs/heads/{upstream_branch}:refs/remotes/origin/{upstream_branch}"],
+                    cwd=ROOT, capture_output=True, text=True, timeout=60, check=False,
+                    env=fetch_env)
+                if upstream_fetch.returncode != 0:
+                    lag_ref_fetched = False
+            except Exception:
+                lag_ref_fetched = False
+            if not lag_ref_fetched:
+                print("hub checkout lag skipped: upstream ref fetch failed", file=sys.stderr)
+        if lag_ref_fetched:
+            _push_checkout_lag(upstream_ref, upstream_branch, newest_branch)
         paused_until = float(state.get("index_paused_until", 0) or 0)
         if paused_until and now < paused_until:
             metrics["result"] = "paused"

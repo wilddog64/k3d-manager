@@ -50,6 +50,10 @@ hub-migrate:
 hub-new:
 	@bin/hub-new
 
+.PHONY: hub-sync
+hub-sync:
+	@bin/k3dm-hub-sync
+
 .PHONY: hub-cutover hub-cutover-rollback hub-cutover-forwards hub-cutover-verify
 hub-cutover:
 	@bin/hub-cutover
