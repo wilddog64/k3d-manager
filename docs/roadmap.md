@@ -536,7 +536,7 @@ Split from v1.43.13 on 2026-10-31 by Claude; moved to v1.43.15 on 2026-11-01 (be
 
 Branch `k3d-manager-v1.43.17`, cut from `main` after v1.43.16 merges (it depends on the v1.43.16 dev hub). Operator dispatch go 2026-11-07.
 
-**Operator prerequisite (before the v1.43.16 dev hub):** raise OrbStack `memory_mib` on the M5 from 16384 to 24576 (the 16 GB cap dates from the 24 GB M4 Air, 2026-09-13); it restarts the hub, so it is a planned step with the 2026-09-13 restart checklist.
+**Operator prerequisite (before the v1.43.16 dev hub):** raise OrbStack `memory_mib` on the M5 from 16384 to 24576 (the 16 GB cap dates from the 24 GB M4 Air, 2026-09-13); it restarts the hub, so it is a planned step with the 2026-09-13 restart checklist. **Done 2026-11-07 06:38 PST** (Docker 23.5 GiB; hub recovered by 06:51, details in the dev-hub spec P0).
 
 **v1.43.17 plan 1:** [`argocd-ha-zero-downtime-upgrade`](plans/v1.43.17-argocd-ha-zero-downtime-upgrade.md) (operator, 2026-11-07: "do we have room to support argocd no downtime upgrade (for cve patch)"). ArgoCD server, repo-server and applicationset-controller at 2 replicas with PDBs; `argocd_upgrade` probes availability through the rollout and refuses a hub upgrade without a passing rehearsal in the dev hub. Takes over the ArgoCD part of the parked `v1.28.0-platform-zero-downtime-rollouts`.
 
