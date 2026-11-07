@@ -1,6 +1,7 @@
 # Bug: `acg-up` on the M4 dev node restarts the retired local hub instead of refusing
 
-**Status:** LANDED — `bd3002db`; offline acceptance and live verification pending
+**Status:** VERIFIED 2026-11-07 — `90363e97` + `bd3002db`; independent verifier PASS (30/30 on `bd3002db`; 21 red on `6e186f20`: M1, N1, N2, N3). Gap: offline M2/M3 prove the guard lets a hub through, not that `k3d cluster start` is reached (stubbed cluster-up stops in the AWS steps first); that part rests on live E3. Live E2 (M4) and E3 (M5) pending
+**Waiting on:** live check — since 2026-11-07
 **Priority:** P2
 **Severity:** medium — running `bin/acg-up` / `make up` from the M4 (where Claude and dispatches run) would start a second hub: a second ArgoCD that registers the sandbox, port-forward plists and CronJobs that push to the same Pushgateway names; the workaround is to run it on the M5
 **Approval:** operator, 2026-11-01 (asked "does it matter from m4 or m5?" while scheduling acg-up; hub-migration gaps are filed as found); scope widened to the hub release targets: operator, 2026-11-01 ("we should widen machine-role check to those three"); dispatch go: operator, 2026-11-01 ("go as you recommended")

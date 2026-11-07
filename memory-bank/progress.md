@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: hub machine-role guard independently verified (M2/M3 gap noted). Slip: ca2aecc6 pushed VERIFIED before the ledger accepted the evidence (rc format); recorded a minute later from a normalized copy.
 - 2026-11-07: dispatch resume-reason independently verified; dispatch-stall plan Status corrected (S1 verified, S2–S5 v1.43.16).
 - 2026-11-07: keychain-trust follow-up independently verified (14/14 fix and head).
 - 2026-11-07: tier v2 verified; fleet-host plan moved v1.43.14 → v1.43.16 (fixture precondition unmet).
