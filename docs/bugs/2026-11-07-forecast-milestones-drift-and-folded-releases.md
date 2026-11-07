@@ -1,8 +1,9 @@
 # Bug: Release forecast drifts from the roadmap unnoticed, and releases that will never ship make every row overdue
 
-**Status:** OPEN — filed 2026-11-07; dispatched to Luna the same day
+**Status:** VERIFIED 2026-11-07 offline — landed `11982d31` (Luna, corrections by Claude); independent Acceptance-only verifier 17/17 on the fix, 13 red on pre-fix `d02fc28e` (the 4 passes are paired controls); verify recorded. Live E2 pending (after `make platform-ops`).
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+**Fix commit:** `11982d31`
 **Severity:** low — the Remaining releases panel was blank or showed every row overdue; no data is lost
 **Branch:** `k3d-manager-v1.43.14`
 **Release:** v1.43.14 (bug; does not count toward the five-plan cap)
