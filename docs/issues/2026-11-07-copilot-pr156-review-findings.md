@@ -56,3 +56,16 @@ Process note: a test that swaps `HOME` and starts another Python must carry the 
 - **Failure:** `make lint-python` found 4 errors: F841 unused `path` (`test_check_bug_status.py:138`), F401 unused `import time` (`test_hermes_checkout_lag.py:6`), F841 unused `as scratch` twice (`webhook_status.py:118`, `:214`).
 - **Why it surfaced late:** every earlier run failed at a test step, so step 12 (Lint Python) was skipped; this was the first run to reach it. Ruff is also not installed on the dev Mac, so the gate never ran locally.
 - **Fix:** dropped the unused names; behaviour unchanged. Verified with pinned `ruff==0.15.8` in a scratch venv ("All checks passed!"); affected pytest 37 passed, `webhook_status.py` 13 OK; `make validate-manifests` (step 13) 85/85 valid.
+
+## Copilot review-summary notes (not posted inline; review 5813679615 on 2abb1f97)
+
+The review body's "Review notes" listed findings beyond the two inline threads. Triage:
+
+| Note | Verdict | Action |
+|---|---|---|
+| `.github/dependabot.yml` `directories` + glob unsupported | False — `directories:` with globs is a supported Dependabot key | none |
+| `bin/k3dm-require-role` reads role with trailing newline | False — `$(cat …)` strips trailing newlines | none |
+| role-gate message names `acg-up` | Nit; wording is asserted by `require_role.bats:25,44` (spec'd text) | left as is |
+| `bin/k3dm-webhook-doctor` counts a blank `K3DM_STATUS_CHANNEL_ID` as configured | Valid | fixed: value must be non-blank; blank and whitespace cases added to `test_webhook_doctor.py`, shown red before the fix |
+| `browser_user_listeners.bats` unasserted `run grep` (line 24) | Valid — dead line | removed |
+| `rg` missing → exit 127 passes the negative assertion | Valid | already fixed in `1f2381c2` (`grep -En`) |

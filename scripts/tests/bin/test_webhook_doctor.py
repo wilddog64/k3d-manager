@@ -499,6 +499,8 @@ def test_slack_bot_plist_presence_and_redaction(monkeypatch, tmp_path, capsys):
     path.parent.mkdir(parents=True)
     for env, expected, status_expected in [({}, "missing_token", "missing"), ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token"}, "missing_channel", "missing"),
                           ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123"}, "configured", "missing"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123", "K3DM_STATUS_CHANNEL_ID": ""}, "configured", "missing"),
+                          ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123", "K3DM_STATUS_CHANNEL_ID": "   "}, "configured", "missing"),
                           ({"SLACK_BOT_TOKEN": "xoxb-QZ7K-fixture-secret-token", "SLACK_CHANNEL_ID": "C123", "K3DM_STATUS_CHANNEL_ID": "C456"}, "configured", "configured")]:
         path.write_bytes(plistlib.dumps({"EnvironmentVariables": env}))
         assert doctor.main(["--check"]) == 0

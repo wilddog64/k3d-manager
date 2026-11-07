@@ -21,7 +21,6 @@ setup() {
 @test "missing relay path warns and browser listener setup never uses sudo" {
   run grep -En 'make install-browser-relays|K3DM_LAUNCHD_DIR' "${REPO_ROOT}/bin/cluster-up"
   [ "$status" -eq 0 ]
-  run grep -En 'sudo|interactive-sudo|prefer-sudo' "${REPO_ROOT}/bin/cluster-up"
   run bash -c 'grep -En "sudo|interactive-sudo|prefer-sudo" "$1" | grep -En "browser|LaunchDaemon|ifconfig"' _ "${REPO_ROOT}/bin/cluster-up"
   [ "$status" -ne 0 ]
 }
