@@ -1,8 +1,10 @@
 # Bug: HubDataExportNeverRan on hub
 
-**Status:** OPEN — gap explained 2026-11-07: the M5 hub build never ran `hub_data_export_setup`, so the `hub-data-export` ServiceAccount was missing and every scheduled export failed from 2026-11-01 until it was created by hand on 2026-11-04; the fix is not written yet, and a restore is untested
+**Status:** OPEN — gap explained 2026-11-07 (the M5 hub build never ran `hub_data_export_setup`, so every scheduled export failed from 2026-11-01 until the ServiceAccount was created by hand on 2026-11-04); fix specced below and dispatched; a restore is untested
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-07 (go for a fix spec: the hub build runs `hub_data_export_setup`)
+**Waiting on:** fix running — since 2026-11-07
+**Approval:** operator 2026-11-07: "fix to for spec and dispatch to Flash 3.8"
+**Assigned:** Gemini Flash 3.8 (`AGENT=agy MODEL=gemini-3.8-flash-medium`)
 **Filed:** 2026-11-02
 **Detected by:** operator Gmail Alertmanager screenshot (messages visible Nov 1–2)
 **Branch:** `k3d-manager-v1.43.15` (moved 2026-11-07 by Claude, operator: "go ahead to move that four bugs to v1.43.15"; no landed fix to verify in v1.43.14; filed on `k3d-manager-v1.43.14`)
@@ -23,15 +25,9 @@ The operator screenshot shows a FIRING Alertmanager email for this alert family.
 3. Check existing bug documents and recent changes before proposing a fix; link related incidents and avoid duplicate root-cause work.
 4. Identify root cause, blast radius, safe mitigation and regression test. Preserve evidence before deleting Jobs or resetting alerts.
 
-## Acceptance
+## Acceptance (initial triage, superseded)
 
-- [ ] Capture actual failing resource/run IDs, timestamps and diagnostic evidence.
-- [ ] Reproduce or independently verify the failure mode and root cause.
-- [ ] Implement or document safe remediation with regression coverage.
-- [ ] Confirm healthy subsequent execution and alert resolution using live evidence.
-- [ ] Record human intervention and link any related bug or plan.
-
-**Note:** Initial triage; not a confirmed diagnosis or a claim that remediation has occurred.
+The triage checklist that stood here is replaced by the fix spec's Acceptance block at the end of this doc.
 
 ## Prior-art / duplication check (2026-11-02)
 
@@ -69,4 +65,50 @@ Timeline (times UTC; the job runs at 03:30 local, 10:30Z in PDT and 11:30Z in PS
 **Run 1's host-key failure** (2026-10-31) did not recur: run 2 cloned the repo. The `known_hosts` entry for `github-k3dm-hub-data` was added between the two runs; by what is not recorded.
 
 **Proposed fix (needs the operator's go; hub work):** the hub build calls `hub_data_export_setup` after Vault is unsealed and before it installs the export job. The hub build's checks then fail if `secrets/hub-data-export` is missing. Correct the `not-installed.list` note. Acceptance: a test that the hub build's install sequence calls setup before the launchd install. Live evidence: the next hub rebuild drill shows a successful export on the first scheduled run.
+
+## Fix spec (2026-11-07)
+
+### Change
+
+1. `bin/hub-new`, the `data` stage: after `make hub-data-recover` succeeds, run `make hub-data-export-setup`. A failure fails the stage with this next step: `make hub-data-export-setup`, then `HUB_NEW_FROM=data make hub-new`. It goes after the data restore because the setup writes a Vault policy and a Kubernetes auth role. Its self-test also lists `secret/`, which only works once Vault holds restored data. The `prepare-singletons` stage, which installs the export's launchd job, comes after `data`, so the job is never installed without its ServiceAccount.
+2. `bin/hub-new` `verify_hub`: fail with `hub-data-export ServiceAccount secrets/hub-data-export is missing` when `kubectl --context "$context" -n secrets get serviceaccount hub-data-export` fails. The next step is `make hub-data-export-setup`. Add `"hub_data_export_sa":"pass"` to the verify JSON and the check table.
+3. `scripts/etc/machine/not-installed.list:4`: change the note to `installed by the cluster deploy (hub build: data stage runs make hub-data-export-setup, prepare-singletons installs the job)`. Do not change the label or the installer.
+4. `scripts/tests/bin/hub_new.bats`: add the tests in Acceptance. The `make` stub records `make hub-data-export-setup` to `$CALLS` like the other targets. The `kubectl` stub answers `-n secrets get serviceaccount hub-data-export` with exit 0, or exit 1 when `STUB_NO_EXPORT_SA=1`. Copy the wording of the exit-1 error from a real read-only capture on the M5 (`kubectl -n secrets get serviceaccount does-not-exist`) and put the host and date in a comment beside it.
+5. `docs/howto/m5-hub-migration.md`: one sentence saying the data stage now runs `make hub-data-export-setup`.
+
+### What NOT to Do
+
+- Do not change `hub_data_export_setup`, `hub_data_export_scheduled`, the launchd template, the alert rules or `hub_recover`.
+- Do not run `make hub-new`, `make hub-data-export-setup` or any `kubectl` against a real cluster. Do not edit `CLAUDE.md`, `memory-bank/` or `docs/roadmap.md`.
+- Do not reorder `STAGES`.
+- No commit, no PR. Do not skip hooks.
+
+## Acceptance
+
+```yaml
+interface:
+  - "bin/hub-new (make hub-new), HUB_NEW_FROM=<stage>; stages listed in STAGES"
+  - "env: PATH stubs for make, kubectl, docker, launchctl, security as in scripts/tests/bin/hub_new.bats; HUB_NEW_STATE_DIR scratch dir"
+must:
+  - id: M1
+    text: "A full hub-new run calls make hub-data-export-setup after make hub-data-recover and before make hub-data-export-schedule."
+  - id: M2
+    text: "verify_hub checks that secrets/hub-data-export exists and reports hub_data_export_sa pass in the verify JSON."
+  - id: M3
+    text: "not-installed.list line for install-hub-data-export names the data-stage setup; label and installer are unchanged."
+must_not:
+  - id: N1
+    text: "hub-new never installs the export job without running the setup: when make hub-data-export-setup fails, the data stage fails, the run stops, and make hub-data-export-schedule is not called (paired control: M1's run calls it)."
+  - id: N2
+    text: "verify_hub never reports pass when the ServiceAccount is missing: with STUB_NO_EXPORT_SA=1 it exits non-zero, names secrets/hub-data-export, and writes no hub-new-report.json with status pass (paired control: the stubbed SA present gives pass)."
+evidence:
+  - id: E1
+    proves: [M1, M2, M3, N1, N2]
+    kind: offline
+    what: "bats scripts/tests/bin/hub_new.bats; N1 and N2 shown red on the pre-fix bin/hub-new; the whole suite green after."
+  - id: E2
+    proves: [M1, M2]
+    kind: live
+    what: "Operator or Claude: the next hub rebuild drill's hub-new report shows hub_data_export_sa pass, and its first scheduled export succeeds (k3dm_hub_data_export_last_run_success 1, no HubDataExportNeverRan)."
+```
 
