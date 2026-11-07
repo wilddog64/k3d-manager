@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: disk fix landed d70047d5; filed cve-autopatch-empty-tables and grafana-error-page-stack-trace (P3); tier spec corrected; 4 dispatches.
 - 2026-11-07: matcher fix landed 73120c90; filed disk-metrics-scutil, hermes-e2e-null-counts, e2e-results-never-reach-m5-hub, security-findings-tier-column; watchdog Job deleted.
 - 2026-11-07: operator `make hub-sync` on M5: 3 docs-only commits pulled (8bab7807..8e483765), restarts and platform-ops correctly skipped, appsets-check ran (8 sets on v1.43.14). Hub catch-up E4 docs-only path PASS; code-commit path still waits for a code commit. `make restart-webhook` reloaded 03:55:52 PST; fan-out cap E2 waits for a multi-alert group. Hermes is a 300s StartInterval job, last exit 0.
 - 2026-11-07: operator gave the dispatch go for the Bugs dashboard matcher P1; dispatched to Luna as `bugs-dashboard-matcher`.

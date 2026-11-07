@@ -21,6 +21,10 @@
 
 Since the summary has null counts, Hermes then crashes (separate bug, linked above).
 
+## Progress
+
+- 2026-11-07: operator ran `gh auth refresh` on the M5 (F2 step 1). Next: one e2e run dispatched from the M5 shows whether `deploying-substrate` now passes (E2).
+
 ## Decision needed
 
 1. F1: point publish-back at the M5. Either Claude specs `make machine-setup ROLE=hub` to install the conf file, publisher key and forced-command entry (and a read-only check), or the operator recreates them by hand once. Either way, `make e2e-replay` then drains the 10 pending results.

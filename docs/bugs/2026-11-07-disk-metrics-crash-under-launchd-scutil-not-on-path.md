@@ -2,9 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** LANDED 2026-11-07 — `d70047d5` (Luna; Claude made the launchd-PATH test macOS-only for Linux CI); independent verifier pending
+**Fix commit:** d70047d5
 **Priority:** P2 — every host's disk gauges are frozen, so the critical disk-space alert cannot fire; running the script by hand is a workaround
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** explicit 2026-11-07 "can you investigate this issue, file bug if necessary and dispatch to Luna" (operator)
 **Severity:** high
 **Related:** `docs/bugs/2026-10-30-host-disk-labels-the-new-hub-as-m4-and-cannot-reach-m2.md` (its 2026-11-06 recurrence note; this doc is that recurrence's root cause)

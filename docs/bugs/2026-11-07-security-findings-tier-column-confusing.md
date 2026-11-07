@@ -21,18 +21,18 @@ Only `scripts/etc/argocd/platform-ops/grafana-dashboard-alertmanager-delivery.ya
    Escape it as the YAML file already escapes its JSON strings.
 2. **Table.** Columns, in order: `image`, `alertname`, `Value` renamed to `firing in`. Drop `tier` from `indexByName`. Change `options.sortBy` to `firing in` descending.
 3. **Description.** One row per image. `(upstream)` marks a third-party image we only consume, with no auto-remediation; no suffix means one of our images, remediated through the CVE loop. `firing in` is the number of cluster and namespace places where the image has critical CVEs, not the number of CVEs; see the CVE inventory dashboard for counts. This is a backlog, not a page.
-4. **Test.** Add assertions per the Acceptance block to the existing test for this dashboard if there is one under `scripts/tests/`; otherwise add them to `scripts/tests/bin/test_dashboard_queries.py`. If an existing assertion fails, stop and report it. Do not edit it.
+4. **Test.** Add assertions per the Acceptance block to `scripts/tests/plugins/alertmanager_delivery_dashboard.bats`, the existing test for this dashboard. If an existing assertion fails, stop and report it. Do not edit it. (2026-11-07: the first dispatch stopped because this step and the Files list disagreed; Claude corrected the Files list.)
 5. `CHANGELOG.md`: one bullet at the end of `[Unreleased]`.
 
 ## Files
 
 - `scripts/etc/argocd/platform-ops/grafana-dashboard-alertmanager-delivery.yaml`
-- `scripts/tests/bin/test_dashboard_queries.py`
+- `scripts/tests/plugins/alertmanager_delivery_dashboard.bats`
 - `CHANGELOG.md`
 
 ## Gates
 
-`pytest scripts/tests/bin/test_dashboard_queries.py` with `PATH` including a Python that has PyYAML, plus any bats file under `scripts/tests/` that names `alertmanager-delivery`. Paste the output, including failures.
+`bats scripts/tests/plugins/alertmanager_delivery_dashboard.bats` and `pytest scripts/tests/bin/test_dashboard_queries.py`, with `PATH` including a Python that has PyYAML. Paste the output, including failures.
 
 ## What NOT to Do
 
