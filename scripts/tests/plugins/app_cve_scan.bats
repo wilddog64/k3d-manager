@@ -60,6 +60,29 @@ case "${_last}" in
       printf 'lookup failed: no such host\n' >&2
       exit 1
     fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "refused" ]; then
+      printf 'dial tcp: connection refused\n' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "timeout" ]; then
+      # Captured from Trivy on the M4, 2026-11-06.
+      printf '%s\n' 'FATAL\tFatal error\trun error: image scan error: scan error: scan failed: failed analysis: analyze error: pipeline error: failed to analyze layer (sha256:ac271d74ef3d9c496439d99c5e8b7979ea5dfd47a333612551f0fcecd292089b): post analysis error: post analysis error: walk dir error: walk error: context deadline exceeded' >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "redaction" ]; then
+      printf 'detail %s ghp_abcdefghijklmnopqrstuvwxyz0123456789 github_pat_abcdefghijklmnopqrstuvwxyz0123456789 visible-tail\n' "${GH_TOKEN:-secret-sentinel}" >&2
+      exit 1
+    fi
+    if [ "${TEST_TRIVY_MODE:-ok}" = "cut-token" ]; then
+      printf '012345678901234567890123456789%s' "${TEST_CUT_TOKEN}" >&2
+      _i=0
+      while [ "${_i}" -lt 395 ]; do
+        printf x >&2
+        _i=$((_i + 1))
+      done
+      printf '\n' >&2
+      exit 1
+    fi
     if [ "${TEST_TRIVY_MODE:-ok}" = "invalid" ]; then
       printf 'unexpected scanner output\n'
       exit 0
@@ -417,7 +440,8 @@ _run_basket_candidate_scan() {
   run env -i PATH="${PATH}" TRIVY_LOG="${TRIVY_LOG}" CURL_LOG="${CURL_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
-    APP_SERVICES="shopping-cart-basket" GH_TOKEN="test-token" TEST_TRIVY_MODE="${_mode}" \
+    APP_SERVICES="shopping-cart-basket" GH_TOKEN="${TEST_GH_TOKEN:-test-token}" TEST_TRIVY_MODE="${_mode}" \
+    TEST_GH_TOKEN="${TEST_GH_TOKEN:-test-token}" TEST_CUT_TOKEN="${TEST_CUT_TOKEN:-}" \
     TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0" \
     TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0" \
     TEST_LATEST_CVES_shopping_cart_basket=1 TEST_LATEST_SEVERITY="${_severity}" \
@@ -586,6 +610,7 @@ _run_basket_candidate_scan() {
 
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=registry-auth)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: unauthorized: <redacted>"* ]]
   [[ "${output}" == *"FATAL: 1 candidate scan(s) failed"* ]]
   [[ "${output}" != *"${GH_TOKEN}"* ]]
   _assert_no_candidate_promotion_or_rebuild
@@ -636,6 +661,7 @@ _run_basket_candidate_scan() {
   _run_basket_candidate_scan execution HIGH
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=execution)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: scan engine failed unexpectedly"* ]]
   _assert_no_candidate_promotion_or_rebuild
 }
 
@@ -643,6 +669,90 @@ _run_basket_candidate_scan() {
   _run_basket_candidate_scan transport HIGH
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"candidate scan failed (reason=registry-transport)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: lookup failed: no such host"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy connection refused remains a registry transport failure" {
+  _run_basket_candidate_scan refused HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=registry-transport)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: dial tcp: connection refused"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail is stderr only and scan failure remains on stdout" {
+  export APP_SERVICES="shopping-cart-basket"
+  export GH_TOKEN="stderr-control-token"
+  export TEST_TRIVY_MODE="timeout"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report ghcr.io/wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  _stdout_file="${BATS_TEST_TMPDIR}/scan.stdout"
+  _stderr_file="${BATS_TEST_TMPDIR}/scan.stderr"
+
+  run /bin/sh -c '"$1" >"$2" 2>"$3"; exit "$?"' sh "${TEST_SCAN_SCRIPT}" "${_stdout_file}" "${_stderr_file}"
+  [ "${status}" -eq 1 ]
+  grep -q 'candidate scan failed (reason=timeout)' "${_stdout_file}"
+  grep -q 'FATAL: 1 candidate scan(s) failed' "${_stdout_file}"
+  grep -q 'trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new:.*context deadline exceeded' "${_stderr_file}"
+  run grep -q 'trivy error for' "${_stdout_file}"
+  [ "${status}" -eq 1 ]
+  run grep -q 'candidate scan failed' "${_stderr_file}"
+  [ "${status}" -eq 1 ]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "only the app-cve-scan CronJob deadlines and TTL change" {
+  _cronjob="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan-cronjob.yaml"
+  _app_values="$(awk '/name: app-cve-scan$/ { in_app=1 } in_app && /activeDeadlineSeconds:/ { deadline=$2 } in_app && /ttlSecondsAfterFinished:/ { ttl=$2; print deadline, ttl; exit }' "${_cronjob}")"
+  _verify_values="$(awk '/name: cve-remediation-verify$/ { in_verify=1 } in_verify && /ttlSecondsAfterFinished:/ { ttl=$2 } in_verify && /activeDeadlineSeconds:/ { print $2, ttl; exit }' "${_cronjob}")"
+  [ "${_app_values}" = "2400 90000" ]
+  [ "${_verify_values}" = "120 3600" ]
+}
+
+@test "Trivy deadline exceeded is logged as timeout and remains a failed candidate" {
+  _run_basket_candidate_scan timeout HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"candidate scan failed (reason=timeout)"* ]]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new:"* ]]
+  [[ "${output}" == *"context deadline exceeded"* ]]
+  [[ "${output}" != *"immutable candidate ghcr.io/wilddog64/shopping-cart-basket:sha-new is clean"* ]]
+  [[ "${output}" != *"candidate scan failed (reason=execution)"* ]]
+  grep -q -- '--timeout 10m' "${TRIVY_LOG}"
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts all supported token forms and keeps surrounding text" {
+  _run_basket_candidate_scan redaction HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"trivy error for ghcr.io/wilddog64/shopping-cart-basket:sha-new: detail <redacted> <redacted> <redacted> visible-tail"* ]]
+  [[ "${output}" != *"test-token"* ]]
+  [[ "${output}" != *"ghp_abcdefghijklmnopqrstuvwxyz0123456789"* ]]
+  [[ "${output}" != *"github_pat_abcdefghijklmnopqrstuvwxyz0123456789"* ]]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts GH_TOKEN before cutting at the 400 character boundary" {
+  export TEST_CUT_TOKEN="test-token-value-that-extends-past-the-cut-boundary"
+  export TEST_GH_TOKEN="${TEST_CUT_TOKEN}"
+  _run_basket_candidate_scan cut-token HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -20}"* ]]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -5}"* ]]
+  _detail="$(printf '%s\n' "${output}" | sed -n 's/^.*trivy error for .*: //p' | head -n1)"
+  [ "${#_detail}" -le 400 ]
+  _assert_no_candidate_promotion_or_rebuild
+}
+
+@test "Trivy detail redacts ghp_ tokens before cutting at the 400 character boundary" {
+  export TEST_CUT_TOKEN="ghp_abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZ"
+  export TEST_GH_TOKEN="different-gh-token"
+  _run_basket_candidate_scan cut-token HIGH
+  [ "${status}" -eq 1 ]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -20}"* ]]
+  [[ "${output}" != *"${TEST_CUT_TOKEN: -5}"* ]]
+  _detail="$(printf '%s\n' "${output}" | sed -n 's/^.*trivy error for .*: //p' | head -n1)"
+  [ "${#_detail}" -le 400 ]
   _assert_no_candidate_promotion_or_rebuild
 }
 
@@ -677,6 +787,7 @@ _run_basket_candidate_scan() {
     TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
+  [[ "${output}" != *"trivy error for"* ]]
   grep -q 'patch application ubuntu-hostinger-shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
