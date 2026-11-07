@@ -3,6 +3,7 @@
 - 2026-11-07: ladder table live-verified (operator). Hub specs got dispatch go; reordered: hub-deploy-ref → v1.43.15 p5, claude-cost-task-attribution → v1.43.16 p5, dev-hub-vcluster → v1.43.16 p4, argocd-ha → v1.43.17 p1.
 - 2026-11-07: verification-ladder-table VERIFIED offline (verify recorded); live E2 pending.
 - 2026-11-07: verification-ladder-table LANDED 35fbd4bb (table, sort by tasks, unknown explained); verifier pending.
+- 2026-11-07: spec v1.43.17-service-password-travel-bundle (plan 2; age-encrypted show-service-passwords for enrolled laptops via iCloud Drive; operator asked). Tailscale noted as separate pull option.
 - 2026-11-07: OrbStack 16→24 GB on the M5 DONE (dev-hub P0). Hub restart recovered by 06:51: Vault unsealed by the operator (`hub_data_unseal_dr`), 3 stale node-exporter IPs fixed with `k3dm-hostnet-drift --fix`, Hostinger store revalidated by itself, 29/29 apps, smoke 9/0, SSO OK.
 - 2026-11-07: v1.43.17 specs dev-hub-vcluster + argocd-ha-zero-downtime-upgrade (rehearse in dev hub; takes ArgoCD part of v1.28.0). Prereq OrbStack 24 GB.
 - 2026-11-07: spec v1.43.15-hub-deploy-ref-and-live-write-guard (a36fac97: deploy/hub ref, hub-promote/rollback, platform-ops from git-archive). v1.43.15 at cap, so v1.43.16 plan 4.

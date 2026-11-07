@@ -540,6 +540,8 @@ Branch `k3d-manager-v1.43.17`, cut from `main` after v1.43.16 merges (it depends
 
 **v1.43.17 plan 1:** [`argocd-ha-zero-downtime-upgrade`](plans/v1.43.17-argocd-ha-zero-downtime-upgrade.md) (operator, 2026-11-07: "do we have room to support argocd no downtime upgrade (for cve patch)"). ArgoCD server, repo-server and applicationset-controller at 2 replicas with PDBs; `argocd_upgrade` probes availability through the rollout and refuses a hub upgrade without a passing rehearsal in the dev hub. Takes over the ArgoCD part of the parked `v1.28.0-platform-zero-downtime-rollouts`.
 
+**v1.43.17 plan 2:** [`service-password-travel-bundle`](plans/v1.43.17-service-password-travel-bundle.md) (operator, 2026-11-07: "is there a secure way to send make show-service-passwords to me if I travel"; "yes, write a spec for option 2"). The hub age-encrypts the `show-service-passwords` output for each enrolled laptop's key into iCloud Drive whenever it changes; the laptop decrypts it with a Keychain-held identity. Never plaintext on disk or in a message. Tailscale (pull over ssh) stays a separate travel-goal candidate.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
