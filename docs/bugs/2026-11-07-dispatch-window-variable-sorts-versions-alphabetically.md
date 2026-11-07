@@ -1,8 +1,8 @@
 # Bug: the Window dropdown on the Agent Dispatch and Agent Cost dashboards sorts releases alphabetically
 
-**Status:** OPEN — E2 live check FAILED 2026-11-07: `0a00bb39` (`sort: 8`) is live but Grafana 11.4.0 cannot apply it (upstream scenes natural-sort defect); a data-side fix is needed
+**Status:** OPEN — `0a00bb39` (`sort: 8`) is live but inert on Grafana 11.4.0 (upstream scenes defect, fixed in Grafana 11.5.0); data-side fix specced and dispatched 2026-11-07 (operator: "go ahead with sorting on our side")
 **Priority:** P3 (cosmetic: the dropdown order is wrong, every option still works)
-**Waiting on:** operator decision — since 2026-11-07
+**Waiting on:** fix running — since 2026-11-07
 **Severity:** low
 **Approval:** operator 2026-11-07: "go ahead, but don't forget the file a bug for it too"
 **Release:** v1.43.15 (bug docs do not count toward the plan cap)
@@ -108,3 +108,80 @@ defect, which is the reason E2 exists.
    This works on 11.4.0. Recommended.
 2. **Upgrade Grafana** to a release whose scenes compares `label`. This is a larger change, and needs the fixed scenes
    version confirmed first.
+
+## Fix (amended 2026-11-07 — data-side order; supersedes `## Fix` above)
+
+Operator decision 2026-11-07: "go ahead with sorting on our side". Grafana must not do the sorting; the order comes
+from the data.
+
+1. `bin/k3dm-dispatch-metrics`: for every `window` value it emits on `k3dm_dispatch_landed`, also emit exactly one
+   `k3dm_dispatch_window_order{window="<w>"} <n>`, where a higher `n` means listed earlier:
+   - a release `vX.Y.Z`: `n = X*1000000 + Y*1000 + Z` (so `v1.43.15` = 1043015, above `v1.43.9` = 1043009);
+   - the time windows rank below every release, in the order `1d` (3), `7d` (2), `30d` (1).
+2. The Window variable on both dashboards (`scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
+   and `grafana-dashboard-agent-cost.yaml`): query `query_result(sort_desc(k3dm_dispatch_window_order))`, regex
+   `/window="([^"]+)"/`, and `"sort": 0`. In Grafana 11.4.0, `0` is `VariableSort.disabled`
+   (`packages/grafana-data/src/types/templateVars.ts` at `v11.4.0`), and scenes 5.28.1 `sortVariableValues` then
+   returns the options in query order. Keep the variable's name, label, default (`current`) and refresh as they are.
+3. Update `docs/guides/grafana-dashboards/` for each of the two dashboards (the Window variable): the order comes from
+   `k3dm_dispatch_window_order` because Grafana 11.4.0 cannot natural-sort; on Grafana 11.5.0 or later a `sort`
+   value would work, but the data-side order stays correct on either.
+
+Expected order: `v1.43.15, v1.43.14, v1.43.13, v1.43.12, ..., v1.43.10, v1.43.9, ..., v1.43.0, 1d, 7d, 30d`.
+
+## Files (amended fix)
+
+- `bin/k3dm-dispatch-metrics`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml`
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml`
+- `scripts/tests/bin/test_dispatch_metrics.py`
+- `scripts/tests/plugins/agent_dispatch_dashboard.bats`
+- the two dashboard guides under `docs/guides/grafana-dashboards/` (name them in your final message)
+
+## What NOT to do (amended fix)
+
+- Do not use a `sort` value other than `0`; Grafana 11.4.0 applies none of the natural or numerical sorts.
+- Do not rename `window` labels or zero-pad versions; every panel query filters on `window="$window"`.
+- Do not change any other metric or panel.
+- Two other open dispatches (`2026-11-07-bugs-dashboard-fix-running-not-checked-against-worker`,
+  `2026-11-07-agy-dispatch-runs-have-no-api-equivalent-cost`) also edit `bin/k3dm-dispatch-metrics`. Keep your change
+  local to where `k3dm_dispatch_landed` is emitted, so the three merge cleanly.
+- Do not run git add, commit or push, and do not touch `memory-bank/`.
+
+## Acceptance (amended fix)
+
+```yaml
+must:
+  M1: for each window value on k3dm_dispatch_landed, the exporter emits exactly one k3dm_dispatch_window_order series with the value defined in the amended Fix
+  M2: both dashboards' Window variable queries query_result(sort_desc(k3dm_dispatch_window_order)) with regex /window="([^"]+)"/ and sort 0
+  M3: the guides explain where the order comes from and why
+must_not:
+  N1: v1.43.10 never ranks below v1.43.9, and v1.43.15 never ranks below v1.43.2 (red on the pre-fix exporter, which emits no order)
+  N2: a window that is not on k3dm_dispatch_landed never gets an order series, so the dropdown shows no option without data (paired control for M1)
+  N3: no time window ranks above a release
+evidence:
+  E1:
+    proves: [M1, N1, N2, N3]
+    kind: offline
+    intent: >-
+      You will see test_dispatch_metrics.py feed releases v1.43.0, v1.43.2, v1.43.9, v1.43.10, v1.43.15 and the three
+      time windows, and assert the window_order values and the resulting descending order; red on the pre-fix exporter.
+    what: python3 -m pytest scripts/tests/bin/test_dispatch_metrics.py
+  E2:
+    proves: [M2]
+    kind: offline
+    intent: >-
+      You will see agent_dispatch_dashboard.bats assert the query, regex and sort 0 on both dashboards; red on the
+      pre-fix dashboards (sort 8, label_values query).
+    what: bats scripts/tests/plugins/agent_dispatch_dashboard.bats
+  E3:
+    proves: [M1, M2, N1]
+    kind: live
+    intent: >-
+      After make platform-ops and with the ApplicationSets on the fix branch, the operator opens Window on k3dm Agent
+      Dispatch and sees v1.43.15 first and 1d, 7d, 30d last.
+    what: k3dm Agent Dispatch dashboard, Window dropdown
+interface:
+  - bin/k3dm-dispatch-metrics (Prometheus text output)
+  - the Window variable in grafana-dashboard-agent-dispatch.yaml and grafana-dashboard-agent-cost.yaml
+```
