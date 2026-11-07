@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: P1 #9 matcher tile LIVE-VERIFIED (operator E2). All v1.43.14 P1s settled: 6 live-verified, 3 carried to v1.43.15. Release cut started (operator: "start v1.43.14 release cut").
 - 2026-11-07: P1 #9 matcher tile VERIFIED offline (independent Sonnet verifier: 73120c90 5 passed rc 0; dc5f6bb0 3 failed rc 1; verify recorded). Live E2 = operator's look at the tile.
 - 2026-11-07: P1 sudoers-launchdaemon LIVE-VERIFIED (M2 reinstalled 08:13, 5 rules, no LaunchDaemon/ifconfig). Carried 3 P1 live checks to v1.43.15 (D3 Part B E5, browser-agent-78 E2, hub-cutover E3). #9 matcher tile: independent verifier dispatched.
 - 2026-11-07: P1 recheck. LIVE-VERIFIED: sudoers-passwordless (M4/M5/M2 listings), hostinger-refresh-browser-agents (M5 E4). FOUND: the M2 still has the root-equivalent LaunchDaemon sudoers rule (checkout predates D3 Part A). Operator: git pull + make install-sudoers on the M2.

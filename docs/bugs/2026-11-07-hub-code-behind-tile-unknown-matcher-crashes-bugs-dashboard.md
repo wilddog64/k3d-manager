@@ -2,10 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** VERIFIED 2026-11-07 offline — independent verifier PASS (see `## Independent verification E1`); live E2 pending the operator's look at the tile. Was: LANDED 2026-11-07 — `73120c90` (Luna)
-**Fix commit:** 73120c90
+**Status:** LIVE-VERIFIED 2026-11-07 — E2 confirmed by the operator ("go ahead to promote #9 to live-verified"); offline E1 independent verifier PASS (see `## Independent verification E1`). Was: LANDED 2026-11-07 — `73120c90` (Luna)
+**Fix commit:** `73120c90`
+**Live evidence:** 2026-11-07 · run operator-grafana-bugs-dashboard · env hub · scenario hub-code-behind-tile-renders · commit b1337c84 · proves E2
 **Priority:** P1 — the whole Bugs dashboard fails to render; there is no workaround in the UI
-**Waiting on:** live check — since 2026-11-07
 **Approval:** explicit 2026-11-07 "go ahead." (operator, dispatch go)
 **Severity:** high
 
