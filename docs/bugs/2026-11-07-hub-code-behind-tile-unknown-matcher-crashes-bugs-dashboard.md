@@ -4,8 +4,8 @@
 **Branch:** `k3d-manager-v1.43.14`
 **Status:** OPEN
 **Priority:** P1 — the whole Bugs dashboard fails to render; there is no workaround in the UI
-**Waiting on:** operator decision — since 2026-11-07
-**Approval:** pending — hub dashboard fix, needs a dispatch go
+**Waiting on:** fix running — since 2026-11-07
+**Approval:** explicit 2026-11-07 "go ahead." (operator, dispatch go)
 **Severity:** high
 
 ## Symptom

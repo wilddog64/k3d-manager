@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: operator gave the dispatch go for the Bugs dashboard matcher P1; dispatched to Luna as `bugs-dashboard-matcher`.
 - 2026-11-07: live check of `dc5f6bb0` found the Bugs dashboard crashing: tile 19 override uses frame matcher `byRefId`, field override needs `byFrameRefID` (Grafana 11.4.0 `ids.ts`). Filed P1 `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md`, waiting on dispatch go. Hub catch-up E3 tile half fails until fixed.
 - 2026-11-07: M5 pulled to `8bab7807` (operator ran `git pull`, so no code left behind). Hermes restarted 03:50 PST; `k3dm_hub_checkout_code_commits_behind` = 0 matches M5 rev-list 0, on_newest_release = 1. Hub catch-up E3 zero case passed; nonzero case and E4 wait for the next code commit. Payment pinned by promoter `8bab7807`, app Synced/Healthy.
 - 2026-11-06: `s1-version-resolve` landed `7d7cd7bd`, verify PASS (37 tests, 5 mutants). `p0-s1-dispatcher` verify PASS recorded. Live checks and S1 E8 open.
