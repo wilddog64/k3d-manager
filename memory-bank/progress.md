@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: P1 recheck. LIVE-VERIFIED: sudoers-passwordless (M4/M5/M2 listings), hostinger-refresh-browser-agents (M5 E4). FOUND: the M2 still has the root-equivalent LaunchDaemon sudoers rule (checkout predates D3 Part A). Operator: git pull + make install-sudoers on the M2.
 - 2026-11-07: P1 2/9 observability-launchd-reload-race LIVE-VERIFIED (Claude, M5: 4 agents loaded, auth proxies on python3.14, no direnv path, Alertmanager 401 not 502).
 - 2026-11-07: P1 1/9 dispatch-verify-records-pass-with-no-evidence LIVE-VERIFIED (Claude, hub Prometheus: v1.43.13 claimed 11, v1.43.14 delivered 36). M5 checkout is 54 behind origin: host-side P1 checks need operator git pull + make platform-ops on the M5.
 - 2026-11-07: forecast drift P3 LANDED 11982d31 and VERIFIED (verifier 17/17, 13 red pre-fix); live E2 after platform-ops. P1 live-check pass started (operator: one at a time, then cut).

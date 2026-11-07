@@ -1,7 +1,9 @@
 # Bug: the Hostinger refresh never writes the argocd and keycloak browser agents, so `make install-browser-relays` would leave the hub's browser URLs with no backend
 
-**Status:** VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED 2026-11-06 (`632ac235`), independent verify PASS (offline E1, E2, E3, E5, E6). Live E4 on the M5 still open, with Part B E5. Not reproduced live; found by reading the code before the M5 pass.
+**Status:** LIVE-VERIFIED 2026-11-07 — E4 by Claude on the M5 (see `## Live verification E4 (Claude, M5, 2026-11-07)`). Was: VERIFIED — restated 2026-11-07 by Claude, verification already recorded below; was: LANDED 2026-11-06 (`632ac235`), independent verify PASS (offline E1, E2, E3, E5, E6). Live E4 on the M5 still open, with Part B E5. Not reproduced live; found by reading the code before the M5 pass.
 **Priority:** P1
+**Fix commit:** `632ac235`
+**Live evidence:** 2026-11-07 · run claude-m5-launchctl-read · env hub · scenario hostinger-refresh-writes-three-browser-agents · commit 632ac235 · proves E4
 **Severity:** high on the M5 only when its Part B pass runs. `make install-browser-relays` removes the root daemons, and nothing then listens on 18443 or 18080. Today nothing is broken, because the M5 still runs the legacy daemons.
 **Approval:** operator, 2026-11-05: "dispatch Part B gap".
 **Filed:** 2026-11-06
@@ -117,3 +119,16 @@ interface:
 - `scripts/tests/lib/provider_contract.bats:839` already drives this function with a scratch `SCRIPT_DIR`. Copy `lib/port_forward_wrapper.sh` and any needed template there, or the helper silently is not present.
 - The plugin loader only checks for `register_app_cluster` and `_argocd_hub_kubectl_cmd`. A test that stubs those skips the `source` and must define the wrapper helper itself, so assert the wrapper file exists rather than trusting a zero exit.
 - Stubs imitating `launchctl` take real captured output, with host and date in a comment.
+
+## Live verification E4 (Claude, M5, 2026-11-07)
+
+Read-only over SSH. The M5 checkout `8e483765` contains `632ac235` (2026-11-05 21:36).
+
+- Plists `com.k3d-manager.browser.argocd-https` and `browser.keycloak-http` were written 2026-11-06 04:25:56, and
+  `browser.hostinger-frontend-http` at 04:26:08. All three come from one run, after the fix. Before the fix, the Hostinger path never wrote the first two.
+- `launchctl print`: all three agents have a pid. argocd and keycloak have `runs = 1` and have never exited.
+- Listeners: `socat` on `127.0.0.1:18443`, `kubectl` on `127.0.0.1:18080` and `127.0.0.2:18082`.
+- Browser URLs: `https://argocd.shopping-cart.local` 200, `http://keycloak.shopping-cart.local` 302,
+  `http://127.0.0.2:80` 200. Public: `frontend.3ai-talk.org` 200, `keycloak.3ai-talk.org` 302, `argocd.3ai-talk.org` 200.
+- `browser.hostinger-frontend-http` shows `runs = 129`. Its log tail is ordinary `Handling connection for 18082`. The
+  restarts come from `kubectl port-forward` reconnects under KeepAlive, not this bug.

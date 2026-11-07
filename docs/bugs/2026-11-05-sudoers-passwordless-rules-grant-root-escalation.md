@@ -1,7 +1,9 @@
 # Bug: passwordless sudoers rules let any same-user process gain root (self-update and /usr/local/bin wildcards)
 
-**Status:** CLOSED: VERIFIED 2026-11-05. Fixed in `4c4f7dd1`. Independent verify PASS. Live E4 PASS on the M4. The fixed rules are reinstalled on M4, M5 and M2.
+**Status:** LIVE-VERIFIED 2026-11-07 — Claude re-read the listings on the M4, M5 and M2 (see `## Live recheck (Claude, 2026-11-07)`). Was: CLOSED: VERIFIED 2026-11-05. Fixed in `4c4f7dd1`. Independent verify PASS. Live E4 PASS on the M4. The fixed rules are reinstalled on M4, M5 and M2.
 **Priority:** P1
+**Fix commit:** `4c4f7dd1`
+**Live evidence:** 2026-11-07 · run claude-sudo-n-l-read · env m4-m5-m2 · scenario no-root-escalating-nopasswd-rule · commit e1aa2e28 · proves E4
 **Severity:** high — local privilege escalation. Any process running as an `%admin` user (a dispatched Codex/agy agent, a compromised npm/pip postinstall, a malicious repo script) can become root with no password, on every Mac that ran `make install-sudoers`.
 **Filed:** 2026-11-05
 **Detected by:** Terra's abandoned Phase C worktree inventory (`docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md`, archived 2026-11-05 in `~/.local/share/k3d-manager/archive/2026-11-02-acg-up-stalls-at-system-keychain-trust/untracked.tar.gz` after its worktree was abandoned), re-checked by Claude against `bin/install-sudoers.sh` on `k3d-manager-v1.43.14` (`7c9927e9`).
@@ -136,3 +138,18 @@ The M2 is pending until the bash 3.2 crash is fixed, or until it is installed wi
 
 - **M2.** The operator ran `eval "$(brew shellenv)"`, then `make install-sudoers` on `k3d-manager-v1.43.14`. The output shows `Installed /etc/sudoers.d/k3d-manager` and `Installed /usr/local/bin/k3d-manager-update-hosts`. Claude cannot reach the M2, so the full `sudo -n -l` listing was checked on the M4 only.
 - **M5.** `make install-sudoers` succeeded (operator report).
+
+## Live recheck (Claude, 2026-11-07)
+
+Read-only `sudo -n -l` on each machine, compared with the Darwin rules in `bin/install-sudoers.sh:39-47`
+(lines 53-59 are Linux-only and are not installed on macOS).
+
+| Machine | `NOPASSWD` lines | `/etc/sudoers.d` target, or install/cp/chmod under `/usr/local/bin` |
+|---|---|---|
+| M4 | 5, exactly the Darwin set | none |
+| M5 (hub) | 5, exactly the Darwin set | none |
+| M2 | 16 | none |
+
+The M2 file (Nov 5 16:31, 1823 bytes) carries this fix. It predates D3 Part A and still lists the LaunchDaemon and
+`ifconfig` rules; that is the separate P1 `docs/bugs/2026-11-05-sudoers-launchdaemon-plist-rule-is-root-equivalent.md`.
+Since the E4 run on 2026-11-05, D3 Part A has removed more rules, from 16 lines down to 5 on the M4 and the M5.

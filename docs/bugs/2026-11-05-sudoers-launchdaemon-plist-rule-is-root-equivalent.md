@@ -1,8 +1,8 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B landed and verified (`docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`); its live check is partial. This doc stays open until the old rule is confirmed gone from the machines.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B landed and verified (`docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`); its live check is partial. This doc stays open until the old rule is confirmed gone from the machines. 2026-11-07: gone on the M4 and the M5, still present on the M2 (see `## Live recheck (Claude, 2026-11-07)`).
 **Priority:** P1
-**Waiting on:** live check
+**Waiting on:** live check — since 2026-11-07
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.
 **Filed:** 2026-11-05
 **Detected by:** `docs/issues/2026-11-02-acg-phase-c-privileged-inventory.md` (Terra Phase C worktree), confirmed by Claude against `bin/install-sudoers.sh` at `7c9927e9`.
@@ -245,3 +245,18 @@ interface:
 ```
 
 Part 2's Acceptance is written when it is filed.
+
+## Live recheck (Claude, 2026-11-07)
+
+Read-only `sudo -n -l` and `launchctl print system/<relay>`:
+
+| Machine | LaunchDaemon / `ifconfig` rule | Relays `username` |
+|---|---|---|
+| M4 (rebooted 2026-11-06 07:32, after Part A) | gone | `nobody` for all four |
+| M5 (hub) | gone | `nobody` for all four |
+| M2 | **present**: `ifconfig lo0 alias/-alias`, `launchctl bootstrap/bootout system .../com.k3d-manager.*.plist`, `install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist`, `rm -f .../com.k3d-manager.*.plist *` | not checked |
+
+The M2 checkout is `6b7d068c` (2026-11-05 16:24), which predates Part A (`84da2bcc`, 16:34). Its sudoers file is from 16:31.
+Remaining: the operator, on the M2, runs `git pull` then `make install-sudoers`. Claude then rechecks `sudo -n -l`.
+Browser URLs on the M5: argocd 200, keycloak 302, Hostinger frontend 200. The sandbox frontend (`127.0.0.3:80`) has no
+backend while no ACG sandbox is up.
