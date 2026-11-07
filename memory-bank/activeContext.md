@@ -12,7 +12,7 @@ Triage 2026-11-07 (bug docs touched on this branch vs main):
 
 ## Handoff — 2026-11-06 bug batch dispatched in waves; start here
 
-**2026-11-07 cut-plan progress (latest):** CVE empty-tables VERIFIED (279839c1; verifier 13/13, pre-fix 5 red). 21 already-verified bugs restated with VERIFIED first word (1a609c47). Tier v2 LANDED 5b7ecd15 (live E2 after dashboard sync). Independent verifiers running: tier v2 (5b7ecd15 vs 1d3db79e), keychain-trust follow-up (0b11c1f9 vs 8d57ff9e, plus head), hub machine-role guard (bd3002db vs 6e186f20), dispatch resume-reason (22110d0c vs 6774f198). Workers still running: control-node-role, claude-context-cost-per-turn.
+**2026-11-07 cut-plan progress (latest):** CVE empty-tables VERIFIED (279839c1; verifier 13/13, pre-fix 5 red). 21 already-verified bugs restated with VERIFIED first word (1a609c47). Tier v2 VERIFIED 5b7ecd15 (verifier 10/10, pre-fix 10 red; live E2 after dashboard sync). fleet-host-cpu-memory-alerts MOVED to v1.43.16 (not started; raw 10-31 captures never stored, macmon not installed) — v1.43.14 back to 5 plans. Independent verifiers running: keychain-trust follow-up (0b11c1f9 vs 8d57ff9e, plus head), hub machine-role guard (bd3002db vs 6e186f20), dispatch resume-reason (22110d0c vs 6774f198). Workers still running: control-node-role, claude-context-cost-per-turn.
 
 - 2026-11-07: CVE empty tables LANDED `279839c1` (verifier running). Dispatched to Luna: plans `control-node-role`, `claude-context-cost-per-turn` (cost-plan D1 already done 2026-11-01). Tier v2 still running.
 - 2026-11-07: Hermes null counts LANDED `d619fcbd`, independent verify PASS (Status VERIFIED; live E2 = next scheduled M5 slot writes <slot>.json and posts). Memory bank compressed (`7353f147`).

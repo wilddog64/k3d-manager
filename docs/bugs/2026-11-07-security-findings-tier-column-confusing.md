@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — 5b7ecd15 (Luna, second run; reviewed by Claude, CHANGELOG conflict resolved by Claude); independent verifier running
+**Status:** VERIFIED 2026-11-07 — 5b7ecd15 (Luna, second run; reviewed by Claude, CHANGELOG conflict resolved by Claude); independent verifier PASS (fix 10 passed with anchored label_replace evaluation, pre-fix 10 red); live E2 pending
 **Fix commit:** 5b7ecd15
 **Priority:** P3 — cosmetic; every row is present and correct
 **Waiting on:** live check — since 2026-11-07
