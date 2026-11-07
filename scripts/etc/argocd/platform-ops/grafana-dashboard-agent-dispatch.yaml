@@ -1530,13 +1530,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, spec_url, vsort) (label_replace(label_replace(label_replace(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "expr": "sum by (version, slug, run, outcome, evidence, evidence_summary, evidence_path, spec_url, vsort) (label_join(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(k3dm_dispatch_task_run_outcome{window=\"$window\"}, \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"), \"rpad\", \"00$1\", \"run\", \"([0-9])\"), \"rpad\", \"0$1\", \"run\", \"([0-9]{2})\"), \"rpad\", \"$1\", \"run\", \"([0-9]{3,})\"), \"vsort\", \"|\", \"vsort\", \"slug\", \"rpad\"))",
               "instant": true,
               "format": "table",
               "refId": "A"
             },
             {
-              "expr": "sum by (version, slug, run, vsort) (label_replace(label_replace(label_replace(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"}, \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"))",
+              "expr": "sum by (version, slug, run, vsort) (label_join(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(k3dm_dispatch_task_run_agent_tokens{window=\"$window\"}, \"vsort\", \"$1\", \"version\", \"(.*)\"), \"vsort\", \"v$1.0$2.$3\", \"vsort\", \"v([0-9]+)[.]([0-9])[.](.*)\"), \"vsort\", \"$1.0$2\", \"vsort\", \"(v[0-9]+[.][0-9]+)[.]([0-9])\"), \"rpad\", \"00$1\", \"run\", \"([0-9])\"), \"rpad\", \"0$1\", \"run\", \"([0-9]{2})\"), \"rpad\", \"$1\", \"run\", \"([0-9]{3,})\"), \"vsort\", \"|\", \"vsort\", \"slug\", \"rpad\"))",
               "instant": true,
               "format": "table",
               "refId": "B"
@@ -1713,6 +1713,18 @@ data:
                   "evidence_path": "Log",
                   "Value #B": "Tokens"
                 }
+              }
+            },
+            {
+              "id": "convertFieldType",
+              "options": {
+                "fields": {},
+                "conversions": [
+                  {
+                    "targetField": "run",
+                    "destinationType": "number"
+                  }
+                ]
               }
             }
           ]
