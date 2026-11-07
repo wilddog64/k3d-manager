@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: control-node-role landed 0b9f0461 (CHANGELOG conflict kept both bullets); verifier launched. Filed P3 verification-ladder-panel-clips-rows-and-cannot-sort from operator live check.
 - 2026-11-07: claude-context-cost-per-turn independently verified (15/15 on fix, 13 red pre-fix); ledger needed `verifier:` and `pre_fix_command:` header lines — added in a normalized copy.
 - 2026-11-07: claude-context-cost-per-turn landed 1bf0cf40 (bats 42/42, pytest 190/190); `--allow-out-of-scope` for the bats fixture update; independent verify launched.
 - 2026-11-07: hub machine-role guard independently verified (M2/M3 gap noted). Slip: ca2aecc6 pushed VERIFIED before the ledger accepted the evidence (rc format); recorded a minute later from a normalized copy.
