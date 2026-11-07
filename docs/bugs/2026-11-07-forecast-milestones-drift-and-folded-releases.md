@@ -61,6 +61,16 @@
   `make check-release-milestones`. Follow the existing guard pattern in the hook, including a skip
   variable (`K3DM_SKIP_RELEASE_MILESTONES=1`) like `K3DM_SKIP_DOC_LINKS`.
 
+## Files
+
+- `bin/k3dm-vectordb-metrics` (`_load_milestones`, `_forecast`, `_forecast_metrics` only)
+- `scripts/tests/bin/test_vectordb_bug_metrics.py`
+- `scripts/tests/bin/test_release_milestones_drift.py`
+- `.githooks/pre-commit`
+- `Makefile` (`check-release-milestones` and its help line)
+- `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml` (Remaining releases panel, only if F2 needs it)
+- `CHANGELOG.md` (one `### Fixed` bullet under `[Unreleased]`)
+
 ## What NOT to Do
 
 - Do not generate `docs/release-milestones.json`. It holds hand-entered facts (`not_before`,
