@@ -42,3 +42,11 @@ Fix: the fixture passes `PYTHONUSERBASE` (the parent's value, or `site.getuserba
 `ubuntu:24.04` as a non-root user with `pip install --user pytest==9.1.1`: pre-fix 2 failed (rc 1), fixed 3 passed (rc 0).
 
 Process note: a test that swaps `HOME` and starts another Python must carry the user site with it.
+
+## CI red 4 — `codex_dispatch.bats` S1 advisory-gates test raced the worker (run 42396866390)
+
+- **Failure:** `not ok 237 codex dispatch S1 open advisory gates do not block resume, land, or a new task`; `git -C "$K3DM_WORKTREE_ROOT/v9.9.9/$slug" commit` failed at line 384.
+- **Root cause:** `s1_start_finished` returned as soon as `$run/exit` existed. The dispatcher writes the exit marker *before* its bookkeeping (`_dispatch_codex_exit` runs `git add -A`, `write-tree`, `reset` in the worktree). The test's own `git add`/`commit` then raced that bookkeeping for the worktree index — losing on a slower CI runner.
+- **Fix:** the helper now also waits until the worker PID from `$run/pid` has exited.
+- **Proof:** mutation — a `sleep 1` injected between `write-tree` and `reset` made the old helper fail (`[ "$open_rc" -eq 0 ]`) and the new helper pass; dispatcher restored and `cmp`-checked. Full suite 105/105 locally.
+- **Process note:** a test that waits on a "done" marker must check the marker is written last; here it is deliberately written first (so a bookkeeping failure cannot hide the exit), so "done" means the process is gone.

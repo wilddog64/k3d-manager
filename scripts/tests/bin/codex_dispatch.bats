@@ -120,7 +120,12 @@ s1_start_finished() {
   local slug="$1" run_dir="$K3DM_WORKTREE_ROOT/v9.9.9/$1.run" tries
   export STUB_ARGV="$BATS_TEST_TMPDIR/$slug.argv" STUB_ENV="$BATS_TEST_TMPDIR/$slug.env"
   dispatch start --spec docs/plans/v9.9.9-demo.md --slug "$slug" >/dev/null
-  for tries in {1..100}; do [[ -f "$run_dir/exit" ]] && return 0; sleep 0.1; done
+  local pid=""
+  for tries in {1..100}; do
+    [[ -n "$pid" || ! -f "$run_dir/pid" ]] || pid="$(<"$run_dir/pid")"
+    if [[ -f "$run_dir/exit" && -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then return 0; fi
+    sleep 0.1
+  done
   echo "worker did not finish: $slug" >&2
   return 1
 }
