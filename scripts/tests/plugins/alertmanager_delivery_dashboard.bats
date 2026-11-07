@@ -104,6 +104,41 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "security findings panel combines tier into image and explains firing places" {
+  run python3 - "$DASH" <<'PY'
+import json, re, sys
+text = open(sys.argv[1]).read()
+body = text.split("alertmanager-delivery.json: |\n", 1)[1]
+dash = json.loads("\n".join(line[4:] for line in body.splitlines()))
+panel = next(panel for panel in dash["panels"] if panel["id"] == 10)
+expr = panel["targets"][0]["expr"]
+assert "count by (image, alertname)" in expr, expr
+assert "count by (tier," not in expr, expr
+columns = panel["transformations"][0]["options"]["indexByName"]
+assert list(columns) == ["image", "alertname", "Value"], columns
+assert "tier" not in columns and "tier" not in expr.split("count by (", 1)[1].split(")", 1)[0]
+assert panel["transformations"][0]["options"]["renameByName"]["Value"] == "firing in"
+assert panel["options"]["sortBy"] == [{"displayName": "firing in", "desc": True}]
+assert "not the number of CVEs" in panel["description"]
+
+# Equivalent evaluation of the two label_replace rules in the panel query.
+joined = re.compile(r"(.+)\|(.+)")
+trailing = re.compile(r"(.+)\|")
+def image_value(repository, tier=None):
+    value = repository + "|" + (tier or "")
+    value = joined.sub(r"\1 (\2)", value)
+    return trailing.sub(r"\1", value)
+
+assert image_value("argoproj/argocd", "upstream") == "argoproj/argocd (upstream)"
+assert image_value("wilddog64/foo") == "wilddog64/foo"
+assert not image_value("wilddog64/foo").endswith("|")
+assert "()" not in image_value("wilddog64/foo")
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
 @test "dashboard panel rectangles do not overlap and ids are unique" {
   run python3 - "$DASH" <<'PY'
 import json, sys
