@@ -306,11 +306,11 @@ Usage:
   bin/k3dm-codex-dispatch usage-backfill
   bin/k3dm-codex-dispatch release-merged --version vX.Y.Z --pr N --merged-at YYYY-MM-DDTHH:MM:SSZ
   bin/k3dm-codex-dispatch gate-status --slug SLUG [--version V] [--json] [--as-of TS]
-  bin/k3dm-codex-dispatch mark --slug S --state offline_tested|deployed|live_verified --sha SHA --evidence FILE --by NAME
-  bin/k3dm-codex-dispatch gate-record --slug S --event EVENT [event-specific flags]
+  bin/k3dm-codex-dispatch mark --slug S [--version V] --state offline_tested|deployed|live_verified --sha SHA --evidence FILE --by NAME
+  bin/k3dm-codex-dispatch gate-record --slug S [--version V] --event EVENT [event-specific flags]
   bin/k3dm-codex-dispatch gate-coverage-start
-  bin/k3dm-codex-dispatch link --slug S --parent P --role build|review|verify
-  bin/k3dm-codex-dispatch combine --parent P --parts a,b --conflicts N --result pass|fail --evidence FILE --by NAME
+  bin/k3dm-codex-dispatch link --slug S [--version V] --parent P --role build|review|verify
+  bin/k3dm-codex-dispatch combine [--version V] --parent P --parts a,b --conflicts N --result pass|fail --evidence FILE --by NAME
 EOF
 }
 
@@ -469,7 +469,13 @@ elif command in ('link','mark','gate-record','combine'):
         if d.get('--result') not in ('pass','fail') or not d.get('--conflicts','').isdigit(): die('invalid combine values')
         ev=Path(d.get('--evidence',''))
         if not ev.is_file() or not os.access(ev,os.R_OK) or ev.stat().st_size==0: die('invalid evidence file')
-        resolved_version=version or current_version(rows)
+        if version:
+            resolved_version=version
+        else:
+            part_versions=[task_rows(rows,part,None)[0] for part in parts]
+            if not part_versions: die('combine requires at least one part')
+            if len(set(part_versions))!=1: die('combine parts do not resolve to one task version')
+            resolved_version=part_versions[0]
         for part in parts:
             v,h,a=task_rows(rows,part,resolved_version)
             cur=None
@@ -481,12 +487,12 @@ elif command in ('link','mark','gate-record','combine'):
         if not slug: die('missing --slug')
         version=resolve(d,rows)
         if command=='link':
-            if set(d)-{'--slug','--version','--parent','--role'} or not {'--slug','--version','--parent','--role'}.issubset(d): die('missing or unlisted link flag')
+            if set(d)-{'--slug','--version','--parent','--role'} or not {'--slug','--parent','--role'}.issubset(d): die('missing or unlisted link flag')
             p=d.get('--parent',''); role=d.get('--role')
             if not PARENT.fullmatch(p) or role not in ('build','review','verify'): die('invalid parent or role')
             append('link',version,slug,parent=p,role=role)
         elif command=='mark':
-            if set(d)-{'--slug','--version','--state','--sha','--evidence','--by'} or not {'--slug','--version','--state','--sha','--evidence','--by'}.issubset(d): die('missing or unlisted mark flag')
+            if set(d)-{'--slug','--version','--state','--sha','--evidence','--by'} or not {'--slug','--state','--sha','--evidence','--by'}.issubset(d): die('missing or unlisted mark flag')
             state=d.get('--state'); sha=d.get('--sha',''); ev=Path(d.get('--evidence',''))
             if state not in ('offline_tested','deployed','live_verified') or not re.fullmatch('[0-9a-fA-F]{40}',sha): die('invalid state or sha')
             repo=Path(root)/version/(slug+'.run')/'repo'; repo=Path(repo.read_text().strip()) if repo.is_file() else Path(os.environ.get('K3DM_REPO_ROOT',manager))

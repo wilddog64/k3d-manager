@@ -20,6 +20,7 @@
 - Give Trivy candidate scans a 10-minute timeout, log sanitized failure detail, and retain app CVE scan Job results longer.
 
 - Add `make hub-sync` for guarded hub checkout catch-up, publish code lag and newest-release status, and show it on the Bugs dashboard.
+- Resolve S1 `link` and `mark` versions from their ledger slug, and resolve `combine` from its parts.
 
 ## [1.43.14] - Unreleased
 

@@ -125,6 +125,52 @@ s1_start_finished() {
   return 1
 }
 
+@test "codex dispatch S1 resolves mark link and combine versions from ledger starts" {
+  [[ "$K3DM_WORKTREE_ROOT" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$FIXTURE" == "$BATS_TEST_TMPDIR/"* ]]
+  [[ "$K3DM_DISPATCH_PUSHGATEWAY_URL" == http://127.0.0.1:9 ]]
+  git -C "$FIXTURE" checkout -q -b feature/s1-no-version
+  local sha evidence before
+  sha="$(git -C "$FIXTURE" rev-parse HEAD)"
+  evidence="$BATS_TEST_TMPDIR/s1-evidence"; printf 'offline evidence\n' >"$evidence"
+  mkdir -p "$K3DM_WORKTREE_ROOT/v8.8.8/task.run" "$K3DM_WORKTREE_ROOT/v9.9.9/task.run"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v8.8.8/task.run/repo"
+  printf '%s\n' "$FIXTURE" >"$K3DM_WORKTREE_ROOT/v9.9.9/task.run/repo"
+  cat >"$K3DM_WORKTREE_ROOT/ledger.jsonl" <<'EOF'
+{"ts":1,"event":"start","version":"v8.8.8","slug":"task","run":1}
+{"ts":2,"event":"start","version":"v8.8.8","slug":"part-a","run":1,"parent":"bundle","role":"build"}
+{"ts":3,"event":"start","version":"v8.8.8","slug":"part-b","run":1,"parent":"bundle","role":"build"}
+{"ts":4,"event":"start","version":"v9.9.9","slug":"later","run":1}
+EOF
+  dispatch link --slug task --parent p-one --role build
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+.slug')" = link:v8.8.8:task ]
+  dispatch mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+.state')" = state_mark:v8.8.8:offline_tested ]
+  dispatch combine --parent bundle --parts part-a,part-b --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+(.parts|join(","))')" = combine:v8.8.8:part-a,part-b ]
+  printf '%s\n' '{"ts":5,"event":"start","version":"v9.9.9","slug":"task","run":1}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  s1_refused_unchanged link --slug task --parent p-one --role build
+  s1_refused_unchanged mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  dispatch link --slug task --version v8.8.8 --parent p-one --role build
+  dispatch mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  s1_refused_unchanged link --slug missing --parent p --role build
+  s1_refused_unchanged mark --slug missing --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  s1_refused_unchanged mark --slug task --state offline_tested --sha "$sha" --evidence "$evidence"
+  s1_refused_unchanged mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence"
+  s1_refused_unchanged link --slug task --parent p
+  s1_refused_unchanged link --slug task --version v8.8.8 --parent p
+  dispatch link --slug task --version v8.8.8 --parent p-one --role build
+  dispatch mark --slug task --version v8.8.8 --state offline_tested --sha "$sha" --evidence "$evidence" --by operator
+  printf '%s\n' '{"ts":7,"event":"start","version":"v9.9.9","slug":"other-part","run":1,"parent":"bundle","role":"build"}' >>"$K3DM_WORKTREE_ROOT/ledger.jsonl"
+  before="$(s1_snapshot)"
+  run dispatch combine --parent bundle --parts part-a,other-part --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$status" -eq 2 ]
+  [ "$before" = "$(s1_snapshot)" ]
+  dispatch combine --version v8.8.8 --parent bundle --parts part-a,part-b --conflicts 0 --result pass --evidence "$evidence" --by operator
+  [ "$(tail -n 1 "$K3DM_WORKTREE_ROOT/ledger.jsonl" | jq -r '.event+":"+.version+":"+(.parts|join(","))')" = combine:v8.8.8:part-a,part-b ]
+}
+
 s1_add_open_gates() {
   local slug="$1"
   printf '%s\n' \
