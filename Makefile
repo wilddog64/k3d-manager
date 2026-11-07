@@ -81,7 +81,7 @@ install-test-metrics:
 	if [ "$(K3DM_AGENT_LOAD)" != 0 ]; then launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.test-metrics.plist"; fi
 
-.PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
+.PHONY: check-agent-docs fast-gate up hub-up hub-restore hub-recover argocd-admin-resync down refresh fleet-render fleet-validate fleet-plan fleet-up cleanup-stale-sandbox cleanup-stale-clusters cleanup-stale-registration cleanup-stale-resources status status-full status-json status-public preflight creds chrome-cdp chrome-cdp-stop acg-watch acg-watch-stop acg-watch-check acg-restart acg-recover argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker gh-secret gh-secret-sync-relay cloudflared-backup cloudflared-config alertmanager-secret alertmanager-config restore-google-app-password argocd-hermes-token hermes-approvals-kv hermes-drain-token hermes-approvers hermes-approvals-setup signing-restore backup restore test test-bin test-python-unit test-pytest test-alertmanager-behaviour check-doc-links check-release-milestones validate-manifests index-docs embed-cache-backup embed-cache-seed embed-cache-stats embed-cache-prune embed-cache-restore find-similar-docs check-repo-root test-python test-all test-metrics e2e e2e-sandbox e2e-sandbox-provision help observability platform-ops observability-acg observability-status monitoring-pause monitoring-resume vuln-scan trivy-scan-report app-cve-scan show-service-passwords shopping-cart-credential-drift update-webhook-slack update-webhook-slack-roles update-webhook-slack-secret webhook-log-level job-log harvest-job-failures restart-webhook restart-cloud-bridge install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-hub-pushgateway-port-forward uninstall-hub-pushgateway-port-forward install-hub-loki-port-forward uninstall-hub-loki-port-forward dispatch-logs install-node-health-watch uninstall-node-health-watch install-sandbox-reaper uninstall-sandbox-reaper init-cloud-requests install-cloud-bridge uninstall-cloud-bridge clean-tmp e2e-remote e2e-runner-health e2e-replay e2e-republish e2e-runner-unlock refresh-registration vault-dr-shards-save vault-dr-shards-export vault-dr-shards-import hub-data-export dr-drill dr-drill-publish
 
 ## Export Hub Vault PKI root CA and trust it in macOS System Keychain (local GUI session required)
 trust-vault-ca:
@@ -1433,6 +1433,21 @@ lint-python:
 	 done < <(git ls-files | grep -v '^scripts/lib/foundation/' | grep -v '\.py$$'); \
 	 "$$ruff" check -- "$${files[@]}"
 
+## Check docs/release-milestones.json against roadmap and plan versions
+check-release-milestones:
+	@set -euo pipefail; \
+	 if [ -n "$${PYTEST:-}" ]; then set -- $$PYTEST; \
+	 elif command -v pytest >/dev/null 2>&1; then set -- pytest; \
+	 elif python3 -m pytest --version >/dev/null 2>&1; then set -- python3 -m pytest; \
+	 elif [ -x "$$HOME/.pyenv/shims/python3" ] \
+	      && "$$HOME/.pyenv/shims/python3" -m pytest --version >/dev/null 2>&1; then \
+	   set -- "$$HOME/.pyenv/shims/python3" -m pytest; \
+	 else \
+	   echo "[make] no pytest found. Install pytest or set PYTEST." >&2; \
+	   exit 2; \
+	 fi; \
+	 "$$@" -q scripts/tests/bin/test_release_milestones_drift.py::test_release_milestones_stay_in_sync_with_roadmap
+
 ## Run the pytest suites (scripts/tests/hermes + scripts/tests/bin/test_*.py)
 check-doc-links:
 	@python3 scripts/check-doc-links.py
@@ -1664,6 +1679,7 @@ help:
 	@echo "    make status-full   Show full pod and diagnostic report"
 	@echo "    make status-json   Emit concise status as JSON"
 	@echo "    make status-public Sustained multi-sample public-endpoint probe (JSON=1 for machine output)"
+	@echo "    make check-release-milestones  Check roadmap and plan versions against milestones"
 	@echo "    make test          Run all BATS test suites"
 	@echo "    make index-docs    Embed docs/ into the vector store (DRY_RUN=1, LIMIT=n)"
 	@echo "    make find-similar-docs Q=\"...\" [K=5]  Find prior art by similarity (advisory)"

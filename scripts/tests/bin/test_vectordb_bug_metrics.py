@@ -1630,3 +1630,81 @@ def test_bug_open_history_push_and_failure_isolation_e2(metrics, monkeypatch, tm
     assert any(job == "k3dm-bug-releases" and inst is None for job, _m, inst in failure_calls)
     err = capsys.readouterr().err
     assert "bug open history skipped (non-fatal):" in err
+
+
+def test_folded_row_and_count_have_unfolded_control(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    path = root / "docs/release-milestones.json"
+    items = [{"version": "v1.0.1", "state": "folded"},
+             {"version": "v1.0.2", "target": True}]
+    globals_ = metrics._forecast_metrics.__globals__
+    current_release = globals_["_current_release"]
+    monkeypatch.setitem(globals_, "_release_tags", lambda _root: [("v1.0.0", 0)])
+    monkeypatch.setitem(globals_, "_cadence", lambda _tags: {"p25": 10, "p50": 10, "p75": 10, "last_ts": 0, "gaps": 6})
+    monkeypatch.setitem(globals_, "_current_release", lambda *_args: None)
+    def output(entries):
+        path.write_text(json.dumps({"milestones": entries}))
+        return metrics._forecast_metrics(root, now=15)
+    folded = output(items)
+    absent = output(items[1:])
+    assert folded == absent
+    assert 'version="v1.0.1"' not in folded
+    assert 'k3dm_release_milestones_remaining{repo="k3d-manager"} 1' in folded
+    control = output([{"version": "v1.0.1"}, items[1]])
+    assert 'version="v1.0.1"' in control
+    assert 'k3dm_release_milestones_remaining{repo="k3d-manager"} 2' in control
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.0.2"], cwd=root, check=True)
+    monkeypatch.setitem(globals_, "_current_release", current_release)
+    current = output(items)
+    assert 'state="in_progress"' in current
+    assert 'version="v1.0.2",bound="mid"' in current
+
+
+def test_current_release_and_following_are_not_overdue(metrics, monkeypatch, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.0.1"], cwd=root, check=True)
+    items = [{"version": "v1.0.1"}, {"version": "v1.0.2", "target": True}]
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": items}))
+    globals_ = metrics._forecast_metrics.__globals__
+    monkeypatch.setitem(globals_, "_release_tags", lambda _root: [])
+    monkeypatch.setitem(globals_, "_cadence", lambda _tags: {
+        "p25": 10, "p50": 20, "p75": 30, "last_ts": 0, "gaps": 6})
+    def info(output):
+        return [line for line in output.splitlines()
+                if line.startswith("k3dm_release_milestone_info{")]
+    subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=root, check=True)
+    control = info(metrics._forecast_metrics(root, now=100))
+    assert len(control) == 2 and all('overdue="true"' in row for row in control)
+    subprocess.run(["git", "symbolic-ref", "HEAD", "refs/heads/k3d-manager-v1.0.1"],
+                   cwd=root, check=True)
+    output = metrics._forecast_metrics(root, now=100)
+    rows = info(output)
+    assert 'state="in_progress"' in rows[0]
+    assert all('overdue="false"' in row for row in rows)
+    for version, bounds in (("v1.0.1", (100, 100, 100)), ("v1.0.2", (110, 120, 130))):
+        for bound, value in zip(("low", "mid", "high"), bounds):
+            assert (f'k3dm_release_milestone_forecast_seconds{{repo="k3d-manager",'
+                    f'version="{version}",bound="{bound}"}} {value}') in output
+    cadence = {"p25": 10, "p50": 20, "p75": 30, "last_ts": 0}
+    floored = metrics._forecast([{**items[0], "not_before": "2026-01-01"}],
+                                [], cadence, 100, current_release="v1.0.1")[0]
+    assert floored["state"] == "in_progress" and floored["low"] > 100
+    blocked = metrics._forecast([{**items[0], "blocked_by": "external"}, items[1]],
+                                [], cadence, 100, current_release="v1.0.1")
+    assert [row["state"] for row in blocked] == ["blocked", "after_blocked"]
+
+
+@pytest.mark.parametrize("item", [{"version": "v1.0.1", "state": "unknown"},
+                                  {"version": "v1.0.1", "state": "folded", "target": True}])
+def test_load_milestones_rejects_invalid_state_and_folded_target(metrics, tmp_path, item):
+    root = tmp_path / "fixture-repo"
+    (root / "docs").mkdir(parents=True)
+    assert root.resolve() != ROOT.resolve()
+    items = [item] if item.get("target") else [item, {"version": "v1.0.2", "target": True}]
+    (root / "docs/release-milestones.json").write_text(json.dumps({"milestones": items}))
+    with pytest.raises(ValueError):
+        metrics._load_milestones(root)

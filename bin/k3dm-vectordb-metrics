@@ -787,6 +787,10 @@ def _load_milestones(root, ref=None):
             raise ValueError("milestone missing version")
         if not _VERSION_RE.fullmatch(version):
             raise ValueError(f"invalid milestone version: {version}")
+        if "state" in milestone and milestone["state"] != "folded":
+            raise ValueError(f"invalid milestone state for {version}: {milestone['state']}")
+        if milestone.get("state") == "folded" and milestone.get("target"):
+            raise ValueError(f"target cannot be folded: {version}")
         not_before = milestone.get("not_before")
         if not_before is not None:
             try:
@@ -816,13 +820,15 @@ def _cadence(tags, window=12):
             "gaps": len(gaps), "last_ts": max(ts for _, ts in dated)}
 
 
-def _forecast(milestones, tags, cadence, now):
+def _forecast(milestones, tags, cadence, now, current_release=None):
     shipped = {version for version, _ in tags}
     rows, blocked = [], False
     k = 0
     previous = {"low": cadence["last_ts"], "mid": cadence["last_ts"],
                 "high": cadence["last_ts"]} if cadence else {}
     for item in milestones:
+        if item.get("state") == "folded":
+            continue
         version = item["version"]
         row = {**item, "overdue": False}
         if version in shipped:
@@ -836,7 +842,7 @@ def _forecast(milestones, tags, cadence, now):
             row["state"] = "insufficient"
         else:
             k += 1
-            row["state"] = "forecast"
+            row["state"] = "in_progress" if version == current_release else "forecast"
             for bound, key in (("low", "p25"), ("mid", "p50"), ("high", "p75")):
                 value = previous[bound] + cadence[key]
                 floor = item.get("not_before")
@@ -847,6 +853,8 @@ def _forecast(milestones, tags, cadence, now):
                         value = floor_ts
                         if bound == "mid":
                             row["floored"] = True
+                if row["state"] == "in_progress":
+                    value = max(now, value)
                 previous[bound] = value
                 if value < now:
                     value = now
@@ -861,7 +869,8 @@ def _forecast_metrics(root, ref=None, now=None, repo="k3d-manager"):
     tags = _release_tags(root)
     milestones = _load_milestones(root, ref)["milestones"]
     cadence = _cadence(tags)
-    rows = _forecast(milestones, tags, cadence, now)
+    current = _current_release(root, ref)
+    rows = _forecast(milestones, tags, cadence, now, current)
     lines = [f'k3dm_release_shipped_timestamp_seconds{{repo="{repo}",version="{v}"}} {ts}'
              for v, ts in tags[-20:]]
     gaps = cadence["gaps"] if cadence else max(0, len(tags) - 1)
@@ -869,7 +878,6 @@ def _forecast_metrics(root, ref=None, now=None, repo="k3d-manager"):
     if cadence:
         for quantile, key in (("0.25", "p25"), ("0.5", "p50"), ("0.75", "p75")):
             lines.append(f'k3dm_release_cadence_seconds{{repo="{repo}",quantile="{quantile}"}} {cadence[key]}')
-    current = _current_release(root, ref)
     remaining, target_seen = 0, False
     for position, row in enumerate(rows, 1):
         version = row["version"]
@@ -883,7 +891,7 @@ def _forecast_metrics(root, ref=None, now=None, repo="k3d-manager"):
             remaining += 1
         if row.get("target"):
             target_seen = True
-        if row["state"] == "forecast":
+        if row["state"] in ("forecast", "in_progress"):
             lines.extend(f'k3dm_release_milestone_forecast_seconds{{repo="{repo}",version="{version}",bound="{bound}"}} {row[bound]}'
                          for bound in ("low", "mid", "high"))
         if target_seen:

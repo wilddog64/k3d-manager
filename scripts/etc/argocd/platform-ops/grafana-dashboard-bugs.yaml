@@ -2812,7 +2812,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(1 * label_replace(label_join(k3dm_release_milestone_info{repo=\"$repo\",state=\"blocked\"}, \"blocker\", \": \", \"version\", \"blocked_by\"), \"blocker\", \"blocked at $1\", \"blocker\", \"(.*)\") and on(repo) k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"forecast\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
+              "expr": "(1 * label_replace(label_join(k3dm_release_milestone_info{repo=\"$repo\",state=\"blocked\"}, \"blocker\", \": \", \"version\", \"blocked_by\"), \"blocker\", \"blocked at $1\", \"blocker\", \"(.*)\") and on(repo) k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"blocked|after_blocked\"}) or (2 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"insufficient\"}) or (3 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=~\"forecast|in_progress\"}) or (4 * k3dm_release_milestone_info{repo=\"$repo\",target=\"true\",state=\"shipped\"})",
               "instant": true
             }
           ],

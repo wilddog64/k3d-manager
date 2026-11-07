@@ -117,7 +117,7 @@ assert p[31]["options"]["text"] == {"titleSize": 16, "valueSize": 40}
 assert p[31]["fieldConfig"]["defaults"]["noValue"] == "-"
 assert 'label_join(k3dm_release_milestone_info{repo="$repo",state="blocked"}' in blocked
 assert 'state=~"blocked|after_blocked"' in blocked
-assert 'k3dm_release_milestone_info{repo="$repo",target="true",state="forecast"}' in blocked
+assert 'k3dm_release_milestone_info{repo="$repo",target="true",state=~"forecast|in_progress"}' in blocked
 PY
   [ "${status}" -eq 0 ]
 }

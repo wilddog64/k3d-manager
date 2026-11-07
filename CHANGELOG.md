@@ -38,6 +38,7 @@
 
 - Add `.github/dependabot.yml` for weekly GitHub Actions updates in workflows and composite actions; the lib-foundation subtree's npm dependencies are updated upstream.
 - Pull lib-foundation through PR #77: `brace-expansion` 1.1.21 in the ACG lockfile clears three high DoS advisories.
+- Keep release forecasts aligned with roadmap milestones, folded releases, and work in progress.
 
 ## [1.43.14] - Unreleased
 
