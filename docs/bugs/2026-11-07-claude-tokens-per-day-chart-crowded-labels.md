@@ -1,6 +1,6 @@
 # Bug: "Claude tokens per day" and "Claude tokens per day by kind" are crowded: value labels and dates collide at 20+ days
 
-**Status:** OPEN — filed 2026-11-07; dispatched to Flash 3.8; amended 2026-11-07 (panel 32 added, assertion conflict resolved), redispatched
+**Status:** OPEN — run 2 implemented (Flash exited 2026-11-07; 2 files changed in its worktree, uncommitted); Claude verification and land next (panels 32 and 87, the rewritten 659-660 assertion and its mutation)
 **Priority:** P3 (cosmetic: the numbers are right, the chart is hard to read)
 **Waiting on:** fix running — since 2026-11-07
 **Severity:** low

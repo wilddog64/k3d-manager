@@ -1,6 +1,6 @@
 # Bug: the Window dropdown on the Agent Dispatch and Agent Cost dashboards sorts releases alphabetically
 
-**Status:** LANDED — `0a00bb39` on `k3d-manager-v1.43.15` (sort 8 on both dashboards; E1 green, red on pre-fix); E2 live check not yet run
+**Status:** LANDED — `0a00bb39` on `k3d-manager-v1.43.15` (sort 8 on both dashboards; E1 green, red on pre-fix); E2 live check blocked: hub ApplicationSets still read `k3d-manager-v1.43.14` (checked 2026-11-07), so the reapply comes first
 **Priority:** P3 (cosmetic: the dropdown order is wrong, every option still works)
 **Waiting on:** live check — since 2026-11-07
 **Severity:** low
@@ -74,3 +74,7 @@ evidence:
     kind: live
     what: "Operator or Claude, after make platform-ops from the release branch: the Window dropdown lists v1.43.15 first, v1.43.2 below v1.43.10, and 7d last."
 ```
+
+## Triage 2026-11-07 (Claude)
+
+`grafana-dashboards-hub` and three more ApplicationSets on the hub template `k3d-manager-v1.43.14`. The Window sort is invisible on the hub until `make appsets-reapply` runs from `k3d-manager-v1.43.15` (operator).

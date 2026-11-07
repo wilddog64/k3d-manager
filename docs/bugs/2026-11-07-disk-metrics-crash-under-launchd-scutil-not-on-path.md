@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED 2026-11-07 — `d70047d5` (Luna; Claude made the launchd-PATH test macOS-only for Linux CI); independent verifier pending
+**Status:** LANDED 2026-11-07 — `d70047d5` (Luna; Claude made the launchd-PATH test macOS-only for Linux CI); independent verifier pending; live check blocked until the M5 checkout includes the fix (it is at `8e483765`)
 **Fix commit:** d70047d5
 **Priority:** P2 — every host's disk gauges are frozen, so the critical disk-space alert cannot fire; running the script by hand is a workaround
 **Waiting on:** live check — since 2026-11-07

@@ -1,6 +1,6 @@
 # Bug: HubDataExportNeverRan on hub
 
-**Status:** OPEN — gap explained 2026-11-07 (the M5 hub build never ran `hub_data_export_setup`, so every scheduled export failed from 2026-11-01 until the ServiceAccount was created by hand on 2026-11-04); fix specced below and dispatched; a restore is untested
+**Status:** OPEN — fix implemented 2026-11-07 (Flash run exited; 4 files changed in its worktree, uncommitted); Claude verification and land next. Gap explained: the M5 hub build never ran `hub_data_export_setup`. A restore is untested.
 **Priority:** P2
 **Waiting on:** fix running — since 2026-11-07
 **Approval:** operator 2026-11-07: "fix to for spec and dispatch to Flash 3.8"
@@ -119,3 +119,6 @@ evidence:
     what: "Operator or Claude: the next hub rebuild drill's hub-new report shows hub_data_export_sa pass, and its first scheduled export succeeds (k3dm_hub_data_export_last_run_success 1, no HubDataExportNeverRan)."
 ```
 
+## Triage 2026-11-07 (Claude)
+
+The Flash worker has exited, and its four spec-listed files are changed in `~/.local/share/k3d-manager/worktrees/v1.43.15/2026-11-02-hub-data-export-never-ran`. Nothing is landed yet. Next: N1/N2 red on pre-fix, full `hub_new.bats`, land, then E2 at the next hub rebuild drill.
