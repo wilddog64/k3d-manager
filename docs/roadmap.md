@@ -530,6 +530,16 @@ Split from v1.43.13 on 2026-10-31 by Claude; moved to v1.43.15 on 2026-11-01 (be
 
 **Unscheduled candidate plan:** `merge-to-deploy-promotion-pr` (operator, 2026-11-06: "open a PR then approve it makes more sense. we can do this in a later release"). Today an app merge to `main` pushes a signed `sha-*` image to GHCR, but the pin in `services/<app>/kustomization.yaml` changes only by hand, or by `app-cve-scan` when the deployed image has HIGH/CRITICAL findings. Add a second rule to that promoter, triggered by the app's main CI through the existing scan trigger: when the new `main` build is signed, attested, and has no CRITICAL/HIGH the deployed image lacks, **open a k3d-manager PR** bumping the pin, for the operator to approve; never commit directly. Reuse the CVE path's git-write and remediation-verify events, so each deploy shows on the dashboard. Not Image Updater: following `:latest` was removed on 2026-06-30 (`docs/bugs/2026-06-30-image-updater-always-follows-latest-instead-of-vuln-gated-promotion.md`). The "not worse" gate is required: the payment build of 2026-11-05 (`docs/bugs/2026-11-05-payment-runtime-base-on-eol-temurin-24.md`) would have replaced 1 CRITICAL with 5. Release to be chosen when v1.43.16 is scoped.
 
+### Patch release — v1.43.17
+
+Branch `k3d-manager-v1.43.17`, cut from `main` after v1.43.16 merges (it depends on v1.43.16's `deploy/hub`). Both plans are hub specs; dispatch waits for the operator's go.
+
+**Operator prerequisite:** raise OrbStack `memory_mib` on the M5 from 16384 to 24576 (the 16 GB cap dates from the 24 GB M4 Air, 2026-09-13); it restarts the hub, so it is a planned step with the 2026-09-13 restart checklist.
+
+**v1.43.17 plan 1:** [`dev-hub-vcluster`](plans/v1.43.17-dev-hub-vcluster.md) (operator, 2026-11-07: "can we have vCluster running on m5 side by side as hub for the development purpose and verify there?"). A `dev-hub` vCluster in its own namespace reads the release branch, runs ArgoCD and the branch's dashboards against the hub Prometheus read-only, holds no hub credentials, and is capped by a 3 GiB quota at a preemptible PriorityClass. Live checks happen there; the hub changes only by `hub-promote`.
+
+**v1.43.17 plan 2:** [`argocd-ha-zero-downtime-upgrade`](plans/v1.43.17-argocd-ha-zero-downtime-upgrade.md) (operator, 2026-11-07: "do we have room to support argocd no downtime upgrade (for cve patch)"). ArgoCD server, repo-server and applicationset-controller at 2 replicas with PDBs; `argocd_upgrade` probes availability through the rollout and refuses a hub upgrade without a passing rehearsal in the dev hub. Takes over the ArgoCD part of the parked `v1.28.0-platform-zero-downtime-rollouts`.
+
 ### Candidate milestone — v1.44.0
 
 **Cloud-request trust and operator acceptance.** The cloud bridge treats write access to the
