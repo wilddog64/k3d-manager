@@ -18,6 +18,52 @@ DASHBOARD = Path(os.environ.get(
 GUIDE = ROOT / "docs/guides/grafana-dashboards/k3dm-bugs.md"
 PROMETHEUS_IMAGE = "prom/prometheus:v3.1.0"
 
+# Captured from packages/grafana-data/src/transformations/matchers/ids.ts at
+# Grafana tag v11.4.0, recorded by Claude in the 2026-11-07 bug spec.
+GRAFANA_FIELD_MATCHER_IDS = {
+    "anyMatch", "allMatch", "invertMatch", "alwaysMatch", "neverMatch",
+    "numeric", "time", "first", "firstTimeField", "byType", "byTypes",
+    "byName", "byNames", "byRegexp", "byRegexpOrNames", "byFrameRefID",
+    "byValue",
+}
+PLATFORM_OPS = ROOT / "scripts/etc/argocd/platform-ops"
+DASHBOARD_JSON_MARKER = re.compile(r"^  [^\n]+\.json: \|\n", re.MULTILINE)
+
+
+def embedded_dashboard_json(path):
+    """Parse the dashboard JSON embedded in its ConfigMap YAML."""
+    content = path.read_text()
+    match = DASHBOARD_JSON_MARKER.search(content)
+    assert match, f"{path} has no embedded dashboard JSON"
+    return json.loads("\n".join(line[4:] for line in content[match.end():].splitlines()))
+
+
+def invalid_field_matchers(dashboard):
+    """Return field override matcher IDs outside Grafana's field registry."""
+    invalid = []
+    for panel in dashboard.get("panels", []):
+        for override in panel.get("fieldConfig", {}).get("overrides", []):
+            matcher_id = override.get("matcher", {}).get("id")
+            if matcher_id not in GRAFANA_FIELD_MATCHER_IDS:
+                invalid.append(matcher_id)
+    return invalid
+
+
+def test_platform_ops_field_override_matchers_are_grafana_114_field_matchers():
+    dashboard_paths = sorted(PLATFORM_OPS.glob("grafana-dashboard-*.yaml"))
+    assert dashboard_paths, f"no platform-ops dashboards found under {PLATFORM_OPS}"
+    assert all(path.parent == PLATFORM_OPS for path in dashboard_paths)
+    for path in dashboard_paths:
+        assert invalid_field_matchers(embedded_dashboard_json(path)) == [], path
+
+
+def test_field_matcher_guard_rejects_frame_only_matchers():
+    for matcher_id in ("byRefId", "byIndex"):
+        synthetic = {"panels": [{"fieldConfig": {"overrides": [
+            {"matcher": {"id": matcher_id}},
+        ]}}]}
+        assert invalid_field_matchers(synthetic) == [matcher_id]
+
 
 def load_module(name, path):
     spec = importlib.util.spec_from_loader(name, importlib.machinery.SourceFileLoader(name, str(path)))

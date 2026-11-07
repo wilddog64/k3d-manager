@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fix the Bugs dashboard Hub code behind field override to use Grafana 11.4's `byFrameRefID` matcher and guard dashboard matcher IDs.
+
 - Remove the unused `scripts/playwright/acg_extend.js`, which still read the old login profile directory; `acg.sh` uses the lib-foundation copy.
 
 - Add validated Cloudflare client IP and sanitized User-Agent fields to webhook request access logs.

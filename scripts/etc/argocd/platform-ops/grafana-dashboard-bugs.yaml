@@ -395,7 +395,7 @@ data:
           "options": {"graphMode": "none", "colorMode": "value", "reduceOptions": {"calcs": ["lastNotNull"]}},
           "fieldConfig": {
             "defaults": {"noValue": "unknown", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}},
-            "overrides": [{"matcher": {"id": "byRefId", "options": "B"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"1": {"text": "current release", "color": "green"}, "0": {"text": "older release", "color": "orange"}}}]}]}]
+            "overrides": [{"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "mappings", "value": [{"type": "value", "options": {"1": {"text": "current release", "color": "green"}, "0": {"text": "older release", "color": "orange"}}}]}]}]
           }
         },
         {

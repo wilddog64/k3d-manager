@@ -34,7 +34,7 @@ assert targets["A"]["legendFormat"] == "{{branch}}"
 assert targets["B"]["expr"] == "k3dm_hub_checkout_on_newest_release and on() (time() - k3dm_hub_checkout_last_check_timestamp_seconds < 900)"
 assert targets["B"]["legendFormat"] == "{{newest_branch}}"
 override=hub["fieldConfig"]["overrides"][0]
-assert override["matcher"] == {"id":"byRefId","options":"B"}
+assert override["matcher"] == {"id":"byFrameRefID","options":"B"}
 mapping=override["properties"][0]["value"][0]["options"]
 assert mapping["1"] == {"text":"current release","color":"green"}
 assert mapping["0"] == {"text":"older release","color":"orange"}
