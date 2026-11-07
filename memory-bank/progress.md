@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: dispatch-stall plan Status reworded to lead with VERIFIED (Plans panel read "S1" as unknown). Its "no record" dispatch is an exporter gap: S1 was dispatched as p0-s1-dispatcher/p0-s1-metrics from docs/issues briefs, and k3dm_dispatch_plan_state maps plans only by start spec stem.
 - 2026-11-07: ladder table live-verified (operator). Hub specs got dispatch go; reordered: hub-deploy-ref → v1.43.15 p5, claude-cost-task-attribution → v1.43.16 p5, dev-hub-vcluster → v1.43.16 p4, argocd-ha → v1.43.17 p1.
 - 2026-11-07: verification-ladder-table VERIFIED offline (verify recorded); live E2 pending.
 - 2026-11-07: verification-ladder-table LANDED 35fbd4bb (table, sort by tasks, unknown explained); verifier pending.
