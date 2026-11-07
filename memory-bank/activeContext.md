@@ -12,6 +12,8 @@ Triage 2026-11-07 (bug docs touched on this branch vs main):
 
 ## Handoff — 2026-11-06 bug batch dispatched in waves; start here
 
+**2026-11-07 cut-plan progress (latest):** CVE empty-tables VERIFIED (279839c1; verifier 13/13, pre-fix 5 red). 21 already-verified bugs restated with VERIFIED first word (1a609c47). Tier v2 LANDED 5b7ecd15 (live E2 after dashboard sync). Independent verifiers running: tier v2 (5b7ecd15 vs 1d3db79e), keychain-trust follow-up (0b11c1f9 vs 8d57ff9e, plus head), hub machine-role guard (bd3002db vs 6e186f20), dispatch resume-reason (22110d0c vs 6774f198). Workers still running: control-node-role, claude-context-cost-per-turn.
+
 - 2026-11-07: CVE empty tables LANDED `279839c1` (verifier running). Dispatched to Luna: plans `control-node-role`, `claude-context-cost-per-turn` (cost-plan D1 already done 2026-11-01). Tier v2 still running.
 - 2026-11-07: Hermes null counts LANDED `d619fcbd`, independent verify PASS (Status VERIFIED; live E2 = next scheduled M5 slot writes <slot>.json and posts). Memory bank compressed (`7353f147`).
 - 2026-11-07 (later): disk fix d70047d5 independently verified (pass; E2 live pending M5 hub-sync). Grafana stack-trace investigation: Luna had no network; Claude read v11.4.0 source, no setting hides the stack (ErrorBoundary.tsx:110-122, ErrorWithStack.tsx:17-21); Findings committed in worktree 0afa2504, not yet landed; Waiting on operator decision (close won't-fix vs. revisit on upgrade). CVE empty-tables worker stopped for the same reason; Claude cited PanelDataErrorView.tsx:95-105 in the spec (5d8f4d8e) and redispatched as `cve-autopatch-empty-tables-v2`. Still running: hermes-e2e-null-counts, security-findings-tier-v2.

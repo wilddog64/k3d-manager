@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: CVE empty-tables verified; 21 bug Statuses restated VERIFIED; tier v2 landed 5b7ecd15; 4 offline verifiers launched (tier, keychain, hub-role, resume-reason).
 - 2026-11-07: cve-autopatch-empty-tables landed 279839c1. Plans control-node-role and claude-context-cost-per-turn dispatched.
 - 2026-11-07: hermes-e2e-null-counts landed d619fcbd, verified pass. Memory bank compressed 7353f147.
 - 2026-11-07: verified disk-metrics-scutil (pass). Grafana error-page stack: no supported setting in 11.4 (findings 0afa2504, pending land, operator decision). CVE empty-tables spec cited (5d8f4d8e), redispatched v2.

@@ -2,9 +2,10 @@
 
 **Filed:** 2026-11-07
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
+**Status:** LANDED 2026-11-07 — 5b7ecd15 (Luna, second run; reviewed by Claude, CHANGELOG conflict resolved by Claude); independent verifier running
+**Fix commit:** 5b7ecd15
 **Priority:** P3 — cosmetic; every row is present and correct
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
 **Approval:** explicit 2026-11-07 "I think what we can do is to combine tier and image_repository: <repo> + upstream, i.e. argoproj/argocd (upstream). less confusing" (operator)
 **Severity:** low
 
