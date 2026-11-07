@@ -802,8 +802,12 @@ def _publish_health_metrics(ref=None):
 
 def _publish_disk_metrics():
     try:
-        subprocess.run([str(ROOT / "bin" / "k3dm-disk-metrics")],
-                       capture_output=True, text=True, timeout=120, check=False)
+        result = subprocess.run([str(ROOT / "bin" / "k3dm-disk-metrics")],
+                                capture_output=True, text=True, timeout=120, check=False)
+        if result.returncode != 0:
+            lines = result.stderr.splitlines()
+            detail = next((line for line in reversed(lines) if line.strip()), "unknown error")[:300]
+            print(f"disk metrics publish failed: rc={result.returncode}: {detail}", file=sys.stderr)
     except Exception as exc:
         print(f"disk metrics publish skipped: {exc}", file=sys.stderr)
 

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Use the absolute `scutil` path for launchd disk metrics and log sanitized publish failures from Hermes.
+
 - Fix the Bugs dashboard Hub code behind field override to use Grafana 11.4's `byFrameRefID` matcher and guard dashboard matcher IDs.
 
 - Remove the unused `scripts/playwright/acg_extend.js`, which still read the old login profile directory; `acg.sh` uses the lib-foundation copy.
