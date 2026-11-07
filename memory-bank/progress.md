@@ -76,8 +76,11 @@
 - [x] `bug-open-history-from-git` LIVE-VERIFIED: E4 30/30 dates.
 - [x] S1 spec revised after the second review; `v1.43.16-prompts-by-model` filed.
 - [x] Waiting-on spec revised: `Open P*` tile descriptions dropped, `Waiting since` not shown.
-- [ ] S1 third check, then dispatch both halves.
-- [ ] Waiting-on correction to Luna, review, land, verify.
+- [x] S1 third check landed; three gaps fixed by Claude.
+- [ ] S1 dispatcher (Luna) and metrics (Flash 3.8) running.
+- [ ] P3 Run column sort: Flash 3.8 running.
+- [x] Waiting-on corrected and landed `6d42c201`.
+- [ ] Waiting-on independent verify, plan-metrics part of E4, doc lines, `CLAUDE.md` convention.
 - [x] `agent-instruction-files-refresh` LIVE-VERIFIED.
 
 ## 2026-11-05 security + telemetry filings

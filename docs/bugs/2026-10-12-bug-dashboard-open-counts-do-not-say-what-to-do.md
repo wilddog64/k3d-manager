@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — spec rewritten 2026-11-06; dispatched to Luna 2026-11-06 Revised 2026-11-06 after review: the first version collided with two existing dashboard guards (see Design limits).
+**Status:** OPEN — fix landed `6d42c201` (Luna; corrected after Claude's review), independent verify running, live E5 and E6 pending. E4: of 1004 docs, doc_status changes for exactly the four expected. Spec revised 2026-11-06 after review: the first version collided with two existing dashboard guards (see Design limits).
 **Priority:** P2 — raised from P3 2026-11-06; a reader cannot tell a stalled bug from a shipped fix waiting for proof, and it misled the operator about seven rows that day
 **Approval:** explicit 2026-11-06 "go ahead" (operator, on rewriting this spec and dispatching it to Luna). Originally explicit 2026-10-12 "then maybe we should have same comment or explaination (short one) to present; otherwise this confuse people as we don't know what to do or panic".
 **Severity:** medium

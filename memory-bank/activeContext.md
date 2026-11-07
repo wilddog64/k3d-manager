@@ -20,6 +20,8 @@
 
 - 2026-11-06 late: `agent-instruction-files-refresh` LIVE-VERIFIED: independent verify PASS recorded, E3 read from later dispatches. Second-review findings landed. Terra third check dispatched; Waiting-on correction sent to Luna.
 
+- 2026-11-06 late, later: Waiting-on landed `6d42c201`; verifier running; after PASS, add Waiting on lines to open docs, hand-triage the rows, add the convention to `CLAUDE.md`. Terra's third S1 check landed: three coverage gaps fixed by Claude with no fourth review; `p0-s1-dispatcher` (Luna) and `p0-s1-metrics` (Flash 3.8) dispatched. P3 `2026-11-06-per-run-evidence-run-column-sorts-as-text` filed and dispatched to Flash 3.8 by operator's request; it narrows the `label_join` guard to `"doc"`, tried on the hub first. Analyzer: no job at 00:37Z 11-07 (last 12:33Z 11-06); read again later.
+
 ## Handoff — 2026-11-06 M4 reboot for tunnel E4
 
 - **On resume, in order:** (1) Tunnel E4: confirm the M4 forward ports 19094 and 19100 came up without a login and dispatch metrics reach the M5; spec `docs/bugs/2026-11-06-hub-forward-tunnels-lose-auth-after-old-hub-reboot.md`. (2) After 00:33Z 11-07: read the newest analyze job on the M5 and ask the operator whether the post appeared in `#grafana-notification`. (3) Ask the operator for dispatch timing; nothing is dispatched and no Luna run is active.
