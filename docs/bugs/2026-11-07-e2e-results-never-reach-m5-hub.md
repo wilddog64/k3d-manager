@@ -67,6 +67,12 @@ Add an `install_e2e_publish_back` phase to `bin/k3dm-machine-setup`. It runs onl
 - Do not add the key to any repo file. Do not use `eval`. Do not edit `CLAUDE.md`, `memory-bank/` or `docs/roadmap.md`.
 - No commit, no PR. Do not skip hooks. F2 is not part of this fix.
 
+## Files
+
+- `bin/k3dm-machine-setup`
+- `scripts/tests/bin/machine_setup.bats`
+- `docs/howto/m5-hub-migration.md`
+
 ## Acceptance
 
 ```yaml

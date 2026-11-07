@@ -83,6 +83,13 @@ Timeline (times UTC; the job runs at 03:30 local, 10:30Z in PDT and 11:30Z in PS
 - Do not reorder `STAGES`.
 - No commit, no PR. Do not skip hooks.
 
+## Files
+
+- `bin/hub-new`
+- `scripts/etc/machine/not-installed.list`
+- `scripts/tests/bin/hub_new.bats`
+- `docs/howto/m5-hub-migration.md`
+
 ## Acceptance
 
 ```yaml
