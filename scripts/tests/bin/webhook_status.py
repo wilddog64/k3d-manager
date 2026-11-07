@@ -115,7 +115,7 @@ class WebhookStatusTests(unittest.TestCase):
     def test_post_provision_keeps_degraded_provider_and_shared_apps(self):
         output = []
         webhook._POST_PROVISION_DELAY_SECS = 0
-        with tempfile.TemporaryDirectory() as scratch:
+        with tempfile.TemporaryDirectory():
             with mock.patch.object(webhook, "_notify_job", side_effect=lambda _job, text: output.append(text)), \
                     mock.patch.object(webhook, "_smoke_test_services", return_value=[]), \
                     mock.patch.object(webhook, "_posix_spawn_capture", return_value=(
@@ -211,7 +211,7 @@ class WebhookStatusTests(unittest.TestCase):
     def test_post_provision_aws_never_triages_other_provider_apps(self):
         output = []
         webhook._POST_PROVISION_DELAY_SECS = 0
-        with tempfile.TemporaryDirectory() as scratch, \
+        with tempfile.TemporaryDirectory(), \
                 mock.patch.object(webhook, "_notify_job", side_effect=lambda _job, text: output.append(text)), \
                 mock.patch.object(webhook, "_smoke_test_services", return_value=[]), \
                 mock.patch.object(webhook, "_posix_spawn_capture", return_value=(

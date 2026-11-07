@@ -135,7 +135,7 @@ def test_M4_hook_blocks_bad_status_and_bypass_allows_commit(tmp_path):
         f"#!/bin/sh\nexec bash '{root / '.githooks' / 'pre-commit'}'\n", encoding="utf-8"
     )
     (root / ".git" / "hooks" / "pre-commit").chmod(0o755)
-    path = _doc(root, "FIX IN SUBTREE")
+    _doc(root, "FIX IN SUBTREE")
     blocked = _hook_commit(root)
     assert blocked.returncode != 0
     assert "docs/bugs/example.md" in blocked.stderr

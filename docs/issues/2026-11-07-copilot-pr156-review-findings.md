@@ -50,3 +50,9 @@ Process note: a test that swaps `HOME` and starts another Python must carry the 
 - **Fix:** the helper now also waits until the worker PID from `$run/pid` has exited.
 - **Proof:** mutation — a `sleep 1` injected between `write-tree` and `reset` made the old helper fail (`[ "$open_rc" -eq 0 ]`) and the new helper pass; dispatcher restored and `cmp`-checked. Full suite 105/105 locally.
 - **Process note:** a test that waits on a "done" marker must check the marker is written last; here it is deliberately written first (so a bookkeeping failure cannot hide the exit), so "done" means the process is gone.
+
+## CI red 5 — Ruff (pyflakes) on branch-added test files (run 42399587467)
+
+- **Failure:** `make lint-python` found 4 errors: F841 unused `path` (`test_check_bug_status.py:138`), F401 unused `import time` (`test_hermes_checkout_lag.py:6`), F841 unused `as scratch` twice (`webhook_status.py:118`, `:214`).
+- **Why it surfaced late:** every earlier run failed at a test step, so step 12 (Lint Python) was skipped; this was the first run to reach it. Ruff is also not installed on the dev Mac, so the gate never ran locally.
+- **Fix:** dropped the unused names; behaviour unchanged. Verified with pinned `ruff==0.15.8` in a scratch venv ("All checks passed!"); affected pytest 37 passed, `webhook_status.py` 13 OK; `make validate-manifests` (step 13) 85/85 valid.
