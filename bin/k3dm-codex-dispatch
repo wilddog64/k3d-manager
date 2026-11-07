@@ -305,7 +305,247 @@ Usage:
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
   bin/k3dm-codex-dispatch release-merged --version vX.Y.Z --pr N --merged-at YYYY-MM-DDTHH:MM:SSZ
+  bin/k3dm-codex-dispatch gate-status --slug SLUG [--version V] [--json] [--as-of TS]
+  bin/k3dm-codex-dispatch mark --slug S --state offline_tested|deployed|live_verified --sha SHA --evidence FILE --by NAME
+  bin/k3dm-codex-dispatch gate-record --slug S --event EVENT [event-specific flags]
+  bin/k3dm-codex-dispatch gate-coverage-start
+  bin/k3dm-codex-dispatch link --slug S --parent P --role build|review|verify
+  bin/k3dm-codex-dispatch combine --parent P --parts a,b --conflicts N --result pass|fail --evidence FILE --by NAME
 EOF
+}
+
+# S1 gate commands share one deterministic, line-order ledger reader. Keeping
+# this in the dispatcher avoids creating a second state file or dependency.
+_dispatch_s1() {
+  python3 - "$_dispatch_worktree_root" "$_dispatch_repo_root" "$@" <<'PY'
+import hashlib, json, os, re, subprocess, sys, time
+from pathlib import Path
+
+root, manager, command, *args = sys.argv[1:]
+ledger = Path(root) / 'ledger.jsonl'
+PARENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+def die(msg): print('[codex-dispatch] ERROR: '+msg, file=sys.stderr); raise SystemExit(2)
+def parse(argv, boolean=()):
+    d={}; i=0
+    while i<len(argv):
+        k=argv[i]
+        if not k.startswith('--'): die('unexpected argument '+k)
+        if k in d: die('duplicate flag '+k)
+        if k in boolean: d[k]=True; i+=1; continue
+        if i+1>=len(argv) or argv[i+1].startswith('--'): die(k+' requires a value')
+        d[k]=argv[i+1]; i+=2
+    return d
+def read_lines():
+    rows=[]; bad=0
+    if not ledger.exists(): return rows,bad
+    try: raw=ledger.read_bytes().splitlines()
+    except OSError as e: die(str(e))
+    for line in raw:
+        try:
+            x=json.loads(line.decode('utf-8'))
+            if not isinstance(x,dict) or isinstance(x.get('ts'),bool) or not isinstance(x.get('ts'),(int,float)): raise ValueError()
+            rows.append(x)
+        except Exception: bad+=1
+    return rows,bad
+def task_rows(rows, slug, version=None, cutoff=None):
+    selected=[x for x in rows if x.get('slug')==slug and x.get('event')=='start' and (cutoff is None or x['ts']<=cutoff)]
+    versions=list(dict.fromkeys(x.get('version') for x in selected))
+    if version is None:
+        if len(versions)!=1: die('slug does not resolve to exactly one task version')
+        version=versions[0]
+    alltask=[x for x in rows if x.get('slug')==slug and x.get('version')==version]
+    starts=[i for i,x in enumerate(alltask) if x.get('event')=='start' and (cutoff is None or x['ts']<=cutoff)]
+    if not starts: die('task has no start at or before --as-of')
+    # Full history for parent/interventions; current attempt begins at last start.
+    attempt=alltask[starts[-1]:]
+    return version, alltask, attempt
+def assess_status(rows, slug, version=None, cutoff=None, bad=0):
+    version, hist, a = task_rows(rows,slug,version,cutoff)
+    coverage=next((i for i,x in enumerate(rows) if x.get('event')=='gate_coverage_start'),None)
+    first=next((i for i,x in enumerate(rows) if x.get('event')=='start' and x.get('slug')==slug and x.get('version')==version),None)
+    covered=coverage is not None and first is not None and first>=coverage
+    run=1; runs=set(); exits={}; charged={}; assessments={}; interventions=0
+    for i,x in enumerate(a):
+        ev=x.get('event')
+        if ev=='start': run=x.get('run',1); runs.add(run)
+        elif ev=='resume':
+            outgoing=run
+            if x.get('reason')=='correction': charged.setdefault(outgoing,i)
+            run=x.get('run',x.get('n',run+1)); runs.add(run)
+        elif ev in ('codex_exit','agent_exit'):
+            rn=x.get('run',run); exits[rn]=x.get('exit');
+            if x.get('exit') not in (0,None): charged.setdefault(rn,i)
+        elif ev in ('verify','land_refused'):
+            rn=run
+            if ev=='verify' and x.get('result')=='fail': charged.setdefault(rn,i)
+            if ev=='land_refused' and x.get('reason') in ('tests','fast-gate'): charged.setdefault(rn,i)
+        if ev=='attempt_assessed' and isinstance(x.get('run'),int): assessments[x['run']]=(i,x)
+    for rn,(idx,x) in assessments.items():
+        if rn not in runs: continue
+        if x.get('outcome') in ('failed','rework'): charged[rn]=idx
+        elif x.get('outcome') in ('progress','quota'): charged.pop(rn,None)
+    progress=[rn for rn,(_,x) in assessments.items() if rn in runs and x.get('outcome')=='progress' and x.get('new_evidence_sha256')]
+    p=max(progress,default=0)
+    clears=[i for i,x in enumerate(a) if x.get('event')=='gate_cleared' and x.get('gate')=='stall']
+    lastclear=max(clears,default=-1)
+    unsuccessful=sorted(charged)
+    streak=sum(1 for r,i in charged.items() if r>p and i>lastclear)
+    interventions=sum(1 for x in hist if x.get('event')=='intervention')
+    terminal=any(x.get('event') in ('land','abandon') for x in a)
+    stall='closed' if terminal else 'open' if streak>=2 else 'clear'
+    states={x.get('state') for x in a if x.get('event')=='state_mark'}
+    lastverify=next((x for x in reversed(a) if x.get('event')=='verify'),None)
+    ladder={
+      'implemented':'done' if exits.get(run)==0 else 'pending',
+      'offline_tested':'done' if 'offline_tested' in states else ('pending' if covered else 'unknown'),
+      'independently_verified':'done' if lastverify and lastverify.get('result')=='pass' and lastverify.get('evidence_sha256') else 'unknown' if lastverify and lastverify.get('result')=='pass' else 'pending',
+      'landed':'done' if any(x.get('event')=='land' for x in a) else 'pending',
+      'deployed':'done' if 'deployed' in states else ('pending' if covered else 'unknown'),
+      'live_verified':'done' if 'live_verified' in states else ('pending' if covered else 'unknown')}
+    gateclears={g:max((i for i,x in enumerate(a) if x.get('event')=='gate_cleared' and x.get('gate')==g),default=-1) for g in ('scope','arch')}
+    scopes=[{'ts':x.get('ts'),'paths':x.get('paths',[]),'risk':x.get('risk')} for i,x in enumerate(a) if x.get('event')=='scope_gate' and i>gateclears['scope']]
+    arch=[{'ts':x.get('ts'),'decision':x.get('decision'),'reviewer':x.get('reviewer')} for i,x in enumerate(a) if x.get('event')=='architecture_review' and i>gateclears['arch']]
+    parent=role=None
+    for x in hist:
+        if x.get('event') in ('start','link') and 'parent' in x: parent=x['parent']; role=x.get('role')
+    landed=ladder['landed']=='done'
+    action='none' if any(x.get('event')=='abandon' for x in a) else 'stall_review' if stall=='open' else 'clear_gate' if scopes or arch else 'wait_for_run' if not landed and run not in exits else 'resume_or_abandon' if not landed and exits.get(run) not in (None,0) else 'land' if not landed else 'verify' if ladder['independently_verified']=='pending' else 'deploy' if ladder['deployed']=='pending' else 'live_verify' if ladder['live_verified']=='pending' else 'none'
+    return {'version':version,'slug':slug,'as_of':cutoff,'advisory':True,'ladder':ladder,'stall':stall,'streak':streak,'unsuccessful':unsuccessful,'runs':len(runs),'human_interventions':interventions,'open_scope':scopes,'open_architecture':arch,'parent':parent,'role':role,'bad_lines':bad,'next_action':action}
+def append(event, version=None, slug=None, **fields):
+    obj={'ts':int(time.time()),'event':event,'version':version,'repo':'k3d-manager',**fields}
+    if slug is not None: obj['slug']=slug
+    if slug and version:
+        rp=Path(root)/version/(slug+'.run')/'repo-name'
+        if rp.is_file(): obj['repo']=rp.read_text().strip()
+    ledger.parent.mkdir(parents=True,exist_ok=True)
+    with ledger.open('a') as f: f.write(json.dumps(obj,separators=(',',':'))+'\n')
+    if command!='gate-status':
+        subprocess.Popen([os.environ.get('K3DM_DISPATCH_METRICS_BIN',str(Path(manager)/'bin/k3dm-dispatch-metrics'))],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+def current_version(rows):
+    branch=subprocess.run(['git','-C',manager,'symbolic-ref','--quiet','--short','HEAD'],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL).stdout.strip()
+    m=re.fullmatch(r'k3d-manager-(v?\d+\.\d+\.\d+)',branch)
+    if m: return m.group(1)
+    starts=[x.get('version') for x in rows if x.get('event')=='start']
+    return starts[-1] if starts else None
+def resolve(d, rows):
+    if not d.get('--slug'): die('missing --slug')
+    version=d.get('--version')
+    return task_rows(rows,d['--slug'],version)[0]
+def known_runs(rows, slug, version):
+    known=set(); latest=1
+    for row in task_rows(rows,slug,version)[2]:
+        if row.get('event')=='start':
+            latest=row.get('run',1); known.add(latest)
+        elif row.get('event')=='resume':
+            latest=row.get('run',row.get('n',latest+1)); known.add(latest)
+    return known
+rows,bad=read_lines()
+if command=='gate-status':
+    d=parse(args,('--json',))
+    cutoff=None
+    if '--as-of' in d:
+        try: cutoff=int(d['--as-of'])
+        except (TypeError,ValueError): die('invalid --as-of')
+    rows=[x for x in rows if cutoff is None or x['ts']<=cutoff]
+    if set(d)-{'--slug','--version','--json','--as-of'}: die('unlisted gate-status flag')
+    if '--slug' not in d: die('missing --slug')
+    out=assess_status(rows,d['--slug'],d.get('--version'),cutoff,bad)
+    if '--json' in d: print(json.dumps(out,separators=(',',':')))
+    else: print(json.dumps(out,indent=2)); print('Result is advisory and self-reported.')
+else:
+    d=parse(args)
+if command=='gate-status':
+    pass
+elif command=='gate-coverage-start':
+    if d: die('gate-coverage-start takes no flags')
+    if not any(x.get('event')=='gate_coverage_start' for x in rows): append('gate_coverage_start',current_version(rows))
+elif command in ('link','mark','gate-record','combine'):
+    slug=d.get('--slug'); version=d.get('--version')
+    if command=='combine':
+        allowed={'--version','--parent','--parts','--conflicts','--result','--evidence','--by'}
+        if set(d)-allowed or not {'--parent','--parts','--conflicts','--result','--evidence','--by'}.issubset(d): die('missing or unlisted combine flag')
+        p=d.get('--parent',''); parts=d.get('--parts','').split(',') if d.get('--parts') else []
+        if not PARENT.fullmatch(p): die('invalid parent')
+        if d.get('--result') not in ('pass','fail') or not d.get('--conflicts','').isdigit(): die('invalid combine values')
+        ev=Path(d.get('--evidence',''))
+        if not ev.is_file() or not os.access(ev,os.R_OK) or ev.stat().st_size==0: die('invalid evidence file')
+        resolved_version=version or current_version(rows)
+        for part in parts:
+            v,h,a=task_rows(rows,part,resolved_version)
+            cur=None
+            for x in h:
+                if x.get('event') in ('start','link') and 'parent' in x: cur=x.get('parent')
+            if cur!=p: die('part is not linked to parent')
+        append('combine',resolved_version,None,parent=p,parts=parts,conflicts=int(d['--conflicts']),result=d['--result'],evidence_path=d['--evidence'],evidence_sha256=hashlib.sha256(ev.read_bytes()).hexdigest(),recorded_by=d['--by'])
+    else:
+        if not slug: die('missing --slug')
+        version=resolve(d,rows)
+        if command=='link':
+            if set(d)-{'--slug','--version','--parent','--role'} or not {'--slug','--version','--parent','--role'}.issubset(d): die('missing or unlisted link flag')
+            p=d.get('--parent',''); role=d.get('--role')
+            if not PARENT.fullmatch(p) or role not in ('build','review','verify'): die('invalid parent or role')
+            append('link',version,slug,parent=p,role=role)
+        elif command=='mark':
+            if set(d)-{'--slug','--version','--state','--sha','--evidence','--by'} or not {'--slug','--version','--state','--sha','--evidence','--by'}.issubset(d): die('missing or unlisted mark flag')
+            state=d.get('--state'); sha=d.get('--sha',''); ev=Path(d.get('--evidence',''))
+            if state not in ('offline_tested','deployed','live_verified') or not re.fullmatch('[0-9a-fA-F]{40}',sha): die('invalid state or sha')
+            repo=Path(root)/version/(slug+'.run')/'repo'; repo=Path(repo.read_text().strip()) if repo.is_file() else Path(os.environ.get('K3DM_REPO_ROOT',manager))
+            if subprocess.run(['git','-C',str(repo),'cat-file','-e',sha+'^{commit}'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode: die('sha is not a task repo commit')
+            if not ev.is_file() or ev.stat().st_size==0 or not os.access(ev,os.R_OK): die('invalid evidence')
+            if state!='offline_tested':
+                txt=ev.read_text(); pieces=txt.splitlines(); sep=next((i for i,line in enumerate(pieces) if line.strip()=='---'),None); head='\n'.join(pieces[:sep]) if sep is not None else ''; output=pieces[sep+1:] if sep is not None else []
+                if any(not re.search(r'^'+k+r':\s*\S',head,re.M) for k in ('artifact','environment','command')) or not re.search(r'^rc:\s*0\s*$',head,re.M) or not any(line.strip() for line in output): die('live evidence header is incomplete')
+            append('state_mark',version,slug,state=state,sha=sha,evidence_path=d['--evidence'],evidence_sha256=hashlib.sha256(ev.read_bytes()).hexdigest(),recorded_by=d['--by'])
+        else:
+            event=d.get('--event'); fields={
+             'attempt_assessed':({'--run','--outcome','--assessor','--baseline-sha'},{'--new-evidence'}),
+             'stall_gate':({'--runs','--reason','--assessor','--baseline-sha'},set()),
+             'replan_reviewed':({'--decision','--reviewer','--plan','--baseline-sha'},set()),
+             'scope_gate':({'--paths','--risk','--assessor','--baseline-sha'},set()),
+             'architecture_review':({'--decision','--reviewer','--evidence','--baseline-sha'},set()),
+             'gate_cleared':({'--gate','--by','--evidence'},set())}
+            if event not in fields: die('unknown gate event')
+            required,optional=fields[event]
+            if set(d)-{'--slug','--version','--event'}-required-optional or not required.issubset(d): die('missing or unlisted gate-record flag')
+            enums={'--outcome':{'failed','rework','progress','quota','unknown'},'--decision':{'approved','rejected','narrow_fix','diagnose_first','separate_security_spec','change_architecture','operator_decision_required'},'--risk':{'normal','high'},'--gate':{'stall','scope','arch'}}
+            if '--outcome' in d and d['--outcome'] not in {'failed','rework','progress','quota','unknown'}: die('invalid --outcome')
+            if '--decision' in d:
+                choices={'approved','rejected'} if event=='replan_reviewed' else {'narrow_fix','diagnose_first','separate_security_spec','change_architecture','operator_decision_required'}
+                if d['--decision'] not in choices: die('invalid --decision')
+            if '--risk' in d and d['--risk'] not in {'normal','high'}: die('invalid --risk')
+            if '--gate' in d and d['--gate'] not in {'stall','scope','arch'}: die('invalid --gate')
+            commits=[x for x in rows if x.get('slug')==slug and x.get('version')==version and x.get('event') in ('start','resume')]
+            for k in ('--reviewer',):
+                if k in d and any(d[k] in (x.get('agent'),(x.get('worker_identity') or {}).get('model')) for x in commits): die('reviewer is the worker')
+            if '--baseline-sha' in d:
+                repo=Path(root)/version/(slug+'.run')/'repo'; repo=repo.read_text().strip() if repo.is_file() else os.environ.get('K3DM_REPO_ROOT',manager)
+                if not re.fullmatch('[0-9a-fA-F]{40}',d['--baseline-sha']) or subprocess.run(['git','-C',repo,'cat-file','-e',d['--baseline-sha']+'^{commit}'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode: die('invalid baseline commit')
+            data={}
+            mapping={'--run':'run','--runs':'runs','--outcome':'outcome','--assessor':'assessor','--baseline-sha':'baseline_sha','--reason':'reason','--decision':'decision','--reviewer':'reviewer','--risk':'risk','--paths':'paths','--gate':'gate','--by':'by'}
+            for k,v in d.items():
+                if k in mapping: data[mapping[k]]=(v.split(',') if k=='--paths' else v)
+            evidence_key={'--new-evidence':'new_evidence','--plan':'plan','--evidence':'evidence'}.get(next((k for k in ('--new-evidence','--plan','--evidence') if k in d),''))
+            for k in ('--new-evidence','--plan','--evidence'):
+                if k in d:
+                    ev=Path(d[k]);
+                    if not ev.is_file() or not os.access(ev,os.R_OK) or ev.stat().st_size==0: die('invalid evidence file')
+                    data[evidence_key+'_path' if evidence_key!='new_evidence' else 'new_evidence_path']=d[k]; data[evidence_key+'_sha256' if evidence_key!='new_evidence' else 'new_evidence_sha256']=hashlib.sha256(ev.read_bytes()).hexdigest()
+            if event=='attempt_assessed' and not evidence_key: data.update(new_evidence_path=None,new_evidence_sha256=None)
+            if event=='attempt_assessed':
+                try: data['run']=int(data['run'])
+                except (TypeError,ValueError): die('invalid --run')
+                if data['run'] not in known_runs(rows,slug,version): die('unknown run')
+            if event=='stall_gate':
+                try: data['runs']=[int(n) for n in data['runs'].split(',')]
+                except (TypeError,ValueError): die('invalid --runs')
+                if not data['runs'] or any(n not in known_runs(rows,slug,version) for n in data['runs']): die('unknown run')
+            if event in ('stall_gate','scope_gate'): data['gate_state']='opened'
+            if event=='gate_cleared':
+                status=assess_status(rows,slug,version,None,bad)
+                if (d['--gate']=='stall' and status['stall']!='open') or (d['--gate']=='scope' and not status['open_scope']) or (d['--gate']=='arch' and not status['open_architecture']): die('gate is not open')
+            append(event,version,slug,**data)
+else: die('unknown S1 command')
+PY
 }
 
 _dispatch_release_merged() {
@@ -583,11 +823,13 @@ _dispatch_network_task_running() {
 }
 
 _dispatch_start() {
-  local spec="" slug="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model="" primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
+  local spec="" slug="" parent="" role="" network=0 rel version head remote spec_base worktree run state_dir arg network_slug agent=codex model="" model_source=inherited available_models repo="" target="" repo_name="" task_repo manager_git task_git coordinator="" coordinator_vendor="" coordinator_model="" primary_coordinator="" primary_vendor=unknown primary_model=unknown primary_source="" primary_identity_json
   while (($#)); do
     case "$1" in
       --spec) (($# >= 2)) || _dispatch_error "--spec requires a path"; spec="$2"; shift 2 ;;
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --parent) (($# >= 2)) || _dispatch_error "--parent requires a value"; parent="$2"; shift 2 ;;
+      --role) (($# >= 2)) || _dispatch_error "--role requires a value"; role="$2"; shift 2 ;;
       --agent) (($# >= 2)) || _dispatch_error "--agent requires a value"; agent="$2"; shift 2 ;;
       --model) (($# >= 2)) || _dispatch_error "--model requires a value"; model="$2"; model_source=explicit; shift 2 ;;
       --coordinator) (($# >= 2)) || _dispatch_error "invalid coordinator"; coordinator="$2"; shift 2 ;;
@@ -605,6 +847,11 @@ _dispatch_start() {
     [[ "$coordinator" =~ ^([A-Za-z0-9._:-]{1,64})/([A-Za-z0-9._:-]{1,64})$ ]] || _dispatch_error "invalid coordinator"
     coordinator_vendor="${BASH_REMATCH[1]}"; coordinator_model="${BASH_REMATCH[2]}"
   fi
+  if [[ -n "$parent" || -n "$role" ]]; then
+    [[ "$parent" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ && "$role" =~ ^(build|review|verify)$ ]] || _dispatch_error "--parent and --role must be valid and used together"
+  fi
+  [[ -z "$parent" || -n "$role" ]] || _dispatch_error "--parent requires --role"
+  [[ -z "$role" || -n "$parent" ]] || _dispatch_error "--role requires --parent"
   primary_identity_json="$(_dispatch_primary_identity_json "$primary_coordinator" "$primary_source")" \
     || _dispatch_error "invalid primary coordinator identity or provenance"
   primary_vendor="$(jq -r '.vendor' <<<"$primary_identity_json")"
@@ -693,9 +940,9 @@ _dispatch_start() {
   printf '%s\n' "$agent" >"$run/agent"
   printf '%s\n' "$model" >"$run/model"
   if [[ "$agent" == codex && -n "$model" ]]; then
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --arg model "$model" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor openai --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:$model,source:$model_source,status:$worker_status}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   else
-    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" '.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
+    _dispatch_ledger_event_best_effort start "$version" "$slug" --argjson network "$network" --argjson run 1 --arg spec "$spec" "${stats_args[@]}" --arg agent "$agent" --argjson model "$( [[ -n "$model" ]] && jq -nc --arg m "$model" '$m' || echo null )" --arg model_source "$model_source" --arg coordinator_vendor "$coordinator_vendor" --arg coordinator_model "$coordinator_model" --arg worker_vendor "$([[ "$agent" == agy ]] && echo google || echo openai)" --arg worker_status "$([[ "$model_source" == inherited ]] && echo unverified || echo selected)" --arg parent "$parent" --arg role "$role" 'if $parent=="" then . else .parent=$parent|.role=$role end|.network=$network|.run=$run|.spec=$spec|if ($spec_stats|type)=="object" then .spec_stats=$spec_stats else . end|.agent=$agent|.model=$model|.model_source=$model_source|.worker_identity={vendor:$worker_vendor,model:(.model // "unknown"),source:$model_source,status:(if .model == null then "unknown" else $worker_status end)}|.coordinator_identity=(if $coordinator_vendor=="" then {vendor:"unknown",model:"unknown",source:"unreported",status:"unknown"} else {vendor:$coordinator_vendor,model:$coordinator_model,source:"declared",status:"declared"} end)'
   fi
   _dispatch_ledger_event_best_effort primary_coordinator "$version" "$slug" --arg vendor "$primary_vendor" --arg model "$primary_model" --arg source "$primary_source" \
     '.primary_coordinator_identity={vendor:$vendor,model:$model,source:$source,status:(if $source=="unknown" then "unknown" elif $source=="runtime-reported" then "runtime_reported" else "declared" end)}'
@@ -1153,6 +1400,7 @@ main() {
     prune) shift; _dispatch_prune "$@" ;;
     usage-backfill) shift; (($# == 0)) || _dispatch_error "usage-backfill accepts no options"; _dispatch_usage_backfill ;;
     release-merged) shift; _dispatch_release_merged "$@" ;;
+    gate-status|mark|gate-record|gate-coverage-start|link|combine) cmd="$1"; shift; _dispatch_s1 "$cmd" "$@" ;;
     -h|--help) _dispatch_usage ;;
     *) _dispatch_error "unknown command: $1" ;;
   esac

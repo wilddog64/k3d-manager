@@ -446,7 +446,7 @@ bug-tally:
 
 ## Start Codex in an isolated worktree (SPEC=path)
 codex-dispatch:
-	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',)
+	@bin/k3dm-codex-dispatch start --spec '$(SPEC)' $(if $(REPO),--repo '$(REPO)',) $(if $(filter command% environment%,$(origin BRANCH)),--branch '$(BRANCH)',) $(if $(AGENT),--agent '$(AGENT)',) $(if $(MODEL),--model '$(MODEL)',) $(if $(COORDINATOR),--coordinator '$(COORDINATOR)',) $(if $(PRIMARY_COORDINATOR),--primary-coordinator '$(PRIMARY_COORDINATOR)',) $(if $(PRIMARY_COORDINATOR_SOURCE),--primary-coordinator-source '$(PRIMARY_COORDINATOR_SOURCE)',) $(if $(PARENT),--parent '$(PARENT)',) $(if $(ROLE),--role '$(ROLE)',)
 
 ## Show Codex worktree task status
 codex-status:

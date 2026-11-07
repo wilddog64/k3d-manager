@@ -94,6 +94,35 @@ the status change to FIXED. If the change touches dashboards, ApplicationSets, `
 the webhook, landing is safe, but hold `make appsets-reapply`, `make platform-ops` and
 `make restart-webhook` until that review.
 
+## Advisory S1 status and evidence
+
+The S1 commands record self-reported milestones and provide a read-only summary. They do not
+enforce dispatch, resume, scope, landing, deployment, or reviewer authorization. Recorded digests
+show that a file existed at record time; they do not establish independent verification, deployment,
+or reviewer identity. The reviewer check compares literal identity strings only.
+
+```bash
+bin/k3dm-codex-dispatch gate-status --slug example --json
+bin/k3dm-codex-dispatch mark --slug example --state offline_tested --sha <commit> --evidence /path/result.txt --by operator
+bin/k3dm-codex-dispatch gate-record --slug example --event attempt_assessed --run 2 --outcome progress --assessor operator --baseline-sha <commit>
+bin/k3dm-codex-dispatch gate-coverage-start
+bin/k3dm-codex-dispatch link --slug example-review --parent example --role review
+bin/k3dm-codex-dispatch combine --parent example --parts example,example-review --conflicts 0 --result pass --evidence /path/combine.txt --by operator
+```
+
+`gate-status` makes no network call and does not create a missing ledger or run directory. The
+ladder keeps implementation, offline testing, independent verification, landing, deployment, and
+live verification as separate states. Only captured deployment evidence with the required header
+can record `deployed` or `live_verified`; an offline result cannot promote the live rung. `--as-of`
+filters valid ledger events by timestamp while preserving append order. Malformed lines are counted
+and skipped.
+
+`gate-record` appends assessments, review decisions, scope/architecture observations, and gate
+clears. Evidence paths are recorded as supplied with a SHA-256 digest. `start --parent P --role R`
+and `make codex-dispatch PARENT=P ROLE=R` attach split work; `link` can attach an existing task.
+`combine` records a parent result and is repeatable. These records do not independently prove that
+the stated reviewer or evidence is authentic.
+
 `land` tests the rebased commit before it is pushed, so a test that requires HEAD to be on
 `origin` fails there. The four `e2e_remote.bats` dispatch tests do: give `TEST` a `bats -f`
 filter that excludes them, and run the full suite after the push.
