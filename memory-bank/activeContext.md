@@ -2,6 +2,7 @@
 
 ## Handoff — 2026-11-06 bug batch dispatched in waves; start here
 
+- 2026-11-07: operator `make hub-sync` on M5: 3 docs-only commits pulled (8bab7807..8e483765), restarts and platform-ops correctly skipped, appsets-check ran (8 sets on v1.43.14). Hub catch-up E4 docs-only path PASS; code-commit path still waits for a code commit. `make restart-webhook` reloaded 03:55:52 PST; fan-out cap E2 waits for a multi-alert group. Hermes is a 300s StartInterval job, last exit 0.
 - 2026-11-07: operator gave the dispatch go for the Bugs dashboard matcher P1; dispatched to Luna as `bugs-dashboard-matcher`.
 - 2026-11-07: live check of `dc5f6bb0` found the Bugs dashboard crashing: tile 19 override uses frame matcher `byRefId`, field override needs `byFrameRefID` (Grafana 11.4.0 `ids.ts`). Filed P1 `docs/bugs/2026-11-07-hub-code-behind-tile-unknown-matcher-crashes-bugs-dashboard.md`, waiting on dispatch go. Hub catch-up E3 tile half fails until fixed.
 - 2026-11-07: M5 pulled to `8bab7807` (operator ran `git pull`, so no code left behind). Hermes restarted 03:50 PST; `k3dm_hub_checkout_code_commits_behind` = 0 matches M5 rev-list 0, on_newest_release = 1. Hub catch-up E3 zero case passed; nonzero case and E4 wait for the next code commit. Payment pinned by promoter `8bab7807`, app Synced/Healthy.
