@@ -1,3 +1,5 @@
+**2026-11-07 — v1.43.14 release PR #156 created** (https://github.com/wilddog64/k3d-manager/pull/156, head 2abb1f97). Copilot tagged; CI run 42391577770 running. Next: Copilot fixes (Sonnet), resolve threads, enforce_admins DELETE, operator merges, then /post-merge tags v1.43.14.
+
 **2026-11-07 — v1.43.17 plan 3 written:** `service-password-tailnet-read` (operator: a Tailscale function so Windows/Linux can reach the hub and show service passwords securely). Forced-command SSH key (`from=100.64.0.0/10`, `restrict`, `command=bin/k3dm-password-read`) over a tcp:22-only tailnet grant; output only to the caller's terminal; audit line without output. Spec only — Tailscale install/enrol and every live step need a separate operator go. v1.43.17 now 3 of 5 plans.
 
 # Progress — compressed operational log
