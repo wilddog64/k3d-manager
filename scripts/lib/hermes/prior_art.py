@@ -113,7 +113,7 @@ _BOLD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.*)$", re.MULTILINE)
 _BARE_STATUS_RE = re.compile(r"^Status:\s*(.*)$", re.MULTILINE)
 _STATUS_HEADING_RE = re.compile(r"^## Status\s*$", re.IGNORECASE | re.MULTILINE)
 _CLOSED_RE = re.compile(
-    r"^(?:FIXED|CLOSED|RESOLVED|DONE|WONTFIX|WON'T FIX|SUPERSEDED|DUPLICATE|VERIFIED|LIVE-VERIFIED|IMPLEMENTED|LANDED)\b"
+    r"^(?:FIXED|CLOSED|RESOLVED|DONE|WONTFIX|WON'T FIX|SUPERSEDED|DUPLICATE|VERIFIED|LIVE-VERIFIED|IMPLEMENTED|LANDED|WITHDRAWN|OBSOLETE|COMPLETE|COMPLETED)\b"
     r"|^Fixed (?:on|in)\b", re.IGNORECASE
 )
 _BRANCH_RELEASE_RE = re.compile(r"^\*\*Branch:\*\*.*?v(\d+\.\d+\.\d+)", re.MULTILINE)
@@ -147,7 +147,40 @@ def _status_value(text):
         heading = _STATUS_HEADING_RE.search(text)
         if heading:
             value = next((line.strip() for line in text[heading.end():].splitlines() if line.strip()), None)
-    return value
+    return re.sub(r"^[^\w]+", "", value) if value else value
+
+
+_WAITING_ON_VALUES = {"dispatch", "fix running", "live check", "scheduled run", "investigation", "operator decision"}
+_WAITING_ON_RE = re.compile(r"^\*\*Waiting on:\*\*\s*(.*?)\s*$", re.IGNORECASE)
+
+
+def doc_waiting_on(text):
+    """Return a safe waiting-on label and an ISO date from the document header."""
+    header = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            break
+        header.append(line)
+    for line in header:
+        match = _WAITING_ON_RE.fullmatch(line)
+        if not match:
+            continue
+        parts = match.group(1).split(" — since ", 1)
+        waiting_on = parts[0].strip().lower()
+        if waiting_on not in _WAITING_ON_VALUES:
+            return "invalid", "-"
+        if len(parts) == 2:
+            try:
+                date_value = parts[1].strip()
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+                    raise ValueError("not an ISO calendar date")
+                waiting_since = date.fromisoformat(date_value).isoformat()
+            except ValueError:
+                waiting_since = "-"
+        else:
+            waiting_since = "-"
+        return waiting_on, waiting_since
+    return "not stated", "-"
 
 
 def doc_meta(text):

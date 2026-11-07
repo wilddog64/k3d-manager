@@ -287,9 +287,9 @@ assert [panels[i]["gridPos"] for i in (7, 8, 25)] == [
     {"x": 16, "y": 37, "w": 8, "h": 9},
 ]
 organize = next(t for t in panels[23]["transformations"] if t["id"] == "organize")["options"]
-assert organize["indexByName"]["fixed_in"] == 6
+assert organize["indexByName"]["fixed_in"] == 7
 assert organize["renameByName"]["fixed_in"] == "Fixed in"
-assert [organize["indexByName"][k] for k in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at")] == [7, 8, 9, 10, 11, 12]
+assert [organize["indexByName"][k] for k in ("fix_sha", "verified_sha", "verified", "verified_at", "live_verified", "live_verified_at")] == [8, 9, 10, 11, 12, 13]
 PY
   [ "${status}" -eq 0 ]
 }
@@ -609,15 +609,21 @@ elif check == "columns":
     assert {"sort_key", "release", "__name__", "job", "instance", "Time", "repo"} <= hidden, hidden
     assert not {"bug", "branch"} & hidden
     visible = sorted(organize["indexByName"], key=organize["indexByName"].get)
-    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
-    assert organize["indexByName"]["fixed_in"] == 6
-    assert organize["indexByName"]["fix_sha"] == 7
-    assert organize["indexByName"]["verified_sha"] == 8
-    assert organize["indexByName"]["verified"] == 9
-    assert organize["indexByName"]["verified_at"] == 10
-    assert organize["indexByName"]["live_verified"] == 11
-    assert organize["indexByName"]["live_verified_at"] == 12
+    assert [organize["renameByName"][name] for name in visible] == ["Release", "Bug", "Priority", "Filed", "Open for", "Status", "Waiting on", "Fixed in", "Fix commit", "Verified commit", "Verified", "Verified at", "Live-verified", "Live-verified at", "Live evidence"]
+    assert organize["excludeByName"]["waiting_since"] is True
+    assert "waiting_since" not in organize["renameByName"]
+    assert organize["indexByName"]["waiting_on"] == 6
+    assert organize["indexByName"]["fixed_in"] == 7
+    assert organize["indexByName"]["fix_sha"] == 8
+    assert organize["indexByName"]["verified_sha"] == 9
+    assert organize["indexByName"]["verified"] == 10
+    assert organize["indexByName"]["verified_at"] == 11
+    assert organize["indexByName"]["live_verified"] == 12
+    assert organize["indexByName"]["live_verified_at"] == 13
     assert organize["renameByName"]["live_verified_at"] == "Live-verified at"
+    waiting = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Waiting on")
+    assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.filterable"] is True
+    assert {p["id"]: p["value"] for p in waiting["properties"]}["custom.width"] == 130
     priority = next(o for o in table["fieldConfig"]["overrides"] if o["matcher"]["options"] == "Priority")
     mapping = next(p["value"][0]["options"] for p in priority["properties"] if p["id"] == "mappings")
     pinned = {o["matcher"]["options"]: o["properties"][0]["value"]["fixedColor"]
@@ -776,6 +782,20 @@ PY
   [ "${status}" -eq 0 ]
 }
 
+@test "bugs table describes waiting-on values and hides exported waiting date" {
+  run python3 - "${dashboard}" <<'PY'
+import json, sys
+from pathlib import Path
+d=json.loads(Path(sys.argv[1]).read_text().split("  k3dm-bugs.json: |\n",1)[1])
+table=next(p for p in d["panels"] if p["type"] == "table" and p["title"] == "Bugs")
+assert "not stated" in table["description"] and "Waiting on line" in table["description"]
+assert "The Open P0 to P3 tiles count every open doc" in table["description"]
+organize=next(t for t in table["transformations"] if t["id"] == "organize")["options"]
+assert organize["excludeByName"]["waiting_since"] is True
+PY
+  [ "${status}" -eq 0 ]
+}
+
 @test "bugs table columns fit a laptop-width panel without horizontal scrolling" {
   run python3 - "${dashboard}" <<'PY'
 import json, sys
@@ -784,6 +804,7 @@ table = next(p for p in data["panels"] if p["type"] == "table" and p["title"] ==
 assert table["gridPos"]["w"] == 24
 widths = {o["matcher"].get("options"): p["value"] for o in table["fieldConfig"]["overrides"] for p in o["properties"] if p["id"] == "custom.width"}
 assert "Bug" not in widths, widths
+assert widths["Waiting on"] == 130
 assert widths["Fixed in"] and sum(widths.values()) + 150 <= 1350, sum(widths.values())
 for column in ("Verified at", "Live-verified at"):
     assert widths[column] <= 100, column

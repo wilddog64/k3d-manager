@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts" / "lib"))
 from hermes.prior_art import (doc_fix_commit, doc_live_evidence, doc_investigation_evidence, doc_is_investigation, doc_has_fix_commit, _status_value, doc_meta,
-                              doc_status, doc_verification)  # noqa: E402
+                              doc_status, doc_verification, doc_waiting_on)  # noqa: E402
 PUSH_RETRIES = 3
 PUSH_SLEEP_SECONDS = 2
 RELEASE_HISTORY = 5
@@ -674,16 +674,17 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
         else:
             value = -1
         sort_key = f"{_release_order(release)} {priority} {STATUS_RANK[status]} {filed or '9999-99-99'} {stem}"
+        waiting_on, waiting_since = doc_waiting_on(text) if status in ("open", "unknown") else ("-", "-")
         rows.append((sort_key, priority, title, filed, stem, value, branch, release, status, verified,
-                     live_verified, live_evidence, path))
+                     live_verified, live_evidence, waiting_on, waiting_since, path))
     rows.sort(key=lambda row: row[0])
     truncated = int(len(rows) > 1000)
     aggregates = {}
-    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _live_evidence, _path in rows:
+    for _sort_key, priority, _title, _filed, _stem, _value, _branch, release, status, verified, live_verified, _live_evidence, _waiting_on, _waiting_since, _path in rows:
         key = (release, priority, status, verified, live_verified)
         aggregates[key] = aggregates.get(key, 0) + 1
     lines = []
-    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, live_evidence, path in rows[:1000]:
+    for sort_key, priority, title, filed, stem, value, scan_branch, release, status, verified, live_verified, live_evidence, waiting_on, waiting_since, path in rows[:1000]:
         labels = (f'priority="{priority}",title="{title}",filed="{filed}",bug="{stem}",'
                   f'sort_key="{sort_key}",branch="{scan_branch}",release="{release}",'
                   f'status="{status}",release_order="{_release_order(release)}"')
@@ -726,6 +727,7 @@ def _bug_status_metrics(root, ref=None, now=None, tally=None, texts=None, fixed_
             verified_sha = "-"
         labels += f',fix_sha="{fix_sha}",verified_sha="{verified_sha}"'
         labels += f',live_evidence="{live_evidence}"'
+        labels += f',waiting_on="{waiting_on}",waiting_since="{waiting_since}"'
         lines.append(f"k3dm_bug_info{{{labels}}} {value}")
     def aggregate_key(item):
         release, priority, status, verified, live_verified = item[0]

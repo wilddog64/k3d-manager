@@ -35,6 +35,44 @@ def _repo(tmp_path):
     return tmp_path
 
 
+def test_bug_metrics_waiting_on_labels_are_safe_and_status_gated(metrics, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    assert root.name == "fixture-repo" and not (root / "docs/bugs").resolve() == (ROOT / "docs/bugs").resolve()
+    texts = {
+        "docs/bugs/2026-11-01-open.md": "# open\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** OPEN — fix landed\n**Waiting on:** live check — since 2026-11-06\n",
+        "docs/bugs/2026-11-01-unknown.md": "# unknown\n**Priority:** P2\n**Filed:** 2026-11-01\n**Waiting on:** scheduled run\n",
+        "docs/bugs/2026-11-01-closed.md": "# closed\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** FIXED\n**Waiting on:** dispatch\n",
+        "docs/bugs/2026-11-01-deferred.md": "# deferred\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** DEFERRED\n**Waiting on:** operator decision\n",
+        "docs/bugs/2026-11-01-malformed.md": '# malformed\n**Priority:** P2\n**Filed:** 2026-11-01\n**Status:** OPEN\n**Waiting on:** live check", evil="1\n',
+    }
+    output = metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts=texts)
+    assert 'bug="2026-11-01-open",' in output
+    rows = {re.search(r'bug="([^"]+)"', line).group(1): line for line in output.splitlines() if line.startswith("k3dm_bug_info{")}
+    assert 'waiting_on="live check",waiting_since="2026-11-06"' in rows["2026-11-01-open"]
+    assert 'waiting_on="scheduled run",waiting_since="-"' in rows["2026-11-01-unknown"]
+    assert 'waiting_on="-",waiting_since="-"' in rows["2026-11-01-closed"]
+    assert 'waiting_on="-",waiting_since="-"' in rows["2026-11-01-deferred"]
+    assert 'waiting_on="invalid",waiting_since="-"' in rows["2026-11-01-malformed"]
+    assert 'evil=' not in rows["2026-11-01-malformed"]
+
+
+def test_waiting_on_does_not_change_metric_identity_fields(metrics, tmp_path):
+    root = tmp_path / "fixture-repo"
+    (root / "docs/bugs").mkdir(parents=True)
+    assert root.name == "fixture-repo"
+    base = "# bug\n**Priority:** P1\n**Filed:** 2026-11-01\n**Status:** OPEN\n"
+    outputs = [metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts={"docs/bugs/2026-11-01-x.md": base + tail}) for tail in ("", "**Waiting on:** dispatch\n", "**Waiting on:** live check\n")]
+    def identity(output):
+        line = next(line for line in output.splitlines() if line.startswith("k3dm_bug_info{"))
+        labels = line.split("} ", 1)[0]
+        return line.split("} ", 1)[1], *(re.search(rf'{name}="([^"]*)"', labels).group(1) for name in ("status", "sort_key", "fix_sha"))
+    assert identity(outputs[0]) == identity(outputs[1]) == identity(outputs[2])
+    fixed = base.replace("OPEN", "FIXED") + "**Fix commit:** `abcdef1234567890`\n"
+    fixed_outputs = [metrics._bug_status_metrics(root, now=datetime(2026, 11, 6, tzinfo=timezone.utc), texts={"docs/bugs/2026-11-01-x.md": fixed + tail}) for tail in ("", "**Waiting on:** dispatch\n")]
+    assert identity(fixed_outputs[0]) == identity(fixed_outputs[1])
+
+
 def _git_repo(root, docs):
     bugs = root / "docs/bugs"
     bugs.mkdir(parents=True)
@@ -989,9 +1027,9 @@ def test_bug_status_metrics_release_is_last_label_and_aggregate_is_uncapped(metr
     output = metrics._bug_status_metrics(tmp_path, tally=tally)
     info = [line for line in output.splitlines() if line.startswith("k3dm_bug_info{")]
     assert len(info) == 201
-    # agent-audit: allow assert-removed label tail now carries the open-bug dash placeholders after release_order
+    # agent-audit: allow assert-removed label tail now carries waiting placeholders after live_evidence
     assert all(line.split("}", 1)[0].endswith(
-        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-"')
+        'status="open",fixed_in="-",release_order="9998.9956.9998 v1.43.1",verified="-",live_verified="-",verified_at="-",live_verified_at="-",fix_sha="-",verified_sha="-",live_evidence="-",waiting_on="not stated",waiting_since="-"')
         for line in info)
     assert all("_at=" not in line for line in output.splitlines()
                if line.startswith("k3dm_bug_status_docs{"))
