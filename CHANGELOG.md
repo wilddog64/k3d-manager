@@ -14,6 +14,8 @@
 
 - Explain open bug dependencies in the Bug Tracking table with a safe Waiting on column, export the waiting-since date, and clarify that open priority counts can include fixes awaiting a live check.
 
+- Give Trivy candidate scans a 10-minute timeout, log sanitized failure detail, and retain app CVE scan Job results longer.
+
 ## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.
