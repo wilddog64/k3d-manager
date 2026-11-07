@@ -1,6 +1,7 @@
 # Bug: headless ACG cluster-up stalls at Vault CA trust until timeout
 
-**Status:** LANDED — `8d57ff9e`; offline-verified by Argon (`verify-evidence.1.log`); independent reviewer assessment and live M5 verification pending
+**Status:** VERIFIED 2026-11-07 — `8d57ff9e` plus follow-up `0b11c1f9`; offline-verified by Argon (`verify-evidence.1.log`), then independent verifier PASS 2026-11-07 (14/14 on `0b11c1f9` and on head `5b7ecd15`; N3, N4 red on `8d57ff9e`); live M5 verification pending
+**Waiting on:** live check — since 2026-11-07
 **Priority:** P2
 **Severity:** medium — Slack-driven ACG bring-up failed; an interactive CA trust path may be a workaround but has not been verified for this incident
 **Filed:** 2026-11-02

@@ -1,5 +1,6 @@
 # Progress — compressed operational log
 
+- 2026-11-07: keychain-trust follow-up independently verified (14/14 fix and head).
 - 2026-11-07: tier v2 verified; fleet-host plan moved v1.43.14 → v1.43.16 (fixture precondition unmet).
 - 2026-11-07: CVE empty-tables verified; 21 bug Statuses restated VERIFIED; tier v2 landed 5b7ecd15; 4 offline verifiers launched (tier, keychain, hub-role, resume-reason).
 - 2026-11-07: cve-autopatch-empty-tables landed 279839c1. Plans control-node-role and claude-context-cost-per-turn dispatched.
