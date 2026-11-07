@@ -2,7 +2,7 @@
 
 **Filed:** 2026-10-12
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN — fix landed `6d42c201` (Luna; corrected after Claude's review). Independent verify PASS 2026-11-06, recorded in the ledger: 93 tests pass on the fix, 84 fail on the parent, 12 mutants red. E4: of 1004 docs, doc_status changes for exactly the four expected. N6: plan metrics identical at parent and fix except the scan timestamp. Waiting on lines added to 26 of the 56 open docs on 2026-11-06; the other 30 stay `not stated` until someone reads them. Live E5 and E6 pending.
+**Status:** VERIFIED — fix landed `6d42c201` (Luna; corrected after Claude's review). Independent verify PASS 2026-11-06, recorded in the ledger: 93 tests pass on the fix, 84 fail on the parent, 12 mutants red. E4: of 1004 docs, doc_status changes for exactly the four expected. N6: plan metrics identical at parent and fix except the scan timestamp. Waiting on lines added to 26 of the 56 open docs on 2026-11-06; the other 30 stay `not stated` until someone reads them. Live E5 and E6 pending.
 **Priority:** P2 — raised from P3 2026-11-06; a reader cannot tell a stalled bug from a shipped fix waiting for proof, and it misled the operator about seven rows that day
 **Waiting on:** live check — since 2026-11-06
 **Approval:** explicit 2026-11-06 "go ahead" (operator, on rewriting this spec and dispatching it to Luna). Originally explicit 2026-10-12 "then maybe we should have same comment or explaination (short one) to present; otherwise this confuse people as we don't know what to do or panic".

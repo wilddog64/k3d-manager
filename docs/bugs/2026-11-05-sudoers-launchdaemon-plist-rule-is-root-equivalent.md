@@ -1,6 +1,6 @@
 # Bug: LaunchDaemon and exec wildcard sudoers rules are root-equivalent
 
-**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B is specified in `docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md` and awaits a dispatch go. Do not run `make install-browser-relays` until Part B lands.
+**Status:** OPEN. D1 dropped (pf skips `lo0`). D3 (launchd socket relay) relay spike PASSED on the M4 on 2026-11-05, and the D3 spec is written. Operator go 2026-11-05 ("let's get D3 a shot"). Part A landed (`84da2bcc`, `40f57287`, `69f2db66`); independent verify PASS. Part B landed and verified (`docs/bugs/2026-11-05-launchdaemon-d3-part-b-user-listeners.md`); its live check is partial. This doc stays open until the old rule is confirmed gone from the machines.
 **Priority:** P1
 **Waiting on:** live check
 **Severity:** high — local privilege escalation through rules that headless `acg-up` currently relies on.

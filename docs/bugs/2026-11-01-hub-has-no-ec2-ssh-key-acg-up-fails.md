@@ -1,6 +1,6 @@
 # Bug: acg-up on the new hub fails at once because no EC2 SSH key exists, and machine-setup never creates one
 
-**Status:** OPEN — machine-setup half `08c94b0f` + `15549a06` landed and verified; lib-foundation PR #73 merged and subtree synced in `c22646e1`; duplicate-key fingerprint follow-up PR #75 merged and synced in `73c14ac6` (found 2026-11-06, nothing left to dispatch); E3 live verification remains pending
+**Status:** LANDED — machine-setup half `08c94b0f` + `15549a06` landed and verified; lib-foundation PR #73 merged and subtree synced in `c22646e1`; duplicate-key fingerprint follow-up PR #75 merged and synced in `73c14ac6` (found 2026-11-06, nothing left to dispatch); E3 live verification remains pending
 **Priority:** P2
 **Waiting on:** live check
 **Severity:** medium — `/cluster-up aws` on the M5 hub fails before provisioning; workaround: create the key by hand on the M5

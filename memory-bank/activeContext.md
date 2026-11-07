@@ -2,6 +2,7 @@
 
 ## Handoff — 2026-11-06 bug batch dispatched in waves; start here
 
+- **Workers exited, 2026-11-06:** S1 dispatcher, S1 metrics, Run sort all exit 0, unreviewed. Land dispatcher, metrics, then Run sort (rebase it), then S1 E6 and E9. Dispatch CVE timeout and Status guard to Luna now; hub catch-up (`2026-11-06-hub-code-lag-invisible-and-no-catch-up-step`) only after S1 lands. Payment newest image scanned clean: read tonight's 09:00Z app-cve-scan run; do not promote by hand. Hermes reads docs from origin; the M5 checkout lags only for code.
 - **Operator go, 2026-11-06:** dispatch the filed bugs in a batch by dependency and priority; investigate the 401s; S1 review by Codex at Claude's call. Live checks come after all fixes land, one at a time.
 - **Tunnel E4: PASS** (recorded in the bug doc). Forward-only key, empty agent, push reached the M5.
 - **`GET / 401`: explained.** Blackbox probe every 60s plus Hermes `public-endpoint-probe` bursts. Not an attack. Residual `/v1/models` probes are all refused and cannot be attributed: filed P3 `2026-11-06-webhook-access-log-cannot-identify-the-client`.
