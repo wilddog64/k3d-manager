@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.43.14] - 2026-11-07
+
 - Export Claude context per turn, post-compaction floor and observed ceiling, active-day turn rates, and cache rebuild counts and cost; add the matching Agent Cost dashboard row and guide.
 
 - Add a `control` machine role for local development on Macs that do not run a cluster.
@@ -39,8 +41,6 @@
 - Add `.github/dependabot.yml` for weekly GitHub Actions updates in workflows and composite actions; the lib-foundation subtree's npm dependencies are updated upstream.
 - Pull lib-foundation through PR #77: `brace-expansion` 1.1.21 in the ACG lockfile clears three high DoS advisories.
 - Keep release forecasts aligned with roadmap milestones, folded releases, and work in progress.
-
-## [1.43.14] - Unreleased
 
 - Add `bin/cluster-up --trust-vault-ca` (`make trust-vault-ca`) with admin webhook endpoint and Slack command support; allow `sudo -n true` in sudoers and fall back to `sudo -n -l /bin/launchctl` in headless LaunchDaemon guards.
 - Use provider-scoped SSH tunnel ports (`16443` for `k3s-aws`, `6443` for `k3s-hostinger`) and filter ArgoCD degraded apps by provider in webhook post-provision checks and cluster status.

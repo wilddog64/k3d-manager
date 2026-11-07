@@ -69,6 +69,20 @@ is backed by a local TLS listener on port 443. The listener uses a Vault PKI
 certificate for `argocd.shopping-cart.local`; if Safari does not yet trust the
 Vault CA, run `bin/setup-vault-ca -m` to install it into the macOS keychain.
 
+### Trust the Hub Vault CA (`make trust-vault-ca`)
+
+`make trust-vault-ca` (`bin/cluster-up --trust-vault-ca`) trusts the Hub Vault PKI root CA in the macOS
+System Keychain:
+
+- It uses `~/.local/share/k3d-manager/acg/argocd-browser-https-tls/ca.crt`, or reads `pki/cert/ca` from the hub's
+  Vault when that file is missing.
+- It does nothing when the CA is already trusted (`security verify-cert`), or on a host that is not macOS.
+- Otherwise it runs `security add-trusted-cert -d -r trustRoot` through `_run_command --interactive-sudo`.
+
+macOS asks for approval through SecurityAgent, so run it from a local terminal on the Mac. Over SSH, or with no TTY,
+it stops with an error that says so. `acg-up` skips this step in those sessions and warns you to run
+`make trust-vault-ca` yourself. The webhook exposes the target to the `admin` role only.
+
 ## Notes
 
 - ArgoCD runs on the **infra cluster** (`k3d-k3d-cluster` context) and deploys to the **app cluster** (`ubuntu-k3s` context)
