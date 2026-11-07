@@ -223,14 +223,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102]) and len(all_ids)==len(set(all_ids))
-assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101}|set(range(42,49))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106]) and len(all_ids)==len(set(all_ids))
+assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98}
 assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 86 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 90 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -243,7 +243,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -691,7 +691,7 @@ props={o["matcher"]["options"]:{p["id"]:p["value"] for p in o["properties"]} for
 for field in ["Worker","Coordinator (legacy)","Primary coordinator","Acting coordinator","Landed by"]:
     opts=props[field]["mappings"][0]["options"]
     assert opts=={"unknown":{"text":"not recorded"}}
-assert len(d["panels"])==31
+assert len(d["panels"])==35
 print("ok")
 PY
   [ "$status" -eq 0 ]
@@ -889,7 +889,7 @@ later={"Per run evidence":(10,18,6,39), "First-pass live verification":(10,6,0,3
        "Lines changed total":(4,6,0,49), "Median lines / spec":(4,6,6,49),
        "Acceptance items total":(4,6,12,49), "Measured":(4,6,18,49),
        "Final worker exit → land":(8,6,0,54), "Human continuation prompts":(8,18,6,54)}
-assert {p["title"] for p in d["panels"] if p["gridPos"]["y"]>=42}==set(later)
+assert {p["title"] for p in d["panels"] if 42<=p["gridPos"]["y"]<65}==set(later)
 for title,(h,w,x,y) in later.items():
     assert panels[title]["gridPos"]=={"h":h,"w":w,"x":x,"y":y+3},title
 # The expanded row and the immediately following row tile the whole width without gaps or overlaps.
@@ -906,4 +906,159 @@ PY
 @test "agent dispatch dashboard: claimed verification stat is present" {
   run grep -F 'k3dm_dispatch_verification_claimed' "$BATS_TEST_DIRNAME/../../etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
   [ "$status" -eq 0 ]
+}
+
+@test "agent dispatch dashboard: S1 gate panels exist and match query and description contract" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" <<'PY'
+import json, re, sys
+from pathlib import Path
+d = json.loads("\n".join(x[4:] for x in open(sys.argv[1]).read().split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
+exporter = Path(sys.argv[2]).read_text()
+panels = {p["title"]: p for p in d["panels"]}
+
+expected_panels = ["Stalled tasks", "Live verification pending", "Verification ladder", "Split work"]
+for title in expected_panels:
+    assert title in panels, f"missing panel: {title}"
+    desc = panels[title].get("description", "").lower()
+    assert "self-reported and advisory" in desc, f"{title} description missing advisory note: {desc}"
+
+series_by_panel = {
+    "Stalled tasks": "k3dm_dispatch_stalled_tasks",
+    "Live verification pending": "k3dm_dispatch_live_pending_tasks",
+    "Verification ladder": "k3dm_dispatch_ladder_tasks",
+}
+for title, series in series_by_panel.items():
+    exprs = "\n".join(t.get("expr", "") for t in panels[title].get("targets", []))
+    assert series in exprs, f"{title} targets do not query {series}: {exprs}"
+    assert series in exporter, f"{series} not in exporter"
+
+split = panels["Split work"]
+split_exprs = [t.get("expr", "") for t in split.get("targets", [])]
+for s in ("k3dm_dispatch_split_parent_parts", "k3dm_dispatch_split_parent_conflicts",
+          "k3dm_dispatch_split_parent_info", "k3dm_dispatch_split_parent_elapsed_seconds"):
+    assert any(s in expr for expr in split_exprs), f"Split work missing query for {s}"
+    assert s in exporter, f"{s} not in exporter"
+
+for role in ("build", "review", "verify"):
+    assert any(f'role="{role}"' in expr for expr in split_exprs), f"Split work missing target for role {role}"
+
+for expr in split_exprs:
+    assert ", role" not in expr and "by (role)" not in expr and "by (parent, role)" not in expr, f"target groups by role: {expr}"
+
+info_expr = next(expr for expr in split_exprs if "split_parent_info" in expr)
+assert "pending" not in info_expr, f"info query has pending filter: {info_expr}"
+
+join_transform = next((t for t in split.get("transformations", []) if t.get("id") == "joinByField"), None)
+assert join_transform is not None, "Split work missing joinByField transformation"
+assert join_transform.get("options", {}).get("byField") == "parent"
+assert join_transform.get("options", {}).get("mode") == "outer"
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent dispatch dashboard: Split work outer join on synthetic metrics" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "$EXPORTER" "${BATS_TEST_DIRNAME}/../fixtures/dispatch-gates/synthetic.jsonl" <<'PY'
+import json, os, re, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+dashboard = json.loads("\n".join(x[4:] for x in open(sys.argv[1]).read().split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
+exporter_path = sys.argv[2]
+fixture_path = Path(sys.argv[3])
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    wt = Path(tmpdir) / "worktrees"
+    wt.mkdir()
+    shutil.copy(fixture_path, wt / "ledger.jsonl")
+    env = os.environ.copy()
+    env["K3DM_WORKTREE_ROOT"] = str(wt)
+    env["K3DM_DISPATCH_PUSHGATEWAY_URL"] = "http://127.0.0.1:9"
+    proc = subprocess.run([sys.executable, exporter_path, "--dry-run"], env=env, capture_output=True, text=True, check=True)
+    metrics_text = proc.stdout
+
+split_panel = next(p for p in dashboard["panels"] if p["title"] == "Split work")
+join_tf = next(t for t in split_panel["transformations"] if t["id"] == "joinByField")
+assert join_tf["options"]["byField"] == "parent"
+assert join_tf["options"]["mode"] == "outer"
+
+split_exprs = [t.get("expr", "") for t in split_panel["targets"]]
+for role in ("build", "review", "verify"):
+    assert any(f'role="{role}"' in expr for expr in split_exprs)
+for expr in split_exprs:
+    assert ", role" not in expr and "by (role)" not in expr and "by (parent, role)" not in expr
+
+info_expr = next(expr for expr in split_exprs if "split_parent_info" in expr)
+assert "pending" not in info_expr
+
+build = {}
+review = {}
+verify = {}
+for line in metrics_text.splitlines():
+    m = re.match(r'^k3dm_dispatch_split_parent_parts\{version="[^"]+",parent="([^"]+)",role="([^"]+)"\}\s+([0-9.]+)', line)
+    if m:
+        p, r, v = m.group(1), m.group(2), int(float(m.group(3)))
+        if r == "build":
+            build[p] = v
+        elif r == "review":
+            review[p] = v
+        elif r == "verify":
+            verify[p] = v
+
+conflicts = {}
+for line in metrics_text.splitlines():
+    m = re.match(r'^k3dm_dispatch_split_parent_conflicts\{version="[^"]+",parent="([^"]+)"\}\s+([0-9.]+)', line)
+    if m:
+        conflicts[m.group(1)] = int(float(m.group(2)))
+
+combines = {}
+for line in metrics_text.splitlines():
+    m = re.match(r'^k3dm_dispatch_split_parent_info\{version="[^"]+",parent="([^"]+)",combine="([^"]+)"\}\s+([0-9.]+)', line)
+    if m:
+        combines[m.group(1)] = m.group(2)
+
+elapsed = {}
+for line in metrics_text.splitlines():
+    m = re.match(r'^k3dm_dispatch_split_parent_elapsed_seconds\{version="[^"]+",parent="([^"]+)"\}\s+([0-9.]+)', line)
+    if m:
+        elapsed[m.group(1)] = int(float(m.group(2)))
+
+all_parents = sorted(set(list(build.keys()) + list(review.keys()) + list(verify.keys()) + list(conflicts.keys()) + list(combines.keys()) + list(elapsed.keys())))
+joined_rows = []
+for p in all_parents:
+    joined_rows.append({
+        "parent": p,
+        "build": build.get(p),
+        "review": review.get(p),
+        "verify": verify.get(p),
+        "conflicts": conflicts.get(p),
+        "combine": combines.get(p),
+        "elapsed": elapsed.get(p),
+    })
+
+assert len(joined_rows) == len(all_parents)
+assert len(joined_rows) == len(set(r["parent"] for r in joined_rows))
+
+p_one_rows = [r for r in joined_rows if r["parent"] == "p-one"]
+assert len(p_one_rows) == 1
+p1 = p_one_rows[0]
+assert p1["build"] == 2 and p1["verify"] == 1 and p1["review"] == 0
+assert p1["conflicts"] == 1 and p1["combine"] == "pass" and p1["elapsed"] == 70
+
+for no_comb in ("p-two", "p-four"):
+    r = next(row for row in joined_rows if row["parent"] == no_comb)
+    assert r["combine"] == "pending"
+    assert r["conflicts"] is None
+    assert r["elapsed"] is None
+
+p_four = next(r for r in joined_rows if r["parent"] == "p-four")
+assert p_four["build"] == 0 and p_four["verify"] == 0 and p_four["review"] == 1
+p_orphan = next(r for r in joined_rows if r["parent"] == "p-orphan")
+assert p_orphan["build"] == 0 and p_orphan["review"] == 0 and p_orphan["verify"] == 0
+assert p_orphan["combine"] == "pass"
+
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
 }

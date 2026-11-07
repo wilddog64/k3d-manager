@@ -1768,6 +1768,301 @@ data:
               "valueSize": 24
             }
           }
+        },
+        {
+          "id": 103,
+          "type": "stat",
+          "title": "Stalled tasks",
+          "description": "Self-reported and advisory. Tasks with stall state open.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 65
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_dispatch_stalled_tasks)",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto"
+          }
+        },
+        {
+          "id": 104,
+          "type": "stat",
+          "title": "Live verification pending",
+          "description": "Self-reported and advisory. Tasks landed but awaiting live verification.",
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 65
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum(k3dm_dispatch_live_pending_tasks)",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "yellow"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto"
+          }
+        },
+        {
+          "id": 105,
+          "type": "bargauge",
+          "title": "Verification ladder",
+          "description": "Self-reported and advisory. Verification ladder tasks by rung and status, unknown shown separately.",
+          "gridPos": {
+            "h": 6,
+            "w": 12,
+            "x": 12,
+            "y": 65
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (rung, status) (k3dm_dispatch_ladder_tasks)",
+              "instant": true,
+              "legendFormat": "{{rung}} {{status}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "basic",
+            "orientation": "horizontal",
+            "namePlacement": "left",
+            "text": {
+              "titleSize": 14,
+              "valueSize": 24
+            }
+          }
+        },
+        {
+          "id": 106,
+          "type": "table",
+          "title": "Split work",
+          "description": "Self-reported and advisory. Split work parents by role, conflicts, combine result, and elapsed.",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 71
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (parent) (k3dm_dispatch_split_parent_parts{role=\"build\"})",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "refId": "B",
+              "expr": "sum by (parent) (k3dm_dispatch_split_parent_parts{role=\"review\"})",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "refId": "C",
+              "expr": "sum by (parent) (k3dm_dispatch_split_parent_parts{role=\"verify\"})",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "refId": "D",
+              "expr": "max by (parent) (k3dm_dispatch_split_parent_conflicts)",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "refId": "E",
+              "expr": "max by (parent, combine) (k3dm_dispatch_split_parent_info)",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "refId": "F",
+              "expr": "max by (parent) (k3dm_dispatch_split_parent_elapsed_seconds)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "parent",
+                "mode": "outer"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value #E": true,
+                  "__name__": true
+                },
+                "indexByName": {
+                  "parent": 0,
+                  "Value #A": 1,
+                  "Value #B": 2,
+                  "Value #C": 3,
+                  "Value #D": 4,
+                  "combine": 5,
+                  "Value #F": 6
+                },
+                "renameByName": {
+                  "parent": "Parent",
+                  "Value #A": "Build",
+                  "Value #B": "Review",
+                  "Value #C": "Verify",
+                  "Value #D": "Conflicts",
+                  "combine": "Combine",
+                  "Value #F": "Elapsed (s)"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          }
         }
       ]
     }

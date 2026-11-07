@@ -40,6 +40,17 @@ MODEL_IDENTITY_ALLOWLIST = {
     "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
     "gemini-4-argon-medium", "gemini-4-argon-high", "gemini-4-argon-low",
 }
+RUNGS = ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed")
+STATUSES = ("done", "pending", "unknown")
+ROLES = ("build", "review", "verify")
+GATE_EVENTS = ("attempt_assessed", "stall_gate", "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared")
+COMBINE_RESULTS = ("pass", "fail", "pending")
+PARENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+NEW_S1_EVENTS = {
+    "gate_coverage_start", "combine", "attempt_assessed", "stall_gate",
+    "replan_reviewed", "scope_gate", "architecture_review", "gate_cleared",
+    "state_mark", "link",
+}
 
 
 def _repo_root():
@@ -747,6 +758,8 @@ def read_ledger(path):
 def _task_states(events):
     states = defaultdict(list)
     for event in events:
+        if event.get("event") in NEW_S1_EVENTS or not event.get("slug"):
+            continue
         key = (event.get("version"), event.get("slug"))
         states[key].append(event)
     return states
@@ -2016,6 +2029,277 @@ def _render_claude_context(lines, now, claude_context, repo_root):
         lines.append(f"k3dm_claude_auto_compact_tokens {auto_tokens}")
 
 
+def _render_dispatch_gates(lines, events):
+    cov_idx = None
+    for idx, e in enumerate(events):
+        if e.get("event") == "gate_coverage_start":
+            cov_idx = idx
+            break
+
+    versions_latest = {}
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        if isinstance(v, str) and v:
+            versions_latest[v] = idx
+
+    sorted_versions = sorted(versions_latest.keys(), key=lambda v: versions_latest[v], reverse=True)[:10]
+    covered_versions = sorted(sorted_versions)
+
+    tasks_events = {}
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        s = e.get("slug")
+        if v and s:
+            tasks_events.setdefault((v, s), []).append((idx, e))
+
+    tasks = {k: v for k, v in tasks_events.items() if any(e.get("event") == "start" for _, e in v)}
+
+    task_parent_role = {}
+    task_parent_idx = {}
+    task_earliest_start = {}
+    combines_by_parent = {}
+
+    for idx, e in enumerate(events):
+        v = e.get("version")
+        if not v or not isinstance(v, str):
+            continue
+        evt = e.get("event")
+        s = e.get("slug")
+        if evt == "start" and s:
+            if (v, s) not in task_earliest_start and isinstance(e.get("ts"), (int, float)):
+                task_earliest_start[(v, s)] = e["ts"]
+            if "parent" in e:
+                p = e.get("parent")
+                r = e.get("role")
+                if isinstance(p, str):
+                    task_parent_role[(v, s)] = (p, r if r in ROLES else None)
+                    task_parent_idx[(v, s)] = idx
+        elif evt == "link" and s:
+            if (v, s) in tasks and "parent" in e:
+                p = e.get("parent")
+                r = e.get("role")
+                if isinstance(p, str):
+                    task_parent_role[(v, s)] = (p, r if r in ROLES else None)
+                    task_parent_idx[(v, s)] = idx
+        elif evt == "combine":
+            p = e.get("parent")
+            if isinstance(p, str):
+                combines_by_parent.setdefault((v, p), []).append((idx, e))
+
+    parents_by_version = {}
+    for (v, s), (p, r) in task_parent_role.items():
+        idx = task_parent_idx.get((v, s), -1)
+        cur = parents_by_version.setdefault(v, {})
+        cur[p] = max(cur.get(p, -1), idx)
+
+    for (v, p), c_list in combines_by_parent.items():
+        last_c_idx = c_list[-1][0]
+        cur = parents_by_version.setdefault(v, {})
+        cur[p] = max(cur.get(p, -1), last_c_idx)
+
+    all_valid_parents = {}
+    for v, p_dict in parents_by_version.items():
+        for p, idx in p_dict.items():
+            if PARENT_RE.fullmatch(p):
+                all_valid_parents[(v, p)] = idx
+
+    sorted_valid_parents = sorted(all_valid_parents.keys(), key=lambda vp: all_valid_parents[vp], reverse=True)
+    top_20_parents = set(sorted_valid_parents[:20])
+
+    for v in covered_versions:
+        v_tasks = [evts for (tv, s), evts in tasks.items() if tv == v]
+
+        ladder_counts = {r: {st: 0 for st in STATUSES} for r in RUNGS}
+        stalled_count = 0
+        live_pending_count = 0
+
+        for evts in v_tasks:
+            first_start_idx = next(idx for idx, e in evts if e.get("event") == "start")
+            outside_cov = cov_idx is None or first_start_idx < cov_idx
+
+            last_start_idx = max(idx for idx, e in evts if e.get("event") == "start")
+            attempt_evts = [(idx, e) for idx, e in evts if idx >= last_start_idx]
+
+            distinct_runs = set()
+            latest_run = None
+            run_exits = {}
+            run_natural_charge = {}
+            run_assessments = {}
+            has_land = any(e.get("event") == "land" for _, e in attempt_evts)
+            has_abandon = any(e.get("event") == "abandon" for _, e in attempt_evts)
+            stall_clear_idx = None
+
+            for idx, e in attempt_evts:
+                evt_name = e.get("event")
+                if evt_name == "start":
+                    r = e.get("run") if isinstance(e.get("run"), int) else 1
+                    latest_run = r
+                    distinct_runs.add(r)
+                elif evt_name == "resume":
+                    if e.get("reason") == "correction" and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                    if isinstance(e.get("run"), int):
+                        r = e["run"]
+                    elif isinstance(e.get("n"), int):
+                        r = e["n"]
+                    else:
+                        r = (latest_run or 0) + 1
+                    latest_run = r
+                    distinct_runs.add(r)
+                elif evt_name in ("codex_exit", "agent_exit"):
+                    r = e.get("run") if isinstance(e.get("run"), int) else latest_run
+                    run_exits[r] = e.get("exit")
+                    if e.get("exit") not in (0, None):
+                        if r not in run_natural_charge:
+                            run_natural_charge[r] = idx
+                elif evt_name == "verify":
+                    if e.get("result") == "fail" and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                elif evt_name == "land_refused":
+                    if e.get("reason") in ("tests", "fast-gate") and latest_run is not None:
+                        if latest_run not in run_natural_charge:
+                            run_natural_charge[latest_run] = idx
+                elif evt_name == "attempt_assessed":
+                    r = e.get("run")
+                    if isinstance(r, int):
+                        run_assessments[r] = (idx, e)
+                elif evt_name == "gate_cleared":
+                    if e.get("gate") == "stall":
+                        stall_clear_idx = idx
+
+            unsuccessful = []
+            charge_lines = {}
+            P = 0
+            for r in distinct_runs:
+                if r in run_assessments:
+                    a_idx, a_evt = run_assessments[r]
+                    if a_evt.get("outcome") == "progress" and a_evt.get("new_evidence_sha256"):
+                        P = max(P, r)
+
+            for r in distinct_runs:
+                if r in run_assessments:
+                    a_idx, a_evt = run_assessments[r]
+                    outc = a_evt.get("outcome")
+                    if outc in ("failed", "rework"):
+                        unsuccessful.append(r)
+                        charge_lines[r] = a_idx
+                    elif outc in ("progress", "quota"):
+                        pass
+                    else:
+                        if r in run_natural_charge:
+                            unsuccessful.append(r)
+                            charge_lines[r] = run_natural_charge[r]
+                else:
+                    if r in run_natural_charge:
+                        unsuccessful.append(r)
+                        charge_lines[r] = run_natural_charge[r]
+            unsuccessful.sort()
+
+            streak = 0
+            for r in unsuccessful:
+                if r > P:
+                    if stall_clear_idx is None or charge_lines[r] > stall_clear_idx:
+                        streak += 1
+
+            if has_land or has_abandon:
+                stall = "closed"
+            elif streak >= 2:
+                stall = "open"
+            else:
+                stall = "clear"
+
+            if stall == "open":
+                stalled_count += 1
+
+            task_ladder = {}
+            last_exit = run_exits.get(latest_run)
+            task_ladder["implemented"] = "done" if last_exit == 0 else "pending"
+
+            for rung in ("offline_tested", "deployed", "live_verified"):
+                if any(e.get("event") == "state_mark" and e.get("state") == rung for _, e in attempt_evts):
+                    task_ladder[rung] = "done"
+                elif outside_cov:
+                    task_ladder[rung] = "unknown"
+                else:
+                    task_ladder[rung] = "pending"
+
+            verifies = [e for _, e in attempt_evts if e.get("event") == "verify"]
+            if verifies:
+                last_v = verifies[-1]
+                if last_v.get("result") == "pass":
+                    task_ladder["independently_verified"] = "done" if last_v.get("evidence_sha256") else "unknown"
+                else:
+                    task_ladder["independently_verified"] = "pending"
+            else:
+                task_ladder["independently_verified"] = "pending"
+
+            task_ladder["landed"] = "done" if has_land else "pending"
+
+            if task_ladder["landed"] == "done" and task_ladder["live_verified"] == "pending":
+                live_pending_count += 1
+
+            for rung in RUNGS:
+                st = task_ladder[rung]
+                ladder_counts[rung][st] += 1
+
+        for rung in RUNGS:
+            for st in STATUSES:
+                lines.append(f'k3dm_dispatch_ladder_tasks{{version="{v}",rung="{rung}",status="{st}"}} {ladder_counts[rung][st]}')
+
+        lines.append(f'k3dm_dispatch_stalled_tasks{{version="{v}"}} {stalled_count}')
+        lines.append(f'k3dm_dispatch_live_pending_tasks{{version="{v}"}} {live_pending_count}')
+
+        gate_counts = {ge: 0 for ge in GATE_EVENTS}
+        for e in events:
+            if e.get("version") == v and e.get("event") in gate_counts:
+                gate_counts[e["event"]] += 1
+
+        for ge in GATE_EVENTS:
+            lines.append(f'k3dm_dispatch_gate_events{{version="{v}",event="{ge}"}} {gate_counts[ge]}')
+
+        named_in_v = parents_by_version.get(v, {})
+        valid_in_v = {p: idx for p, idx in named_in_v.items() if PARENT_RE.fullmatch(p)}
+        invalid_in_v = {p: idx for p, idx in named_in_v.items() if not PARENT_RE.fullmatch(p)}
+
+        exported_in_v = sorted(p for p in valid_in_v if (v, p) in top_20_parents)
+        dropped_in_v = len(invalid_in_v) + len([p for p in valid_in_v if (v, p) not in top_20_parents])
+
+        for p in exported_in_v:
+            members = [(s, r) for (tv, s), (tp, r) in task_parent_role.items() if tv == v and tp == p]
+            combines = combines_by_parent.get((v, p), [])
+            if combines:
+                last_c = combines[-1][1]
+                comb_res = last_c.get("result")
+                conflicts = last_c.get("conflicts")
+                last_c_ts = last_c.get("ts", 0)
+                if members:
+                    member_starts = [task_earliest_start[(v, s)] for s, _ in members if (v, s) in task_earliest_start]
+                    elapsed = max(0, int(last_c_ts - min(member_starts))) if member_starts else None
+                else:
+                    elapsed = None
+            else:
+                comb_res = "pending"
+                conflicts = None
+                elapsed = None
+
+            if comb_res in COMBINE_RESULTS:
+                lines.append(f'k3dm_dispatch_split_parent_info{{version="{v}",parent="{p}",combine="{comb_res}"}} 1')
+
+            for r in ROLES:
+                r_cnt = sum(1 for _, mr in members if mr == r)
+                lines.append(f'k3dm_dispatch_split_parent_parts{{version="{v}",parent="{p}",role="{r}"}} {r_cnt}')
+
+            if conflicts is not None and type(conflicts) is int:
+                lines.append(f'k3dm_dispatch_split_parent_conflicts{{version="{v}",parent="{p}"}} {conflicts}')
+
+            if elapsed is not None:
+                lines.append(f'k3dm_dispatch_split_parent_elapsed_seconds{{version="{v}",parent="{p}"}} {elapsed}')
+
+        lines.append(f'k3dm_dispatch_split_parents_dropped{{version="{v}"}} {dropped_in_v}')
+
+
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
            codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None):
     now = time.time() if now is None else now
@@ -2090,6 +2374,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
     else:
         _quota_efficiency(lines, events, None, now)
     _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events)
+    _render_dispatch_gates(lines, events)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
     return "\n".join(lines) + "\n"
 

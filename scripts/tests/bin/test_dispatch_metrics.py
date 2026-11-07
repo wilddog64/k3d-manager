@@ -2743,3 +2743,273 @@ def test_resume_reason_preserves_precedence(tmp_path, extra, exit_code, expected
             *extra, event(120, "resume", "task", n=2, reason="clarification")]
     result = dispatch_metrics._run_outcome_metrics(rows, tmp_path, now=140)
     assert result["outcomes"][expected] == 1
+
+
+def test_dispatch_gates_synthetic_matches_expected(tmp_path):
+    import re
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    root.mkdir(parents=True, exist_ok=True)
+
+    fixture_dir = Path(__file__).parents[2] / "tests/fixtures/dispatch-gates"
+    assert (fixture_dir / "synthetic.jsonl").exists() and (fixture_dir / "expected.json").exists()
+
+    shutil.copy(fixture_dir / "synthetic.jsonl", root / "ledger.jsonl")
+
+    proc = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                          env=os.environ.copy(), check=True, timeout=60)
+    stdout = proc.stdout
+
+    with open(fixture_dir / "expected.json") as f:
+        exp = json.load(f)["synthetic"]
+
+    # 1. Stalled and live_pending tasks counts
+    stalled_val = exp["counts"]["stalled_tasks"]
+    assert f'k3dm_dispatch_stalled_tasks{{version="v9.9.9"}} {stalled_val}' in stdout
+    lp_val = exp["counts"]["live_pending_tasks"]
+    assert f'k3dm_dispatch_live_pending_tasks{{version="v9.9.9"}} {lp_val}' in stdout
+    spd_val = exp["split_parents_dropped"]
+    assert f'k3dm_dispatch_split_parents_dropped{{version="v9.9.9"}} {spd_val}' in stdout
+
+    # 2. Gate events (all 6 present and match)
+    for ge, count in exp["gate_events"].items():
+        assert f'k3dm_dispatch_gate_events{{version="v9.9.9",event="{ge}"}} {count}' in stdout
+
+    # 3. Ladder counts from tasks (all 18 combinations present)
+    ladder_counts = {}
+    for task in exp["tasks"].values():
+        for rung, status in task["ladder"].items():
+            ladder_counts[(rung, status)] = ladder_counts.get((rung, status), 0) + 1
+
+    for rung in dispatch_metrics.RUNGS:
+        for status in dispatch_metrics.STATUSES:
+            count = ladder_counts.get((rung, status), 0)
+            assert f'k3dm_dispatch_ladder_tasks{{version="v9.9.9",rung="{rung}",status="{status}"}} {count}' in stdout
+
+    # 4. Split parent rows
+    for p, pdata in exp["split"].items():
+        comb = pdata["combine"]
+        assert f'k3dm_dispatch_split_parent_info{{version="v9.9.9",parent="{p}",combine="{comb}"}} 1' in stdout
+        for role in dispatch_metrics.ROLES:
+            role_cnt = pdata[role]
+            assert f'k3dm_dispatch_split_parent_parts{{version="v9.9.9",parent="{p}",role="{role}"}} {role_cnt}' in stdout
+        if pdata["conflicts"] is not None:
+            c_val = pdata["conflicts"]
+            assert f'k3dm_dispatch_split_parent_conflicts{{version="v9.9.9",parent="{p}"}} {c_val}' in stdout
+        else:
+            assert f'k3dm_dispatch_split_parent_conflicts{{version="v9.9.9",parent="{p}"}}' not in stdout
+        if pdata["elapsed_seconds"] is not None:
+            el_val = pdata["elapsed_seconds"]
+            assert f'k3dm_dispatch_split_parent_elapsed_seconds{{version="v9.9.9",parent="{p}"}} {el_val}' in stdout
+        else:
+            assert f'k3dm_dispatch_split_parent_elapsed_seconds{{version="v9.9.9",parent="{p}"}}' not in stdout
+
+    # 5. Label-value allowlists (E4)
+    s1_series_prefixes = (
+        "k3dm_dispatch_ladder_tasks",
+        "k3dm_dispatch_stalled_tasks",
+        "k3dm_dispatch_live_pending_tasks",
+        "k3dm_dispatch_gate_events",
+        "k3dm_dispatch_split_parent_info",
+        "k3dm_dispatch_split_parent_parts",
+        "k3dm_dispatch_split_parent_conflicts",
+        "k3dm_dispatch_split_parent_elapsed_seconds",
+        "k3dm_dispatch_split_parents_dropped",
+    )
+    s1_lines = [line for line in stdout.splitlines() if any(line.startswith(p) for p in s1_series_prefixes)]
+    assert len(s1_lines) > 0
+    for line in s1_lines:
+        assert "slug=" not in line
+        if "rung=" in line:
+            m = re.search(r'rung="([^"]+)"', line)
+            assert m and m.group(1) in dispatch_metrics.RUNGS
+        if "status=" in line:
+            m = re.search(r'status="([^"]+)"', line)
+            assert m and m.group(1) in dispatch_metrics.STATUSES
+        if "role=" in line:
+            m = re.search(r'role="([^"]+)"', line)
+            assert m and m.group(1) in dispatch_metrics.ROLES
+        if "combine=" in line:
+            m = re.search(r'combine="([^"]+)"', line)
+            assert m and m.group(1) in dispatch_metrics.COMBINE_RESULTS
+        if "event=" in line:
+            m = re.search(r'event="([^"]+)"', line)
+            assert m and m.group(1) in dispatch_metrics.GATE_EVENTS
+        if "parent=" in line:
+            m = re.search(r'parent="([^"]+)"', line)
+            assert m and dispatch_metrics.PARENT_RE.fullmatch(m.group(1))
+
+
+def test_dispatch_gates_n7_label_and_parent_bounds(tmp_path):
+    import re
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    root.mkdir(parents=True, exist_ok=True)
+
+    now = 1_800_000_000
+    bad_rows = [
+        {"ts": now, "event": "gate_coverage_start"},
+        # Invalid role
+        {"ts": now + 1, "event": "start", "version": "v1.0.0", "slug": "bad-role", "parent": "valid-p1", "role": "invalid_role"},
+        # Valid role (paired positive control)
+        {"ts": now + 2, "event": "start", "version": "v1.0.0", "slug": "good-role", "parent": "valid-p1", "role": "build"},
+        # Invalid combine
+        {"ts": now + 3, "event": "combine", "version": "v1.0.0", "parent": "valid-p1", "parts": ["good-role"], "conflicts": 0, "result": "invalid_res"},
+        # Valid combine (paired positive control on another parent)
+        {"ts": now + 4, "event": "start", "version": "v1.0.0", "slug": "good-role-2", "parent": "valid-p2", "role": "verify"},
+        {"ts": now + 5, "event": "combine", "version": "v1.0.0", "parent": "valid-p2", "parts": ["good-role-2"], "conflicts": 0, "result": "pass"},
+        # Unknown event type (not in GATE_EVENTS)
+        {"ts": now + 6, "event": "custom_unknown_event", "version": "v1.0.0", "slug": "good-role-2"},
+        # Valid gate event (paired positive control)
+        {"ts": now + 7, "event": "stall_gate", "version": "v1.0.0", "slug": "good-role-2", "gate_state": "opened", "runs": [1], "reason": "r", "assessor": "a", "baseline_sha": "0" * 40},
+        # Invalid parent pattern
+        {"ts": now + 8, "event": "start", "version": "v1.0.0", "slug": "bad-parent-task", "parent": "Bad Parent!", "role": "build"},
+    ]
+    (root / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in bad_rows))
+
+    proc = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                          env=os.environ.copy(), check=True, timeout=60)
+    out = proc.stdout
+
+    s1_series_prefixes = (
+        "k3dm_dispatch_ladder_tasks", "k3dm_dispatch_stalled_tasks", "k3dm_dispatch_live_pending_tasks",
+        "k3dm_dispatch_gate_events", "k3dm_dispatch_split_parent_info", "k3dm_dispatch_split_parent_parts",
+        "k3dm_dispatch_split_parent_conflicts", "k3dm_dispatch_split_parent_elapsed_seconds",
+        "k3dm_dispatch_split_parents_dropped",
+    )
+    for line in out.splitlines():
+        if any(line.startswith(p) for p in s1_series_prefixes):
+            assert "slug=" not in line
+
+    assert 'role="invalid_role"' not in out
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="valid-p1",role="build"} 1' in out
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="valid-p1",role="review"} 0' in out
+
+    assert 'combine="invalid_res"' not in out
+    assert 'k3dm_dispatch_split_parent_info{version="v1.0.0",parent="valid-p2",combine="pass"} 1' in out
+
+    assert 'event="custom_unknown_event"' not in out
+    assert 'k3dm_dispatch_gate_events{version="v1.0.0",event="stall_gate"} 1' in out
+
+    assert 'parent="Bad Parent!"' not in out
+    assert 'k3dm_dispatch_split_parents_dropped{version="v1.0.0"} 1' in out
+
+    # 25 valid parents: newest 20 exported, oldest 5 dropped into split_parents_dropped
+    parents_25_rows = [{"ts": now, "event": "gate_coverage_start"}]
+    for i in range(25):
+        pname = f"parent-{i:02d}"
+        parents_25_rows.append({
+            "ts": now + 10 + i,
+            "event": "start",
+            "version": "v2.0.0",
+            "slug": f"task-p-{i:02d}",
+            "parent": pname,
+            "role": "build",
+        })
+    (root / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in parents_25_rows))
+
+    proc25 = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                            env=os.environ.copy(), check=True, timeout=60)
+    out25 = proc25.stdout
+
+    exported_parents = set(re.findall(r'k3dm_dispatch_split_parent_info\{version="v2.0.0",parent="([^"]+)"', out25))
+    assert len(exported_parents) == 20
+    for i in range(5):
+        assert f"parent-{i:02d}" not in exported_parents
+    for i in range(5, 25):
+        assert f"parent-{i:02d}" in exported_parents
+    assert 'k3dm_dispatch_split_parents_dropped{version="v2.0.0"} 5' in out25
+
+
+def test_dispatch_gates_n8_existing_series_unmoved(tmp_path):
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    root.mkdir(parents=True, exist_ok=True)
+
+    fixture_dir = Path(__file__).parents[2] / "tests/fixtures/dispatch-gates"
+    raw_lines = (fixture_dir / "synthetic.jsonl").read_text().splitlines()
+
+    events_all = []
+    events_without_new = []
+    for line in raw_lines:
+        try:
+            data = json.loads(line)
+            if isinstance(data, dict) and isinstance(data.get("ts"), (int, float)):
+                events_all.append(data)
+                if data.get("event") not in dispatch_metrics.NEW_S1_EVENTS and data.get("event") != "gate_coverage_start":
+                    events_without_new.append(data)
+        except Exception:
+            pass
+
+    fixed_now = 1_800_000_000
+    out_with_new = dispatch_metrics.render(events_all, 1, now=fixed_now)
+    out_without_new = dispatch_metrics.render(events_without_new, 1, now=fixed_now)
+
+    s1_series_prefixes = (
+        "k3dm_dispatch_ladder_tasks",
+        "k3dm_dispatch_stalled_tasks",
+        "k3dm_dispatch_live_pending_tasks",
+        "k3dm_dispatch_gate_events",
+        "k3dm_dispatch_split_parent_info",
+        "k3dm_dispatch_split_parent_parts",
+        "k3dm_dispatch_split_parent_conflicts",
+        "k3dm_dispatch_split_parent_elapsed_seconds",
+        "k3dm_dispatch_split_parents_dropped",
+    )
+
+    existing_lines_with = [l for l in out_with_new.splitlines() if not any(l.startswith(p) for p in s1_series_prefixes)]
+    existing_lines_without = [l for l in out_without_new.splitlines() if not any(l.startswith(p) for p in s1_series_prefixes)]
+
+    assert len(existing_lines_with) > 0
+    assert existing_lines_with == existing_lines_without
+
+    s1_lines_with = [l for l in out_with_new.splitlines() if any(l.startswith(p) for p in s1_series_prefixes)]
+    s1_lines_without = [l for l in out_without_new.splitlines() if any(l.startswith(p) for p in s1_series_prefixes)]
+    assert s1_lines_with != s1_lines_without
+
+
+def test_dispatch_gates_parent_reassignment_drops_stale_parent(tmp_path):
+    root = Path(os.environ["K3DM_WORKTREE_ROOT"])
+    assert root.is_relative_to(tmp_path) and root != Path.home() / ".local/share/k3d-manager/worktrees"
+    assert os.environ["K3DM_DISPATCH_PUSHGATEWAY_URL"] == "http://127.0.0.1:9"
+    root.mkdir(parents=True, exist_ok=True)
+
+    rows = [
+        {"ts": 100, "event": "gate_coverage_start"},
+        {"ts": 101, "event": "start", "version": "v1.0.0", "repo": "r", "slug": "a", "run": 1, "parent": "old-parent", "role": "build"},
+        {"ts": 102, "event": "link", "version": "v1.0.0", "repo": "r", "slug": "a", "parent": "new-parent", "role": "review"},
+    ]
+    (root / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+    proc = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                          env=os.environ.copy(), check=True, timeout=60)
+    out = proc.stdout
+
+    # new-parent exported
+    assert 'parent="new-parent"' in out
+    assert 'k3dm_dispatch_split_parent_info{version="v1.0.0",parent="new-parent",combine="pending"} 1' in out
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="new-parent",role="review"} 1' in out
+
+    # old-parent absent and not counted as dropped
+    assert 'parent="old-parent"' not in out
+    assert 'k3dm_dispatch_split_parents_dropped{version="v1.0.0"} 0' in out
+
+    # Paired control: a combine naming old-parent brings it back with zero parts
+    control_rows = list(rows) + [
+        {"ts": 103, "event": "combine", "version": "v1.0.0", "parent": "old-parent", "parts": [], "conflicts": 0, "result": "pass"},
+    ]
+    (root / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in control_rows))
+
+    proc_control = subprocess.run([str(SCRIPT), "--dry-run"], capture_output=True, text=True,
+                                  env=os.environ.copy(), check=True, timeout=60)
+    out_control = proc_control.stdout
+
+    assert 'parent="new-parent"' in out_control
+    assert 'k3dm_dispatch_split_parent_info{version="v1.0.0",parent="old-parent",combine="pass"} 1' in out_control
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="old-parent",role="build"} 0' in out_control
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="old-parent",role="review"} 0' in out_control
+    assert 'k3dm_dispatch_split_parent_parts{version="v1.0.0",parent="old-parent",role="verify"} 0' in out_control
+    assert 'k3dm_dispatch_split_parents_dropped{version="v1.0.0"} 0' in out_control
