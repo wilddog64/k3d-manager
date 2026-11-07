@@ -92,6 +92,20 @@ class WebhookStatusTests(unittest.TestCase):
             self.assertEqual(status._tunnel_port_for_context("ubuntu-k3s"), 17443)
             self.assertEqual(status._tunnel_port_for_context("ubuntu-hostinger"), 7443)
 
+    def test_tunnel_port_for_context_falls_back_on_invalid_values(self):
+        cases = (
+            ("ubuntu-k3s", "TUNNEL_SANDBOX_LOCAL_PORT", 16443),
+            ("ubuntu-hostinger", "TUNNEL_LOCAL_PORT", 6443),
+        )
+        for context, name, default in cases:
+            for value in ("", "abc", "0", "70000", "-1", "12.5"):
+                with self.subTest(context=context, value=value):
+                    with mock.patch.dict(os.environ, {name: value}):
+                        self.assertEqual(status._tunnel_port_for_context(context), default)
+            with self.subTest(context=context, value="valid"):
+                with mock.patch.dict(os.environ, {name: "17443"}):
+                    self.assertEqual(status._tunnel_port_for_context(context), 17443)
+
     def test_app_context_filters_provider_apps_and_keeps_shared_apps(self):
         for matcher in (webhook._app_matches_provider_context, status._app_matches_provider_context):
             self.assertTrue(matcher("ubuntu-k3s-data-layer", "ubuntu-k3s"))

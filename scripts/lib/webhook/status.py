@@ -33,8 +33,14 @@ _status_channel_id = lambda: ""
 def _tunnel_port_for_context(app_context):
     """Return the local SSH tunnel port for an app-cluster context."""
     if app_context == "ubuntu-k3s":
-        return int(os.environ.get("TUNNEL_SANDBOX_LOCAL_PORT", "16443"))
-    return int(os.environ.get("TUNNEL_LOCAL_PORT", "6443"))
+        name, default = "TUNNEL_SANDBOX_LOCAL_PORT", 16443
+    else:
+        name, default = "TUNNEL_LOCAL_PORT", 6443
+    try:
+        port = int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+    return port if 1 <= port <= 65535 else default
 
 
 _APP_CLUSTER_PREFIXES = (

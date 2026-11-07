@@ -347,11 +347,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-11-07 | [Copilot PR #156 review findings and CI reds](docs/issues/2026-11-07-copilot-pr156-review-findings.md) | Webhook status / test portability |
 | 2026-11-06 | [P0 S1 spec: third check of review findings](docs/issues/2026-11-06-s1-spec-third-check-findings.md) | Dispatch gates |
 | 2026-11-06 | [P0 S1 spec: second independent review](docs/issues/2026-11-06-s1-spec-second-review-findings.md) | Dispatch gates |
 | 2026-11-06 | [P0 S1 spec: independent review](docs/issues/2026-11-06-s1-spec-review-findings.md) | Dispatch gates |
 | 2026-11-03 | [Phase B: headless CA trust containment](docs/issues/2026-11-03-ca-trust-phase-b-containment.md) | acg-up / Vault CA |
-| 2026-11-03 | [Phase A: ACG CA trust stall diagnosis](docs/issues/2026-11-03-ca-trust-phase-a-diagnosis.md) | acg-up / Vault CA |
 
 [All issues →](docs/issues/)
 
