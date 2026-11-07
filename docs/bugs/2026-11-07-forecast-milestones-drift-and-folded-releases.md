@@ -21,11 +21,14 @@
    `docs/plans/vX.Y.Z-*.md` file names, and it runs only in CI, after the commit.
 2. **Releases that will never ship.** v1.43.10 and v1.43.11 have no tag and never will: their work was
    folded into later releases (operator 2026-11-07: "mark them fold"). `_forecast` treats every untagged
-   milestone as still to come and chains each forecast from the one before it. Those two rows start the
-   chain, so every later row is pushed into the past and shows as overdue.
-3. **The release being built shows as overdue.** The current release (from the release branch name,
-   `_current_release`) is forecast from the last tag plus the cadence. A release that takes longer than the
-   median gap is flagged overdue while work on it is still going, which says nothing useful.
+   milestone as still to come, so they show as rows with dates and count as remaining releases.
+   (Correction 2026-11-07, after Luna stopped on the first dispatch: these rows do **not** cause the
+   overdue rows. Each row adds one cadence step to the one before it, so an extra row pushes later rows
+   *later*. The overdue rows come from item 3.)
+3. **The release being built, and every row after it, shows as overdue.** The chain starts at the last
+   tag (v1.43.13, 2026-11-01) and adds the median gap (about 0.7 days) per row. Once more time than that
+   has passed, the current release and the next few rows all fall before now and are flagged overdue,
+   while work on the current release is still going. That says nothing useful.
 
 ## Fix
 
@@ -36,7 +39,8 @@
 - `_load_milestones` accepts only `"folded"` as a `state` value (anything else raises `ValueError`), and
   refuses a folded milestone that is the `target`.
 - `_forecast` skips folded milestones: they get no row, do not advance the chain, and do not count in
-  `k3dm_release_milestones_remaining`.
+  `k3dm_release_milestones_remaining`. Folding is exactly equivalent to deleting the entry from the file
+  for every forecast output.
 
 ### F2. The release being built is `in_progress`
 
@@ -103,9 +107,9 @@ must:
     text: "make check-release-milestones runs the drift check alone and exits nonzero on drift."
 must_not:
   - id: N1
-    text: "A folded milestone never makes a later milestone overdue (paired control: the same fixture without state folded does make the later milestone overdue)."
+    text: "A folded milestone never appears as a forecast row or in the remaining count (paired control: the same fixture without state folded does produce a row for it and counts it)."
   - id: N2
-    text: "The current release is never flagged overdue (paired control: an untagged milestone that is not the current release, with the same dates, is flagged overdue)."
+    text: "The current release, and the milestones chained after it, are never flagged overdue (paired control: the same fixture with no matching release branch flags them overdue)."
   - id: N3
     text: "_load_milestones refuses a state value other than folded, and refuses a folded target."
   - id: N4
