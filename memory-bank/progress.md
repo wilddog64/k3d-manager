@@ -78,7 +78,7 @@
 - [x] Waiting-on spec revised: `Open P*` tile descriptions dropped, `Waiting since` not shown.
 - [ ] S1 third check, then dispatch both halves.
 - [ ] Waiting-on correction to Luna, review, land, verify.
-- [ ] `agent-instruction-files-refresh` independent verifier result, then Status.
+- [x] `agent-instruction-files-refresh` LIVE-VERIFIED.
 
 ## 2026-11-05 security + telemetry filings
 
