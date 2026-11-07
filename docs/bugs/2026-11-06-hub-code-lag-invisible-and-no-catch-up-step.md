@@ -2,8 +2,8 @@
 
 **Filed:** 2026-11-06
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** OPEN
-**Waiting on:** fix running — since 2026-11-06
+**Status:** VERIFIED `dc5f6bb0`; independent verification recorded (66 tests; 35 mutants before the last correction, 32 red and 3 not caught, 3 more after it, all red), live E3 and E4 pending
+**Waiting on:** live check — since 2026-11-06
 **Priority:** P2 — fixes look missing or broken while they are simply not deployed; a workaround exists (the manual steps)
 **Approval:** explicit 2026-11-06 "go ahead to spec this out, and dispatch in an approperate time" (operator, on the timing of hub changes), and "sounds good" (operator, on Hermes reading the newest release branch from origin rather than fetching from the M4 or M2). Dispatch after P0 S1 lands, because both edit the `Makefile`.
 **Severity:** medium

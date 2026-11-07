@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-06
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED `f832a140`; independent verifier running, live check pending
+**Status:** VERIFIED `f832a140`; independent verification recorded (6 mutants red), live E3 passed; rollout to the M5 checkout pending
 **Waiting on:** live check — since 2026-11-06
 **Priority:** P3 — hygiene; the row is wrong until someone notices, and no service is affected
 **Approval:** explicit 2026-11-06 "file as P3 and dispatch when allow" (operator, after four landed bugs showed as Open).

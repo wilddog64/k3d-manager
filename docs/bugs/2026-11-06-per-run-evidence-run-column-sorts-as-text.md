@@ -2,7 +2,7 @@
 
 **Filed:** 2026-11-06
 **Branch:** `k3d-manager-v1.43.14`
-**Status:** LANDED `49765821`; independent verifier running, live check pending
+**Status:** VERIFIED `49765821`; independent verification recorded, live check pending
 **Priority:** P3 — cosmetic; the rows are all present and correct, only their order misleads
 **Waiting on:** live check — since 2026-11-06
 **Approval:** explicit 2026-11-06 "you can file run column as P3 and dispatch to Gemini Flash 3.8" (operator).
