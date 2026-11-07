@@ -41,7 +41,7 @@ runs:
         sudo -n env TAG="$k3d_version" bash "$tmp_script"
 
     - name: Install kubectl
-      uses: azure/setup-kubectl@v4
+      uses: azure/setup-kubectl@v5
 
     - name: Setup k3d cluster and vCluster
       id: setup
