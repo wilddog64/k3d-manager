@@ -21,6 +21,57 @@ PY
   [[ "$output" == *ok* ]]
 }
 
+@test "agent dispatch dashboard: verification ladder contract" {
+  run python3 - "$BASE/grafana-dashboard-agent-dispatch.yaml" "${BATS_TEST_DIRNAME}/../../../docs/guides/grafana-dashboards/k3dm-agent-dispatch.md" <<'PY'
+import json, re, subprocess, sys
+from pathlib import Path
+dashboard_path, guide_path = map(Path, sys.argv[1:])
+def load(path):
+    text = path.read_text()
+    return json.loads("\n".join(line[4:] for line in text.split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
+dashboard = load(dashboard_path)
+panel = next(panel for panel in dashboard["panels"] if panel["title"] == "Verification ladder")
+assert panel["id"] == 105 and panel["gridPos"] == {"h": 6, "w": 12, "x": 12, "y": 65}
+assert panel["type"] == "table"
+target, = panel["targets"]
+assert target["expr"] == "sum by (rung, status) (k3dm_dispatch_ladder_tasks)"
+assert target["instant"] is True and target["format"] == "table"
+organize = next(item["options"] for item in panel["transformations"] if item["id"] == "organize")
+assert organize["indexByName"] == {"rung": 0, "status": 1, "Value": 2}
+assert organize["renameByName"]["Value"] == "tasks" and organize["excludeByName"]["Time"] is True
+task_override = next(item for item in panel["fieldConfig"]["overrides"] if item["matcher"]["options"] == "tasks")
+cell = next(item["value"] for item in task_override["properties"] if item["id"] == "custom.cellOptions")
+assert cell == {"type": "gauge", "mode": "basic"}
+assert panel["options"]["sortBy"] == [{"displayName": "tasks", "desc": True}]
+filters, = [item["options"] for item in panel["transformations"] if item["id"] == "filterByValue"]
+assert filters["type"] == "exclude"
+assert filters["match"] == "all"
+assert [(item["fieldName"], item["config"]["id"], item["config"]["options"]["value"]) for item in filters["filters"]] == [("status", "equal", "unknown"), ("rung", "regex", "^(implemented|landed)$")]
+rows = [("implemented", "unknown", 0), ("landed", "unknown", 0), ("implemented", "pending", 0), ("offline_tested", "unknown", 0), ("independently_verified", "unknown", 0)]
+visible = [row for row in rows if not (row[1] == "unknown" and re.fullmatch(filters["filters"][1]["config"]["options"]["value"], row[0]))]
+assert visible == rows[2:], visible
+description = panel["description"]
+assert "Self-reported and advisory" in description
+for phrase in ("offline_tested", "deployed", "live_verified", "gate_coverage_start", "independently_verified", "evidence_sha256"):
+    assert phrase in description, phrase
+section = guide_path.read_text().split("## Verification ladder", 1)[1].split("\n## ", 1)[0]
+for phrase in ("implemented", "offline_tested", "deployed", "live_verified", "independently_verified", "landed", "gate_coverage_start", "evidence hash"):
+    assert phrase in section, phrase
+dashboard_repo_path = "scripts/etc/argocd/platform-ops/grafana-dashboard-agent-dispatch.yaml"
+baseline_text = subprocess.run(["git", "-C", str(dashboard_path.parent), "show", f"028b898f:{dashboard_repo_path}"], check=True, capture_output=True, text=True).stdout
+baseline_json = json.loads("\n".join(line[4:] for line in baseline_text.split("  agent-dispatch.json: |\n", 1)[1].splitlines()))
+assert next(item for item in baseline_json["panels"] if item["id"] == 105)["type"] == "bargauge"
+old = {item["id"]: item for item in baseline_json["panels"]}
+new = {item["id"]: item for item in dashboard["panels"]}
+assert set(old) == set(new)
+for panel_id in old.keys() - {105}:
+    assert old[panel_id] == new[panel_id], panel_id
+print("ok: verification ladder contract; other panels unchanged")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok: verification ladder contract; other panels unchanged"* ]]
+}
+
 @test "agent dispatch dashboard: every queried metric is exported" {
   run python3 - "$BASE" "$EXPORTER" <<'PY'
 import json,re,sys

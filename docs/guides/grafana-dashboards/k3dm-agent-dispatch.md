@@ -51,3 +51,14 @@ The **Per run evidence** table's **Log** cell opens **k3dm Agent Run Log** for t
 The Agent Dispatch **Per spec** table includes a **Repo** column. Per-task metrics carry the origin repository name as a `repo` label; legacy or invalid labels are exported as `k3d-manager`. Aggregate series do not include this label.
 
 Each land attempt retains its own `land-test.<N>.log`; `land-test.log` points to the latest attempt. Refused test runs show the test count and first failure in the Result label, with a link to that attempt’s log. Older events continue to use `land-test.log`.
+
+## Verification ladder
+
+The **Verification ladder** table counts tasks at each rung by status; click a column heading to
+sort, and the default order is highest task count first. `implemented` and `landed` are `done` or
+`pending` only. For `offline_tested`, `deployed` and `live_verified`, `unknown` means the task
+started before the ledger's `gate_coverage_start` marker, so that rung was not recorded yet.
+For `independently_verified`, `unknown` means a passing verification was recorded without an
+evidence hash, before evidence validation existed. Other cases are `pending` until their rung is
+marked done.
+

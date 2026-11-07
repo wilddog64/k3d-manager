@@ -34,6 +34,7 @@
 
 - Add `make hub-sync` for guarded hub checkout catch-up, publish code lag and newest-release status, and show it on the Bugs dashboard.
 - Resolve S1 `link` and `mark` versions from their ledger slug, and resolve `combine` from its parts.
+- Make the Verification ladder table sortable, prevent clipped rows, and explain unknown status.
 
 ## [1.43.14] - Unreleased
 
