@@ -143,13 +143,23 @@ of `-2`. The pre-commit hook rejects a commit that makes a bug doc LIVE-VERIFIED
 well-formed line and now requires a **Fix commit:** header for a new LIVE-VERIFIED doc, checking
 that an evidence commit contains it (`make check-bug-evidence` sweeps every doc).
 
+The **State check** column verifies the doc's `Waiting on` claim against the dispatch ledger (`k3dm_dispatch_bug_state` and `k3dm_dispatch_ledger_timestamp_seconds`):
+
+| State check | Meaning | Action called for |
+|---|---|---|
+| `no worker running (<dispatch_state>)` | The bug doc says `Waiting on: fix running`, but its latest dispatch task has exited (with state `awaiting_land`, `codex_failed`, `landed`, etc.) rather than `running`. | Verify the worker's changes (if awaiting land), re-dispatch/rework (if failed), or update the doc's `Waiting on` header (e.g. to `live check` or `investigation`). |
+| `no dispatch recorded` | The bug doc says `Waiting on: fix running`, but no dispatch task matching the bug stem exists in the dispatch ledger. | Verify the dispatch slug/branch, dispatch the task with `bin/k3dm-codex-dispatch`, or correct the doc's `Waiting on` line. |
+| `already dispatched (<dispatch_state>)` | The bug doc says `Waiting on: dispatch`, but a dispatch task already exists in the ledger with state `<dispatch_state>`. | Update the doc's `Waiting on` line to reflect the dispatch (e.g. `fix running` or `live check`), or check whether a previous dispatch was abandoned. |
+| `unchecked` | Dispatch metrics are stale (older than 30 minutes, measured by `k3dm_dispatch_ledger_timestamp_seconds`). Freshness is not guaranteed. | Check the dispatch metrics exporter and Pushgateway scrape; refresh telemetry before relying on the check. |
+| `ok` | The doc's `Waiting on` claim matches the dispatch ledger state, or the bug is not waiting on dispatch / fix running (e.g. `live check`, `scheduled run`, `triage`, or fixed). | None. |
+
 `k3dm_bug_info` also gives a bug that is not fixed `fixed_in="-"`. The placeholder keeps the three
 columns in the table when the selected release has no fixed bug: Grafana drops a column that no row
 has. The `k3dm_bug_status_docs` aggregate still carries none of these labels for an unfixed bug.
 
 The summary strip follows the Release dropdown and shows open P0–P3 (titled P0 to P3), Fixed, Verified,
 Live-verified, Deferred, and scan age. The table reads `k3dm_bug_info`, includes Release, Bug,
-Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, and Live evidence, and clicking a title opens that
+Priority, Filed, Open for, Status, Fixed in, Verified, Live-verified, Live evidence, and State check, and clicking a title opens that
 document on the scanned branch. The dashboard opens on **Show all**; **Hide live-verified** is the
 other option. It keeps open, unknown, deferred, and not-yet-live-verified rows visible while hiding
 live-verified and historic `n/a` fixes. To mark a fix live-proven, change its Status to

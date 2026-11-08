@@ -34,6 +34,7 @@ RUN_CAP = 20
 VERSION_RE = re.compile(r"^v?[0-9]+\.[0-9]+\.[0-9]+$")
 SLUG_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 PLAN_STEM_RE = re.compile(r"^v\d+\.\d+\.\d+-[a-z0-9][a-z0-9-]*$")
+BUG_SPEC_RE = re.compile(r"^docs/bugs/(\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)\.md$")
 SPEC_PATH_RE = re.compile(r"^docs/(?:plans|bugs)/[A-Za-z0-9._-]+\.md$")
 MODEL_IDENTITY_ALLOWLIST = {
     "gpt-6-luna", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-luna",
@@ -2459,6 +2460,25 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         version, slug = key
         lines.append(f'k3dm_dispatch_plan_state{{plan="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     lines.append(f"k3dm_dispatch_plan_state_skipped {skipped}")
+    bug_tasks = {}
+    for key, task_events in _task_states(events).items():
+        starts = [event for event in task_events if event.get("event") == "start" and event.get("spec")]
+        if not starts:
+            continue
+        start = max(starts, key=lambda event: event.get("ts", 0))
+        spec = start.get("spec")
+        if not isinstance(spec, str):
+            continue
+        m = BUG_SPEC_RE.fullmatch(spec)
+        if not m:
+            continue
+        stem = m.group(1)
+        candidate = (start.get("ts", 0), key, task_events)
+        if stem not in bug_tasks or candidate[0] > bug_tasks[stem][0]:
+            bug_tasks[stem] = candidate
+    for stem, (_, key, task_events) in sorted(bug_tasks.items()):
+        version, slug = key
+        lines.append(f'k3dm_dispatch_bug_state{{bug="{stem}",version="{version}",slug="{slug}",dispatch_state="{_dispatch_state(task_events)}"}} 1')
     if claude_context is not None or repo_root is not None:
         if claude_context is not None:
             claude_context["rates"] = claude_prices or {}

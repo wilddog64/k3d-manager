@@ -372,6 +372,28 @@ def test_per_plan_dispatch_state_uses_latest_started_task():
     assert 'plan="legacy"' not in output
 
 
+def test_bug_dispatch_state_uses_latest_started_task_and_emits_bug_state():
+    events = [
+        event(1, "start", "plan-task", spec="docs/plans/v1.43.15-test-plan.md"),
+        event(2, "codex_exit", "plan-task", exit=0),
+        event(3, "start", "bug-exited-old", spec="docs/bugs/2026-11-01-exited-bug.md"),
+        event(4, "codex_exit", "bug-exited-old", exit=1),
+        event(5, "start", "bug-exited", spec="docs/bugs/2026-11-01-exited-bug.md"),
+        event(6, "codex_exit", "bug-exited", exit=0),
+        event(7, "start", "bug-running", spec="docs/bugs/2026-11-02-running-bug.md"),
+        event(8, "start", "outside-task", spec="docs/issues/2026-11-03-outside.md"),
+        event(9, "start", "bad-stem", spec="docs/bugs/invalid_stem.md"),
+    ]
+    output = dispatch_metrics.render(events, 0, 100)
+    assert 'k3dm_dispatch_plan_state{plan="v1.43.15-test-plan",version="9.9.9",slug="plan-task",dispatch_state="awaiting_land"} 1' in output
+    assert "k3dm_dispatch_plan_state_skipped 5" in output
+    assert 'k3dm_dispatch_bug_state{bug="2026-11-01-exited-bug",version="9.9.9",slug="bug-exited",dispatch_state="awaiting_land"} 1' in output
+    assert 'k3dm_dispatch_bug_state{bug="2026-11-02-running-bug",version="9.9.9",slug="bug-running",dispatch_state="running"} 1' in output
+    assert output.count("k3dm_dispatch_bug_state{") == 2
+    assert 'bug="2026-11-03-outside"' not in output
+    assert 'bug="invalid_stem"' not in output
+
+
 @pytest.mark.parametrize(("events", "expected"), [
     ([event(1,"start" )], "running"),
     ([event(1,"start"),event(2,"codex_exit",exit=1)], "codex_failed"),

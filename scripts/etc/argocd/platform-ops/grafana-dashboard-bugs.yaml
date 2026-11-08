@@ -1095,7 +1095,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "(k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))",
+              "expr": "((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_join((((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))) * on(bug) group_left(dispatch_state) k3dm_dispatch_bug_state) or on(bug) label_replace(((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))), \"dispatch_state\", \"none\", \"\", \"\"), \"_check\", \";\", \"waiting_on\", \"dispatch_state\"), \"state_check\", \"ok\", \"\", \"\"), \"state_check\", \"no worker running ($1)\", \"_check\", \"fix running;(.+)\"), \"state_check\", \"no dispatch recorded\", \"_check\", \"fix running;none\"), \"state_check\", \"ok\", \"_check\", \"fix running;running\"), \"state_check\", \"already dispatched ($1)\", \"_check\", \"dispatch;(.+)\"), \"state_check\", \"ok\", \"_check\", \"dispatch;none\") and on() (time() - k3dm_dispatch_ledger_timestamp_seconds <= 1800)) or on(bug) label_replace(((k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\"} and on(repo,release) k3dm_bug_current_release_info{repo=\"$repo\"} and on() (vector($release_mode) == 1)) or (k3dm_bug_info{repo=\"$repo\",live_verified=~\"$verified\",release=~\"$release\"} and on() (vector($release_mode) == 0))), \"state_check\", \"unchecked\", \"\", \"\"))",
               "instant": true,
               "format": "table"
             }
@@ -1130,7 +1130,8 @@ data:
                   "verified_at": 11,
                   "live_verified": 12,
                   "live_verified_at": 13,
-                  "live_evidence": 14
+                  "live_evidence": 14,
+                  "state_check": 15
                 },
                 "excludeByName": {
                   "sort_key": true,
@@ -1140,7 +1141,9 @@ data:
                   "instance": true,
                   "Time": true,
                   "repo": true,
-                  "waiting_since": true
+                  "waiting_since": true,
+                  "dispatch_state": true,
+                  "_check": true
                 },
                 "renameByName": {
                   "priority": "Priority",
@@ -1157,7 +1160,8 @@ data:
                   "verified_at": "Verified at",
                   "live_verified": "Live-verified",
                   "live_verified_at": "Live-verified at",
-                  "live_evidence": "Live evidence"
+                  "live_evidence": "Live evidence",
+                  "state_check": "State check"
                 }
               }
             }
@@ -1527,6 +1531,56 @@ data:
                   {"id": "mappings", "value": [{"type": "value", "options": {
                     "-": {"text": "—", "color": "#8e8e8e", "index": 0}
                   }}]}
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "State check"
+                },
+                "properties": [
+                  {
+                    "id": "custom.filterable",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "no dispatch recorded": {
+                            "color": "orange",
+                            "index": 0
+                          },
+                          "unchecked": {
+                            "color": "#8e8e8e",
+                            "index": 1
+                          },
+                          "ok": {
+                            "color": "text",
+                            "index": 2
+                          }
+                        }
+                      },
+                      {
+                        "type": "regex",
+                        "options": {
+                          "pattern": "^(no worker running.*|already dispatched.*)$",
+                          "result": {
+                            "color": "orange",
+                            "index": 3
+                          }
+                        }
+                      }
+                    ]
+                  }
                 ]
               }
             ]
