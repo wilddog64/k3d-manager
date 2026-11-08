@@ -2,12 +2,13 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** dispatch
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** pre-existing (Blocked by has always been computed from the plan doc alone; `ready to dispatch` dates from `d95afbfe`)
 **Should have been caught by:** spec
 **Severity:** low — display only; the operator read `ready to dispatch` on a plan Luna had already run, and on a plan the
 one-dispatch-per-file rule was holding back
 **Approval:** operator, 2026-11-08 ("and blocked by column set to ready to dispatch seems to misleading")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, M5 hub Grafana Plans panel screenshots, 2026-11-08
 **Affected:** Plans panel in `scripts/etc/argocd/platform-ops/grafana-dashboard-bugs.yaml`, `bin/k3dm-vectordb-metrics`
