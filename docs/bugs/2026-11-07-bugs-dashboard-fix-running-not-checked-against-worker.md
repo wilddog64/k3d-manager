@@ -1,8 +1,9 @@
 # Bug: the Bugs dashboard shows "fix running" after the worker has exited
 
-**Status:** OPEN — fix specced and dispatched 2026-11-07
+**Status:** LANDED `bcf7b31d` 2026-11-07 (Flash; reviewed and landed by Claude, land tests green); independent verifier not yet run
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+**Fix commit:** `bcf7b31d`
 **Severity:** low — the dashboard misstates what a bug is waiting for; the operator has to ask Claude to triage by hand
 **Approval:** operator, 2026-11-07 ("go ahead to file a P3 bug then dispatch to Flash 3.8")
 **Assigned:** Flash 3.8 (`AGENT=agy MODEL=gemini-3.8-flash-medium`)
