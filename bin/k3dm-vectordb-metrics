@@ -399,7 +399,6 @@ def _plan_metrics(root, ref=None, texts=None, repo="k3d-manager", ledger=None):
                 stem = Path(dependency).stem
                 if stem not in dependencies:
                     dependencies.append(stem)
-        component_line = _plan_header(text, "Component")
         files = _plan_files(text)
         wave_header = _plan_header(text, "Wave")
         wave_match = re.match(r"(\d+)\s*[—–-]?\s*(.*)", wave_header)
