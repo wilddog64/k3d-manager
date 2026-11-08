@@ -1,15 +1,16 @@
 # Bug: `POST /api/v1/cluster {"action": "trust-vault-ca"}` is authorized for a reader token
 
-**Status:** OPEN — confirmed offline 2026-11-07; not yet dispatched
+**Status:** OPEN — confirmed offline 2026-11-07; dispatched to Luna 2026-11-07
 **Priority:** P2
-**Waiting on:** dispatch — since 2026-11-07
+**Waiting on:** fix running — since 2026-11-07
 **Introduced by:** `ecae8a73` (v1.43.14)
 **Should have been caught by:** review
 **Severity:** medium — a token with the lowest role can start an admin-classed job on the hub (`bin/cluster-up --trust-vault-ca`, which can raise a SecurityAgent dialog on the hub's screen and pushes a deployment metric); no secret is exposed, because the Vault CA certificate is public
 **Branch:** `k3d-manager-v1.43.15`
 **Release:** v1.43.15 if there is room, otherwise the first item of the next bug-fix patch (pre-existing P2 found during a release)
 **Filed:** 2026-11-07, by Claude, confirming a finding from the Argon baseline critique of the 2026-11-03 spec
-**Approval:** not yet; hub-facing webhook code, so it needs the operator's dispatch go
+**Approval:** operator, 2026-11-07 ("go for it")
+**Assigned:** Luna (`gpt-6-luna`, Codex)
 **Component:** `scripts/lib/webhook/policy.py` (`_action_policy`), `bin/k3dm-webhook` (`do_POST`, cluster handler)
 **Related:** [`2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe`](2026-11-03-vault-ca-trust-target-and-headless-sudoers-probe.md) (added the action)
 

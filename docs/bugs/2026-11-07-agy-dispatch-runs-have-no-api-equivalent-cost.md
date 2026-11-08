@@ -1,8 +1,9 @@
 # Bug: agy dispatch runs show no API equivalent cost
 
-**Status:** OPEN — fix specced and dispatched 2026-11-07
+**Status:** LANDED `0ce9366b` 2026-11-07 (reviewed and landed by Claude; prices JSON `source` conflict with the Claude Max edit resolved keeping both); independent verifier not yet run
 **Priority:** P3
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+**Fix commit:** `0ce9366b`
 **Severity:** low — the Agent Cost Per spec table leaves API eq. blank for every agy (Gemini) task, so Gemini work looks unpriced next to Codex work
 **Approval:** operator, 2026-11-07 ("go ahead to file a small P3 for agy and dispatch to Luna")
 **Assigned:** Luna (`MODEL=gpt-6-luna`)
