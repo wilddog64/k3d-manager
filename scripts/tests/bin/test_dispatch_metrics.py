@@ -1029,8 +1029,9 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     dashboard = load_dispatch_dashboard()
     window = dashboard["templating"]["list"][0]
     assert window["type"] == "query"
-    assert window["query"]["query"] == "label_values(k3dm_dispatch_landed, window)"
-    assert window["sort"] == 8 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed sort 7 to 8 (natural descending), bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
+    assert window["query"]["query"] == "query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert window["regex"] == '/window="([^"]+)"/'
+    assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
     assert sum("$window" in expr for expr in expressions) == 94  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets
@@ -1066,6 +1067,26 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert link[0]["targetBlank"] is True
     assert "version" not in per_spec["transformations"][1]["options"]["excludeByName"]
     assert any(item.get("url") == "/d/k3dm-bugs" for item in dashboard["links"])
+
+
+def test_dispatch_window_order_metric_ranks_only_emitted_scopes():
+    versions = ("v1.43.0", "v1.43.2", "v1.43.9", "v1.43.10", "v1.43.15")
+    events = [event(index, "start", version=version) for index, version in enumerate(versions, start=1)]
+    output = dispatch_metrics.render(events, 0, now=100)
+    matches = list(re.finditer(r'k3dm_dispatch_window_order\{window="([^"]+)"\} (\d+)', output))
+    orders = {match.group(1): int(match.group(2)) for match in matches}
+    landed_windows = re.findall(r'k3dm_dispatch_landed\{window="([^"]+)"\}', output)
+    assert len(matches) == len(orders) == len(landed_windows)
+    assert set(orders) == set(landed_windows)
+    assert orders == {
+        "1d": 3, "7d": 2, "30d": 1,
+        "v1.43.0": 1_043_000, "v1.43.2": 1_043_002,
+        "v1.43.9": 1_043_009, "v1.43.10": 1_043_010,
+        "v1.43.15": 1_043_015,
+    }
+    assert sorted(orders, key=orders.get, reverse=True) == [
+        "v1.43.15", "v1.43.10", "v1.43.9", "v1.43.2", "v1.43.0", "1d", "7d", "30d"]
+    assert "v9.9.9" not in orders
 
 
 def test_api_cost_uses_last_session_event_and_counts_all_attempts(tmp_path):

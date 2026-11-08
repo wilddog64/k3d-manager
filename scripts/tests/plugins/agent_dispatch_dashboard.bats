@@ -206,9 +206,11 @@ from pathlib import Path
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
     text=(Path(sys.argv[1])/filename).read_text(); d=json.loads("\n".join(x[4:] for x in text.split(f"  {key}: |\n",1)[1].splitlines()))
     var=next(v for v in d["templating"]["list"] if v["name"]=="window")
-    assert var["type"]=="query" and var["definition"]=="label_values(k3dm_dispatch_landed, window)"
+    assert var["type"]=="query" and var["definition"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert var["query"]["query"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+    assert var["regex"]=='/window="([^"]+)"/' and var["sort"]==0
     assert var["current"]["value"]=="7d" and var["label"]=="Window"
-    assert var["sort"]==8, (filename, var["sort"])
+    assert var["sort"]==0, (filename, var["sort"])
 PY
   [ "$status" -eq 0 ]
 }
@@ -397,7 +399,9 @@ assert activity["name"]=="window" and activity["label"]=="Window" and activity["
 assert [o["value"] for o in activity["options"]]==["1d","7d","30d"] and activity["current"]["value"]=="7d"
 for file,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json")):
  window=load(file,key)["templating"]["list"][0]
- assert window["type"]=="query" and window["definition"]=="label_values(k3dm_dispatch_landed, window)"
+ assert window["type"]=="query" and window["definition"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+ assert window["query"]["query"]=="query_result(sort_desc(k3dm_dispatch_window_order))"
+ assert window["regex"]=='/window="([^"]+)"/' and window["sort"]==0
 print("ok")
 PY
   [ "$status" -eq 0 ]

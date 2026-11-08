@@ -1,5 +1,7 @@
 # k3dm Agent Dispatch (`k3dm-agent-dispatch`) — hub
 
+The **Window** dropdown order comes from the exporter’s `k3dm_dispatch_window_order` metric. Release values rank by numeric version (`major*1000000 + minor*1000 + patch`), followed by `1d`, `7d`, and `30d`. Grafana 11.4.0 cannot natural-sort query variable values because of an upstream scenes defect, so the variable disables Grafana sorting and preserves Prometheus query order. Grafana 11.5.0 or later can natural-sort, but the data-side order remains correct there too.
+
 [← Grafana dashboards index](../grafana-dashboards.md)
 
 The dispatch dashboard reads the shared Codex ledger export; the **Window** control (top left,

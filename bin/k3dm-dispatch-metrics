@@ -1392,6 +1392,16 @@ def _normalize_version(value):
     return "v" + value.lstrip("v")
 
 
+def _window_order(window):
+    if window in WINDOWS:
+        return {"1d": 3, "7d": 2, "30d": 1}[window]
+    version = _normalize_version(window)
+    if version is None:
+        return None
+    major, minor, patch = (int(part) for part in version[1:].split("."))
+    return major * 1_000_000 + minor * 1_000 + patch
+
+
 def _releases(events):
     releases = {_normalize_version(event.get("version")) for event in events
                 if event.get("event") == "start"}
@@ -1502,6 +1512,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
             lines.append(f'k3dm_dispatch_task_run_agent_tokens{{{labels}}} {row["agent_tokens"]}')
     lines.append(f'k3dm_dispatch_task_run_skipped{{window="{window}"}} {skipped_runs}')
     lines.append(f'k3dm_dispatch_landed{{window="{window}"}} {metrics["landed"]}')
+    lines.append(f'k3dm_dispatch_window_order{{window="{window}"}} {_window_order(window)}')
     for result in RESULTS:
         lines.append(f'k3dm_dispatch_land_attempts{{window="{window}",result="{result}"}} '
                      f'{metrics["attempts"][result]}')

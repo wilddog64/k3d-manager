@@ -56,12 +56,13 @@ data:
               "uid": "prometheus"
             },
             "query": {
-              "query": "label_values(k3dm_dispatch_landed, window)",
+              "query": "query_result(sort_desc(k3dm_dispatch_window_order))",
               "refId": "window"
             },
-            "definition": "label_values(k3dm_dispatch_landed, window)",
+            "definition": "query_result(sort_desc(k3dm_dispatch_window_order))",
             "refresh": 2,
-            "sort": 8,
+            "regex": "/window=\"([^\"]+)\"/",
+            "sort": 0,
             "includeAll": false,
             "multi": false,
             "current": {
