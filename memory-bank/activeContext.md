@@ -1,3 +1,4 @@
+**2026-11-08 — Slack app: /hostinger-status and /argocd-upgrade deleted** (operator screenshot; 14 commands remain, /hermes-auth kept). Relay code still lists both until the retire P3 and v1.45.0 A4 land.
 **2026-11-08 — retire-/hostinger-status P3 E1 re-approved**; intent header restored; waits on a WIP slot (trial dispatch 2).
 **2026-11-08 — v1.45.0 ArgoCD HA plan gains A4**: retire Slack /argocd-upgrade + webhook /api/v1/argocd-upgrade + thread command (never run; no rehearsal gate). Operator deleted /argocd-upgrade from the Slack app 2026-11-08. N5 added; argocd_upgrade plugin kept.
 **2026-11-08 — trial 2 spec review applied** (retire /hostinger-status): +architecture doc, relay behaviour tests, thread command out of scope, N2 as diff check. Intent header removed; E1 needs re-approval.

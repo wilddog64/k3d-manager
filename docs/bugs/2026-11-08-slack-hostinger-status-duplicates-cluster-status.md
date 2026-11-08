@@ -119,7 +119,8 @@ Before your last message, do all of these and paste the evidence:
 ## Notes
 
 - Operator step, not part of the dispatch: delete `/hostinger-status` under api.slack.com → the app → Slash Commands.
-  The operator said on 2026-11-08 they will do it.
+  Done 2026-11-08 (operator screenshot of the Slash Commands page: 14 commands, `/hostinger-status` and
+  `/argocd-upgrade` gone). The first step of E2 is complete.
 - The relay only changes once it is redeployed. Check
   `reference_deploy_worker_workflow_overwrites_relay_secrets` before any redeploy.
 - No file overlap with the open dispatches or with the Gemini-ask P3 (which touches `agent.py`, `status.py` and
