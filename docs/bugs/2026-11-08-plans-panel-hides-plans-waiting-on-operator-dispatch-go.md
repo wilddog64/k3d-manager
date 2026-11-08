@@ -1,8 +1,7 @@
 # Bug: Plans panel shows a plan waiting on the operator's dispatch go as grey "not recorded"
 
-**Status:** LANDED — fix and tests pushed on the release branch 2026-11-08; live once a second `make hub-promote` moves `deploy/hub` past it
+**Status:** VERIFIED — live on the M5 hub 2026-11-08 after `deploy/hub` moved to `61195319` and Grafana restarted
 **Priority:** P3
-**Waiting on:** live check — since 2026-11-08
 **Introduced by:** `608b90a1` (v1.43.9, the fix for `docs/bugs/2026-10-26-release-plans-dispatch-approval-unknown-despite-landed.md`, which chose the grey "not recorded" text)
 **Should have been caught by:** spec
 **Severity:** low — display only; the operator cannot tell from the Plans panel which plans wait on them
@@ -43,3 +42,12 @@ none); `color-text` is a table cell type (`packages/grafana-schema/src/common/co
   mappings, and the exporter's blocker text matching the panel's highlight pattern
 
 Live check after promote: the Plans panel shows the two v1.43.15 plans in orange as `⚠ needs your go`.
+
+## Live check — 2026-11-08
+
+Operator screenshot, M5 hub Grafana, Plans panel, after the Grafana restart (see
+`docs/bugs/2026-11-08-grafana-keeps-old-dashboard-after-configmap-sync.md`):
+- `control role on L…` and `Checkout auto-…` (v1.43.15, proposed, spec approved): Dispatch approval
+  `⚠ needs your go` in orange; Blocked by `needs your dispatch go`; Dispatch task `no record`.
+- The three landed v1.43.15 plans: Dispatch approval `-`, Dispatch task `landed`. No grey "not recorded" remains.
+- Both labels fit their columns without truncation (the earlier "needs your disp…" crowding is gone).
