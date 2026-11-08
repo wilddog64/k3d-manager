@@ -60,6 +60,7 @@ reviews Luna's work, and Luna reviews Flash's. It is linked to the task:
   2026-11-08). Untracked new files are included with `git add -N` before `git diff`, then unstaged again.
 - `start` runs the intent gate for review children too. The operator approves each brief, and the brief carries
   `**Intent approved:**` (operator, 2026-11-08, choosing this over exempting `--role review` from the gate).
+- `start` also needs a `## Files` section with a backticked path: list the files under review, marked read-only.
 
 ### 3. Spec review by a second agent before intent approval
 

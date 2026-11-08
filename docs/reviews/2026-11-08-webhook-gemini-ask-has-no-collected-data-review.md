@@ -5,6 +5,14 @@
 **Approval:** operator, 2026-11-08 ("go ahead with your recommendation": approve each review brief)
 **Spec under review:** `docs/bugs/2026-11-08-webhook-gemini-ask-has-no-collected-data.md` (read it in full first).
 
+## Files
+
+Read-only: review these, change none of them.
+- `scripts/lib/webhook/agent.py`
+- `scripts/lib/webhook/status.py`
+- `bin/k3dm-webhook`
+- `scripts/tests/bin/test_webhook_ask_gemini_context.py`
+
 ## Task
 
 Review the worker's diff below against the spec: its Fix steps, its Do-not list and its Acceptance block. Report
