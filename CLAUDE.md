@@ -187,6 +187,11 @@ dispatched tests:
     never block filing. The v1.40.0 live eval found a modest recall gain on bugs only and more
     intrusion than a TF-IDF control, so scores stay advisory — never a filing gate.
     See `docs/howto/find-prior-art.md`.
+  - **Record the result (operator, 2026-11-08).** Every new `docs/bugs/` doc carries
+    `**Prior art:** <path> (<score>) — <what was done>` in its header: `read, different root cause`,
+    `appended Recurrence` (then no new file), or `none above threshold`. Write `not run` rather than
+    skip the line. Started 2026-11-08 to measure whether Pass 2 changes decisions; review at the first
+    grooming after 2026-12-08 (keep, retune or drop the pass).
 
 ---
 
