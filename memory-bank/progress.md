@@ -1,3 +1,4 @@
+- [x] 2026-11-08 dispatched Gemini-ask P3 to Flash (trial 1)
 - [x] 2026-11-08 landed control-node-linux-setup `4bd764b9` (Claude fixes: M1 assertion, Vagrantfile); E3/E4 live pending
 - [x] 2026-11-08 operator deleted /hostinger-status and /argocd-upgrade from the Slack app
 - [x] 2026-11-08 retire-/hostinger-status P3 intents re-approved (E1)

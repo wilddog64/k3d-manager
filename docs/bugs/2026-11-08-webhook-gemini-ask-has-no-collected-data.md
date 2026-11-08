@@ -2,7 +2,7 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** dispatch — since 2026-11-08
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** pre-existing (the no-tools guard in `_call_gemini` dates from `fd281c85`, v1.24.0; the Gemini ask
 branch has no collection step)
 **Should have been caught by:** unknown
