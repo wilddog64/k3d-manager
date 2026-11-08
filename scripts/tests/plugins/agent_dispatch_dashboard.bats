@@ -277,14 +277,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106}|set(range(42,49))
 assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112}
-assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102}|set(range(35,40))|set(range(49,65))|set(range(66,72))
+assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 96 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 99 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -297,7 +297,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112):
+    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -941,7 +941,7 @@ assert panel["type"]=="stat" and panel["targets"][0]["expr"]=='k3dm_agy_source_p
 assert panel["targets"][1]["expr"]=='k3dm_agy_source_present{source="none"}'
 assert [target["refId"] for target in panel["targets"]]==["A","B"]
 assert panel["options"]["textMode"]=="name"
-assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":60}
+assert panel["gridPos"]=={"h":8,"w":6,"x":12,"y":66}
 assert "host" in panel["targets"][0]["legendFormat"] and "source" in panel["targets"][0]["legendFormat"]
 assert "interactive and print" in panel["description"] and "not combined" in panel["description"]
 warning=panel["fieldConfig"]["overrides"][0]
@@ -1141,6 +1141,50 @@ assert p_four["build"] == 0 and p_four["verify"] == 0 and p_four["review"] == 1
 p_orphan = next(r for r in joined_rows if r["parent"] == "p-orphan")
 assert p_orphan["build"] == 0 and p_orphan["review"] == 0 and p_orphan["verify"] == 0
 assert p_orphan["combine"] == "pass"
+
+print("ok")
+PY
+  [ "$status" -eq 0 ]
+  [[ "$output" == *ok* ]]
+}
+
+@test "agent activity: Claude quota panels exist, query quota metrics, and do not overlap" {
+  run python3 - "$BASE/grafana-dashboard-agent-activity.yaml" <<'PY'
+import json, sys
+text = open(sys.argv[1]).read()
+d = json.loads("\n".join(x[4:] for x in text.split("  agent-activity.json: |\n", 1)[1].splitlines()))
+panels = {p.get("title"): p for p in d["panels"]}
+
+assert "Claude weekly quota used" in panels, "missing Claude weekly quota used panel"
+assert "Claude 5h quota used" in panels, "missing Claude 5h quota used panel"
+assert "Claude quota reading age" in panels, "missing Claude quota reading age panel"
+
+weekly = panels["Claude weekly quota used"]
+assert weekly["type"] == "stat"
+assert weekly["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="seven_day"}'
+assert weekly["fieldConfig"]["defaults"]["unit"] == "percentunit"
+assert "Claude Code status line cache" in weekly["description"]
+assert "only updates while Claude Code runs on the machine the exporter runs on" in weekly["description"]
+
+five_h = panels["Claude 5h quota used"]
+assert five_h["type"] == "stat"
+assert five_h["targets"][0]["expr"] == 'k3dm_claude_quota_used_ratio{limit="five_hour"}'
+assert five_h["fieldConfig"]["defaults"]["unit"] == "percentunit"
+assert five_h["fieldConfig"]["defaults"]["thresholds"] == weekly["fieldConfig"]["defaults"]["thresholds"]
+
+age = panels["Claude quota reading age"]
+assert age["type"] == "stat"
+assert age["targets"][0]["expr"] == 'time() - k3dm_claude_quota_sample_timestamp_seconds'
+assert age["fieldConfig"]["defaults"]["unit"] == "s"
+
+all_ids = [p["id"] for p in d["panels"]]
+assert len(all_ids) == len(set(all_ids)), "duplicate panel ids found"
+
+for i, left in enumerate(d["panels"]):
+    a = left["gridPos"]
+    for right in d["panels"][i + 1:]:
+        b = right["gridPos"]
+        assert not (a["x"] < b["x"] + b["w"] and b["x"] < a["x"] + a["w"] and a["y"] < b["y"] + b["h"] and b["y"] < a["y"] + a["h"]), (left["id"], right["id"])
 
 print("ok")
 PY

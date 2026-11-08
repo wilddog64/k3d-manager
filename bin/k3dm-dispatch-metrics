@@ -1875,6 +1875,40 @@ def _activity_metrics(lines, events, files, now, prices):
                     lines.append(f"k3dm_codex_quota_resets_at_seconds{{{label}}} {data['resets_at']}")
 
 
+def _claude_quota(lines, cache_path):
+    if not cache_path:
+        return
+    path = Path(cache_path)
+    try:
+        if not path.is_file():
+            return
+        mtime = path.stat().st_mtime
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return
+    except (OSError, ValueError, TypeError):
+        return
+
+    lines.append(f"k3dm_claude_quota_sample_timestamp_seconds {mtime}")
+    for limit, minutes in (("five_hour", "300"), ("seven_day", "10080")):
+        obj = data.get(limit)
+        if not isinstance(obj, dict):
+            continue
+        util = obj.get("utilization")
+        if not isinstance(util, (int, float)) or isinstance(util, bool):
+            continue
+        label = f'limit="{limit}",window_minutes="{minutes}"'
+        lines.append(f"k3dm_claude_quota_used_ratio{{{label}}} {util / 100}")
+        resets_at = obj.get("resets_at")
+        if isinstance(resets_at, str):
+            try:
+                from datetime import datetime
+                stamp = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+                lines.append(f"k3dm_claude_quota_resets_at_seconds{{{label}}} {stamp}")
+            except (ValueError, TypeError, AttributeError):
+                pass
+
+
 def _quota_efficiency(lines, events, quota, now):
     observation_file = _root() / "codex-quota-observations.jsonl"
     observations = []
@@ -2469,7 +2503,8 @@ def _render_dispatch_gates(lines, events):
 
 
 def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked=None,
-           codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None):
+           codex_home=None, claude_records=None, claude_prices=None, claude_context=None, repo_root=None,
+           claude_usage_cache=None):
     now = time.time() if now is None else now
     doc_root = Path(repo_root) if repo_root is not None else _repo_root()
     prices = prices or {}
@@ -2583,6 +2618,7 @@ def render(events, bad_lines, now=None, prices=None, subscriptions=None, checked
         _quota_efficiency(lines, events, newest_quota, now)
     else:
         _quota_efficiency(lines, events, None, now)
+    _claude_quota(lines, claude_usage_cache)
     _agy_metrics(lines, os.environ.get("K3DM_AGENT_LEDGER_DIR", str(Path.home() / ".local/share/k3d-manager/agent-sessions")) + "/agy.jsonl", now, events=events)
     _render_dispatch_gates(lines, events)
     lines.append(f"k3dm_dispatch_ledger_timestamp_seconds {now}")
@@ -2598,6 +2634,7 @@ def main(argv=None):
     repo_key = str(_repo_root()).replace("/", "-")
     parser.add_argument("--claude-projects", default=str(Path.home() / ".claude" / "projects" / repo_key))
     parser.add_argument("--claude-cache", default=str(Path.home() / ".local/share/k3d-manager/claude-usage/rollup.json"))
+    parser.add_argument("--claude-usage-cache", default=os.path.join(os.environ.get("STATUSLINE_CACHE_DIR") or "/tmp/claude", "statusline-usage-cache.json"))
     args = parser.parse_args(argv)
     if args.spec_stats is not None:
         print(json.dumps(_spec_stats(args.spec_stats), separators=(",", ":")))
@@ -2608,7 +2645,8 @@ def main(argv=None):
     claude_records = _claude_rollup(args.claude_projects, args.claude_cache, claude_context) if claude_context is not None else None
     payload = render(events, bad_lines, prices=model_prices, subscriptions=subscriptions,
                      checked=checked, codex_home=args.codex_home, claude_records=claude_records,
-                     claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root())
+                     claude_prices=claude_prices, claude_context=claude_context, repo_root=_repo_root(),
+                     claude_usage_cache=args.claude_usage_cache)
     if args.dry_run:
         print(payload, end="")
         return 0

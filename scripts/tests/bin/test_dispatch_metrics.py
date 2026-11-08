@@ -3219,3 +3219,104 @@ def test_claude_context_metrics_follow_release_scoped_claude_turns():
                                      claude_context=context, repo_root=Path("/nonexistent"))
     assert 'k3dm_claude_context_tokens{window="v1.0.0",agent="main",quantile="0.5"} 123' in output
     assert 'k3dm_claude_context_turns{window="v1.0.0",agent="main"} 1' in output
+
+
+def test_claude_quota_metrics_emitted_from_usage_cache(tmp_path, capsys):
+    cache = tmp_path / "statusline-usage-cache.json"
+    data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-08T02:39:59.614566+00:00", "limit_dollars": None, "used_dollars": None, "remaining_dollars": None, "locked_reason": None},
+        "seven_day": {"utilization": 17.0, "resets_at": "2026-11-12T21:59:59.614590+00:00", "limit_dollars": None, "used_dollars": None, "remaining_dollars": None, "locked_reason": None},
+        "seven_day_opus": None,
+        "seven_day_sonnet": None,
+        "extra_usage": {"is_enabled": False, "monthly_limit": None, "used_credits": 0.0, "utilization": None, "currency": "USD", "disabled_reason": "out_of_credits"}
+    }
+    cache.write_text(json.dumps(data))
+    mtime = 1794000000.0
+    os.utime(cache, (mtime, mtime))
+
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+
+    assert f"k3dm_claude_quota_sample_timestamp_seconds {mtime}" in output
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="five_hour",window_minutes="300"} 1794105599.614566' in output
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'k3dm_claude_quota_resets_at_seconds{limit="seven_day",window_minutes="10080"} 1794520799.61459' in output
+    assert "extra_usage" not in output
+    assert "locked_reason" not in output
+    assert "limit_dollars" not in output
+
+
+def test_claude_quota_missing_unreadable_or_invalid_json(tmp_path, capsys):
+    missing = tmp_path / "missing-cache.json"
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(missing),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    assert "k3dm_claude_quota_" not in capsys.readouterr().out
+
+    invalid = tmp_path / "invalid-cache.json"
+    invalid.write_text("not json {{{")
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(invalid),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    assert "k3dm_claude_quota_" not in capsys.readouterr().out
+
+
+def test_claude_quota_null_or_non_numeric_utilization(tmp_path, capsys):
+    cache = tmp_path / "statusline-usage-cache.json"
+    data = {
+        "five_hour": {"utilization": 5.0, "resets_at": "2026-11-08T02:39:59.614566+00:00"},
+        "seven_day": None
+    }
+    cache.write_text(json.dumps(data))
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+    assert 'k3dm_claude_quota_used_ratio{limit="five_hour",window_minutes="300"} 0.05' in output
+    assert 'limit="seven_day"' not in output
+
+    data["five_hour"]["utilization"] = True
+    data["seven_day"] = {"utilization": 17.0, "resets_at": "2026-11-12T21:59:59.614590+00:00"}
+    cache.write_text(json.dumps(data))
+    assert dispatch_metrics.main([
+        "--dry-run",
+        "--claude-usage-cache", str(cache),
+        "--codex-home", str(tmp_path / "codex"),
+        "--prices", str(tmp_path / "prices.json"),
+    ]) == 0
+    output = capsys.readouterr().out
+    assert 'k3dm_claude_quota_used_ratio{limit="seven_day",window_minutes="10080"} 0.17' in output
+    assert 'limit="five_hour"' not in output
+
+
+def test_codex_quota_series_byte_identical_before_and_after(tmp_path):
+    from datetime import datetime, timezone
+    now = time.time()
+    day = time.strftime("%Y/%m/%d", time.gmtime(now))
+    home = tmp_path / "codex"
+    folder = home / "sessions" / day
+    folder.mkdir(parents=True)
+    path = folder / "rollout-one.jsonl"
+    path.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "sid", "timestamp": datetime.fromtimestamp(now - 10, timezone.utc).isoformat(), "cwd": "/repo/shop", "originator": "codex_exec"}}),
+        json.dumps({"type": "event_msg", "timestamp": datetime.fromtimestamp(now - 2, timezone.utc).isoformat(), "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 20, "output_tokens": 30}}, "rate_limits": {"primary": {"used_percent": 30, "window_minutes": 300, "resets_at": now + 10}, "secondary": {"used_percent": 40, "window_minutes": 10080, "resets_at": now + 20}}}}),
+        json.dumps({"type": "event_msg", "payload": {"type": "task_complete", "duration_ms": 1500}}),
+    ]) + "\n")
+    output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
+    assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.3' in output
+    assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
