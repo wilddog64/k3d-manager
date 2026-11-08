@@ -7,7 +7,7 @@
 **Should have been caught by:** spec
 **Severity:** medium — `make hub-rollback`, the recovery lever, currently returns `deploy/hub` to the commit it is already on; the operator must roll back twice and may not notice. Workaround: run it twice.
 **Approval:** operator, 2026-11-08 ("go ahead to file those and dispatch to Luna/Flash 3.8 base on our rules")
-**Intent approved:** operator, 2026-11-08 ("go ahead"), all evidence items
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** Claude, `git ls-remote origin 'refs/tags/hub-promote/*'` after the second promote
 **Affected:** `bin/k3dm-hub-promote` (`main` promote path, `record_move`, `resolve_on_origin`, `rollback`)

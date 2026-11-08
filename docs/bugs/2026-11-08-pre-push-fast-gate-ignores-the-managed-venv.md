@@ -7,7 +7,7 @@
 **Should have been caught by:** deploy step
 **Severity:** medium — any push from M5 fails the gate (`ModuleNotFoundError: No module named 'yaml'`), and from M4 unless PATH is changed by hand. Workaround: `K3DM_SKIP_FAST_GATE=1`, or `PATH=/opt/homebrew/bin:$PATH` on M4 only.
 **Approval:** operator, 2026-11-08 ("go ahead to file those and dispatch to Luna/Flash 3.8 base on our rules")
-**Intent approved:** operator, 2026-11-08 ("go ahead"), all evidence items
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, M5 `make hub-promote` (bootstrap): `FAIL scripts/tests/lib/ci_workflow_no_stage2.bats`
 **Affected:** `scripts/ci/fast_gate.sh`
