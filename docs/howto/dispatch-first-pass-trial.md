@@ -98,3 +98,8 @@ The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was cau
 - 2026-11-08: `docs/bugs/2026-11-08-slack-hostinger-status-duplicates-cluster-status.md`. Process slip: Claude asked
   for intent approval before the step-3 spec review. The review ran right after; if it changes any approved intent, the
   operator re-approves before dispatch.
+- Step 3 result (Sonnet, about 30 s): 3 should-fix and 2 nits, all confirmed. A stale allowlist copy in
+  `docs/architecture/cloudflare-slack-relay.md:82`. M1 was only checkable by a source grep; it now has a relay
+  behaviour test using the `relay.test.mjs` harness. N2 was not testable black-box; it is now a diff check. The
+  `hostinger-status` job-thread command was undecided; it is now explicitly out of scope. E1's intent changed, so the
+  operator is asked to approve again: the slip cost one extra approval round.

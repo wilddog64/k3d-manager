@@ -8,7 +8,6 @@ covered the same checks)
 **Should have been caught by:** live check
 **Severity:** low — confusing duplicate command; workaround: `/cluster-status hostinger`
 **Approval:** operator, 2026-11-08 ("go ahead to do that, and I will remove hostinger-status")
-**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack, 2026-11-08 (screenshots: `/hostinger-status` → "failed because the app did not
 respond"; `/cluster-status hostinger` → HEALTHY, 21 ok / 0 warn / 0 fail)
@@ -40,15 +39,25 @@ Nobody used the smaller command, so nothing noticed when its Slack app setting b
 Retire the Slack slash command only.
 - `workers/slack-relay/index.js`: remove `/hostinger-status` from `ALLOWED_COMMANDS` (line 1), from the role map
   (line 12), and remove its handler (lines 460-468).
-- `scripts/lib/webhook/make_targets.py:69`: remove the `/hostinger-status` row from the `/k3dm help` list.
+- `scripts/lib/webhook/make_targets.py:69`: remove the `/hostinger-status` row from the `/k3dm help` list. Add no
+  replacement row.
 - `docs/howto/slack-slash-commands.md`: remove it from the command list (line 4), the reader role row (line 70), the
-  manifest (lines 167-173) and the command table (line 350). Add one line saying that Hostinger status is
-  `/cluster-status hostinger`.
-- `scripts/tests/plugins/slack_slash_commands.bats`: the tests that require `/hostinger-status` (lines 13, 39, 75,
-  96-105) now require its absence, and `/cluster-status` stays present.
-
-Keep, unchanged: the webhook route `/api/v1/hostinger-status`, `_run_hostinger_status`, `policy.py`, and
-`cloud_actions.py`. Cloud sessions call that route (`docs/howto/cloud-session-requests.md:69`), and the Gemini-ask
+  manifest block (lines 167-173) and the command table (line 350). In the Notes cell of the `/cluster-status` row
+  (line 346), add: "Hostinger status: `/cluster-status hostinger` (`/hostinger-status` was retired 2026-11-08)."
+- `docs/architecture/cloudflare-slack-relay.md:82`: remove `'/hostinger-status'` from the copied allowlist. Leave
+  line 133, which is the API route.
+- `workers/slack-relay/test/relay.test.mjs`: add behaviour tests using the existing harness (`loadWorker`, `signed`,
+  `fetches`). A signed `/slack/commands` POST with `command=/hostinger-status` gets
+  `Unknown command: /hostinger-status`, and `fetches` stays empty. Paired control: `command=/cluster-status`,
+  `text=hostinger` produces one fetch to `/api/v1/cluster-status`.
+- `scripts/tests/plugins/slack_slash_commands.bats`: the tests at lines 13, 39 and 75 now require the command's
+  absence. Rename the test at line 96 ("…includes cluster-status and hostinger-status") and drop `/hostinger-status`
+  from its list (line 105). `/cluster-status` stays required.
+Keep, unchanged (do not edit `bin/k3dm-webhook`, `scripts/lib/webhook/policy.py`,
+`scripts/lib/webhook/cloud_actions.py` or `scripts/lib/webhook/status.py`): the webhook route
+`/api/v1/hostinger-status`, `_run_hostinger_status`, and the `hostinger-status` job-thread command
+(`bin/k3dm-webhook:727,732,993`; out of scope). Also unchanged: `docs/architecture/webhook-server.md:180` and
+`docs/howto/cloud-session-requests.md:69`, which describe the API route. Cloud sessions call that route (`docs/howto/cloud-session-requests.md:69`), and the Gemini-ask
 fix reuses its collector.
 
 ## Files
@@ -56,6 +65,8 @@ fix reuses its collector.
 - `workers/slack-relay/index.js`
 - `scripts/lib/webhook/make_targets.py`
 - `docs/howto/slack-slash-commands.md`
+- `docs/architecture/cloudflare-slack-relay.md`
+- `workers/slack-relay/test/relay.test.mjs`
 - `scripts/tests/plugins/slack_slash_commands.bats`
 
 ## Acceptance
@@ -63,30 +74,30 @@ fix reuses its collector.
 ```yaml
 must:
   - id: M1
-    text: "the relay rejects /hostinger-status like any unknown command, and still accepts /cluster-status"
+    text: "a signed Slack /slack/commands POST to the relay with command /hostinger-status gets 'Unknown command: /hostinger-status' and makes no webhook call; /cluster-status with text hostinger still makes one call to /api/v1/cluster-status"
   - id: M2
-    text: "the /k3dm help text and the slash-command howto and manifest no longer list /hostinger-status, and the howto names /cluster-status hostinger for Hostinger status"
+    text: "the /k3dm help list, the slash-command howto (command list, role table, manifest) and the relay architecture doc's allowlist no longer list /hostinger-status, and the howto's /cluster-status row names /cluster-status hostinger for Hostinger status"
   - id: M3
-    text: "the webhook API route /api/v1/hostinger-status still exists with its reader role (paired control: only the Slack command is retired)"
+    text: "the webhook API route /api/v1/hostinger-status still exists with its reader role (paired control: only the Slack command is retired; green before and after the fix by design)"
 must_not:
   - id: N1
-    text: "the relay, /k3dm help, the howto or its manifest still lists /hostinger-status"
+    text: "the relay still forwards /hostinger-status to the webhook, or the relay, /k3dm help, the howto, its manifest or the architecture allowlist still lists it"
   - id: N2
-    text: "/cluster-status, the webhook hostinger-status API route, policy.py or cloud_actions.py changes"
+    text: "the change touches bin/k3dm-webhook, scripts/lib/webhook/policy.py, scripts/lib/webhook/cloud_actions.py or scripts/lib/webhook/status.py"
 evidence:
   - id: E1
     proves: [M1, M2, M3, N1, N2]
     kind: offline
-    intent: "tests read the relay's allowed commands and role map, the /k3dm help text and the slash-command howto, and check that /hostinger-status is gone from each while /cluster-status and the webhook's hostinger-status API route remain"
+    intent: "tests send a signed Slack request for /hostinger-status to the relay and check it answers 'Unknown command' without calling the webhook, while /cluster-status hostinger still calls it; they read the /k3dm help list and the docs for the command's absence, check the webhook's hostinger-status API route is still there, and check the change left the webhook files untouched"
   - id: E2
     proves: [M1]
     kind: live
-    intent: "after the operator deletes /hostinger-status from the Slack app and the relay is redeployed, /k3dm help no longer shows it and /cluster-status hostinger still returns the Hostinger report"
+    intent: "after the operator deletes /hostinger-status from the Slack app and then the relay is redeployed, /k3dm help no longer shows it and /cluster-status hostinger still returns the Hostinger report"
 interface:
-  - "workers/slack-relay/index.js ALLOWED_COMMANDS and its command-role map"
+  - "POST /slack/commands on the relay (workers/slack-relay/index.js), driven by the relay.test.mjs harness"
   - "scripts/lib/webhook/make_targets.py CLUSTER_COMMANDS (rendered by /k3dm help)"
-  - "docs/howto/slack-slash-commands.md (command list, role table, manifest JSON, command table)"
-  - "bin/k3dm-webhook route table entry /api/v1/hostinger-status"
+  - "docs/howto/slack-slash-commands.md and docs/architecture/cloudflare-slack-relay.md"
+  - "bin/k3dm-webhook route table entry /api/v1/hostinger-status; git diff --name-only of the change"
 ```
 
 ## Definition of done (worker)
@@ -112,4 +123,8 @@ Before your last message, do all of these and paste the evidence:
   `reference_deploy_worker_workflow_overwrites_relay_secrets` before any redeploy.
 - No file overlap with the open dispatches or with the Gemini-ask P3 (which touches `agent.py`, `status.py` and
   `bin/k3dm-webhook`), so it can go out on its own or batched with another P3 on the relay or the howto.
+- Order for E2: operator deletes the Slack command, then the relay is redeployed, then the live check.
+- Spec review (separate agent, 2026-11-08) added the architecture doc, the relay behaviour tests, the thread-command
+  decision and a testable N2; E1's intent changed, so it needs approval again.
+- Needs `**Intent approved:**` before dispatch.
 - First-pass trial dispatch 2 of 3 (`docs/howto/dispatch-first-pass-trial.md`).
