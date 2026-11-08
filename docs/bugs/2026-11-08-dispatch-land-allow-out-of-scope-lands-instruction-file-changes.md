@@ -11,7 +11,8 @@ session, and the override that lets it through is used routinely for unrelated r
 **Intent approved:** operator, 2026-11-08 ("approve both": E1 and E2)
 **Prior art:** `docs/bugs/2026-10-09-codex-dispatch-task-can-widen-its-own-scope.md` (found by grep, not scored) —
 read, different root cause: that fix stopped a task from editing its own spec's file list; this is the operator
-override. `find-similar-docs` not run: embeddings credential unavailable in this shell (rc 44 / rc 36).
+override. `find-similar-docs` not run: the embeddings key now reads on m4-air, but the store is reached through kube
+context `k3d-k3d-cluster`, which m4-air does not have.
 **Filed:** 2026-11-08
 **Detected by:** Claude, reviewing dev.to "Your AGENTS.md is an attack surface" (sarahreid, 2026-10-27) against this
 repo, 2026-11-08
