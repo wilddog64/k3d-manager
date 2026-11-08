@@ -971,6 +971,28 @@ proposal). With the semantic approval gate, v1.59.0 holds 3 of 5 plans.
 [`argocd-image-updater-dashboard-kpi-alignment`](bugs/2026-10-13-argocd-image-updater-dashboard-kpi-alignment.md),
 [`slack-k3dm-alertmanager-behaviour-test-target.md`](plans/slack-k3dm-alertmanager-behaviour-test-target.md).
 
+### Candidate milestones — v1.63.0 and v1.64.0: 30-day SaaS simulation experiment
+
+**Proposed 2026-11-07 (operator: "sounds good. go ahead for that").** The question: *could k3d-manager
+support the infrastructure operations of a simulated 30-person SaaS company for 30 consecutive days?*
+The targets and stop conditions are fixed before the run, and faults are injected unannounced. "No,
+because X" is a valid result: it names the next platform investment.
+
+**Placement (Claude, 2026-11-07).** The experiment comes after v1.61.0, when the platform proofs have moved
+to the reference app. Shopping-cart is retired at v2.0.0, so a run against it could lose its workload
+mid-run. It also comes after v1.62.0, which completes the committed queue. It has two minors so the
+harness ships and is piloted before 30 days of hub time are committed.
+
+| Release | Plans |
+|---|---|
+| v1.63.0 (4 of 5) | [`workload-and-tenant-model`](plans/v1.63.0-saas-sim-workload-and-tenant-model.md), [`slo-scorecard-and-cost-ledger`](plans/v1.63.0-saas-sim-slo-scorecard-and-cost-ledger.md), [`sealed-chaos-scheduler`](plans/v1.63.0-saas-sim-sealed-chaos-scheduler.md), [`pilot-5-day-run`](plans/v1.63.0-saas-sim-pilot-5-day-run.md) |
+| v1.64.0 (1 of 5) | [`30-day-run-and-report`](plans/v1.64.0-saas-sim-30-day-run-and-report.md); the branch stays open for the run, and fixes found during it land here |
+
+Operator decisions due before the pilot: where the hub runs (laptop as today is recommended, since its
+fragility is part of the question); whether platform releases keep merging during the run (recommended
+yes, counted as change load); and whether Hostinger is in scope (recommended probe-only, never chaos).
+Every chaos injector needs its own dispatch go.
+
 ### Candidate major — v2.0.0: a real reference workload replaces shopping-cart
 
 **Proposed 2026-10-10 (operator; not yet scoped).** The shopping-cart apps are a demo. Their
