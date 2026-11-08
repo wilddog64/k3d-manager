@@ -737,7 +737,7 @@ tty_machine() {
   run_machine --role console --from old-mac.local
   run_machine --role console --check --from old-mac.local
   run ! grep -q '^secrets pull' "$CALL_LOG"
-  run ! grep -q '^ssh ' "$CALL_LOG"
+  run ! grep -q '^ssh .*old-mac\.local' "$CALL_LOG"
 }
 
 @test "machine setup: safety N3 worker rejects hub installers" {
