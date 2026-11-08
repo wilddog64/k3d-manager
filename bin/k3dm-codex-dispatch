@@ -301,7 +301,7 @@ Usage:
   bin/k3dm-codex-dispatch handoff --slug SLUG --acting-coordinator VENDOR/MODEL [--reason ENUM] [--provenance declared|runtime-reported]
   bin/k3dm-codex-dispatch verify --slug SLUG --result pass|fail [--evidence FILE] [--tokens N] [--verifier NAME]
   bin/k3dm-codex-dispatch intervention --slug SLUG --reason continue_prompt|clarification|correction|other
-  bin/k3dm-codex-dispatch abandon --slug SLUG --yes
+  bin/k3dm-codex-dispatch abandon --slug SLUG [--version V] [--reason TEXT] --yes
   bin/k3dm-codex-dispatch prune [--yes]
   bin/k3dm-codex-dispatch usage-backfill
   bin/k3dm-codex-dispatch release-merged --version vX.Y.Z --pr N --merged-at YYYY-MM-DDTHH:MM:SSZ
@@ -1319,24 +1319,106 @@ _dispatch_resume() {
   echo "resumed: $slug"; echo "resume: $n"
 }
 
+_dispatch_abandon_check_ledger() {
+  local ledger="$1" version="$2" slug="$3"
+  [[ -f "$ledger" ]] || _dispatch_error "task has no start in ledger: $version/$slug"
+  local check rc=0
+  check="$(python3 - "$ledger" "$version" "$slug" <<'PYCHECK'
+import json, sys
+
+ledger_path = sys.argv[1]
+target_version = sys.argv[2]
+target_slug = sys.argv[3]
+
+has_start = False
+is_closed = False
+repo = "k3d-manager"
+
+try:
+    with open(ledger_path, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(ev, dict) and ev.get("version") == target_version and ev.get("slug") == target_slug:
+                ev_type = ev.get("event")
+                if ev_type == "start":
+                    has_start = True
+                    if ev.get("repo"):
+                        repo = ev.get("repo")
+                elif ev_type in ("land", "abandon"):
+                    is_closed = True
+except Exception:
+    sys.exit(3)
+
+if not has_start:
+    sys.exit(3)
+if is_closed:
+    sys.exit(4)
+print(repo)
+sys.exit(0)
+PYCHECK
+  )" || rc=$?
+  case "$rc" in
+    0) printf '%s' "${check:-k3d-manager}" ;;
+    3) _dispatch_error "task has no start in ledger: $version/$slug" ;;
+    4) _dispatch_error "task is already closed: $version/$slug" ;;
+    *) _dispatch_error "could not verify task in ledger: $version/$slug" ;;
+  esac
+}
+
+_dispatch_abandon_remove() {
+  local repo_path="$1" version="$2" slug="$3" task_dir="$4"
+  if [[ -d "$task_dir" ]]; then
+    git -C "$repo_path" worktree remove --force "$task_dir"
+  else
+    echo "missing worktree: $task_dir"
+    git -C "$repo_path" worktree prune 2>/dev/null || true
+  fi
+  if git -C "$repo_path" show-ref --verify --quiet "refs/heads/task/$version/$slug"; then
+    git -C "$repo_path" branch -D "task/$version/$slug" >/dev/null
+  else
+    echo "missing branch: task/$version/$slug"
+  fi
+}
+
 _dispatch_abandon() {
-  local slug="" yes=0 rel version
+  local slug="" version="" reason="" yes=0 rel
   while (($#)); do
     case "$1" in
       --slug) (($# >= 2)) || _dispatch_error "--slug requires a value"; slug="$2"; shift 2 ;;
+      --version) (($# >= 2)) || _dispatch_error "--version requires a value"; version="$2"; shift 2 ;;
+      --reason) (($# >= 2)) || _dispatch_error "--reason requires a value"; reason="$2"; shift 2 ;;
       --yes) yes=1; shift ;;
       *) _dispatch_error "unknown abandon option: $1" ;;
     esac
   done
   [[ -n "$slug" ]] || _dispatch_error "abandon requires --slug SLUG"
-  rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"; _dispatch_task_paths "$version" "$slug"
-  _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo k3d-manager)"
-  local repo_path target
+  if [[ -z "$version" ]]; then
+    rel="$(_dispatch_release_branch)"
+    version="${rel#k3d-manager-}"
+  else
+    [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || _dispatch_error "invalid version: $version"
+  fi
+  local ledger="$_dispatch_worktree_root/ledger.jsonl" ledger_repo
+  ledger_repo="$(_dispatch_abandon_check_ledger "$ledger" "$version" "$slug")"
+  _dispatch_task_paths "$version" "$slug"
+  _dispatch_event_repo="$(cat "$_dispatch_run_dir/repo-name" 2>/dev/null || echo "$ledger_repo")"
+  local repo_path
   repo_path="$(cat "$_dispatch_run_dir/repo" 2>/dev/null || printf '%s' "$_dispatch_repo_root")"
-  target="$(cat "$_dispatch_run_dir/target" 2>/dev/null || printf '%s' "$rel")"
-  if (( ! yes )); then echo "would remove: $_dispatch_task_dir"; echo "would delete branch: task/$version/$slug"; exit 2; fi
-  git -C "$repo_path" worktree remove --force "$_dispatch_task_dir"; git -C "$repo_path" branch -D "task/$version/$slug" >/dev/null
-  _dispatch_ledger_event_best_effort abandon "$version" "$slug"
+  if (( ! yes )); then
+    [[ -d "$_dispatch_task_dir" ]] && echo "would remove: $_dispatch_task_dir"
+    git -C "$repo_path" show-ref --verify --quiet "refs/heads/task/$version/$slug" && echo "would delete branch: task/$version/$slug"
+    echo "would record: abandon $version/$slug"
+    exit 2
+  fi
+  _dispatch_abandon_remove "$repo_path" "$version" "$slug" "$_dispatch_task_dir"
+  if [[ -n "$reason" ]]; then
+    _dispatch_ledger_event_best_effort abandon "$version" "$slug" --arg reason "$reason" '.reason=$reason'
+  else
+    _dispatch_ledger_event_best_effort abandon "$version" "$slug"
+  fi
   _dispatch_schedule_metrics
   echo "abandoned: $slug"
 }
