@@ -45,3 +45,20 @@ Claude's M4 session, 2026-11-07 PT, before the local date rolled over:
 The fixture spec carries `**Intent approved:** test, 2026-11-07`. It has no Acceptance evidence block, so the
 header is its only gap, and the gate passes it whatever date it gets. The dispatcher tests then run a spec that
 the gate checks and accepts, rather than one that is always older than the rule.
+
+## Second instance: `test_all_existing_specs_are_exempt_as_of_this_commit`
+
+The same assumption sits in `scripts/tests/bin/test_spec_intent.py`. The test ran the gate over every doc in
+`docs/plans/` and `docs/bugs/`. From 2026-11-08, any doc filed without `**Intent approved:**` failed it, though
+`CLAUDE.md` requires the header only before dispatch. This doc tripped it when first written
+(`make test-pytest`, 2026-11-08: `missing **Intent approved:** header`).
+
+Fix: the test checks only the docs that existed at `c5d28596`, the commit that fixed the rule's date scope
+(1841 paths, read with `git ls-tree`; CI's `lint` job checks out with `fetch-depth: 0`). That keeps its guard:
+a pre-rule doc that the gate misdates still fails it. Evidence, 2026-11-08, Claude's M4 session:
+
+- new test, current tree → `1 passed`
+- old test with an unapproved doc filed 2026-11-08 → `1 failed` (the probe doc listed); new test → `1 passed`
+- new test with `docs/bugs/2026-11-02-hub-data-export-never-ran.md` redated to `**Filed:** 2026-11-08` →
+  `1 failed`; the file was restored and compared with `cmp`
+- `python3 -m pytest -q scripts/tests/bin/test_spec_intent.py` → `12 passed`

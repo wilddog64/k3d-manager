@@ -128,6 +128,12 @@ def test_all_existing_specs_are_exempt_as_of_this_commit():
     assert specs
     assert all(path.is_file() for path in specs)
     gaps = {}
+    existing = subprocess.run(
+        ["git", "-C", str(repo), "ls-tree", "-r", "--name-only", "c5d28596", "--", "docs/plans", "docs/bugs"],
+        check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    assert len(existing) > 500
+    specs = [path for path in specs if str(path.relative_to(repo)) in existing]
     for path in specs:
         result = check(path)
         if result:
