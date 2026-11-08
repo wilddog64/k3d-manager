@@ -1,6 +1,7 @@
 # Review brief: Gemini-ask fix (Flash) — cross-vendor diff review
 
 **Role:** review child of `2026-11-08-webhook-gemini-ask-has-no-collected-data` (first-pass trial step 2).
+**Intent approved:** operator, 2026-11-08 ("go ahead with your recommendation": approve each review brief)
 **Spec under review:** `docs/bugs/2026-11-08-webhook-gemini-ask-has-no-collected-data.md` (read it in full first).
 
 ## Task

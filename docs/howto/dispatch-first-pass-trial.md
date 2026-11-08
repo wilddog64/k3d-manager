@@ -56,8 +56,10 @@ reviews Luna's work, and Luna reviews Flash's. It is linked to the task:
 - Findings are advisory. Claude checks each one, sends the real ones back to the worker by `resume`, and records the
   rest as noise.
 - Claude still reviews last, before `codex-land`.
-- How the reviewer gets the diff (inline in the brief, or a read-only path to the worker's worktree) is settled on
-  first use and written down here.
+- The diff goes inline in the brief, `docs/reviews/<slug>-review.md`, committed before `start` (settled on first use,
+  2026-11-08). Untracked new files are included with `git add -N` before `git diff`, then unstaged again.
+- `start` runs the intent gate for review children too. The operator approves each brief, and the brief carries
+  `**Intent approved:**` (operator, 2026-11-08, choosing this over exempting `--role review` from the gate).
 
 ### 3. Spec review by a second agent before intent approval
 
