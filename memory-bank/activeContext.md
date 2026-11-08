@@ -87,6 +87,7 @@ The operator asked: "Could k3d-manager support the infrastructure operations of 
 - Abandon P3 LANDED `5df3a166`, pushed; marks offline_tested + live_verified. 23 stale rows closed; `open` 27 → 4. Kept: v1.43.13 machine-setup row (OPEN bug, uncommitted 67-line fix in its worktree) — needs land-or-redo decision.
 - Machine-setup P3: old v1.43.13 row abandoned for redo on v1.43.15 (operator 2026-11-08); prior function kept in bug doc; waits on intent approval. Open dispatches now 2 counted (Gemini ask, control node) + review child.
 - Hermes branch-check P2 dispatched to Luna (gpt-6-luna) 2026-11-08, trial dispatch 3; next: Flash cross-vendor diff review, then Claude review + land. Machine-setup P3 intents approved; next free slot.
+- ideas.md: added inbox row "remember bad fixes, Hermes suppresses known-harmful repairs" (from dev.to Hindsight article; operator go 2026-11-08). Groom at next /release-groom.
 - Shopping-cart retirement now conditional on twinkle app capacity (roadmap).
 - Next: Hermes values_branch P2 (blocks v1.43.15); Gemini-ask back to worker with Luna finding; control-node round 3 vm-test; intents for the two v1.44.0 plans pending.
 
