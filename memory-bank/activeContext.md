@@ -90,7 +90,7 @@ The operator asked: "Could k3d-manager support the infrastructure operations of 
 - ideas.md: added inbox row "remember bad fixes, Hermes suppresses known-harmful repairs" (from dev.to Hindsight article; operator go 2026-11-08). Groom at next /release-groom.
 - ideas.md: added inbox row "record find-similar-docs prior art per bug" (audit: runs ~1/bug in most sessions, 0/10 and 3/10 in two; outcome never recorded). Operator go 2026-11-08.
 - `**Prior art:**` header line on every new bug doc, started 2026-11-08 (CLAUDE.md dedup rule; operator). Review at first grooming after 2026-12-08.
-- New P3 filed 2026-11-08: docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md (land refuses instruction/hook file changes unless --allow-instruction-files; from dev.to AGENTS.md article). Waits on intent approval; then P3 batch on bin/k3dm-codex-dispatch.
+- New P3 filed 2026-11-08: docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md (land refuses instruction/hook file changes unless --allow-instruction-files; from dev.to AGENTS.md article). Intents approved 2026-11-08; waits on a free slot (WIP 3/3), after the machine-setup P3.
 - Shopping-cart retirement now conditional on twinkle app capacity (roadmap).
 - Next: Hermes values_branch P2 (blocks v1.43.15); Gemini-ask back to worker with Luna finding; control-node round 3 vm-test; intents for the two v1.44.0 plans pending.
 

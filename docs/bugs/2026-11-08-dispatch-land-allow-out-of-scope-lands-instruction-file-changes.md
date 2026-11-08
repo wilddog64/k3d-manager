@@ -2,13 +2,13 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08
+**Waiting on:** dispatch — since 2026-11-08
 **Introduced by:** pre-existing
 **Should have been caught by:** spec
 **Severity:** medium — no known exploit, but one landed edit to an instruction or hook file steers every later agent
 session, and the override that lets it through is used routinely for unrelated reasons
 **Approval:** operator, 2026-11-08 ("got file P3 to make land refuse change")
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-08 ("approve both": E1 and E2)
 **Prior art:** `docs/bugs/2026-10-09-codex-dispatch-task-can-widen-its-own-scope.md` (found by grep, not scored) —
 read, different root cause: that fix stopped a task from editing its own spec's file list; this is the operator
 override. `find-similar-docs` not run: embeddings credential unavailable in this shell (rc 44 / rc 36).
