@@ -217,7 +217,9 @@ def test_plan_operator_go_is_own_label_and_real_blockers_remain(metrics, tmp_pat
 def test_plan_blocked_by_dispatch_intent_and_file_wait(metrics, tmp_path, exit_code):
     root = tmp_path / "scratch-repo"
     assert root.resolve() != ROOT.resolve()
-    assert ".local/share/k3d-manager" not in str(root.resolve())
+    # agent-audit: allow assert-removed target guards replaced, not dropped: exact real-ledger path instead of a substring that land's TMPDIR trips
+    real_ledger = Path("~/.local/share/k3d-manager/worktrees/ledger.jsonl").expanduser().resolve()
+    assert (root / "ledger.jsonl").resolve() != real_ledger
     (root / "docs/plans").mkdir(parents=True)
     subprocess.run(["git", "init", "-q", "-b", "k3d-manager-v1.57.0", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
@@ -252,7 +254,7 @@ def test_plan_blocked_by_dispatch_intent_and_file_wait(metrics, tmp_path, exit_c
                         "slug": "active-worker", "exit": exit_code})
     ledger = root / "ledger.jsonl"
     ledger.write_text("".join(json.dumps(item) + "\n" for item in records))
-    assert ledger.resolve() != (ROOT / "ledger.jsonl").resolve()
+    assert ledger.resolve() not in {(ROOT / "ledger.jsonl").resolve(), real_ledger}
     output = metrics._plan_metrics(root, texts=docs, ledger=ledger)
     rows = {re.search(r'plan="([^"]+)"', line).group(1): line
             for line in output.splitlines() if line.startswith("k3dm_plan_info{")}
