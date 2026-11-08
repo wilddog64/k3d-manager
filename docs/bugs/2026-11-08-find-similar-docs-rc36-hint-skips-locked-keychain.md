@@ -8,7 +8,7 @@
 **Severity:** low — no data or service impact; the misleading hint cost one session a needless item change, a new
 Keychain item and a GUI detour
 **Approval:** operator, 2026-11-08 ("yes", file the hint P3; direction revised after the root cause was found)
-**Intent approved:** pending
+**Intent approved:** operator, 2026-11-08 ("approve both E1 and E2")
 **Prior art:** `docs/bugs/2026-10-03-hub-restore-has-no-single-make-target.md`, `docs/bugs/2026-09-30-vectordb-index-never-refreshes-automatically.md`
 (found by grep, not scored) — read, different root cause: both record rc 36 on the Gemini item as an item-access
 limit; neither covers a keychain locked for the session. `find-similar-docs` not run: the store is reached through kube
