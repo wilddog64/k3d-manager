@@ -74,6 +74,7 @@ Scope: Hostinger only (the reported case). Other live-state questions get a poin
 - `scripts/lib/webhook/status.py`
 - `bin/k3dm-webhook` (pass `user_question` on the Slack ask route)
 - `scripts/tests/bin/test_webhook_ask_gemini_context.py` (new)
+- `scripts/tests/fixtures/webhook-hostinger-status-2026-11-08.txt` (captured; read-only for the worker)
 
 ## Do not
 
@@ -144,7 +145,10 @@ Before your last message, do all of these and paste the evidence:
   injection path and the bug-filing path; this version fixes all three.
 - Existing tests in `scripts/tests/bin/test_webhook_ask_delivery.py` ask gemini with no Hostinger mention and expect
   the stubbed answer verbatim; under fix step 6 they stay green.
-- The stubbed collector text must be taken from a real `/hostinger-status` reply (host and date in a comment);
-  Claude attaches the capture before dispatch. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
+- Stub capture: `scripts/tests/fixtures/webhook-hostinger-status-2026-11-08.txt`, the `_format_status_summary_slack`
+  output for `k3s-hostinger` from a real `/cluster-status hostinger` reply in Slack (M5 hub, 2026-11-08, operator
+  screenshot; Slack rendering turned back into raw markup by Claude). Use it as the stubbed `_hostinger_status_text()`
+  return value; add your own canary for N2. `/hostinger-status` itself timed out in Slack ("app did not respond") the
+  same morning while `/cluster-status hostinger` worked; that is a Slack app setting, not part of this fix. Fixtures assert first that no real `kubectl`, `ssh` or Gemini binary
   is reachable on PATH.
 - The webhook must be restarted after the fix lands for E2 (`feedback_restart_webhook_after_verify`).
