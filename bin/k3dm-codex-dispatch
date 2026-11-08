@@ -894,6 +894,16 @@ _dispatch_start() {
   fi
   rel="$(_dispatch_release_branch)"; version="${rel#k3d-manager-}"
   [[ -f "$_dispatch_repo_root/$spec" ]] || _dispatch_error "spec does not exist: $spec"
+  local spec_intent_output spec_intent_rc
+  if spec_intent_output="$(python3 "$_dispatch_repo_root/scripts/lib/spec_intent.py" "$_dispatch_repo_root/$spec" 2>&1)"; then
+    :
+  else
+    spec_intent_rc=$?
+    if (( spec_intent_rc == 1 )); then
+      _dispatch_error "refused: ${spec_intent_output}"
+    fi
+    _dispatch_error "spec-intent checker failed (rc ${spec_intent_rc}): ${spec_intent_output}"
+  fi
   git -C "$_dispatch_repo_root" ls-files --error-unmatch -- "$spec" >/dev/null 2>&1 || _dispatch_error "spec is not tracked: $spec"
   git -C "$_dispatch_repo_root" diff --quiet HEAD -- "$spec" || _dispatch_error "spec is changed: $spec"
   git -C "$_dispatch_repo_root" fetch origin "+$rel:refs/remotes/origin/$rel" >/dev/null 2>&1 || _dispatch_error "could not fetch origin/$rel"

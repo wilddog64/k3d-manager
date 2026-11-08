@@ -129,6 +129,7 @@ test shown red against the pre-fix code; an independent verifier (a separately t
 its own tests from the Acceptance section only, never the fix spec or the diff, and both test sets
 must pass; live evidence is run by the operator or Claude, never Gemini. Example:
 `docs/bugs/2026-10-13-e2e-sandbox-does-not-provision-missing-acg-cluster.md`.
+Every evidence item carries an operator-facing `intent`, and the spec carries `**Intent approved:**` before dispatch.
 
 **Test controls (operator, 2026-10-30; from "Four ways a test can lie").** Three more rules for
 dispatched tests:

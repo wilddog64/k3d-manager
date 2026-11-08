@@ -1524,6 +1524,11 @@ check-repo-root:
 fast-gate:
 	@scripts/ci/fast_gate.sh $(BASE)
 
+.PHONY: check-spec-intent
+check-spec-intent:
+	@test -n "$(SPEC)" || { echo "usage: make check-spec-intent SPEC=<path>" >&2; exit 2; }
+	@python3 scripts/lib/spec_intent.py "$(SPEC)"
+
 check-agent-docs:
 	@./bin/k3dm-check-agent-docs
 
