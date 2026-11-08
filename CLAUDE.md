@@ -13,9 +13,21 @@ Uses a dispatcher pattern with lazy plugin loading.
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
 
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
+- **Prove external behaviour before dispatch (operator, 2026-11-07).** If a fix depends on how something
+  outside the repo behaves (a Grafana option or feature, kubectl, ArgoCD or Helm behaviour, a CLI's output
+  format), the spec carries proof from the version actually deployed before it is dispatched: a read-only
+  capture, the upstream source at the deployed tag, or a live probe, with host, date and version beside
+  it. Offline tests share the spec's assumption and cannot catch a wrong one. Precedents: `sort: 8` on
+  Grafana 11.4.0, which bundles a scenes version that ignores it; the invented `byRefId` matcher.
+- **Dispatch WIP limit and P3 batching (operator, 2026-11-07).** At most 3 dispatches open at once
+  (running, or exited and not yet landed), and at most one open dispatch per file. A spec touching a file
+  that an open dispatch edits waits, or is folded into the next dispatch for that file. P0 and P1 may exceed
+  the limit. A P3 is filed with `**Waiting on:** dispatch` and dispatched in a batch with other P3s on
+  the same files once there is room. Precedent: four concurrent dispatches on `bin/k3dm-dispatch-metrics`
+  on 2026-11-07.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
 <!-- shared:begin plan-cap -->
-- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
+- **Versioning and release scope (operator, 2026-11-07; supersedes the 2026-10-10 split-early-into-a-patch rule)** — `X.0.0` is a breaking change. `X.Y.0` is a feature release, a sprint story of at most 5 plan docs in `docs/plans/`. A 6th plan, or a release growing too big or too fast, splits into the next minor `X.(Y+1).0`, never into a patch. `X.Y.N` (N ≥ 1) is **bug-fix only**: specs from `docs/bugs/`, no `docs/plans/`, branch `k3d-manager-vX.Y.N` cut from `main` after the previous release merges. **Bugs before features (operator, 2026-11-07).** A P0 is fixed at once, whatever the release: a hotfix `X.Y.N` from `main` if the open release is not about to merge. A P1, and a P2 that `**Introduced by:**` places in the open release, block that release's PR. A P2 that already existed, found during a release, is fixed in it if there is room; otherwise it is the first item of the bug-fix patch cut right after the release merges, never the P3 backlog. P3s are batched into a release or a patch. When bug work crowds a release, the lowest-priority plan not yet started moves to the next minor: plans move out, bugs stay. Bug specs never count toward the 5-plan cap. Claude decides splits, records them in `docs/roadmap.md`, and tells the operator. The queue after v1.43.15 was renumbered to this scheme on 2026-11-07 (old → new table in `docs/roadmap.md`).
 <!-- shared:end plan-cap -->
 - **No network path out of a cloud session** — if you are running in a Claude cloud
   environment with only the GitHub connection, you cannot reach the k3dm webhook, the cluster,
@@ -97,6 +109,10 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
 without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+**Escape origin (operator, 2026-11-07).** Every bug filed from 2026-11-07 also carries
+`**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
+one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
+should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
 <!-- shared:end bug-priority -->
 
 **Waiting on line (operator, 2026-11-06).** An open `docs/bugs/` doc says what it needs next, in its

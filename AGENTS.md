@@ -25,13 +25,17 @@ Use the existing Bash and Python styles. Route privileged and external commands 
 ## Shared rules
 
 <!-- shared:begin plan-cap -->
-- **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes. **Split early into a patch release:** when a release branch grows too big or too fast — even under five specs — move dependent or not-yet-started plans to `vX.Y.(N+1)` (`vX.Y.N-<slug>.md`, branch `k3d-manager-vX.Y.N` cut from `main` after the parent merges). Claude decides the split, records it in `docs/roadmap.md`, and tells the operator (operator, 2026-10-10; precedent: v1.43.0 → v1.43.1). A patch release may also be a **bug-fix-only release** when fixes are needed between minors; bug specs in `docs/bugs/` do not count toward the cap.
+- **Versioning and release scope (operator, 2026-11-07; supersedes the 2026-10-10 split-early-into-a-patch rule)** — `X.0.0` is a breaking change. `X.Y.0` is a feature release, a sprint story of at most 5 plan docs in `docs/plans/`. A 6th plan, or a release growing too big or too fast, splits into the next minor `X.(Y+1).0`, never into a patch. `X.Y.N` (N ≥ 1) is **bug-fix only**: specs from `docs/bugs/`, no `docs/plans/`, branch `k3d-manager-vX.Y.N` cut from `main` after the previous release merges. **Bugs before features (operator, 2026-11-07).** A P0 is fixed at once, whatever the release: a hotfix `X.Y.N` from `main` if the open release is not about to merge. A P1, and a P2 that `**Introduced by:**` places in the open release, block that release's PR. A P2 that already existed, found during a release, is fixed in it if there is room; otherwise it is the first item of the bug-fix patch cut right after the release merges, never the P3 backlog. P3s are batched into a release or a patch. When bug work crowds a release, the lowest-priority plan not yet started moves to the next minor: plans move out, bugs stay. Bug specs never count toward the 5-plan cap. Claude decides splits, records them in `docs/roadmap.md`, and tells the operator. The queue after v1.43.15 was renumbered to this scheme on 2026-11-07 (old → new table in `docs/roadmap.md`).
 <!-- shared:end plan-cap -->
 
 <!-- shared:begin bug-priority -->
 Bug priority is urgency, separate from Severity: P0 outage/data loss/security now; P1 broken
 without a workaround; P2 degraded with a workaround; P3 cosmetic, hygiene or test-only. Every
 new `docs/bugs/` file must carry `**Priority:** P0`, `P1`, `P2`, or `P3` directly under Status.
+**Escape origin (operator, 2026-11-07).** Every bug filed from 2026-11-07 also carries
+`**Introduced by:** <commit or release | pre-existing | unknown>` and `**Should have been caught by:**`
+one of `spec`, `offline test`, `review`, `deploy step`, `live check` or `none`: the first safety net that
+should have stopped it. Write `unknown` rather than guess. Each retro counts them by release and by net.
 <!-- shared:end bug-priority -->
 
 <!-- shared:begin security -->
