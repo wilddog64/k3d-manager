@@ -1,8 +1,7 @@
 # Bug: Codex spend panels add the per-mode total to the per-category series, and show unpriced tokens as dollars
 
-**Status:** LANDED — fix and tests pushed on the release branch 2026-11-08, after the `deploy/hub` bootstrap; live once a second `make hub-promote` moves `deploy/hub` past it
+**Status:** VERIFIED — live 2026-11-08 on the M5 hub, `deploy/hub` = `61195319` (operator screenshot)
 **Priority:** P2
-**Waiting on:** live check — since 2026-11-08
 **Introduced by:** `8153f9eb` (v1.43.15, Codex spend by session category)
 **Should have been caught by:** offline test
 **Severity:** medium — three cost readings are wrong: a phantom "Value" bar equal to the whole total, unpriced tokens drawn as `$49.1M`, the all-sessions total doubled, and the outside-dispatch share halved
@@ -60,3 +59,14 @@ matcher (`packages/grafana-data/src/transformations/matchers/ids.ts`); `BarGauge
 
 Live check after promote: the panel shows no "Value" bar, codex-auto-review as a token count, readable names;
 panel 58 equals the sum of the category bars.
+
+## Live check — 2026-11-08 (operator on M5, screenshot; Claude read it)
+
+- `hub-grafana-dashboards`: `Synced` at `61195319` on both sources; ConfigMap `monitoring/grafana-dashboard-agent-cost`
+  rewritten 2026-11-08T13:52:19Z. The panel stayed old until `kubectl -n monitoring rollout restart` of
+  `kube-prometheus-stack-grafana`: Grafana did not reload the changed ConfigMap by itself.
+- Codex spend by category, after the restart: horizontal bars, names on the left; rows dispatch $29.0,
+  dispatch_unrecorded $1.31, exec_untracked $0, interactive $21.3, other $0, and "+ codex-auto-review unpriced
+  tokens" 49.1 Mil (a count, not dollars). No "Value" row. The old "Value" bar read $51.6 = 29.0 + 1.31 + 21.3,
+  the mode series adding up to the same total a second time.
+
