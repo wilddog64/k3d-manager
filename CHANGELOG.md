@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Run CI on every push to a `k3d-manager-v*` release branch, not only on pull requests. `make hub-promote` requires green GitHub check runs on the commit it promotes, and release-branch commits had none until a PR opened, so the hub could not be promoted during development without `BREAK_GLASS=1`. The `lint` job's same-repository guard now also admits push events, which only the repository's own branches can produce.
+
 ### Added
 
 - Add the `deploy/hub` promotion and rollback flow, status reporting, and platform-ops deployment from the promoted tree.

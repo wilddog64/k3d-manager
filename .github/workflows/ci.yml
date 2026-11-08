@@ -6,6 +6,9 @@ name: CI
     types: [opened, synchronize, reopened]
     branches:
       - main
+  push:
+    branches:
+      - "k3d-manager-v*"
 
 permissions:
   contents: read
@@ -31,7 +34,8 @@ jobs:
 
   lint:
     if: >-
-      ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+      ${{ github.event_name == 'push' ||
+          github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout

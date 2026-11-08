@@ -1,8 +1,8 @@
 # Bug: `make hub-promote` refuses every release-branch commit, because CI runs only on pull requests
 
-**Status:** OPEN — filed 2026-11-07, fix not chosen
+**Status:** LANDED — option 1 (operator, 2026-11-07): `.github/workflows/ci.yml` also runs on `push` to `k3d-manager-v*`; the `lint` job's fork guard admits push events. Two ci.yml bats suites green (0 failures).
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07 (the push of this fix must produce green check runs on the branch head; then `make hub-promote REF=k3d-manager-v1.43.15` passes without BREAK_GLASS)
 **Introduced by:** `897cfe72` (v1.43.15, hub-deploy-ref)
 **Should have been caught by:** spec
 **Severity:** medium — the hub cannot be promoted to a release-branch commit, so no live check of ArgoCD or platform-ops changes can run during development without `BREAK_GLASS=1`
