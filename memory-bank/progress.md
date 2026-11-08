@@ -72,7 +72,8 @@
 - New P3 filed 2026-11-08: docs/bugs/2026-11-08-dispatch-land-allow-out-of-scope-lands-instruction-file-changes.md (land refuses instruction/hook file changes unless --allow-instruction-files; from dev.to AGENTS.md article). Intents approved 2026-11-08; waits on a free slot (WIP 3/3), after the machine-setup P3.
 - 2026-11-08 late: Hermes P2 worker EXITED OK (not yet reviewed/landed): next Flash cross-vendor review (start --parent ... --role review), then Claude review + land. find-similar-docs rc 36 on M4 = SSH session can't use the login keychain (show-keychain-info also rc 36), not the item ACL; operator unlocking keychain; then confirm k3dm-embeddings-api-key non-empty, rerun search for the instruction-file P3 Prior-art line, and file the rc-36 hint P3 (hint: check show-keychain-info / unlock first, item access second).
 - [ ] P3 rc-36 hint skips the locked-keychain check: filed 2026-11-08, intents approved, waiting on a WIP slot.
-- [ ] Hermes P2 Flash review blocked: `--parent` limit 64 chars vs an 80-char slug; operator decision pending.
+- [x] Dispatch `--parent` limit raised to 120 (`68d991f3`).
+- [ ] Hermes P2 Flash review child running; then Claude review, land, trial table.
 - Shopping-cart retirement now conditional on twinkle app capacity (roadmap).
 - Next: Hermes values_branch P2 (blocks v1.43.15); Gemini-ask back to worker with Luna finding; control-node round 3 vm-test; intents for the two v1.44.0 plans pending.
 
