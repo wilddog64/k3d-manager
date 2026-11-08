@@ -84,7 +84,7 @@ Operator setup (run in Terminal.app):
 1. `make hermes-approvals-setup APPROVERS=<your Slack user ID>` creates and binds the KV namespace, creates or reuses the Keychain drain token and pushes it to the relay, and validates and pushes the approver allowlist.
    `ROTATE=1 make hermes-drain-token` rotates the drain token and syncs it to the relay.
 2. Commit `workers/slack-relay/wrangler.toml` if it changed, then run `make deploy-worker`.
-3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth`.
+3. In the Slack app, enable Interactivity with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/interactivity`, and register `/hermes-auth` with Request URL `https://k3dm-slack-relay.k3dm.workers.dev/slack/commands`, the same as every other slash command. Not the interactivity URL: a command sent there has no `payload`, the relay answers 400, and Slack reports "/hermes-auth failed because the app did not respond" (2026-11-08).
    It must be the app whose signing secret the relay holds (`SLACK_SIGNING_SECRET`, the slash-command app), and the
    `k3dm-slack-webhook` Keychain item must be an incoming webhook of that same app. Slack sends a button click to the
    app that posted the message: a card posted through another app's webhook (for example `k3dm-notices`) shows
