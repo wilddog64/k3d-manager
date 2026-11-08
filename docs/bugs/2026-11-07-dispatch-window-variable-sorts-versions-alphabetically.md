@@ -1,8 +1,10 @@
 # Bug: the Window dropdown on the Agent Dispatch and Agent Cost dashboards sorts releases alphabetically
 
-**Status:** OPEN — `0a00bb39` (`sort: 8`) is live but inert on Grafana 11.4.0 (upstream scenes defect, fixed in Grafana 11.5.0); data-side fix specced and dispatched 2026-11-07 (operator: "go ahead with sorting on our side")
+**Status:** LANDED — `210f4ea5` (Luna; Claude added the agent-audit reason for the two replaced assertions), 2026-11-07. Exporter emits k3dm_dispatch_window_order (1d, 7d, 30d, then releases by semver); both dashboards query query_result(sort_desc(k3dm_dispatch_window_order)) with sort 0. test_dispatch_metrics.py 193 passed (land run, after rebase), agent_dispatch_dashboard.bats 43/43
+**Fix commit:** `210f4ea5`
 **Priority:** P3 (cosmetic: the dropdown order is wrong, every option still works)
-**Waiting on:** fix running — since 2026-11-07
+**Waiting on:** live check — since 2026-11-07
+Live check (operator): make platform-ops from k3d-manager-v1.43.15, wait one exporter push, then the Window dropdown on Agent Dispatch and Agent Cost reads 1d, 7d, 30d, v1.43.15, v1.43.14, ... .
 **Fixed upstream in:** Grafana 11.5.0 (bundles `@grafana/scenes` 5.36.4, which has `a5f78bee`); hub runs 11.4.0
 **Severity:** low
 **Approval:** operator 2026-11-07: "go ahead, but don't forget the file a bug for it too"
