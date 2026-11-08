@@ -607,9 +607,13 @@ data:
           "options": {
             "xField": "date",
             "stacking": "normal",
-            "text": {
-              "valueSize": 14
-            }
+            "showValue": "never",
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
           }
         },
         {
@@ -765,9 +769,13 @@ data:
           "options": {
             "xField": "date",
             "stacking": "normal",
-            "text": {
-              "valueSize": 14
-            }
+            "showValue": "never",
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": -45,
+            "xTickLabelSpacing": 100
           }
         },
         {

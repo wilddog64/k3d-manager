@@ -623,11 +623,22 @@ from pathlib import Path
 text=(Path(sys.argv[1])/"grafana-dashboard-agent-cost.yaml").read_text()
 cost=json.loads("\n".join(x[4:] for x in text.split("  agent-cost.json: |\n",1)[1].splitlines()))
 by_id={p["id"]:p for p in cost["panels"]}
-daily=by_id[87]; gauge=by_id[88]
+p32=by_id[32]; daily=by_id[87]; gauge=by_id[88]
+assert p32["title"]=="Claude tokens per day" and p32["type"]=="barchart"
+assert p32["targets"][0]["expr"]=="sum by (date, model) (k3dm_dispatch_claude_daily_tokens)"
+assert p32["gridPos"]=={"h":8,"w":24,"x":0,"y":19}
+assert p32["options"]["stacking"]=="normal" and p32["options"]["xField"]=="date"
+assert "all token kinds including cache reads" in p32["description"]
 assert daily["title"]=="Claude tokens per day by kind" and daily["type"]=="barchart"
 assert daily["targets"][0]["expr"]=="sum by (date, kind) (k3dm_dispatch_claude_daily_tokens_by_kind)"
 assert daily["targets"][0]["legendFormat"]=="{{kind}}" and daily["gridPos"]=={"h":8,"w":24,"x":0,"y":35}
 assert daily["options"]["stacking"]=="normal" and "cache_read" in daily["description"] and "fraction" in daily["description"]
+for p in (p32, daily):
+  opt=p["options"]
+  assert opt["showValue"]=="never" and opt["tooltip"]=={"mode":"multi","sort":"desc"}
+  assert opt["xTickLabelRotation"]==-45 and opt["xTickLabelSpacing"]==100
+  assert opt.get("showValue") not in ("always","auto")
+  assert "text" not in opt or "valueSize" not in opt["text"]
 assert gauge["title"]=="Claude cost by kind" and gauge["type"]=="bargauge"
 assert gauge["targets"][0]["expr"]=='k3dm_dispatch_claude_api_cost_by_kind_usd{window="$window"}'
 assert gauge["targets"][0]["instant"] and gauge["targets"][0]["legendFormat"]=="{{kind}}"
@@ -657,7 +668,8 @@ assert sum(cost[i]["gridPos"]["w"] for i in (34,93,86,88))==24
 for i in (29,31):
   assert cost[i]["fieldConfig"]["defaults"]["noValue"]=="Release window only",i
 for i in (32,87):
-  assert cost[i]["options"]["text"]["valueSize"]>=14,i
+  if cost[i]["options"].get("showValue") != "never":
+    assert cost[i]["options"].get("text", {}).get("valueSize", 0) >= 14, i  # agent-audit: allow assert-removed valueSize guard made conditional on showValue, bug 2026-11-07-claude-tokens-per-day-chart-crowded-labels
 rename=[o for o in dispatch[85]["fieldConfig"]["overrides"] if o["matcher"]=={"id":"byName","options":"continue_prompt"}]
 assert rename and {"id":"displayName","value":"continue"} in rename[0]["properties"]
 assert dispatch[85]["options"]["namePlacement"]=="top"
