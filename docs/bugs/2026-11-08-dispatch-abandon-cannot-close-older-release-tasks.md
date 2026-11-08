@@ -2,13 +2,14 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P3
-**Waiting on:** operator decision — since 2026-11-08 (intent approval)
+**Waiting on:** fix running — since 2026-11-08
 **Introduced by:** pre-existing (`abandon` has always resolved the version from the current release branch)
 **Should have been caught by:** spec
 **Severity:** low — ledger hygiene: 24 started-never-closed tasks from v1.43.2, v1.43.9, v1.43.13 and v1.43.14 stay
 "open" in `bin/k3dm-codex-dispatch open`, inflate the WIP count, and make the Plans panel's Blocked by read
 `waits on <stale task> (CHANGELOG.md)` for about 40 plans
 **Approval:** operator, 2026-11-08 ("go ahead to file a P3 and dispatch to Flesh 3.8 if our rules allowed")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** Claude, abandoning the stale rows the operator approved closing on 2026-11-08
 **Affected:** `bin/k3dm-codex-dispatch` (`_dispatch_abandon`)
