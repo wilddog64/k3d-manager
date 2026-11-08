@@ -2,12 +2,13 @@
 
 **Status:** OPEN — filed 2026-11-08
 **Priority:** P2
-**Waiting on:** operator decision — since 2026-11-08
+**Waiting on:** dispatch — since 2026-11-08
 **Introduced by:** `897cfe72` (v1.43.15, hub deploy ref: ApplicationSets pin `deploy/hub`)
 **Should have been caught by:** spec
 **Severity:** high — one Approve click puts unpromoted release-branch code on the hub, and r9 is marked not reversible;
 workaround: Deny every r9 card
-**Approval:** pending
+**Approval:** operator, 2026-11-08 ("approved the intent")
+**Intent approved:** operator, 2026-11-08
 **Filed:** 2026-11-08
 **Detected by:** operator, Slack `k3dm-notices`, 2026-11-08 09:51 PST (screenshot: "values_branch: 20 apps (21 source
 refs) not on k3d-manager-v1.43.15: blackbox-exporter@deploy/hub, hub-grafana-dashboards@deploy/hub,
@@ -95,6 +96,7 @@ interface:
 
 ## Notes
 
+- Intents approved by the operator on 2026-11-08 ("approved the intent"). The operator pressed Deny on `r9-d9add2e2` the same day.
 - Until the fix lands: Deny every r9 card. Approving one undoes the promote gate for all hub apps.
 - No overlap with open dispatches (abandon P3: `bin/k3dm-codex-dispatch`; Gemini-ask: `agent.py`, `status.py`,
   `bin/k3dm-webhook`; control-node role: provision-homebrew). WIP is 3/3, so it waits for a slot.
