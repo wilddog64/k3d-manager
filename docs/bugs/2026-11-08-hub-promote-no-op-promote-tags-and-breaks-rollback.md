@@ -1,8 +1,8 @@
 # Bug: hub-promote tags a promote that moves nothing, and a later rollback goes nowhere; push failures all read "lease rejected"
 
-**Status:** OPEN — dispatched 2026-11-08: Luna implements, Gemini 3.8 Flash verifies from the Acceptance block
+**Status:** LANDED — `98942bdb` on `k3d-manager-v1.43.15` (2026-11-08); Claude review: added streaming of the push output through `tee` (Luna's version captured it, hiding the minutes-long pre-push gate); 25/25 `hub_promote.bats` outside the sandbox
 **Priority:** P2
-**Waiting on:** fix running — since 2026-11-08
+**Waiting on:** investigation — since 2026-11-08 (independent Flash verifier; launch needs operator permission)
 **Introduced by:** `897cfe72` (v1.43.15, deploy/hub ref with make hub-promote, hub-rollback and hub-promote-status)
 **Should have been caught by:** spec
 **Severity:** medium — `make hub-rollback`, the recovery lever, currently returns `deploy/hub` to the commit it is already on; the operator must roll back twice and may not notice. Workaround: run it twice.
