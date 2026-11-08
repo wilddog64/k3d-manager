@@ -15,3 +15,5 @@ New ideas land here first, as one line each. They are not plans, not bugs, and n
 
 | Added | Idea | Source | Status |
 |---|---|---|---|
+| 2026-11-06 | Travel with any one laptop (M2, M4 or the M5 hub) and everything still works unless there is no network. Today the platform needs the M5 awake at home, and some cross-machine paths use `.local` names that only resolve on the home LAN; new paths should not assume either. First piece is planned: [`v1.45.0-service-password-travel-bundle`](plans/v1.45.0-service-password-travel-bundle.md); roadmap open decisions D1 (reaching the hub away from home) and D2 (the M2 e2e runner while away). Packing the M5: it will not sleep (`SleepDisabled 1`), so heat and battery are the risk. | operator | inbox |
+| 2026-11-07 | Tailscale so any laptop can reach the hub (pull over ssh) from anywhere. Complements the travel bundle but needs the hub reachable; candidate answer to D1. | operator | inbox |
