@@ -113,9 +113,31 @@ output rates there when pricing changes. Models without an explicit entry remain
 - **Cached input** shows cached input tokens as a share of input tokens.
 - **Subscriptions / month** shows the fixed ChatGPT, Claude, Gemini, GitHub and Hostinger plan costs
   (Hostinger is $250 per two years, so $10.42 a month); only the ChatGPT plan pays for Codex.
-- **Ledger coverage** compares Codex sessions started in the selected time window with sessions
-  present in the dispatch ledger. It has no release-scope value; “outside the ledger” estimates the
-  cost of sessions missing from that ledger.
+- **Dispatch coverage (by cost)** measures the share of agent-run Codex spend recorded in the ledger:
+  `dispatch / (dispatch + dispatch_unrecorded + exec_untracked)`. Interactive work and guardian reviews
+  (assigned to their parents) are excluded from the denominator. This replaces the old "Ledger coverage"
+  stat; the old metric measured raw session counts (diluted by high-frequency guardian reviews) and is
+  not comparable. The legacy `k3dm_dispatch_codex_sessions` and `k3dm_dispatch_unledgered_api_cost_usd`
+  metrics are deprecated and will be removed in the next release.
+- **Codex spend by category** shows priced Codex spend (`k3dm_codex_api_cost_usd`) classified into
+  mutually exclusive categories:
+  - `dispatch`: session with a `codex_usage` ledger event.
+  - `dispatch_unrecorded`: worktree session (`cwd` under `K3DM_WORKTREE_ROOT`) with no `codex_usage` event.
+  - `interactive`: operator interactive session (`originator: codex-tui` outside worktree root).
+  - `exec_untracked`: raw CLI session (`originator: codex_exec` outside worktree root).
+  - `other`: any other session, including unreadable `session_meta`.
+  - `guardian`: guardian approval reviews (`thread_source: guardian_review`). A guardian review's tokens
+    and priced cost are assigned to its parent session (`parent_thread_id`) and that session's category
+    (and dispatched task when ledgered). When the parent is not in the scanned sessions or is itself a
+    guardian session, the review remains categorized as `guardian` with label `parent="missing"`.
+  - **Unpriced tokens**: models without a price row in `scripts/etc/agent/codex-model-prices.json` (such
+    as `codex-auto-review`) contribute $0 to priced cost and are exported as
+    `k3dm_codex_unpriced_tokens{window,model,kind}`. The panel notes "+ N unpriced tokens" beside the
+    dollar figure when unpriced tokens are present.
+- **Ledger gaps** displays the priced cost and session count of `dispatch_unrecorded` only. This is the
+  number the dispatch tooling should drive to zero.
+- **Spend outside dispatch** measures `(interactive + exec_untracked + other) / all_cost`, showing the
+  share of total spend sitting outside dispatched agent work so per-spec figures can be contextualized.
 - **By model** splits priced usage by model. Time windows count a session by when it started;
   **Projected / month** divides the 7d cost by the days actually observed, then scales to 30 days.
 - **Claude per landed spec** and **Claude tokens per landed spec** have values only when Window is a

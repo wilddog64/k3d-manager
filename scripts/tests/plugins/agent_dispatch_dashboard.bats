@@ -277,14 +277,14 @@ old=load(fixture,"agent-dispatch.json")
 files=(("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json"))
 new=[load(base/f,key) for f,key in files]; old_ids=[p["id"] for p in old["panels"]]
 all_ids=[p["id"] for d in new for p in d["panels"]]
-assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115]) and len(all_ids)==len(set(all_ids))
+assert sorted(all_ids)==sorted(old_ids+[14,15,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118]) and len(all_ids)==len(set(all_ids))
 assert set(p["id"] for p in new[0]["panels"])==set(range(1,16))|{40,41,84,85,89,90,91,92,101,103,104,105,106}|set(range(42,49))
-assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112}
+assert set(p["id"] for p in new[1]["panels"])=={19,20,21,22,23,24,25,27,28,29,30,31,32,34,86,87,88,93,94,95,96,97,98,107,108,109,110,111,112,116,117,118}
 assert set(p["id"] for p in new[2]["panels"])=={33,83,99,100,102,113,114,115}|set(range(35,40))|set(range(49,65))|set(range(66,72))
 print(f"ok: {len(all_ids)} panels, each exactly once")
 PY
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: 99 panels, each exactly once"* ]]
+  [[ "$output" == *"ok: 102 panels, each exactly once"* ]]
 }
 
 @test "agent dashboards: panel targets, fieldConfig and options match the pre-split fixture" {
@@ -297,7 +297,7 @@ def load(path,key):
 old=load(fixture,"agent-dispatch.json"); old_by_id={p["id"]:p for p in old["panels"]}
 for filename,key in (("grafana-dashboard-agent-dispatch.yaml","agent-dispatch.json"),("grafana-dashboard-agent-cost.yaml","agent-cost.json"),("grafana-dashboard-agent-activity.yaml","agent-activity.json")):
  for panel in load(base/filename,key)["panels"]:
-    if panel["id"] in (14,15,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115):
+    if panel["id"] in (14,15,24,34,47,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118):
       continue
     for field in ("targets","fieldConfig","options"):
       new,old_field=panel.get(field),old_by_id[panel["id"]].get(field)
@@ -822,22 +822,40 @@ PY
   [[ "$output" == *ok* ]]
 }
 
-@test "agent cost: existing panels are unchanged and new API panels do not overlap" {
+@test "agent cost: new attribution panels exist with exprs, unpriced note, no Ledger coverage, and no overlaps" {
   run python3 - "$BASE/grafana-dashboard-agent-cost.yaml" <<'PY'
-import json,subprocess,sys
+import json,sys
 from pathlib import Path
 path=Path(sys.argv[1]); text=path.read_text()
 def load(raw): return json.loads("\n".join(x[4:] for x in raw.split("  agent-cost.json: |\n",1)[1].splitlines()))
 current=load(text)
-base=load(subprocess.check_output(["git","show","HEAD:scripts/etc/argocd/platform-ops/grafana-dashboard-agent-cost.yaml"],text=True))
-old={p["id"]:p for p in base["panels"]}
-now={p["id"]:p for p in current["panels"]}
-assert set(old).issubset(now)
-for panel_id,panel in old.items():
-    assert now[panel_id]==panel,(panel_id,"existing panel changed")
-for i,a_panel in enumerate(current["panels"]):
+panels=current["panels"]
+by_title={p["title"]:p for p in panels}
+
+expected_titles=["Dispatch coverage (by cost)", "Codex spend by category", "Ledger gaps", "Spend outside dispatch"]
+for title in expected_titles:
+    assert title in by_title, f"missing panel: {title}"
+
+coverage=by_title["Dispatch coverage (by cost)"]
+assert coverage["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category="dispatch"}) / sum(k3dm_codex_api_cost_usd{window="$window",category=~"dispatch|dispatch_unrecorded|exec_untracked"})'
+
+spend=by_title["Codex spend by category"]
+assert spend["targets"][0]["expr"]=='sum by (category) (k3dm_codex_api_cost_usd{window="$window"})'
+assert spend["targets"][1]["expr"]=='sum by (model) (k3dm_codex_unpriced_tokens{window="$window"}) > 0'
+assert "unpriced" in spend["description"].lower()
+
+gaps=by_title["Ledger gaps"]
+assert gaps["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category="dispatch_unrecorded"})'
+assert gaps["targets"][1]["expr"]=='sum(k3dm_codex_sessions{window="$window",category="dispatch_unrecorded"})'
+
+outside=by_title["Spend outside dispatch"]
+assert outside["targets"][0]["expr"]=='sum(k3dm_codex_api_cost_usd{window="$window",category=~"interactive|exec_untracked|other"}) / sum(k3dm_codex_api_cost_usd{window="$window"})'
+
+assert not any(p["title"]=="Ledger coverage" for p in panels)
+
+for i,a_panel in enumerate(panels):
     a=a_panel["gridPos"]
-    for b_panel in current["panels"][i+1:]:
+    for b_panel in panels[i+1:]:
         b=b_panel["gridPos"]
         assert not (a["x"]<b["x"]+b["w"] and b["x"]<a["x"]+a["w"] and a["y"]<b["y"]+b["h"] and b["y"]<a["y"]+a["h"]),(a_panel["id"],b_panel["id"])
 print("ok")

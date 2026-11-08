@@ -1034,7 +1034,7 @@ def test_dispatch_dashboard_window_variable_and_release_link():
     assert window["sort"] == 0 and window["current"]["value"] == "7d"  # agent-audit: allow assert-removed label_values and sort 8 replaced by query_result(sort_desc) and sort 0, bug 2026-11-07-dispatch-window-variable-sorts-versions-alphabetically
     expressions = [target["expr"] for panel in dashboard["panels"]
                    for target in panel.get("targets", [])]
-    assert sum("$window" in expr for expr in expressions) == 94  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets
+    assert sum("$window" in expr for expr in expressions) == 98  # agent-audit: allow assert-removed includes the Claude context per turn panel expressions and adds its two time-window series targets, plus 4 cost attribution targets
     assert all('window="$window"' in expr for expr in expressions
                if any(metric in expr for metric in (
                    "k3dm_dispatch_landed", "k3dm_dispatch_land_attempts",
@@ -1311,8 +1311,11 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
     dashboard = load_dispatch_dashboard()
     by_title = {panel["title"]: panel for panel in dashboard["panels"]}
     titles = {"Codex at API prices", "Per landed spec", "Cached input", "Subscriptions / month",
-              "Ledger coverage", "By model", "Projected / month"}
+              "Dispatch coverage (by cost)", "By model", "Projected / month",
+              "Codex spend by category", "Ledger gaps", "Spend outside dispatch"}
+    # agent-audit: allow assert-removed Ledger coverage replaced by Dispatch coverage (by cost), Codex spend by category, Ledger gaps and Spend outside dispatch
     assert titles <= by_title.keys()
+    assert "Ledger coverage" not in by_title
     assert 'window="7d"' in by_title["Projected / month"]["targets"][0]["expr"]
     assert by_title["Projected / month"]["targets"][0]["expr"] == (
         'k3dm_dispatch_api_cost_usd{window="7d"} / '
@@ -1321,8 +1324,8 @@ def test_dashboard_has_cost_panels_and_nonoverlapping_layout():
         'k3dm_dispatch_claude_api_cost_observed_days{window="7d"} * 30')
     assert "by session start time" in by_title["Projected / month"]["description"]
     assert 'window="$window"' not in by_title["Projected / month"]["targets"][0]["expr"]
-    outside_override = next(item for item in by_title["Ledger coverage"]["fieldConfig"]["overrides"]
-                            if item["matcher"] == {"id": "byName", "options": "outside the ledger"})
+    outside_override = next(item for item in by_title["Ledger gaps"]["fieldConfig"]["overrides"]
+                            if item["matcher"] == {"id": "byName", "options": "cost"})
     properties = {prop["id"]: prop["value"] for prop in outside_override["properties"]}
     assert properties["unit"] == "currencyUSD"
     assert properties["decimals"] == 2
@@ -1371,9 +1374,13 @@ def test_by_model_target_is_instant_and_uses_model_legend():
 
 
 def test_ledger_coverage_targets_have_named_legends():
-    panel = next(panel for panel in load_dispatch_dashboard()["panels"] if panel["id"] == 24)
-    assert panel["targets"][0]["legendFormat"] == "in the ledger"
-    assert panel["targets"][1]["legendFormat"] == "outside the ledger"
+    # agent-audit: allow assert-removed Ledger coverage replaced with Ledger gaps and Codex spend by category
+    dashboard = load_dispatch_dashboard()
+    by_title = {p["title"]: p for p in dashboard["panels"]}
+    gaps = by_title["Ledger gaps"]
+    assert gaps["targets"][0]["legendFormat"] == "cost"
+    assert gaps["targets"][1]["legendFormat"] == "sessions"
+    assert "Ledger coverage" not in by_title
 
 
 @pytest.mark.external
@@ -3320,3 +3327,176 @@ def test_codex_quota_series_byte_identical_before_and_after(tmp_path):
     output = dispatch_metrics.render([], 0, now, prices={}, codex_home=home)
     assert 'k3dm_codex_quota_used_ratio{limit="primary",window_minutes="300"} 0.3' in output
     assert 'k3dm_codex_quota_used_ratio{limit="secondary",window_minutes="10080"} 0.4' in output
+
+
+def test_cost_attribution_coverage_and_guardian_assignment(tmp_path, monkeypatch):
+    now = int(time.time())
+    codex_home = tmp_path / "fake-codex"
+    worktree_root = tmp_path / "worktrees"
+    assert codex_home != Path.home() / ".codex"
+    assert worktree_root != Path.home() / ".local/share/k3d-manager/worktrees"
+    monkeypatch.setenv("K3DM_WORKTREE_ROOT", str(worktree_root))
+
+    rates = {
+        "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
+        "gpt-6-luna": {"input": 0.30, "cached_input": 0.03, "output": 1.50},
+    }
+    # Note: codex-auto-review is unpriced (not in rates).
+
+    def make_session(sid, started, originator, thread_source, parent_id, cwd, model, usage, prompt="SECRET PROMPT"):
+        folder = codex_home / "sessions/2026/11/01"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"rollout-{sid}.jsonl"
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))
+        meta_payload = {
+            "id": sid,
+            "timestamp": stamp,
+            "originator": originator,
+            "thread_source": thread_source,
+            "source": "exec" if originator == "codex_exec" else "tui",
+        }
+        if parent_id is not None:
+            meta_payload["parent_thread_id"] = parent_id
+        if cwd is not None:
+            meta_payload["cwd"] = str(cwd)
+        lines = [
+            json.dumps({"type": "session_meta", "payload": meta_payload}),
+            json.dumps({"type": "turn_context", "payload": {"model": model}}),
+            json.dumps({"type": "event_msg", "payload": {"user_prompt": prompt}}),
+        ]
+        if usage is not None:
+            lines.append(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {
+                "model": model, "total_token_usage": usage}}}))
+        path.write_text("\n".join(lines) + "\n")
+        os.utime(path, (started, started))
+
+    # 1. Dispatch session (in ledger, cwd under worktree root)
+    make_session("s_dispatch", now - 100, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-dispatch", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 2. Dispatch unrecorded session (not in ledger, cwd under worktree root)
+    make_session("s_unrecorded", now - 100, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-unrecorded", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 3. Interactive session (originator codex-tui, outside worktree root)
+    make_session("s_interactive", now - 100, "codex-tui", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 2_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 4. Exec untracked session (originator codex_exec, outside worktree root)
+    make_session("s_exec", now - 100, "codex_exec", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 5. Guardian session with dispatch parent (unpriced codex-auto-review)
+    make_session("g_dispatch_unpriced", now - 90, "codex_exec", "guardian_review", "s_dispatch",
+                 worktree_root / "v1.43.15/task-dispatch", "codex-auto-review",
+                 {"input_tokens": 500_000, "cached_input_tokens": 100_000, "output_tokens": 50_000})
+    # 6. Guardian session with dispatch parent (priced gpt-5.6-luna)
+    make_session("g_dispatch_priced", now - 90, "codex_exec", "guardian_review", "s_dispatch",
+                 worktree_root / "v1.43.15/task-dispatch", "gpt-5.6-luna",
+                 {"input_tokens": 100_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 7. Guardian session with interactive parent (priced gpt-5.6-luna)
+    make_session("g_interactive_priced", now - 80, "codex-tui", "guardian_review", "s_interactive",
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 200_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 8. Guardian session with missing parent (priced gpt-5.6-luna)
+    make_session("g_missing_parent", now - 70, "codex_exec", "guardian_review", "parent_not_scanned",
+                 worktree_root / "v1.43.15/task-other", "gpt-5.6-luna",
+                 {"input_tokens": 300_000, "cached_input_tokens": 0, "output_tokens": 0})
+    # 9. Other session (originator neither codex-tui nor codex_exec)
+    make_session("s_other", now - 60, "codex_vscode", "user", None,
+                 tmp_path / "other-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0})
+    corrupt_path = codex_home / "sessions/2026/11/01" / "rollout-s_corrupt.jsonl"
+    corrupt_path.write_text("not json at all\n")
+    os.utime(corrupt_path, (now - 60, now - 60))
+
+    total_sessions = 9
+
+    ledger = [
+        event(now - 95, "codex_usage", session="s_dispatch", model="gpt-5.6-luna",
+              input=1_000_000, cached_input=0, output=0)
+    ]
+
+    output = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+
+    # M1: each fixture session lands in exactly one category from session_meta alone,
+    # and k3dm_codex_sessions sums to the total session count
+    assert 'k3dm_codex_sessions{window="1d",category="dispatch"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="dispatch_unrecorded"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="guardian"} 4' in output
+    assert 'k3dm_codex_sessions{window="1d",category="interactive"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="exec_untracked"} 1' in output
+    assert 'k3dm_codex_sessions{window="1d",category="other"} 1' in output
+
+    session_metric_lines = [line for line in output.splitlines()
+                            if line.startswith('k3dm_codex_sessions{window="1d",category=')]
+    assert len(session_metric_lines) == 6
+    assert sum(int(line.split()[-1]) for line in session_metric_lines) == total_sessions
+
+    # M2 & N2: guardian assignment and costs
+    # Base costs (at $0.20 per 1M input tokens):
+    # s_dispatch: $0.20
+    # g_dispatch_priced (100k tokens = $0.02) added to dispatch -> dispatch = $0.22
+    # s_interactive: $0.40
+    # g_interactive_priced (200k tokens = $0.04) added to interactive -> interactive = $0.44
+    # s_unrecorded: $0.20
+    # s_exec: $0.20
+    # g_missing_parent: 300k tokens = $0.06 -> stays guardian with parent="missing"
+    # s_other: $0.00
+    # g_dispatch_unpriced: unpriced codex-auto-review -> $0.00
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch"} 0.22' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="interactive"} 0.44' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.2' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="exec_untracked"} 0.2' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="other"} 0' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="guardian",parent="missing"} 0.06' in output
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="guardian"} ' not in output  # N2: never counted twice
+
+    cost_lines = [line for line in output.splitlines()
+                  if line.startswith('k3dm_codex_api_cost_usd{window="1d",category=')]
+    total_priced = sum(float(line.split()[-1]) for line in cost_lines)
+    # Total priced = 0.22 + 0.44 + 0.20 + 0.20 + 0.00 + 0.06 = 1.12
+    assert total_priced == pytest.approx(1.12)
+
+    # M3: unpriced tokens of model with no price row appear in k3dm_codex_unpriced_tokens
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="input"} 500000' in output
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="cached_input"} 100000' in output
+    assert 'k3dm_codex_unpriced_tokens{window="1d",model="codex-auto-review",kind="output"} 50000' in output
+
+    # M4: coverage calculation: dispatch / (dispatch + dispatch_unrecorded + exec_untracked)
+    # Baseline dispatch = 0.22, dispatch_unrecorded = 0.20, exec_untracked = 0.20
+    # Base coverage = 0.22 / (0.22 + 0.20 + 0.20) = 0.22 / 0.62 = 0.354838...
+    # Adding interactive cost:
+    make_session("s_interactive_2", now - 50, "codex-tui", "user", None,
+                 tmp_path / "main-checkout", "gpt-5.6-luna",
+                 {"input_tokens": 5_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    output_interactive = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+    # Interactive cost increased:
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="interactive"} 1.44' in output_interactive
+    # But dispatch coverage by cost terms remain identical:
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch"} 0.22' in output_interactive
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.2' in output_interactive
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="exec_untracked"} 0.2' in output_interactive
+
+    # Adding dispatch_unrecorded cost:
+    make_session("s_unrecorded_2", now - 40, "codex_exec", "user", None,
+                 worktree_root / "v1.43.15/task-unrecorded-2", "gpt-5.6-luna",
+                 {"input_tokens": 1_000_000, "cached_input_tokens": 0, "output_tokens": 0})
+    output_unrecorded = dispatch_metrics.render(ledger, 0, now, prices=rates, codex_home=codex_home)
+    assert 'k3dm_codex_api_cost_usd{window="1d",category="dispatch_unrecorded"} 0.4' in output_unrecorded
+    # Denominator increases (0.22 / (0.22 + 0.40 + 0.20) = 0.22 / 0.82 < 0.22 / 0.62), lowering coverage
+
+    # M6: deprecated metrics still emitted with previous values
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="true"} 1' in output
+    # Non-ledgered sessions = 8 (s_unrecorded, s_interactive, s_exec, 4 guardians, s_other)
+    assert 'k3dm_dispatch_codex_sessions{window="1d",ledgered="false"} 8' in output
+    assert 'k3dm_dispatch_unledgered_api_cost_usd{window="1d"}' in output
+
+    # N1: no metric line or label contains a prompt, cwd, session ID or parent ID
+    assert "SECRET PROMPT" not in output
+    assert "s_dispatch" not in output
+    assert "s_interactive" not in output
+    assert "g_dispatch_unpriced" not in output
+    assert "parent_not_scanned" not in output
+    assert str(worktree_root) not in output
+    assert str(tmp_path) not in output

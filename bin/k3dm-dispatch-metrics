@@ -636,6 +636,7 @@ def _session_files(codex_home, now, repo_by_worktree=None):
             usage = None
             active = 0
             quota = None
+            originator = thread_source = parent_thread_id = cwd = None
             with open(name, encoding="utf-8") as stream:
                 for index, line in enumerate(stream):
                     try:
@@ -650,6 +651,9 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                             continue
                         session, start = payload.get("id"), payload.get("timestamp")
                         origin = payload.get("originator")
+                        originator = origin
+                        thread_source = payload.get("thread_source")
+                        parent_thread_id = payload.get("parent_thread_id")
                         mode = "exec" if origin == "codex_exec" else "interactive" if origin == "codex-tui" else "other"
                         cwd = payload.get("cwd")
                         repo = _worktree_repo(cwd, repo_by_worktree)
@@ -685,7 +689,9 @@ def _session_files(codex_home, now, repo_by_worktree=None):
                             model = payload["model"]
             if isinstance(session, str) and session and isinstance(start, str):
                 yield {"session": session, "start": start, "model": model, "usage": usage,
-                       "mode": mode or "other", "repo": repo or "other", "active": active, "quota": quota}
+                       "mode": mode or "other", "repo": repo or "other", "active": active, "quota": quota,
+                       "originator": originator, "cwd": cwd, "thread_source": thread_source,
+                       "parent_thread_id": parent_thread_id}
         except (OSError, ValueError, TypeError):
             continue
 
@@ -756,6 +762,33 @@ def _agy_cost(event, prices):
 
 def _root():
     return Path(os.environ.get("K3DM_WORKTREE_ROOT", "~/.local/share/k3d-manager/worktrees")).expanduser()
+
+
+def _is_under_worktree_root(cwd, root=None):
+    if not cwd or not isinstance(cwd, (str, Path)):
+        return False
+    try:
+        wt_root = (Path(root) if root else _root()).resolve()
+        cwd_path = Path(cwd).expanduser().resolve()
+        return cwd_path == wt_root or cwd_path.is_relative_to(wt_root)
+    except (ValueError, OSError, RuntimeError):
+        return False
+
+
+def _classify_session(session_item, ledgered, wt_root=None):
+    if session_item.get("thread_source") == "guardian_review":
+        return "guardian"
+    if session_item.get("session") in ledgered:
+        return "dispatch"
+    cwd = session_item.get("cwd")
+    if _is_under_worktree_root(cwd, wt_root):
+        return "dispatch_unrecorded"
+    origin = session_item.get("originator")
+    if origin == "codex-tui":
+        return "interactive"
+    if origin == "codex_exec":
+        return "exec_untracked"
+    return "other"
 
 
 def _display_path(path):
@@ -1733,6 +1766,7 @@ def _render_scope(lines, window, metrics, events=None, prices=None, coverage=Non
         unledgered = [item for item in in_window if item["session"] not in ledgered]
         cost = sum(_cost(_coverage_event(item), prices or {}) or 0 for item in unledgered)
         lines.append(f'k3dm_dispatch_unledgered_api_cost_usd{{window="{window}"}} {cost}')
+        _render_cost_attribution(lines, window, in_window, coverage, ledgered, prices)
     if claude_records is not None:
         all_tasks = []
         scoped_tasks = []
@@ -1806,6 +1840,70 @@ def _render_cost(lines, window, usage, landed, prices):
     if total:
         lines.append(f'k3dm_dispatch_cached_input_ratio{{window="{window}"}} {cached / total}')
     lines.append(f'k3dm_dispatch_api_cost_unpriced_sessions{{window="{window}"}} {len(unpriced_sessions)}')
+
+
+def _render_cost_attribution(lines, window, in_window, all_scanned_list, ledgered, prices):
+    categories = ("dispatch", "dispatch_unrecorded", "guardian", "interactive", "exec_untracked", "other")
+    session_counts = {c: 0 for c in categories}
+    category_costs = {c: 0.0 for c in ("dispatch", "dispatch_unrecorded", "interactive", "exec_untracked", "other")}
+    guardian_missing_cost = 0.0
+    has_missing_guardian = False
+    unpriced_tokens = defaultdict(lambda: {"input": 0, "cached_input": 0, "output": 0})
+
+    all_scanned = {item["session"]: item for item in (all_scanned_list or []) if item.get("session")}
+
+    for item in in_window:
+        cat = _classify_session(item, ledgered)
+        session_counts[cat] += 1
+
+        usage = item.get("usage") or {}
+        inp = int(usage.get("input_tokens") or 0)
+        cached = int(usage.get("cached_input_tokens") or 0)
+        out = int(usage.get("output_tokens") or 0)
+        model = item.get("model")
+        if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", model):
+            model = "unknown"
+
+        rates = (prices or {}).get(model)
+        if isinstance(rates, dict):
+            cost = _cost({"model": model, "input": inp, "cached_input": cached, "output": out}, prices or {}) or 0.0
+        else:
+            cost = 0.0
+            if inp or cached or out:
+                unpriced_tokens[model]["input"] += inp
+                unpriced_tokens[model]["cached_input"] += cached
+                unpriced_tokens[model]["output"] += out
+
+        if cat != "guardian":
+            category_costs[cat] += cost
+        else:
+            parent_id = item.get("parent_thread_id")
+            parent = all_scanned.get(parent_id) if parent_id else None
+            if parent is None or parent.get("thread_source") == "guardian_review":
+                has_missing_guardian = True
+                guardian_missing_cost += cost
+            else:
+                parent_cat = _classify_session(parent, ledgered)
+                category_costs[parent_cat] += cost
+
+    def _fmt_cost(val):
+        rounded = round(val, 6)
+        if abs(rounded) < 1e-9:
+            return "0"
+        return f"{rounded:g}"
+
+    for cat in categories:
+        lines.append(f'k3dm_codex_sessions{{window="{window}",category="{cat}"}} {session_counts[cat]}')
+
+    for cat in ("dispatch", "dispatch_unrecorded", "interactive", "exec_untracked", "other"):
+        lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",category="{cat}"}} {_fmt_cost(category_costs[cat])}')
+    if has_missing_guardian or guardian_missing_cost > 0:
+        lines.append(f'k3dm_codex_api_cost_usd{{window="{window}",category="guardian",parent="missing"}} {_fmt_cost(guardian_missing_cost)}')
+
+    for model, kinds in sorted(unpriced_tokens.items()):
+        for kind in ("input", "cached_input", "output"):
+            lines.append(f'k3dm_codex_unpriced_tokens{{window="{window}",model="{model}",kind="{kind}"}} {kinds[kind]}')
+
 
 def _activity_metrics(lines, events, files, now, prices):
     associated = {e.get("session") for e in events if e.get("event") == "codex_usage"}
