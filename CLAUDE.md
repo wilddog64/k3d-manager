@@ -19,6 +19,8 @@ Uses a dispatcher pattern with lazy plugin loading.
   capture, the upstream source at the deployed tag, or a live probe, with host, date and version beside
   it. Offline tests share the spec's assumption and cannot catch a wrong one. Precedents: `sort: 8` on
   Grafana 11.4.0, which bundles a scenes version that ignores it; the invented `byRefId` matcher.
+- **Ideas inbox (operator, 2026-11-07).** A new feature idea goes in `docs/ideas.md` as one row, not a plan or a
+  dispatch. At each release cut (`/post-merge`), list the inbox and let the operator pick what to promote into plans.
 - **Dispatch WIP limit and P3 batching (operator, 2026-11-07).** At most 3 dispatches open at once
   (running, or exited and not yet landed), and at most one open dispatch per file. A spec touching a file
   that an open dispatch edits waits, or is folded into the next dispatch for that file. P0 and P1 may exceed
