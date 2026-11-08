@@ -76,12 +76,15 @@ For each trial dispatch, recorded in the table below:
   verifier, live).
 - **Noise:** cross-review findings Claude rejected.
 - **Cost:** extra agent runs and roughly how long they took.
+- **Tokens:** total for the land: worker runs (the `tokens used` line of each codex log), review children,
+  spec-review subagents and every rework round (operator, 2026-11-08). The question it answers: tokens per land that
+  needed no rework, against the baseline.
 
 The baseline is 2026-11-08: 5 of 5 lands needed rework, and every defect was caught at Claude review or later.
 
-| Dispatch | Worker | Reviewer | Rework rounds | Caught by (defect → step) | Noise | Notes |
-|---|---|---|---|---|---|---|
-| | | | | | | |
+| Dispatch | Worker | Reviewer | Rework rounds | Caught by (defect → step) | Noise | Tokens (worker + reviews + rework) | Notes |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
 
 ## Open points
 
