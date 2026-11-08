@@ -89,6 +89,8 @@ Operator setup (run in Terminal.app):
    `k3dm-slack-webhook` Keychain item must be an incoming webhook of that same app. Slack sends a button click to the
    app that posted the message: a card posted through another app's webhook (for example `k3dm-notices`) shows
    "This app is not configured to handle interactive responses" (operator, 2026-11-08).
+   Since 2026-11-08 the item holds a `k3d-manager` app webhook for `#grafana-notification`; a webhook URL carries
+   its channel, so a rebuild that creates a new one must pick that channel.
 4. The LaunchAgent template sets `K3DM_HERMES_APPROVAL_DRAIN_URL`. Approvals turn on once the drain token is in the Keychain (step 1). Run `bin/k3dm-hermes-setup` to re-render the agent after pulling this change.
 
 `APPROVERS` takes Slack member IDs, not emails: comma-separated with no spaces, each beginning with `U` or `W`.
